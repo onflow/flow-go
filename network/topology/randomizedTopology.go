@@ -26,7 +26,10 @@ type RandomizedTopology struct {
 }
 
 // NewRandomizedTopology returns an instance of the RandomizedTopology.
-func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgeProb float64, state protocol.State,
+func NewRandomizedTopology(nodeID flow.Identifier,
+	logger zerolog.Logger,
+	edgeProb float64,
+	state protocol.State,
 	subMngr network.SubscriptionManager) (*RandomizedTopology, error) {
 	// edge probability should be a positive value between 0 and 1. However,
 	// we like it to be strictly greater than zero. Also, at the current scale of
@@ -51,7 +54,7 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 		subMngr:    subMngr,
 		chance:     uint64(100 * edgeProb),
 		rng:        rng,
-		logger:     logger.With().Str("component:", "topic-based-topology").Logger(),
+		logger:     logger.With().Str("component:", "randomized-topology").Logger(),
 	}
 
 	return t, nil
@@ -69,6 +72,7 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 		// no subscribed channel id, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
+		r.logger.Warn().Msg("skips generating fanout with no subscribed channels")
 		return flow.IdentityList{}, nil
 	}
 
@@ -86,6 +90,9 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 	if len(myFanout) == 0 {
 		return nil, fmt.Errorf("topology size reached zero")
 	}
+	r.logger.Debug().
+		Int("fanout_size", len(myFanout)).
+		Msg("fanout successfully generated")
 	return myFanout, nil
 }
 
