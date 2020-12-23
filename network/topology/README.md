@@ -18,5 +18,5 @@ as the node itself, e.g., fanout set of the red node is illustrated using red ed
 every node has a fanout size of 3. 
 
 <p align="center">
-  <img src="topology.svg" alt="drawing" width="200"/>
+  <img src="topology.svg" alt="drawing" width="500"/>
 </p>
