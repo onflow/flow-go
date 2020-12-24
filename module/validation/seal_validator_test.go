@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	mock2 "github.com/onflow/flow-go/module/mock"
@@ -42,7 +43,7 @@ func (s *SealValidationSuite) TestSealValid() {
 	s.Extend(&blockParent)
 
 	block := unittest.BlockWithParentFixture(blockParent.Header)
-	seal := s.ValidSealForResult(&receipt.ExecutionResult)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
 	block.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
@@ -50,7 +51,131 @@ func (s *SealValidationSuite) TestSealValid() {
 	_, err := s.sealValidator.Validate(&block)
 
 	s.Require().NoError(err)
+}
 
+func (s *SealValidationSuite) TestSealInvalidBlockID() {
+	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+	)
+	blockParent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receipt},
+	})
+
+	s.Extend(&blockParent)
+
+	block := unittest.BlockWithParentFixture(blockParent.Header)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	seal.BlockID = unittest.IdentifierFixture()
+	block.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	_, err := s.sealValidator.Validate(&block)
+
+	s.Require().Error(err)
+	s.Require().True(st.IsInvalidExtensionError(err))
+}
+
+func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
+	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+	)
+	blockParent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receipt},
+	})
+
+	s.Extend(&blockParent)
+
+	block := unittest.BlockWithParentFixture(blockParent.Header)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	seal.AggregatedApprovalSigs = seal.AggregatedApprovalSigs[1:]
+	block.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	_, err := s.sealValidator.Validate(&block)
+
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err))
+}
+
+func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
+	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+	)
+	blockParent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receipt},
+	})
+
+	s.Extend(&blockParent)
+
+	block := unittest.BlockWithParentFixture(blockParent.Header)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	seal.AggregatedApprovalSigs[0].SignerIDs = seal.AggregatedApprovalSigs[0].SignerIDs[1:]
+	block.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	_, err := s.sealValidator.Validate(&block)
+
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err))
+}
+
+func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
+	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+	)
+	blockParent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receipt},
+	})
+
+	s.Extend(&blockParent)
+
+	block := unittest.BlockWithParentFixture(blockParent.Header)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	seal.AggregatedApprovalSigs[0].VerifierSignatures = seal.AggregatedApprovalSigs[0].VerifierSignatures[1:]
+	block.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	_, err := s.sealValidator.Validate(&block)
+
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err))
+}
+
+func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
+	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+	)
+	blockParent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receipt},
+	})
+
+	s.Extend(&blockParent)
+
+	block := unittest.BlockWithParentFixture(blockParent.Header)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	seal.AggregatedApprovalSigs[0].SignerIDs[0] = unittest.IdentifierFixture()
+	block.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	_, err := s.sealValidator.Validate(&block)
+
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err))
 }
 
 // Test that Validate will pick the seal corresponding to the highest block when
@@ -72,8 +197,8 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	})
 	s.Extend(&block4)
 
-	seal2 := s.ValidSealForResult(&block2Receipt.ExecutionResult)
-	seal3 := s.ValidSealForResult(&block3Receipt.ExecutionResult)
+	seal2 := s.validSealForResult(&block2Receipt.ExecutionResult)
+	seal3 := s.validSealForResult(&block3Receipt.ExecutionResult)
 
 	// include the seals in block5
 	block5 := unittest.BlockWithParentFixture(block4.Header)
@@ -115,7 +240,7 @@ func (s *SealValidationSuite) TestExtendSealNotConnected() {
 	// Insert block4 with a seal for block 2. Note that there is no seal
 	// for block1. The block should be rejected because it contains a seal
 	// that breaks the chain.
-	block2Seal := s.ValidSealForResult(&block2Receipt.ExecutionResult)
+	block2Seal := s.validSealForResult(&block2Receipt.ExecutionResult)
 
 	block4 := unittest.BlockWithParentFixture(block3.Header)
 	block4.SetPayload(flow.Payload{
@@ -285,7 +410,7 @@ func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 	})
 }
 
-func (s *SealValidationSuite) ValidSealForResult(result *flow.ExecutionResult) *flow.Seal {
+func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *flow.Seal {
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(result))
 
 	assignment := s.Assignments[result.ID()]

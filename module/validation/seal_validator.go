@@ -196,11 +196,6 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 }
 
 func (s *sealValidator) validateSeal(seal *flow.Seal, executionResult *flow.ExecutionResult) error {
-	if executionResult.BlockID != seal.BlockID {
-		return engine.NewInvalidInputErrorf("invalid blockID for seal, expected: %v got: %v",
-			executionResult.BlockID, seal.BlockID)
-	}
-
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {
 		return engine.NewInvalidInputErrorf("mismatching signatures, expected: %d, got: %d",
 			executionResult.Chunks.Len(),
