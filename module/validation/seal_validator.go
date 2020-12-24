@@ -202,14 +202,14 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, executionResult *flow.Exec
 			len(seal.AggregatedApprovalSigs))
 	}
 
-	assignemnts, err := s.assigner.Assign(executionResult, seal.BlockID)
+	assignments, err := s.assigner.Assign(executionResult, seal.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not retreive assignments for block: %v, %w", seal.BlockID, err)
 	}
 
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := seal.AggregatedApprovalSigs[chunk.Index]
-		assignedVerifiers := assignemnts.Verifiers(chunk)
+		assignedVerifiers := assignments.Verifiers(chunk)
 		lenSignerIds := len(chunkSigs.SignerIDs)
 		if lenSignerIds != assignedVerifiers.Len() {
 			return engine.NewInvalidInputErrorf("mismatched signature ids length %d vs %d",
@@ -223,7 +223,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, executionResult *flow.Exec
 		}
 
 		for _, signerId := range chunkSigs.SignerIDs {
-			if !assignemnts.HasVerifier(chunk, signerId) {
+			if !assignments.HasVerifier(chunk, signerId) {
 				return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
 			}
 		}
