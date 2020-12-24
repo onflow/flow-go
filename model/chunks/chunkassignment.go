@@ -24,6 +24,16 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 	return v
 }
 
+// Verifiers returns the list of verifier nodes assigned to a chunk
+func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) bool {
+	for id := range a.table[chunk.Index] {
+		if id == identifier {
+			return true
+		}
+	}
+	return false
+}
+
 // Add records the list of verifier nodes as the assigned verifiers of the chunk
 // it returns an error if the list of verifiers is empty or contains duplicate ids
 func (a *Assignment) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {

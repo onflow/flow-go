@@ -57,9 +57,9 @@ func (v *receiptValidator) ensureStakedNodeWithRole(identity *flow.Identity, exp
 // Error returns:
 //   * sentinel engine.InvalidInputError is nodeID is NOT an authorized member of the network
 //   * generic error indicating a fatal internal problem
-func (v *receiptValidator) identityForNode(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
+func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	// get the identity of the origin node
-	identity, err := v.state.AtBlockID(blockID).Identity(nodeID)
+	identity, err := state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return nil, engine.NewInvalidInputErrorf("unknown node identity: %w", err)
@@ -159,7 +159,7 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
 // 	* execution result has a valid parent
 // Returns nil if all checks passed successfully
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
-	identity, err := v.identityForNode(receipt.ExecutionResult.BlockID, receipt.ExecutorID)
+	identity, err := identityForNode(v.state, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
 		return err
 	}
