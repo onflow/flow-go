@@ -85,6 +85,7 @@ func main() {
 		conMetrics       module.ConsensusMetrics
 		mainMetrics      module.HotstuffMetrics
 		receiptValidator module.ReceiptValidator
+		assignment       *chmodule.PublicAssignment
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -115,8 +116,15 @@ func main() {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
 
-			signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results, signatureVerifier)
+			assignment, err = chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
+			if err != nil {
+				return fmt.Errorf("could not create public assignment: %w", err)
+			}
+
+			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
+				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
+				node.Storage.Seals, assignment, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -125,6 +133,7 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 				receiptValidator,
+				sealValidator,
 			)
 			return err
 		}).
@@ -198,11 +207,6 @@ func main() {
 				return nil, err
 			}
 
-			assigner, err := chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
-			if err != nil {
-				return nil, fmt.Errorf("could not create public assignment: %w", err)
-			}
-
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -220,7 +224,7 @@ func main() {
 				receipts,
 				approvals,
 				seals,
-				assigner,
+				assignment,
 				receiptValidator,
 				requireOneApproval,
 			)
