@@ -26,11 +26,14 @@ func TestStateInteractionsInsertCheckRetrieve(t *testing.T) {
 		})
 
 		// some set and reads
-		d1.Set(string([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;")), "", "", []byte("zażółć gęślą jaźń"))
-		d1.Set(string([]byte{2}), "", "", []byte("b"))
-		d1.Set(string([]byte{2}), "", "", []byte("c"))
+		err := d1.Set(string([]byte("\x89krg\u007fBN\x1d\xf5\xfb\xb8r\xbc4\xbd\x98ռ\xf1\xd0twU\xbf\x16N\xb4?,\xa0&;")), "", "", []byte("zażółć gęślą jaźń"))
+		require.NoError(t, err)
+		err = d1.Set(string([]byte{2}), "", "", []byte("b"))
+		require.NoError(t, err)
+		err = d1.Set(string([]byte{2}), "", "", []byte("c"))
+		require.NoError(t, err)
 
-		_, err := d1.Get(string([]byte{2}), "", "")
+		_, err = d1.Get(string([]byte{2}), "", "")
 		require.NoError(t, err)
 		_, err = d1.Get(string([]byte{3}), "", "")
 		require.NoError(t, err)

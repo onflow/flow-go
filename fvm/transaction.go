@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
@@ -12,14 +11,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const TopShotContractAddress = "0b2a3299cc857e29"
-
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
 		ID:          tx.ID(),
 		Transaction: tx,
 		TxIndex:     txIndex,
 	}
+}
+
+type TransactionProcessor interface {
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State) error
 }
 
 type TransactionProcedure struct {
@@ -33,13 +34,9 @@ type TransactionProcedure struct {
 	Err     Error
 }
 
-type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, state.Ledger) error
-}
-
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, ledger)
+		err := p.Process(vm, ctx, proc, st)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -68,9 +65,9 @@ func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, ledger)
+	env, err := newEnvironment(ctx, st)
 	if err != nil {
 		return err
 	}
@@ -85,6 +82,14 @@ func (i *TransactionInvocator) Process(
 		return err
 	}
 
+	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
+
+	// commit changes
+	err = st.Commit()
+	if err != nil {
+		return err
+	}
+
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()
 
@@ -96,17 +101,17 @@ func (i *TransactionInvocator) Process(
 // checking failures in this contract indicate the unexpected computation happening.
 // This is a temporary measure.
 func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
-	fmt.Println("ERROR", err)
 	e := err.Error()
-	if strings.Contains(e, TopShotContractAddress) && strings.Contains(e, "checking") {
+	i.logger.Info().Str("error", e).Msg("TEMP LOGGING: Cadence Execution ERROR")
+	if strings.Contains(e, "checking") {
 		re, isRuntime := err.(runtime.Error)
 		if !isRuntime {
-			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not RuntimeError")
+			i.logger.Err(err).Msg("found checking error for a contract but exception is not RuntimeError")
 			return
 		}
 		ee, is := re.Err.(*runtime.ParsingCheckingError)
 		if !is {
-			i.logger.Err(err).Msg("found checking error for TopShot contract but exception is not ExtendedParsingCheckingError")
+			i.logger.Err(err).Msg("found checking error for a contract but exception is not ExtendedParsingCheckingError")
 			return
 		}
 
@@ -115,6 +120,6 @@ func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
 		spew.Config.DisableMethods = true
 		dump := spew.Sdump(ee)
 
-		i.logger.Error().Str("extended_error", dump).Msg("TopShot contract checking failed")
+		i.logger.Error().Str("extended_error", dump).Msg("contract checking failed")
 	}
 }
