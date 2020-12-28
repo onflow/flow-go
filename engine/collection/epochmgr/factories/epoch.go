@@ -1,8 +1,8 @@
 package factories
 
 import (
-	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state/cluster/badger"
 
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/module"
@@ -96,24 +96,18 @@ func (factory *EpochComponentsFactory) Create(
 		payloads storage.ClusterPayloads
 		blocks   storage.ClusterBlocks
 	)
-	state, headers, payloads, blocks, err = factory.state.Create(cluster.ChainID())
+
+	stateRoot, err := badger.NewStateRoot(cluster.ChainID(), cluster.RootBlock())
+	if err != nil {
+		err = fmt.Errorf("could not create valid state root: %w", err)
+		return
+	}
+	var mutableState *badger.MutableState
+	mutableState, headers, payloads, blocks, err = factory.state.Create(stateRoot)
+	state = mutableState
 	if err != nil {
 		err = fmt.Errorf("could not create cluster state: %w", err)
 		return
-	}
-	_, err = state.Final().Head()
-	// storage layer error while checking state - fail fast
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		err = fmt.Errorf("could not check cluster state db: %w", err)
-		return
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		// no existing cluster state, bootstrap with root block for epoch
-		err = state.Mutate().Bootstrap(cluster.RootBlock())
-		if err != nil {
-			err = fmt.Errorf("could not bootstrap cluster state: %w", err)
-			return
-		}
 	}
 
 	// get the transaction pool for the epoch
@@ -125,7 +119,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	proposalEng, err := factory.proposal.Create(state, headers, payloads)
+	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return
