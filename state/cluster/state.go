@@ -1,7 +1,7 @@
 package cluster
 
 import (
-	clustermodel "github.com/onflow/flow-go/model/cluster"
+	cluster "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -34,5 +34,5 @@ type MutableState interface {
 	State
 	// Extend introduces the given block into the cluster state as a pending
 	// without modifying the current finalized state.
-	Extend(candidate *clustermodel.Block) error
+	Extend(candidate *cluster.Block) error
 }
