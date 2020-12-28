@@ -3,7 +3,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/storage/badger/procedure"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 type State struct {

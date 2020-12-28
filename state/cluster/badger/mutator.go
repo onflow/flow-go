@@ -3,13 +3,13 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/module"
 	"math"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"

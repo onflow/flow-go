@@ -2,7 +2,9 @@ package factories
 
 import (
 	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/module"
 	clusterkv "github.com/onflow/flow-go/state/cluster/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"

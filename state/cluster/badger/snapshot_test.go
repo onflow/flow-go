@@ -63,6 +63,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
 	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.Assert().Nil(err)
 
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)
