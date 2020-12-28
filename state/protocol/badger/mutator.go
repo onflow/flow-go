@@ -334,7 +334,7 @@ func (m *MutableState) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	lastSeal, err := m.sealValidator.Validate(candidate)
 
 	if err != nil {
-		return nil, fmt.Errorf("seal validation error: %w", err)
+		return nil, state.NewInvalidExtensionErrorf("seal validation error: %w", err)
 	}
 
 	return lastSeal, nil

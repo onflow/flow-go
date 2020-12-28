@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/engine"
@@ -97,7 +96,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		byBlock[seal.BlockID] = seal
 	}
 	if len(payload.Seals) != len(byBlock) {
-		return nil, state.NewInvalidExtensionErrorf("multiple seals for the same block")
+		return nil, engine.NewInvalidInputError("multiple seals for the same block")
 	}
 
 	// incorporatedResults collects the _first_ appearance of unsealed execution
@@ -163,7 +162,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		blockID := blockIDs[i]
 		seal, found := byBlock[blockID]
 		if !found {
-			return nil, state.NewInvalidExtensionErrorf("chain of seals broken (missing: %x)", blockID)
+			return nil, engine.NewInvalidInputErrorf("chain of seals broken (missing: %x)", blockID)
 		}
 
 		delete(byBlock, blockID)
@@ -171,14 +170,14 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		// check if we have an incorporatedResult for this seal
 		incorporatedResult, ok := incorporatedResults[seal.ResultID]
 		if !ok {
-			return nil, state.NewInvalidExtensionErrorf("seal %x does not correspond to a result on this fork", seal.ID())
+			return nil, engine.NewInvalidInputErrorf("seal %x does not correspond to a result on this fork", seal.ID())
 		}
 
 		// check the integrity of the seal
 		err := s.validateSeal(seal, incorporatedResult.Result)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
-				return nil, state.NewInvalidExtensionErrorf("payload includes invalid seal (%x), %w", seal.ID(), err)
+				return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
 			}
 
 			return nil, fmt.Errorf("unexpected seal validation error %w", err)
@@ -189,7 +188,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 
 	// at this point no seals should be left
 	if len(byBlock) > 0 {
-		return nil, state.NewInvalidExtensionErrorf("not all seals connected to state (left: %d)", len(byBlock))
+		return nil, engine.NewInvalidInputErrorf("not all seals connected to state (left: %d)", len(byBlock))
 	}
 
 	return last, nil

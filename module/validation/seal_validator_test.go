@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	mock2 "github.com/onflow/flow-go/module/mock"
-	st "github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -75,7 +74,7 @@ func (s *SealValidationSuite) TestSealInvalidBlockID() {
 	_, err := s.sealValidator.Validate(&block)
 
 	s.Require().Error(err)
-	s.Require().True(st.IsInvalidExtensionError(err))
+	s.Require().True(engine.IsInvalidInputError(err))
 }
 
 func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
@@ -250,7 +249,7 @@ func (s *SealValidationSuite) TestExtendSealNotConnected() {
 	_, err := s.sealValidator.Validate(&block4)
 
 	require.Error(s.T(), err)
-	require.True(s.T(), st.IsInvalidExtensionError(err), err)
+	require.True(s.T(), engine.IsInvalidInputError(err), err)
 
 	//// verify seal not indexed
 	//var sealID flow.Identifier
@@ -295,7 +294,7 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 		// we expect an error because block 4 contains a seal that is
 		// already contained in another block on the fork
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 
 	// B <- B1 <- B2{R(B1)} <- B3{S(R(B1)), S(R(B1))}
@@ -311,7 +310,7 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 		// we expect an error because block 3 contains duplicate seals
 		// within its payload
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 }
 
@@ -340,7 +339,7 @@ func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 		// we expect an error because there is no block on the fork that
 		// contains a receipt committing to block1
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 
 	// B-->B1-->B2{ER1a}-->B3{Seal(ER1b)}
@@ -371,7 +370,7 @@ func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 		// we expect an error because there is no block on the fork that
 		// contains a receipt committing to the seal's result
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 
 	// B-->B1-->B2-->B4{Seal(ER1)}
@@ -406,7 +405,7 @@ func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 		// we expect an error because there is no block on the fork that
 		// contains a receipt committing to the seal's result
 		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
+		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 }
 

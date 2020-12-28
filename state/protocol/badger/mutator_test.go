@@ -1358,6 +1358,73 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 	})
 }
 
+func TestExtendInvalidSealsInBlock(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := storeutil.StorageLayer(t, db)
+
+		// create a event consumer to test epoch transition events
+		distributor := events.NewDistributor()
+		consumer := new(mockprotocol.Consumer)
+		distributor.AddConsumer(consumer)
+
+		block, result, seal := unittest.BootstrapFixture(participants)
+		stateRoot, err := protocol.NewStateRoot(block, result, seal, 0)
+		require.NoError(t, err)
+
+		state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+
+		block1 := unittest.BlockWithParentFixture(block.Header)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+
+		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{block1Receipt},
+		})
+
+		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{block1Seal},
+		})
+
+		sealValidator := &mock2.SealValidator{}
+		sealValidator.On("Validate", mock.Anything).
+			Return(func(candidate *flow.Block) *flow.Seal {
+				if candidate.ID() == block3.ID() {
+					return nil
+				}
+				seal, _ := seals.ByBlockID(candidate.Header.ParentID)
+				return seal
+			}, func(candidate *flow.Block) error {
+				if candidate.ID() == block3.ID() {
+					return engine.NewInvalidInputError("")
+				}
+				_, err := seals.ByBlockID(candidate.Header.ParentID)
+				return err
+			}).
+			Times(3)
+
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer,
+			util.MockReceiptValidator(), sealValidator)
+		require.NoError(t, err)
+
+		err = fullState.Extend(&block1)
+		require.NoError(t, err)
+		err = fullState.Extend(&block2)
+		require.NoError(t, err)
+		err = fullState.Extend(&block3)
+
+		sealValidator.AssertExpectations(t)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
+	})
+}
+
 func TestHeaderExtendValid(t *testing.T) {
 	stateRoot := fixtureStateRoot(t)
 	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.FollowerState) {
