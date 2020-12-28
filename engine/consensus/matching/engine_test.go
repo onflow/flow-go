@@ -14,8 +14,10 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
+	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,8 +56,8 @@ func TestMatchingEngine(t *testing.T) {
 type MatchingSuite struct {
 	unittest.BaseChainSuite
 	// misc SERVICE COMPONENTS which are injected into Matching Engine
-	requester        *module.Requester
-	receiptValidator *module.ReceiptValidator
+	requester        *mockmodule.Requester
+	receiptValidator *mockmodule.ReceiptValidator
 
 	// MATCHING ENGINE
 	matching *Engine
@@ -70,30 +72,30 @@ func (ms *MatchingSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
-	ms.requester = new(module.Requester)
-	ms.receiptValidator = &module.ReceiptValidator{}
+	ms.requester = new(mockmodule.Requester)
+	ms.receiptValidator = &mockmodule.ReceiptValidator{}
 
 	ms.matching = &Engine{
-		unit:                    unit,
-		log:                     log,
-		engineMetrics:           metrics,
-		mempool:                 metrics,
-		metrics:                 metrics,
-		state:                   ms.State,
-		receiptRequester:        ms.requester,
-		resultsDB:               ms.ResultsDB,
-		headersDB:               ms.HeadersDB,
-		indexDB:                 ms.IndexDB,
-		incorporatedResults:     ms.ResultsPL,
-		receipts:                ms.ReceiptsPL,
-		approvals:               ms.ApprovalsPL,
-		seals:                   ms.SealsPL,
-		checkingSealing:         atomic.NewBool(false),
-		requestReceiptThreshold: 10,
-		maxResultsToRequest:     200,
-		assigner:                ms.Assigner,
-		requireApprovals:        true,
-		receiptValidator:        ms.receiptValidator,
+		unit:                unit,
+		log:                 log,
+		engineMetrics:       metrics,
+		mempool:             metrics,
+		metrics:             metrics,
+		state:               ms.State,
+		receiptRequester:    ms.requester,
+		resultsDB:           ms.ResultsDB,
+		headersDB:           ms.HeadersDB,
+		indexDB:             ms.IndexDB,
+		incorporatedResults: ms.ResultsPL,
+		receipts:            ms.ReceiptsPL,
+		approvals:           ms.ApprovalsPL,
+		seals:               ms.SealsPL,
+		checkingSealing:     atomic.NewBool(false),
+		sealingThreshold:    10,
+		maxResultsToRequest: 200,
+		assigner:            ms.Assigner,
+		requireApprovals:    true,
+		receiptValidator:    ms.receiptValidator,
 	}
 }
 
@@ -728,9 +730,9 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	ms.Assert().Empty(results, "expecting no sealable result")
 }
 
-// TestRequestReceiptsPendingBlocks tests matching.Engine.requestPending():
+// TestRequestPendingReceipts tests matching.Engine.requestPendingReceipts():
 //   * generate n=100 consecutive blocks, where the first one is sealed and the last one is final
-func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
+func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	// create blocks
 	n := 100
 	orderedBlocks := make([]flow.Block, 0, n)
@@ -756,4 +758,87 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 	err := ms.matching.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.EntityByID(<blockID>, filter.Any) was called
+}
+
+// TestRequestPendingApprovals checks that requests are sent only for chunks
+// that have not collected any approvals yet, and are sent only to the verifiers
+// assigned to those chunks.
+func (ms *MatchingSuite) TestRequestPendingApprovals() {
+	// create blocks
+	n := 100
+	orderedBlocks := make([]flow.Block, 0, n)
+	parentBlock := ms.UnfinalizedBlock
+	for i := 0; i < n; i++ {
+		block := unittest.BlockWithParentFixture(parentBlock.Header)
+		ms.Blocks[block.ID()] = &block
+		orderedBlocks = append(orderedBlocks, block)
+		parentBlock = block
+	}
+
+	// progress latest sealed and latest finalized:
+	ms.LatestSealedBlock = orderedBlocks[0]
+	ms.LatestFinalizedBlock = orderedBlocks[n-1]
+
+	// we will assume that all chunks are assigned to the same verifier. So each
+	// approval request should only be sent to this single verifier.
+	verifier := unittest.IdentifierFixture()
+
+	// expectedRequests collects the set of ApprovalRequests that should be sent
+	expectedRequests := []*messages.ApprovalRequest{}
+
+	// populate the incorporated-results mempool with:
+	// - 50 that have collected one signature per chunk
+	// - 50 that have collected no signatures
+	//
+	// each chunk is assigned to the single verifier we defined above
+	//
+	// we populate expectedRequests with requests for chunks that have no
+	// signatures
+	for i := 0; i < 100; i++ {
+		ir := unittest.IncorporatedResult.Fixture()
+
+		assignment := chunks.NewAssignment()
+
+		for _, chunk := range ir.Result.Chunks {
+			assignment.Add(chunk, flow.IdentifierList{verifier})
+			ms.Assigner.On("Assign", ir.Result, ir.IncorporatedBlockID).Return(assignment, nil)
+
+			if i < 50 {
+				ir.AddSignature(chunk.Index, unittest.IdentifierFixture(), unittest.SignatureFixture())
+				expectedRequests = append(expectedRequests,
+					&messages.ApprovalRequest{
+						ResultID:   ir.Result.ID(),
+						ChunkIndex: chunk.Index,
+					})
+			}
+		}
+
+		ms.PendingResults[ir.ID()] = ir
+	}
+
+	// wire-up the approval requests conduit to keep track of all sent requests
+	// and check that the target matches the unique verifier assigned to each
+	// chunk
+	requests := []*messages.ApprovalRequest{}
+	conduit := &mocknetwork.Conduit{}
+	conduit.On("Publish", mock.Anything, mock.Anything).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			// collect the request
+			ar, ok := args[0].(*messages.ApprovalRequest)
+			ms.Assert().True(ok)
+			requests = append(requests, ar)
+
+			// check that the target is the verifier assigned to the chunk
+			target, ok := args[1].(flow.Identifier)
+			ms.Assert().True(ok)
+			ms.Assert().Equal(verifier, target)
+		})
+	ms.matching.approvalConduit = conduit
+
+	err := ms.matching.requestPendingApprovals()
+	ms.Require().NoError(err)
+
+	// We should have only sent requests for chunks that have no approvals
+	ms.Assert().Len(requests, len(expectedRequests))
 }

@@ -93,7 +93,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 		}
 
 		if storedApprovalID != approvalID {
-			return fmt.Errorf("storing approval that is different from the already stored one for chunk: %v, storing approval: %v, %d, stored approval: %v. %w",
+			return fmt.Errorf("attempting to store conflicting approval (result: %v, chunk index: %d): storing: %v, stored: %v. %w",
 				resultID, chunkIndex, approvalID, storedApprovalID, storage.ErrDataMismatch)
 		}
 

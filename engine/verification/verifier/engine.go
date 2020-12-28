@@ -131,7 +131,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *verification.VerifiableChunkData:
 		err = e.verifiableChunkHandler(originID, resource)
 	case *messages.ApprovalRequest:
-		err = e.handleApprovalRequest(originID, resource)
+		err = e.approvalRequestHandler(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -334,7 +334,7 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	return nil
 }
 
-func (e *Engine) handleApprovalRequest(originID flow.Identifier, req *messages.ApprovalRequest) error {
+func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.ApprovalRequest) error {
 
 	log := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
@@ -342,20 +342,18 @@ func (e *Engine) handleApprovalRequest(originID flow.Identifier, req *messages.A
 		Uint64("chunk_index", req.ChunkIndex).
 		Logger()
 
-	log.Debug().Msgf("XXX handleApprovalRequest")
-
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", originID, err)
 	}
 
 	if origin.Role != flow.RoleConsensus {
-		return engine.NewInvalidInputErrorf("invalid for requesting approvals: %s", origin.Role)
+		return engine.NewInvalidInputErrorf("invalid role for requesting approvals: %s", origin.Role)
 	}
 
 	approval, err := e.approvals.ByChunk(req.ResultID, req.ChunkIndex)
 	if err != nil {
-		return fmt.Errorf("could not retrieve approval for chunk (resultID %s, chunk-index: %d): %w",
+		return fmt.Errorf("could not retrieve approval for chunk (result: %s, chunk index: %d): %w",
 			req.ResultID,
 			req.ChunkIndex,
 			err)

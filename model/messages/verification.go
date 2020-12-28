@@ -3,8 +3,7 @@ package messages
 import "github.com/onflow/flow-go/model/flow"
 
 // ApprovalRequest represents a request for a ResultApproval corresponding to
-// the a specific chunk, identified by the ID of the ExecutionResult and the
-// chunk index within the result.
+// a specific chunk.
 type ApprovalRequest struct {
 	Nonce      uint64
 	ResultID   flow.Identifier
