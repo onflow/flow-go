@@ -22,7 +22,7 @@ type State struct {
 // Bootstrap initializes the persistent cluster state with a genesis block.
 // The genesis block must have number 0, a parent hash of 32 zero bytes,
 // and an empty collection as payload.
-func Bootstrap(db *badger.DB, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, stateRoot *StateRoot) (*State, error) {
+func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)

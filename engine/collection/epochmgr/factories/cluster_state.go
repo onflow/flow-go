@@ -50,7 +50,7 @@ func (f *ClusterStateFactory) Create(stateRoot *clusterkv.StateRoot) (
 			return nil, nil, nil, nil, fmt.Errorf("could not open cluster state: %w", err)
 		}
 	} else {
-		clusterState, err = clusterkv.Bootstrap(f.db, f.tracer, headers, payloads, stateRoot)
+		clusterState, err = clusterkv.Bootstrap(f.db, stateRoot)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("could not open cluster state: %w", err)
 		}
