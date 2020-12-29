@@ -29,7 +29,7 @@ type Engine struct {
 	cleaner        storage.Cleaner
 	headers        storage.Headers
 	payloads       storage.Payloads
-	state          protocol.State
+	state          protocol.MutableState
 	pending        module.PendingBlockBuffer
 	follower       module.HotStuffFollower
 	con            network.Conduit
@@ -45,7 +45,7 @@ func New(
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	state protocol.State,
+	state protocol.MutableState,
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
@@ -302,7 +302,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
-	err := e.state.Mutate().HeaderExtend(block)
+	err := e.state.Extend(block)
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

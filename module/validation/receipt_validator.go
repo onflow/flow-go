@@ -12,13 +12,13 @@ import (
 )
 
 type receiptValidator struct {
-	state    protocol.ReadOnlyState
+	state    protocol.State
 	index    storage.Index
 	results  storage.ExecutionResults
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state protocol.ReadOnlyState, index storage.Index, results storage.ExecutionResults, verifier module.Verifier) *receiptValidator {
+func NewReceiptValidator(state protocol.State, index storage.Index, results storage.ExecutionResults, verifier module.Verifier) *receiptValidator {
 	rv := &receiptValidator{
 		state:    state,
 		index:    index,
@@ -121,7 +121,11 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	return nil
 }
 
-func (v *receiptValidator) verifyExecutionResult(result *flow.ExecutionResult) error {
+// subgraphCheck enforces that result forms a valid sub-graph:
+// Let R1 be a result that references block A, and R2 be R1's parent result.
+// The execution results form a valid subgraph if and only if R2 references
+// A's parent.
+func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
@@ -175,7 +179,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 		return fmt.Errorf("invalid chunks format: %w", err)
 	}
 
-	err = v.verifyExecutionResult(&receipt.ExecutionResult)
+	err = v.subgraphCheck(&receipt.ExecutionResult)
 	if err != nil {
 		return fmt.Errorf("invalid execution result: %w", err)
 	}

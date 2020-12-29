@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	mock2 "github.com/onflow/flow-go/module/mock"
@@ -55,6 +56,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
+	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
 func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
@@ -73,13 +75,26 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid stake")
+	s.Assert().True(engine.IsInvalidInputError(err))
+}
+
+func (s *ReceiptValidationSuite) TestReceiptInvalidRole() {
+	valSubgrph := s.ValidSubgraphFixture()
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.verifier.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe() // call optional, as validator might check stake first
 
 	// replace identity with invalid one
 	s.Identities[s.ExeID] = unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
-	err = s.receiptValidator.Validate(receipt)
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
-	s.verifier.AssertExpectations(s.T())
+	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
 func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
@@ -97,6 +112,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid signature")
+	s.Assert().True(engine.IsInvalidInputError(err))
 	s.verifier.AssertExpectations(s.T())
 }
 
@@ -111,10 +127,11 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	s.verifier.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Once()
+		mock.Anything).Return(true, nil).Maybe()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject with invalid chunks")
+	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
 func (s *ReceiptValidationSuite) TestReceiptChunkInvalidBlockID() {
@@ -127,10 +144,11 @@ func (s *ReceiptValidationSuite) TestReceiptChunkInvalidBlockID() {
 	s.verifier.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Once()
+		mock.Anything).Return(true, nil).Maybe()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject with invalid chunks")
+	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
 func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
@@ -143,10 +161,11 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 	s.verifier.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Once()
+		mock.Anything).Return(true, nil).Maybe()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid collection index")
+	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
 func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
@@ -161,7 +180,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 	s.verifier.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Once()
+		mock.Anything).Return(true, nil).Maybe()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid receipt")
@@ -179,7 +198,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 	s.verifier.On("Verify",
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(true, nil).Once()
+		mock.Anything).Return(true, nil).Maybe()
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid previous result")

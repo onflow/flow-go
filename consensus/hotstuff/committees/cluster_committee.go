@@ -19,7 +19,7 @@ import (
 // implementation reference blocks on the cluster chain, which in turn reference
 // blocks on the main chain - this implementation manages that translation.
 type Cluster struct {
-	state    protocol.ReadOnlyState
+	state    protocol.State
 	payloads storage.ClusterPayloads
 	me       flow.Identifier
 	// pre-computed leader selection for the full lifecycle of the cluster
@@ -31,7 +31,7 @@ type Cluster struct {
 }
 
 func NewClusterCommittee(
-	state protocol.ReadOnlyState,
+	state protocol.State,
 	payloads storage.ClusterPayloads,
 	cluster protocol.Cluster,
 	epoch protocol.Epoch,

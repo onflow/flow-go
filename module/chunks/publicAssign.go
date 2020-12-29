@@ -27,13 +27,13 @@ type PublicAssignment struct {
 	alpha       int // used to indicate the number of verifiers that should be assigned to each chunk
 	assignments mempool.Assignments
 
-	protocolState protocol.ReadOnlyState
+	protocolState protocol.State
 }
 
 // NewPublicAssignment generates and returns an instance of the Public Chunk
 // Assignment algorithm. Parameter alpha is the number of verifiers that should
 // be assigned to each chunk.
-func NewPublicAssignment(alpha int, protocolState protocol.ReadOnlyState) (*PublicAssignment, error) {
+func NewPublicAssignment(alpha int, protocolState protocol.State) (*PublicAssignment, error) {
 	// TODO to have limit of assignment mempool as a parameter (2703)
 	assignment, err := stdmap.NewAssignments(1000)
 	if err != nil {

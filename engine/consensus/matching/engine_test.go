@@ -99,77 +99,16 @@ func (ms *MatchingSuite) SetupTest() {
 	}
 }
 
-// Test that we reject receipts that were not sent by their execution node (as
-// specified by the ExecutorID field)
-func (ms *MatchingSuite) TestOnReceiptInvalidOrigin() {
-	// we don't validate the origin of an execution receipt anymore, as Execution Nodes
-	// might forward us Execution Receipts from others for blocks they haven't computed themselves
-	ms.T().Skip()
-
-	// this receipt has a random executor ID
-	receipt := unittest.ExecutionReceiptFixture()
-
-	// try to submit it from another random origin
-	err := ms.matching.onReceipt(unittest.IdentifierFixture(), receipt)
-	ms.Require().Error(err, "should reject receipt with mismatching origin and executor")
-
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
 // Test that we reject receipts for unknown blocks without generating an error
 func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
-
 	// This receipt has a random block ID, so the matching engine won't find it.
 	receipt := unittest.ExecutionReceiptFixture()
 
 	// onReceipt should reject the receipt without throwing an error
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for unknown block")
+	ms.Require().NoError(err, "should drop receipt for unknown block without error")
 
 	ms.ReceiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-// try to submit a receipt for a known block from a NON-ExecutionNode (here: consensus node)
-func (ms *MatchingSuite) TestOnReceiptInvalidRole() {
-	originID := ms.ConID
-	receipt := unittest.ExecutionReceiptFixture(
-		unittest.WithExecutorID(originID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
-	)
-
-	ms.receiptValidator.On("Validate", mock.Anything).
-		Return(engine.NewInvalidInputError("")).Once()
-
-	// the receipt should be rejected with an error
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
-	ms.Require().Error(err, "should reject receipt from wrong node role")
-	ms.Require().True(engine.IsInvalidInputError(err))
-
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-// try ot submit a receipt from an Execution node with zero stake
-func (ms *MatchingSuite) TestOnReceiptUnstakedExecutor() {
-	originID := ms.ExeID
-	receipt := unittest.ExecutionReceiptFixture(
-		unittest.WithExecutorID(originID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
-	)
-
-	ms.receiptValidator.On("Validate", mock.Anything).Return(engine.NewInvalidInputError("")).Once()
-
-	// assign 0 stake to this executor node
-	ms.Identities[ms.ExeID].Stake = 0
-
-	// the receipt should be rejected with an error
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
-	ms.Require().Error(err, "should reject receipt from unstaked node")
-	ms.Require().True(engine.IsInvalidInputError(err))
-
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -196,23 +135,18 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", mock.Anything).Return(nil)
+	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// setup the receipts mempool to check if we attempted to add the receipt to
-	// the mempool, and return false as if it was already in the mempool
-	ms.ReceiptsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			added := args.Get(0).(*flow.ExecutionReceipt)
-			ms.Assert().Equal(receipt, added)
-		},
-	).Return(false)
+	// the mempool, and return false as we are testing the case where it was already in the mempool
+	ms.ReceiptsPL.On("Add", receipt).Return(false).Once()
 
 	// onReceipt should return immediately after trying to insert the receipt,
 	// but without throwing any errors
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should ignore already pending receipt")
 
-	ms.ReceiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -224,25 +158,17 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", mock.Anything).Return(nil)
+	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// setup the receipts mempool to check if we attempted to add the receipt to
 	// the mempool
-	ms.ReceiptsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			added := args.Get(0).(*flow.ExecutionReceipt)
-			ms.Assert().Equal(receipt, added)
-		},
-	).Return(true)
+	ms.ReceiptsPL.On("Add", receipt).Return(true).Twice()
 
 	// setup the results mempool to check if we attempted to insert the
 	// incorporated result, and return false as if it was already in the mempool
-	ms.ResultsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			incorporatedResult := args.Get(0).(*flow.IncorporatedResult)
-			ms.Assert().Equal(incorporatedResult.Result, &receipt.ExecutionResult)
-		},
-	).Return(false, nil)
+	ms.ResultsPL.
+		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
+		Return(false, nil).Twice()
 
 	// onReceipt should return immediately after trying to pool the result, but
 	// without throwing any errors
@@ -254,8 +180,8 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	// resubmit receipt
 	err = ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for already pending result")
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 2)
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 2)
+	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
 // try to submit a receipt that should be valid
@@ -266,32 +192,43 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", mock.Anything).Return(nil)
+	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 
-	// setup the receipts mempool to check if we attempted to add the receipt to
-	// the mempool
-	ms.ReceiptsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			added := args.Get(0).(*flow.ExecutionReceipt)
-			ms.Assert().Equal(receipt, added)
-		},
-	).Return(true)
+	// we expect that receipt is added to mempool
+	ms.ReceiptsPL.On("Add", receipt).Return(true).Once()
 
-	// setup the results mempool to check if we attempted to add the
-	// incorporated result
-	ms.ResultsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			incorporatedResult := args.Get(0).(*flow.IncorporatedResult)
-			ms.Assert().Equal(incorporatedResult.Result, &receipt.ExecutionResult)
-		},
-	).Return(true, nil)
+	// setup the results mempool to check if we attempted to add the incorporated result
+	ms.ResultsPL.
+		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
+		Return(true, nil).Once()
 
 	// onReceipt should run to completion without throwing an error
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
-	ms.ReceiptsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.receiptValidator.AssertExpectations(ms.T())
+	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
+}
+
+// TestOnReceiptInvalid tests that we reject receipts that don't pass the ReceiptValidator
+func (ms *MatchingSuite) TestOnReceiptInvalid() {
+	// we use the same Receipt as in TestOnReceiptValid to ensure that the matching engine is not
+	// rejecting the receipt for any other reason
+	originID := ms.ExeID
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(originID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
+	)
+	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputError("")).Once()
+
+	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
+	ms.Assert().True(engine.IsInvalidInputError(err))
+
+	ms.receiptValidator.AssertExpectations(ms.T())
+	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
 // try to submit an approval where the message origin is inconsistent with the message creator
@@ -324,18 +261,13 @@ func (ms *MatchingSuite) TestApprovalUnknownBlock() {
 	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(originID)) // generates approval for random block ID
 
 	// Make sure the approval is added to the cache for future processing
-	ms.ApprovalsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			added := args.Get(0).(*flow.ResultApproval)
-			ms.Assert().Equal(approval, added)
-		},
-	).Return(true, nil)
+	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
 
 	// onApproval should not throw an error
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
 	ms.Require().NoError(err, "should cache approvals for unknown blocks")
 
-	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.ApprovalsPL.AssertExpectations(ms.T())
 }
 
 // try to submit an approval from a consensus node
@@ -390,19 +322,14 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 
 	// setup the approvals mempool to check that we attempted to add the
 	// approval, and return false as if it was already in the mempool
-	ms.ApprovalsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			added := args.Get(0).(*flow.ResultApproval)
-			ms.Assert().Equal(approval, added)
-		},
-	).Return(false, nil)
+	ms.ApprovalsPL.On("Add", approval).Return(false, nil).Once()
 
 	// onApproval should return immediately after trying to insert the approval,
 	// without throwing any errors
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
 	ms.Require().NoError(err, "should ignore approval if already pending")
 
-	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.ApprovalsPL.AssertExpectations(ms.T())
 }
 
 // try to submit an approval for a known block
@@ -414,18 +341,13 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 	)
 
 	// check that the approval is correctly added
-	ms.ApprovalsPL.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			added := args.Get(0).(*flow.ResultApproval)
-			ms.Assert().Equal(approval, added)
-		},
-	).Return(true, nil)
+	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
 
 	// onApproval should run to completion without throwing any errors
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
 	ms.Require().NoError(err, "should add approval to mempool if valid")
 
-	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
+	ms.ApprovalsPL.AssertExpectations(ms.T())
 }
 
 // try to get matched results with nothing in memory pools
@@ -841,4 +763,12 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
 	// We should have only sent requests for chunks that have no approvals
 	ms.Assert().Len(requests, len(expectedRequests))
+}
+
+// incorporatedResult returns a testify `argumentMatcher` that only accepts an
+// IncorporatedResult with the given parameters
+func incorporatedResult(blockID flow.Identifier, result *flow.ExecutionResult) interface{} {
+	return mock.MatchedBy(func(ir *flow.IncorporatedResult) bool {
+		return ir.IncorporatedBlockID == blockID && ir.Result.ID() == result.ID()
+	})
 }
