@@ -2,12 +2,12 @@ package validation
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 type sealValidator struct {
@@ -63,6 +63,21 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 	return nil
 }
 
+// Validate checks the compliance of the payload seals and returns the last
+// valid seal on the fork up to and including `candidate`. To be valid, we
+// require that seals
+// 1) form a valid chain on top of the last seal as of the parent of `candidate` and
+// 2) correspond to blocks and execution results incorporated on the current fork.
+// 3) has valid signatures for all of its chunks.
+//
+// Note that we don't explicitly check that sealed results satisfy the sub-graph
+// check. Nevertheless, correctness in this regard is guaranteed because:
+//  * We only allow seals that correspond to ExecutionReceipts that were
+//    incorporated in this fork.
+//  * We only include ExecutionReceipts whose results pass the sub-graph check
+//    (as part of ReceiptValidator).
+// => Therefore, only seals whose results pass the sub-graph check will be
+//    allowed.
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// Get the latest seal in the fork that ends with the candidate's parent.
 	// The protocol state saves this information for each block that has been
@@ -194,6 +209,15 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	return last, nil
 }
 
+// validateSeal performs integrity checks of single seal. To be valid, we
+// require that seal:
+// 1) Contains correct number of approval signatures, one aggregated sig for each chunk.
+// 2) Every aggregated signature contains valid signer ids. module.ChunkAssigner is used to perform this check.
+// 3) Every aggregated signature contains valid signatures.
+// Returns:
+// * nil - in case of success
+// * engine.InvalidInputError - in case of malformed seal
+// * exception - in case of unexpected error
 func (s *sealValidator) validateSeal(seal *flow.Seal, executionResult *flow.ExecutionResult) error {
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {
 		return engine.NewInvalidInputErrorf("mismatching signatures, expected: %d, got: %d",

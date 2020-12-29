@@ -1,14 +1,13 @@
 package util
 
 import (
-	"github.com/onflow/flow-go/model/flow"
-	storage "github.com/onflow/flow-go/storage/badger"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	mock2 "github.com/onflow/flow-go/module/mock"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )

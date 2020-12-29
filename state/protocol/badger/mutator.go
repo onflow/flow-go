@@ -139,24 +139,19 @@ func (m *MutableState) Extend(candidate *flow.Block) error {
 		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
 	}
 
-	// check if the seals in the payload is a valid extension of the finalized
-	// state, return the last seal at the candidate block
-	last, err := m.sealExtend(candidate)
-	if err != nil {
-		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
-	}
-
 	// check if the receipts in the payload are valid
 	err = m.receiptExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
 	}
 
-	// insert the block and index the last seal for the block
-	err = m.insert(candidate, last)
+	// check if the seals in the payload is a valid extension of the finalized
+	// state
+	err = m.sealExtend(candidate)
 	if err != nil {
-		return fmt.Errorf("failed to insert the block: %w", err)
+		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
+
 	return nil
 }
 
@@ -311,33 +306,25 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 	return nil
 }
 
-// sealExtend checks the compliance of the payload seals and returns the last
-// valid seal on the fork up to and including `candidate`. To be valid, we
-// require that seals
-// 1) form a valid chain on top of the last seal as of the parent of `candidate` and
-// 2) correspond to blocks and execution results incorporated on the current fork.
-//
-// Note that we don't explicitly check that sealed results satisfy the sub-graph
-// check. Nevertheless, correctness in this regard is guaranteed because:
-//  * We only allow seals that correspond to ExecutionReceipts that were
-//    incorporated in this fork.
-//  * We only include ExecutionReceipts whose results pass the sub-graph check
-//    (as part of ReceiptValidator).
-// => Therefore, only seals whose results pass the sub-graph check will be
-//    allowed.
-func (m *MutableState) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
-
+// sealExtend checks the compliance of the payload seals and inserts `candidate` block
+// into DB. This has to be called as final step of extending `candidate` block.
+func (m *MutableState) sealExtend(candidate *flow.Block) error {
 	blockID := candidate.ID()
 	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
 	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
-
 	if err != nil {
-		return nil, state.NewInvalidExtensionErrorf("seal validation error: %w", err)
+		return state.NewInvalidExtensionErrorf("seal validation error: %w", err)
 	}
 
-	return lastSeal, nil
+	// insert the block and index the last seal for the block
+	err = m.insert(candidate, lastSeal)
+	if err != nil {
+		return fmt.Errorf("failed to insert the block: %w", err)
+	}
+
+	return nil
 }
 
 // receiptExtend checks the compliance of the receipt payload.

@@ -3,11 +3,12 @@ package module
 import "github.com/onflow/flow-go/model/flow"
 
 // SealValidator is an interface which is used for validating
-// seals with respect to current protocol state. Except seal to check,
-// user needs to provide a `ExecutionResult` against which seal has to be validated.
+// seals with respect to current protocol state. Accepts `candidate` block with seals
+// that needs to be verified for protocol state validity.
 // Returns the following errors:
-// * nil - in case of success
+// * last seal in `candidate` block - in case of success
+// * engine.InvalidInputError - in case if `candidate` block violates protocol state.
 // * exception in case of any other error, usually this is not expected.
 type SealValidator interface {
-	Validate(block *flow.Block) (*flow.Seal, error)
+	Validate(candidate *flow.Block) (*flow.Seal, error)
 }
