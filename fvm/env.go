@@ -24,7 +24,7 @@ var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx              Context
-	ledger           state.Ledger
+	st               *state.State
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *UUIDGenerator
@@ -46,19 +46,19 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
-	accounts := state.NewAccounts(ledger)
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
+	accounts := state.NewAccounts(st)
+	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
 
-	uuids := state.NewUUIDs(ledger)
+	uuids := state.NewUUIDs(st)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
 		ctx:                ctx,
-		ledger:             ledger,
+		st:                 st,
 		Metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
 		addressGenerator:   generator,
@@ -89,7 +89,7 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, t
 	e.transactionEnv = newTransactionEnv(
 		vm,
 		e.ctx,
-		e.ledger,
+		e.st,
 		e.accounts,
 		e.addressGenerator,
 		tx,
@@ -491,7 +491,7 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
-	ledger           state.Ledger
+	st               *state.State
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 
@@ -505,7 +505,7 @@ type transactionEnv struct {
 func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
-	ledger state.Ledger,
+	st *state.State,
 	accounts *state.Accounts,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
@@ -515,7 +515,7 @@ func newTransactionEnv(
 	return &transactionEnv{
 		vm:               vm,
 		ctx:              ctx,
-		ledger:           ledger,
+		st:               st,
 		accounts:         accounts,
 		addressGenerator: addressGenerator,
 		tx:               tx,
@@ -569,6 +569,8 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
 			e.ledger,
+			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
+			e.st,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202

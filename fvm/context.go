@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,6 +15,9 @@ type Context struct {
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
+	MaxStateKeySize                  uint64
+	MaxStateValueSize                uint64
+	MaxStateInteractionSize          uint64
 	EventCollectionByteSizeLimit     uint64
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
@@ -52,9 +56,10 @@ func newContext(ctx Context, opts ...Option) Context {
 
 const AccountKeyWeightThreshold = 1000
 
-const defaultGasLimit = 100_000
-
-const defaultEventCollectionByteSizeLimit = 128_000 // 128KB
+const (
+	DefaultGasLimit                     = 100_000 // 100K
+	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
+)
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
@@ -62,8 +67,11 @@ func defaultContext(logger zerolog.Logger) Context {
 		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
-		GasLimit:                         defaultGasLimit,
-		EventCollectionByteSizeLimit:     defaultEventCollectionByteSizeLimit,
+		GasLimit:                         DefaultGasLimit,
+		MaxStateKeySize:                  state.DefaultMaxKeySize,
+		MaxStateValueSize:                state.DefaultMaxValueSize,
+		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
@@ -109,6 +117,31 @@ func WithASTCache(cache ASTCache) Option {
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.GasLimit = limit
+		return ctx
+	}
+}
+
+// WithMaxStateKeySize sets the byte size limit for ledger keys
+func WithMaxStateKeySize(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MaxStateKeySize = limit
+		return ctx
+	}
+}
+
+// WithMaxStateValueSize sets the byte size limit for ledger values
+func WithMaxStateValueSize(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MaxStateValueSize = limit
+		return ctx
+	}
+}
+
+// WithMaxStateInteractionSize sets the byte size limit for total interaction with ledger.
+// this prevents attacks such as reading all large registers
+func WithMaxStateInteractionSize(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MaxStateInteractionSize = limit
 		return ctx
 	}
 }
