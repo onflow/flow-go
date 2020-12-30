@@ -45,7 +45,7 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 
 		atst := flow.Attestation{
 			BlockID:           chunk.BlockID,
-			ExecutionResultID: execurtionResult.ID(),
+			ExecutionResultID: executionResult.ID(),
 			ChunkIndex:        chunk.Index,
 		}
 		atstID := atst.ID()
@@ -189,7 +189,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		}
 
 		// check the integrity of the seal
-   	err := s.validateSeal(seal, incorporatedResult)
+		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
 				return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
@@ -219,6 +219,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 // * engine.InvalidInputError - in case of malformed seal
 // * exception - in case of unexpected error
 func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
+	executionResult := incorporatedResult.Result
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {
 		return engine.NewInvalidInputErrorf("mismatching signatures, expected: %d, got: %d",
 			executionResult.Chunks.Len(),
