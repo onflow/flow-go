@@ -24,7 +24,7 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 	return v
 }
 
-// Verifiers returns the list of verifier nodes assigned to a chunk
+// HasVerifier checks if an entity belongs to the set of assigned verifiers
 func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) bool {
 	for id := range a.table[chunk.Index] {
 		if id == identifier {
