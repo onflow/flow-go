@@ -33,7 +33,7 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 }
 
 func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.AggregatedSignature,
-	chunk *flow.Chunk, execurtionResult *flow.ExecutionResult) error {
+	chunk *flow.Chunk, executionResult *flow.ExecutionResult) error {
 	for i, signature := range aggregatedSignatures.VerifierSignatures {
 		signerId := aggregatedSignatures.SignerIDs[i]
 
@@ -189,7 +189,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		}
 
 		// check the integrity of the seal
-		err := s.validateSeal(seal, incorporatedResult.Result)
+   	err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
 				return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
@@ -218,7 +218,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 // * nil - in case of success
 // * engine.InvalidInputError - in case of malformed seal
 // * exception - in case of unexpected error
-func (s *sealValidator) validateSeal(seal *flow.Seal, executionResult *flow.ExecutionResult) error {
+func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {
 		return engine.NewInvalidInputErrorf("mismatching signatures, expected: %d, got: %d",
 			executionResult.Chunks.Len(),
