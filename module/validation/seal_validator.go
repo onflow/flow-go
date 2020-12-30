@@ -226,7 +226,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			len(seal.AggregatedApprovalSigs))
 	}
 
-	assignments, err := s.assigner.Assign(executionResult, seal.BlockID)
+	assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retreive assignments for block: %v, %w", seal.BlockID, err)
 	}
