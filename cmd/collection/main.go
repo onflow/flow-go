@@ -359,12 +359,18 @@ func main() {
 
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+
+			// create QC vote client
+			// TODO: Add QCContractClient to contructor for rootQCVoter and
+			// add scaffold for access address, epoch smart contract address and key index?
+			// qcContractClient := epochs.NewQCContractClient("", "", 0, )
+
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
 				node.Me,
 				signer,
 				node.State,
-				nil, // TODO
+				nil,
 			)
 
 			factory := factories.NewEpochComponentsFactory(

@@ -17,7 +17,6 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
 )
 
 // QCContractClient is a client to the QC Contract
@@ -29,11 +28,11 @@ type QCContractClient struct {
 	// node details
 	accountAddress  sdk.Address
 	accountKeyIndex int
-	privateKey      crypto.PrivateKey
+	privateKey      string
 }
 
 // NewQCContractClient returns a new client to the QC contract
-func NewQCContractClient(accessAddress, qcContractAddress, accountAddress string, accountKeyIndex int, privateKey crypto.PrivateKey) (*QCContractClient, error) {
+func NewQCContractClient(privateKey, accountAddress string, accountKeyIndex int, accessAddress, qcContractAddress string) (*QCContractClient, error) {
 
 	// create a new instance of flow-go-sdk client
 	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
@@ -83,7 +82,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// sign transaction
-	sk, err := sdkcrypto.DecodePrivateKey(account.Keys[c.accountKeyIndex].SigAlgo, c.privateKey.Encode())
+	sk, err := sdkcrypto.DecodePrivateKeyHex(account.Keys[c.accountKeyIndex].SigAlgo, c.privateKey)
 	signer := sdkcrypto.NewInMemorySigner(sk, account.Keys[c.accountKeyIndex].HashAlgo)
 	err = tx.SignPayload(account.Address, c.accountKeyIndex, signer)
 	if err != nil {
