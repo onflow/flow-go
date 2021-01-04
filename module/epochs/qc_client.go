@@ -83,6 +83,10 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 
 	// sign transaction
 	sk, err := sdkcrypto.DecodePrivateKeyHex(account.Keys[c.accountKeyIndex].SigAlgo, c.privateKey)
+	if err != nil {
+		return fmt.Errorf("could not decode private key from hex: %v", err)
+	}
+
 	signer := sdkcrypto.NewInMemorySigner(sk, account.Keys[c.accountKeyIndex].HashAlgo)
 	err = tx.SignPayload(account.Address, c.accountKeyIndex, signer)
 	if err != nil {

@@ -123,8 +123,8 @@ func main() {
 				"the delay to broadcast block proposal in order to control block production rate")
 
 			// epoch qc contract flags
-			flags.String(&accessAddress, "access-address", "DEFAULT_ACCESS_ADDRESS?", "the address of an access node")
-			flags.String(&qcContractAddress, "qc-contract-address", "DEFAULT_QC_CONTRACT_ADDRESS?", "the address of the Epoch QC contract")
+			flags.StringVar(&accessAddress, "access-address", "DEFAULT_ACCESS_ADDRESS?", "the address of an access node")
+			flags.StringVar(&qcContractAddress, "qc-contract-address", "DEFAULT_QC_CONTRACT_ADDRESS?", "the address of the Epoch QC contract")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -370,7 +370,10 @@ func main() {
 
 			// create QC vote client
 			// TODO: Add QCContractClient to contructor for rootQCVoter
-			qcContractClient := epochs.NewQCContractClient("PRIVATE_KEY", "ACCOUNT_ADDRESS", 0, accessAddres, qcContractAddress)
+			qcContractClient, err := epochs.NewQCContractClient("PRIVATE_KEY", "ACCOUNT_ADDRESS", 0, accessAddress, qcContractAddress)
+			if err != nil {
+				return nil, err
+			}
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
