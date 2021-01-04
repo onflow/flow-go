@@ -72,6 +72,10 @@ func main() {
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
+
+		// epoch qc contract client
+		accessAddress     string
+		qcContractAddress string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -117,6 +121,10 @@ func main() {
 				"additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
+
+			// epoch qc contract flags
+			flags.String(&accessAddress, "access-address", "DEFAULT_ACCESS_ADDRESS?", "the address of an access node")
+			flags.String(&qcContractAddress, "qc-contract-address", "DEFAULT_QC_CONTRACT_ADDRESS?", "the address of the Epoch QC contract")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -361,16 +369,15 @@ func main() {
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// create QC vote client
-			// TODO: Add QCContractClient to contructor for rootQCVoter and
-			// add scaffold for access address, epoch smart contract address and key index?
-			// qcContractClient := epochs.NewQCContractClient("", "", 0, )
+			// TODO: Add QCContractClient to contructor for rootQCVoter
+			qcContractClient := epochs.NewQCContractClient("PRIVATE_KEY", "ACCOUNT_ADDRESS", 0, accessAddres, qcContractAddress)
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
 				node.Me,
 				signer,
 				node.State,
-				nil,
+				qcContractClient,
 			)
 
 			factory := factories.NewEpochComponentsFactory(
