@@ -1,7 +1,11 @@
 package complete
 
 import (
+	"bufio"
+	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,7 +23,7 @@ import (
 )
 
 const DefaultCacheSize = 1000
-const DefaultPathFinderVersion = 0
+const DefaultPathFinderVersion = 1
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -73,10 +77,16 @@ func NewLedger(dbDir string,
 		pathFinderVersion: pathFinderVer,
 	}
 
+	// pause records to prevent double logging trie removals
+	w.PauseRecord()
+	defer w.UnpauseRecord()
+
 	err = w.ReplayOnForest(forest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
+
+	w.UnpauseRecord()
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
@@ -248,7 +258,13 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
-func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migration, targetPathFinderVersion uint8, outputFilePath string) (ledger.State, error) {
+func (l *Ledger) ExportCheckpointAt(state ledger.State,
+	migrations []ledger.Migration,
+	reporters []ledger.Reporter,
+	targetPathFinderVersion uint8,
+	outputFilePath string) (ledger.State, error) {
+
+	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
 
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
@@ -256,12 +272,22 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 		return nil, fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
+	// TODO enable validity check of trie
+	// only check validity of the trie we are interested in
+	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
+	// if !t.IsAValidTrie() {
+	//	 return nil, fmt.Errorf("trie is not valid: %w", err)
+	// }
+	// l.logger.Info().Msg("Trie is valid.")
+
 	// get all payloads
 	payloads := t.AllPayloads()
 	payloadSize := len(payloads)
 
 	// migrate payloads
 	for i, migrate := range migrations {
+		l.logger.Info().Msgf("migration %d is underway", i)
+
 		payloads, err = migrate(payloads)
 		if err != nil {
 			return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
@@ -269,7 +295,18 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 		if payloadSize != len(payloads) {
 			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
 		}
+		l.logger.Info().Msgf("migration %d is done", i)
 	}
+
+	// run reporters
+	for i, reporter := range reporters {
+		err = reporter.Report(payloads)
+		if err != nil {
+			return nil, fmt.Errorf("error running reporter (%d): %w", i, err)
+		}
+	}
+
+	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
 
 	// get paths
 	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
@@ -287,6 +324,8 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
+	l.logger.Info().Msg("creating a checkpoint for the new trie")
+
 	writer, err := wal.CreateCheckpointWriterForFile(outputFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
@@ -297,6 +336,8 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 		return nil, fmt.Errorf("failed to flatten the trie: %w", err)
 	}
 
+	l.logger.Info().Msg("storing the checkpoint to the file")
+
 	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store the checkpoint: %w", err)
@@ -304,4 +345,26 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State, migrations []ledger.Migr
 	writer.Close()
 
 	return newTrie.RootHash(), nil
+}
+
+// DumpTrieAsJSON export trie at specific state as a jsonl file, each line is json encode of a payload
+func (l *Ledger) DumpTrieAsJSON(state ledger.State, outputFilePath string) error {
+	fmt.Println(ledger.RootHash(state))
+	trie, err := l.forest.GetTrie(ledger.RootHash(state))
+	if err != nil {
+		return fmt.Errorf("cannot find the target trie: %w", err)
+	}
+
+	path := filepath.Join(outputFilePath, hex.EncodeToString(ledger.RootHash(state))+".trie.jsonl")
+
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	return trie.DumpAsJSON(writer)
 }

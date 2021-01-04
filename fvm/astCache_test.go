@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,7 +30,7 @@ func TestTransactionASTCache(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	t.Run("transaction execution results in cached program", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -45,7 +46,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -73,7 +74,7 @@ func TestScriptASTCache(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	t.Run("script execution results in cached program", func(t *testing.T) {
 		code := []byte(`
@@ -113,7 +114,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -149,7 +150,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	// Run the Use import (FT Vault resource) transaction
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err = vm.Run(ctx, tx, ledger)
 	require.NoError(t, err)
@@ -187,7 +188,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 			options = append(options, fvm.WithASTCache(cache))
 		}
 
-		ctx := fvm.NewContext(options...)
+		ctx := fvm.NewContext(zerolog.Nop(), options...)
 
 		// Create a number of account private keys.
 		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -223,7 +224,7 @@ func TestTransactionWithProgramASTCacheConsistentRegTouches(t *testing.T) {
 
 		// Run the Use import (FT Vault resource) transaction
 
-		tx := fvm.Transaction(txBody)
+		tx := fvm.Transaction(txBody, 0)
 
 		err = vm.Run(ctx, tx, ledger)
 		require.NoError(t, err)
@@ -249,7 +250,7 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(b, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -293,9 +294,9 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		for _, txBody := range txs {
+		for j, txBody := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, uint32(j))
 
 			err := vm.Run(ctx, tx, ledger)
 			assert.NoError(b, err)
@@ -323,7 +324,7 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 
 	vm := fvm.New(rt)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(&nonFunctioningCache{}))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(&nonFunctioningCache{}))
 
 	// Create a number of account private keys.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -364,9 +365,9 @@ func BenchmarkTransactionWithoutProgramASTCache(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		for _, txBody := range txs {
+		for j, txBody := range txs {
 			// Run the Use import (FT Vault resource) transaction.
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, uint32(j))
 
 			err := vm.Run(ctx, tx, ledger)
 			assert.NoError(b, err)
@@ -386,7 +387,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	cache, err := fvm.NewLRUASTCache(CacheSize)
 	require.NoError(t, err)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
 
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -416,7 +417,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressLocation(fvm.FlowTokenAddress(chain).Bytes())
+	location := runtime.AddressLocation{Address: runtime.Address(fvm.FlowTokenAddress(chain)), Name: "FlowToken"}
 
 	// Get cached program
 	var program *ast.Program

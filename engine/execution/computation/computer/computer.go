@@ -57,7 +57,7 @@ func NewBlockComputer(
 		fvm.WithASTCache(systemChunkASTCache),
 		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
 	)
 
 	return &blockComputer{
@@ -241,7 +241,7 @@ func (e *blockComputer) executeTransaction(
 
 	txView := collectionView.NewChild()
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, txIndex)
 
 	err := e.vm.Run(ctx, tx, txView)
 
@@ -253,12 +253,6 @@ func (e *blockComputer) executeTransaction(
 
 	if err != nil {
 		return nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to execute transaction: %w", err)
-	}
-
-	txEvents, err := tx.ConvertEvents(txIndex)
-
-	if err != nil {
-		return nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to create flow events: %w", err)
 	}
 
 	txResult := flow.TransactionResult{
@@ -282,5 +276,5 @@ func (e *blockComputer) executeTransaction(
 		collectionView.MergeView(txView)
 	}
 
-	return txEvents, txResult, tx.GasUsed, nil
+	return tx.Events, txResult, tx.GasUsed, nil
 }

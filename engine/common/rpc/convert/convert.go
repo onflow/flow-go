@@ -74,7 +74,7 @@ func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.Trans
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	proposalKeyMessage := &entities.Transaction_ProposalKey{
 		Address:        tb.ProposalKey.Address.Bytes(),
-		KeyId:          uint32(tb.ProposalKey.KeyID),
+		KeyId:          uint32(tb.ProposalKey.KeyIndex),
 		SequenceNumber: tb.ProposalKey.SequenceNumber,
 	}
 
@@ -88,7 +88,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	for i, sig := range tb.PayloadSignatures {
 		payloadSigMessages[i] = &entities.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}
@@ -98,7 +98,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	for i, sig := range tb.EnvelopeSignatures {
 		envelopeSigMessages[i] = &entities.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}
@@ -244,10 +244,10 @@ func MessageToAccount(m *entities.Account) (*flow.Account, error) {
 	}
 
 	return &flow.Account{
-		Address: flow.BytesToAddress(m.GetAddress()),
-		Balance: m.GetBalance(),
-		Code:    m.GetCode(),
-		Keys:    accountKeys,
+		Address:   flow.BytesToAddress(m.GetAddress()),
+		Balance:   m.GetBalance(),
+		Keys:      accountKeys,
+		Contracts: m.Contracts,
 	}, nil
 }
 
@@ -262,10 +262,11 @@ func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 	}
 
 	return &entities.Account{
-		Address: a.Address.Bytes(),
-		Balance: a.Balance,
-		Code:    a.Code,
-		Keys:    keys,
+		Address:   a.Address.Bytes(),
+		Balance:   a.Balance,
+		Code:      nil,
+		Keys:      keys,
+		Contracts: a.Contracts,
 	}, nil
 }
 

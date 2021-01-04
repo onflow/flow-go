@@ -2,7 +2,9 @@ package fvm
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -13,22 +15,28 @@ type Context struct {
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
+	MaxStateKeySize                  uint64
+	MaxStateValueSize                uint64
+	MaxStateInteractionSize          uint64
+	EventCollectionByteSizeLimit     uint64
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	CadenceLoggingEnabled            bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
+	Logger                           zerolog.Logger
 }
 
 // SetValueHandler receives a value written by the Cadence runtime.
 type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(opts ...Option) Context {
-	return newContext(defaultContext(), opts...)
+func NewContext(logger zerolog.Logger, opts ...Option) Context {
+	return newContext(defaultContext(logger), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -46,30 +54,39 @@ func newContext(ctx Context, opts ...Option) Context {
 
 const AccountKeyWeightThreshold = 1000
 
-const defaultGasLimit = 100000
+const (
+	DefaultGasLimit                     = 100_000 // 100K
+	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
+)
 
-func defaultContext() Context {
+func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
 		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
-		GasLimit:                         defaultGasLimit,
+		GasLimit:                         DefaultGasLimit,
+		MaxStateKeySize:                  state.DefaultMaxKeySize,
+		MaxStateValueSize:                state.DefaultMaxValueSize,
+		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
+		CadenceLoggingEnabled:            false,
 		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
-			NewTransactionInvocator(),
+			NewTransactionInvocator(logger),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
 		},
+		Logger: logger,
 	}
 }
 
@@ -96,6 +113,39 @@ func WithASTCache(cache ASTCache) Option {
 func WithGasLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.GasLimit = limit
+		return ctx
+	}
+}
+
+// WithMaxStateKeySize sets the byte size limit for ledger keys
+func WithMaxStateKeySize(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MaxStateKeySize = limit
+		return ctx
+	}
+}
+
+// WithMaxStateValueSize sets the byte size limit for ledger values
+func WithMaxStateValueSize(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MaxStateValueSize = limit
+		return ctx
+	}
+}
+
+// WithMaxStateInteractionSize sets the byte size limit for total interaction with ledger.
+// this prevents attacks such as reading all large registers
+func WithMaxStateInteractionSize(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.MaxStateInteractionSize = limit
+		return ctx
+	}
+}
+
+// WithEventCollectionSizeLimit sets the event collection byte size limit for a virtual machine context.
+func WithEventCollectionSizeLimit(limit uint64) Option {
+	return func(ctx Context) Context {
+		ctx.EventCollectionByteSizeLimit = limit
 		return ctx
 	}
 }
@@ -132,7 +182,7 @@ func WithMetricsCollector(mc *MetricsCollector) Option {
 	}
 }
 
-// WithTransactionSignatureVerifier sets the transaction processors for a
+// WithTransactionProcessors sets the transaction processors for a
 // virtual machine context.
 func WithTransactionProcessors(processors ...TransactionProcessor) Option {
 	return func(ctx Context) Context {
@@ -154,6 +204,15 @@ func WithServiceAccount(enabled bool) Option {
 func WithRestrictedDeployment(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedDeploymentEnabled = enabled
+		return ctx
+	}
+}
+
+// WithCadenceLogging enables or disables Cadence logging for a
+// virtual machine context.
+func WithCadenceLogging(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.CadenceLoggingEnabled = enabled
 		return ctx
 	}
 }

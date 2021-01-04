@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,22 +21,24 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 	ctx = fvm.NewContextFromParent(
 		ctx,
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	)
 
 	txBody := flow.NewTransactionBody().
 		SetScript([]byte(createAccountTransaction)).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err := vm.Run(ctx, tx, ledger)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
-	require.Equal(t, string(flow.EventAccountCreated), tx.Events[0].EventType.TypeID)
+	require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
 
-	address := flow.Address(tx.Events[0].Fields[0].(cadence.Address))
+	data, err := jsoncdc.Decode(tx.Events[0].Payload)
+	require.NoError(t, err)
+	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
 	return address
 }
@@ -54,7 +57,7 @@ func addAccountKey(
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address)
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err := vm.Run(ctx, tx, ledger)
 	require.NoError(t, err)
@@ -82,7 +85,7 @@ func addAccountCreator(
 		SetScript(script).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err := vm.Run(ctx, tx, ledger)
 	require.NoError(t, err)
@@ -109,7 +112,7 @@ func removeAccountCreator(
 		SetScript(script).
 		AddAuthorizer(chain.ServiceAddress())
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, 0)
 
 	err := vm.Run(ctx, tx, ledger)
 	require.NoError(t, err)
@@ -226,7 +229,7 @@ func TestCreateAccount(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Single account",
@@ -237,7 +240,7 @@ func TestCreateAccount(t *testing.T) {
 				SetScript([]byte(createAccountTransaction)).
 				AddAuthorizer(payer)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err := vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -245,9 +248,12 @@ func TestCreateAccount(t *testing.T) {
 			assert.NoError(t, tx.Err)
 
 			require.Len(t, tx.Events, 1)
-			assert.Equal(t, string(flow.EventAccountCreated), tx.Events[0].EventType.TypeID)
 
-			address := flow.Address(tx.Events[0].Fields[0].(cadence.Address))
+			require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
+
+			data, err := jsoncdc.Decode(tx.Events[0].Payload)
+			require.NoError(t, err)
+			address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
 			account, err := vm.GetAccount(ctx, address, ledger)
 			require.NoError(t, err)
@@ -265,7 +271,7 @@ func TestCreateAccount(t *testing.T) {
 				SetScript([]byte(createMultipleAccountsTransaction)).
 				AddAuthorizer(payer)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err := vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -275,9 +281,11 @@ func TestCreateAccount(t *testing.T) {
 			require.Len(t, tx.Events, count)
 
 			for i := 0; i < count; i++ {
-				require.Equal(t, string(flow.EventAccountCreated), tx.Events[i].EventType.TypeID)
+				require.Equal(t, flow.EventAccountCreated, tx.Events[i].Type)
 
-				address := flow.Address(tx.Events[i].Fields[0].(cadence.Address))
+				data, err := jsoncdc.Decode(tx.Events[i].Payload)
+				require.NoError(t, err)
+				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
 				account, err := vm.GetAccount(ctx, address, ledger)
 				require.NoError(t, err)
@@ -291,7 +299,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(true),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Unauthorized account payer",
@@ -302,7 +310,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 				SetScript([]byte(createAccountTransaction)).
 				AddAuthorizer(payer)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err := vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -317,7 +325,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 				SetScript([]byte(createAccountTransaction)).
 				AddAuthorizer(chain.ServiceAddress())
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err := vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -336,7 +344,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 				SetPayer(payer).
 				AddAuthorizer(payer)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err := vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -354,7 +362,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 				SetScript([]byte(createAccountTransaction)).
 				AddAuthorizer(payer)
 
-			validTx := fvm.Transaction(txBody)
+			validTx := fvm.Transaction(txBody, 0)
 
 			err := vm.Run(ctx, validTx, ledger)
 			require.NoError(t, err)
@@ -363,7 +371,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 			removeAccountCreator(t, vm, chain, ctx, ledger, payer)
 
-			invalidTx := fvm.Transaction(txBody)
+			invalidTx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, invalidTx, ledger)
 			require.NoError(t, err)
@@ -392,7 +400,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Add to empty key list",
@@ -410,7 +418,7 @@ func TestAddAccountKey(t *testing.T) {
 				AddArgument(cadencePublicKey).
 				AddAuthorizer(address)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -448,7 +456,7 @@ func TestAddAccountKey(t *testing.T) {
 				AddArgument(publicKey2Arg).
 				AddAuthorizer(address)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -489,7 +497,7 @@ func TestAddAccountKey(t *testing.T) {
 				AddArgument(invalidPublicKeyArg).
 				AddAuthorizer(address)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -520,7 +528,7 @@ func TestAddAccountKey(t *testing.T) {
 				AddArgument(publicKey2Arg).
 				AddAuthorizer(address)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -552,7 +560,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator()),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Non-existent key",
@@ -569,7 +577,7 @@ func TestRemoveAccountKey(t *testing.T) {
 			require.NoError(t, err)
 			assert.Len(t, before.Keys, keyCount)
 
-			for _, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+			for i, keyIndex := range []int{-1, keyCount, keyCount + 1} {
 				keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 				require.NoError(t, err)
 
@@ -578,7 +586,7 @@ func TestRemoveAccountKey(t *testing.T) {
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address)
 
-				tx := fvm.Transaction(txBody)
+				tx := fvm.Transaction(txBody, uint32(i))
 
 				err = vm.Run(ctx, tx, ledger)
 				require.NoError(t, err)
@@ -619,7 +627,7 @@ func TestRemoveAccountKey(t *testing.T) {
 				AddArgument(keyIndexArg).
 				AddAuthorizer(address)
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)
@@ -663,7 +671,7 @@ func TestRemoveAccountKey(t *testing.T) {
 				txBody.AddArgument(keyIndexArg)
 			}
 
-			tx := fvm.Transaction(txBody)
+			tx := fvm.Transaction(txBody, 0)
 
 			err = vm.Run(ctx, tx, ledger)
 			require.NoError(t, err)

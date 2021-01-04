@@ -68,6 +68,11 @@ func HasStake(hasStake bool) flow.IdentityFilter {
 	}
 }
 
+// Ejected is a filter that returns true if the node is ejected.
+func Ejected(identity *flow.Identity) bool {
+	return identity.Ejected
+}
+
 // HasRole returns a filter for nodes with one of the input roles.
 func HasRole(roles ...flow.Role) flow.IdentityFilter {
 	lookup := make(map[flow.Role]struct{})
@@ -79,3 +84,11 @@ func HasRole(roles ...flow.Role) flow.IdentityFilter {
 		return ok
 	}
 }
+
+// IsVotingConsensusCommitteeMember is a identity filter for all members of
+// the consensus committee allowed to vote.
+var IsVotingConsensusCommitteeMember = And(
+	HasRole(flow.RoleConsensus),
+	HasStake(true),
+	Not(Ejected),
+)

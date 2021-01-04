@@ -28,6 +28,12 @@ type NetworkMetrics interface {
 
 	// QueueDuration tracks the time spent by a message with the given priority in the queue
 	QueueDuration(duration time.Duration, priority int)
+
+	// OutboundConnections updates the metric tracking the number of outbound connections of this node
+	OutboundConnections(connectionCount uint)
+
+	// InboundConnections updates the metric tracking the number of inbound connections of this node
+	InboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
@@ -310,5 +316,7 @@ type TransactionMetrics interface {
 }
 
 type PingMetrics interface {
-	NodeReachable(node *flow.Identity, reachable bool)
+	// NodeReachable tracks the node availability of the node and reports it as 1 if the node was successfully pinged, 0
+	// otherwise. The nodeInfo provides additional information about the node such as the name of the node operator
+	NodeReachable(node *flow.Identity, nodeInfo string, reachable bool)
 }

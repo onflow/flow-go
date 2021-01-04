@@ -30,7 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -100,6 +100,7 @@ func (suite *Suite) RunTest(
 			suite.state,
 			suite.execClient,
 			suite.collClient,
+			nil,
 			blocks,
 			headers,
 			collections,
@@ -280,6 +281,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil, // setting collectionRPC to nil to choose a random collection node for each send tx request
 			nil,
 			nil,
+			nil,
 			collections,
 			transactions,
 			suite.chainID,
@@ -417,7 +419,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 
 		// setup mocks
 		originID := unittest.IdentifierFixture()
-		conduit := new(network.Conduit)
+		conduit := new(mocknetwork.Conduit)
 		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
 		suite.request.On("Request", mock.Anything, mock.Anything).Return()
@@ -444,8 +446,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			suite.chainID, metrics, 0, false)
+		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
+			suite.chainID, metrics, 0, false, false)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
