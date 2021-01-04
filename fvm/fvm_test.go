@@ -1142,9 +1142,7 @@ func TestSignatureVerification(t *testing.T) {
 
 				err := vm.Run(ctx, script, ledger)
 				require.NoError(t, err)
-				require.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.NewBool(false), script.Value)
+				require.Error(t, script.Err)
 			})
 		},
 	))

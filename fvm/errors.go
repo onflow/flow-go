@@ -236,7 +236,7 @@ func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithm
 }
 
-// An StorageCapacityExceededError indicates that a given key has an invalid hash algorithm.
+// An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
 type StorageCapacityExceededError struct {
 	Address         flow.Address
 	StorageUsed     uint64

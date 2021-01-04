@@ -333,7 +333,7 @@ func (e *hostEnv) VerifySignature(
 	)
 
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	return valid, nil

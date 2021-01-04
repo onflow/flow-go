@@ -107,7 +107,7 @@ type OwnerKeyValue struct {
 func storageUsed(owner string, value uint64) OwnerKeyValue {
 	return OwnerKeyValue{
 		Owner: owner,
-		Key:   "storage_used",
+		Key:   state.KeyStorageUsed,
 		Value: value,
 	}
 }
@@ -115,7 +115,7 @@ func storageUsed(owner string, value uint64) OwnerKeyValue {
 func accountExists(owner string) OwnerKeyValue {
 	return OwnerKeyValue{
 		Owner: owner,
-		Key:   "exists",
+		Key:   state.KeyExists,
 		Value: 1,
 	}
 }
