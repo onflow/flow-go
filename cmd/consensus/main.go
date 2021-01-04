@@ -124,7 +124,7 @@ func main() {
 			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
-				node.Storage.Seals, assignment, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
+				node.Storage.Seals, assignment, signature.NewAggregationVerifier(encoding.ResultApprovalTag), !requireOneApproval)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,

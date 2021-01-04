@@ -11,22 +11,25 @@ import (
 )
 
 type sealValidator struct {
-	state    protocol.State
-	assigner module.ChunkAssigner
-	verifier module.Verifier
-	seals    storage.Seals
-	headers  storage.Headers
-	payloads storage.Payloads
+	state            protocol.State
+	assigner         module.ChunkAssigner
+	verifier         module.Verifier
+	seals            storage.Seals
+	headers          storage.Headers
+	payloads         storage.Payloads
+	skipSealValidity bool
 }
 
-func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals, assigner module.ChunkAssigner, verifier module.Verifier) *sealValidator {
+func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
+	assigner module.ChunkAssigner, verifier module.Verifier, skipSealValidity bool) *sealValidator {
 	rv := &sealValidator{
-		state:    state,
-		assigner: assigner,
-		verifier: verifier,
-		headers:  headers,
-		seals:    seals,
-		payloads: payloads,
+		state:            state,
+		assigner:         assigner,
+		verifier:         verifier,
+		headers:          headers,
+		seals:            seals,
+		payloads:         payloads,
+		skipSealValidity: skipSealValidity,
 	}
 
 	return rv
@@ -191,11 +194,17 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		// check the integrity of the seal
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
-			if engine.IsInvalidInputError(err) {
-				return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
-			}
+			// Skip fail on invalid seal. We don't put this earlier in the function
+			// because we still want to test that the above code doesn't panic.
+			// TODO: this is only here temporarily to ease the migration to new chunk
+			// based sealing.
+			if !s.skipSealValidity {
+				if engine.IsInvalidInputError(err) {
+					return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
+				}
 
-			return nil, fmt.Errorf("unexpected seal validation error %w", err)
+				return nil, fmt.Errorf("unexpected seal validation error %w", err)
+			}
 		}
 
 		last = seal
