@@ -3,7 +3,6 @@
 package consensus
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"time"
@@ -338,11 +337,11 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 		//  enforce that execution results form chain
 		nextResultToBeSealed := nextSeal.IncorporatedResult.Result
-		initialState, isOK := nextResultToBeSealed.InitialStateCommit()
-		if !isOK {
-			return nil, fmt.Errorf("missing initial state commitment in execution result %v", nextResultToBeSealed.ID())
-		}
-		if !bytes.Equal(initialState, last.FinalState) {
+
+		// at this point we are safe just to check this condition since every
+		// ER gets validated by `module.ReceiptValidator` which checks if
+		// results form a valid chain.
+		if nextResultToBeSealed.PreviousResultID != last.ResultID {
 			return nil, fmt.Errorf("execution results do not form chain")
 		}
 
