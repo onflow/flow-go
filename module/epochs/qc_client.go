@@ -83,8 +83,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// sign transaction
-	sk, err := sdkcrypto.DecodePrivateKey(sdkcrypto.ECDSA_P256, c.privateKey.Encode())
-	signer := sdkcrypto.NewInMemorySigner(sk, sdkcrypto.SHA2_256)
+	sk, err := sdkcrypto.DecodePrivateKey(account.Keys[c.accountKeyIndex].SigAlgo, c.privateKey.Encode())
+	signer := sdkcrypto.NewInMemorySigner(sk, account.Keys[c.accountKeyIndex].HashAlgo)
 	err = tx.SignPayload(account.Address, c.accountKeyIndex, signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
