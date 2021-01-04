@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -26,7 +27,7 @@ type QCContractClient struct {
 	client            *client.Client // flow-go-sdk client to access node
 
 	// node details
-	accountAddress  string
+	accountAddress  sdk.Address
 	accountKeyIndex int
 	privateKey      crypto.PrivateKey
 }
@@ -44,7 +45,7 @@ func NewQCContractClient(accessAddress, qcContractAddress, accountAddress string
 		accessAddress:     accessAddress,
 		qcContractAddress: qcContractAddress,
 		client:            flowClient,
-		accountAddress:    accountAddress,
+		accountAddress:    sdk.HexToAddress(accountAddress),
 		accountKeyIndex:   accountKeyIndex,
 		privateKey:        privateKey,
 	}, nil
@@ -66,7 +67,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSubmitVoteScript(c.getEnvironment())).
 		SetGasLimit(1000).
-		SetReferenceBlockID(latestBlock.ID)
+		SetReferenceBlockID(latestBlock.ID).
+		SetPayer(c.accountAddress)
 
 	// add signature data to the transaction and submit to node
 	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
@@ -75,7 +77,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// get account details
-	account, err := c.client.GetAccount(ctx, sdk.BytesToAddress([]byte(c.accountAddress)))
+	account, err := c.client.GetAccount(ctx, c.accountAddress)
 	if err != nil {
 		return fmt.Errorf("could not get account: %w", err)
 	}
@@ -89,7 +91,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// submit signed transaction to node
-	txHash, err := c.submitTx(tx)
+	txID, err := c.submitTx(tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
@@ -97,12 +99,12 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	// wait for transaction to be sealed
 	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
 	for result.Status != sdk.TransactionStatusSealed {
-		result, err = c.client.GetTransactionResult(ctx, txHash)
+		result, err = c.client.GetTransactionResult(ctx, txID)
 		if err != nil {
 			return fmt.Errorf("could not get transaction result: %w", err)
 		}
 
-		// if the transaction has expire we skip waiting for seal
+		// if the transaction has expired we skip waiting for seal
 		if result.Status == sdk.TransactionStatusExpired {
 			break
 		}
@@ -118,11 +120,18 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 // cluster QC aggregator smart contract for the current epoch.
 func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 
-	// execute script to read if voted
-	_, err := c.client.ExecuteScriptAtLatestBlock(ctx, templates.GenerateGetNodeHasVotedScript(c.getEnvironment()), nil)
-	if err != nil {
-		return false, fmt.Errorf("could not execute voted script: %w", err)
-	}
+	// template := templates.GenerateGetNodeHasVotedScript(c.getEnvironment())
+
+	// val, err := jsoncdc.Decode(arg)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("could not deocde arguments: %w", err)
+	// }
+
+	// // execute script to read if voted
+	// _, err := c.client.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{val})
+	// if err != nil {
+	// 	return false, fmt.Errorf("could not execute voted script: %w", err)
+	// }
 
 	return false, nil
 }
