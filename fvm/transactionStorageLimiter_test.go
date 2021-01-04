@@ -14,7 +14,7 @@ import (
 func TestTransactionStorageLimiter_Process(t *testing.T) {
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		ledger := newMockLedger(
+		st := newMockState(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 99),
@@ -25,13 +25,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		err := d.Process(nil, fvm.Context{
 			StorageCapacityResolver: storageCapacityResolver,
 			LimitAccountStorage:     true,
-		}, nil, ledger)
+		}, nil, st)
 
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		ledger := newMockLedger(
+		st := newMockState(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 100),
@@ -42,13 +42,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		err := d.Process(nil, fvm.Context{
 			StorageCapacityResolver: storageCapacityResolver,
 			LimitAccountStorage:     true,
-		}, nil, ledger)
+		}, nil, st)
 
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		ledger := newMockLedger(
+		st := newMockState(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -59,55 +59,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		err := d.Process(nil, fvm.Context{
 			StorageCapacityResolver: storageCapacityResolver,
 			LimitAccountStorage:     true,
-		}, nil, ledger)
+		}, nil, st)
 
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
-	t.Run("if two registers change on the same account, only check capacity once", func(t *testing.T) {
-		owner := string(flow.HexToAddress("1").Bytes())
-		ledger := newMockLedger(
-			[]string{owner, owner},
-			[]OwnerKeyValue{
-				storageUsed(owner, 99),
-				accountExists(owner),
-			})
-		d := &fvm.TransactionStorageLimiter{}
-
-		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: storageCapacityResolver,
-			LimitAccountStorage:     true,
-		}, nil, ledger)
-
-		require.NoError(t, err)
-		// two touches per account: get exists, get used
-		require.Equal(t, 2, ledger.GetCalls[owner])
-	})
-	t.Run("two registers change on different accounts, only check capacity once per account", func(t *testing.T) {
-		owner1 := string(flow.HexToAddress("1").Bytes())
-		owner2 := string(flow.HexToAddress("2").Bytes())
-		ledger := newMockLedger(
-			[]string{owner1, owner1, owner2, owner2},
-			[]OwnerKeyValue{
-				storageUsed(owner1, 99),
-				accountExists(owner1),
-				storageUsed(owner2, 99),
-				accountExists(owner2),
-			})
-		d := &fvm.TransactionStorageLimiter{}
-
-		err := d.Process(nil, fvm.Context{
-			StorageCapacityResolver: storageCapacityResolver,
-			LimitAccountStorage:     true,
-		}, nil, ledger)
-
-		require.NoError(t, err)
-		// two touches per account: get exists, get used
-		require.Equal(t, 2, ledger.GetCalls[owner1])
-		require.Equal(t, 2, ledger.GetCalls[owner2])
-	})
 	t.Run("non account registers are ignored", func(t *testing.T) {
 		owner := ""
-		ledger := newMockLedger(
+		st := newMockState(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -118,13 +76,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		err := d.Process(nil, fvm.Context{
 			StorageCapacityResolver: storageCapacityResolver,
 			LimitAccountStorage:     true,
-		}, nil, ledger)
+		}, nil, st)
 
 		require.NoError(t, err)
 	})
 	t.Run("account registers without exists are ignored", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		ledger := newMockLedger(
+		st := newMockState(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -134,16 +92,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		err := d.Process(nil, fvm.Context{
 			StorageCapacityResolver: storageCapacityResolver,
 			LimitAccountStorage:     true,
-		}, nil, ledger)
+		}, nil, st)
 
 		require.NoError(t, err)
 	})
-}
-
-type MockLedger struct {
-	UpdatedRegisterKeys []flow.RegisterID
-	StorageValues       map[string]map[string]flow.RegisterValue
-	GetCalls            map[string]int
 }
 
 type OwnerKeyValue struct {
@@ -168,42 +120,23 @@ func accountExists(owner string) OwnerKeyValue {
 	}
 }
 
-func newMockLedger(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) MockLedger {
-	storageValues := make(map[string]map[string]flow.RegisterValue)
+func newMockState(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.State {
+
+	ledger := state.NewMapLedger()
+	s := state.NewState(ledger)
+
 	for _, okv := range ownerKeyStorageValue {
-		_, exists := storageValues[okv.Owner]
-		if !exists {
-			storageValues[okv.Owner] = make(map[string]flow.RegisterValue)
-		}
-		storageValues[okv.Owner][okv.Key] = utils.Uint64ToBinary(okv.Value)
+		_ = s.Set(okv.Owner, "", okv.Key, utils.Uint64ToBinary(okv.Value))
 	}
-	updatedRegisters := make([]flow.RegisterID, len(updatedKeys))
-	for i, key := range updatedKeys {
-		updatedRegisters[i] = flow.RegisterID{
-			Owner:      key,
-			Controller: "",
-			Key:        "",
-		}
+	_ = s.Commit()
+
+	for _, key := range updatedKeys {
+		_ = s.Set(key, "", "", []byte("1"))
 	}
 
-	return MockLedger{
-		UpdatedRegisterKeys: updatedRegisters,
-		StorageValues:       storageValues,
-		GetCalls:            make(map[string]int),
-	}
+	return s
 }
 
-func (l MockLedger) Set(_, _, _ string, _ flow.RegisterValue) {}
-func (l MockLedger) Get(owner, _, key string) (flow.RegisterValue, error) {
-	l.GetCalls[owner] = l.GetCalls[owner] + 1
-	return l.StorageValues[owner][key], nil
-}
-func (l MockLedger) Touch(_, _, _ string)  {}
-func (l MockLedger) Delete(_, _, _ string) {}
-func (l MockLedger) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	return l.UpdatedRegisterKeys, []flow.RegisterValue{}
-}
-
-func storageCapacityResolver(_ state.Ledger, _ flow.Address, _ fvm.Context) (uint64, error) {
+func storageCapacityResolver(_ *state.State, _ flow.Address, _ fvm.Context) (uint64, error) {
 	return 100, nil
 }

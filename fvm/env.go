@@ -135,7 +135,7 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 }
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	return e.ctx.StorageCapacityResolver(e.ledger, flow.BytesToAddress(address.Bytes()), e.ctx)
+	return e.ctx.StorageCapacityResolver(e.st, flow.BytesToAddress(address.Bytes()), e.ctx)
 }
 
 func (e *hostEnv) ResolveLocation(
@@ -568,8 +568,6 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				flowAddress,
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
-			e.ledger,
-			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
 			e.st,
 		)
 		if err != nil {

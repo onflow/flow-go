@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type TransactionStorageLimiter struct{}
@@ -15,32 +14,19 @@ func (d *TransactionStorageLimiter) Process(
 	_ *VirtualMachine,
 	ctx Context,
 	_ *TransactionProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
 	if !ctx.LimitAccountStorage {
 		return nil
 	}
 
 	storageCapacityResolver := ctx.StorageCapacityResolver
-	accounts := state.NewAccounts(ledger)
+	accounts := state.NewAccounts(st)
 
-	registerIds, _ := ledger.RegisterUpdates()
+	addresses := st.UpdatedAddresses()
 
-	checked := map[string]struct{}{}
-	for _, id := range registerIds {
-		owner := id.Owner
+	for _, address := range addresses {
 
-		if _, wasChecked := checked[owner]; wasChecked {
-			// we already checked this account, move on
-			continue
-		}
-		checked[owner] = struct{}{}
-
-		// is this an address?
-		address, isAddress := addressFromString(owner)
-		if !isAddress {
-			continue
-		}
 		// does it exist?
 		exists, err := accounts.Exists(address)
 		if err != nil {
@@ -50,7 +36,7 @@ func (d *TransactionStorageLimiter) Process(
 			continue
 		}
 
-		capacity, err := storageCapacityResolver(ledger, address, ctx)
+		capacity, err := storageCapacityResolver(st, address, ctx)
 		if err != nil {
 			return err
 		}
@@ -69,14 +55,4 @@ func (d *TransactionStorageLimiter) Process(
 		}
 	}
 	return nil
-}
-
-func addressFromString(owner string) (flow.Address, bool) {
-	ownerBytes := []byte(owner)
-	if len(ownerBytes) != flow.AddressLength {
-		// not an address
-		return flow.EmptyAddress, false
-	}
-	address := flow.BytesToAddress(ownerBytes)
-	return address, true
 }

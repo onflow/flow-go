@@ -27,7 +27,8 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tx *flow.TransactionBody,
 	st *state.State,
 ) error {
-	accounts := state.NewAccounts(st)
+	cst := st.Child()
+	accounts := state.NewAccounts(cst)
 	proposalKey := tx.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
@@ -67,7 +68,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		return err
 	}
 
-	err = st.Commit()
+	err = cst.Commit()
 	if err != nil {
 		return err
 	}

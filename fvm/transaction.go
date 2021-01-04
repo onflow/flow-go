@@ -67,7 +67,8 @@ func (i *TransactionInvocator) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, st)
+	cst := st.Child()
+	env, err := newEnvironment(ctx, cst)
 	if err != nil {
 		return err
 	}
@@ -82,10 +83,10 @@ func (i *TransactionInvocator) Process(
 		return err
 	}
 
-	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
+	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", cst.InteractionUsed())
 
 	// commit changes
-	err = st.Commit()
+	err = cst.Commit()
 	if err != nil {
 		return err
 	}

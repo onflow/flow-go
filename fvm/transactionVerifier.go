@@ -32,8 +32,8 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx *flow.TransactionBody,
 	st *state.State,
 ) (err error) {
-
-	accounts := state.NewAccounts(st)
+	cst := st.Child()
+	accounts := state.NewAccounts(cst)
 
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
@@ -91,7 +91,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	return st.Commit()
+	return cst.Commit()
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

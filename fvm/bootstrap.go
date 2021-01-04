@@ -189,7 +189,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, flowToken flow.Address) 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployStorageFeesTransaction(service, contract),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
@@ -236,7 +236,7 @@ func (b *BootstrapProcedure) setupFees(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupFeesTransaction(service, addressCreationFee, minimumStorageReservation),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup fees: %s", err.Error()))
@@ -249,7 +249,7 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", err.Error()))

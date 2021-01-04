@@ -10,15 +10,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type StorageCapacityResolver func(state.Ledger, flow.Address, Context) (uint64, error)
+type StorageCapacityResolver func(*state.State, flow.Address, Context) (uint64, error)
 
-func ResourceStorageCapacityResolver(l state.Ledger, address flow.Address, ctx Context) (uint64, error) {
-	storageReservation, err := getAccountsStorageReservation(l, address, ctx)
+func ResourceStorageCapacityResolver(s *state.State, address flow.Address, ctx Context) (uint64, error) {
+	storageReservation, err := getAccountsStorageReservation(s, address, ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	minimumStorageReservation, bytesPerFLOW, err := getStorageFeeParameters(l, ctx)
+	minimumStorageReservation, bytesPerFLOW, err := getStorageFeeParameters(s, ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -30,14 +30,14 @@ func ResourceStorageCapacityResolver(l state.Ledger, address flow.Address, ctx C
 	return uint64(storageCapacityValue), nil
 }
 
-func getStorageFeeParameters(l state.Ledger, ctx Context) (interpreter.UFix64Value, interpreter.UFix64Value, error) {
+func getStorageFeeParameters(s *state.State, ctx Context) (interpreter.UFix64Value, interpreter.UFix64Value, error) {
 	flowStorageFeesId := flow.RegisterID{
 		Owner:      string(ctx.Chain.ServiceAddress().Bytes()),
 		Controller: "",
 		Key:        fmt.Sprintf("contract\x1F%s", "FlowStorageFees"),
 	}
 
-	composite, err := getCompositeFromRegister(l, flowStorageFeesId)
+	composite, err := getCompositeFromRegister(s, flowStorageFeesId)
 	if err != nil {
 		return 0.0, 0.0, err
 	}
@@ -63,7 +63,7 @@ func getStorageFeeParameters(l state.Ledger, ctx Context) (interpreter.UFix64Val
 	return minimumStorageReservation, bytesPerFlow, nil
 }
 
-func getAccountsStorageReservation(l state.Ledger, address flow.Address, ctx Context) (interpreter.UFix64Value, error) {
+func getAccountsStorageReservation(s *state.State, address flow.Address, ctx Context) (interpreter.UFix64Value, error) {
 	storageReservationRegisterId := flow.RegisterID{
 		Owner:      string(address.Bytes()),
 		Controller: "",
@@ -71,7 +71,7 @@ func getAccountsStorageReservation(l state.Ledger, address flow.Address, ctx Con
 		Key: fmt.Sprintf("%s\x1F%s", "storage", "flowStorageReservation"),
 	}
 
-	composite, err := getCompositeFromRegister(l, storageReservationRegisterId)
+	composite, err := getCompositeFromRegister(s, storageReservationRegisterId)
 	if err != nil {
 		return 0, nil
 	}
@@ -112,8 +112,8 @@ func getAccountsStorageReservation(l state.Ledger, address flow.Address, ctx Con
 	return balance, nil
 }
 
-func getCompositeFromRegister(l state.Ledger, id flow.RegisterID) (*interpreter.CompositeValue, error) {
-	resource, err := l.Get(id.Owner, id.Controller, id.Key)
+func getCompositeFromRegister(s *state.State, id flow.RegisterID) (*interpreter.CompositeValue, error) {
+	resource, err := s.Get(id.Owner, id.Controller, id.Key)
 	if err != nil {
 		return nil, fmt.Errorf("could not load storage capacity resource at %s: %w", id.String(), err)
 	}
