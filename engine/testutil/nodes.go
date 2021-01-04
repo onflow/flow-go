@@ -85,11 +85,11 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	distributor := events.NewDistributor()
 	statuses := storage.NewEpochStatuses(metrics, db)
 
-	state, err := protocol.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, distributor)
+	root, result, seal := unittest.BootstrapFixture(participants)
+	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
 	require.NoError(t, err)
 
-	root, result, seal := unittest.BootstrapFixture(participants)
-	err = state.Mutate().Bootstrap(root, result, seal)
+	state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
 	require.NoError(t, err)
 
 	for _, option := range options {
@@ -113,9 +113,6 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 
 	stubnet := stub.NewNetwork(state, me, hub)
-
-	tracer, err = trace.NewTracer(log, "test")
-	require.NoError(t, err)
 
 	return testmock.GenericNode{
 		Log:            log,
@@ -205,7 +202,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)
 
-	seals := stdmap.NewIncorporatedResultSeals(1000)
+	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
@@ -266,6 +263,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.DB)
 	receipts := storage.NewExecutionReceipts(node.DB, results)
 
+	protoState, ok := node.State.(*protocol.State)
+	require.True(t, ok)
+
+	followerState, err := protocol.NewFollowerState(protoState, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
+	require.NoError(t, err)
+
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
 
 	dbDir := unittest.TempDir(t)
@@ -306,10 +309,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	vm := fvm.New(rt)
 
+	blockFinder := fvm.NewBlockFinder(node.Headers)
+
 	vmCtx := fvm.NewContext(
 		node.Log,
 		fvm.WithChain(node.ChainID.Chain()),
-		fvm.WithBlocks(node.Blocks),
+		fvm.WithBlocks(blockFinder),
 	)
 
 	computationEngine, err := computation.New(
@@ -360,13 +365,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore, finalizer := createFollowerCore(t, &node, ingestionEngine, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, followerState, ingestionEngine, rootHead, rootQC)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
 	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, node.State, pendingBlocks, followerCore, syncCore)
+		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore)
 	require.NoError(t, err)
 
 	syncEngine, err := synchronization.New(
@@ -384,6 +389,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	return testmock.ExecutionNode{
 		GenericNode:     node,
+		MutableState:    followerState,
 		IngestionEngine: ingestionEngine,
 		FollowerEngine:  followerEng,
 		SyncEngine:      syncEngine,
@@ -448,7 +454,7 @@ func (s *RoundRobinLeaderSelection) DKG(blockID flow.Identifier) (hotstuff.DKG, 
 	return nil, fmt.Errorf("error")
 }
 
-func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *flow.QuorumCertificate) (module.HotStuffFollower, *confinalizer.Finalizer) {
+func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState *protocol.FollowerState, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *flow.QuorumCertificate) (module.HotStuffFollower, *confinalizer.Finalizer) {
 
 	identities, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
@@ -463,7 +469,7 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, notifier hotst
 	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, node.State)
+	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, followerState)
 
 	pending := make([]*flow.Header, 0)
 
@@ -618,10 +624,12 @@ func VerificationNode(t testing.TB,
 
 		vm := fvm.New(rt)
 
+		blockFinder := fvm.NewBlockFinder(node.Headers)
+
 		vmCtx := fvm.NewContext(
 			node.Log,
 			fvm.WithChain(node.ChainID.Chain()),
-			fvm.WithBlocks(node.Blocks),
+			fvm.WithBlocks(blockFinder),
 		)
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)

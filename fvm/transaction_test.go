@@ -21,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const TopShotContractAddress = "0b2a3299cc857e29"
+
 // Runtime is Cadence interface hence it would be hard to mock it
 // implementation for our needs is simple enough though
 type mockRuntime struct {
@@ -48,43 +50,22 @@ func prepare(executeTxResult error) (error, *bytes.Buffer) {
 	runtime := mockRuntime{executeTxResult: executeTxResult}
 	vm := New(runtime)
 
-	proc := Transaction(&flow.TransactionBody{})
+	proc := Transaction(&flow.TransactionBody{}, 0)
 
 	ledger := state.NewMapLedger()
 
 	context := NewContext(log)
 
-	err := txInvocator.Process(vm, context, proc, ledger)
+	st := state.NewState(ledger, state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+		state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+		state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize))
+
+	err := txInvocator.Process(vm, context, proc, st)
 
 	return err, buffer
 }
 
 func TestTopShotSafety(t *testing.T) {
-
-	t.Run("logs nothing for successful tx", func(t *testing.T) {
-		err, buffer := prepare(nil)
-		require.NoError(t, err)
-		require.Equal(t, 0, buffer.Len())
-	})
-
-	t.Run("logs for failing tx but not related to TopShot", func(t *testing.T) {
-
-		runtimeError := runtime.Error{
-			Err: sema.CheckerError{
-				Errors: []error{&sema.ImportedProgramError{
-					CheckerError: &sema.CheckerError{},
-					ImportLocation: ast.AddressLocation{
-						Name:    "NotTopshot",
-						Address: common.BytesToAddress([]byte{0, 1, 2}),
-					},
-				}},
-			},
-		}
-
-		err, buffer := prepare(runtimeError)
-		require.Error(t, err)
-		require.Equal(t, 0, buffer.Len())
-	})
 
 	t.Run("logs for failing TopShot tx but no extra info is provided", func(t *testing.T) {
 
@@ -174,7 +155,7 @@ func TestTopShotSafety(t *testing.T) {
 			Authorizers:        nil,
 			PayloadSignatures:  nil,
 			EnvelopeSignatures: nil,
-		})
+		}, 0)
 
 		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
 
@@ -191,12 +172,18 @@ func TestTopShotSafety(t *testing.T) {
 		encodedName, err := encodeContractNames([]string{"TopShot"})
 		require.NoError(t, err)
 
-		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "contract_names", encodedName)
-		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code.TopShot", []byte(topShotCode))
+		err = ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "contract_names", encodedName)
+		require.NoError(t, err)
+		err = ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code.TopShot", []byte(topShotCode))
+		require.NoError(t, err)
 
 		context := NewContext(log)
 
-		err = txInvocator.Process(vm, context, proc, ledger)
+		st := state.NewState(ledger, state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize))
+
+		err = txInvocator.Process(vm, context, proc, st)
 		require.Error(t, err)
 
 		expected := addressToSpewBytesString(topShotContractAddress)

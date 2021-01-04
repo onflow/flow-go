@@ -81,7 +81,7 @@ func TestNilProducesSameHashAsEmptySlice(t *testing.T) {
 
 func TestOrderingChangesHash(t *testing.T) {
 
-	seals := unittest.BlockSealsFixture(5)
+	seals := unittest.Seal.Fixtures(5)
 
 	payload1 := flow.Payload{
 		Seals: seals,

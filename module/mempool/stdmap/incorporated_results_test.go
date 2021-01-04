@@ -14,7 +14,7 @@ func TestIncorporatedResults(t *testing.T) {
 	pool, err := NewIncorporatedResults(1000)
 	require.NoError(t, err)
 
-	ir1 := unittest.IncorporatedResultFixture()
+	ir1 := unittest.IncorporatedResult.Fixture()
 	t.Run("Adding first incorporated result", func(t *testing.T) {
 		ok, err := pool.Add(ir1)
 		require.True(t, ok)
@@ -44,7 +44,7 @@ func TestIncorporatedResults(t *testing.T) {
 		require.Contains(t, incorporatedResults, ir2.IncorporatedBlockID)
 	})
 
-	ir3 := unittest.IncorporatedResultFixture()
+	ir3 := unittest.IncorporatedResult.Fixture()
 	t.Run("Adding third incorporated result", func(t *testing.T) {
 		ok, err := pool.Add(ir3)
 		require.True(t, ok)
@@ -84,7 +84,7 @@ func TestIncorporatedResultsEjectSize(t *testing.T) {
 
 		// insert 20 items (10 above limit)
 		for i := 0; i < 20; i++ {
-			_, _ = pool.Add(unittest.IncorporatedResultFixture())
+			_, _ = pool.Add(unittest.IncorporatedResult.Fixture())
 		}
 
 		// 10 items should have been evicted, so size 10
@@ -108,7 +108,6 @@ func TestIncorporatedResultsEjectSize(t *testing.T) {
 		mempool, err := NewIncorporatedResults(10, WithEject(ejector))
 		require.NoError(t, err)
 
-		// add 3 IncorporatedResult structs for
 		for r := 1; r <= 10; r++ {
 			// insert 3 different IncorporatedResult for the same result
 			addIncorporatedResults(t, mempool, result, 3)
@@ -130,12 +129,10 @@ func TestIncorporatedResultsEjectSize(t *testing.T) {
 		// Hence, eviction should lead to _all_ IncorporatedResult for a single result being dropped.
 		// For this specific test, we always evict the IncorporatedResult for the first base result.
 		// Hence, we expect:
+		//   * 0 IncorporatedResult for each of the results 1, as it was evicted
 		//   * 3 IncorporatedResult for each of the results 2, 3, ..., 10
 		//   * plus one result for result 11
 		require.Equal(t, uint(9*3+1), mempool.Size())
-		if uint(9*3+1) != mempool.Size() {
-			assert.FailNow(t, "")
-		}
 	})
 }
 
