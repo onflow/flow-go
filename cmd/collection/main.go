@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"time"
+
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/spf13/pflag"
 
@@ -386,8 +389,18 @@ func main() {
 				return nil, fmt.Errorf("flag `qc-contract-address` required")
 			}
 
+			// construct private key object
+			privateKeyBytes, err := hex.DecodeString(privateKey)
+			if err != nil {
+				return nil, err
+			}
+			sk, err := sdkcrypto.DecodePrivateKey(sdkcrypto.ECDSA_P256, privateKeyBytes)
+			if err != nil {
+				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
+			}
+
 			// create QC vote client
-			qcContractClient, err := epochs.NewQCContractClient(privateKey, accountAddress, 0, accessAddress, qcContractAddress)
+			qcContractClient, err := epochs.NewQCContractClient(sk, accountAddress, 0, accessAddress, qcContractAddress)
 			if err != nil {
 				return nil, err
 			}

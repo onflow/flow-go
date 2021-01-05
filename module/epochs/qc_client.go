@@ -26,12 +26,12 @@ type QCContractClient struct {
 	client            *client.Client // flow-go-sdk client to access node
 	account           *sdk.Account
 	accountKeyIndex   int
-	privateKey        string
+	privateKey        sdkcrypto.PrivateKey
 	signer            sdkcrypto.Signer
 }
 
 // NewQCContractClient returns a new client to the QC contract
-func NewQCContractClient(privateKey, accountAddress string, accountKeyIndex int, accessAddress, qcContractAddress string) (*QCContractClient, error) {
+func NewQCContractClient(privateKey sdkcrypto.PrivateKey, accountAddress string, accountKeyIndex int, accessAddress, qcContractAddress string) (*QCContractClient, error) {
 
 	address := sdk.HexToAddress(accountAddress)
 
@@ -54,11 +54,7 @@ func NewQCContractClient(privateKey, accountAddress string, accountKeyIndex int,
 
 	// construct signer for signing transactions
 	accountKey := account.Keys[accountKeyIndex]
-	sk, err := sdkcrypto.DecodePrivateKeyHex(accountKey.SigAlgo, privateKey)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode private key from hex: %v", err)
-	}
-	signer := sdkcrypto.NewInMemorySigner(sk, account.Keys[accountKeyIndex].HashAlgo)
+	signer := sdkcrypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
 
 	return &QCContractClient{
 		accessAddress:     accessAddress,
