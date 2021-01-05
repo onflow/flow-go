@@ -24,15 +24,16 @@ type QCContractClient struct {
 	accessAddress     string         // address of the access node
 	qcContractAddress string         // QuorumCertificate contract address
 	client            *client.Client // flow-go-sdk client to access node
-
-	// node details
-	accountAddress  sdk.Address
-	accountKeyIndex int
-	privateKey      string
+	account           *sdk.Account
+	accountKeyIndex   int
+	privateKey        string
+	signer            sdkcrypto.Signer
 }
 
 // NewQCContractClient returns a new client to the QC contract
 func NewQCContractClient(privateKey, accountAddress string, accountKeyIndex int, accessAddress, qcContractAddress string) (*QCContractClient, error) {
+
+	address := sdk.HexToAddress(accountAddress)
 
 	// create a new instance of flow-go-sdk client
 	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
@@ -40,13 +41,33 @@ func NewQCContractClient(privateKey, accountAddress string, accountKeyIndex int,
 		return nil, fmt.Errorf("could not create flow client: %w", err)
 	}
 
+	// get account for given address
+	account, err := flowClient.GetAccount(context.Background(), address)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account: %w", err)
+	}
+
+	// check if account key index within range of keys
+	if len(account.Keys) <= accountKeyIndex {
+		return nil, fmt.Errorf("given account key index is bigger than the number of keys for this account")
+	}
+
+	// construct signer for signing transactions
+	accountKey := account.Keys[accountKeyIndex]
+	sk, err := sdkcrypto.DecodePrivateKeyHex(accountKey.SigAlgo, privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode private key from hex: %v", err)
+	}
+	signer := sdkcrypto.NewInMemorySigner(sk, account.Keys[accountKeyIndex].HashAlgo)
+
 	return &QCContractClient{
 		accessAddress:     accessAddress,
 		qcContractAddress: qcContractAddress,
 		client:            flowClient,
-		accountAddress:    sdk.HexToAddress(accountAddress),
+		account:           account,
 		accountKeyIndex:   accountKeyIndex,
 		privateKey:        privateKey,
+		signer:            signer,
 	}, nil
 }
 
@@ -67,7 +88,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		SetScript(templates.GenerateSubmitVoteScript(c.getEnvironment())).
 		SetGasLimit(1000).
 		SetReferenceBlockID(latestBlock.ID).
-		SetPayer(c.accountAddress)
+		SetPayer(c.account.Address)
 
 	// add signature data to the transaction and submit to node
 	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
@@ -75,20 +96,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
 	}
 
-	// get account details
-	account, err := c.client.GetAccount(ctx, c.accountAddress)
-	if err != nil {
-		return fmt.Errorf("could not get account: %w", err)
-	}
-
-	// sign transaction
-	sk, err := sdkcrypto.DecodePrivateKeyHex(account.Keys[c.accountKeyIndex].SigAlgo, c.privateKey)
-	if err != nil {
-		return fmt.Errorf("could not decode private key from hex: %v", err)
-	}
-
-	signer := sdkcrypto.NewInMemorySigner(sk, account.Keys[c.accountKeyIndex].HashAlgo)
-	err = tx.SignPayload(account.Address, c.accountKeyIndex, signer)
+	// sign payload using account signer
+	err = tx.SignPayload(c.account.Address, c.accountKeyIndex, c.signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}

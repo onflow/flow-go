@@ -76,6 +76,8 @@ func main() {
 		// epoch qc contract client
 		accessAddress     string
 		qcContractAddress string
+		accountAddress    string
+		privateKey        string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -123,8 +125,10 @@ func main() {
 				"the delay to broadcast block proposal in order to control block production rate")
 
 			// epoch qc contract flags
-			flags.StringVar(&accessAddress, "access-address", "DEFAULT_ACCESS_ADDRESS?", "the address of an access node")
-			flags.StringVar(&qcContractAddress, "qc-contract-address", "DEFAULT_QC_CONTRACT_ADDRESS?", "the address of the Epoch QC contract")
+			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&qcContractAddress, "qc-contract-address", "", "the address of the Epoch QC contract")
+			flags.StringVar(&privateKey, "private-key", "", "the private key of the account used to interact")
+			flags.StringVar(&accountAddress, "account-address", "", "the private key of the account used to interact")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -368,9 +372,22 @@ func main() {
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
+			// check if required fields are left empty
+			if accountAddress == "" {
+				return nil, fmt.Errorf("flag `account-address` required")
+			}
+			if privateKey == "" {
+				return nil, fmt.Errorf("flag `private-key` required")
+			}
+			if accessAddress == "" {
+				return nil, fmt.Errorf("flag `access-address` required")
+			}
+			if qcContractAddress == "" {
+				return nil, fmt.Errorf("flag `qc-contract-address` required")
+			}
+
 			// create QC vote client
-			// TODO: Add QCContractClient to contructor for rootQCVoter
-			qcContractClient, err := epochs.NewQCContractClient("PRIVATE_KEY", "ACCOUNT_ADDRESS", 0, accessAddress, qcContractAddress)
+			qcContractClient, err := epochs.NewQCContractClient(privateKey, accountAddress, 0, accessAddress, qcContractAddress)
 			if err != nil {
 				return nil, err
 			}
