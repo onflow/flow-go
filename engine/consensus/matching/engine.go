@@ -522,7 +522,6 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 	// enough approvals for
 RES_LOOP:
 	for _, incorporatedResult := range e.incorporatedResults.All() {
-
 		// not finding the block header for an incorporated result is a fatal
 		// implementation bug, as we only add results to the IncorporatedResults
 		// mempool, where _both_ the block that incorporates the result as well
@@ -532,55 +531,9 @@ RES_LOOP:
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// Retrieve parent result / skip if parent result still unknown:
-		// Before we store a result into the incorporatedResults mempool, we store it in resultsDB.
-		// I.e. resultsDB contains a superset of all results stored in the mempool. Hence, we only need
-		// to check resultsDB. Any result not in resultsDB cannot be in incorporatedResults mempool.
-		previousID := incorporatedResult.Result.PreviousResultID
-		previous, err := e.resultsDB.ByID(previousID)
-		if errors.Is(err, storage.ErrNotFound) {
-			e.log.Debug().Msg("skipping sealable result with unknown previous result")
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("could not get previous result: %w", err)
-		}
-
-		// check sub-graph
-		if block.ParentID != previous.BlockID {
-			_ = e.incorporatedResults.Rem(incorporatedResult)
-			e.log.Warn().
-				Str("block_parent_id", block.ParentID.String()).
-				Str("previous_result_block_id", previous.BlockID.String()).
-				Msg("removing result with invalid sub-graph")
-			continue
-		}
-
-		// we create one chunk per collection, plus the
-		// system chunk. so we can check if the chunk number matches with the
-		// number of guarantees plus one; this will ensure the execution receipt
-		// cannot lie about having less chunks and having the remaining ones
-		// approved
-		requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
-
-		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
-		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, err
-			}
-			// reaching this line means the block is empty, i.e. it has no payload => we expect only the system chunk
-		} else {
-			requiredChunks += len(index.CollectionIDs)
-		}
-
-		if incorporatedResult.Result.Chunks.Len() != requiredChunks {
-			_ = e.incorporatedResults.Rem(incorporatedResult)
-			e.log.Warn().
-				Int("result_chunks", len(incorporatedResult.Result.Chunks)).
-				Int("required_chunks", requiredChunks).
-				Msg("removing result with invalid number of chunks")
-			continue
-		}
+		// At this point we can be sure that all needed checks on validity of ER
+		// were executed prior to this point, since we perform validation of every ER
+		// before adding it into mempool, that's why mempool can contain only valid entries.
 
 		// the chunk assigment is based on the first block in its fork which
 		// contains a receipt that commits to this result.
@@ -595,27 +548,7 @@ RES_LOOP:
 		}
 
 		// check that each chunk collects enough approvals
-		for i := 0; i < requiredChunks; i++ {
-			// arriving at a failure condition here means that the execution
-			// result is invalid; we should skip it and move on to the next
-			// execution result.
-
-			// get chunk at position i
-			chunk, ok := incorporatedResult.Result.Chunks.ByIndex(uint64(i))
-			if !ok {
-				e.log.Warn().Msgf("chunk out of range requested: %d", i)
-				_ = e.incorporatedResults.Rem(incorporatedResult)
-				continue RES_LOOP
-			}
-
-			// Check if chunk index matches its position. This ensures that the
-			// result contains all chunks and no duplicates.
-			if chunk.Index != uint64(i) {
-				e.log.Warn().Msgf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
-				_ = e.incorporatedResults.Rem(incorporatedResult)
-				continue RES_LOOP
-			}
-
+		for _, chunk := range incorporatedResult.Result.Chunks {
 			matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
 			if err != nil {
 				return nil, fmt.Errorf("")
