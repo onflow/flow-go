@@ -28,7 +28,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}
 	if isBootstrapped {
-		return nil, fmt.Errorf("expected empty database")
+		return nil, fmt.Errorf("expected empty cluster state for cluster ID %s", stateRoot.ClusterID())
 	}
 	state := newState(db, stateRoot.ClusterID())
 
