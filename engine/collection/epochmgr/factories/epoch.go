@@ -97,7 +97,7 @@ func (factory *EpochComponentsFactory) Create(
 		blocks   storage.ClusterBlocks
 	)
 
-	stateRoot, err := badger.NewStateRoot(cluster.ChainID(), cluster.RootBlock())
+	stateRoot, err := badger.NewStateRoot(cluster.RootBlock())
 	if err != nil {
 		err = fmt.Errorf("could not create valid state root: %w", err)
 		return

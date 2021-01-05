@@ -9,25 +9,20 @@ import (
 
 // StateRoot is the root information required to bootstrap the cluster state
 type StateRoot struct {
-	block     *cluster.Block
+	block *cluster.Block
 }
 
-func NewStateRoot(clusterID flow.ChainID, genesis *cluster.Block) (*StateRoot, error) {
-	err := validate(clusterID, genesis)
+func NewStateRoot(genesis *cluster.Block) (*StateRoot, error) {
+	err := validateClusterGenesis(genesis)
 	if err != nil {
 		return nil, fmt.Errorf("inconsistent state root: %w", err)
 	}
 	return &StateRoot{
-		clusterID: clusterID,
-		block:     genesis,
+		block: genesis,
 	}, nil
 }
 
 func validateClusterGenesis(genesis *cluster.Block) error {
-	// check chain ID
-	if genesis.Header.ChainID != clusterID {
-		return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.Header.ChainID, clusterID)
-	}
 	// check header number
 	if genesis.Header.Height != 0 {
 		return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Header.Height)
@@ -52,7 +47,7 @@ func validateClusterGenesis(genesis *cluster.Block) error {
 }
 
 func (s StateRoot) ClusterID() flow.ChainID {
-	return s.clusterID
+	return s.block.Header.ChainID
 }
 
 func (s StateRoot) Block() *cluster.Block {

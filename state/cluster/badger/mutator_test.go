@@ -60,7 +60,7 @@ func (suite *MutatorSuite) SetupTest() {
 	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	clusterStateRoot, err := NewStateRoot(suite.chainID, suite.genesis)
+	clusterStateRoot, err := NewStateRoot(suite.genesis)
 	suite.NoError(err)
 	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
 	suite.Assert().Nil(err)
@@ -141,31 +141,24 @@ func TestMutator(t *testing.T) {
 	suite.Run(t, new(MutatorSuite))
 }
 
-func (suite *MutatorSuite) TestBootstrap_InvalidChainID() {
-	suite.genesis.Header.ChainID = flow.ChainID(fmt.Sprintf("%s-invalid", suite.genesis.Header.ChainID))
-
-	_, err := NewStateRoot(suite.chainID, suite.genesis)
-	suite.Assert().Error(err)
-}
-
 func (suite *MutatorSuite) TestBootstrap_InvalidNumber() {
 	suite.genesis.Header.Height = 1
 
-	_, err := NewStateRoot(suite.chainID, suite.genesis)
+	_, err := NewStateRoot(suite.genesis)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidParentHash() {
 	suite.genesis.Header.ParentID = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.chainID, suite.genesis)
+	_, err := NewStateRoot(suite.genesis)
 	suite.Assert().Error(err)
 }
 
 func (suite *MutatorSuite) TestBootstrap_InvalidPayloadHash() {
 	suite.genesis.Header.PayloadHash = unittest.IdentifierFixture()
 
-	_, err := NewStateRoot(suite.chainID, suite.genesis)
+	_, err := NewStateRoot(suite.genesis)
 	suite.Assert().Error(err)
 }
 
@@ -173,7 +166,7 @@ func (suite *MutatorSuite) TestBootstrap_InvalidPayload() {
 	// this is invalid because genesis collection should be empty
 	suite.genesis.Payload = unittest.ClusterPayloadFixture(2)
 
-	_, err := NewStateRoot(suite.chainID, suite.genesis)
+	_, err := NewStateRoot(suite.genesis)
 	suite.Assert().Error(err)
 }
 
