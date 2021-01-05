@@ -213,7 +213,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *messages.ApprovalResponse:
 		e.unit.Lock()
 		defer e.unit.Unlock()
-		e.log.Debug().Msg("received approval response")
 		return e.onApproval(originID, &ev.Approval)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -930,9 +929,7 @@ func (e *Engine) requestPendingReceipts() error {
 		blockID := header.ID()
 		if _, ok := knownResultForBlock[blockID]; !ok {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-			continue
 		}
-
 	}
 
 	// request missing execution results, if sealed height is low enough
@@ -951,6 +948,14 @@ func (e *Engine) requestPendingReceipts() error {
 // threshold, we go through the entire mempool of incorporated-results, which
 // haven't yet been sealed, and check which chunks need more approvals.
 func (e *Engine) requestPendingApprovals() error {
+
+	// Skip requesting approvals if they are not required for sealing.
+	// TODO: this is only here temporarily to ease the migration to new chunk
+	// based sealing.
+	if !e.requireApprovals {
+		return nil
+	}
+
 	// last sealed block
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {

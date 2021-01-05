@@ -83,9 +83,13 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 			return err
 		}
 
-		// when trying to index an approval for a result, and there is already
+		// When trying to index an approval for a result, and there is already
 		// an approval for the result, double check if the indexed approval is
-		// the same
+		// the same.
+		// We don't allow indexing multiple approvals per chunk because the
+		// store is only used within Verification nodes, and it is impossible
+		// for a Verification node to compute different approvals for the same
+		// chunk.
 		var storedApprovalID flow.Identifier
 		err = operation.LookupResultApproval(resultID, chunkIndex, &storedApprovalID)(tx)
 		if err != nil {
@@ -101,16 +105,13 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 	}
 }
 
+// Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(approval))
 }
 
-func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	tx := r.db.NewTransaction(false)
-	defer tx.Discard()
-	return r.byID(approvalID)(tx)
-}
-
+// Index indexes a ResultApproval by chunk ( ResultID + chunk index ), and
+// overrides any pre-existing entry for this key.
 func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
 	err := operation.RetryOnConflict(r.db.Update, r.index(resultID, chunkIndex, approvalID))
 	if err != nil {
@@ -119,6 +120,16 @@ func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, app
 	return nil
 }
 
+// ByID retrieves a ResultApproval by its ID
+func (r *ResultApprovals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
+	tx := r.db.NewTransaction(false)
+	defer tx.Discard()
+	return r.byID(approvalID)(tx)
+}
+
+// ByChunk retrieves a ResultApproval by result ID and chunk index. The
+// ResultApprovals store is only used within a verification node, where it is
+// assumed that there is never more than one approval per chunk.
 func (r *ResultApprovals) ByChunk(resultID flow.Identifier, chunkIndex uint64) (*flow.ResultApproval, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
