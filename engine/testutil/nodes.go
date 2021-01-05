@@ -56,6 +56,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -78,18 +79,6 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	require.NoError(t, err)
 	metrics := metrics.NewNoopCollector()
 
-	guarantees := storage.NewGuarantees(metrics, db)
-	seals := storage.NewSeals(metrics, db)
-	headers := storage.NewHeaders(metrics, db)
-	index := storage.NewIndex(metrics, db)
-	resultsDB := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewExecutionReceipts(metrics, db, resultsDB)
-	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	setups := storage.NewEpochSetups(metrics, db)
-	commits := storage.NewEpochCommits(metrics, db)
-	distributor := events.NewDistributor()
-	statuses := storage.NewEpochStatuses(metrics, db)
 	// creates state fixture and bootstrap it.
 	stateFixture := CompleteStateFixture(t, log, metrics, tracer, participants)
 
@@ -163,7 +152,7 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer)
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator())
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
