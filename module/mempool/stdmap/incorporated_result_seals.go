@@ -34,7 +34,7 @@ func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	return res
 }
 
-// ByID gets an IncorporatedResultSeal by ID
+// ByID gets an IncorporatedResultSeal by IncorporatedResult ID
 func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedResultSeal, bool) {
 	entity, ok := ir.Backend.ByID(id)
 	if !ok {

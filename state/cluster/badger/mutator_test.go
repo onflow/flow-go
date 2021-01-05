@@ -57,7 +57,7 @@ func (suite *MutatorSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, _ := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis)
