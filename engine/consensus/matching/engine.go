@@ -40,7 +40,7 @@ type Engine struct {
 	state                   protocol.State                  // used to access the  protocol state
 	me                      module.Local                    // used to access local node information
 	requester               module.Requester                // used to request missing execution receipts by block ID
-	resultsDB               storage.ExecutionResults        // used to check previous results are known
+	receiptsDB              storage.ExecutionReceipts       // used to store execution receipts when we get it as part of gossip protocol
 	headersDB               storage.Headers                 // used to check sealed headers
 	indexDB                 storage.Index                   // used to check payloads for results
 	incorporatedResults     mempool.IncorporatedResults     // holds incorporated results in memory
@@ -67,7 +67,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	requester module.Requester,
-	resultsDB storage.ExecutionResults,
+	receiptsDB storage.ExecutionReceipts,
 	headersDB storage.Headers,
 	indexDB storage.Index,
 	incorporatedResults mempool.IncorporatedResults,
@@ -90,7 +90,7 @@ func New(
 		state:                   state,
 		me:                      me,
 		requester:               requester,
-		resultsDB:               resultsDB,
+		receiptsDB:              receiptsDB,
 		headersDB:               headersDB,
 		indexDB:                 indexDB,
 		incorporatedResults:     incorporatedResults,
@@ -271,11 +271,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	log.Info().Msg("execution receipt added to mempool")
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
-	// store the result to make it persistent for later
-	result := &receipt.ExecutionResult
-	err = e.resultsDB.Store(result) // internally de-duplicates
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store sealing result: %w", err)
+	err = e.persistExecutionReceipt(receipt)
+	if err != nil {
+		return fmt.Errorf("failed to persist execution receipt: %w", err)
 	}
 
 	// We do _not_ return here if resultsDB already contained result!
@@ -316,6 +314,21 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// kick off a check for potential seal formation
 	e.unit.Launch(e.checkSealing)
 
+	return nil
+}
+
+func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+	// store the receipt to make it persistent for later
+	err := e.receiptsDB.Store(receipt) // internally de-duplicates
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		return fmt.Errorf("could not store sealing result: %w", err)
+	}
+	// TODO if the second operation fails we should remove stored execution result
+	// This is global execution storage problem - see TODO at the top
+	err = e.receiptsDB.Index(receipt.ExecutionResult.BlockID, receipt.ID())
+	if err != nil {
+		return fmt.Errorf("could not index execution receipt: %w", err)
+	}
 	return nil
 }
 
@@ -659,10 +672,11 @@ func (e *Engine) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.He
 // seals mempool.
 func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 
-	// store the result to make it persistent for later checks
-	err := e.resultsDB.Store(incorporatedResult.Result)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store sealing result: %w", err)
+	// at this point we expect to have receipt stored in database. Check our state before sealing.
+	// Failing here means implementation flaw.
+	_, err := e.receiptsDB.ByBlockID(incorporatedResult.Result.BlockID)
+	if err != nil {
+		return fmt.Errorf("missing receipt for execution result: %w", err)
 	}
 
 	// collect aggregate signatures

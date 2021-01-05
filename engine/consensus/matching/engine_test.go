@@ -81,7 +81,7 @@ func (ms *MatchingSuite) SetupTest() {
 		metrics:                 metrics,
 		state:                   ms.State,
 		requester:               ms.requester,
-		resultsDB:               ms.ResultsDB,
+		receiptsDB:              ms.ReceiptsDB,
 		headersDB:               ms.HeadersDB,
 		indexDB:                 ms.IndexDB,
 		incorporatedResults:     ms.ResultsPL,
@@ -122,7 +122,7 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for sealed result")
 
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -173,7 +173,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for already pending result")
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 
 	// resubmit receipt
 	err = ms.matching.onReceipt(receipt.ExecutorID, receipt)
@@ -225,7 +225,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	ms.Assert().True(engine.IsInvalidInputError(err))
 
 	ms.receiptValidator.AssertExpectations(ms.T())
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
