@@ -1,9 +1,13 @@
 package fvm
 
 import (
+	"encoding/binary"
+	"math/rand"
+
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/service"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -11,32 +15,32 @@ import (
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain                            flow.Chain
-	ASTCache                         ASTCache
+	BlockHeader                      *flow.Header
 	Blocks                           Blocks
-	Metrics                          *MetricsCollector
+	RandomNumberSeed                 *rand.Rand
+	Metrics                          MetricsCollector
+	SignatureVerifier                SignatureVerifier
 	GasLimit                         uint64
 	MaxStateKeySize                  uint64
 	MaxStateValueSize                uint64
 	MaxStateInteractionSize          uint64
 	EventCollectionByteSizeLimit     uint64
-	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	CadenceLoggingEnabled            bool
 	SetValueHandler                  SetValueHandler
-	SignatureVerifier                SignatureVerifier
-	TransactionProcessors            []TransactionProcessor
-	ScriptProcessors                 []ScriptProcessor
 	Logger                           zerolog.Logger
+	Ledger                           state.Ledger
 }
 
+// TODO RAMTIN remove me
 // SetValueHandler receives a value written by the Cadence runtime.
 type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
-func NewContext(logger zerolog.Logger, opts ...Option) Context {
-	return newContext(defaultContext(logger), opts...)
+func NewContext(logger zerolog.Logger, ledger state.Ledger, opts ...Option) Context {
+	return newContext(defaultContext(logger, ledger), opts...)
 }
 
 // NewContextFromParent spawns a child execution context with the provided options.
@@ -59,10 +63,10 @@ const (
 	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
 )
 
-func defaultContext(logger zerolog.Logger) Context {
+func defaultContext(logger zerolog.Logger, ledger state.Ledger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
-		ASTCache:                         nil,
+		BlockHeader:                      nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
 		GasLimit:                         DefaultGasLimit,
@@ -70,23 +74,13 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxStateValueSize:                state.DefaultMaxValueSize,
 		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
 		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
-		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
 		SetValueHandler:                  nil,
-		SignatureVerifier:                NewDefaultSignatureVerifier(),
-		TransactionProcessors: []TransactionProcessor{
-			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
-			NewTransactionSequenceNumberChecker(),
-			NewTransactionFeeDeductor(),
-			NewTransactionInvocator(logger),
-		},
-		ScriptProcessors: []ScriptProcessor{
-			NewScriptInvocator(),
-		},
-		Logger: logger,
+		Logger:                           logger,
+		Ledger:                           ledger,
 	}
 }
 
@@ -97,14 +91,6 @@ type Option func(ctx Context) Context
 func WithChain(chain flow.Chain) Option {
 	return func(ctx Context) Context {
 		ctx.Chain = chain
-		return ctx
-	}
-}
-
-// WithASTCache sets the AST cache for a virtual machine context.
-func WithASTCache(cache ASTCache) Option {
-	return func(ctx Context) Context {
-		ctx.ASTCache = cache
 		return ctx
 	}
 }
@@ -157,6 +143,23 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
+		// Seed the random number generator with entropy created from the block header ID. The random number generator will
+		// be used by the UnsafeRandom function.
+		id := header.ID()
+		source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
+		ctx.RandomNumberSeed = rand.New(source)
+
+		return ctx
+	}
+}
+
+// WithRandomNumberSeed rewrites the random number seed with the given value
+//
+// Note that using WithBlockHeader automatically updates RandomNumberSeed
+// with the seed from the blockheader.
+func WithRandomNumberSeed(seed *rand.Rand) Option {
+	return func(ctx Context) Context {
+		ctx.RandomNumberSeed = seed
 		return ctx
 	}
 }
@@ -175,18 +178,9 @@ func WithBlocks(blocks Blocks) Option {
 // WithMetricsCollector sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsCollector(mc *MetricsCollector) Option {
+func WithMetricsCollector(mc MetricsCollector) Option {
 	return func(ctx Context) Context {
 		ctx.Metrics = mc
-		return ctx
-	}
-}
-
-// WithTransactionProcessors sets the transaction processors for a
-// virtual machine context.
-func WithTransactionProcessors(processors ...TransactionProcessor) Option {
-	return func(ctx Context) Context {
-		ctx.TransactionProcessors = processors
 		return ctx
 	}
 }

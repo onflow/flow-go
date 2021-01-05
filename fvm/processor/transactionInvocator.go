@@ -1,55 +1,13 @@
-package fvm
+package processor
 
 import (
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 )
-
-func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
-	return &TransactionProcedure{
-		ID:          tx.ID(),
-		Transaction: tx,
-		TxIndex:     txIndex,
-	}
-}
-
-type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State) error
-}
-
-type TransactionProcedure struct {
-	ID          flow.Identifier
-	Transaction *flow.TransactionBody
-	TxIndex     uint32
-	Logs        []string
-	Events      []flow.Event
-	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
-	GasUsed uint64
-	Err     Error
-}
-
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
-	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st)
-		vmErr, fatalErr := handleError(err)
-		if fatalErr != nil {
-			return fatalErr
-		}
-
-		if vmErr != nil {
-			proc.Err = vmErr
-			return nil
-		}
-	}
-
-	return nil
-}
 
 type TransactionInvocator struct {
 	logger zerolog.Logger
@@ -62,36 +20,43 @@ func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
 }
 
 func (i *TransactionInvocator) Process(
-	vm *VirtualMachine,
-	ctx Context,
-	proc *TransactionProcedure,
-	st *state.State,
+	vm fvm.VirtualMachine,
+	proc fvm.Procedure,
+	env fvm.Environment,
 ) error {
-	env, err := newEnvironment(ctx, st)
-	if err != nil {
-		return err
+
+	var txProc fvm.TransactionProcedure
+	var ok bool
+	if accountProc, ok := proc.(fvm.TransactionProcedure); !ok {
+		return errors.New("transaction invocator can only process transaction procedures")
 	}
-	env.setTransaction(vm, proc.Transaction, proc.TxIndex)
 
-	location := runtime.TransactionLocation(proc.ID[:])
+	if txProc.Transaction == nil {
+		return errors.New("transaction invocator cannot process a procedure with empty transaction")
+	}
 
-	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	location := runtime.TransactionLocation(txProc.ID()[:])
+	err = vm.Runtime.ExecuteTransaction(txProc.Transaction().Script, txProc.Transaction().Arguments, env, location)
 
 	if err != nil {
 		i.topshotSafetyErrorCheck(err)
 		return err
 	}
 
-	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
+	i.logger.Info().Str("txHash", proc.ID().String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
+	// TODO only commit the changes if no error
 	// commit changes
 	err = st.Commit()
 	if err != nil {
 		return err
 	}
 
+	// Collect the parts we need from env and add it to proc
+	// TODO change this to return 
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()
+	proc.GasUsed = evn.ComputationUsed()
 
 	return nil
 }

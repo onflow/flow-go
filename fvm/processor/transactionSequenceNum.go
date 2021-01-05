@@ -1,8 +1,9 @@
-package fvm
+package processor
 
 import (
 	"errors"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -14,20 +15,19 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 }
 
 func (c *TransactionSequenceNumberChecker) Process(
-	vm *VirtualMachine,
-	ctx Context,
-	proc *TransactionProcedure,
-	st *state.State,
+	vm *fvm.VirtualMachine,
+	proc *fvm.TransactionProcedure,
+	env *fvm.Environment,
 ) error {
 
-	return c.checkAndIncrementSequenceNumber(proc.Transaction, st)
+	return c.checkAndIncrementSequenceNumber(proc.Transaction, env)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tx *flow.TransactionBody,
-	st *state.State,
+	env *fvm.Environment,
 ) error {
-	accounts := state.NewAccounts(st)
+	accounts := env.Accounts()
 	proposalKey := tx.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)

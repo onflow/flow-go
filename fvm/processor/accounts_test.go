@@ -1,4 +1,4 @@
-package fvm_test
+package processor_test
 
 import (
 	"fmt"

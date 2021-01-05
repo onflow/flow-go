@@ -1,4 +1,4 @@
-package fvm
+package service_test
 
 import (
 	"testing"

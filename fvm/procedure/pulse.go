@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TODO RAMTIN we might need to move this to exec node instead of here
 const systemChunkTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 transaction {

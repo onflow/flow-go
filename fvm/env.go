@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/processor"
+	"github.com/onflow/flow-go/fvm/service"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -24,18 +26,19 @@ var _ runtime.Interface = &hostEnv{}
 var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx              Context
-	st               *state.State
-	accounts         *state.Accounts
-	addressGenerator flow.AddressGenerator
-	uuidGenerator    *UUIDGenerator
-	runtime.Metrics
+	ctx                Context
+	st                 *state.State
+	accounts           *state.Accounts
+	addressGenerator   flow.AddressGenerator
+	uuidGenerator      UUIDGenerator
+	sigVerifier        SignatureVerifier
 	events             []flow.Event
 	totalEventByteSize uint64
 	logs               []string
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
+	runtime.Metrics
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -53,36 +56,18 @@ func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
 		return nil, err
 	}
 
-	uuids := state.NewUUIDs(st)
-	uuidGenerator := NewUUIDGenerator(uuids)
-
 	env := &hostEnv{
 		ctx:                ctx,
 		st:                 st,
-		Metrics:            &noopMetricsCollector{},
+		Metrics:            service.NewMetricsCollector(),
 		accounts:           accounts,
 		addressGenerator:   generator,
-		uuidGenerator:      uuidGenerator,
+		sigVerifier:        service.NewDefaultSignatureVerifier(),
+		uuidGenerator:      service.NewStatefulUUIDGenerator(state.NewUUIDs(st)),
 		totalEventByteSize: uint64(0),
 	}
 
-	if ctx.BlockHeader != nil {
-		env.seedRNG(ctx.BlockHeader)
-	}
-
-	if ctx.Metrics != nil {
-		env.Metrics = &metricsCollector{ctx.Metrics}
-	}
-
 	return env, nil
-}
-
-func (e *hostEnv) seedRNG(header *flow.Header) {
-	// Seed the random number generator with entropy created from the block header ID. The random number generator will
-	// be used by the UnsafeRandom function.
-	id := header.ID()
-	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
-	e.rng = rand.New(source)
 }
 
 func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, txIndex uint32) {
@@ -140,8 +125,7 @@ func (e *hostEnv) GetStorageCapacity(_ common.Address) (value uint64, err error)
 
 func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
-	location runtime.Location,
-) ([]runtime.ResolvedLocation, error) {
+	location runtime.Location) ([]runtime.ResolvedLocation, error) {
 
 	addressLocation, isAddress := location.(runtime.AddressLocation)
 
@@ -218,31 +202,14 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	return code, nil
 }
 
+// TODO remove me from interface
 func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) {
-	if e.ctx.ASTCache == nil {
-		return nil, nil
-	}
-
-	program, err := e.ctx.ASTCache.GetProgram(location)
-	if program != nil {
-		// Program was found within cache, do an explicit ledger register touch
-		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(runtime.AddressLocation); ok {
-			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
-		}
-	}
-
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return program, err
+	return nil, nil
 }
 
+// TODO remove me from interface
 func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) error {
-	if e.ctx.ASTCache == nil {
-		return nil
-	}
-
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.ctx.ASTCache.SetProgram(location, program)
+	return nil
 }
 
 func (e *hostEnv) Log(message string) error {
@@ -324,8 +291,7 @@ func (e *hostEnv) VerifySignature(
 	rawSigAlgo string,
 	rawHashAlgo string,
 ) (bool, error) {
-	valid, err := verifySignatureFromRuntime(
-		e.ctx.SignatureVerifier,
+	valid, err := e.sigVerifier.VerifySignatureFromRuntime(
 		signature,
 		tag,
 		message,
@@ -503,15 +469,19 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 // Transaction Environment
 
 type transactionEnv struct {
-	vm               *VirtualMachine
-	ctx              Context
-	st               *state.State
-	accounts         *state.Accounts
-	addressGenerator flow.AddressGenerator
-
-	tx      *flow.TransactionBody
-	txIndex uint32
-	txID    flow.Identifier
+	vm                  *VirtualMachine
+	ctx                 Context
+	st                  *state.State
+	accounts            *state.Accounts
+	addressGenerator    flow.AddressGenerator
+	txSignatureVerifier Processor
+	seqNumChecker       Processor
+	feeDeductor         Processor
+	invocator           Processor
+	accountCreator      Processor
+	tx                  *flow.TransactionBody
+	txIndex             uint32
+	txID                flow.Identifier
 
 	authorizers []runtime.Address
 }
@@ -527,14 +497,19 @@ func newTransactionEnv(
 
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:               vm,
-		ctx:              ctx,
-		st:               st,
-		accounts:         accounts,
-		addressGenerator: addressGenerator,
-		tx:               tx,
-		txIndex:          txIndex,
-		txID:             tx.ID(),
+		vm:                  vm,
+		ctx:                 ctx,
+		st:                  st,
+		accounts:            accounts,
+		addressGenerator:    addressGenerator,
+		txSignatureVerifier: processor.NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
+		seqNumChecker:       processor.NewTransactionSequenceNumberChecker(),
+		feeDeductor:         processor.NewTransactionFeeDeductor(),
+		invocator:           processor.NewTransactionInvocator(logger),
+		accountCreator:      processor.NewTransactionAccountCreator(),
+		tx:                  tx,
+		txIndex:             txIndex,
+		txID:                tx.ID(),
 	}
 }
 
@@ -563,16 +538,16 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+
 	// TODO Ramtin
 	if e.ctx.ServiceAccountEnabled {
 		err = e.vm.invokeMetaTransaction(
-			e.ctx,
 			deductAccountCreationFeeTransaction(
 				flow.Address(payer),
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled,
 			),
-			e.st,
+			e,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202

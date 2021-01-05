@@ -1,8 +1,9 @@
-package fvm
+package processor
 
 import (
 	"errors"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -20,20 +21,19 @@ func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatu
 }
 
 func (v *TransactionSignatureVerifier) Process(
-	vm *VirtualMachine,
-	ctx Context,
-	proc *TransactionProcedure,
-	st *state.State,
+	vm *fvm.VirtualMachine,
+	proc *fvm.TransactionProcedure,
+	env *fvm.Environment,
 ) error {
-	return v.verifyTransactionSignatures(proc.Transaction, st)
+	return v.verifyTransactionSignatures(proc.Transaction, env)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx *flow.TransactionBody,
-	st *state.State,
+	env *fvm.Environment,
 ) (err error) {
 
-	accounts := state.NewAccounts(st)
+	accounts := env.Accounts()
 
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}

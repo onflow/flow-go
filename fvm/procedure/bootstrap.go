@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,8 +17,8 @@ import (
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm       *VirtualMachine
-	ctx      Context
+	vm       *fvm.VirtualMachine
+	ctx      fvm.Context
 	st       *state.State
 	accounts *state.Accounts
 

@@ -1,4 +1,4 @@
-package fvm
+package service
 
 import (
 	"fmt"
@@ -6,16 +6,16 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-type UUIDGenerator struct {
+type StatefulUUIDGenerator struct {
 	uuids *state.UUIDs
 }
 
-func NewUUIDGenerator(uuids *state.UUIDs) *UUIDGenerator {
-	return &UUIDGenerator{
+func NewStatefulUUIDGenerator(uuids *state.UUIDs) *StatefulUUIDGenerator {
+	return &StatefulUUIDGenerator{
 		uuids: uuids,
 	}
 }
-func (u *UUIDGenerator) GenerateUUID() (uint64, error) {
+func (u *StatefulUUIDGenerator) GenerateUUID() (uint64, error) {
 	uuid, err := u.uuids.GetUUID()
 	if err != nil {
 		return 0, fmt.Errorf("cannot get UUID: %w", err)

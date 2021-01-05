@@ -1,4 +1,4 @@
-package fvm
+package service
 
 import (
 	"errors"
@@ -8,22 +8,15 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type Blocks interface {
-	// ByHeight returns the block at the given height in the chain ending in `header` (or finalized
-	// if `header` is nil). This enables querying un-finalized blocks by height with respect to the
-	// chain defined by the block we are executing.
-	ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error)
-}
-
-type BlocksFinder struct {
+type BlockFinder struct {
 	storage storage.Headers
 }
 
-func NewBlockFinder(storage storage.Headers) Blocks {
-	return &BlocksFinder{storage: storage}
+func NewBlockFinder(storage storage.Headers) *BlockFinder {
+	return &BlockFinder{storage: storage}
 }
 
-func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
+func (b *BlockFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
 	if header == nil {
 		byHeight, err := b.storage.ByHeight(height)
 		if err != nil {

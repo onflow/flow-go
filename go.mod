@@ -8,8 +8,8 @@ require (
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
+	github.com/dapperlabs/flow-go v0.9.3
 	github.com/davecgh/go-spew v1.1.1
-	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
@@ -47,7 +47,6 @@ require (
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
-	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.3.0+incompatible // indirect

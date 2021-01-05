@@ -44,7 +44,7 @@ const (
 // Each VM error is identified by a unique error code that is returned to the user.
 type Error interface {
 	Code() uint32
-	Error() string
+	error
 }
 
 var ErrAccountNotFound = errors.New("account not found")
@@ -347,7 +347,7 @@ func (e *ExecutionError) Code() uint32 {
 	return errCodeExecution
 }
 
-func handleError(err error) (vmErr Error, fatalErr error) {
+func HandleError(err error) (vmErr Error, fatalErr error) {
 	switch typedErr := err.(type) {
 	case runtime.Error:
 		// If the error originated from the runtime, handle separately
@@ -355,6 +355,8 @@ func handleError(err error) (vmErr Error, fatalErr error) {
 	case Error:
 		// If the error is an fvm.Error, return as is
 		return typedErr, nil
+	case Failure:
+		return nil, err
 	default:
 		// All other errors are considered fatal
 		return nil, err
@@ -372,7 +374,7 @@ func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
 		if recoveredErr, ok := externalErr.Recovered.(error); ok {
 			// If the recovered value is an error, pass it to the original
 			// error handler to distinguish between fatal and non-fatal errors.
-			return handleError(recoveredErr)
+			return HandleError(recoveredErr)
 		}
 
 		// If the recovered value is not an error, bubble up the panic.

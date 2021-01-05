@@ -1,22 +1,62 @@
-package fvm
+package processor
+
+// TODO Ramtin update this to be a process
 
 import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
 )
 
+type AccountFetcher struct {
+	logger zerolog.Logger
+}
+
+func NewAccountFetcher(logger zerolog.Logger) *AccountFetcher {
+	return &AccountFetcher{
+		logger: logger,
+	}
+}
+
+func (i *AccountOperator) Process(
+	vm fvm.VirtualMachine,
+	proc fvm.Procedure,
+	env fvm.Environment,
+) error {
+
+	var accountProc fvm.AccountProcedure
+	var ok bool
+	if accountProc, ok := proc.(fvm.AccountProcedure); !ok {
+		return errors.New("account fetcher can only process account procedures")
+	}
+
+	account, err := getAccount(vm, env, proc.Chain(), proc.Address())
+
+	vmErr, fatalErr := fvm.HandleError(err)
+	if fatalErr != nil {
+		return fatalErr
+	}
+
+	if vmErr != nil {
+		proc.Err = vmErr
+		return nil
+	}
+
+	proc.Account = account
+	return nil
+}
+
 func getAccount(
-	vm *VirtualMachine,
-	ctx Context,
-	st *state.State,
+	vm *fvm.VirtualMachine,
+	env fvm.Environment,
 	chain flow.Chain,
 	address flow.Address,
 ) (*flow.Account, error) {
-	accounts := state.NewAccounts(st)
-
+	accounts := env.Accounts()
 	account, err := accounts.Get(address)
 	if err != nil {
 		if errors.Is(err, state.ErrAccountNotFound) {
@@ -26,7 +66,7 @@ func getAccount(
 		return nil, err
 	}
 
-	if ctx.ServiceAccountEnabled {
+	if env.ctx.ServiceAccountEnabled {
 		script := getFlowTokenBalanceScript(address, chain.ServiceAddress())
 
 		err = vm.Run(

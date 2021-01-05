@@ -1,4 +1,4 @@
-package fvm
+package service
 
 import (
 	"fmt"
@@ -7,16 +7,6 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-type SignatureVerifier interface {
-	Verify(
-		signature []byte,
-		tag []byte,
-		message []byte,
-		publicKey crypto.PublicKey,
-		hashAlgo hash.HashingAlgorithm,
-	) (bool, error)
-}
 
 type DefaultSignatureVerifier struct{}
 
@@ -33,7 +23,7 @@ func (DefaultSignatureVerifier) Verify(
 ) (bool, error) {
 	hasher := newHasher(hashAlgo)
 	if hasher == nil {
-		return false, ErrInvalidHashAlgorithm
+		return false, fmt.Errorf("invalid hashing algorithm: %s", hashAlgo)
 	}
 
 	message = append(tag, message...)
@@ -80,10 +70,10 @@ func StringToHashingAlgorithm(s string) hash.HashingAlgorithm {
 	}
 }
 
+// TODO Ramtin (make this part of the service and pass to env)
 // verifySignatureFromRuntime is an adapter that performs signature verification using
 // raw values provided by the Cadence runtime.
-func verifySignatureFromRuntime(
-	verifier SignatureVerifier,
+func (verifier DefaultSignatureVerifier) VerifySignatureFromRuntime(
 	signature []byte,
 	rawTag string,
 	message []byte,
