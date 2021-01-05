@@ -14,15 +14,17 @@ type Payloads struct {
 	index      *Index
 	guarantees *Guarantees
 	seals      *Seals
+	receipts   *ExecutionReceipts
 }
 
-func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals) *Payloads {
+func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts) *Payloads {
 
 	p := &Payloads{
 		db:         db,
 		index:      index,
 		guarantees: guarantees,
 		seals:      seals,
+		receipts:   receipts,
 	}
 
 	return p
@@ -44,6 +46,14 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 			err := p.seals.storeTx(seal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store seal: %w", err)
+			}
+		}
+
+		// store all payload receipts
+		for _, receipt := range payload.Receipts {
+			err := p.receipts.store(receipt)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store receipt: %w", err)
 			}
 		}
 
@@ -86,9 +96,20 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 			seals = append(seals, seal)
 		}
 
+		// retrieve receipts
+		receipts := make([]*flow.ExecutionReceipt, 0, len(idx.ReceiptIDs))
+		for _, recID := range idx.ReceiptIDs {
+			receipt, err := p.receipts.byID(recID)(tx)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve receipt (%x): %w", recID, err)
+			}
+			receipts = append(receipts, receipt)
+		}
+
 		payload := &flow.Payload{
 			Seals:      seals,
 			Guarantees: guarantees,
+			Receipts:   receipts,
 		}
 
 		return payload, nil
