@@ -231,7 +231,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	log = log.With().Hex("initial_state", resultInitialState).Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
-	// later.
+	// later by `requestPending` function.
 	head, err := e.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
@@ -255,6 +255,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
+        // if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
+        // in the case where a child receipt is dropped because it is received before its parent receipt, we will
+        // eventually request the parent receipt with the `requestPending` function
 	err = e.receiptValidator.Validate(receipt)
 	if err != nil {
 		return fmt.Errorf("failed to process execution receipt: %w", err)
