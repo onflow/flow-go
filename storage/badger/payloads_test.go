@@ -2,11 +2,13 @@ package badger_test
 
 import (
 	"errors"
+
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,10 +23,13 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		index := badgerstorage.NewIndex(metrics, db)
 		seals := badgerstorage.NewSeals(metrics, db)
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals)
+		results := badgerstorage.NewExecutionResults(metrics, db)
+		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
 
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture()
+		expected.Receipts = make([]*flow.ExecutionReceipt, 0)
 
 		// store payload
 		err := store.Store(blockID, expected)
@@ -44,7 +49,9 @@ func TestPayloadRetreiveWithoutStore(t *testing.T) {
 		index := badgerstorage.NewIndex(metrics, db)
 		seals := badgerstorage.NewSeals(metrics, db)
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals)
+		results := badgerstorage.NewExecutionResults(metrics, db)
+		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
 
 		blockID := unittest.IdentifierFixture()
 
