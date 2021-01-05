@@ -36,7 +36,7 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 }
 
 func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.AggregatedSignature,
-	chunk *flow.Chunk, executionResult *flow.ExecutionResult) error {
+	chunk *flow.Chunk, executionResultID flow.Identifier) error {
 	for i, signature := range aggregatedSignatures.VerifierSignatures {
 		signerId := aggregatedSignatures.SignerIDs[i]
 
@@ -48,7 +48,7 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 
 		atst := flow.Attestation{
 			BlockID:           chunk.BlockID,
-			ExecutionResultID: executionResult.ID(),
+			ExecutionResultID: executionResultID,
 			ChunkIndex:        chunk.Index,
 		}
 		atstID := atst.ID()
@@ -194,17 +194,17 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		// check the integrity of the seal
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
-			// Skip fail on invalid seal. We don't put this earlier in the function
-			// because we still want to test that the above code doesn't panic.
-			// TODO: this is only here temporarily to ease the migration to new chunk
-			// based sealing.
-			if !s.skipSealValidity {
-				if engine.IsInvalidInputError(err) {
+			if engine.IsInvalidInputError(err) {
+				// Skip fail on invalid seal. We don't put this earlier in the function
+				// because we still want to test that the above code doesn't panic.
+				// TODO: this is only here temporarily to ease the migration to new chunk
+				// based sealing.
+				if !s.skipSealValidity {
 					return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
 				}
-
-				return nil, fmt.Errorf("unexpected seal validation error %w", err)
 			}
+
+			return nil, fmt.Errorf("unexpected seal validation error %w", err)
 		}
 
 		last = seal
@@ -240,6 +240,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 		return fmt.Errorf("could not retreive assignments for block: %v, %w", seal.BlockID, err)
 	}
 
+	executionResultID := executionResult.ID()
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := seal.AggregatedApprovalSigs[chunk.Index]
 		assignedVerifiers := assignments.Verifiers(chunk)
@@ -261,7 +262,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			}
 		}
 
-		err := s.verifySealSignature(&chunkSigs, chunk, executionResult)
+		err := s.verifySealSignature(&chunkSigs, chunk, executionResultID)
 		if err != nil {
 			return fmt.Errorf("invalid seal signature: %w", err)
 		}
