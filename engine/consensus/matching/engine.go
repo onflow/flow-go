@@ -218,14 +218,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
 	if !ok { // discard receipt
-		log.Error().Msg("execution receipt without FinalStateCommit received")
 		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
 	log = log.With().Hex("final_state", resultFinalState).Logger()
 
 	resultInitialState, ok := receipt.ExecutionResult.InitialStateCommit()
 	if !ok { // discard receipt
-		log.Error().Msg("execution receipt without InitialStateCommit received")
 		return engine.NewInvalidInputErrorf("execution receipt without InitialStateCommit: %x", receipt.ID())
 	}
 	log = log.With().Hex("initial_state", resultInitialState).Logger()
@@ -306,7 +304,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		),
 	)
 	if err != nil {
-		log.Err(err).Msg("error inserting incorporated result in mempool")
 		return fmt.Errorf("error inserting incorporated result in mempool: %w", err)
 	}
 	if !added {
@@ -909,6 +906,7 @@ func (e *Engine) requestPending() error {
 
 		// check if we have an result for the block at this height
 		blockID := header.ID()
+
 		if _, ok := knownResultForBlock[blockID]; !ok {
 			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
 		}
