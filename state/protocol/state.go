@@ -3,7 +3,10 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // State represents the full protocol state of the local node. It allows us to
@@ -59,4 +62,15 @@ type MutableState interface {
 	// has to be already valid.
 	// It modifies the persistent immutable protocol state accordingly.
 	MarkValid(blockID flow.Identifier) error
+}
+
+// IsNodeStakedAtBlockID returns true if the `identifier` is staked at `blockID` according to `state`.
+func IsNodeStakedAtBlockID(state State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
+	identity, err := state.AtBlockID(blockID).Identity(identifier)
+	if err != nil {
+		return false, fmt.Errorf("could not retrieve identity for identifier  %x at block id snapshot %x: %w)", logging.ID(identifier), blockID, err)
+	}
+
+	staked := identity.Stake > 0
+	return staked, nil
 }
