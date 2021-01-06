@@ -35,6 +35,7 @@ type MutableIdentityTableSuite struct {
 	suite.Suite
 	ConduitWrapper
 	nets         []*p2p.Network
+	removedNets  []*p2p.Network // networks for node which might have been removed from the mesh
 	mws          []*p2p.Middleware
 	idRefreshers []*p2p.NodeIDRefresher
 	engines      []*MeshEngine
@@ -50,14 +51,15 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 
 func (suite *MutableIdentityTableSuite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
-	nodeCount := 10
-	suite.logger = zerolog.New(os.Stderr).Level(zerolog.InfoLevel)
+	nodeCount := 4
+	suite.logger = zerolog.New(os.Stderr).Level(zerolog.TraceLevel)
 	log.SetAllLoggers(log.LevelError)
 
 	// create ids
-	ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, !DryRun, suite.logger)
-	suite.ids = ids
-	suite.mws = mws
+
+	//ids, mws := GenerateIDsAndMiddlewares(suite.T(), nodeCount, !DryRun, suite.logger)
+	//suite.ids = ids
+	//suite.mws = mws
 
 	// setup state related mocks
 	final := unittest.BlockHeaderFixture()
@@ -76,60 +78,95 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 		states[i] = suite.state
 	}
 
+	suite.addNode(nodeCount)
+
 	// create networks using the mocked state and default topology
-	sms := GenerateSubscriptionManagers(suite.T(), mws)
-	nets := GenerateNetworks(suite.T(), suite.logger, ids, mws, 100, nil, sms, !DryRun)
-	suite.nets = nets
+	//sms := GenerateSubscriptionManagers(suite.T(), mws)
+	//nets := GenerateNetworks(suite.T(), suite.logger, ids, mws, 100, nil, sms, !DryRun)
+	//suite.nets = nets
 
 	// generate the refreshers
-	suite.idRefreshers = suite.generateNodeIDRefreshers(nets)
+	//suite.idRefreshers = suite.generateNodeIDRefreshers(nets)
 
 	// generate the engines
-	suite.engines = GenerateEngines(suite.T(), nets)
+	//suite.engines = GenerateEngines(suite.T(), nets)
+
+	// simulate a start of an epoch by signaling a change in the identity table
+	for _, n := range suite.idRefreshers {
+		n.OnIdentityTableChanged()
+	}
+	// wait for two lip2p heatbeats for the nodes to discover each other and form the mesh
+	time.Sleep(2 * time.Second)
 }
 
 // TearDownTest closes the networks within a specified timeout
 func (suite *MutableIdentityTableSuite) TearDownTest() {
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
+	if len(suite.removedNets) > 0 {
+		stopNetworks(suite.T(), suite.removedNets, 3*time.Second)
+	}
+}
+
+// addNode creates count many new nodes and appends them to the suite state variables
+func (suite *MutableIdentityTableSuite) addNode(count int) {
+	// create the ids, middlewares and networks
+	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
+	suite.ids = append(suite.ids, ids...)
+	suite.mws = append(suite.mws, mws...)
+	suite.nets = append(suite.nets, nets...)
+
+	// create the engines for the new nodes
+	engines := GenerateEngines(suite.T(), nets)
+	suite.engines = append(suite.engines, engines...)
+
+	// create the node refreshers
+	idRefereshers := suite.generateNodeIDRefreshers(nets)
+	suite.idRefreshers = append(suite.idRefreshers, idRefereshers...)
+}
+
+func (suite *MutableIdentityTableSuite) removeNode() ([]*flow.Identity, []*p2p.Middleware, []*p2p.Network, []*MeshEngine, []*p2p.NodeIDRefresher) {
+	// choose a random node to remove
+	removeIndex := rand.Intn(len(suite.ids) - 1)
+	removeIndex = 1
+	removedID := suite.ids[removeIndex:removeIndex+1]
+	removedMiddleware := suite.mws[removeIndex:removeIndex+1]
+	removedNet := suite.nets[removeIndex:removeIndex+1]
+	removedEngine := suite.engines[removeIndex:removeIndex+1]
+	removedRefresher := suite.idRefreshers[removeIndex:removeIndex+1]
+
+	// adjust state
+	suite.ids = append(suite.ids[:removeIndex], suite.ids[removeIndex+1:]...)
+	suite.mws = append(suite.mws[:removeIndex], suite.mws[removeIndex+1:]...)
+	suite.removedNets = removedNet
+	suite.nets = append(suite.nets[:removeIndex], suite.nets[removeIndex+1:]...)
+	suite.engines = append(suite.engines[:removeIndex], suite.engines[removeIndex+1:]...)
+	suite.idRefreshers = append(suite.idRefreshers[:removeIndex], suite.idRefreshers[removeIndex+1:]...)
+
+	return removedID, removedMiddleware, removedNet, removedEngine, removedRefresher
 }
 
 // TestNewNodeAdded tests that when a new node is added to the identity list e.g. on an epoch,
 // then it can connect to the network.
 func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 
-	// create the id, middleware and network for a new node
-	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), 1, suite.logger, 100, nil, !DryRun)
-	newID := ids[0]
-	suite.nets = append(suite.nets, nets[0])
-	newMiddleware := mws[0]
-
-	newIDs := append(suite.ids, ids...)
-	suite.ids = newIDs
-
-	// create a new refresher
-	newIDRefresher := suite.generateNodeIDRefreshers(nets)
-	newIDRefreshers := append(suite.idRefreshers, newIDRefresher...)
-
-	// create the engine for the new node
-	newEngine := GenerateEngines(suite.T(), nets)
-	newEngines := append(suite.engines, newEngine...)
+	suite.addNode(1)
 
 	// update IDs for all the networks (simulating an epoch)
-	for _, n := range newIDRefreshers {
+	for _, n := range suite.idRefreshers {
 		n.OnIdentityTableChanged()
 	}
 
-	// wait for all the connections and disconnections to occur at the network layer
-	time.Sleep(2 * time.Second)
+	newID := suite.ids[len(suite.ids) - 1]
+	newMiddleware := suite.mws[len(suite.mws) - 1]
 
 	// check if the new node has sufficient connections with the existing nodes
 	// if it does, then it has been inducted successfully in the network
-	checkConnectivity(suite.T(), newMiddleware, newIDs.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
+	assertConnected(suite.T(), newMiddleware, suite.ids.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// check that all the engines on this new epoch can talk to each other using any of the three networking primitives
-	suite.exchangeMessages(newIDs, newEngines, nil, nil, suite.Publish)
-	suite.exchangeMessages(newIDs, newEngines, nil, nil, suite.Multicast)
-	suite.exchangeMessages(newIDs, newEngines, nil, nil, suite.Unicast)
+	suite.exchangeMessages(suite.ids, suite.engines, nil, nil, suite.Publish)
+	suite.exchangeMessages(suite.ids, suite.engines, nil, nil, suite.Multicast)
+	suite.exchangeMessages(suite.ids, suite.engines, nil, nil, suite.Unicast)
 }
 
 // TestNodeRemoved tests that when an existing node is removed from the identity
@@ -137,51 +174,34 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 // has un-staked) then it cannot connect to the network.
 func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 
-	// choose a random node to remove
-	removeIndex := rand.Intn(len(suite.ids) - 1)
-	removedID := suite.ids[removeIndex]
-	removedEngines := suite.engines[removeIndex : removeIndex+1]
+	fmt.Printf("\nsuite.ids was : %v\n", suite.ids)
+	// removed a node
+	removedIDs, removedMiddlewares, _, removedEngines, ref := suite.removeNode()
+	fmt.Printf("\nsuite.ids is : %v\n", suite.ids)
 
-	fmt.Printf("Removed ID: %s at index %d\n", removedID.String(), removeIndex)
+	ref[0].OnIdentityTableChanged()
 
-	// remove the identity at that index from the ids
-	newIDs := suite.ids.Filter(filter.Not(filter.HasNodeID(removedID.NodeID)))
-	removedIDs := suite.ids[removeIndex : removeIndex+1]
-	suite.ids = newIDs
-
-	// create a list of engines except for the removed node
-	var newEngines []*MeshEngine
-	for i, eng := range suite.engines {
-		if i == removeIndex {
-			continue
-		}
-		newEngines = append(newEngines, eng)
-	}
-
-	// update IDs for all the networks except the one that was removed
-	// (since the evicted node may just continue with the old list)
+	// update IDs for all the remaining nodes
+	// the removed node continues with the old identity list and we don't want to rely on it updating its ids list
 	for _, n := range suite.idRefreshers {
-		//if i == removeIndex {
-		//	continue
-		//}
 		n.OnIdentityTableChanged()
 	}
 
-	// wait for all the connections and disconnections to occur at the network layer
-	time.Sleep(2 * time.Second)
+	// assert that the removed node has no connections with any of the other nodes
+	assertDisconnected(suite.T(), removedMiddlewares[0], suite.ids)
 
 	// check that all remaining engines can still talk to each other while the ones removed can't
 	// using any of the three networking primitives
-	suite.exchangeMessages(newIDs, newEngines, removedIDs, removedEngines, suite.Publish)
-	suite.exchangeMessages(newIDs, newEngines, removedIDs, removedEngines, suite.Multicast)
-	suite.exchangeMessages(newIDs, newEngines, removedIDs, removedEngines, suite.Unicast)
+	suite.exchangeMessages(suite.ids, suite.engines, removedIDs, removedEngines, suite.Publish)
+	suite.exchangeMessages(suite.ids, suite.engines, removedIDs, removedEngines, suite.Multicast)
+	suite.exchangeMessages(suite.ids, suite.engines, removedIDs, removedEngines, suite.Unicast)
 }
 
-// checkConnectivity checks that the middleware of a node is directly connected
+// assertConnected checks that the middleware of a node is directly connected
 // to at least half of the other nodes.
-func checkConnectivity(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) {
+func assertConnected(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) {
 	threshold := len(ids) / 2
-	assert.Eventually(t, func() bool {
+	require.Eventually(t, func() bool {
 		connections := 0
 		for _, id := range ids {
 			connected, err := mw.IsConnected(*id)
@@ -194,7 +214,23 @@ func checkConnectivity(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) 
 	}, 5*time.Second, time.Millisecond*100)
 }
 
-// exchangeMessages verifies that allowed engines can successfully exchange messages while disallowed engines can't
+// assertDisconnected checks that the middleware of a node is not connected to any of the other nodes specified in the
+// ids list
+func assertDisconnected(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) {
+	require.Eventually(t, func() bool {
+		for _, id := range ids {
+			connected, err := mw.IsConnected(*id)
+			require.NoError(t, err)
+			if connected {
+				return false
+			}
+		}
+		return true
+	}, 5*time.Second, time.Millisecond*100)
+}
+
+// exchangeMessages verifies that allowed engines can successfully exchange messages between them while disallowed
+// engines can't using the ConduitSendWrapperFunc network primitive
 func (suite *MutableIdentityTableSuite) exchangeMessages(
 	allowedIDs flow.IdentityList,
 	allowedEngs []*MeshEngine,
@@ -202,38 +238,40 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 	disallowedEngs []*MeshEngine,
 	send ConduitSendWrapperFunc) {
 
-	count := len(allowedEngs)
-	expectedMsgCnt := count - 1
-
 	// send a message from each of the allowed engine to the other allowed engines
 	for i, allowedEng := range allowedEngs {
 
 		fromID := allowedIDs[i].NodeID
 		targetIDs := allowedIDs.Filter(filter.Not(filter.HasNodeID(allowedIDs[i].NodeID)))
 
-		suite.sendMessage(fromID, allowedEng, targetIDs, send)
+		err := suite.sendMessage(fromID, allowedEng, targetIDs, send)
+		require.NoError(suite.T(), err)
 	}
 
-	// send a message from each of the allowed engine to each of the disallowed engines
-	//for i, allowedEng := range allowedEngs {
-	//
-	//	fromID := allowedIDs[i].NodeID
-	//	targetIDs := disallowedIDs
-	//
-	//	suite.sendMessage(fromID, allowedEng, targetIDs, send)
-	//}
+	// send a message from each of the allowed engine to all of the disallowed engines
+	if len(disallowedEngs) > 0 {
+		for i, fromEng := range allowedEngs {
+
+			fromID := allowedIDs[i].NodeID
+			targetIDs := disallowedIDs
+
+			err := suite.sendMessage(fromID, fromEng, targetIDs, send)
+			suite.checkSendError(err, send)
+		}
+	}
 
 	// send a message from each of the disallowed engine to each of the allowed engines
-	//for i, disallowedEng := range disallowedEngs {
-	//
-	//	fromID := disallowedIDs[i].NodeID
-	//	targetIDs := allowedIDs
-	//
-	//	suite.sendMessage(fromID, disallowedEng, targetIDs, send)
-	//
-	//	fmt.Printf(">>>>>>>>>>>>>>>>> \n disallowed: %s\n", disallowedIDs[i].String())
-	//}
+	for i, fromEng := range disallowedEngs {
 
+		fromID := disallowedIDs[i].NodeID
+		targetIDs := allowedIDs
+
+		err := suite.sendMessage(fromID, fromEng, targetIDs, send)
+		suite.checkSendError(err, send)
+	}
+
+	count := len(allowedEngs)
+	expectedMsgCnt := count - 1
 	wg := sync.WaitGroup{}
 	// fires a goroutine for each of the allowed engine to listen for incoming messages
 	for i := range allowedEngs {
@@ -248,34 +286,38 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 
 	// assert that all allowed engines received expectedMsgCnt number of messages
 	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 5*time.Second)
+	// assert that all allowed engines received no other messages
+	for i := range allowedEngs {
+		assert.Empty(suite.T(), allowedEngs[i].received)
+	}
 
 	// assert that the disallowed engines didn't receive any message
-	for _, eng := range disallowedEngs {
+	for i, eng := range disallowedEngs {
 		unittest.RequireNeverReturnBefore(suite.T(), func() {
 			<-eng.received
-		}, time.Millisecond, fmt.Sprintf("%s engine should not have recevied message", eng.originID.String()))
+		}, time.Millisecond, fmt.Sprintf("%s engine should not have recevied message", disallowedIDs[i]))
 	}
 }
 
-func (suite *MutableIdentityTableSuite) sendMessage(
-	fromID flow.Identifier,
+func (suite *MutableIdentityTableSuite) sendMessage(fromID flow.Identifier,
 	fromEngine *MeshEngine,
 	toIDs flow.IdentityList,
-	send ConduitSendWrapperFunc) {
+	send ConduitSendWrapperFunc) error {
 
 	primitive := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
-	requireError := strings.Contains(primitive, "Unicast")
-
 	event := &message.TestMessage{
 		Text: fmt.Sprintf("hello from node %s using %s", fromID.String(), primitive),
 	}
 
-	err := send(event, fromEngine.con, toIDs.NodeIDs()...)
+	return send(event, fromEngine.con, toIDs.NodeIDs()...)
+}
+
+func (suite *MutableIdentityTableSuite) checkSendError(err error, send ConduitSendWrapperFunc) {
+	primitive := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
+	requireError := strings.Contains(primitive, "Unicast")
 	if requireError {
 		require.Error(suite.T(), err)
-		return
 	}
-	require.NoError(suite.T(), err)
 }
 
 func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*p2p.Network) []*p2p.NodeIDRefresher {

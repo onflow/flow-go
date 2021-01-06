@@ -145,7 +145,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not update approved peer list: %w", err)
 	}
 
-	libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host())
+	libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host(), m.log)
 	if err != nil {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}

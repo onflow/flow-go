@@ -10,21 +10,16 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // Connector connects to peer and disconnects from peer using the underlying networking library
 type Connector interface {
 
-	// ConnectPeers connect to the given flow.Identities and returns a map of identifiers which failed.
-	// ConnectPeer implementation should be idempotent such that multiple calls to connect to the same peer should not
+	// UpdatePeers connects to the given flow.Identities and returns a map of identifiers which failed. It also
+	// disconnects from any other peers with which it may have previously established connection.
+	// UpdatePeers implementation should be idempotent such that multiple calls to connect to the same peer should not
 	// return an error or create multiple connections
-	ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error
-
-	// DisconnectPeers disconnect from the given flow.Identities and returns a map of identifiers which failed.
-	// DisconnectPeers implementation should be idempotent such that multiple calls to connect to the same peer should
-	// not return an error
-	DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error
+	UpdatePeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error
 }
 
 // PeerUpdateInterval is how long the peer manager waits in between attempts to update peer connections
@@ -107,46 +102,16 @@ func (pm *PeerManager) updatePeers() {
 		return
 	}
 
-	// connect to all the current IDs
-	pm.connect(ids)
-
-	// find the ids in the old id list which are no longer in the new id list
-	excludedPeers := pm.currentIDs.Filter(filter.Not(filter.In(ids)))
-
-	// disconnect from the peers no longer in the new id list
-	if len(excludedPeers) > 0 {
-		pm.disconnect(excludedPeers)
-	}
-
-	// remember the new id list for next time
-	pm.currentIDs = ids
-}
-
-func (pm *PeerManager) connect(ids flow.IdentityList) {
 	pm.logger.Trace().
 		Str("peers", fmt.Sprintf("%v", ids.NodeIDs())).
 		Msg("connecting to peers")
 
 	// ask the connector to connect to all peers in the list
-	failedIDs := pm.connector.ConnectPeers(pm.ctx, ids)
+	failedIDs := pm.connector.UpdatePeers(pm.ctx, ids)
 
-	err := failedIDMapToSingleError(failedIDs)
+	err = failedIDMapToSingleError(failedIDs)
 	if err != nil {
 		pm.logger.Error().Int("failed_peer_count", len(failedIDs)).Err(err).Msg("failed to connect to peers")
-	}
-}
-
-func (pm *PeerManager) disconnect(ids flow.IdentityList) {
-	pm.logger.Info().
-		Str("excluded_peers", fmt.Sprintf("%v", ids.NodeIDs())).
-		Msg("disconnecting from peers")
-
-	// ask the connector to disconnect from all peers in the list
-	failedIDs := pm.connector.DisconnectPeers(pm.ctx, ids)
-
-	err := failedIDMapToSingleError(failedIDs)
-	if err != nil {
-		pm.logger.Error().Int("failed_peer_count", len(failedIDs)).Err(err).Msg("failed to disconnect from peers")
 	}
 }
 
