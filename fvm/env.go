@@ -253,19 +253,26 @@ func (e *hostEnv) Log(message string) error {
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
+	if e.transactionEnv == nil {
+		return errors.New("EmitEvent is not supported by this environment")
+	}
+	return e.transactionEnv.EmitEvent(event, e)
+}
+
+func (e *transactionEnv) EmitEvent(event cadence.Event, env *hostEnv) error {
 
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
 		return fmt.Errorf("failed to json encode a cadence event: %w", err)
 	}
 
-	e.totalEventByteSize += uint64(len(payload))
+	env.totalEventByteSize += uint64(len(payload))
 
 	// skip limit if payer is service account
-	if e.transactionEnv != nil && e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
-		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
+	if e != nil && e.tx.Payer != e.ctx.Chain.ServiceAddress() {
+		if env.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
 			return &EventLimitExceededError{
-				TotalByteSize: e.totalEventByteSize,
+				TotalByteSize: env.totalEventByteSize,
 				Limit:         e.ctx.EventCollectionByteSizeLimit,
 			}
 		}
@@ -273,13 +280,13 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 
 	flowEvent := flow.Event{
 		Type:             flow.EventType(event.EventType.ID()),
-		TransactionID:    e.transactionEnv.TxID(),
-		TransactionIndex: e.transactionEnv.TxIndex(),
-		EventIndex:       uint32(len(e.events)),
+		TransactionID:    e.TxID(),
+		TransactionIndex: e.TxIndex(),
+		EventIndex:       uint32(len(env.events)),
 		Payload:          payload,
 	}
 
-	e.events = append(e.events, flowEvent)
+	env.events = append(env.events, flowEvent)
 	return nil
 }
 
