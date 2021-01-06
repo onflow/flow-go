@@ -22,6 +22,19 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// Engine receives receipts and passes them to the match engine if the block of the receipt is available
+// and the verification node is staked at the block ID of the result part of receipt.
+//
+// A receipt follows a lifecycle in this engine:
+// cached: the receipt is received but not handled yet.
+// pending: the receipt is handled, but its corresponding block has not received at this node yet.
+// discarded: the receipt's block has received, but this verification node has not staked at block of the receipt.
+// ready: the receipt's block has received, and this verification node is staked for that block,
+// hence receipt's result is  ready to be forwarded to match engine
+// processed: the receipt's result has been forwarded to matching engine.
+//
+// This engine ensures that each (ready) result is passed to match engine only once.
+// Hence, among concurrent ready receipts with shared result, only one instance of result is passed to match engine.
 type Engine struct {
 	unit                     *engine.Unit
 	log                      zerolog.Logger
