@@ -78,7 +78,7 @@ func (i *TransactionInvocator) Process(
 	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
 
 	if err != nil {
-		i.topshotSafetyErrorCheck(err)
+		i.safetyErrorCheck(err)
 		return err
 	}
 
@@ -96,11 +96,11 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-// topshotSafetyErrorCheck is additional check introduced to help chase erroneous execution results
+// safetyErrorCheck is additional check introduced to help chase erroneous execution results
 // which caused unexpected network fork. TopShot is first full-fledged game running on Flow, and
 // checking failures in this contract indicate the unexpected computation happening.
 // This is a temporary measure.
-func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
+func (i *TransactionInvocator) safetyErrorCheck(err error) {
 	e := err.Error()
 	i.logger.Info().Str("error", e).Msg("TEMP LOGGING: Cadence Execution ERROR")
 	if strings.Contains(e, "checking") {

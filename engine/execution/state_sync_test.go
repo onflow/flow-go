@@ -37,6 +37,7 @@ import (
 // verify that EN2 has the synced state up to B
 // verify that EN2 has executed block up to F
 func TestStateSyncFlow(t *testing.T) {
+	t.Skip("disable state syncing")
 	// create two EN nodes,
 	// EN1 is able to execute blocks fast,
 	// EN2 is slow to execute any block, it has to rely on state syncing
