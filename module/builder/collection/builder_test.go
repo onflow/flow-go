@@ -69,7 +69,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := sutil.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, _ := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
 	suite.headers = headers
 	suite.blocks = blocks
@@ -840,7 +840,7 @@ func benchmarkBuildOn(b *testing.B, size int) {
 
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, _, _, _, blocks, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
+		headers, _, _, _, _, blocks, _, _, _, _ := sutil.StorageLayer(suite.T(), suite.db)
 		suite.headers = headers
 		suite.blocks = blocks
 		suite.payloads = storage.NewClusterPayloads(metrics, suite.db)
