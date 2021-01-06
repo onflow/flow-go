@@ -262,7 +262,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	e.totalEventByteSize += uint64(len(payload))
 
 	// skip limit if payer is service account
-	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
+	if e.transactionEnv != nil && e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
 		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
 			return &EventLimitExceededError{
 				TotalByteSize: e.totalEventByteSize,
