@@ -335,6 +335,7 @@ func (e *Engine) checkCachedReceipts() {
 			log := e.log.With().
 				Hex("origin_id", logging.ID(rdp.OriginID)).
 				Hex("receipt_id", logging.ID(receiptID)).
+				Hex("block_id", logging.ID(rdp.Receipt.ExecutionResult.BlockID)).
 				Hex("result_id", logging.ID(resultID)).Logger()
 
 			// removes receipt from cache
@@ -356,91 +357,95 @@ func (e *Engine) checkCachedReceipts() {
 			ready := e.isProcessable(&rdp.Receipt.ExecutionResult)
 			if !ready {
 				// adds receipt to pending mempool
-				e.addToPending(rdp)
+				added, err := e.addToPending(rdp)
+				if err != nil {
+					log.Debug().Err(err).Msg("could not add receipt to pending mempool")
+					return
+				}
+				log.Debug().
+					Bool("added_to_pending_mempool", added).
+					Msg("cached receipt checked for adding to pending mempool")
 				return
 			}
 
 			// adds receipt to ready mempool
-			e.addToReady(rdp)
+			added, discarded, err := e.addToReady(rdp)
+			if err != nil {
+				log.Debug().Err(err).Msg("could not add receipt to ready mempool")
+				return
+			}
+			log.Debug().
+				Bool("added_to_discarded_mempool", discarded).
+				Bool("added_to_ready_mempool", added).
+				Msg("cached receipt checked for adding to ready mempool")
 		}()
 	}
 }
 
 // addToReady encapsulates the logic around adding a ReceiptDataPack to ready receipts mempool.
 // The ReceiptDataPack is however discarded it if finder engine is not staked at its block id.
-func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) {
+//
+// When no errors occurred, the first return value indicates
+// whether or not the receipt has been added to the ready mempool, and the second return value indicates
+// whether or not the receipt has been discarded due to the node being unstaked at the receipt block ID.
+func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) (bool, bool, error) {
 	receiptID := receiptDataPack.Receipt.ID()
 	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
 	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
-	log := e.log.With().
-		Hex("origin_id", logging.ID(receiptDataPack.OriginID)).
-		Hex("block_id", logging.ID(blockID)).
-		Hex("receipt_id", logging.ID(receiptID)).
-		Hex("result_id", logging.ID(resultID)).Logger()
 
 	// checks whether verification node is staked at snapshot of this result's block.
 	ok, err := e.stakedAtBlockID(blockID)
 	if err != nil {
-		log.Debug().Err(err).Msg("could not verify stake of verification node for result")
-		return
+		return false, false, fmt.Errorf("could not verify stake of verification node for result: %w", err)
 	}
 
 	if !ok {
-		added := e.discardedResultIDs.Add(resultID)
-		log.Debug().
-			Bool("added_to_discard_pool", added).
-			Msg("execution result marks discarded")
-		return
+		discarded := e.discardedResultIDs.Add(resultID)
+		return false, discarded, nil
 	}
 
 	// adds the receipt to the ready mempool
 	ok = e.readyReceipts.Add(receiptDataPack)
 	if !ok {
-		log.Debug().Msg("drops adding duplicate receipt to ready mempool")
-		return
+		return false, false, nil
 	}
 
 	// records the execution receipt id based on its result id
 	err = e.receiptIDsByResult.Append(resultID, receiptID)
 	if err != nil {
-		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
-		return
+		return false, false, nil
 	}
 
-	log.Info().Msg("cached execution receipt added to ready mempool")
+	return true, false, nil
 }
 
 // addToPending encapsulates the logic around adding a ReceiptDataPack to pending receipts mempool.
-func (e *Engine) addToPending(receiptDataPack *verification.ReceiptDataPack) {
+//
+// When no errors occurred, the first return value indicates
+// whether or not the receipt has been added to the pending mempool.
+func (e *Engine) addToPending(receiptDataPack *verification.ReceiptDataPack) (bool, error) {
 	receiptID := receiptDataPack.Receipt.ID()
 	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
 	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
-	log := e.log.With().
-		Hex("origin_id", logging.ID(receiptDataPack.OriginID)).
-		Hex("block_id", logging.ID(blockID)).
-		Hex("receipt_id", logging.ID(receiptID)).
-		Hex("result_id", logging.ID(resultID)).Logger()
 
 	ok := e.pendingReceipts.Add(receiptDataPack)
 	if !ok {
-		log.Debug().Msg("drops adding duplicate receipt to pending mempool")
-		return
+		return false, nil
 	}
 
 	// marks receipt pending for its block ID
 	err := e.pendingReceiptIDsByBlock.Append(blockID, receiptID)
 	if err != nil {
-		log.Debug().Err(err).Msg("could not append receipt to receipt-ids-by-block mempool")
+		return false, fmt.Errorf("could not append receipt to receipt-ids-by-block mempool: %w", err)
 	}
 
 	// records the execution receipt id based on its result id
 	err = e.receiptIDsByResult.Append(resultID, receiptID)
 	if err != nil {
-		log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
-		return
+		return false, fmt.Errorf("could not append receipt to receipt-ids-by-result mempool: %w", err)
 	}
 
-	log.Info().Msg("cached execution receipt added to pending mempool")
+	return true, nil
 }
 
 // pendingToReady receives a list of receipt identifiers and moves all their corresponding receipts
