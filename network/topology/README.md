@@ -26,7 +26,7 @@ every node has a fanout size of 3.
 
 ### [Topology Interface](../../network/topology.go)
 
-At its interface, as a distributed algorithm, the topology receives the (whitelist) of nodes in the system and generates and returns the fanout of the
+The Topology interface provides a way to retrieve a topology for a node. It receives the approved list of nodes in the system and generates and returns the fanout of the
 node. The current implementations of this topology interface are topic-based topology and randomized topology.
 
 ### [TopicBasedTopology](../../network/topology/topicBasedTopology.go)
