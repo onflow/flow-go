@@ -239,18 +239,10 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 // It returns false and error if it could not extract the stake of (verification node) node at the specified block.
 func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 	// extracts identity of verification node at block height of result
-	id, err := e.state.AtBlockID(blockID).Identity(e.me.NodeID())
+	staked, err := protocol.IsNodeStakedAtBlockID(e.state, blockID, e.me.NodeID())
 	if err != nil {
-		return false, fmt.Errorf("could not retrieve identity of verification node at snapshot of block id: %x: %w)", blockID, err)
+		return false, fmt.Errorf("could not check if node is staked at block %v: %w", blockID, err)
 	}
-
-	// checks this node is staked as a verification node
-	if id.Role != flow.RoleVerification {
-		return false, fmt.Errorf("node not staked as verification role at block id, role found: %s, block id: %x", id.Role.String(), blockID)
-	}
-
-	// checks stake of the verification node
-	staked := id.Stake > 0
 	return staked, nil
 }
 
