@@ -485,12 +485,12 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 	}
 }
 
-// discardPendingReceipts receives a list of receipt ids, and removes
+// discardReceiptsFromPending receives a list of receipt ids, and removes
 // all receipts from the pending receipts mempool and marks their execution result as discarded.
 // blockID is the block identifier that all receipts are pointing to.
 //
 // finder engine discards a receipt if it is not staked at block id of that receipt.
-func (e *Engine) discardPendingReceipts(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
+func (e *Engine) discardReceiptsFromPending(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
 	for _, receiptID := range receiptIDs {
 		log := e.log.With().
 			Hex("block_id", logging.ID(blockID)).
@@ -573,7 +573,7 @@ func (e *Engine) checkPendingReceipts() {
 		if !ok {
 			// node is not staked at block id
 			// discards all pending receipts for this block id.
-			e.discardPendingReceipts(receiptIDs, blockID)
+			e.discardReceiptsFromPending(receiptIDs, blockID)
 			continue
 		}
 
