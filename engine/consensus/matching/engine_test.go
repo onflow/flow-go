@@ -688,18 +688,22 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	// create blocks
 	n := 100
-	orderedBlocks := make([]flow.Block, 0, n)
+	unsealedFinalizedBlocks := make([]flow.Block, 0, n)
 	parentBlock := ms.UnfinalizedBlock
 	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock.Header)
 		ms.Blocks[block.ID()] = &block
-		orderedBlocks = append(orderedBlocks, block)
+		unsealedFinalizedBlocks = append(unsealedFinalizedBlocks, block)
 		parentBlock = block
 	}
 
 	// progress latest sealed and latest finalized:
-	ms.LatestSealedBlock = orderedBlocks[0]
-	ms.LatestFinalizedBlock = orderedBlocks[n-1]
+	ms.LatestSealedBlock = unsealedFinalizedBlocks[0]
+	ms.LatestFinalizedBlock = unsealedFinalizedBlocks[n-1]
+
+	// add an unfinalized block
+	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock.Header)
+	ms.Blocks[unfinalizedBlock.ID()] = &unfinalizedBlock
 
 	// we will assume that all chunks are assigned to the same verifier. So each
 	// approval request should only be sent to this single verifier.
@@ -717,7 +721,13 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	// we populate expectedRequests with requests for chunks that have no
 	// signatures
 	for i := 0; i < 100; i++ {
-		ir := unittest.IncorporatedResult.Fixture()
+		ir := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(
+				unittest.ExecutionResultFixture(
+					unittest.WithBlock(&unsealedFinalizedBlocks[i]),
+				),
+			),
+		)
 
 		assignment := chunks.NewAssignment()
 
@@ -737,6 +747,29 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
 		ms.PendingResults[ir.ID()] = ir
 	}
+
+	// add an incorporated-result for a block that was already sealed. We
+	// expect that no approval requests will be sent for this result, even if it
+	// hasn't collected any approvals yet.
+	sealedBlockIR := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(&ms.LatestSealedBlock),
+			),
+		),
+	)
+	ms.PendingResults[sealedBlockIR.ID()] = sealedBlockIR
+
+	// add an incorporated-result for an unfinalized block. It should not
+	// generate any requests either.
+	unfinalizedBlockIR := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(&unfinalizedBlock),
+			),
+		),
+	)
+	ms.PendingResults[unfinalizedBlock.ID()] = unfinalizedBlockIR
 
 	// wire-up the approval requests conduit to keep track of all sent requests
 	// and check that the target matches the unique verifier assigned to each

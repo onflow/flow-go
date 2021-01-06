@@ -983,6 +983,19 @@ func (e *Engine) requestPendingApprovals() error {
 	for _, r := range e.incorporatedResults.All() {
 		resultID := r.Result.ID()
 
+		// not finding the result's block is a fatal error at this stage because
+		// we should only create incorporated-results for known blocks.
+		block, err := e.headersDB.ByBlockID(r.Result.BlockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve block: %w", err)
+		}
+
+		// do not request approvals for blocks that are sealed or not finalized
+		if block.Height <= sealed.Height ||
+			block.Height > final.Height {
+			continue
+		}
+
 		// Compute the chunk assigment. Chunk approvals will only be requested
 		// from verifiers that were assigned to the chunk. Note that the
 		// assigner keeps a cache of computed assignments, so this is not
