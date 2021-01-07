@@ -34,30 +34,32 @@ import (
 // from verification nodes), and saves the seals into seals mempool for adding
 // into a new block.
 type Engine struct {
-	unit                *engine.Unit                    // used to control startup/shutdown
-	log                 zerolog.Logger                  // used to log relevant actions with context
-	engineMetrics       module.EngineMetrics            // used to track sent and received messages
-	tracer              module.Tracer                   // used to trace execution
-	mempool             module.MempoolMetrics           // used to track mempool size
-	metrics             module.ConsensusMetrics         // used to track consensus metrics
-	state               protocol.State                  // used to access the  protocol state
-	me                  module.Local                    // used to access local node information
-	receiptRequester    module.Requester                // used to request missing execution receipts by block ID
-	approvalConduit     network.Conduit                 // used to request missing approvals from verification nodes
-	resultsDB           storage.ExecutionResults        // used to check previous results are known
-	headersDB           storage.Headers                 // used to check sealed headers
-	indexDB             storage.Index                   // used to check payloads for results
-	incorporatedResults mempool.IncorporatedResults     // holds incorporated results in memory
-	receipts            mempool.Receipts                // holds execution receipts in memory
-	approvals           mempool.Approvals               // holds result approvals in memory
-	seals               mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
-	missing             map[flow.Identifier]uint        // track how often a block was missing
-	assigner            module.ChunkAssigner            // chunk assignment object
-	checkingSealing     *atomic.Bool                    // used to rate limit the checksealing call
-	sealingThreshold    uint                            // how many blocks between sealed/finalized before we request execution receipts and approvals
-	maxResultsToRequest int                             // max number of finalized blocks for which we request execution results
-	requireApprovals    bool                            // flag to disable verifying chunk approvals
-	receiptValidator    module.ReceiptValidator         // used to validate receipts
+	unit                   *engine.Unit                    // used to control startup/shutdown
+	log                    zerolog.Logger                  // used to log relevant actions with context
+	engineMetrics          module.EngineMetrics            // used to track sent and received messages
+	tracer                 module.Tracer                   // used to trace execution
+	mempool                module.MempoolMetrics           // used to track mempool size
+	metrics                module.ConsensusMetrics         // used to track consensus metrics
+	state                  protocol.State                  // used to access the  protocol state
+	me                     module.Local                    // used to access local node information
+	receiptRequester       module.Requester                // used to request missing execution receipts by block ID
+	approvalConduit        network.Conduit                 // used to request missing approvals from verification nodes
+	resultsDB              storage.ExecutionResults        // used to check previous results are known
+	headersDB              storage.Headers                 // used to check sealed headers
+	indexDB                storage.Index                   // used to check payloads for results
+	incorporatedResults    mempool.IncorporatedResults     // holds incorporated results in memory
+	receipts               mempool.Receipts                // holds execution receipts in memory
+	approvals              mempool.Approvals               // holds result approvals in memory
+	seals                  mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
+	missing                map[flow.Identifier]uint        // track how often a block was missing
+	assigner               module.ChunkAssigner            // chunk assignment object
+	checkingSealing        *atomic.Bool                    // used to rate limit the checksealing call
+	sealingThreshold       uint                            // how many blocks between sealed/finalized before we request execution receipts and approvals
+	maxResultsToRequest    int                             // max number of finalized blocks for which we request execution results
+	requireApprovals       bool                            // flag to disable verifying chunk approvals
+	receiptValidator       module.ReceiptValidator         // used to validate receipts
+	requestTracker         *RequestTracker                 // used to cout the number of approval requests by chunk ([result id][chunk index]=>count)
+	maxRequestsPerApproval uint                            // used to safeguard the engine from continuously requesting the same approval
 }
 
 // New creates a new collection propagation engine.
@@ -85,29 +87,31 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:                engine.NewUnit(),
-		log:                 log.With().Str("engine", "matching").Logger(),
-		engineMetrics:       engineMetrics,
-		tracer:              tracer,
-		mempool:             mempool,
-		metrics:             conMetrics,
-		state:               state,
-		me:                  me,
-		receiptRequester:    receiptRequester,
-		resultsDB:           resultsDB,
-		headersDB:           headersDB,
-		indexDB:             indexDB,
-		incorporatedResults: incorporatedResults,
-		receipts:            receipts,
-		approvals:           approvals,
-		seals:               seals,
-		missing:             make(map[flow.Identifier]uint),
-		checkingSealing:     atomic.NewBool(false),
-		sealingThreshold:    10,
-		maxResultsToRequest: 200,
-		assigner:            assigner,
-		requireApprovals:    requireApprovals,
-		receiptValidator:    validator,
+		unit:                   engine.NewUnit(),
+		log:                    log.With().Str("engine", "matching").Logger(),
+		engineMetrics:          engineMetrics,
+		tracer:                 tracer,
+		mempool:                mempool,
+		metrics:                conMetrics,
+		state:                  state,
+		me:                     me,
+		receiptRequester:       receiptRequester,
+		resultsDB:              resultsDB,
+		headersDB:              headersDB,
+		indexDB:                indexDB,
+		incorporatedResults:    incorporatedResults,
+		receipts:               receipts,
+		approvals:              approvals,
+		seals:                  seals,
+		missing:                make(map[flow.Identifier]uint),
+		checkingSealing:        atomic.NewBool(false),
+		sealingThreshold:       10,
+		maxResultsToRequest:    200,
+		assigner:               assigner,
+		requireApprovals:       requireApprovals,
+		receiptValidator:       validator,
+		requestTracker:         NewRequestTracker(),
+		maxRequestsPerApproval: 10,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -847,6 +851,14 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 		}
 	}
 
+	// clear the request tracker of all items corresponding to results that are
+	// no longer in the incorporated-results mempool
+	for resultID := range e.requestTracker.GetAll() {
+		if _, _, ok := e.incorporatedResults.ByResultID(resultID); ok {
+			e.requestTracker.Remove(resultID)
+		}
+	}
+
 	// for each missing block that we are tracking, remove it from tracking if
 	// we now know that block or if we have just cleared related resources; then
 	// increase the count for the remaining missing blocks
@@ -1022,6 +1034,20 @@ func (e *Engine) requestPendingApprovals() error {
 			if ok && sigs.Len() > 0 {
 				continue
 			}
+
+			requestCount := e.requestTracker.Get(resultID, c.Index)
+
+			// prevent the engine from requesting the same approval more times
+			// than the prescribed limit
+			if requestCount >= e.maxRequestsPerApproval {
+				e.log.Debug().Msgf("reached maximum number of approval requests (%d) for result %v chunk %d",
+					e.maxRequestsPerApproval,
+					resultID,
+					c.Index)
+				continue
+			}
+
+			e.requestTracker.Increment(resultID, c.Index)
 
 			// prepare the request
 			req := &messages.ApprovalRequest{

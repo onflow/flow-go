@@ -76,26 +76,28 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
 
 	ms.matching = &Engine{
-		unit:                unit,
-		log:                 log,
-		engineMetrics:       metrics,
-		mempool:             metrics,
-		metrics:             metrics,
-		state:               ms.State,
-		receiptRequester:    ms.requester,
-		resultsDB:           ms.ResultsDB,
-		headersDB:           ms.HeadersDB,
-		indexDB:             ms.IndexDB,
-		incorporatedResults: ms.ResultsPL,
-		receipts:            ms.ReceiptsPL,
-		approvals:           ms.ApprovalsPL,
-		seals:               ms.SealsPL,
-		checkingSealing:     atomic.NewBool(false),
-		sealingThreshold:    10,
-		maxResultsToRequest: 200,
-		assigner:            ms.Assigner,
-		requireApprovals:    true,
-		receiptValidator:    ms.receiptValidator,
+		unit:                   unit,
+		log:                    log,
+		engineMetrics:          metrics,
+		mempool:                metrics,
+		metrics:                metrics,
+		state:                  ms.State,
+		receiptRequester:       ms.requester,
+		resultsDB:              ms.ResultsDB,
+		headersDB:              ms.HeadersDB,
+		indexDB:                ms.IndexDB,
+		incorporatedResults:    ms.ResultsPL,
+		receipts:               ms.ReceiptsPL,
+		approvals:              ms.ApprovalsPL,
+		seals:                  ms.SealsPL,
+		checkingSealing:        atomic.NewBool(false),
+		sealingThreshold:       10,
+		maxResultsToRequest:    200,
+		assigner:               ms.Assigner,
+		requireApprovals:       true,
+		receiptValidator:       ms.receiptValidator,
+		requestTracker:         NewRequestTracker(),
+		maxRequestsPerApproval: 10,
 	}
 }
 
@@ -686,8 +688,17 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 // that have not collected any approvals yet, and are sent only to the verifiers
 // assigned to those chunks.
 func (ms *MatchingSuite) TestRequestPendingApprovals() {
-	// create blocks
+
+	// n is the total number of blocks and incorporated-results we add to the
+	// chain and mempool
 	n := 100
+
+	// s is the number of incorporated results that have already collected at
+	// least onne approval per chunk, so they should not require any approval
+	// requests
+	s := 50
+
+	// create blocks
 	unsealedFinalizedBlocks := make([]flow.Block, 0, n)
 	parentBlock := ms.UnfinalizedBlock
 	for i := 0; i < n; i++ {
@@ -701,7 +712,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	ms.LatestSealedBlock = unsealedFinalizedBlocks[0]
 	ms.LatestFinalizedBlock = unsealedFinalizedBlocks[n-1]
 
-	// add an unfinalized block
+	// add an unfinalized block; it shouldn't require an approval request
 	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock.Header)
 	ms.Blocks[unfinalizedBlock.ID()] = &unfinalizedBlock
 
@@ -720,7 +731,10 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	//
 	// we populate expectedRequests with requests for chunks that have no
 	// signatures
-	for i := 0; i < 100; i++ {
+	for i := 0; i < n; i++ {
+
+		// Create an incorporated result for unsealedFinalizedBlocks[i].
+		// By default the result will contain 17 chunks.
 		ir := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(
 				unittest.ExecutionResultFixture(
@@ -732,11 +746,16 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 		assignment := chunks.NewAssignment()
 
 		for _, chunk := range ir.Result.Chunks {
+
+			// assign the verifier to this chunk
 			assignment.Add(chunk, flow.IdentifierList{verifier})
 			ms.Assigner.On("Assign", ir.Result, ir.IncorporatedBlockID).Return(assignment, nil)
 
-			if i < 50 {
+			// only add a signature if the result belongs to the set of results
+			// that we assume have already received approvals for every chunk
+			if i < s {
 				ir.AddSignature(chunk.Index, unittest.IdentifierFixture(), unittest.SignatureFixture())
+			} else {
 				expectedRequests = append(expectedRequests,
 					&messages.ApprovalRequest{
 						ResultID:   ir.Result.ID(),
@@ -794,8 +813,19 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	err := ms.matching.requestPendingApprovals()
 	ms.Require().NoError(err)
 
-	// We should have only sent requests for chunks that have no approvals
+	// We should have only sent requests for chunks that haven't collected any
+	// approvals
 	ms.Assert().Len(requests, len(expectedRequests))
+
+	// Check the approval tracker
+	ms.Assert().Equal(s, len(ms.matching.requestTracker.index))
+	for _, expectedRequest := range expectedRequests {
+		requestCount := ms.matching.requestTracker.Get(
+			expectedRequest.ResultID,
+			expectedRequest.ChunkIndex,
+		)
+		ms.Assert().Equal(uint(1), requestCount)
+	}
 }
 
 // incorporatedResult returns a testify `argumentMatcher` that only accepts an
