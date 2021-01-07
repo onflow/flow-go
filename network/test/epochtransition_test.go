@@ -164,7 +164,6 @@ func (suite *MutableIdentityTableSuite) removeNode() testNode {
 // TestNewNodeAdded tests that when a new node is added to the identity list e.g. on an epoch,
 // then it can connect to the network.
 func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
-	suite.T().Skip() // temp change to fix broken CI build
 
 	// add a new node the current list of nodes
 	suite.addNode(1)
@@ -184,9 +183,15 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 	assertConnected(suite.T(), newMiddleware, ids.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// check that all the engines on this new epoch can talk to each other using any of the three networking primitives
-	suite.exchangeMessages(ids, engs, nil, nil, suite.Publish)
-	suite.exchangeMessages(ids, engs, nil, nil, suite.Multicast)
-	suite.exchangeMessages(ids, engs, nil, nil, suite.Unicast)
+	suite.Run("TestNewNodeAdded Publish", func() {
+		suite.exchangeMessages(ids, engs, nil, nil, suite.Publish)
+	})
+	suite.Run("TestNewNodeAdded Multicast", func() {
+		suite.exchangeMessages(ids, engs, nil, nil, suite.Multicast)
+	})
+	suite.Run("TestNewNodeAdded Unicast", func() {
+		suite.exchangeMessages(ids, engs, nil, nil, suite.Unicast)
+	})
 }
 
 // TestNodeRemoved tests that when an existing node is removed from the identity
@@ -214,13 +219,15 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
-
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
-
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
-
+	suite.Run("TestNodesAddedAndRemoved Publish", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
+	})
+	suite.Run("TestNodesAddedAndRemoved Multicast", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
+	})
+	suite.Run("TestNodesAddedAndRemoved Unicast", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
+	})
 }
 
 // TestNodesAddedAndRemoved tests that:
