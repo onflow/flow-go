@@ -317,6 +317,12 @@ func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
 	}
 }
 
+func WithCollection(collection *flow.Collection) func(guarantee *flow.CollectionGuarantee) {
+	return func(guarantee *flow.CollectionGuarantee) {
+		guarantee.CollectionID = collection.ID()
+	}
+}
+
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
 	guarantee := &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),

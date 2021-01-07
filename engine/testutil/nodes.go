@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +27,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
-	"github.com/onflow/flow-go/engine/execution/state"
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/finder"
@@ -52,14 +53,18 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) testmock.GenericNode {
-
+// GenericNode is a test helper that creates and returns a generic node.
+// The generic node is used as the core data structure to create other types of flow nodes.
+func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID,
+	options ...func(protocol.State)) testmock.GenericNode {
 	var i int
 	var participant *flow.Identity
 	for i, participant = range participants {
@@ -68,38 +73,32 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 		}
 	}
 
+	// creates logger, metrics collector and tracer.
 	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
-
-	dbDir := unittest.TempDir(t)
-	db := unittest.BadgerDB(t, dbDir)
-
-	metrics := metrics.NewNoopCollector()
 	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
+	metrics := metrics.NewNoopCollector()
 
-	guarantees := storage.NewGuarantees(metrics, db)
-	seals := storage.NewSeals(metrics, db)
-	headers := storage.NewHeaders(metrics, db)
-	index := storage.NewIndex(metrics, db)
-	resultsDB := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewExecutionReceipts(metrics, db, resultsDB)
-	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts)
-	blocks := storage.NewBlocks(db, headers, payloads)
-	setups := storage.NewEpochSetups(metrics, db)
-	commits := storage.NewEpochCommits(metrics, db)
-	distributor := events.NewDistributor()
-	statuses := storage.NewEpochStatuses(metrics, db)
+	// creates state fixture and bootstrap it.
+	stateFixture := CompleteStateFixture(t, log, metrics, tracer, participants)
 
-	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
 	require.NoError(t, err)
-
-	state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
-	require.NoError(t, err)
-
 	for _, option := range options {
-		option(state)
+		option(stateFixture.State)
 	}
+
+	return GenericNodeWithStateFixture(t, stateFixture, hub, identity, log, metrics, tracer, chainID)
+}
+
+// GenericNodeWithStateFixture is a test helper that creates a generic node with specified state fixture.
+func GenericNodeWithStateFixture(t testing.TB,
+	stateFixture *testmock.StateFixture,
+	hub *stub.Hub,
+	identity *flow.Identity,
+	log zerolog.Logger,
+	metrics *metrics.NoopCollector,
+	tracer module.Tracer,
+	chainID flow.ChainID) testmock.GenericNode {
 
 	// Generates test signing oracle for the nodes
 	// Disclaimer: it should not be used for practical applications
@@ -117,30 +116,56 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	me, err := local.New(identity, sk)
 	require.NoError(t, err)
 
-	stubnet := stub.NewNetwork(state, me, hub)
+	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
 
 	return testmock.GenericNode{
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
-		DB:             db,
-		Headers:        headers,
-		Guarantees:     guarantees,
-		Seals:          seals,
-		Payloads:       payloads,
-		Blocks:         blocks,
-		Index:          index,
-		State:          state,
+		DB:             stateFixture.DB,
+		State:          stateFixture.State,
+		Headers:        stateFixture.Storage.Headers,
+		Guarantees:     stateFixture.Storage.Guarantees,
+		Seals:          stateFixture.Storage.Seals,
+		Payloads:       stateFixture.Storage.Payloads,
+		Blocks:         stateFixture.Storage.Blocks,
 		Me:             me,
 		Net:            stubnet,
-		DBDir:          dbDir,
+		DBDir:          stateFixture.DBDir,
 		ChainID:        chainID,
-		ProtocolEvents: distributor,
+		ProtocolEvents: stateFixture.ProtocolEvents,
+	}
+}
+
+// CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
+func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.NoopCollector, tracer module.Tracer,
+	participants flow.IdentityList) *testmock.StateFixture {
+	dbDir := unittest.TempDir(t)
+	db := unittest.BadgerDB(t, dbDir)
+	s := storage.InitAll(metric, db)
+	consumer := events.NewNoop()
+
+	root, result, seal := unittest.BootstrapFixture(participants)
+	stateRoot, err := badgerstate.NewStateRoot(root, result, seal, 0)
+	require.NoError(t, err)
+
+	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
+	require.NoError(t, err)
+
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator())
+	require.NoError(t, err)
+
+	return &testmock.StateFixture{
+		DB:             db,
+		Storage:        s,
+		DBDir:          dbDir,
+		ProtocolEvents: events.NewDistributor(),
+		State:          mutableState,
 	}
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID, options ...func(*protocol.State)) testmock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID, options ...func(protocol.State)) testmock.CollectionNode {
 
 	node := GenericNode(t, hub, identity, identities, chainID, options...)
 
@@ -173,7 +198,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID, options ...func(*protocol.State)) []testmock.CollectionNode {
+func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID, options ...func(protocol.State)) []testmock.CollectionNode {
 	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
 
 	// add some extra dummy identities so we have one of each role
@@ -210,7 +235,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
 
 	// receive collections
-	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State, node.Headers, node.Me, guarantees)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
+		node.Headers, node.Me, guarantees)
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
@@ -278,7 +304,6 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainI
 }
 
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
-
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
@@ -290,10 +315,10 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 
-	protoState, ok := node.State.(*protocol.State)
+	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
 
-	followerState, err := protocol.NewFollowerState(protoState, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
+	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
 	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
@@ -314,7 +339,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
 	require.NoError(t, err)
 
-	execState := state.NewExecutionState(
+	execState := executionState.NewExecutionState(
 		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, results, receipts, node.DB, node.Tracer,
 	)
 
@@ -481,7 +506,8 @@ func (s *RoundRobinLeaderSelection) DKG(blockID flow.Identifier) (hotstuff.DKG, 
 	return nil, fmt.Errorf("error")
 }
 
-func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState *protocol.FollowerState, notifier hotstuff.FinalizationConsumer, rootHead *flow.Header, rootQC *flow.QuorumCertificate) (module.HotStuffFollower, *confinalizer.Finalizer) {
+func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState *badgerstate.FollowerState, notifier hotstuff.FinalizationConsumer,
+	rootHead *flow.Header, rootQC *flow.QuorumCertificate) (module.HotStuffFollower, *confinalizer.Finalizer) {
 
 	identities, err := node.State.AtHeight(0).Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
@@ -531,6 +557,12 @@ func WithMatchEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
+func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
+	return func(node *testmock.VerificationNode) {
+		node.GenericNode = genericNode
+	}
+}
+
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
@@ -547,12 +579,15 @@ func VerificationNode(t testing.TB,
 	opts ...VerificationOpt) testmock.VerificationNode {
 
 	var err error
-	node := testmock.VerificationNode{
-		GenericNode: GenericNode(t, hub, identity, identities, chainID),
-	}
+	var node testmock.VerificationNode
 
 	for _, apply := range opts {
 		apply(&node)
+	}
+
+	if node.GenericNode == nil {
+		gn := GenericNode(t, hub, identity, identities, chainID)
+		node.GenericNode = &gn
 	}
 
 	if node.CachedReceipts == nil {
@@ -607,6 +642,15 @@ func VerificationNode(t testing.TB,
 
 		// registers size method of backend for metrics
 		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
+		require.Nil(t, err)
+	}
+
+	if node.DiscardedResultIDs == nil {
+		node.DiscardedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceDiscardedResultID, node.DiscardedResultIDs.Size)
 		require.Nil(t, err)
 	}
 
@@ -695,12 +739,14 @@ func VerificationNode(t testing.TB,
 			node.Tracer,
 			node.Net,
 			node.Me,
+			node.State,
 			node.MatchEngine,
 			node.CachedReceipts,
 			node.PendingReceipts,
 			node.ReadyReceipts,
 			node.Headers,
 			node.ProcessedResultIDs,
+			node.DiscardedResultIDs,
 			node.PendingReceiptIDsByBlock,
 			node.ReceiptIDsByResult,
 			node.BlockIDsCache,
