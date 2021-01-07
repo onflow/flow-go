@@ -183,13 +183,13 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 	assertConnected(suite.T(), newMiddleware, ids.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// check that all the engines on this new epoch can talk to each other using any of the three networking primitives
-	suite.Run("TestNewNodeAdded Publish", func() {
+	suite.Run("Publish", func() {
 		suite.exchangeMessages(ids, engs, nil, nil, suite.Publish)
 	})
-	suite.Run("TestNewNodeAdded Multicast", func() {
+	suite.Run("Multicast", func() {
 		suite.exchangeMessages(ids, engs, nil, nil, suite.Multicast)
 	})
-	suite.Run("TestNewNodeAdded Unicast", func() {
+	suite.Run("Unicast", func() {
 		suite.exchangeMessages(ids, engs, nil, nil, suite.Unicast)
 	})
 }
@@ -219,13 +219,13 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.Run("TestNodeRemoved Publish", func() {
+	suite.Run("Publish", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
 	})
-	suite.Run("TestNodeRemoved Multicast", func() {
+	suite.Run("Multicast", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
 	})
-	suite.Run("TestNodeRemoved Unicast", func() {
+	suite.Run("Unicast", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
 	})
 }
@@ -263,13 +263,13 @@ func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.Run("TestNodesAddedAndRemoved Publish", func() {
+	suite.Run("Publish", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
 	})
-	suite.Run("TestNodesAddedAndRemoved Multicast", func() {
+	suite.Run("Multicast", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
 	})
-	suite.Run("TestNodesAddedAndRemoved Unicast", func() {
+	suite.Run("Unicast", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
 	})
 }
