@@ -49,7 +49,7 @@ type Engine struct {
 	seals                   mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
 	missing                 map[flow.Identifier]uint        // track how often a block was missing
 	assigner                module.ChunkAssigner            // chunk assignment object
-	checkingSealing         *atomic.Bool                    // used to rate limit the checksealing call
+	isCheckingSealing       *atomic.Bool                    // used to rate limit the checksealing call
 	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxResultsToRequest     int                             // max number of finalized blocks for which we request execution results
 	requireApprovals        bool                            // flag to disable verifying chunk approvals
@@ -98,7 +98,7 @@ func New(
 		approvals:               approvals,
 		seals:                   seals,
 		missing:                 make(map[flow.Identifier]uint),
-		checkingSealing:         atomic.NewBool(false),
+		isCheckingSealing:       atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxResultsToRequest:     200,
 		assigner:                assigner,
@@ -369,7 +369,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 // checkSealing checks if there is anything worth sealing at the moment.
 func (e *Engine) checkSealing() {
 	// rate limit the check sealing
-	if e.checkingSealing.Load() {
+	if e.isCheckingSealing.Load() {
 		return
 	}
 
@@ -377,13 +377,17 @@ func (e *Engine) checkSealing() {
 	defer e.unit.Unlock()
 
 	// only check sealing when no one else is checking
-	canCheck := e.checkingSealing.CAS(false, true)
+	canCheck := e.isCheckingSealing.CAS(false, true)
 	if !canCheck {
 		return
 	}
 
-	defer e.checkingSealing.Store(false)
+	defer e.isCheckingSealing.Store(false)
 
+	e.checkingSealing()
+}
+
+func (e *Engine) checkingSealing() {
 	start := time.Now()
 
 	// get all results that have collected enough approvals on a per-chunk basis
@@ -594,7 +598,7 @@ RES_LOOP:
 
 			matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
 			if err != nil {
-				return nil, fmt.Errorf("")
+				return nil, fmt.Errorf("could not match chunk: %w", err)
 			}
 			if !matched {
 				continue RES_LOOP
@@ -602,7 +606,6 @@ RES_LOOP:
 		}
 
 		// add the result to the results that should be sealed
-		e.log.Info().Msg("adding result with sufficient verification")
 		results = append(results, incorporatedResult)
 	}
 

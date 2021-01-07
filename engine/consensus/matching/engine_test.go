@@ -88,7 +88,7 @@ func (ms *MatchingSuite) SetupTest() {
 		receipts:                ms.ReceiptsPL,
 		approvals:               ms.ApprovalsPL,
 		seals:                   ms.SealsPL,
-		checkingSealing:         atomic.NewBool(false),
+		isCheckingSealing:       atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxResultsToRequest:     200,
 		assigner:                ms.Assigner,

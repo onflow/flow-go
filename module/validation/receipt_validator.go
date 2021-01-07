@@ -130,18 +130,16 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
-		} else {
-			return err
 		}
+		return err
 	}
 
 	block, err := v.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return engine.NewInvalidInputErrorf("no block found %v %w", result.BlockID, err)
-		} else {
-			return err
 		}
+		return err
 	}
 
 	if prevResult.BlockID != block.ParentID {
