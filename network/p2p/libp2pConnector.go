@@ -41,6 +41,10 @@ func (l *libp2pConnector) UpdatePeers(ctx context.Context, ids flow.IdentityList
 	// derive the peer.AddrInfo from each of the flow.Identity
 	pInfos, invalidIDs := peerInfosFromIDs(ids)
 
+	for i, p := range pInfos {
+		fmt.Printf("\nAllowed peer %s %s", p.ID, ids[i].NodeID.String())
+	}
+
 	// connect to each of the peer.AddrInfo in pInfos
 	l.connectToPeers(ctx, pInfos)
 
