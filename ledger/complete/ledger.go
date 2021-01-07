@@ -77,10 +77,16 @@ func NewLedger(dbDir string,
 		pathFinderVersion: pathFinderVer,
 	}
 
+	// pause records to prevent double logging trie removals
+	w.PauseRecord()
+	defer w.UnpauseRecord()
+
 	err = w.ReplayOnForest(forest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
+
+	w.UnpauseRecord()
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)

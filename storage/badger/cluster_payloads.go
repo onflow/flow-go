@@ -53,7 +53,10 @@ func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Pay
 func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*cluster.Payload, error) {
 	return func(tx *badger.Txn) (*cluster.Payload, error) {
 		val, err := cp.cache.Get(blockID)(tx)
-		return val.(*cluster.Payload), err
+		if err != nil {
+			return nil, err
+		}
+		return val.(*cluster.Payload), nil
 	}
 }
 

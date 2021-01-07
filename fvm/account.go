@@ -11,11 +11,11 @@ import (
 func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
-	ledger state.Ledger,
+	st *state.State,
 	chain flow.Chain,
 	address flow.Address,
 ) (*flow.Account, error) {
-	accounts := state.NewAccounts(ledger)
+	accounts := state.NewAccounts(st)
 
 	account, err := accounts.Get(address)
 	if err != nil {
@@ -32,7 +32,7 @@ func getAccount(
 		err = vm.Run(
 			ctx,
 			script,
-			ledger,
+			st.Ledger(),
 		)
 		if err != nil {
 			return nil, err
@@ -77,6 +77,7 @@ func initFlowTokenTransaction(accountAddress, serviceAddress flow.Address) *Tran
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(initFlowTokenTransactionTemplate, serviceAddress))).
 			AddAuthorizer(accountAddress),
+		0,
 	)
 }
 

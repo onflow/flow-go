@@ -24,14 +24,14 @@ type ScriptProcedure struct {
 	Arguments [][]byte
 	Value     cadence.Value
 	Logs      []string
-	Events    []cadence.Event
+	Events    []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, state.Ledger) error
+	Process(*VirtualMachine, Context, *ScriptProcedure, *state.State) error
 }
 
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
@@ -42,9 +42,9 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, ledger)
+		err := p.Process(vm, ctx, proc, st)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -69,9 +69,9 @@ func (i ScriptInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *ScriptProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, ledger)
+	env, err := newEnvironment(ctx, st)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (i ScriptInvocator) Process(
 
 	proc.Value = value
 	proc.Logs = env.getLogs()
-	proc.Events = env.getEvents()
+	proc.Events = env.Events()
 
 	return nil
 }

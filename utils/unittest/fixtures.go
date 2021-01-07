@@ -317,6 +317,12 @@ func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
 	}
 }
 
+func WithCollection(collection *flow.Collection) func(guarantee *flow.CollectionGuarantee) {
+	return func(guarantee *flow.CollectionGuarantee) {
+		guarantee.CollectionID = collection.ID()
+	}
+}
+
 func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flow.CollectionGuarantee {
 	guarantee := &flow.CollectionGuarantee{
 		CollectionID: IdentifierFixture(),
@@ -399,9 +405,9 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	return executableBlock
 }
 
-func WithExecutorID(id flow.Identifier) func(*flow.ExecutionReceipt) {
-	return func(receipt *flow.ExecutionReceipt) {
-		receipt.ExecutorID = id
+func WithExecutorID(executorID flow.Identifier) func(*flow.ExecutionReceipt) {
+	return func(er *flow.ExecutionReceipt) {
+		er.ExecutorID = executorID
 	}
 }
 
@@ -422,6 +428,13 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 	for _, apply := range opts {
 		apply(receipt)
 	}
+
+	return receipt
+}
+
+func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
+	result := ExecutionResultFixture(WithBlock(block))
+	receipt := ExecutionReceiptFixture(WithResult(result))
 	return receipt
 }
 
@@ -438,6 +451,7 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
+	var previousResultID flow.Identifier
 	if block.Payload != nil {
 		chunks += len(block.Payload.Guarantees)
 	}
@@ -448,6 +462,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 		result.BlockID = blockID
 		result.Chunks = ChunksFixture(uint(chunks), block.ID())
 		result.Chunks[0].StartState = startState // set start state to value before update
+		result.PreviousResultID = previousResultID
 	}
 }
 
@@ -468,15 +483,21 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	return result
 }
 
-func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
+func WithApproverID(approverID flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.Body.ExecutionResultID = id
+		ra.Body.ApproverID = approverID
 	}
 }
 
-func WithApproverID(id flow.Identifier) func(*flow.ResultApproval) {
+func WithAttestationBlock(block *flow.Block) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
-		ra.Body.ApproverID = id
+		ra.Body.Attestation.BlockID = block.ID()
+	}
+}
+
+func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.Body.ExecutionResultID = id
 	}
 }
 
@@ -554,6 +575,20 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 func WithStake(stake uint64) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
 		identity.Stake = stake
+	}
+}
+
+// WithAddress sets the network address of identity fixture.
+func WithAddress(address string) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Address = address
+	}
+}
+
+// WithNetworkingKey sets the networking public key of identity fixture.
+func WithNetworkingKey(key crypto.PublicKey) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.NetworkPubKey = key
 	}
 }
 
@@ -661,10 +696,10 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return identities
 }
 
-func ChunkFixture(blockID flow.Identifier) *flow.Chunk {
+func ChunkFixture(blockID flow.Identifier, collectionIndex uint) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex:      42,
+			CollectionIndex:      collectionIndex,
 			StartState:           StateCommitmentFixture(),
 			EventCollection:      IdentifierFixture(),
 			TotalComputationUsed: 4200,
@@ -679,7 +714,7 @@ func ChunkFixture(blockID flow.Identifier) *flow.Chunk {
 func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
-		chunk := ChunkFixture(blockID)
+		chunk := ChunkFixture(blockID, uint(i))
 		chunk.Index = i
 		chunks = append(chunks, chunk)
 	}
@@ -987,6 +1022,29 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 		apply(setup)
 	}
 	return setup
+}
+
+func EpochStatusFixture() *flow.EpochStatus {
+	return &flow.EpochStatus{
+		FirstBlockID: IdentifierFixture(),
+		CurrentEpoch: flow.EventIDs{
+			SetupID:  IdentifierFixture(),
+			CommitID: IdentifierFixture(),
+		},
+		NextEpoch: flow.EventIDs{
+			SetupID:  IdentifierFixture(),
+			CommitID: IdentifierFixture(),
+		},
+	}
+}
+
+func IndexFixture() *flow.Index {
+	return &flow.Index{
+		NodeIDs:       IdentifierListFixture(5),
+		CollectionIDs: IdentifierListFixture(5),
+		SealIDs:       IdentifierListFixture(5),
+		ReceiptIDs:    IdentifierListFixture(5),
+	}
 }
 
 func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCommit) {
