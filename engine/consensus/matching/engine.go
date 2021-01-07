@@ -107,7 +107,6 @@ func New(
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
@@ -180,7 +179,7 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	// to parallelize engines in terms of threading
 	err := e.process(originID, receipt)
 	if err != nil {
-		e.log.Error().Err(err).Msg("could not process receipt")
+		e.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
 	}
 }
 
@@ -207,26 +206,21 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+	initialState, finalState, err := receiptIntegrityCheck(receipt)
+	if err != nil {
+		return engine.NewInvalidInputErrorf("%w", err)
+	}
+
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-		Hex("previous_id", receipt.ExecutionResult.PreviousResultID[:]).
+		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
+		Hex("initial_state", initialState).
+		Hex("final_state", finalState).
 		Logger()
-
-	resultFinalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok { // discard receipt
-		return engine.NewInvalidInputErrorf("execution receipt without FinalStateCommit: %x", receipt.ID())
-	}
-	log = log.With().Hex("final_state", resultFinalState).Logger()
-
-	resultInitialState, ok := receipt.ExecutionResult.InitialStateCommit()
-	if !ok { // discard receipt
-		return engine.NewInvalidInputErrorf("execution receipt without InitialStateCommit: %x", receipt.ID())
-	}
-	log = log.With().Hex("initial_state", resultInitialState).Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
@@ -248,7 +242,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	if err != nil {
 		return fmt.Errorf("could not find sealed block: %w", err)
 	}
-	if sealed.Height >= head.Height {
+
+	isSealed := head.Height <= sealed.Height
+	if isSealed {
 		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
 		return nil
 	}
@@ -258,19 +254,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// eventually request the parent receipt with the `requestPending` function
 	err = e.receiptValidator.Validate(receipt)
 	if err != nil {
-		return fmt.Errorf("failed to process execution receipt: %w", err)
+		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
-
-	// add the receipt to the mempool so that the builder can incorporate it in
-	// a block payload
-	added := e.receipts.Add(receipt)
-	if !added {
-		log.Debug().Msg("skipping receipt already in mempool")
-		return nil
-	}
-
-	log.Info().Msg("execution receipt added to mempool")
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
 	// store the result to make it persistent for later
 	result := &receipt.ExecutionResult
@@ -297,7 +282,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
 	// will be the ID of the first block on its fork that contains a receipt
 	// committing to this result.
-	added, err = e.incorporatedResults.Add(
+	added, err := e.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
 			receipt.ExecutionResult.BlockID,
 			&receipt.ExecutionResult,
@@ -532,28 +517,19 @@ RES_LOOP:
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// Retrieve parent result / skip if parent result still unknown:
-		// Before we store a result into the incorporatedResults mempool, we store it in resultsDB.
-		// I.e. resultsDB contains a superset of all results stored in the mempool. Hence, we only need
-		// to check resultsDB. Any result not in resultsDB cannot be in incorporatedResults mempool.
-		previousID := incorporatedResult.Result.PreviousResultID
-		previous, err := e.resultsDB.ByID(previousID)
-		if errors.Is(err, storage.ErrNotFound) {
-			e.log.Debug().Msg("skipping sealable result with unknown previous result")
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("could not get previous result: %w", err)
-		}
-
-		// check sub-graph
-		if block.ParentID != previous.BlockID {
+		// TODO: move block (header) to the IncorporatedResult struct,
+		// get rid of the above non-existing error case
+		err = validateResult(e.resultsDB, block, incorporatedResult)
+		if engine.IsInvalidInputError(err) {
 			_ = e.incorporatedResults.Rem(incorporatedResult)
 			e.log.Warn().
-				Str("block_parent_id", block.ParentID.String()).
-				Str("previous_result_block_id", previous.BlockID.String()).
+				Err(err).
 				Msg("removing result with invalid sub-graph")
 			continue
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("could not validate result: %w", err)
 		}
 
 		// we create one chunk per collection, plus the
@@ -688,6 +664,7 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 	return validApprovals > 0, nil
 }
 
+// TODO: to be extracted as a common function in state/protocol/state.go
 // checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
 //   * is an authorized member of the network
 //   * has _positive_ weight
@@ -810,11 +787,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 			_ = e.incorporatedResults.Rem(result)
 		}
 	}
-	for _, receipt := range e.receipts.All() {
-		if clear[receipt.ExecutionResult.ID()] || shouldClear(receipt.ExecutionResult.BlockID) {
-			_ = e.receipts.Rem(receipt.ID())
-		}
-	}
+
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
 			// delete all the approvals for the corresponding chunk
@@ -839,9 +812,6 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	for missingID := range missingIDs {
 		e.missing[missingID]++
 	}
-
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 }
@@ -920,5 +890,55 @@ func (e *Engine) requestPending() error {
 		e.requester.EntityByID(blockID, filter.Any)
 	}
 
+	return nil
+}
+
+// check the receipt's data integrity by checking its result has
+// both final statecommitment and initial statecommitment
+func receiptIntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.StateCommitment, error) {
+	final, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		return nil, nil, fmt.Errorf("execution receipt without FinalStateCommit: %x", receipt.ID())
+	}
+
+	init, ok := receipt.ExecutionResult.InitialStateCommit()
+	if !ok {
+		return nil, nil, fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
+	}
+	return init, final, nil
+}
+
+func validateResult(resultsDB storage.ExecutionResults, header *flow.Header, result *flow.IncorporatedResult) error {
+
+	// Retrieve parent result / skip if parent result still unknown:
+	// Before we store a result into the incorporatedResults mempool, we store it in resultsDB.
+	// I.e. resultsDB contains a superset of all results stored in the mempool. Hence, we only need
+	// to check resultsDB. Any result not in resultsDB cannot be in incorporatedResults mempool.
+	previous, err := resultsDB.ByID(result.Result.PreviousResultID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil
+	}
+
+	if err != nil {
+		return fmt.Errorf("could not get previous result: %w", err)
+	}
+
+	// check sub-graph:
+	// validating the PreviousResultID field
+	// ExecutionResult_X.PreviousResult.BlockID must equal to Block_X.ParentBlockID
+	// for instance: given the following chain
+	// A <- B <- C (ER_A) <- D
+	// a result ER_C with `ID(ER_A)` as its ER_C.Result.PreviousResultID
+	// would be invalid, because `ER_C.Result.PreviousResultID` must be ID(ER_B)
+	valid := header.ParentID == previous.BlockID
+
+	// When `valid` is false, it could either mean this result is invalid, which should be ignored,
+	// or its parent result is invalid, which we could also ignore this result, because we only care
+	// about the first mismatching result, which is the parent result.
+	// In other words, we could ignore this result in both cases.
+	if !valid {
+		return engine.NewInvalidInputErrorf("invalid execution result, parent result block id: %v, executed block's parent id: %v",
+			previous.BlockID, header.ParentID)
+	}
 	return nil
 }
