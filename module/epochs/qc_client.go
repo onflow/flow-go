@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -17,21 +18,25 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// QCContractClient is a client to the QC Contract
+// QCContractClient is a client to the Quorum Certificate contract. Allows the client to
+// functionality to submit a vote and check if collection node has voted already.
 type QCContractClient struct {
-	accessAddress     string         // address of the access node
-	qcContractAddress string         // QuorumCertificate contract address
-	client            *client.Client // flow-go-sdk client to access node
-	account           *sdk.Account
-	accountKeyIndex   int
-	privateKey        sdkcrypto.PrivateKey
-	signer            sdkcrypto.Signer
+	nodeID            flow.Identifier  // flow identifier of the collection node
+	accessAddress     string           // address of the access node
+	qcContractAddress string           // QuorumCertificate contract address
+	accountKeyIndex   int              // account key index
+	signer            sdkcrypto.Signer // signer used to sign vote transaction
+
+	account *sdk.Account   // account belonging to the collection node
+	client  *client.Client // flow-go-sdk client to access node
 }
 
-// NewQCContractClient returns a new client to the QC contract
-func NewQCContractClient(privateKey sdkcrypto.PrivateKey, accountAddress string, accountKeyIndex int, accessAddress, qcContractAddress string) (*QCContractClient, error) {
+// NewQCContractClient returns a new client to the Quorum Certificate contract
+func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
+	accountKeyIndex int, accessAddress, qcContractAddress string, signer sdkcrypto.Signer) (*QCContractClient, error) {
 
 	address := sdk.HexToAddress(accountAddress)
 
@@ -52,18 +57,14 @@ func NewQCContractClient(privateKey sdkcrypto.PrivateKey, accountAddress string,
 		return nil, fmt.Errorf("given account key index is bigger than the number of keys for this account")
 	}
 
-	// construct signer for signing transactions
-	accountKey := account.Keys[accountKeyIndex]
-	signer := sdkcrypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
-
 	return &QCContractClient{
 		accessAddress:     accessAddress,
 		qcContractAddress: qcContractAddress,
 		client:            flowClient,
 		account:           account,
 		accountKeyIndex:   accountKeyIndex,
-		privateKey:        privateKey,
 		signer:            signer,
+		nodeID:            nodeID,
 	}, nil
 }
 
@@ -114,7 +115,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 
 		// if the transaction has expired we skip waiting for seal
 		if result.Status == sdk.TransactionStatusExpired {
-			break
+			return fmt.Errorf("submit vote transaction has expired")
 		}
 
 		// wait 1 second before trying again.
@@ -128,20 +129,24 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 // cluster QC aggregator smart contract for the current epoch.
 func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 
-	// template := templates.GenerateGetNodeHasVotedScript(c.getEnvironment())
+	val, err := jsoncdc.Decode(c.nodeID[:])
+	if err != nil {
+		return false, fmt.Errorf("could not deocde arguments: %w", err)
+	}
 
-	// val, err := jsoncdc.Decode(arg)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("could not deocde arguments: %w", err)
-	// }
+	// execute script to read if voted
+	template := templates.GenerateGetNodeHasVotedScript(c.getEnvironment())
+	hasVoted, err := c.client.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{val})
+	if err != nil {
+		return false, fmt.Errorf("could not execute voted script: %w", err)
+	}
 
-	// // execute script to read if voted
-	// _, err := c.client.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{val})
-	// if err != nil {
-	// 	return false, fmt.Errorf("could not execute voted script: %w", err)
-	// }
+	// check if node has voted
+	if !hasVoted.(cadence.Bool) {
+		return false, nil
+	}
 
-	return false, nil
+	return true, nil
 }
 
 // submitTx submits a transaction to flow
