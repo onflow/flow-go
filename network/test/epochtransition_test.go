@@ -85,7 +85,7 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 func (suite *MutableIdentityTableSuite) SetupTest() {
 	suite.testNodes = nil
 	rand.Seed(time.Now().UnixNano())
-	nodeCount := 5
+	nodeCount := 10
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	log.SetAllLoggers(log.LevelError)
 
