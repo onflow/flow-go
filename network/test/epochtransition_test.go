@@ -214,15 +214,13 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.Run("TestNodesAddedAndRemoved Publish", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
-	})
-	suite.Run("TestNodesAddedAndRemoved Multicast", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
-	})
-	suite.Run("TestNodesAddedAndRemoved Unicast", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
-	})
+
+	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
+
+	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
+
+	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
+
 }
 
 // TestNodesAddedAndRemoved tests that:
