@@ -81,7 +81,7 @@ func (c ConnManager) logConnectionUpdate(n network.Network, con network.Conn, lo
 	c.log.Debug().
 		Str("remote_peer", con.RemotePeer().String()).
 		Str("remote_addrs", con.RemoteMultiaddr().String()).
-		Str("local_peer",con.LocalPeer().String()).
+		Str("local_peer", con.LocalPeer().String()).
 		Str("local_addrs", con.LocalMultiaddr().String()).
 		Str("direction", con.Stat().Direction.String()).
 		Int("total_connections", len(n.Conns())).

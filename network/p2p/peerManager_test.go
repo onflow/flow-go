@@ -228,9 +228,3 @@ func assertListsEqual(t *testing.T, list1, list2 flow.IdentityList) {
 	list2 = list2.Order(order.ByNodeIDAsc)
 	assert.Equal(t, list1, list2)
 }
-
-// assertListsDisjoint asserts that list1 and list2 have no element in common
-func assertListsDisjoint(t *testing.T, list1, list2 flow.IdentityList) {
-	common := list1.Filter(filter.In(list2))
-	assert.Zero(t, len(common))
-}

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	"github.com/rs/zerolog"
@@ -47,7 +46,7 @@ func (l *libp2pConnector) UpdatePeers(ctx context.Context, ids flow.IdentityList
 	l.connectToPeers(ctx, pInfos)
 
 	// disconnect from any other peers not in pInfos
-	l.trimExtraConnections(pInfos)
+	l.trimAllConnectionsExcept(pInfos)
 
 	return invalidIDs
 }
@@ -70,10 +69,10 @@ func (l *libp2pConnector) connectToPeers(ctx context.Context, pInfos []peer.Addr
 	l.backoffConnector.Connect(ctx, peerCh)
 }
 
-// trimExtraConnections trims all connections of the node from peers not part of peerInfos. A node would have created
-// such extra connections earlier when the identity list may have been different OR it may have been target of such
-// connections from node which have now been excluded.
-func (l *libp2pConnector) trimExtraConnections(peerInfos []peer.AddrInfo) {
+// trimAllConnectionsExcept trims all connections of the node from peers not part of peerInfos.
+// A node would have created such extra connections earlier when the identity list may have been different OR
+// it may have been target of such connections from node which have now been excluded.
+func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 
 	// convert the peerInfos to a peer.ID -> bool map
 	peersToKeep := make(map[peer.ID]bool, len(peerInfos))
@@ -105,11 +104,6 @@ func (l *libp2pConnector) trimExtraConnections(peerInfos []peer.AddrInfo) {
 			}
 		}
 	}
-}
-
-func (l *libp2pConnector) isConnected(peerInfo peer.AddrInfo) bool {
-	connectedness := l.host.Network().Connectedness(peerInfo.ID)
-	return connectedness == network.Connected
 }
 
 // defaultLibp2pBackoffConnector creates a default libp2p backoff connector similar to the one created by libp2p.pubsub

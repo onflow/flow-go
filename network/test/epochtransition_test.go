@@ -62,14 +62,6 @@ func (t testNodeList) ids() flow.IdentityList {
 	return ids
 }
 
-func (t testNodeList) middlewares() []*p2p.Middleware {
-	mws := make([]*p2p.Middleware, len(t))
-	for i, node := range t {
-		mws[i] = node.mw
-	}
-	return mws
-}
-
 func (t testNodeList) engines() []*MeshEngine {
 	engs := make([]*MeshEngine, len(t))
 	for i, node := range t {

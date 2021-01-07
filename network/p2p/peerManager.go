@@ -27,14 +27,12 @@ var PeerUpdateInterval = 1 * time.Minute
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
-	unit        *engine.Unit
-	ctx         context.Context
-	logger      zerolog.Logger
-	idsProvider func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
-
-	peerRequestQ chan struct{}     // a channel to queue a peer update request
-	connector    Connector         // connector to connect or disconnect from peers
-	currentIDs   flow.IdentityList // a list of currentIDs this node should be connected to
+	unit         *engine.Unit
+	ctx          context.Context
+	logger       zerolog.Logger
+	idsProvider  func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
+	peerRequestQ chan struct{}                     // a channel to queue a peer update request
+	connector    Connector                         // connector to connect or disconnect from peers
 }
 
 // NewPeerManager creates a new peer manager which calls the idsProvider callback to get a list of peers to connect to
