@@ -36,14 +36,12 @@ func newLibp2pConnector(host host.Host, log zerolog.Logger) (*libp2pConnector, e
 	}, nil
 }
 
+// UpdatePeers is the implementation of the Connector.UpdatePeers function. It connects to all of the ids and
+// disconnects from any other connection that the libp2p node might have.
 func (l *libp2pConnector) UpdatePeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error {
 
 	// derive the peer.AddrInfo from each of the flow.Identity
 	pInfos, invalidIDs := peerInfosFromIDs(ids)
-
-	for i, p := range pInfos {
-		fmt.Printf("\nAllowed peer %s %s", p.ID, ids[i].NodeID.String())
-	}
 
 	// connect to each of the peer.AddrInfo in pInfos
 	l.connectToPeers(ctx, pInfos)
