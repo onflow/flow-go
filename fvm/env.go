@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -37,16 +36,8 @@ type hostEnv struct {
 	logs               []string
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
-	rng                *rand.Rand
 	runtime.Metrics
-}
-
-func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
-	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
-	if err != nil {
-		panic(HasherFailure{err, "can not create hasher", hashAlgorithm})
-	}
-	return hasher.ComputeHash(data), nil
+	
 }
 
 func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
@@ -80,6 +71,14 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, t
 		tx,
 		txIndex,
 	)
+}
+
+func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
+	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
+	if err != nil {
+		panic(HasherFailure{err, "can not create hasher", hashAlgorithm})
+	}
+	return hasher.ComputeHash(data), nil
 }
 
 func (e *hostEnv) getEvents() []flow.Event {
@@ -289,8 +288,7 @@ func (e *hostEnv) VerifySignature(
 	message []byte,
 	rawPublicKey []byte,
 	rawSigAlgo string,
-	rawHashAlgo string,
-) (bool, error) {
+	rawHashAlgo string) (bool, error) {
 	valid, err := e.sigVerifier.VerifySignatureFromRuntime(
 		signature,
 		tag,
@@ -329,11 +327,11 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
 func (e *hostEnv) UnsafeRandom() (uint64, error) {
-	if e.rng == nil {
+	if e.ctx.RandomNumberSeed == nil {
 		return 0, &MethodNotSupportedError{"UnsafeRandom"}
 	}
 	buf := make([]byte, 8)
-	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
+	_, _ = e.ctx.RandomNumberSeed.Read(buf) // Always succeeds, no need to check error
 	return binary.LittleEndian.Uint64(buf), nil
 }
 
@@ -431,33 +429,6 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	return e.transactionEnv.RemoveAccountContractCode(address, name)
 }
 
-func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
-	accountAddress := flow.Address(address)
-
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		return &RestrictedAccessError{"code deployment requires authorization from the service account"}
-	}
-
-	// TODO(Ramtin)
-	// handle errors
-	// if ledger Error
-	// fvm.LedgerFailure{err}
-
-	return e.accounts.SetContract(name, accountAddress, code)
-}
-
-func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	accountAddress := flow.Address(address)
-
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		return &RestrictedAccessError{"code deployment requires authorization from the service account"}
-	}
-
-	return e.accounts.DeleteContract(name, accountAddress)
-}
-
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	if e.transactionEnv == nil {
 		return nil, &MethodNotSupportedError{"GetSigningAccounts"}
@@ -467,7 +438,6 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 }
 
 // Transaction Environment
-
 type transactionEnv struct {
 	vm                  *VirtualMachine
 	ctx                 Context
@@ -493,9 +463,7 @@ func newTransactionEnv(
 	accounts *state.Accounts,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
-	txIndex uint32,
-
-) *transactionEnv {
+	txIndex uint32) *transactionEnv {
 	return &transactionEnv{
 		vm:                  vm,
 		ctx:                 ctx,
@@ -511,6 +479,33 @@ func newTransactionEnv(
 		txIndex:             txIndex,
 		txID:                tx.ID(),
 	}
+}
+
+func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+	accountAddress := flow.Address(address)
+
+	// must be signed by the service account
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+		return &RestrictedAccessError{"code deployment requires authorization from the service account"}
+	}
+
+	// TODO(Ramtin)
+	// handle errors
+	// if ledger Error
+	// fvm.LedgerFailure{err}
+
+	return e.accounts.SetContract(name, accountAddress, code)
+}
+
+func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	accountAddress := flow.Address(address)
+
+	// must be signed by the service account
+	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+		return &RestrictedAccessError{"code deployment requires authorization from the service account"}
+	}
+
+	return e.accounts.DeleteContract(name, accountAddress)
 }
 
 func (e *transactionEnv) GetSigningAccounts() []runtime.Address {

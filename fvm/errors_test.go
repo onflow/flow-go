@@ -3,6 +3,7 @@ package fvm_test
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/stretchr/testify/require"
 )
 

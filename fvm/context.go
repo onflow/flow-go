@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/fvm/service"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -19,7 +18,6 @@ type Context struct {
 	Blocks                           Blocks
 	RandomNumberSeed                 *rand.Rand
 	Metrics                          MetricsCollector
-	SignatureVerifier                SignatureVerifier
 	GasLimit                         uint64
 	MaxStateKeySize                  uint64
 	MaxStateValueSize                uint64
