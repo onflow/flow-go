@@ -183,9 +183,15 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 	assertConnected(suite.T(), newMiddleware, ids.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// check that all the engines on this new epoch can talk to each other using any of the three networking primitives
-	suite.exchangeMessages(ids, engs, nil, nil, suite.Publish)
-	suite.exchangeMessages(ids, engs, nil, nil, suite.Multicast)
-	suite.exchangeMessages(ids, engs, nil, nil, suite.Unicast)
+	suite.Run("Publish", func() {
+		suite.exchangeMessages(ids, engs, nil, nil, suite.Publish)
+	})
+	suite.Run("Multicast", func() {
+		suite.exchangeMessages(ids, engs, nil, nil, suite.Multicast)
+	})
+	suite.Run("Unicast", func() {
+		suite.exchangeMessages(ids, engs, nil, nil, suite.Unicast)
+	})
 }
 
 // TestNodeRemoved tests that when an existing node is removed from the identity
@@ -213,9 +219,15 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
+	suite.Run("Publish", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
+	})
+	suite.Run("Multicast", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
+	})
+	suite.Run("Unicast", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
+	})
 }
 
 // TestNodesAddedAndRemoved tests that:
@@ -251,9 +263,15 @@ func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
-	suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
+	suite.Run("Publish", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
+	})
+	suite.Run("Multicast", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
+	})
+	suite.Run("Unicast", func() {
+		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
+	})
 }
 
 // signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
@@ -289,7 +307,6 @@ func assertDisconnected(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList)
 			connected, err := mw.IsConnected(*id)
 			require.NoError(t, err)
 			if connected {
-				fmt.Printf("\n still connected to: %s", id.NodeID)
 				return false
 			}
 		}
