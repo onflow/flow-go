@@ -389,7 +389,7 @@ func main() {
 				return nil, fmt.Errorf("flag `qc-contract-address` required")
 			}
 
-			// construct private key object
+			// construct signer from private key
 			privateKeyBytes, err := hex.DecodeString(privateKey)
 			if err != nil {
 				return nil, err
@@ -398,9 +398,10 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
 			}
+			txSigner := sdkcrypto.NewInMemorySigner(sk, sdkcrypto.SHA2_256)
 
 			// create QC vote client
-			qcContractClient, err := epochs.NewQCContractClient(sk, accountAddress, 0, accessAddress, qcContractAddress)
+			qcContractClient, err := epochs.NewQCContractClient(node.Me.NodeID(), accountAddress, 0, accessAddress, qcContractAddress, txSigner)
 			if err != nil {
 				return nil, err
 			}
