@@ -430,6 +430,22 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     return RLC_ERR;
 }
 
+// reads a scalar in a and checks it is a valid Zr element (a < r)
+// returns RLC_OK if the scalar is valid and RLC_ERR otherwise.
+int bn_read_Zr_bin(bn_t a, const uint8_t *bin, int len) {
+    if (len!=Fr_BYTES) {
+        return RLC_ERR;
+    }
+    bn_read_bin(a, bin, Fr_BYTES);
+    bn_t r;
+    bn_new(r); 
+    g2_get_ord(r);
+    if (bn_cmp(a, r) == RLC_LT) {
+        return RLC_OK;
+    }
+    return RLC_ERR;
+}
+
 // computes the sum of the array elements x and writes the sum in jointx
 // the sum is computed in Zr
 void bn_sum_vector(bn_t jointx, const bn_st* x, const int len) {

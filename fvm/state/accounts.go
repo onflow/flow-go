@@ -33,12 +33,12 @@ func keyPublicKey(index uint64) string {
 }
 
 type Accounts struct {
-	ledger Ledger
+	state *State
 }
 
-func NewAccounts(ledger Ledger) *Accounts {
+func NewAccounts(state *State) *Accounts {
 	return &Accounts{
-		ledger: ledger,
+		state: state,
 	}
 }
 
@@ -114,9 +114,8 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 	// mark that this account exists
 	err = a.setValue(newAddress, false, keyExists, []byte{1})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update the ledger: %w", err)
 	}
-
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
@@ -166,7 +165,6 @@ func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.Accoun
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public key count of account: %w", err)
 	}
-
 	publicKeys = make([]flow.AccountPublicKey, count)
 
 	for i := uint64(0); i < count; i++ {
@@ -336,9 +334,9 @@ func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValu
 
 func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.ledger.Get(string(address.Bytes()), string(address.Bytes()), key)
+		return a.state.Read(string(address.Bytes()), string(address.Bytes()), key)
 	}
-	return a.ledger.Get(string(address.Bytes()), "", key)
+	return a.state.Read(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -353,11 +351,9 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	}
 
 	if isController {
-		a.ledger.Set(string(address.Bytes()), string(address.Bytes()), key, value)
-	} else {
-		a.ledger.Set(string(address.Bytes()), "", key, value)
+		return a.state.Update(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return nil
+	return a.state.Update(string(address.Bytes()), "", key, value)
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -417,12 +413,14 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 	return registerKey.Size() + len(value)
 }
 
+// TODO replace with touch
+// TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		a.ledger.Touch(string(address.Bytes()), string(address.Bytes()), key)
-	} else {
-		a.ledger.Touch(string(address.Bytes()), "", key)
+		_, _ = a.state.Read(string(address.Bytes()), string(address.Bytes()), key)
+		return
 	}
+	_, _ = a.state.Read(string(address.Bytes()), "", key)
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {
@@ -520,7 +518,7 @@ func (l *contractNames) add(contractNames string) {
 func (l *contractNames) remove(contractName string) {
 	i := sort.SearchStrings(*l, contractName)
 	if i == len(*l) || (*l)[i] != contractName {
-		// list doesnt contain the element
+		// list does not contain the element
 		return
 	}
 	*l = append((*l)[:i], (*l)[i+1:]...)
