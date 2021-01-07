@@ -219,13 +219,13 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.Run("TestNodesAddedAndRemoved Publish", func() {
+	suite.Run("TestNodeRemoved Publish", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
 	})
-	suite.Run("TestNodesAddedAndRemoved Multicast", func() {
+	suite.Run("TestNodeRemoved Multicast", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
 	})
-	suite.Run("TestNodesAddedAndRemoved Unicast", func() {
+	suite.Run("TestNodeRemoved Unicast", func() {
 		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
 	})
 }
@@ -235,7 +235,6 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 // b. a node that has has been removed cannot exchange messages with the existing nodes
 func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 
-	suite.T().Skip() // temp change to fix broken CI build
 	// add a node
 	suite.addNode(1)
 	newNode := suite.testNodes[len(suite.testNodes)-1]
