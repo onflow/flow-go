@@ -23,7 +23,7 @@ func NewStateRoot(genesis *cluster.Block) (*StateRoot, error) {
 }
 
 func validateClusterGenesis(genesis *cluster.Block) error {
-	// check header number
+	// check height of genesis block
 	if genesis.Header.Height != 0 {
 		return fmt.Errorf("height of genesis cluster block should be 0 (got %d)", genesis.Header.Height)
 	}

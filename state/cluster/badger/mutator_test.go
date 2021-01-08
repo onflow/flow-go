@@ -191,7 +191,7 @@ func (suite *MutatorSuite) TestBootstrap_Successful() {
 		suite.Assert().Nil(err)
 		suite.Assert().Equal(suite.genesis.Header.ID(), header.ID())
 
-		// should insert block number -> ID lookup
+		// should insert block height -> ID lookup
 		var blockID flow.Identifier
 		err = operation.LookupClusterBlockHeight(suite.genesis.Header.ChainID, suite.genesis.Header.Height, &blockID)(tx)
 		suite.Assert().Nil(err)
@@ -225,7 +225,7 @@ func (suite *MutatorSuite) TestExtend_InvalidChainID() {
 
 func (suite *MutatorSuite) TestExtend_InvalidBlockNumber() {
 	block := suite.Block()
-	// change the block number
+	// change the block height
 	block.Header.Height = block.Header.Height - 1
 
 	err := suite.state.Extend(&block)

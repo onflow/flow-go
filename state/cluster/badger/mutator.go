@@ -99,7 +99,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 				return fmt.Errorf("could not get parent (%x): %w", block.Header.ParentID, err)
 			}
 
-			// if its number is below current boundary, the block does not connect
+			// if its height is below current boundary, the block does not connect
 			// to the finalized protocol state and would break database consistency
 			if ancestor.Height < final.Height {
 				return state.NewOutdatedExtensionErrorf("block doesn't connect to finalized state. ancestor.Height (%v), final.Height (%v)",
