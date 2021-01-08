@@ -10,7 +10,7 @@ import (
 type Seals interface {
 
 	// Store inserts the seal.
-	Store(guarantee *flow.Seal) error
+	Store(seal *flow.Seal) error
 
 	// ByID retrieves the seal by the collection
 	// fingerprint.

@@ -138,12 +138,12 @@ func (proc *localDKGProcessor) Broadcast(data []byte) {
 	}
 }
 
-// Blacklist a node
-func (proc *localDKGProcessor) Blacklist(node int) {
+// Disqualify a node
+func (proc *localDKGProcessor) Disqualify(node int, log string) {
 }
 
 // FlagMisbehavior flags a node for misbehaviour
-func (proc *localDKGProcessor) FlagMisbehavior(node int, logData string) {
+func (proc *localDKGProcessor) FlagMisbehavior(node int, log string) {
 }
 
 // dkgRunChan simulates processing incoming messages by a node

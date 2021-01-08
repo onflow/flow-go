@@ -21,6 +21,9 @@ import (
 // valid signature shares to reconstruct the threshold signature.
 // up to (t) shares do not reveal any information about the threshold
 // signature.
+// Although the API allows using arbitrary values of (t),
+// the threshold signature scheme is secure in the presence of up to (t)
+// malicious participants when (t < n/2).
 // In Flow, the input threshold value (t) is set to
 // t = floor((n-1)/2) to optimize for unforgeability and robustness.
 

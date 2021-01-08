@@ -92,7 +92,7 @@ func (suite *Suite) RunTest(
 	f func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _ := util.StorageLayer(suite.T(), db)
+		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 
@@ -100,6 +100,7 @@ func (suite *Suite) RunTest(
 			suite.state,
 			suite.execClient,
 			suite.collClient,
+			nil,
 			blocks,
 			headers,
 			collections,
@@ -280,6 +281,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil, // setting collectionRPC to nil to choose a random collection node for each send tx request
 			nil,
 			nil,
+			nil,
 			collections,
 			transactions,
 			suite.chainID,
@@ -444,8 +446,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			suite.chainID, metrics, 0, false)
+		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
+			suite.chainID, metrics, 0, false, false)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
