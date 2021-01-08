@@ -64,7 +64,7 @@ func newDKGCommon(size int, threshold int, currentIndex int,
 
 	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
 		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d, got %d",
-			size-1, size)
+			size-1, currentIndex)
 	}
 
 	if threshold >= size || threshold < MinimumThreshold {

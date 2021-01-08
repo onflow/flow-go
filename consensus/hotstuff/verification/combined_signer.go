@@ -105,7 +105,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	// check if we have sufficient threshold signature shares
 	enoughShares, err := signature.EnoughThresholdShares(int(dkg.Size()), len(votes))
 	if err != nil {
-		return nil, fmt.Errorf("error in createQC: %w", err)
+		return nil, fmt.Errorf("failed to check if shares are enough: %w", err)
 	}
 	if !enoughShares {
 		return nil, ErrInsufficientShares

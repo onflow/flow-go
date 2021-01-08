@@ -73,7 +73,8 @@ type thresholdSigner struct {
 // threshold is the threshold value, it must be in the range [MinimumThreshold..size-1]
 func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
-		return nil, fmt.Errorf("size should be between %d and %d", ThresholdSignMinSize, ThresholdSignMaxSize)
+		return nil, fmt.Errorf("size should be between %d and %d, got %d",
+			ThresholdSignMinSize, ThresholdSignMaxSize, size)
 	}
 	if currentIndex >= size || currentIndex < 0 {
 		return nil, fmt.Errorf("The current index must be between 0 and %d, got %d",
@@ -394,7 +395,8 @@ func ReconstructThresholdSignature(size int, threshold int,
 // to reconstruct a threshold signature.
 func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 	if threshold < MinimumThreshold {
-		return false, fmt.Errorf("The threshold must be larger than 1, got %d", threshold)
+		return false, fmt.Errorf("The threshold can't be smaller than %d, got %d",
+			MinimumThreshold, threshold)
 	}
 	return sharesNumber > threshold, nil
 }
