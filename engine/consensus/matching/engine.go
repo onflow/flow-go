@@ -279,7 +279,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to persist execution receipt: %w", err)
 	}
 
-	// We do _not_ return here if resultsDB already contained result!
+	// We do _not_ return here if receiptsDB already contained receipt! 
+	// receiptsDB is persistent storage while Mempools are in-memory only.
+	// After a crash, the replica still needs to be able to generate a seal
+	// for an Result even if it had stored the Result (as part of a Receipt) before the crash.
+	// Otherwise, a stored result might never get sealed, and
+	// liveness of sealing is undermined.
 	// resultsDB is persistent storage while Mempools are in-memory only.
 	// After a crash, the replica still needs to be able to generate a seal
 	// for an Result even if it had stored the Result before the crash.
@@ -324,7 +329,7 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 	// store the receipt to make it persistent for later
 	err := e.receiptsDB.Store(receipt) // internally de-duplicates
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store sealing result: %w", err)
+		return fmt.Errorf("could not store receipt: %w", err)
 	}
 	// TODO if the second operation fails we should remove stored execution result
 	// This is global execution storage problem - see TODO at the top
