@@ -27,7 +27,7 @@ type QCContractClient struct {
 	nodeID            flow.Identifier  // flow identifier of the collection node
 	accessAddress     string           // address of the access node
 	qcContractAddress string           // QuorumCertificate contract address
-	accountKeyIndex   int              // account key index
+	accountKeyIndex   uint             // account key index
 	signer            sdkcrypto.Signer // signer used to sign vote transaction
 
 	account *sdk.Account   // account belonging to the collection node
@@ -36,7 +36,7 @@ type QCContractClient struct {
 
 // NewQCContractClient returns a new client to the Quorum Certificate contract
 func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
-	accountKeyIndex int, accessAddress, qcContractAddress string, signer sdkcrypto.Signer) (*QCContractClient, error) {
+	accountKeyIndex uint, accessAddress, qcContractAddress string, signer sdkcrypto.Signer) (*QCContractClient, error) {
 
 	address := sdk.HexToAddress(accountAddress)
 
@@ -53,7 +53,7 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 	}
 
 	// check if account key index within range of keys
-	if len(account.Keys) <= accountKeyIndex {
+	if len(account.Keys) <= int(accountKeyIndex) {
 		return nil, fmt.Errorf("given account key index is bigger than the number of keys for this account")
 	}
 
@@ -94,7 +94,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// sign payload using account signer
-	err = tx.SignPayload(c.account.Address, c.accountKeyIndex, c.signer)
+	err = tx.SignPayload(c.account.Address, int(c.accountKeyIndex), c.signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}

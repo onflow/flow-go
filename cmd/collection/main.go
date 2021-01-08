@@ -82,8 +82,7 @@ func main() {
 		// epoch qc contract client
 		accessAddress     string
 		qcContractAddress string
-		accountAddress    string
-		privateKey        string
+		nodeInfoQCPath    string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -133,8 +132,7 @@ func main() {
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 			flags.StringVar(&qcContractAddress, "qc-contract-address", "", "the address of the Epoch QC contract")
-			flags.StringVar(&privateKey, "private-key", "", "the private key of the account used to interact")
-			flags.StringVar(&accountAddress, "account-address", "", "the private key of the account used to interact")
+			flags.StringVar(&nodeInfoQCPath, "node-info-qc", "", "the path to the account details to interact with the QC contract")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -379,11 +377,8 @@ func main() {
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// check if required fields are left empty
-			if accountAddress == "" {
-				return nil, fmt.Errorf("flag `account-address` required")
-			}
-			if privateKey == "" {
-				return nil, fmt.Errorf("flag `private-key` required")
+			if nodeInfoQCPath == "" {
+				return nil, fmt.Errorf("flag `node-info-qc` required")
 			}
 			if accessAddress == "" {
 				return nil, fmt.Errorf("flag `access-address` required")
@@ -415,7 +410,7 @@ func main() {
 			txSigner := sdkcrypto.NewInMemorySigner(sk, sdkcrypto.HashAlgorithm(accountInfo.HashAlgorithm))
 
 			// create QC vote client
-			qcContractClient, err := epochs.NewQCContractClient(node.Me.NodeID(), accountAddress, 0, accessAddress, qcContractAddress, txSigner)
+			qcContractClient, err := epochs.NewQCContractClient(node.Me.NodeID(), accountInfo.Address, accountInfo.KeyIndex, accessAddress, qcContractAddress, txSigner)
 			if err != nil {
 				return nil, err
 			}
