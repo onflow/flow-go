@@ -20,7 +20,7 @@ type State struct {
 }
 
 // Bootstrap initializes the persistent cluster state with a genesis block.
-// The genesis block must have number 0, a parent hash of 32 zero bytes,
+// The genesis block must have height 0, a parent hash of 32 zero bytes,
 // and an empty collection as payload.
 func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
@@ -41,10 +41,10 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
-		// insert block number -> ID mapping
+		// insert block height -> ID mapping
 		err = operation.IndexClusterBlockHeight(chainID, genesis.Header.Height, genesis.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis number: %w", err)
+			return fmt.Errorf("failed to map genesis block height to block: %w", err)
 		}
 		// insert boundary
 		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Header.Height)(tx)
@@ -59,7 +59,7 @@ func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
 		// insert voted view for hotstuff
 		err = operation.InsertVotedView(chainID, genesis.Header.View)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert started view: %w", err)
+			return fmt.Errorf("could not insert voted view: %w", err)
 		}
 
 		return nil
