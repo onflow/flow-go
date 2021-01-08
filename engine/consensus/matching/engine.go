@@ -469,8 +469,8 @@ func (e *Engine) checkingSealing() {
 		// incorporate the result and seal it on one fork and subsequently on a
 		// different fork incorporate same result and seal it. So we need to
 		// keep it in the mempool for now. This will be changed in phase 3.
-		// sealedResultIDs = append(sealedResultIDs, incorporatedResult.ID())
 
+		sealedResultIDs = append(sealedResultIDs, incorporatedResult.ID())
 		sealedBlockIDs = append(sealedBlockIDs, incorporatedResult.Result.BlockID)
 	}
 
