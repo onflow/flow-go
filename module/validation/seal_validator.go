@@ -12,26 +12,32 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// DefaultRequiredChunkApprovals is the default number of approvals that should be
+// present and valid for each chunk.
+const DefaultRequiredChunkApprovals = 1
+
 type sealValidator struct {
-	state            protocol.State
-	assigner         module.ChunkAssigner
-	verifier         module.Verifier
-	seals            storage.Seals
-	headers          storage.Headers
-	payloads         storage.Payloads
-	skipSealValidity bool
+	state                  protocol.State
+	assigner               module.ChunkAssigner
+	verifier               module.Verifier
+	seals                  storage.Seals
+	headers                storage.Headers
+	payloads               storage.Payloads
+	skipSealValidity       bool
+	requiredChunkApprovals uint
 }
 
 func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
-	assigner module.ChunkAssigner, verifier module.Verifier, skipSealValidity bool) *sealValidator {
+	assigner module.ChunkAssigner, verifier module.Verifier, requiredChunkApprovals uint, skipSealValidity bool) *sealValidator {
 	rv := &sealValidator{
-		state:            state,
-		assigner:         assigner,
-		verifier:         verifier,
-		headers:          headers,
-		seals:            seals,
-		payloads:         payloads,
-		skipSealValidity: skipSealValidity,
+		state:                  state,
+		assigner:               assigner,
+		verifier:               verifier,
+		headers:                headers,
+		seals:                  seals,
+		payloads:               payloads,
+		requiredChunkApprovals: requiredChunkApprovals,
+		skipSealValidity:       skipSealValidity,
 	}
 
 	return rv
@@ -248,11 +254,10 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 	executionResultID := executionResult.ID()
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := seal.AggregatedApprovalSigs[chunk.Index]
-		assignedVerifiers := assignments.Verifiers(chunk)
 		numberApprovals := len(chunkSigs.SignerIDs)
-		if numberApprovals != assignedVerifiers.Len() {
-			return engine.NewInvalidInputErrorf("mismatched signature ids length %d vs %d",
-				numberApprovals, assignedVerifiers.Len())
+		if uint(numberApprovals) < s.requiredChunkApprovals {
+			return engine.NewInvalidInputErrorf("not enough chunk approvals %d vs %d",
+				numberApprovals, s.requiredChunkApprovals)
 		}
 
 		lenVerifierSigs := len(chunkSigs.VerifierSignatures)

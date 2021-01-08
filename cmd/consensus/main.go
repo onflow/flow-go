@@ -69,6 +69,7 @@ func main() {
 		blockRateDelay                         time.Duration
 		requireOneApproval                     bool
 		chunkAlpha                             uint
+		requiredChunkApprovals                 uint
 
 		err              error
 		mutableState     protocol.MutableState
@@ -107,6 +108,7 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+			flags.UintVar(&requiredChunkApprovals, "required-chunk-approvals", validation.DefaultRequiredChunkApprovals, "number of approvals that are required for each chunk")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -124,7 +126,7 @@ func main() {
 			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
-				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), !requireOneApproval)
+				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), requiredChunkApprovals, !requireOneApproval)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,

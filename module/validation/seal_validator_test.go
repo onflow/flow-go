@@ -28,7 +28,7 @@ func (s *SealValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.verifier = &mock2.Verifier{}
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.PayloadsDB, s.SealsDB,
-		s.Assigner, s.verifier, false)
+		s.Assigner, s.verifier, DefaultRequiredChunkApprovals, false)
 }
 
 func (s *SealValidationSuite) TestSealValid() {
