@@ -29,3 +29,15 @@ func IndexBlockSeal(blockID flow.Identifier, sealID flow.Identifier) func(*badge
 func LookupBlockSeal(blockID flow.Identifier, sealID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBlockToSeal, blockID), &sealID)
 }
+
+func InsertExecutionForkEvidence(conflictingSeals []*flow.IncorporatedResultSeal) func(*badger.Txn) error {
+	return insert(makePrefix(codeExecutionFork), conflictingSeals)
+}
+
+func RemoveExecutionForkEvidence() func(*badger.Txn) error {
+	return remove(makePrefix(codeExecutionFork))
+}
+
+func RetrieveExecutionForkEvidence(conflictingSeals *[]*flow.IncorporatedResultSeal) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeExecutionFork), conflictingSeals)
+}

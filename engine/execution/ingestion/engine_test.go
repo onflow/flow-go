@@ -651,7 +651,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -672,11 +672,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -697,11 +697,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -725,13 +725,13 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -756,13 +756,13 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -787,12 +787,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
-		require.NoError(t, ps.Mutate().Finalize(blockA.ID()))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
+		require.NoError(t, ps.Finalize(blockA.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -834,20 +834,20 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		logChain(fork2)
 		logChain(fork3)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockI))
-		require.NoError(t, ps.Mutate().Extend(blockJ))
-		require.NoError(t, ps.Mutate().Extend(blockK))
-		require.NoError(t, ps.Mutate().Extend(blockD))
-		require.NoError(t, ps.Mutate().Extend(blockE))
-		require.NoError(t, ps.Mutate().Extend(blockF))
-		require.NoError(t, ps.Mutate().Extend(blockG))
-		require.NoError(t, ps.Mutate().Extend(blockH))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockI))
+		require.NoError(t, ps.Extend(blockJ))
+		require.NoError(t, ps.Extend(blockK))
+		require.NoError(t, ps.Extend(blockD))
+		require.NoError(t, ps.Extend(blockE))
+		require.NoError(t, ps.Extend(blockF))
+		require.NoError(t, ps.Extend(blockG))
+		require.NoError(t, ps.Extend(blockH))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 
@@ -873,4 +873,41 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
+}
+
+func TestChunkifyEvents(t *testing.T) {
+	// generate events
+	var events []flow.Event
+	for j := 0; j < 10; j++ {
+		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture()))
+	}
+
+	// chunk size be 0
+	ret := ChunkifyEvents(events, 0)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
+
+	// chunk size be 1
+	ret = ChunkifyEvents(events, 1)
+	assert.Equal(t, len(ret), 10)
+	for i := 0; i < len(events); i++ {
+		assert.Equal(t, ret[i], events[i:i+1])
+	}
+
+	// chunk size smaller than events
+	ret = ChunkifyEvents(events, 2)
+	assert.Equal(t, len(ret), 5)
+	for i := 0; i < len(ret); i++ {
+		assert.Equal(t, ret[i], events[i*2:i*2+2])
+	}
+
+	// chunk size equal to the size of events
+	ret = ChunkifyEvents(events, 10)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
+
+	// chunk bigger than the slice
+	ret = ChunkifyEvents(events, 12)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
 }

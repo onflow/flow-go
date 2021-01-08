@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
+
+	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -167,6 +168,19 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root execution result and block seal")
 	constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	log.Info().Msg("")
+
+	// copy files only if the directories differ
+	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", flagOutdir).Msg("attempting to copy private key files")
+	if flagInternalNodePrivInfoDir != flagOutdir {
+		log.Info().Msg("copying internal private keys to output folder")
+		err := copyDir(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, model.DirPrivateRoot))
+		if err != nil {
+			log.Error().Err(err).Msg("could not copy private key files")
+		}
+	} else {
+		log.Info().Msg("skipping copy of private keys to output dir")
+	}
 	log.Info().Msg("")
 
 	// print count of all nodes

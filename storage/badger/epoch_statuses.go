@@ -14,6 +14,7 @@ type EpochStatuses struct {
 	cache *Cache
 }
 
+// NewEpochStatuses ...
 func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatuses {
 
 	store := func(key interface{}, val interface{}) func(*badger.Txn) error {

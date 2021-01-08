@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -28,67 +29,59 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID string
+var rootBlockID = unittest.IdentifierFixture().String()
 
 const DryRun = true
 
-var allocator *portAllocator
-
-// init is a built-in golang function getting called first time this
-// initialize the allocated ports map and the root block ID
-func init() {
-	allocator = newPortAllocator()
-	rootBlockID = unittest.IdentifierFixture().String()
-}
-
-// GenerateIDs generate flow Identities with a valid port and networking key
-func GenerateIDs(t *testing.T, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList,
-	[]crypto.PrivateKey) {
-	privateKeys := make([]crypto.PrivateKey, n)
-	var freePorts []int
-
-	if !dryRunMode {
-		// get free ports
-		freePorts = allocator.getFreePorts(t, n)
-	}
+// GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
+// If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
+// to get used.
+func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node) {
+	libP2PNodes := make([]*p2p.Node, n)
 
 	identities := unittest.IdentityListFixture(n, opts...)
 
 	// generates keys and address for the node
 	for i, id := range identities {
 		// generate key
-		key, err := GenerateNetworkingKey(id.NodeID)
+		key, err := generateNetworkingKey(id.NodeID)
 		require.NoError(t, err)
-		privateKeys[i] = key
-		port := 0
+		port := "0"
 
 		if !dryRunMode {
-			port = freePorts[i]
+			libP2PNodes[i] = generateLibP2PNode(t, logger, *id, key)
+			_, port, err = libP2PNodes[i].GetIPPort()
+			require.NoError(t, err)
 		}
 
-		identities[i].Address = fmt.Sprintf("0.0.0.0:%d", port)
+		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
 		identities[i].NetworkPubKey = key.PublicKey()
 	}
-	return identities, privateKeys
+	return identities, libP2PNodes
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, log zerolog.Logger, identities flow.IdentityList, keys []crypto.PrivateKey) []*p2p.Middleware {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node) []*p2p.Middleware {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
+
 	for i, id := range identities {
+		// casts libP2PNode instance to a local variable to avoid closure
+		node := libP2PNodes[i]
+
+		// libp2p node factory for this instance of middleware
+		factory := func() (*p2p.Node, error) {
+			return node, nil
+		}
+
 		// creating middleware of nodes
-		mw, err := p2p.NewMiddleware(log,
-			json.NewCodec(),
-			id.Address,
+		mws[i] = p2p.NewMiddleware(logger,
+			factory,
 			id.NodeID,
-			keys[i],
 			metrics,
 			p2p.DefaultMaxUnicastMsgSize,
 			p2p.DefaultMaxPubSubMsgSize,
 			rootBlockID)
-		require.NoError(t, err)
-		mws[i] = mw
 	}
 	return mws
 }
@@ -115,7 +108,7 @@ func GenerateNetworks(t *testing.T,
 		// mocks state for collector nodes topology
 		// considers only a single cluster as higher cluster numbers are tested
 		// in collectionTopology_test
-		state, _ := topology.CreateMockStateForCollectionNodes(t,
+		state, _ := topology.MockStateForCollectionNodes(t,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
 		tops = GenerateTopologies(t, state, ids, sms, log)
@@ -140,6 +133,8 @@ func GenerateNetworks(t *testing.T,
 	if !dryRunMode {
 		for _, net := range nets {
 			<-net.Ready()
+			err := net.SetIDs(ids)
+			require.NoError(t, err)
 		}
 	}
 	return nets
@@ -148,11 +143,11 @@ func GenerateNetworks(t *testing.T,
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	log zerolog.Logger) (flow.IdentityList,
+	logger zerolog.Logger) (flow.IdentityList,
 	[]*p2p.Middleware) {
 
-	ids, keys := GenerateIDs(t, n, dryRunMode)
-	mws := GenerateMiddlewares(t, log, ids, keys)
+	ids, libP2PNodes := GenerateIDs(t, logger, n, dryRunMode)
+	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes)
 	return ids, mws
 }
 
@@ -179,6 +174,38 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 	return engs
 }
 
+// generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
+func generateLibP2PNode(t *testing.T,
+	logger zerolog.Logger,
+	id flow.Identity,
+	key crypto.PrivateKey) *p2p.Node {
+
+	noopMetrics := metrics.NewNoopCollector()
+
+	// create PubSub options for libp2p to use
+	psOptions := []pubsub.Option{
+		// skip message signing
+		pubsub.WithMessageSigning(false),
+		// skip message signature
+		pubsub.WithStrictSignatureVerification(false),
+		// set max message size limit for 1-k PubSub messaging
+		pubsub.WithMaxMessageSize(p2p.DefaultMaxPubSubMsgSize),
+	}
+
+	libP2PNode, err := p2p.NewLibP2PNode(logger,
+		id.NodeID,
+		"0.0.0.0:0",
+		p2p.NewConnManager(logger, noopMetrics),
+		key,
+		true,
+		rootBlockID,
+		psOptions...)
+
+	require.NoError(t, err)
+
+	return libP2PNode
+}
+
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
 func optionalSleep(send ConduitSendWrapperFunc) {
 	sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
@@ -187,8 +214,8 @@ func optionalSleep(send ConduitSendWrapperFunc) {
 	}
 }
 
-// GenerateNetworkingKey generates a Flow ECDSA key using the given seed
-func GenerateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
+// generateNetworkingKey generates a Flow ECDSA key using the given seed
+func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
 	copy(seed, s[:])
 	return crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
