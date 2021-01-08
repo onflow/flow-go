@@ -56,7 +56,8 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 }
 
 // Sign signs an array of bytes
-// The private key is read only without modifiying it while sha2 and sha3 hashers are
+//
+// The private key is read only while sha2 and sha3 hashers are
 // modified temporarily.
 // The resulting signature is the concatenation bytes(r)||bytes(s),
 // where r and s are padded to the curve order size.
@@ -85,9 +86,13 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
 	return goecdsa.Verify(pk.goPubKey, h, &r, &s), nil
 }
 
-// Verify verifies a signature of a byte array
+// Verify verifies a signature of an input data under the public key.
+//
+// If the input signature slice has an invalid length or fails to deserialize into valid
+// scalars, the function returns false without an error.
+//
 // Public keys are read only, sha2 and sha3 hashers are
-// modified temporarily
+// modified temporarily.
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
@@ -127,20 +132,6 @@ func (a *ecdsaAlgo) signatureFormatCheck(sig Signature) bool {
 	// We could also check whether r and r+N are quadratic residues modulo (p)
 	// using Euler's criterion.
 	return true
-}
-
-// GeneratePOP returns a proof of possession (PoP) for the receiver private key
-// using the given hasher.
-func (sk *PrKeyECDSA) GeneratePOP(h hash.Hasher) (Signature, error) {
-	// sign the public key
-	return sk.Sign(sk.PublicKey().Encode(), h)
-}
-
-// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
-// using the given hasher.
-func (pk *PubKeyECDSA) VerifyPOP(s Signature, h hash.Hasher) (bool, error) {
-	// verify the signature against the public key
-	return pk.Verify(s, pk.Encode(), h)
 }
 
 var one = new(big.Int).SetInt64(1)
