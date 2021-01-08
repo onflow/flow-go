@@ -15,11 +15,9 @@ import (
 )
 
 func TestDKG(t *testing.T) {
-	t.Run("FeldmanVSS", testFeldmanVSSSimple)
+	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
 	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
-	t.Run("FeldmanVSSUnhappyPath", testFeldmanVSSQualUnhappyPath)
-	t.Run("JointFeldmanHappyPath", testJointFeldman)
-	t.Run("JointFeldmanUnhappyPath", testJointFeldmanUnhappyPath)
+	t.Run("JointFeldman", testJointFeldman)
 }
 
 // optimal threshold (t) to allow the largest number of malicious nodes (m)
@@ -33,117 +31,54 @@ func optimalThreshold(size int) int {
 // Testing the happy path of Feldman VSS by simulating a network of n nodes
 func testFeldmanVSSSimple(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
-	n := 5
-	processors := make([]testDKGProcessor, 0, n)
 
-	// create the node channels
-	chans := make([]chan *message, n)
-	for i := 0; i < n; i++ {
-		chans[i] = make(chan *message, 5)
-	}
-
-	// create n processors for all nodes
-	for current := 0; current < n; current++ {
-		processors = append(processors, testDKGProcessor{
-			current: current,
-			chans:   chans,
-			msgType: dkgType,
+	n := 4
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
+		t.Run(fmt.Sprintf("FeldmanVSS (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+			dkgCommonTest(t, feldmanVSS, n, threshold, false)
 		})
 	}
-	dkgCommonTest(t, feldmanVSS, processors)
 }
 
 // Testing Feldman VSS with the qualification system by simulating a network of n nodes
 func testFeldmanVSSQual(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
-	n := 5
-	processors := make([]testDKGProcessor, 0, n)
 
-	// create the node channels
-	chans := make([]chan *message, n)
-	for i := 0; i < n; i++ {
-		chans[i] = make(chan *message, 5*n)
-	}
-
-	// create n processors for all nodes
-	for current := 0; current < n; current++ {
-		processors = append(processors, testDKGProcessor{
-			current: current,
-			chans:   chans,
-			msgType: dkgType,
+	n := 4
+	// happy path, test multiple values of thresold
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
+		t.Run(fmt.Sprintf("FeldmanVSSQual (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+			dkgCommonTest(t, feldmanVSSQual, n, threshold, false)
 		})
 	}
-	dkgCommonTest(t, feldmanVSSQual, processors)
-}
 
-// Testing Feldman VSS with the qualification system by simulating a network of n nodes
-func testFeldmanVSSQualUnhappyPath(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
-	n := 5
-	processors := make([]testDKGProcessor, 0, n)
+	n = 5
+	// unhappy path, with focus on the optimal threshold value
+	threshold := optimalThreshold(n)
+	t.Run(fmt.Sprintf("FeldmanVSSQual UnhappyPath (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+		dkgCommonTest(t, feldmanVSSQual, n, threshold, true)
+	})
 
-	// create the node channels
-	chans := make([]chan *message, n)
-	for i := 0; i < n; i++ {
-		chans[i] = make(chan *message, 5*n)
-	}
-
-	// create n processors for all nodes
-	for current := 0; current < n; current++ {
-		processors = append(processors, testDKGProcessor{
-			current:   current,
-			chans:     chans,
-			msgType:   dkgType,
-			malicious: true,
-		})
-	}
-	dkgCommonTest(t, feldmanVSSQual, processors)
 }
 
 // Testing JointFeldman by simulating a network of n nodes
 func testJointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
-	n := 5
-	processors := make([]testDKGProcessor, 0, n)
 
-	// create the node channels
-	chans := make([]chan *message, n)
-	for i := 0; i < n; i++ {
-		chans[i] = make(chan *message, 5*n)
-	}
-
-	// create n processors for all nodes
-	for current := 0; current < n; current++ {
-		processors = append(processors, testDKGProcessor{
-			current: current,
-			chans:   chans,
-			msgType: dkgType,
+	n := 4
+	// happy path, test multiple values of thresold
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
+		t.Run(fmt.Sprintf("JointFeldman (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+			dkgCommonTest(t, jointFeldman, n, threshold, false)
 		})
 	}
-	dkgCommonTest(t, jointFeldman, processors)
-}
 
-func testJointFeldmanUnhappyPath(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
-	n := 5
-	processors := make([]testDKGProcessor, 0, n)
-
-	// create the node channels
-	chans := make([]chan *message, n)
-	for i := 0; i < n; i++ {
-		chans[i] = make(chan *message, 5*n)
-	}
-
-	// create n processors for all nodes
-	for current := 0; current < n; current++ {
-		processors = append(processors, testDKGProcessor{
-			current:   current,
-			chans:     chans,
-			msgType:   dkgType,
-			malicious: true,
-		})
-	}
-	dkgCommonTest(t, jointFeldman, processors)
+	n = 5
+	// unhappy path, with focus on the optimal threshold value
+	threshold := optimalThreshold(n)
+	t.Run(fmt.Sprintf("JointFeldman UnhappyPath (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+		dkgCommonTest(t, jointFeldman, n, threshold, true)
+	})
 }
 
 // Supported Key Generation protocols
@@ -165,20 +100,36 @@ func newDKG(dkg int, size int, threshold int, currentIndex int,
 	default:
 		return nil, fmt.Errorf("non supported protocol")
 	}
-
 }
 
-func dkgCommonTest(t *testing.T, dkg int, processors []testDKGProcessor) {
-	log.Info("DKG protocol starts")
+func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, malicious bool) {
+	log.Info("DKG protocol set up")
+
+	// create the node channels
+	chans := make([]chan *message, n)
+	for i := 0; i < n; i++ {
+		chans[i] = make(chan *message, 5*n)
+	}
+
+	// create n processors for all nodes
+	processors := make([]testDKGProcessor, 0, n)
+	for current := 0; current < n; current++ {
+		processors = append(processors, testDKGProcessor{
+			current:   current,
+			chans:     chans,
+			msgType:   dkgType,
+			malicious: malicious,
+		})
+	}
+
 	// number of nodes to test
-	n := len(processors)
 	lead := 0
 	var sync sync.WaitGroup
 
 	// create DKG in all nodes
 	for current := 0; current < n; current++ {
 		var err error
-		processors[current].dkg, err = newDKG(dkg, n, optimalThreshold(n),
+		processors[current].dkg, err = newDKG(dkg, n, threshold,
 			current, &processors[current], lead)
 		require.NoError(t, err)
 	}
@@ -195,6 +146,9 @@ func dkgCommonTest(t *testing.T, dkg int, processors []testDKGProcessor) {
 	require.Equal(t, read, SeedMinLenDKG)
 	require.NoError(t, err)
 	sync.Add(n)
+
+	log.Info("DKG protocol starts")
+
 	for current := 0; current < n; current++ {
 		// start dkg could also run in parallel
 		// but they are run sequentially to avoid having non-deterministic
@@ -298,11 +252,11 @@ func (proc *testDKGProcessor) Broadcast(data []byte) {
 	}
 }
 
-func (proc *testDKGProcessor) Blacklist(node int) {
-	log.Infof("%d wants to blacklist %d", proc.current, node)
+func (proc *testDKGProcessor) Disqualify(node int, logInfo string) {
+	log.Infof("%d wants to Disqualify %d: %s", proc.current, node, logInfo)
 }
-func (proc *testDKGProcessor) FlagMisbehavior(node int, logData string) {
-	log.Infof("%d flags a misbehavior from %d: %s", proc.current, node, logData)
+func (proc *testDKGProcessor) FlagMisbehavior(node int, logInfo string) {
+	log.Infof("%d flags a misbehavior from %d: %s", proc.current, node, logInfo)
 }
 
 // This is a testing function

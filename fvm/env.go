@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 
 	"github.com/onflow/cadence"
@@ -24,45 +25,45 @@ var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx              Context
-	ledger           state.Ledger
+	st               *state.State
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *UUIDGenerator
-
 	runtime.Metrics
-
-	events []cadence.Event
-	logs   []string
-
-	transactionEnv *transactionEnv
-	rng            *rand.Rand
+	events             []flow.Event
+	totalEventByteSize uint64
+	logs               []string
+	totalGasUsed       uint64
+	transactionEnv     *transactionEnv
+	rng                *rand.Rand
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm string) []byte {
+func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
 	if err != nil {
 		panic(fmt.Errorf("cannot create hasher: %w", err))
 	}
-	return hasher.ComputeHash(data)
+	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
-	accounts := state.NewAccounts(ledger)
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
+	accounts := state.NewAccounts(st)
+	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
 
-	uuids := state.NewUUIDs(ledger)
+	uuids := state.NewUUIDs(st)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
-		ctx:              ctx,
-		ledger:           ledger,
-		Metrics:          &noopMetricsCollector{},
-		accounts:         accounts,
-		addressGenerator: generator,
-		uuidGenerator:    uuidGenerator,
+		ctx:                ctx,
+		st:                 st,
+		Metrics:            &noopMetricsCollector{},
+		accounts:           accounts,
+		addressGenerator:   generator,
+		uuidGenerator:      uuidGenerator,
+		totalEventByteSize: uint64(0),
 	}
 
 	if ctx.BlockHeader != nil {
@@ -84,18 +85,19 @@ func (e *hostEnv) seedRNG(header *flow.Header) {
 	e.rng = rand.New(source)
 }
 
-func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody) {
+func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, txIndex uint32) {
 	e.transactionEnv = newTransactionEnv(
 		vm,
 		e.ctx,
-		e.ledger,
+		e.st,
 		e.accounts,
 		e.addressGenerator,
 		tx,
+		txIndex,
 	)
 }
 
-func (e *hostEnv) getEvents() []cadence.Event {
+func (e *hostEnv) getEvents() []flow.Event {
 	return e.events
 }
 
@@ -104,23 +106,19 @@ func (e *hostEnv) getLogs() []string {
 }
 
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
-	v, _ := e.ledger.Get(
-
-		string(owner),
-		"", // TODO: Remove empty controller key
+	v, _ := e.accounts.GetValue(
+		flow.BytesToAddress(owner),
 		string(key),
 	)
 	return v, nil
 }
 
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
-	e.ledger.Set(
-		string(owner),
-		"", // TODO: Remove empty controller key
+	return e.accounts.SetValue(
+		flow.BytesToAddress(owner),
 		string(key),
 		value,
 	)
-	return nil
 }
 
 func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
@@ -132,10 +130,18 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	return len(v) > 0, nil
 }
 
+func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
+	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
+}
+
+func (e *hostEnv) GetStorageCapacity(_ common.Address) (value uint64, err error) {
+	return math.MaxUint64, nil
+}
+
 func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
-) []runtime.ResolvedLocation {
+) ([]runtime.ResolvedLocation, error) {
 
 	addressLocation, isAddress := location.(runtime.AddressLocation)
 
@@ -148,7 +154,7 @@ func (e *hostEnv) ResolveLocation(
 				Location:    location,
 				Identifiers: identifiers,
 			},
-		}
+		}, nil
 	}
 
 	// if the location is an address,
@@ -166,7 +172,7 @@ func (e *hostEnv) ResolveLocation(
 		// then return no resolved locations
 
 		if len(contractNames) == 0 {
-			return nil
+			return nil, nil
 		}
 
 		identifiers = make([]ast.Identifier, len(contractNames))
@@ -193,7 +199,7 @@ func (e *hostEnv) ResolveLocation(
 		}
 	}
 
-	return resolvedLocations
+	return resolvedLocations, nil
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
@@ -239,22 +245,48 @@ func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) erro
 	return e.ctx.ASTCache.SetProgram(location, program)
 }
 
-func (e *hostEnv) Log(message string) {
-	e.logs = append(e.logs, message)
+func (e *hostEnv) Log(message string) error {
+	if e.ctx.CadenceLoggingEnabled {
+		e.logs = append(e.logs, message)
+	}
+	return nil
 }
 
-func (e *hostEnv) EmitEvent(event cadence.Event) {
-	e.events = append(e.events, event)
-}
+func (e *hostEnv) EmitEvent(event cadence.Event) error {
 
-func (e *hostEnv) GenerateUUID() uint64 {
-	uuid, err := e.uuidGenerator.GenerateUUID()
+	payload, err := jsoncdc.Encode(event)
 	if err != nil {
-		// TODO - Return error once Cadence interface accommodates it
-		panic(fmt.Errorf("cannot get UUID: %w", err))
+		return fmt.Errorf("failed to json encode a cadence event: %w", err)
 	}
 
-	return uuid
+	e.totalEventByteSize += uint64(len(payload))
+
+	// skip limit if payer is service account
+	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
+		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
+			return &EventLimitExceededError{
+				TotalByteSize: e.totalEventByteSize,
+				Limit:         e.ctx.EventCollectionByteSizeLimit,
+			}
+		}
+	}
+
+	flowEvent := flow.Event{
+		Type:             flow.EventType(event.EventType.ID()),
+		TransactionID:    e.transactionEnv.TxID(),
+		TransactionIndex: e.transactionEnv.TxIndex(),
+		EventIndex:       uint32(len(e.events)),
+		Payload:          payload,
+	}
+
+	e.events = append(e.events, flowEvent)
+	return nil
+}
+
+func (e *hostEnv) GenerateUUID() (uint64, error) {
+	// TODO add not supported
+	uuid, err := e.uuidGenerator.GenerateUUID()
+	return uuid, err
 }
 
 func (e *hostEnv) GetComputationLimit() uint64 {
@@ -265,11 +297,16 @@ func (e *hostEnv) GetComputationLimit() uint64 {
 	return e.ctx.GasLimit
 }
 
+func (e *hostEnv) SetComputationUsed(used uint64) error {
+	e.totalGasUsed = used
+	return nil
+}
+
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	return jsoncdc.Decode(b)
 }
 
-func (e *hostEnv) Events() []cadence.Event {
+func (e *hostEnv) Events() []flow.Event {
 	return e.events
 }
 
@@ -284,7 +321,7 @@ func (e *hostEnv) VerifySignature(
 	rawPublicKey []byte,
 	rawSigAlgo string,
 	rawHashAlgo string,
-) bool {
+) (bool, error) {
 	valid, err := verifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
@@ -300,7 +337,7 @@ func (e *hostEnv) VerifySignature(
 		panic(err)
 	}
 
-	return valid
+	return valid, nil
 }
 
 func (e *hostEnv) HighLevelStorageEnabled() bool {
@@ -314,24 +351,22 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 // Block Environment Functions
 
 // GetCurrentBlockHeight returns the current block height.
-func (e *hostEnv) GetCurrentBlockHeight() uint64 {
+func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	if e.ctx.BlockHeader == nil {
-		panic("GetCurrentBlockHeight is not supported by this environment")
+		return 0, errors.New("GetCurrentBlockHeight is not supported by this environment")
 	}
-
-	return e.ctx.BlockHeader.Height
+	return e.ctx.BlockHeader.Height, nil
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
-func (e *hostEnv) UnsafeRandom() uint64 {
+func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	if e.rng == nil {
-		panic("UnsafeRandom is not supported by this environment")
+		return 0, errors.New("UnsafeRandom is not supported by this environment")
 	}
-
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
-	return binary.LittleEndian.Uint64(buf)
+	return binary.LittleEndian.Uint64(buf), nil
 }
 
 func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
@@ -444,12 +479,12 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 	return e.accounts.DeleteContract(name, accountAddress)
 }
 
-func (e *hostEnv) GetSigningAccounts() []runtime.Address {
+func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	if e.transactionEnv == nil {
-		panic("GetSigningAccounts is not supported by this environment")
+		return nil, errors.New("GetSigningAccounts is not supported by this environment")
 	}
 
-	return e.transactionEnv.GetSigningAccounts()
+	return e.transactionEnv.GetSigningAccounts(), nil
 }
 
 // Transaction Environment
@@ -457,29 +492,36 @@ func (e *hostEnv) GetSigningAccounts() []runtime.Address {
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
-	ledger           state.Ledger
+	st               *state.State
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 
-	tx          *flow.TransactionBody
+	tx      *flow.TransactionBody
+	txIndex uint32
+	txID    flow.Identifier
+
 	authorizers []runtime.Address
 }
 
 func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
-	ledger state.Ledger,
+	st *state.State,
 	accounts *state.Accounts,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
+	txIndex uint32,
+
 ) *transactionEnv {
 	return &transactionEnv{
 		vm:               vm,
 		ctx:              ctx,
-		ledger:           ledger,
+		st:               st,
 		accounts:         accounts,
 		addressGenerator: addressGenerator,
 		tx:               tx,
+		txIndex:          txIndex,
+		txID:             tx.ID(),
 	}
 }
 
@@ -495,6 +537,14 @@ func (e *transactionEnv) GetSigningAccounts() []runtime.Address {
 	return e.authorizers
 }
 
+func (e *transactionEnv) TxIndex() uint32 {
+	return e.txIndex
+}
+
+func (e *transactionEnv) TxID() flow.Identifier {
+	return e.txID
+}
+
 func (e *transactionEnv) GetComputationLimit() uint64 {
 	return e.tx.GasLimit
 }
@@ -508,7 +558,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled,
 			),
-			e.ledger,
+			e.st,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -531,7 +581,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		err = e.vm.invokeMetaTransaction(
 			e.ctx,
 			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
-			e.ledger,
+			e.st,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
