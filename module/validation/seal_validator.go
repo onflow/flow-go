@@ -3,6 +3,8 @@ package validation
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -37,6 +39,7 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 
 func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.AggregatedSignature,
 	chunk *flow.Chunk, executionResultID flow.Identifier) error {
+	// TODO: replace implementation once proper aggregation is used for Verifiers' attestation signatures.
 	for i, signature := range aggregatedSignatures.VerifierSignatures {
 		signerId := aggregatedSignatures.SignerIDs[i]
 
@@ -85,11 +88,11 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// Get the latest seal in the fork that ends with the candidate's parent.
 	// The protocol state saves this information for each block that has been
 	// successfully added to the chain tree (even when the added block does not
- // itself contain a seal). Per prerequisite of this method, the candidate block's parent must
- // be part of the main chain (without any missing ancestors). For every block B that is 
- // attached to the main chain, we store the latest seal in the fork that ends with B. 
- // Therefore, _not_ finding the latest sealed block of the parent constitutes
- // a fatal internal error.
+	// itself contain a seal). Per prerequisite of this method, the candidate block's parent must
+	// be part of the main chain (without any missing ancestors). For every block B that is
+	// attached to the main chain, we store the latest seal in the fork that ends with B.
+	// Therefore, _not_ finding the latest sealed block of the parent constitutes
+	// a fatal internal error.
 	lastSealUpToParent, err := s.seals.ByBlockID(candidate.Header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.Header.ParentID, err)
@@ -195,16 +198,18 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
-				// Skip fail on invalid seal. We don't put this earlier in the function
+				// Skip fail on an invalid seal. We don't put this earlier in the function
 				// because we still want to test that the above code doesn't panic.
 				// TODO: this is only here temporarily to ease the migration to new chunk
 				// based sealing.
-				if !s.skipSealValidity {
+				if s.skipSealValidity {
+					log.Warn().Msgf("payload includes invalid seal, continuing validation (%x), %s", seal.ID(), err.Error())
+				} else {
 					return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
 				}
+			} else {
+				return nil, fmt.Errorf("unexpected seal validation error %w", err)
 			}
-
-			return nil, fmt.Errorf("unexpected seal validation error %w", err)
 		}
 
 		last = seal
@@ -245,15 +250,15 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 		chunkSigs := seal.AggregatedApprovalSigs[chunk.Index]
 		assignedVerifiers := assignments.Verifiers(chunk)
 		numberApprovals := len(chunkSigs.SignerIDs)
-		if lenSignerIds != assignedVerifiers.Len() {
+		if numberApprovals != assignedVerifiers.Len() {
 			return engine.NewInvalidInputErrorf("mismatched signature ids length %d vs %d",
-				lenSignerIds, assignedVerifiers.Len())
+				numberApprovals, assignedVerifiers.Len())
 		}
 
 		lenVerifierSigs := len(chunkSigs.VerifierSignatures)
-		if lenVerifierSigs != lenSignerIds {
+		if lenVerifierSigs != numberApprovals {
 			return engine.NewInvalidInputErrorf("mismatched signatures length %d vs %d",
-				lenVerifierSigs, lenSignerIds)
+				lenVerifierSigs, numberApprovals)
 		}
 
 		for _, signerId := range chunkSigs.SignerIDs {

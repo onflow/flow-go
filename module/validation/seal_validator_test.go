@@ -252,12 +252,6 @@ func (s *SealValidationSuite) TestExtendSealNotConnected() {
 
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err), err)
-
-	//// verify seal not indexed
-	//var sealID flow.Identifier
-	//err = s.View(operation.LookupBlockSeal(block2Seal.ID(), &sealID))
-	//require.Error(t, err)
-	//require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
 }
 
 // Test that payloads containing duplicate seals are rejected.

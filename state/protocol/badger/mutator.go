@@ -147,9 +147,15 @@ func (m *MutableState) Extend(candidate *flow.Block) error {
 
 	// check if the seals in the payload is a valid extension of the finalized
 	// state
-	err = m.sealExtend(candidate)
+	lastSeal, err := m.sealExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
+	}
+
+	// insert the block and index the last seal for the block
+	err = m.insert(candidate, lastSeal)
+	if err != nil {
+		return fmt.Errorf("failed to insert the block: %w", err)
 	}
 
 	return nil
@@ -306,25 +312,19 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 	return nil
 }
 
-// sealExtend checks the compliance of the payload seals and inserts `candidate` block
-// into DB. This has to be called as final step of extending `candidate` block.
-func (m *MutableState) sealExtend(candidate *flow.Block) error {
+// sealExtend checks the compliance of the payload seals. Returns last seal that form a chain for
+// candidate block.
+func (m *MutableState) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	blockID := candidate.ID()
 	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
 	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
-		return state.NewInvalidExtensionErrorf("seal validation error: %w", err)
+		return nil, state.NewInvalidExtensionErrorf("seal validation error: %w", err)
 	}
 
-	// insert the block and index the last seal for the block
-	err = m.insert(candidate, lastSeal)
-	if err != nil {
-		return fmt.Errorf("failed to insert the block: %w", err)
-	}
-
-	return nil
+	return lastSeal, nil
 }
 
 // receiptExtend checks the compliance of the receipt payload.

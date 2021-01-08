@@ -85,7 +85,7 @@ func main() {
 		conMetrics       module.ConsensusMetrics
 		mainMetrics      module.HotstuffMetrics
 		receiptValidator module.ReceiptValidator
-		chunkAssigner       *chmodule.PublicAssignment
+		chunkAssigner    *chmodule.PublicAssignment
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -116,7 +116,7 @@ func main() {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
 
-			assignment, err = chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
+			chunkAssigner, err = chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
 			if err != nil {
 				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
 			}
@@ -124,7 +124,7 @@ func main() {
 			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
-				node.Storage.Seals, assignment, signature.NewAggregationVerifier(encoding.ResultApprovalTag), !requireOneApproval)
+				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), !requireOneApproval)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -224,7 +224,7 @@ func main() {
 				receipts,
 				approvals,
 				seals,
-				assignment,
+				chunkAssigner,
 				receiptValidator,
 				requireOneApproval,
 			)
