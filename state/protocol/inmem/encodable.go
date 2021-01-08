@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Snapshot is the encoding format for protocol.Snapshot
+// EncodableSnapshot is the encoding format for protocol.Snapshot
 type EncodableSnapshot struct {
 	Head              *flow.Header
 	Identities        flow.IdentityList
@@ -23,7 +23,7 @@ type EncodableEpochs struct {
 	Next     *EncodableEpoch
 }
 
-// Epoch is the encoding format for protocol.Epoch
+// EncodableEpoch is the encoding format for protocol.Epoch
 type EncodableEpoch struct {
 	Counter           uint64
 	FirstView         uint64
@@ -34,13 +34,13 @@ type EncodableEpoch struct {
 	DKG               *EncodableDKG
 }
 
-// DKG is the encoding format for protocol.DKG
+// EncodableDKG is the encoding format for protocol.DKG
 type EncodableDKG struct {
 	GroupKey     encodable.RandomBeaconPubKey
 	Participants map[flow.Identifier]flow.DKGParticipant
 }
 
-// Cluster is the encoding format for protocol.Cluster
+// EncodableCluster is the encoding format for protocol.Cluster
 type EncodableCluster struct {
 	Index     uint
 	Counter   uint64

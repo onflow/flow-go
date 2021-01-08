@@ -16,14 +16,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// should be able to convert from protocol.Snapshot
+// TestFromSnapshot tests that we are able to convert a database-backed snapshot
+// to a memory-backed snapshot.
 func TestFromSnapshot(t *testing.T) {
 	util.RunWithProtocolState(t, func(db *badger.DB, state *bprotocol.State) {
 
 		identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 		root, result, seal := unittest.BootstrapFixture(identities)
 		err := state.Mutate().Bootstrap(root, result, seal)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
 		// See EpochBuilder documentation for details of these blocks.
@@ -53,7 +54,7 @@ func TestFromSnapshot(t *testing.T) {
 
 			expected := state.AtHeight(0)
 			actual, err := inmem.FromSnapshot(expected)
-			require.Nil(t, err)
+			require.NoError(t, err)
 			assertSnapshotsEqual(t, expected, actual)
 			testEncodeDecode(t, actual)
 		})
@@ -63,21 +64,21 @@ func TestFromSnapshot(t *testing.T) {
 			t.Run("staking phase", func(t *testing.T) {
 				expected := state.AtHeight(1)
 				actual, err := inmem.FromSnapshot(expected)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("setup phase", func(t *testing.T) {
 				expected := state.AtHeight(2)
 				actual, err := inmem.FromSnapshot(expected)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("committed phase", func(t *testing.T) {
 				expected := state.AtHeight(3)
 				actual, err := inmem.FromSnapshot(expected)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
@@ -88,21 +89,21 @@ func TestFromSnapshot(t *testing.T) {
 			t.Run("staking phase", func(t *testing.T) {
 				expected := state.AtHeight(5)
 				actual, err := inmem.FromSnapshot(expected)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("setup phase", func(t *testing.T) {
 				expected := state.AtHeight(6)
 				actual, err := inmem.FromSnapshot(expected)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("committed phase", func(t *testing.T) {
 				expected := state.AtHeight(7)
 				actual, err := inmem.FromSnapshot(expected)
-				require.Nil(t, err)
+				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
@@ -114,11 +115,11 @@ func TestFromSnapshot(t *testing.T) {
 func testEncodeDecode(t *testing.T, snap *inmem.Snapshot) {
 
 	bz, err := json.Marshal(snap.Encodable())
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	var encoded inmem.EncodableSnapshot
 	err = json.Unmarshal(bz, &encoded)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	fromEncoded := inmem.SnapshotFromEncodable(encoded)
 	assertSnapshotsEqual(t, snap, fromEncoded)
@@ -126,17 +127,16 @@ func testEncodeDecode(t *testing.T, snap *inmem.Snapshot) {
 
 // checks that 2 snapshots are equivalent by converting to a serializable
 // representation and comparing the serializations
-// TODO check equality manually
 func snapshotsEqual(t *testing.T, snap1, snap2 protocol.Snapshot) bool {
 	enc1, err := inmem.FromSnapshot(snap1)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	enc2, err := inmem.FromSnapshot(snap2)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	bz1, err := json.Marshal(enc1.Encodable())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	bz2, err := json.Marshal(enc2.Encodable())
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	return bytes.Equal(bz1, bz2)
 }
