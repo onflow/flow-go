@@ -253,8 +253,17 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
 	// eventually request the parent receipt with the `requestPending` function
 	err = e.receiptValidator.Validate(receipt)
+
 	if err != nil {
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
+	}
+
+	// add the receipt to the mempool so that the builder can incorporate it in
+	// a block payload
+	added := e.receipts.Add(receipt)
+	if !added {
+		log.Debug().Msg("skipping receipt already in mempool")
+		return nil
 	}
 
 	// store the result to make it persistent for later
@@ -282,7 +291,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
 	// will be the ID of the first block on its fork that contains a receipt
 	// committing to this result.
-	added, err := e.incorporatedResults.Add(
+	added, err = e.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
 			receipt.ExecutionResult.BlockID,
 			&receipt.ExecutionResult,
@@ -470,7 +479,7 @@ func (e *Engine) checkingSealing() {
 		// different fork incorporate same result and seal it. So we need to
 		// keep it in the mempool for now. This will be changed in phase 3.
 
-		sealedResultIDs = append(sealedResultIDs, incorporatedResult.ID())
+		// sealedResultIDs = append(sealedResultIDs, incorporatedResult.ID())
 		sealedBlockIDs = append(sealedBlockIDs, incorporatedResult.Result.BlockID)
 	}
 
@@ -791,6 +800,11 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 		}
 	}
 
+	for _, receipt := range e.receipts.All() {
+		if clear[receipt.ExecutionResult.ID()] || shouldClear(receipt.ExecutionResult.BlockID) {
+			_ = e.receipts.Rem(receipt.ID())
+		}
+	}
 	for _, approval := range e.approvals.All() {
 		if clear[approval.Body.ExecutionResultID] || shouldClear(approval.Body.BlockID) {
 			// delete all the approvals for the corresponding chunk
