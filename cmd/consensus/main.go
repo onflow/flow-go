@@ -36,11 +36,15 @@ import (
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
+	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/ejectors"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -55,6 +59,8 @@ func main() {
 		sealLimit                              uint
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
+		maxSealPerBlock                        uint
+		maxGuaranteePerBlock                   uint
 		hotstuffTimeout                        time.Duration
 		hotstuffMinTimeout                     time.Duration
 		hotstuffTimeoutIncreaseFactor          float64
@@ -64,19 +70,21 @@ func main() {
 		requireOneApproval                     bool
 		chunkAlpha                             uint
 
-		err            error
-		privateDKGData *bootstrap.DKGParticipantPriv
-		guarantees     mempool.Guarantees
-		results        mempool.IncorporatedResults
-		receipts       mempool.Receipts
-		approvals      mempool.Approvals
-		seals          mempool.IncorporatedResultSeals
-		prov           *provider.Engine
-		requesterEng   *requester.Engine
-		syncCore       *synchronization.Core
-		comp           *compliance.Engine
-		conMetrics     module.ConsensusMetrics
-		mainMetrics    module.HotstuffMetrics
+		err              error
+		mutableState     protocol.MutableState
+		privateDKGData   *bootstrap.DKGParticipantPriv
+		guarantees       mempool.Guarantees
+		results          mempool.IncorporatedResults
+		receipts         mempool.Receipts
+		approvals        mempool.Approvals
+		seals            mempool.IncorporatedResultSeals
+		prov             *provider.Engine
+		requesterEng     *requester.Engine
+		syncCore         *synchronization.Core
+		comp             *compliance.Engine
+		conMetrics       module.ConsensusMetrics
+		mainMetrics      module.HotstuffMetrics
+		receiptValidator module.ReceiptValidator
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -88,6 +96,8 @@ func main() {
 			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
+			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
+			flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
 			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
 			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
@@ -96,6 +106,27 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+
+			signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
+			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results, signatureVerifier)
+
+			mutableState, err = badgerState.NewFullConsensusState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+				receiptValidator,
+			)
+			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
@@ -131,7 +162,11 @@ func main() {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
 			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			seals = stdmap.NewIncorporatedResultSeals(sealLimit, stdmap.WithEject(ejector.Eject))
+			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
+			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
+			if err != nil {
+				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
+			}
 			return nil
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -147,7 +182,7 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			sealedResultsDB := bstorage.NewExecutionResults(node.DB)
+
 			requesterEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -178,13 +213,15 @@ func main() {
 				node.State,
 				node.Me,
 				requesterEng,
-				sealedResultsDB,
+				node.Storage.Results,
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,
+				receipts,
 				approvals,
 				seals,
 				assigner,
+				receiptValidator,
 				requireOneApproval,
 			)
 			requesterEng.WithHandle(match.HandleReceipt)
@@ -238,7 +275,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				mutableState,
 				prov,
 				proposals,
 				syncCore,
@@ -252,15 +289,19 @@ func main() {
 			build = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
-				node.State,
+				mutableState,
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
+				node.Storage.Blocks,
 				guarantees,
 				seals,
+				receipts,
 				node.Tracer,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
+				builder.WithMaxSealCount(maxSealPerBlock),
+				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
@@ -268,7 +309,7 @@ func main() {
 			finalize := finalizer.NewFinalizer(
 				node.DB,
 				node.Storage.Headers,
-				node.State,
+				mutableState,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,

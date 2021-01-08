@@ -7,21 +7,25 @@ import (
 
 // InvalidExtensionError is an error for invalid extension of the state
 type InvalidExtensionError struct {
-	msg string
+	err error
 }
 
 func NewInvalidExtensionError(msg string) error {
-	return InvalidExtensionError{
-		msg: msg,
-	}
+	return NewInvalidExtensionErrorf(msg)
 }
 
 func NewInvalidExtensionErrorf(msg string, args ...interface{}) error {
-	return NewInvalidExtensionError(fmt.Sprintf(msg, args...))
+	return InvalidExtensionError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e InvalidExtensionError) Unwrap() error {
+	return e.err
 }
 
 func (e InvalidExtensionError) Error() string {
-	return e.msg
+	return e.err.Error()
 }
 
 // IsInvalidExtensionError returns whether the given error is an InvalidExtensionError error
@@ -35,21 +39,25 @@ func IsInvalidExtensionError(err error) bool {
 // Knowing whether an outdated extension is an invalid extension or not would
 // take more state queries.
 type OutdatedExtensionError struct {
-	msg string
+	err error
 }
 
 func NewOutdatedExtensionError(msg string) error {
-	return OutdatedExtensionError{
-		msg: msg,
-	}
+	return NewOutdatedExtensionErrorf(msg)
 }
 
 func NewOutdatedExtensionErrorf(msg string, args ...interface{}) error {
-	return NewOutdatedExtensionError(fmt.Sprintf(msg, args...))
+	return OutdatedExtensionError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e OutdatedExtensionError) Unwrap() error {
+	return e.err
 }
 
 func (e OutdatedExtensionError) Error() string {
-	return e.msg
+	return e.err.Error()
 }
 
 func IsOutdatedExtensionError(err error) bool {
@@ -60,17 +68,21 @@ func IsOutdatedExtensionError(err error) bool {
 // NoValidChildBlockError is a sentinal error when the case where a certain block has
 // no valid child.
 type NoValidChildBlockError struct {
-	msg string
+	err error
 }
 
 func NewNoValidChildBlockError(msg string) error {
 	return NoValidChildBlockError{
-		msg: msg,
+		err: fmt.Errorf(msg),
 	}
 }
 
+func (e NoValidChildBlockError) Unwrap() error {
+	return e.err
+}
+
 func (e NoValidChildBlockError) Error() string {
-	return e.msg
+	return e.err.Error()
 }
 
 func IsNoValidChildBlockError(err error) bool {

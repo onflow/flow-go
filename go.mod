@@ -19,6 +19,7 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/go-cmp v0.5.2
 	github.com/google/uuid v1.1.1
+	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
@@ -39,7 +40,6 @@ require (
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
-	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/prometheus/tsdb v0.7.1

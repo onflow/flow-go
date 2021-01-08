@@ -121,6 +121,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'ConnectionFactory' -dir="./engine/access/rpc/backend" -case=underscore -output="./engine/access/rpc/backend/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ExecForkActor' --structname 'ExecForkActorMock' -dir=module/mempool/consensus/mock/ -case=underscore -output="./module/mempool/consensus/mock/" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -374,7 +375,7 @@ docker-run-ghost:
 # Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep 1.13 || go version | grep 1.14
+	go version | grep 1.13 || go version | grep 1.14 || go version | grep 1.15
 
 #----------------------------------------------------------------------
 # CD COMMANDS

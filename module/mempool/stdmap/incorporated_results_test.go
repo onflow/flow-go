@@ -14,7 +14,7 @@ func TestIncorporatedResults(t *testing.T) {
 	pool, err := NewIncorporatedResults(1000)
 	require.NoError(t, err)
 
-	ir1 := unittest.IncorporatedResultFixture()
+	ir1 := unittest.IncorporatedResult.Fixture()
 	t.Run("Adding first incorporated result", func(t *testing.T) {
 		ok, err := pool.Add(ir1)
 		require.True(t, ok)
@@ -44,7 +44,7 @@ func TestIncorporatedResults(t *testing.T) {
 		require.Contains(t, incorporatedResults, ir2.IncorporatedBlockID)
 	})
 
-	ir3 := unittest.IncorporatedResultFixture()
+	ir3 := unittest.IncorporatedResult.Fixture()
 	t.Run("Adding third incorporated result", func(t *testing.T) {
 		ok, err := pool.Add(ir3)
 		require.True(t, ok)
@@ -84,7 +84,7 @@ func TestIncorporatedResultsEjectSize(t *testing.T) {
 
 		// insert 20 items (10 above limit)
 		for i := 0; i < 20; i++ {
-			_, _ = pool.Add(unittest.IncorporatedResultFixture())
+			_, _ = pool.Add(unittest.IncorporatedResult.Fixture())
 		}
 
 		// 10 items should have been evicted, so size 10

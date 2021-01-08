@@ -10,8 +10,9 @@ type Config struct {
 	minInterval time.Duration
 	maxInterval time.Duration
 	// the max number of seals to be included in a block proposal
-	maxSealCount uint
-	expiry       uint
+	maxSealCount      uint
+	maxGuaranteeCount uint
+	expiry            uint
 }
 
 func WithMinInterval(minInterval time.Duration) func(*Config) {
@@ -29,5 +30,11 @@ func WithMaxInterval(maxInterval time.Duration) func(*Config) {
 func WithMaxSealCount(maxSealCount uint) func(*Config) {
 	return func(cfg *Config) {
 		cfg.maxSealCount = maxSealCount
+	}
+}
+
+func WithMaxGuaranteeCount(maxGuaranteeCount uint) func(*Config) {
+	return func(cfg *Config) {
+		cfg.maxGuaranteeCount = maxGuaranteeCount
 	}
 }

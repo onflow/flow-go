@@ -46,22 +46,6 @@ func (_m *State) Final() cluster.Snapshot {
 	return r0
 }
 
-// Mutate provides a mock function with given fields:
-func (_m *State) Mutate() cluster.Mutator {
-	ret := _m.Called()
-
-	var r0 cluster.Mutator
-	if rf, ok := ret.Get(0).(func() cluster.Mutator); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(cluster.Mutator)
-		}
-	}
-
-	return r0
-}
-
 // Params provides a mock function with given fields:
 func (_m *State) Params() cluster.Params {
 	ret := _m.Called()
