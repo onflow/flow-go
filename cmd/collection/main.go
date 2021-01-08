@@ -82,7 +82,6 @@ func main() {
 		// epoch qc contract client
 		accessAddress     string
 		qcContractAddress string
-		nodeInfoQCPath    string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -132,7 +131,6 @@ func main() {
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 			flags.StringVar(&qcContractAddress, "qc-contract-address", "", "the address of the Epoch QC contract")
-			flags.StringVar(&nodeInfoQCPath, "node-info-qc", "", "the path to the account details to interact with the QC contract")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -377,9 +375,6 @@ func main() {
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// check if required fields are left empty
-			if nodeInfoQCPath == "" {
-				return nil, fmt.Errorf("flag `node-info-qc` required")
-			}
 			if accessAddress == "" {
 				return nil, fmt.Errorf("flag `access-address` required")
 			}
