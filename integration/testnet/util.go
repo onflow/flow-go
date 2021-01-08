@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -69,9 +70,10 @@ func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 }
 
 func getSeed() ([]byte, error) {
-	seed := make([]byte, crypto.SeedMinLenDKG)
+	seedLen := int(math.Max(crypto.SeedMinLenDKG, crypto.KeyGenSeedMinLenBLSBLS12381))
+	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.SeedMinLenDKG {
+	if err != nil || n != seedLen {
 		return nil, err
 	}
 	return seed, nil
