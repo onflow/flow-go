@@ -69,6 +69,7 @@ func main() {
 		logTxTimeToExecuted          bool
 		logTxTimeToFinalizedExecuted bool
 		retryEnabled                 bool
+		rpcMetricsEnabled            bool
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -87,6 +88,7 @@ func main() {
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
+			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
@@ -206,6 +208,7 @@ func main() {
 				transactionMetrics,
 				collectionGRPCPort,
 				retryEnabled,
+				rpcMetricsEnabled,
 			)
 			return rpcEng, nil
 		}).
