@@ -85,7 +85,7 @@ func main() {
 		conMetrics       module.ConsensusMetrics
 		mainMetrics      module.HotstuffMetrics
 		receiptValidator module.ReceiptValidator
-		assignment       *chmodule.PublicAssignment
+		chunkAssigner       *chmodule.PublicAssignment
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -118,7 +118,7 @@ func main() {
 
 			assignment, err = chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
 			if err != nil {
-				return fmt.Errorf("could not create public assignment: %w", err)
+				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
 			}
 
 			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,

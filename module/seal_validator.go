@@ -2,8 +2,8 @@ package module
 
 import "github.com/onflow/flow-go/model/flow"
 
-// SealValidator is an interface which is used for validating
-// seals with respect to current protocol state. Accepts `candidate` block with seals
+// SealValidator checks seals with respect to current protocol state.
+// Accepts `candidate` block with seals
 // that needs to be verified for protocol state validity.
 // Returns the following values:
 // * last seal in `candidate` block - in case of success

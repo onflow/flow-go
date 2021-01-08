@@ -85,11 +85,11 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// Get the latest seal in the fork that ends with the candidate's parent.
 	// The protocol state saves this information for each block that has been
 	// successfully added to the chain tree (even when the added block does not
-	// itself contain a seal). We just called `headerExtend` to check that the
-	// candidate block's header is a valid extension of the chain, which implies
-	// that the parent must already be part of the chain tree. Therefore, _not_
-	// finding the latest sealed block in the fork up to the parent constitutes
-	// a fatal internal error.
+ // itself contain a seal). Per prerequisite of this method, the candidate block's parent must
+ // be part of the main chain (without any missing ancestors). For every block B that is 
+ // attached to the main chain, we store the latest seal in the fork that ends with B. 
+ // Therefore, _not_ finding the latest sealed block of the parent constitutes
+ // a fatal internal error.
 	lastSealUpToParent, err := s.seals.ByBlockID(candidate.Header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.Header.ParentID, err)
@@ -244,7 +244,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := seal.AggregatedApprovalSigs[chunk.Index]
 		assignedVerifiers := assignments.Verifiers(chunk)
-		lenSignerIds := len(chunkSigs.SignerIDs)
+		numberApprovals := len(chunkSigs.SignerIDs)
 		if lenSignerIds != assignedVerifiers.Len() {
 			return engine.NewInvalidInputErrorf("mismatched signature ids length %d vs %d",
 				lenSignerIds, assignedVerifiers.Len())

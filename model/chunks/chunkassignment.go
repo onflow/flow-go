@@ -26,11 +26,9 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 
 // HasVerifier checks if a chunk is assigned to the given verifier
 func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) bool {
-	for id := range a.table[chunk.Index] {
-		if id == identifier {
-			return true
-		}
-	}
+	assignedVerifiers := a.verifiersForChunk[chunk.Index]
+	_, isAssigned := assignedVerifiers[identifier]
+	return isAssigned
 	return false
 }
 
