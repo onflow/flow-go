@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	cluster "github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -24,9 +25,14 @@ type State interface {
 	// the cluster state, and can thus represent an ambiguous state that was or
 	// will never be finalized.
 	AtBlockID(blockID flow.Identifier) Snapshot
+}
 
-	// Mutate will create a mutator for the persistent cluster state. It allows
-	// extending the cluster state in a consistent manner that preserves
-	// integrity, validity, and functionality of the database.
-	Mutate() Mutator
+// MutableState allows extending the cluster state in a consistent manner that preserves
+// integrity, validity, and functionality of the database. It enforces a number of invariants on the
+// input data to ensure internal bookkeeping mechanisms remain functional and valid.
+type MutableState interface {
+	State
+	// Extend introduces the given block into the cluster state as a pending
+	// without modifying the current finalized state.
+	Extend(candidate *cluster.Block) error
 }
