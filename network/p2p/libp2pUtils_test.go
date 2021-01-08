@@ -27,7 +27,7 @@ func TestLibP2PUtilsTestSuite(t *testing.T) {
 func (ts *LibP2PUtilsTestSuite) TestPeerInfoFromID() {
 	ids, exceptedPeerInfos := idsAndPeerInfos(ts.T())
 	for i, id := range ids {
-		actualAddrInfo, err := PeerInfoFromID(*id)
+		actualAddrInfo, err := PeerAddressInfo(*id)
 		assert.NoError(ts.T(), err)
 		assert.Equal(ts.T(), exceptedPeerInfos[i].String(), actualAddrInfo.String())
 	}
@@ -81,6 +81,6 @@ func BenchmarkPeerInfoFromID(b *testing.B) {
 	id.Address = "1.1.1.1:3569"
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		_, _ = PeerInfoFromID(*id)
+		_, _ = PeerAddressInfo(*id)
 	}
 }

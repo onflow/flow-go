@@ -32,6 +32,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
@@ -44,6 +46,8 @@ func main() {
 		receiptLimit                 uint
 		collectionGRPCPort           uint
 		pingEnabled                  bool
+		nodeInfoFile                 string
+		followerState                protocol.MutableState
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
 		followerEng                  *followereng.Engine
@@ -52,6 +56,7 @@ func main() {
 		rpcEng                       *rpc.Engine
 		collectionRPC                access.AccessAPIClient
 		executionRPC                 execution.ExecutionAPIClient
+		historicalAccessRPCs         []access.AccessAPIClient
 		err                          error
 		conCache                     *buffer.PendingBlocks // pending block cache for follower
 		transactionTimings           *stdmap.TransactionTimings
@@ -64,6 +69,7 @@ func main() {
 		logTxTimeToExecuted          bool
 		logTxTimeToFinalizedExecuted bool
 		retryEnabled                 bool
+		rpcMetricsEnabled            bool
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -76,11 +82,30 @@ func main() {
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
+			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
+			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badgerState.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
@@ -110,6 +135,25 @@ func main() {
 				return err
 			}
 			executionRPC = execution.NewExecutionAPIClient(executionRPCConn)
+			return nil
+		}).
+		Module("historical access node clients", func(node *cmd.FlowNodeBuilder) error {
+			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
+			for _, addr := range addrs {
+				if strings.TrimSpace(addr) == "" {
+					continue
+				}
+				node.Logger.Info().Err(err).Msgf("Historical access node Addr: %s", addr)
+
+				historicalAccessRPCConn, err := grpc.Dial(
+					addr,
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+					grpc.WithInsecure())
+				if err != nil {
+					return err
+				}
+				historicalAccessRPCs = append(historicalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
+			}
 			return nil
 		}).
 		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -155,6 +199,7 @@ func main() {
 				rpcConf,
 				executionRPC,
 				collectionRPC,
+				historicalAccessRPCs,
 				node.Storage.Blocks,
 				node.Storage.Headers,
 				node.Storage.Collections,
@@ -163,6 +208,7 @@ func main() {
 				transactionMetrics,
 				collectionGRPCPort,
 				retryEnabled,
+				rpcMetricsEnabled,
 			)
 			return rpcEng, nil
 		}).
@@ -198,7 +244,7 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -237,7 +283,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				conCache,
 				followerCore,
 				syncCore,
@@ -272,6 +318,7 @@ func main() {
 				pingMetrics,
 				pingEnabled,
 				node.Middleware,
+				nodeInfoFile,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create ping engine: %w", err)

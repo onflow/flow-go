@@ -17,10 +17,10 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 
+	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
-	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +41,7 @@ type CompleteExecutionResult struct {
 // chunkCount determines the number of chunks inside each receipt.
 // The output is an execution result with `chunkCount`+1 chunks, where the last chunk accounts
 // for the system chunk.
-func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain) CompleteExecutionResult {
+func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, root *flow.Header) CompleteExecutionResult {
 	// setups up the first collection of block consists of three transactions
 	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
@@ -55,8 +55,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3}
 	collection := flow.Collection{Transactions: transactions}
 	collections := []*flow.Collection{&collection}
-	guarantee := collection.Guarantee()
-	guarantees := []*flow.CollectionGuarantee{&guarantee}
+	guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(root.ID()))
+	guarantees := []*flow.CollectionGuarantee{guarantee}
 
 	metricsCollector := &metrics.NoopCollector{}
 	log := zerolog.Nop()
@@ -83,7 +83,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 		vm := fvm.New(rt)
 
-		blocks := new(storage.Blocks)
+		blocks := new(fvmMock.Blocks)
 
 		execCtx := fvm.NewContext(
 			log,
@@ -104,15 +104,15 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			require.NoError(t, err)
 
 			collection := flow.Collection{Transactions: []*flow.TransactionBody{tx}}
-			guarantee := collection.Guarantee()
-
+			guarantee := unittest.CollectionGuaranteeFixture(unittest.WithCollection(&collection), unittest.WithCollRef(root.ID()))
 			collections = append(collections, &collection)
-			guarantees = append(guarantees, &guarantee)
+			guarantees = append(guarantees, guarantee)
 		}
 
 		// generates system chunk collection and guarantee as the last collection of the block
 		sysCollection, sysGuarantee := SystemChunkCollectionFixture(chain.ServiceAddress())
 		collections = append(collections, sysCollection)
+		sysGuarantee.ReferenceBlockID = root.ID()
 		guarantees = append(guarantees, sysGuarantee)
 
 		for i := 0; i < len(collections); i++ {
@@ -138,8 +138,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	payload := flow.Payload{
 		Guarantees: guarantees,
 	}
-	header := unittest.BlockHeaderFixture()
-	header.Height = 0
+	header := unittest.BlockHeaderWithParentFixture(root)
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{

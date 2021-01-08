@@ -33,7 +33,7 @@ type Engine struct {
 	log           zerolog.Logger
 	tracer        module.Tracer
 	receiptCon    network.Conduit
-	state         protocol.ReadOnlyState
+	state         protocol.State
 	execState     state.ReadOnlyExecutionState
 	me            module.Local
 	chunksConduit network.Conduit
@@ -44,7 +44,7 @@ func New(
 	logger zerolog.Logger,
 	tracer module.Tracer,
 	net module.Network,
-	state protocol.ReadOnlyState,
+	state protocol.State,
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,

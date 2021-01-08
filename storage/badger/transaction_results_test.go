@@ -1,6 +1,8 @@
 package badger_test
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -8,8 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
+
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 func TestStoringTransactionResults(t *testing.T) {
@@ -22,7 +26,7 @@ func TestStoringTransactionResults(t *testing.T) {
 			txID := unittest.IdentifierFixture()
 			expected := &flow.TransactionResult{
 				TransactionID: txID,
-				ErrorMessage:  "a runtime error " + string(i),
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
 			}
 			txResults = append(txResults, expected)
 		}
@@ -48,7 +52,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,
-				ErrorMessage:  "a runtime error " + string(i),
+				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
 			}
 			txResults = append(txResults, expected)
 		}
@@ -59,5 +63,17 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			require.Nil(t, err)
 			assert.Equal(t, txResult, *actual)
 		}
+	})
+}
+
+func TestReadingNotStoreTransaction(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		store := bstorage.NewTransactionResults(db)
+
+		blockID := unittest.IdentifierFixture()
+		txID := unittest.IdentifierFixture()
+
+		_, err := store.ByBlockIDTransactionID(blockID, txID)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
