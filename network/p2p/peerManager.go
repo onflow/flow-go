@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -108,13 +107,11 @@ func (pm *PeerManager) updatePeers() {
 		return
 	}
 
-	var e *UnconvertableIdentitiesError
-	if errors.As(err, &e) {
+	if IsUnconvertibleIdentitiesError(err) {
 		// log conversion error as fatal since it indicates a bad identity table
 		pm.logger.Fatal().Err(err).Msg("failed to connect to peers")
 		return
 	}
 
 	pm.logger.Error().Err(err).Msg("failed to connect to peers")
-
 }

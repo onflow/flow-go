@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -24,16 +25,30 @@ type libp2pConnector struct {
 
 var _ Connector = &libp2pConnector{}
 
-type UnconvertableIdentitiesError struct {
+// UnconvertibleIdentitiesError is an error which reports all the flow.Identifiers that could not be converted to
+// peer.AddrInfo
+type UnconvertibleIdentitiesError struct {
 	errs map[flow.Identifier]error
 }
 
-func (e *UnconvertableIdentitiesError) Error() string {
+func NewUnconvertableIdentitiesError(errs map[flow.Identifier]error) error {
+	return UnconvertibleIdentitiesError{
+		errs: errs,
+	}
+}
+
+func (e UnconvertibleIdentitiesError) Error() string {
 	multierr := new(multierror.Error)
 	for id, err := range e.errs {
 		multierr = multierror.Append(multierr, fmt.Errorf("failed to connect to %s: %w", id.String(), err))
 	}
 	return multierr.GoString()
+}
+
+// IsUnconvertibleIdentitiesError returns whether the given error is an UnconvertibleIdentitiesError error
+func IsUnconvertibleIdentitiesError(err error) bool {
+	var errUnconvertableIdentitiesError UnconvertibleIdentitiesError
+	return errors.As(err, &errUnconvertableIdentitiesError)
 }
 
 func newLibp2pConnector(host host.Host, log zerolog.Logger) (*libp2pConnector, error) {
@@ -65,9 +80,8 @@ func (l *libp2pConnector) UpdatePeers(ctx context.Context, ids flow.IdentityList
 		return nil
 	}
 
-	err := &UnconvertableIdentitiesError{
-		errs: invalidIDs,
-	}
+	err := NewUnconvertableIdentitiesError(invalidIDs)
+
 	return err
 }
 
