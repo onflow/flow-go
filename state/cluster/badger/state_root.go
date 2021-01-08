@@ -25,7 +25,7 @@ func NewStateRoot(genesis *cluster.Block) (*StateRoot, error) {
 func validateClusterGenesis(genesis *cluster.Block) error {
 	// check header number
 	if genesis.Header.Height != 0 {
-		return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Header.Height)
+		return fmt.Errorf("height of genesis cluster block should be 0 (got %d)", genesis.Header.Height)
 	}
 	// check header parent ID
 	if genesis.Header.ParentID != flow.ZeroID {
