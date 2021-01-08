@@ -13,7 +13,11 @@ import (
 )
 
 // DefaultRequiredChunkApprovals is the default number of approvals that should be
-// present and valid for each chunk.
+// present and valid for each chunk. Setting this to 0 will disable counting of chunk approvals
+// this can be used temporarily to ease the migration to new chunk based sealing.
+// TODO:
+//   * This value is for the happy path (requires just one approval per chunk).
+//   * Full protocol should be +2/3 of all currently staked verifiers.
 const DefaultRequiredChunkApprovals = 1
 
 type sealValidator struct {
@@ -28,7 +32,7 @@ type sealValidator struct {
 }
 
 func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
-	assigner module.ChunkAssigner, verifier module.Verifier, requiredChunkApprovals uint, skipSealValidity bool) *sealValidator {
+	assigner module.ChunkAssigner, verifier module.Verifier, requiredChunkApprovals uint) *sealValidator {
 	rv := &sealValidator{
 		state:                  state,
 		assigner:               assigner,
@@ -37,7 +41,6 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 		seals:                  seals,
 		payloads:               payloads,
 		requiredChunkApprovals: requiredChunkApprovals,
-		skipSealValidity:       skipSealValidity,
 	}
 
 	return rv
