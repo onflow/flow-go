@@ -2,10 +2,10 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -19,7 +19,7 @@ type Connector interface {
 	// disconnects from any other peers with which it may have previously established connection.
 	// UpdatePeers implementation should be idempotent such that multiple calls to connect to the same peer should not
 	// return an error or create multiple connections
-	UpdatePeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error
+	UpdatePeers(ctx context.Context, ids flow.IdentityList) error
 }
 
 // PeerUpdateInterval is how long the peer manager waits in between attempts to update peer connections
@@ -28,7 +28,6 @@ var PeerUpdateInterval = 1 * time.Minute
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
 	unit         *engine.Unit
-	ctx          context.Context
 	logger       zerolog.Logger
 	idsProvider  func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
 	peerRequestQ chan struct{}                     // a channel to queue a peer update request
@@ -37,10 +36,9 @@ type PeerManager struct {
 
 // NewPeerManager creates a new peer manager which calls the idsProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(ctx context.Context, logger zerolog.Logger, idsProvider func() (flow.IdentityList, error),
+func NewPeerManager(logger zerolog.Logger, idsProvider func() (flow.IdentityList, error),
 	connector Connector) *PeerManager {
 	return &PeerManager{
-		ctx:          ctx,
 		unit:         engine.NewUnit(),
 		logger:       logger,
 		idsProvider:  idsProvider,
@@ -105,19 +103,18 @@ func (pm *PeerManager) updatePeers() {
 		Msg("connecting to peers")
 
 	// ask the connector to connect to all peers in the list
-	failedIDs := pm.connector.UpdatePeers(pm.ctx, ids)
-
-	err = failedIDMapToSingleError(failedIDs)
-	if err != nil {
-		pm.logger.Error().Int("failed_peer_count", len(failedIDs)).Err(err).Msg("failed to connect to peers")
+	err = pm.connector.UpdatePeers(pm.unit.Ctx(), ids)
+	if err == nil {
+		return
 	}
-}
 
-// failedIDMapToSingleError converts the failedIDs map to a single error
-func failedIDMapToSingleError(failedIDs map[flow.Identifier]error) error {
-	multierr := new(multierror.Error)
-	for id, err := range failedIDs {
-		multierr = multierror.Append(multierr, fmt.Errorf("failed to connect to %s: %w", id.String(), err))
+	var e *UnconvertableIdentitiesError
+	if errors.As(err, &e) {
+		// log conversion error as fatal since it indicates a bad identity table
+		pm.logger.Fatal().Err(err).Msg("failed to connect to peers")
+		return
 	}
-	return multierr.ErrorOrNil()
+
+	pm.logger.Error().Err(err).Msg("failed to connect to peers")
+
 }

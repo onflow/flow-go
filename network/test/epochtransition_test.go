@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -78,6 +77,14 @@ func (t testNodeList) idRefreshers() []*p2p.NodeIDRefresher {
 	return idRefreshers
 }
 
+func (t testNodeList) networks() []*p2p.Network {
+	nets := make([]*p2p.Network, len(t))
+	for i, node := range t {
+		nets[i] = node.net
+	}
+	return nets
+}
+
 func TestEpochTransitionTestSuite(t *testing.T) {
 	suite.Run(t, new(MutableIdentityTableSuite))
 }
@@ -90,7 +97,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 	log.SetAllLoggers(log.LevelError)
 
 	suite.setupStateMock()
-	suite.addNode(nodeCount)
+	suite.addNodes(nodeCount)
 
 	// simulate a start of an epoch by signaling a change in the identity table
 	suite.signalIdentityChanged()
@@ -101,14 +108,8 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 
 // TearDownTest closes all the networks within a specified timeout
 func (suite *MutableIdentityTableSuite) TearDownTest() {
-	nets := make([]*p2p.Network, 0, len(suite.testNodes)+len(suite.removedTestNodes))
-	for _, n := range suite.testNodes {
-		nets = append(nets, n.net)
-	}
-	for _, n := range suite.removedTestNodes {
-		nets = append(nets, n.net)
-	}
-	stopNetworks(suite.T(), nets, 3*time.Second)
+	networks := append(suite.testNodes.networks(), suite.removedTestNodes.networks()...)
+	stopNetworks(suite.T(), networks, 3*time.Second)
 }
 
 // setupStateMock setup state related mocks (all networks share the same state mock)
@@ -127,8 +128,8 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 	suite.state.On("Final").Return(suite.snapshot, nil)
 }
 
-// addNode creates count many new nodes and appends them to the suite state variables
-func (suite *MutableIdentityTableSuite) addNode(count int) {
+// addNodes creates count many new nodes and appends them to the suite state variables
+func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	// create the ids, middlewares and networks
 	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
 
@@ -154,7 +155,7 @@ func (suite *MutableIdentityTableSuite) addNode(count int) {
 // removeNode removes a randomly chosen test node from suite.testNodes and adds it to suite.removedTestNodes
 func (suite *MutableIdentityTableSuite) removeNode() testNode {
 	// choose a random node to remove
-	i := rand.Intn(len(suite.testNodes) - 1)
+	i := rand.Intn(len(suite.testNodes))
 	removedNode := suite.testNodes[i]
 	suite.removedTestNodes = append(suite.removedTestNodes, removedNode)
 	suite.testNodes = append(suite.testNodes[:i], suite.testNodes[i+1:]...)
@@ -166,7 +167,7 @@ func (suite *MutableIdentityTableSuite) removeNode() testNode {
 func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 
 	// add a new node the current list of nodes
-	suite.addNode(1)
+	suite.addNodes(1)
 
 	// update IDs for all the networks (simulating an epoch)
 	suite.signalIdentityChanged()
@@ -180,18 +181,10 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 
 	// check if the new node has sufficient connections with the existing nodes
 	// if it does, then it has been inducted successfully in the network
-	assertConnected(suite.T(), newMiddleware, ids.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
+	suite.assertConnected(newMiddleware, ids.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// check that all the engines on this new epoch can talk to each other using any of the three networking primitives
-	suite.Run("Publish", func() {
-		suite.exchangeMessages(ids, engs, nil, nil, suite.Publish)
-	})
-	suite.Run("Multicast", func() {
-		suite.exchangeMessages(ids, engs, nil, nil, suite.Multicast)
-	})
-	suite.Run("Unicast", func() {
-		suite.exchangeMessages(ids, engs, nil, nil, suite.Unicast)
-	})
+	suite.assertNetworkPrimitives(ids, engs, nil, nil)
 }
 
 // TestNodeRemoved tests that when an existing node is removed from the identity
@@ -213,21 +206,15 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 	remainingEngs := suite.testNodes.engines()
 
 	// assert that the removed node has no connections with any of the other nodes
-	assertDisconnected(suite.T(), removedMiddleware, remainingIDs)
+	suite.assertDisconnected(removedMiddleware, remainingIDs)
 
 	// check that all remaining engines can still talk to each other while the ones removed can't
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.Run("Publish", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
-	})
-	suite.Run("Multicast", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
-	})
-	suite.Run("Unicast", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
-	})
+
+	// assert that all three network primitives still work
+	suite.assertNetworkPrimitives(remainingIDs, remainingEngs, removedIDs, removedEngines)
 }
 
 // TestNodesAddedAndRemoved tests that:
@@ -236,7 +223,7 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 
 	// add a node
-	suite.addNode(1)
+	suite.addNodes(1)
 	newNode := suite.testNodes[len(suite.testNodes)-1]
 	newID := newNode.id
 	newMiddleware := newNode.mw
@@ -254,24 +241,18 @@ func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 	remainingEngs := suite.testNodes.engines()
 
 	// check if the new node has sufficient connections with the existing nodes
-	assertConnected(suite.T(), newMiddleware, remainingIDs.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
+	suite.assertConnected(newMiddleware, remainingIDs.Filter(filter.Not(filter.HasNodeID(newID.NodeID))))
 
 	// assert that the removed node has no connections with any of the other nodes
-	assertDisconnected(suite.T(), removedMiddleware, remainingIDs)
+	suite.assertDisconnected(removedMiddleware, remainingIDs)
 
 	// check that all remaining engines can still talk to each other while the ones removed can't
 	// using any of the three networking primitives
 	removedIDs := []*flow.Identity{removedID}
 	removedEngines := []*MeshEngine{removedEngine}
-	suite.Run("Publish", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Publish)
-	})
-	suite.Run("Multicast", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Multicast)
-	})
-	suite.Run("Unicast", func() {
-		suite.exchangeMessages(remainingIDs, remainingEngs, removedIDs, removedEngines, suite.Unicast)
-	})
+
+	// assert that all three network primitives still work
+	suite.assertNetworkPrimitives(remainingIDs, remainingEngs, removedIDs, removedEngines)
 }
 
 // signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
@@ -283,7 +264,8 @@ func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
 
 // assertConnected checks that the middleware of a node is directly connected
 // to at least half of the other nodes.
-func assertConnected(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) {
+func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids flow.IdentityList) {
+	t := suite.T()
 	threshold := len(ids) / 2
 	require.Eventually(t, func() bool {
 		connections := 0
@@ -300,8 +282,8 @@ func assertConnected(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) {
 
 // assertDisconnected checks that the middleware of a node is not connected to any of the other nodes specified in the
 // ids list
-func assertDisconnected(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList) {
-
+func (suite *MutableIdentityTableSuite) assertDisconnected(mw *p2p.Middleware, ids flow.IdentityList) {
+	t := suite.T()
 	require.Eventually(t, func() bool {
 		for _, id := range ids {
 			connected, err := mw.IsConnected(*id)
@@ -314,6 +296,23 @@ func assertDisconnected(t *testing.T, mw *p2p.Middleware, ids flow.IdentityList)
 	}, 5*time.Second, time.Millisecond*100)
 }
 
+func (suite *MutableIdentityTableSuite) assertNetworkPrimitives(
+	allowedIDs flow.IdentityList,
+	allowedEngs []*MeshEngine,
+	disallowedIDs flow.IdentityList,
+	disallowedEngs []*MeshEngine) {
+	suite.Run("Publish", func() {
+		suite.exchangeMessages(allowedIDs, allowedEngs, disallowedIDs, disallowedEngs, suite.Publish, false)
+	})
+	suite.Run("Multicast", func() {
+		suite.exchangeMessages(allowedIDs, allowedEngs, disallowedIDs, disallowedEngs, suite.Multicast, false)
+	})
+	suite.Run("Unicast", func() {
+		// unicast send from or to a node that has been evicted should fail with an error
+		suite.exchangeMessages(allowedIDs, allowedEngs, disallowedIDs, disallowedEngs, suite.Unicast, true)
+	})
+}
+
 // exchangeMessages verifies that allowed engines can successfully exchange messages between them while disallowed
 // engines can't using the ConduitSendWrapperFunc network primitive
 func (suite *MutableIdentityTableSuite) exchangeMessages(
@@ -321,7 +320,8 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 	allowedEngs []*MeshEngine,
 	disallowedIDs flow.IdentityList,
 	disallowedEngs []*MeshEngine,
-	send ConduitSendWrapperFunc) {
+	send ConduitSendWrapperFunc,
+	expectSendErrorForDisallowedIDs bool) {
 
 	// send a message from each of the allowed engine to the other allowed engines
 	for i, allowedEng := range allowedEngs {
@@ -341,7 +341,9 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 			targetIDs := disallowedIDs
 
 			err := suite.sendMessage(fromID, fromEng, targetIDs, send)
-			suite.checkSendError(err, send)
+			if expectSendErrorForDisallowedIDs {
+				require.Error(suite.T(), err)
+			}
 		}
 	}
 
@@ -352,7 +354,9 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 		targetIDs := allowedIDs
 
 		err := suite.sendMessage(fromID, fromEng, targetIDs, send)
-		suite.checkSendError(err, send)
+		if expectSendErrorForDisallowedIDs {
+			require.Error(suite.T(), err)
+		}
 	}
 
 	count := len(allowedEngs)
@@ -395,14 +399,6 @@ func (suite *MutableIdentityTableSuite) sendMessage(fromID flow.Identifier,
 	}
 
 	return send(event, fromEngine.con, toIDs.NodeIDs()...)
-}
-
-func (suite *MutableIdentityTableSuite) checkSendError(err error, send ConduitSendWrapperFunc) {
-	primitive := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
-	requireError := strings.Contains(primitive, "Unicast")
-	if requireError {
-		require.Error(suite.T(), err)
-	}
 }
 
 func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*p2p.Network) []*p2p.NodeIDRefresher {

@@ -61,7 +61,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 		Return(nil)
 
 	// create the peer manager (but don't start it)
-	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
+	pm := NewPeerManager(suite.log, idProvider, connector)
 
 	// very first call to updatepeer
 	suite.Run("updatePeers only connects to all peers the first time", func() {
@@ -127,7 +127,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 			wg.Done()
 		}
 	}).Return(nil)
-	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
+	pm := NewPeerManager(suite.log, idProvider, connector)
 	PeerUpdateInterval = 5 * time.Millisecond
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
@@ -163,7 +163,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 		}
 	}).Return(nil)
 
-	pm := NewPeerManager(suite.ctx, suite.log, idProvider, connector)
+	pm := NewPeerManager(suite.log, idProvider, connector)
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
@@ -195,7 +195,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 	connector.On("UpdatePeers", ctx, mock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
-	pm := NewPeerManager(ctx, suite.log, idProvider, connector)
+	pm := NewPeerManager(suite.log, idProvider, connector)
 
 	// set the periodic interval to a high value so that periodic runs don't interfere with this test
 	PeerUpdateInterval = time.Hour
