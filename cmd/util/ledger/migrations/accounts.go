@@ -12,7 +12,8 @@ import (
 
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := newLed(payloads)
-	a := state.NewAccounts(l)
+	st := state.NewState(l)
+	a := state.NewAccounts(st)
 
 	//// TestNet
 	// coreContractEncodedKey := "f847b8402b0bf247520770a4bad19e07f6d6b1e8f0542da564154087e2681b175b4432ec2c7b09a52d34dabe0a887ea0f96b067e52c6a0792dcff730fe78a6c5fbbf0a9c02038203e8"
@@ -134,12 +135,13 @@ type led struct {
 	payloads map[string]ledger.Payload
 }
 
-func (l *led) Set(owner, controller, key string, value flow.RegisterValue) {
+func (l *led) Set(owner, controller, key string, value flow.RegisterValue) error {
 	keyparts := []ledger.KeyPart{ledger.NewKeyPart(0, []byte(owner)),
 		ledger.NewKeyPart(1, []byte(controller)),
 		ledger.NewKeyPart(2, []byte(key))}
 	fk := fullKey(owner, controller, key)
 	l.payloads[fk] = ledger.Payload{Key: ledger.NewKey(keyparts), Value: ledger.Value(value)}
+	return nil
 }
 
 func (l *led) Get(owner, controller, key string) (flow.RegisterValue, error) {
@@ -151,12 +153,15 @@ func (l *led) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	panic("this method shouldn't be used here")
 }
 
-func (l *led) Delete(owner, controller, key string) {
+func (l *led) Delete(owner, controller, key string) error {
 	fk := fullKey(owner, controller, key)
 	delete(l.payloads, fk)
+	return nil
 }
 
-func (l *led) Touch(owner, controller, key string) {}
+func (l *led) Touch(owner, controller, key string) error {
+	return nil
+}
 
 func (l *led) Payloads() []ledger.Payload {
 	ret := make([]ledger.Payload, 0, len(l.payloads))
