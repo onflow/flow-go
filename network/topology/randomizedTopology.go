@@ -17,12 +17,12 @@ import (
 // By random topology we mean a node is connected to any other co-channel nodes with some
 // edge probability.
 type RandomizedTopology struct {
-	identifier flow.Identifier             // used to keep identifier of the node
-	state      protocol.State              // used to keep a read only protocol state
-	subMngr    network.SubscriptionManager // used to keep track topics the node subscribed to
-	chance     uint64                      // used to translate connectedness probability into a number in [0, 100]
-	rng        random.Rand                 // used as a stateful random number generator to sample edges
-	logger     zerolog.Logger
+	myNodeID flow.Identifier             // used to keep identifier of the node
+	state    protocol.State              // used to keep a read only protocol state
+	subMngr  network.SubscriptionManager // used to keep track topics the node subscribed to
+	chance   uint64                      // used to translate connectedness probability into a number in [0, 100]
+	rng      random.Rand                 // used as a stateful random number generator to sample edges
+	logger   zerolog.Logger
 }
 
 // NewRandomizedTopology returns an instance of the RandomizedTopology.
@@ -49,12 +49,12 @@ func NewRandomizedTopology(nodeID flow.Identifier,
 	}
 
 	t := &RandomizedTopology{
-		identifier: nodeID,
-		state:      state,
-		subMngr:    subMngr,
-		chance:     uint64(100 * edgeProb),
-		rng:        rng,
-		logger:     logger.With().Str("component:", "randomized-topology").Logger(),
+		myNodeID: nodeID,
+		state:    state,
+		subMngr:  subMngr,
+		chance:   uint64(100 * edgeProb),
+		rng:      rng,
+		logger:   logger.With().Str("component:", "randomized-topology").Logger(),
 	}
 
 	return t, nil
@@ -101,7 +101,7 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 // Note: this method should not include identity of its executor.
 func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
 	// excludes node itself
-	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.identifier)))
+	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
 
 	// samples a random graph based on whether channel is cluster-based or not.
 	if _, ok := engine.IsClusterChannelID(channel); ok {
@@ -135,13 +135,13 @@ func (r RandomizedTopology) sampleFanout(ids flow.IdentityList) (flow.IdentityLi
 // clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
 func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.IdentityList, error) {
 	// extracts cluster peer ids to which the node belongs to.
-	clusterPeers, err := clusterPeers(r.identifier, r.state)
+	clusterPeers, err := clusterPeers(r.myNodeID, r.state)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", r.identifier.String(), err)
+		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", r.myNodeID.String(), err)
 	}
 
 	// excludes node itself from cluster
-	clusterPeers = clusterPeers.Filter(filter.Not(filter.HasNodeID(r.identifier)))
+	clusterPeers = clusterPeers.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
 
 	// checks all cluster peers belong to the passed ids list
 	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
