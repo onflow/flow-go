@@ -33,5 +33,6 @@ var (
 	FilenameRandomBeaconPriv = "random-beacon.priv.json"
 	PathPrivNodeInfoPrefix   = "node-info.priv."
 	PathNodeInfoPriv         = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")    // %v will be replaced by NodeID
+	PathQCNodeInfoPriv       = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info-qc.priv.json") // %v will be replaced by NodeID
 	PathRandomBeaconPriv     = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID
 )

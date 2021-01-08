@@ -22,6 +22,15 @@ const (
 // that is only valid on instances containing private info.
 var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
+// NodeMachineAccountInfo ...
+type NodeMachineAccountInfo struct {
+	Address          string
+	PrivateKey       encodable.StakingPubKey
+	KeyIndex         uint
+	SigningAlgorithm int
+	HashAlgorithm    int
+}
+
 // NodeConfig contains configuration information used as input to the
 // bootstrap process.
 type NodeConfig struct {

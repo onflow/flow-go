@@ -1,8 +1,9 @@
 package main
 
 import (
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -24,6 +25,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -43,6 +45,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 func main() {
@@ -389,16 +392,27 @@ func main() {
 				return nil, fmt.Errorf("flag `qc-contract-address` required")
 			}
 
-			// construct signer from private key
-			privateKeyBytes, err := hex.DecodeString(privateKey)
+			// loads the private account info for this node from disk for use in the QCContractClient.
+			accountInfo, err := func() (*bootstrap.NodeMachineAccountInfo, error) {
+				data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathQCNodeInfoPriv, node.Me.NodeID())))
+				if err != nil {
+					return nil, err
+				}
+				var info bootstrap.NodeMachineAccountInfo
+				err = json.Unmarshal(data, &info)
+				return &info, err
+			}()
 			if err != nil {
 				return nil, err
 			}
-			sk, err := sdkcrypto.DecodePrivateKey(sdkcrypto.ECDSA_P256, privateKeyBytes)
+
+			// construct signer from private key
+			privateKeyBytes := accountInfo.PrivateKey.Encode()
+			sk, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(accountInfo.SigningAlgorithm), privateKeyBytes)
 			if err != nil {
 				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
 			}
-			txSigner := sdkcrypto.NewInMemorySigner(sk, sdkcrypto.SHA2_256)
+			txSigner := sdkcrypto.NewInMemorySigner(sk, sdkcrypto.HashAlgorithm(accountInfo.HashAlgorithm))
 
 			// create QC vote client
 			qcContractClient, err := epochs.NewQCContractClient(node.Me.NodeID(), accountAddress, 0, accessAddress, qcContractAddress, txSigner)
