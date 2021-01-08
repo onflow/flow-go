@@ -387,23 +387,6 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 	ms.Require().Error(err)
 }
 
-// Given an incorporated result in the mempool, whose previous result
-// (aka parent result) is not known:
-//   * skip this result
-//   * this result should not be removed from the mempool
-func (ms *MatchingSuite) TestSealableResultUnknownPrevious() {
-	subgrph := ms.ValidSubgraphFixture()
-	ms.AddSubgraphFixtureToMempools(subgrph)
-	delete(ms.PersistedResults, subgrph.PreviousResult.ID()) // remove previous execution result from storage layer
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with unsealed previous")
-
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "ByID", 1)
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Rem", 0)
-}
-
 // TestSealableResultsInvalidSubgraph tests matching.Engine.sealableResults():
 // let R1 be a result that references block A, and R2 be R1's parent result.
 //  * the execution results form a valid subgraph if and only if
