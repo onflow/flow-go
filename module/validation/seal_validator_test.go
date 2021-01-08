@@ -31,6 +31,7 @@ func (s *SealValidationSuite) SetupTest() {
 		s.Assigner, s.verifier, DefaultRequiredChunkApprovals)
 }
 
+// TestSealValid tests submitting of valid seal
 func (s *SealValidationSuite) TestSealValid() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
@@ -54,6 +55,8 @@ func (s *SealValidationSuite) TestSealValid() {
 	s.Require().NoError(err)
 }
 
+// TestSealInvalidBlockID tests that we reject seal with invalid blockID for
+// submitted seal
 func (s *SealValidationSuite) TestSealInvalidBlockID() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
@@ -79,6 +82,8 @@ func (s *SealValidationSuite) TestSealInvalidBlockID() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
+// TestSealInvalidAggregatedSigCount tests that we reject seal with invalid number of
+// approval signatures for submitted seal
 func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
@@ -104,6 +109,8 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
+// TestSealInvalidChunkSignersCount tests that we reject seal with invalid approval signatures for
+// submitted seal
 func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
@@ -129,6 +136,8 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
+// TestSealInvalidChunkSignaturesCount tests that we reject seal with invalid approval signatures for
+// submitted seal
 func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
@@ -154,6 +163,8 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
+// TestSealInvalidChunkAssignment tests that we reject seal with invalid signerID of approval signature for
+// submitted seal
 func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
@@ -179,7 +190,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
-// Test that Validate will pick the seal corresponding to the highest block when
+// TestHighestSeal tests that Validate will pick the seal corresponding to the highest block when
 // the payload contains multiple seals that are not ordered.
 func (s *SealValidationSuite) TestHighestSeal() {
 	// take finalized block and build a receipt for it
@@ -214,7 +225,7 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	require.Equal(s.T(), last.FinalState, seal3.FinalState)
 }
 
-// Test that proposed seals are rejected if they do not form a valid chain on
+// TestExtendSealNotConnected tests that proposed seals are rejected if they do not form a valid chain on
 // top of the last known seal on the branch.
 func (s *SealValidationSuite) TestExtendSealNotConnected() {
 	// B <- B1 <- B2 <- B3{R(B1), R(B2)} <- B4{S(R(B2))}
@@ -254,7 +265,7 @@ func (s *SealValidationSuite) TestExtendSealNotConnected() {
 	require.True(s.T(), engine.IsInvalidInputError(err), err)
 }
 
-// Test that payloads containing duplicate seals are rejected.
+// TestExtendSealDuplicate tests that payloads containing duplicate seals are rejected.
 func (s *SealValidationSuite) TestExtendSealDuplicate() {
 	block1 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
 	block1.SetPayload(flow.Payload{})
@@ -310,7 +321,7 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 	})
 }
 
-// Test that seals are rejected if they correspond to ExecutionResults that are
+// TestExtendSealNoIncorporatedResult tests that seals are rejected if they correspond to ExecutionResults that are
 // not incorporated in blocks on this fork
 func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 	block1 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
@@ -405,6 +416,8 @@ func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 	})
 }
 
+// validSealForResult generates a valid seal based on ExecutionResult. As part of seal generation it
+// configures mocked seal verifier to match approvals based on chunk assignments.
 func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *flow.Seal {
 	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(result))
 

@@ -20,6 +20,8 @@ import (
 //   * Full protocol should be +2/3 of all currently staked verifiers.
 const DefaultRequiredChunkApprovals = 1
 
+// sealValidator holds all needed context for checking seal
+// validity against current protocol state.
 type sealValidator struct {
 	state                  protocol.State
 	assigner               module.ChunkAssigner
@@ -27,7 +29,6 @@ type sealValidator struct {
 	seals                  storage.Seals
 	headers                storage.Headers
 	payloads               storage.Payloads
-	skipSealValidity       bool
 	requiredChunkApprovals uint
 }
 
@@ -211,7 +212,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 				// because we still want to test that the above code doesn't panic.
 				// TODO: this is only here temporarily to ease the migration to new chunk
 				// based sealing.
-				if s.skipSealValidity {
+				if s.requiredChunkApprovals == 0 {
 					log.Warn().Msgf("payload includes invalid seal, continuing validation (%x), %s", seal.ID(), err.Error())
 				} else {
 					return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
