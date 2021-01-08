@@ -55,7 +55,7 @@ var blsInstance *blsBLS12381Algo
 //
 // It expands the message into 1024 bits (required for the optimal SwU hash to curve).
 // tag is the domain separation tag, it is recommended to use a different tag for each signature domain.
-// The returned KMAC is customized by the tag and is guaranteed to be different than the KAMC used
+// The returned KMAC is customized by the tag and is guaranteed to be different than the KMAC used
 // to generate proofs of possession.
 func NewBLSKMAC(tag string) hash.Hasher {
 	// application tag is guaranteed to be different than the tag used
