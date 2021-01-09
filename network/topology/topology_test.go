@@ -48,7 +48,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 	}
 
 	suite.randomizedTop = func(t *testing.T, identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
-		top, err := topology.NewRandomizedTopology(identifier, 0.01, state, manager)
+		top, err := topology.NewRandomizedTopology(identifier, suite.logger, 0.01, state, manager)
 		require.NoError(t, err)
 
 		return top
