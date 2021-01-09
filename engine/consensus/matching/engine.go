@@ -50,7 +50,7 @@ type Engine struct {
 	seals                   mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
 	missing                 map[flow.Identifier]uint        // track how often a block was missing
 	assigner                module.ChunkAssigner            // chunk assignment object
-	isCheckingSealing       *atomic.Bool                    // used to rate limit the checksealing call
+	isCheckingSealing       *atomic.Bool                    // used to rate limit the checkingSealing calls
 	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxResultsToRequest     int                             // max number of finalized blocks for which we request execution results
 	requireApprovals        bool                            // flag to disable verifying chunk approvals
