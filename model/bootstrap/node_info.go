@@ -22,7 +22,11 @@ const (
 // that is only valid on instances containing private info.
 var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
-// NodeMachineAccountInfo ...
+// NodeMachineAccountInfo defines the structure for a bootstrapping file containing
+// private information about the node's machine account. The machine account is used
+// by the protocol software to interact with Flow as a client autonomously as needed, in 
+// particular to run the DKG and generate root cluster quorum certificates when preparing
+// for an epoch.
 type NodeMachineAccountInfo struct {
 	Address          string
 	PrivateKey       encodable.StakingPubKey
