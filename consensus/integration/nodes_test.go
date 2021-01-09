@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -129,7 +130,9 @@ func createNode(
 	guaranteesDB := storage.NewGuarantees(metrics, db)
 	sealsDB := storage.NewSeals(metrics, db)
 	indexDB := storage.NewIndex(metrics, db)
-	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB)
+	resultsDB := storage.NewExecutionResults(metrics, db)
+	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB)
+	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
@@ -142,7 +145,7 @@ func createNode(
 	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, blocksDB, setupsDB, commitsDB, statusesDB, stateRoot)
 	require.NoError(t, err)
 
-	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer)
+	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator())
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -186,14 +189,18 @@ func createNode(
 	// add a network for this node to the hub
 	net := hub.AddNetwork(localID, node)
 
-	guaranteeLimit, sealLimit := uint(1000), uint(1000)
+	guaranteeLimit, sealLimit, receiptLimit := uint(1000), uint(1000), uint(1000)
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
+	require.NoError(t, err)
+
+	receipts, err := stdmap.NewReceipts(receiptLimit)
 	require.NoError(t, err)
 
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, guarantees, seals, tracer)
+	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB,
+		guarantees, seals, receipts, tracer)
 
 	signer := &Signer{identity.ID()}
 
