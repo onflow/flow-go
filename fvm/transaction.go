@@ -1,7 +1,7 @@
 package fvm
 
 import (
-	"strings"
+	"errors"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence/runtime"
@@ -98,30 +98,20 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-// safetyErrorCheck is additional check introduced to help chase erroneous execution results
-// which caused unexpected network fork. TopShot is first full-fledged game running on Flow, and
-// checking failures in this contract indicate the unexpected computation happening.
+// safetyErrorCheck is an additional check which was introduced
+// to help chase erroneous execution results which caused an unexpected network fork.
+// Parsing and checking of deployed contracts should normally succeed.
 // This is a temporary measure.
 func (i *TransactionInvocator) safetyErrorCheck(err error) {
-	e := err.Error()
-	i.logger.Info().Str("error", e).Msg("TEMP LOGGING: Cadence Execution ERROR")
-	if strings.Contains(e, "checking") {
-		re, isRuntime := err.(runtime.Error)
-		if !isRuntime {
-			i.logger.Err(err).Msg("found checking error for a contract but exception is not RuntimeError")
-			return
-		}
-		ee, is := re.Err.(*runtime.ParsingCheckingError)
-		if !is {
-			i.logger.Err(err).Msg("found checking error for a contract but exception is not ExtendedParsingCheckingError")
-			return
-		}
-
-		// serializing such large and complex objects to JSON
-		// causes stack overflow, spew works fine
-		spew.Config.DisableMethods = true
-		dump := spew.Sdump(ee)
-
-		i.logger.Error().Str("extended_error", dump).Msg("contract checking failed")
+	var parsingCheckingError *runtime.ParsingCheckingError
+	if !errors.As(err, &parsingCheckingError) {
+		return
 	}
+
+	// serializing such large and complex objects to JSON
+	// causes stack overflow, spew works fine
+	spew.Config.DisableMethods = true
+	dump := spew.Sdump(parsingCheckingError)
+
+	i.logger.Error().Str("extended_error", dump).Msg("checking failed")
 }
