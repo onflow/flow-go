@@ -68,45 +68,49 @@ func prepare(executeTxResult error) (error, *bytes.Buffer) {
 	return err, buffer
 }
 
-func TestTopShotSafety(t *testing.T) {
+func TestSafetyCheck(t *testing.T) {
 
-	t.Run("logs for failing TopShot tx but no extra info is provided", func(t *testing.T) {
+	t.Run("non-parsing/checking error", func(t *testing.T) {
 
 		topShotContract, err := hex.DecodeString(TopShotContractAddress)
 		require.NoError(t, err)
 
 		runtimeError := runtime.Error{
 			Err: sema.CheckerError{
-				Errors: []error{&sema.ImportedProgramError{
-					CheckerError: &sema.CheckerError{},
-					ImportLocation: ast.AddressLocation{
-						Name:    "Topshot",
-						Address: common.BytesToAddress(topShotContract),
+				Errors: []error{
+					&sema.ImportedProgramError{
+						CheckerError: &sema.CheckerError{},
+						Location: common.AddressLocation{
+							Name:    "Topshot",
+							Address: common.BytesToAddress(topShotContract),
+						},
 					},
-				}},
+				},
 			},
 		}
 
 		err, buffer := prepare(runtimeError)
 		require.Error(t, err)
 
-		require.Contains(t, buffer.String(), "exception is not ExtendedParsingCheckingError")
+		require.NotContains(t, buffer.String(), "extended_error")
 	})
 
-	t.Run("logs for failing TopShot tx", func(t *testing.T) {
+	t.Run("parsing/checking error", func(t *testing.T) {
 
 		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
 
 		runtimeError := runtime.Error{
 			Err: &runtime.ParsingCheckingError{
 				Err: sema.CheckerError{
-					Errors: []error{&sema.ImportedProgramError{
-						CheckerError: &sema.CheckerError{},
-						ImportLocation: ast.AddressLocation{
-							Name:    "TopShot",
-							Address: common.BytesToAddress(topShotContractAddress.Bytes()),
+					Errors: []error{
+						&sema.ImportedProgramError{
+							CheckerError: &sema.CheckerError{},
+							Location: common.AddressLocation{
+								Name:    "TopShot",
+								Address: common.BytesToAddress(topShotContractAddress.Bytes()),
+							},
 						},
-					}},
+					},
 				},
 				Code:     []byte("tx_code"),
 				Location: nil,
@@ -119,12 +123,10 @@ func TestTopShotSafety(t *testing.T) {
 		err, buffer := prepare(runtimeError)
 		require.Error(t, err)
 
-		expected := addressToSpewBytesString(topShotContractAddress)
-
-		require.Contains(t, buffer.String(), expected)
+		require.Contains(t, buffer.String(), "extended_error")
 	})
 
-	t.Run("logs for failing TopShot tx in real environment", func(t *testing.T) {
+	t.Run("parsing/checking error in real environment", func(t *testing.T) {
 
 		rt := runtime.NewInterpreterRuntime()
 
@@ -189,9 +191,7 @@ func TestTopShotSafety(t *testing.T) {
 		err = txInvocator.Process(vm, context, proc, st)
 		require.Error(t, err)
 
-		expected := addressToSpewBytesString(topShotContractAddress)
-
-		require.Contains(t, buffer.String(), expected)
+		require.Contains(t, buffer.String(), "extended_error")
 	})
 
 }
