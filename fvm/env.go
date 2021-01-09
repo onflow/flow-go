@@ -143,7 +143,7 @@ func (e *hostEnv) ResolveLocation(
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
 
-	addressLocation, isAddress := location.(runtime.AddressLocation)
+	addressLocation, isAddress := location.(common.AddressLocation)
 
 	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
 	// then return a single resolved location which declares all identifiers.
@@ -191,7 +191,7 @@ func (e *hostEnv) ResolveLocation(
 	for i := range resolvedLocations {
 		identifier := identifiers[i]
 		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: runtime.AddressLocation{
+			Location: common.AddressLocation{
 				Address: addressLocation.Address,
 				Name:    identifier.Identifier,
 			},
@@ -203,7 +203,7 @@ func (e *hostEnv) ResolveLocation(
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
-	contractLocation, ok := location.(runtime.AddressLocation)
+	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
 		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
@@ -218,7 +218,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	return code, nil
 }
 
-func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) {
+func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, error) {
 	if e.ctx.ASTCache == nil {
 		return nil, nil
 	}
@@ -227,7 +227,7 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	if program != nil {
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(runtime.AddressLocation); ok {
+		if addressLocation, ok := location.(common.AddressLocation); ok {
 			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
 		}
 	}
@@ -236,7 +236,7 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	return program, err
 }
 
-func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) error {
+func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) error {
 	if e.ctx.ASTCache == nil {
 		return nil
 	}
@@ -440,7 +440,7 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	return e.GetCode(runtime.AddressLocation{
+	return e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
 	})

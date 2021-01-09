@@ -5,6 +5,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -73,9 +74,18 @@ func (i *TransactionInvocator) Process(
 	}
 	env.setTransaction(vm, proc.Transaction, proc.TxIndex)
 
-	location := runtime.TransactionLocation(proc.ID[:])
+	location := common.TransactionLocation(proc.ID[:])
 
-	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	err = vm.Runtime.ExecuteTransaction(
+		runtime.Script{
+			Source:    proc.Transaction.Script,
+			Arguments: proc.Transaction.Arguments,
+		},
+		runtime.Context{
+			Interface: env,
+			Location: location,
+		},
+	)
 
 	if err != nil {
 		i.safetyErrorCheck(err)

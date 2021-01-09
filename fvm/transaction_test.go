@@ -11,7 +11,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
@@ -29,15 +28,19 @@ type mockRuntime struct {
 	executeTxResult error
 }
 
-func (m mockRuntime) ExecuteScript(script []byte, arguments [][]byte, runtimeInterface runtime.Interface, location runtime.Location) (cadence.Value, error) {
+func (m mockRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 	panic("should not be used")
 }
 
-func (m mockRuntime) ExecuteTransaction(script []byte, arguments [][]byte, runtimeInterface runtime.Interface, location runtime.Location) error {
+func (m mockRuntime) ExecuteScript(_ runtime.Script, _ runtime.Context) (cadence.Value, error) {
+	panic("should not be used")
+}
+
+func (m mockRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
 	return m.executeTxResult
 }
 
-func (m mockRuntime) ParseAndCheckProgram(code []byte, runtimeInterface runtime.Interface, location runtime.Location) (*sema.Checker, error) {
+func (m mockRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*sema.Checker, error) {
 	panic("should not be used")
 }
 
