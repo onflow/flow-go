@@ -79,7 +79,7 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 			  let cap = account.getCapability(/public/counter)
               return cap.borrow<&Testing.Counter>()?.count ?? -3
             `,
-            accountAddress.Hex(),
+			accountAddress.Hex(),
 		),
 	}
 }

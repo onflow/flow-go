@@ -55,5 +55,5 @@ type noopMetricsCollector struct{}
 func (m noopMetricsCollector) ProgramParsed(location common.Location, duration time.Duration)      {}
 func (m noopMetricsCollector) ProgramChecked(location common.Location, duration time.Duration)     {}
 func (m noopMetricsCollector) ProgramInterpreted(location common.Location, duration time.Duration) {}
-func (m noopMetricsCollector) ValueEncoded(duration time.Duration)                              {}
-func (m noopMetricsCollector) ValueDecoded(duration time.Duration)                              {}
+func (m noopMetricsCollector) ValueEncoded(duration time.Duration)                                 {}
+func (m noopMetricsCollector) ValueDecoded(duration time.Duration)                                 {}

@@ -83,7 +83,7 @@ func (i *TransactionInvocator) Process(
 		},
 		runtime.Context{
 			Interface: env,
-			Location: location,
+			Location:  location,
 		},
 	)
 

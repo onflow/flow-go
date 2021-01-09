@@ -86,7 +86,7 @@ func (i ScriptInvocator) Process(
 		},
 		runtime.Context{
 			Interface: env,
-			Location: location,
+			Location:  location,
 		},
 	)
 	if err != nil {

@@ -28,7 +28,7 @@ func (g *Events) New() flow.Event {
 	typeID := location.TypeID(identifier)
 
 	testEventType := &cadence.EventType{
-		Location:     location,
+		Location:            location,
 		QualifiedIdentifier: identifier,
 		Fields: []cadence.Field{
 			{
