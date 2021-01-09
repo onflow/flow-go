@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -221,17 +220,4 @@ func encodeContractNames(contractNames []string) ([]byte, error) {
 		return nil, fmt.Errorf("cannot encode contract names")
 	}
 	return buf.Bytes(), nil
-}
-
-func addressToSpewBytesString(topShotContractAddress flow.Address) string {
-	expectedBytes := topShotContractAddress.Bytes()
-
-	stringBytes := make([]string, len(expectedBytes))
-
-	for i, expectedByte := range expectedBytes {
-		stringBytes[i] = fmt.Sprintf("%x", expectedByte)
-	}
-
-	expected := strings.Join(stringBytes, " ")
-	return expected
 }
