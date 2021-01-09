@@ -141,14 +141,14 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 
 	// create the test engines
 	for i := 0; i < count; i++ {
-		eng := testNode{
+		node := testNode{
 			id:          ids[i],
 			mw:          mws[i],
 			net:         nets[i],
 			engine:      engines[i],
 			idRefresher: idRefereshers[i],
 		}
-		suite.testNodes = append(suite.testNodes, eng)
+		suite.testNodes = append(suite.testNodes, node)
 	}
 }
 
@@ -296,6 +296,8 @@ func (suite *MutableIdentityTableSuite) assertDisconnected(mw *p2p.Middleware, i
 	}, 5*time.Second, time.Millisecond*100)
 }
 
+// assertNetworkPrimitives asserts that allowed engines can exchange messages between themselves but not with the
+// disallowed engines using each of the three network primitives
 func (suite *MutableIdentityTableSuite) assertNetworkPrimitives(
 	allowedIDs flow.IdentityList,
 	allowedEngs []*MeshEngine,
@@ -382,9 +384,8 @@ func (suite *MutableIdentityTableSuite) exchangeMessages(
 
 	// assert that the disallowed engines didn't receive any message
 	for i, eng := range disallowedEngs {
-		unittest.RequireNeverReturnBefore(suite.T(), func() {
-			<-eng.received
-		}, time.Millisecond, fmt.Sprintf("%s engine should not have recevied message", disallowedIDs[i]))
+		unittest.RequireNeverClosedWithin(suite.T(), eng.received, time.Millisecond,
+			fmt.Sprintf("%s engine should not have recevied message", disallowedIDs[i]))
 	}
 }
 

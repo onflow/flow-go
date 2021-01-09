@@ -76,13 +76,12 @@ func (l *libp2pConnector) UpdatePeers(ctx context.Context, ids flow.IdentityList
 	// disconnect from any other peers not in pInfos
 	l.trimAllConnectionsExcept(pInfos)
 
-	if len(invalidIDs) == 0 {
-		return nil
+	// if some ids didn't translate to peer.AddrInfo, return error
+	if len(invalidIDs) != 0 {
+		return NewUnconvertableIdentitiesError(invalidIDs)
 	}
 
-	err := NewUnconvertableIdentitiesError(invalidIDs)
-
-	return err
+	return nil
 }
 
 // connectToPeers connects each of the peer in pInfos
@@ -104,7 +103,7 @@ func (l *libp2pConnector) connectToPeers(ctx context.Context, pInfos []peer.Addr
 }
 
 // trimAllConnectionsExcept trims all connections of the node from peers not part of peerInfos.
-// A node would have created such extra connections earlier when the identity list may have been different OR
+// A node would have created such extra connections earlier when the identity list may have been different, or
 // it may have been target of such connections from node which have now been excluded.
 func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 
@@ -154,21 +153,4 @@ func defaultLibp2pBackoffConnector(host host.Host) (*discovery.BackoffConnector,
 		return nil, fmt.Errorf("failed to create backoff connector: %w", err)
 	}
 	return backoffConnector, nil
-}
-
-// peerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
-// For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
-// included in the error map with the corresponding error
-func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
-	validIDs := make([]peer.AddrInfo, 0, len(ids))
-	invalidIDs := make(map[flow.Identifier]error)
-	for _, id := range ids {
-		peerInfo, err := PeerAddressInfo(*id)
-		if err != nil {
-			invalidIDs[id.NodeID] = err
-			continue
-		}
-		validIDs = append(validIDs, peerInfo)
-	}
-	return validIDs, invalidIDs
 }
