@@ -27,8 +27,8 @@ type NodeMachineAccountInfo struct {
 	Address          string
 	PrivateKey       encodable.StakingPubKey
 	KeyIndex         uint
-	SigningAlgorithm int
-	HashAlgorithm    int
+	SigningAlgorithm sdkcrypto.SigningAlgorithm
+	HashAlgorithm    sdkcrypto.HashAlgorithm
 }
 
 // NodeConfig contains configuration information used as input to the
