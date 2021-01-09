@@ -208,11 +208,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	initialState, finalState, err := validation.IntegrityCheck(receipt)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("%w", err)
-	}
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -220,9 +215,17 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Hex("initial_state", initialState).
-		Hex("final_state", finalState).
 		Logger()
+
+	initialState, finalState, err := validation.IntegrityCheck(receipt)
+	if err != nil {
+		log.Error().Msg("received execution receipt that didn't pass the integrity check")
+		return engine.NewInvalidInputErrorf("%w", err)
+	}
+
+	log = log.With().
+		Hex("initial_state", initialState).
+		Hex("final_state", finalState).Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
@@ -255,7 +258,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
 	// eventually request the parent receipt with the `requestPending` function
 	err = e.receiptValidator.Validate(receipt)
-
 	if err != nil {
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
@@ -268,6 +270,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
+	log.Info().Msg("execution receipt added to mempool")
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
 	// store the result to make it persistent for later
@@ -653,6 +656,7 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 }
 
 // TODO: to be extracted as a common function in state/protocol/state.go
+// ToDo: add check that node was not ejected
 // checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
 //   * is an authorized member of the network
 //   * has _positive_ weight
