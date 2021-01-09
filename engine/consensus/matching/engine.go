@@ -402,6 +402,9 @@ func (e *Engine) checkSealing() {
 
 func (e *Engine) checkingSealing() {
 	start := time.Now()
+	defer func() {
+		e.metrics.CheckSealingDuration(time.Since(start))
+	}()
 
 	// get all results that have collected enough approvals on a per-chunk basis
 	sealableResults, err := e.sealableResults()
@@ -431,32 +434,14 @@ func (e *Engine) checkingSealing() {
 
 	e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
 
-	// Start spans for tracing within the parent spans trace.CONProcessBlock and
-	// trace.CONProcessCollection
-	for _, incorporatedResult := range sealableResults {
-		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
-		// start a child span that will run until this function returns.
-		if span, ok := e.tracer.GetSpan(incorporatedResult.Result.BlockID, trace.CONProcessBlock); ok {
-			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
-				start))
-			defer childSpan.Finish()
-		}
+	e.sealSealableResults(sealableResults)
+}
 
-		// For each execution result, we load all the collection that are in the executed block.
-		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
-		if err != nil {
-			continue
-		}
-		for _, id := range index.CollectionIDs {
-			// For each collection, we load the trace.CONProcessCollection span. If we find it, we start a child span
-			// that will run until this function returns.
-			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
-				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
-					start))
-				defer childSpan.Finish()
-			}
-		}
-	}
+func (e *Engine) sealSealableResults(sealableResults []*flow.IncorporatedResult) {
+	childSpans := e.startTraceResultSealing(sealableResults)
+	defer func() {
+		trace.FinishSpans(childSpans)
+	}()
 
 	// seal the matched results
 	var sealedResultIDs []flow.Identifier
@@ -492,6 +477,17 @@ func (e *Engine) checkingSealing() {
 	// clear the memory pools
 	e.clearPools(sealedResultIDs)
 
+	e.traceFinishProcessingBlock(sealedBlockIDs)
+
+	// request execution receipts for unsealed finalized blocks
+	err := e.requestPending()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not request pending block results")
+		return
+	}
+}
+
+func (e *Engine) traceFinishProcessingBlock(sealedBlockIDs []flow.Identifier) {
 	// finish tracing spans
 	for _, blockID := range sealedBlockIDs {
 		index, err := e.indexDB.ByBlockID(blockID)
@@ -503,16 +499,6 @@ func (e *Engine) checkingSealing() {
 		}
 		e.tracer.FinishSpan(blockID, trace.CONProcessBlock)
 	}
-
-	// request execution receipts for unsealed finalized blocks
-	err = e.requestPending()
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not request pending block results")
-		return
-	}
-
-	// record duration of check sealing
-	e.metrics.CheckSealingDuration(time.Since(start))
 }
 
 // sealableResults returns the IncorporatedResults from the mempool that have
@@ -900,4 +886,37 @@ func (e *Engine) requestPending() error {
 	}
 
 	return nil
+}
+
+func (e *Engine) startTraceResultSealing(sealableResults []*flow.IncorporatedResult) []opentracing.Span {
+	start := time.Now()
+	childSpans := make([]opentracing.Span, 0, len(sealableResults))
+
+	// Start spans for tracing within the parent spans trace.CONProcessBlock and
+	// trace.CONProcessCollection
+	for _, incorporatedResult := range sealableResults {
+		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
+		// start a child span that will run until this function returns.
+		if span, ok := e.tracer.GetSpan(incorporatedResult.Result.BlockID, trace.CONProcessBlock); ok {
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
+				start))
+			childSpans = append(childSpans, childSpan)
+		}
+
+		// For each execution result, we load all the collection that are in the executed block.
+		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
+		if err != nil {
+			continue
+		}
+		for _, id := range index.CollectionIDs {
+			// For each collection, we load the trace.CONProcessCollection span. If we find it, we start a child span
+			// that will run until this function returns.
+			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
+				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(
+					start))
+				childSpans = append(childSpans, childSpan)
+			}
+		}
+	}
+	return childSpans
 }
