@@ -6,10 +6,10 @@ import (
 	"math/rand"
 	"time"
 
+	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/module/signature"
-
-	sdk "github.com/onflow/flow-go-sdk"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
