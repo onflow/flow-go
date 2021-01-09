@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"context"
 	"os"
 	"sync"
 	"testing"
@@ -23,7 +22,6 @@ import (
 type PeerManagerTestSuite struct {
 	suite.Suite
 	log zerolog.Logger
-	ctx context.Context
 }
 
 func TestPeerManagerTestSuite(t *testing.T) {
@@ -33,7 +31,6 @@ func TestPeerManagerTestSuite(t *testing.T) {
 func (suite *PeerManagerTestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
-	suite.ctx = context.Background()
 }
 
 // TestUpdatePeers tests that updatePeers calls the connector with the expected list of ids to connect and disconnect
@@ -53,7 +50,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 
 	// create the connector mock to check ids requested for connect and disconnect
 	connector := new(mocknetwork.Connector)
-	connector.On("UpdatePeers", suite.ctx, mock.AnythingOfType("flow.IdentityList")).
+	connector.On("UpdatePeers", mock.Anything, mock.AnythingOfType("flow.IdentityList")).
 		Run(func(args mock.Arguments) {
 			idArg := args[1].(flow.IdentityList)
 			assertListsEqual(suite.T(), currentIDs, idArg)
@@ -118,7 +115,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	count := 0
 	times := 2 // we expect it to be called twice at least
 	wg.Add(times)
-	connector.On("UpdatePeers", suite.ctx, mock.Anything).Run(func(args mock.Arguments) {
+	connector.On("UpdatePeers", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -153,7 +150,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	wg.Add(1)  // this accounts for one invocation, the other invocation is subsequent
 	connector := new(mocknetwork.Connector)
 	// captures the first periodic update initiated after start to complete
-	connector.On("UpdatePeers", suite.ctx, mock.Anything).Run(func(args mock.Arguments) {
+	connector.On("UpdatePeers", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -185,15 +182,12 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 		return currentIDs, nil
 	}
 
-	ctx, cancel := context.WithCancel(suite.ctx)
-	defer cancel()
-
 	connector := new(mocknetwork.Connector)
 	// connectPeerGate channel gates the return of the connector
 	connectPeerGate := make(chan time.Time)
 	defer close(connectPeerGate)
 
-	connector.On("UpdatePeers", ctx, mock.Anything).Return(nil).
+	connector.On("UpdatePeers", mock.Anything, mock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
 	pm := NewPeerManager(suite.log, idProvider, connector)
 
