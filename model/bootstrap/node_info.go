@@ -29,7 +29,7 @@ var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a
 // for an epoch.
 type NodeMachineAccountInfo struct {
 	Address          string
-	PrivateKey       encodable.StakingPubKey
+	EncodedPrivateKey       []byte
 	KeyIndex         uint
 	SigningAlgorithm sdkcrypto.SigningAlgorithm
 	HashAlgorithm    sdkcrypto.HashAlgorithm
