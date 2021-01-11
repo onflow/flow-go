@@ -707,10 +707,10 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	return confs, nil
 }
 
-// runDKG runs the distributed key generation process for all consensus nodes
+// runDKG simulates the distributed key generation process for all consensus nodes
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
-// Only consensus nodes are participate in the DKG.
+// Only consensus nodes participate in the DKG.
 func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 
 	// filter by consensus nodes
