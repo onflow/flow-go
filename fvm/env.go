@@ -254,6 +254,10 @@ func (e *hostEnv) Log(message string) error {
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
 
+	if e.transactionEnv == nil {
+		return errors.New("emitting events is not supported")
+	}
+
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
 		return fmt.Errorf("failed to json encode a cadence event: %w", err)
