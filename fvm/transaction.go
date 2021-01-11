@@ -1,10 +1,11 @@
 package fvm
 
 import (
-	"strings"
+	"errors"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -73,12 +74,21 @@ func (i *TransactionInvocator) Process(
 	}
 	env.setTransaction(vm, proc.Transaction, proc.TxIndex)
 
-	location := runtime.TransactionLocation(proc.ID[:])
+	location := common.TransactionLocation(proc.ID[:])
 
-	err = vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
+	err = vm.Runtime.ExecuteTransaction(
+		runtime.Script{
+			Source:    proc.Transaction.Script,
+			Arguments: proc.Transaction.Arguments,
+		},
+		runtime.Context{
+			Interface: env,
+			Location:  location,
+		},
+	)
 
 	if err != nil {
-		i.topshotSafetyErrorCheck(err)
+		i.safetyErrorCheck(err)
 		return err
 	}
 
@@ -96,30 +106,20 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-// topshotSafetyErrorCheck is additional check introduced to help chase erroneous execution results
-// which caused unexpected network fork. TopShot is first full-fledged game running on Flow, and
-// checking failures in this contract indicate the unexpected computation happening.
+// safetyErrorCheck is an additional check which was introduced
+// to help chase erroneous execution results which caused an unexpected network fork.
+// Parsing and checking of deployed contracts should normally succeed.
 // This is a temporary measure.
-func (i *TransactionInvocator) topshotSafetyErrorCheck(err error) {
-	e := err.Error()
-	i.logger.Info().Str("error", e).Msg("TEMP LOGGING: Cadence Execution ERROR")
-	if strings.Contains(e, "checking") {
-		re, isRuntime := err.(runtime.Error)
-		if !isRuntime {
-			i.logger.Err(err).Msg("found checking error for a contract but exception is not RuntimeError")
-			return
-		}
-		ee, is := re.Err.(*runtime.ParsingCheckingError)
-		if !is {
-			i.logger.Err(err).Msg("found checking error for a contract but exception is not ExtendedParsingCheckingError")
-			return
-		}
-
-		// serializing such large and complex objects to JSON
-		// causes stack overflow, spew works fine
-		spew.Config.DisableMethods = true
-		dump := spew.Sdump(ee)
-
-		i.logger.Error().Str("extended_error", dump).Msg("contract checking failed")
+func (i *TransactionInvocator) safetyErrorCheck(err error) {
+	var parsingCheckingError *runtime.ParsingCheckingError
+	if !errors.As(err, &parsingCheckingError) {
+		return
 	}
+
+	// serializing such large and complex objects to JSON
+	// causes stack overflow, spew works fine
+	spew.Config.DisableMethods = true
+	dump := spew.Sdump(parsingCheckingError)
+
+	i.logger.Error().Str("extended_error", dump).Msg("checking failed")
 }

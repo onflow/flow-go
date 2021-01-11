@@ -14,33 +14,15 @@ type Connector struct {
 	mock.Mock
 }
 
-// ConnectPeers provides a mock function with given fields: ctx, ids
-func (_m *Connector) ConnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error {
+// UpdatePeers provides a mock function with given fields: ctx, ids
+func (_m *Connector) UpdatePeers(ctx context.Context, ids flow.IdentityList) error {
 	ret := _m.Called(ctx, ids)
 
-	var r0 map[flow.Identifier]error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.IdentityList) map[flow.Identifier]error); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, flow.IdentityList) error); ok {
 		r0 = rf(ctx, ids)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identifier]error)
-		}
-	}
-
-	return r0
-}
-
-// DisconnectPeers provides a mock function with given fields: ctx, ids
-func (_m *Connector) DisconnectPeers(ctx context.Context, ids flow.IdentityList) map[flow.Identifier]error {
-	ret := _m.Called(ctx, ids)
-
-	var r0 map[flow.Identifier]error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.IdentityList) map[flow.Identifier]error); ok {
-		r0 = rf(ctx, ids)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[flow.Identifier]error)
-		}
+		r0 = ret.Error(0)
 	}
 
 	return r0
