@@ -1,5 +1,5 @@
 
-# The short Git commit hash
+# The short Git commit hash - test
 SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
