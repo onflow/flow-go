@@ -6,16 +6,18 @@ package crypto
 // refers to discrete-log based protocols that generate keys for a BLS-based
 // threshold signature scheme.
 // BLS is used with the BLS12-381 curve.
-
+//
 // These protocols mainly generate a BLS key pair and share the secret key
 // among (n) participants in a way that any (t+1) key shares allow reconstructing
 // the initial key (and also reconstructing a BLS threshold signature under the initial key).
-// While up to (t) participants do not get any information on the initial secret key.
+// Up to (t) shares don't reveal any information about the initial key (or a signature generated
+//	by that key).
+//
 // We refer to the initial key pair by group private and group public key.
 // (t) is the threshold parameter.
 // Flow uses DKG with the value t = floor((n-1)/2) to optimize for unforgeability and robustness
 // of the threshold signature scheme using the output keys.
-
+//
 // Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
@@ -63,11 +65,13 @@ func newDKGCommon(size int, threshold int, currentIndex int,
 	}
 
 	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
-		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d", size-1)
+		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d, got %d",
+			size-1, currentIndex)
 	}
 
-	if threshold >= size || threshold < 0 {
-		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
+	if threshold >= size || threshold < MinimumThreshold {
+		return nil, fmt.Errorf("The threshold must be between %d and %d, got %d",
+			MinimumThreshold, size-1, threshold)
 	}
 
 	return &dkgCommon{

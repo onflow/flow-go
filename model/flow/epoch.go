@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"

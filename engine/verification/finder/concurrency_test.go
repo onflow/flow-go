@@ -2,7 +2,6 @@ package finder_test
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -11,23 +10,55 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// ConcurrencyTestSuite encapsulates tests for happy and unhappy paths of concurrently sending several receipts to finder engine.
+type ConcurrencyTestSuite struct {
+	suite.Suite
+	verID        *flow.Identity
+	exeID        *flow.Identity
+	participants flow.IdentityList
+	log          zerolog.Logger
+	tracer       module.Tracer
+	collector    *metrics.NoopCollector
+	stateFixture *mock.StateFixture
+}
+
+// TestFinderEngine executes all FinderEngineTestSuite tests.
+func TestConcurrencyTestSuite(t *testing.T) {
+	suite.Run(t, new(ConcurrencyTestSuite))
+}
+
+// SetupTest is executed before each test in this test suite.
+func (suite *ConcurrencyTestSuite) SetupTest() {
+	tracer, err := trace.NewTracer(suite.log, "test")
+	require.NoError(suite.T(), err)
+	suite.tracer = tracer
+	suite.collector = metrics.NewNoopCollector()
+}
+
 // TestConcurrency evaluates behavior of finder engine against:
 // - finder engine receives concurrent receipts from different sources
-// - for each distinct receipt with an available block finder engine emits it to the matching engine
+// - in a staked verification node:
+// -- for each distinct result with an available block finder engine emits it to the match engine.
+// - in an unstaked verification node:
+// -- marks results of receipts as discarded, and does not emit any result to match engine.
 // - it does a correct resource clean up of the pipeline after handling all incoming receipts
 // Each test case is tried with a scenario where block goes first then receipt, and vice versa.
-func TestConcurrency(t *testing.T) {
+func (suite *ConcurrencyTestSuite) TestConcurrency() {
 	var mu sync.Mutex
 	testcases := []struct {
 		erCount, // number of execution receipts
@@ -66,108 +97,120 @@ func TestConcurrency(t *testing.T) {
 		},
 	}
 
+	// runs each test case in block-first and receipt-first mode.
 	for _, blockFirst := range []bool{true, false} {
-		for _, tc := range testcases {
-			t.Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks/%t-block-first",
-				tc.erCount, tc.senderCount, tc.chunksNum, blockFirst), func(t *testing.T) {
-				mu.Lock()
-				defer mu.Unlock()
-				testConcurrency(t, tc.erCount, tc.senderCount, tc.chunksNum, blockFirst)
-			})
+		// runs each test case in staked and unstaked verification node.
+		for _, staked := range []bool{true, false} {
+			for _, tc := range testcases {
+				suite.T().Run(fmt.Sprintf("%d-ers/%d-senders/%d-chunks/%t-block-first/%t-staked",
+					tc.erCount, tc.senderCount, tc.chunksNum, blockFirst, staked), func(t *testing.T) {
+					mu.Lock()
+					defer mu.Unlock()
+
+					suite.testConcurrency(tc.erCount, tc.senderCount, tc.chunksNum, blockFirst, staked)
+				})
+			}
 		}
 	}
 }
 
-// testConcurrency sends `erCount` many execution receipts each with `chunkNum` many chunks, concurrently by
-// `senderCount` senders to the verification node.
+// testConcurrency sends `receiptCount`-many execution receipts each with `chunkCount`-many chunks, concurrently by
+// `senderCount`-many senders to the verification node.
+//
 // If blockFirst is true, the block arrives at verification node earlier than the receipt.
 // Otherwise, the block arrives after the receipt.
-// This test successfully is passed if each unique execution result is passed to Match engine by the Finder engine
-// in verification node. It also checks the result is marked as processed, and the receipts with process results are
-// cleaned up.
-func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFirst bool) {
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+//
+// If staked is true, the verification node is staked for the current epoch, otherwise not.
+//
+// In case of staked verification node, this test successfully passes if each unique execution result is passed "only once" to
+// match engine by the finder engine in verification node. It also checks the result is marked as processed,
+// and the receipts with process results are cleaned up.
+//
+// In case of an unstaked verification node, this test successfully passes if no execution result is passed from finder to match engine, no
+// result is marked as processed, and rather all results are marked as discarded.
+//
+// In both cases of staked and unstaked tests, it also evaluates that the cached-pending-ready pipeline of finder engine is
+// cleaned up completely.
+func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, chunkCount int, blockFirst bool, staked bool) {
 	// to demarcate the logs
-	t.Logf("TestConcurrencyStarted: %d-receipts/%d-senders/%d-chunks", erCount, senderCount, chunksNum)
-	log.Debug().
-		Int("execution_receipt_count", erCount).
+	suite.T().Logf("TestConcurrencyStarted: %d-receipts/%d-senders/%d-chunks", receiptCount, senderCount, chunkCount)
+	suite.log.Debug().
+		Int("execution_receipt_count", receiptCount).
 		Int("sender_count", senderCount).
-		Int("chunks_num", chunksNum).
+		Int("chunks_num", chunkCount).
 		Msg("TestConcurrency started")
+
+	// bootstraps the system, creates a generic node, and a verification node out of the generic node.
+	suite.bootstrapSystem(staked)
+
 	hub := stub.NewNetworkHub()
-
 	chainID := flow.Testnet
-
-	// creates test id for each role
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-
-	identities := flow.IdentityList{colID, conID, exeID, verID}
-
-	// create `erCount` execution receipt fixtures that will be concurrently delivered
-	ers := make([]utils.CompleteExecutionResult, erCount)
-	results := make([]flow.ExecutionResult, erCount)
-	for i := 0; i < erCount; i++ {
-		er := utils.LightExecutionResultFixture(chunksNum)
-		ers[i] = er
-		results[i] = er.Receipt.ExecutionResult
-	}
-
-	// set up mock matching engine that asserts each receipt is submitted exactly once.
-	requestInterval := 1 * time.Second
-	processInterval := 1 * time.Second
-	failureThreshold := uint(2)
-	matchEng, matchEngWG := SetupMockMatchEng(t, exeID, results)
-
-	assignment := utils.NewMockAssigner(verID.NodeID, IsAssigned)
-
-	// creates a verification node with a real finder engine, and mock matching engine.
-	// no metrics is meant to be collected, hence both verification and mempool collectors are noop
-	collector := metrics.NewNoopCollector()
-	verNode := testutil.VerificationNode(t,
+	genericNode := testutil.GenericNodeWithStateFixture(suite.T(),
+		suite.stateFixture,
 		hub,
-		verID,
-		identities,
-		assignment,
-		requestInterval,
-		processInterval,
-		uint(erCount),
-		uint(erCount*chunksNum),
-		failureThreshold,
+		suite.verID,
+		suite.log,
+		suite.collector,
+		suite.tracer,
+		chainID)
+
+	matchEng := &mocknetwork.Engine{}
+	verNode := testutil.VerificationNode(suite.T(),
+		hub,
+		suite.verID,
+		suite.participants,
+		utils.NewMockAssigner(suite.verID.NodeID, func(index uint64) bool { return false }), // no assignment is needed.
+		1*time.Second,
+		1*time.Second,
+		uint(receiptCount),
+		uint(receiptCount*chunkCount),
+		uint(2),
 		chainID,
-		collector,
-		collector,
+		suite.collector,
+		suite.collector,
+		testutil.WithGenericNode(&genericNode),
 		testutil.WithMatchEngine(matchEng))
 
-	// starts finder engine of verification node
-	// the rest are not involved in this test
+	// create `receiptCount` execution receipt fixtures that will be concurrently delivered to finder engine.
+	// all receipts are children of `parent` block.
+	parent, err := verNode.State.Final().Head()
+	require.NoError(suite.T(), err)
+
+	receipts := make([]utils.CompleteExecutionResult, receiptCount)
+	results := make([]flow.ExecutionResult, receiptCount)
+	for i := 0; i < receiptCount; i++ {
+		completeER := utils.CompleteExecutionResultFixture(suite.T(), chunkCount, chainID.Chain(), parent)
+		receipts[i] = completeER
+		results[i] = completeER.Receipt.ExecutionResult
+	}
+
+	// sets up mock match engine that asserts:
+	// - each result is submitted exactly once, if verification node is staked.
+	// - no result is submitted, if verification node is unstaked.
+	matchEngWG := SetupMockMatchEng(suite.T(), matchEng, suite.exeID, results, staked)
+
+	// starts finder engine of verification node, the rest are not involved in this test.
 	<-verNode.FinderEngine.Ready()
 
-	// the wait group tracks goroutines for each Execution Receipt sent to finder engine
+	// the wait group tracks goroutines for each execution receipt sent to finder engine
 	var senderWG sync.WaitGroup
-	senderWG.Add(erCount * senderCount)
+	senderWG.Add(receiptCount * senderCount)
 
-	// blockStorageLock is needed to provide a concurrency-safe imitation of consensus follower engine
-	var blockStorageLock sync.Mutex
-
-	for _, completeER := range ers {
+	// mutatorLock is needed to provide a concurrency-safe imitation of consensus follower engine.
+	var mutatorLock sync.Mutex
+	for _, completeER := range receipts {
 		// spins up `senderCount` sender goroutines to mimic receiving concurrent execution receipts of same copies
 		for i := 0; i < senderCount; i++ {
 			go func(j int, id flow.Identifier, block *flow.Block, receipt *flow.ExecutionReceipt) {
-
-				// sendBlock makes the block associated with the receipt available to the
-				// follower engine of the verification node
+				// sendBlock makes the block associated with the receipt available to the follower engine of the verification node.
 				sendBlock := func() {
-					// adds the block to the storage of the node
-					// Note: this is done by the follower
-					// this block should be done in a thread-safe way
-					blockStorageLock.Lock()
-					// we don't check for error as it definitely returns error when we
-					// have duplicate blocks, however, this is not the concern for this test
-					_ = verNode.Blocks.Store(block)
-					blockStorageLock.Unlock()
+					// Note: this is done by the follower.
+					mutatorLock.Lock()
+					if _, err := verNode.Blocks.ByID(block.ID()); err != nil {
+						err = verNode.State.Extend(block)
+						require.NoError(suite.T(), err)
+					}
+					mutatorLock.Unlock()
 
 					// casts block into a Hotstuff block for notifier
 					hotstuffBlock := &model.Block{
@@ -181,10 +224,10 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 					verNode.FinderEngine.OnFinalizedBlock(hotstuffBlock)
 				}
 
-				// sendReceipt sends the execution receipt to the finder engine of verification node
+				// sendReceipt sends the execution receipt to the finder engine of verification node.
 				sendReceipt := func() {
-					err := verNode.FinderEngine.Process(exeID.NodeID, receipt)
-					require.NoError(t, err)
+					err := verNode.FinderEngine.Process(suite.exeID.NodeID, receipt)
+					require.NoError(suite.T(), err)
 				}
 
 				if blockFirst {
@@ -207,53 +250,73 @@ func testConcurrency(t *testing.T, erCount, senderCount, chunksNum int, blockFir
 	}
 
 	// waits for all receipts to be sent to verification node
-	unittest.RequireReturnsBefore(t, senderWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second,
+	unittest.RequireReturnsBefore(suite.T(), senderWG.Wait, time.Duration(senderCount*chunkCount*receiptCount*5)*time.Second,
 		"finder engine process")
-	// waits for all distinct execution results sent to matching engine of verification node
-	unittest.RequireReturnsBefore(t, matchEngWG.Wait, time.Duration(senderCount*chunksNum*erCount*5)*time.Second,
+
+	// staked verification node should pass each execution result only once to match engine.
+	// waits for all distinct execution results sent to matching engine of verification node.
+	//
+	// Note: in unstaked mode, matchEngWG wait group has zero counter, so this should pass immediately.
+	unittest.RequireReturnsBefore(suite.T(), matchEngWG.Wait, time.Duration(senderCount*chunkCount*receiptCount*5)*time.Second,
 		"match engine process")
 
 	// sleeps to make sure that the cleaning of processed execution receipts
 	// happens. This sleep is necessary since we are evaluating cleanup right after the sleep.
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// stops finder engine of verification node
 	<-verNode.FinderEngine.Done()
 
-	for _, er := range ers {
-		// all distinct execution results should be marked as processed by finder engine
-		assert.True(t, verNode.ProcessedResultIDs.Has(er.Receipt.ExecutionResult.ID()))
-
-		// no execution receipt should reside in cached, pending, or ready mempools of finder engine
-		require.False(t, verNode.CachedReceipts.Has(er.Receipt.ID()))
-		require.False(t, verNode.PendingReceipts.Has(er.Receipt.ID()))
-		require.False(t, verNode.ReadyReceipts.Has(er.Receipt.ID()))
+	if staked {
+		// staked verification node should mark all distinct execution results as processed
+		for _, result := range results {
+			assert.True(suite.T(), verNode.ProcessedResultIDs.Has(result.ID()))
+		}
 	}
 
-	// no execution receipt should be pending for a block
-	require.True(t, verNode.PendingReceiptIDsByBlock.Size() == 0)
-	require.True(t, verNode.ReceiptIDsByResult.Size() == 0)
+	// evaluates proper resource cleanup
+	//
+	// no execution receipt should reside in cached, pending, or ready mempools of finder engine
+	require.True(suite.T(), verNode.CachedReceipts.Size() == 0)
+	require.True(suite.T(), verNode.PendingReceipts.Size() == 0)
+	require.True(suite.T(), verNode.ReadyReceipts.Size() == 0)
 
-	// no block should remain cached
-	require.True(t, verNode.CachedReceipts.Size() == 0)
+	// no execution receipt should be pending for a block, and no block should remain cached.
+	require.True(suite.T(), verNode.PendingReceiptIDsByBlock.Size() == 0)
+	require.True(suite.T(), verNode.ReceiptIDsByResult.Size() == 0)
+	require.True(suite.T(), verNode.CachedReceipts.Size() == 0)
+	require.True(suite.T(), verNode.BlockIDsCache.Size() == 0)
+
+	if staked {
+		// staked finder engine should not discard any result
+		require.True(suite.T(), verNode.DiscardedResultIDs.Size() == 0)
+	} else {
+		// unstaked finder engine should discard all results
+		require.True(suite.T(), verNode.DiscardedResultIDs.Size() == uint(len(receipts)))
+	}
 
 	verNode.Done()
 
 	// to demarcate the logs
-	log.Debug().
-		Int("execution_receipt_count", erCount).
+	suite.log.Debug().
+		Int("execution_receipt_count", receiptCount).
 		Int("sender_count", senderCount).
-		Int("chunks_num", chunksNum).
+		Int("chunks_num", chunkCount).
 		Msg("TestConcurrency finished")
 }
 
 // SetupMockMatchEng sets up a mock match engine that asserts the followings:
-// - that a set of execution results are delivered to it.
-// - that each execution result is delivered only once.
+// - in a staked verification node:
+// -- that a set of execution results are delivered to it.
+// -- that each execution result is delivered only once.
+// - in an unstaked verification node:
+// -- no result is passed to it.
 // SetupMockMatchEng returns the mock engine and a wait group that unblocks when all results are received.
-func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionResult) (*mocknetwork.Engine, *sync.WaitGroup) {
-	eng := new(mocknetwork.Engine)
-
+func SetupMockMatchEng(t testing.TB,
+	eng *mocknetwork.Engine,
+	exeID *flow.Identity,
+	results []flow.ExecutionResult,
+	staked bool) *sync.WaitGroup {
 	// keeps track of which execution results it has received
 	receivedResults := make(map[flow.Identifier]struct{})
 	var (
@@ -263,13 +326,19 @@ func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionR
 		mu sync.Mutex
 	)
 
-	// expects `len(er)` many distinct execution results
-	wg.Add(len(ers))
+	if staked {
+		// in staked mode, it expects `len(result)` many distinct execution results
+		wg.Add(len(results))
+	}
 
 	eng.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()
+
+			// match engine should only receive a result if the verification node is
+			// staked.
+			require.True(t, staked, "unstaked match engine received result")
 
 			// origin ID of event should be exection node
 			originID, ok := args[0].(flow.Identifier)
@@ -291,8 +360,8 @@ func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionR
 			}
 
 			// ensures the received result matches one we expect
-			for _, er := range ers {
-				if resultID == er.ID() {
+			for _, result := range results {
+				if resultID == result.ID() {
 					// mark it as seen and decrement the waitgroup
 					receivedResults[resultID] = struct{}{}
 					wg.Done()
@@ -306,10 +375,36 @@ func SetupMockMatchEng(t testing.TB, exeID *flow.Identity, ers []flow.ExecutionR
 		}).
 		Return(nil)
 
-	return eng, &wg
+	return &wg
 }
 
-// IsAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
-func IsAssigned(index uint64) bool {
-	return index%2 == 0
+// bootstrapSystem bootstraps a flow system with one node of each main roles.
+// If staked set to true, it bootstraps verification node as an staked one.
+// Otherwise, it bootstraps the verification node as unstaked in current epoch.
+func (suite *ConcurrencyTestSuite) bootstrapSystem(staked bool) {
+	// creates identities to bootstrap system with
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	identities := flow.IdentityList{colID, conID, exeID, verID}
+
+	// bootstraps the system
+	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.log, suite.collector, suite.tracer, identities)
+
+	if !staked {
+		// creates a new verification node identity that is unstaked for this epoch
+		verID = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+		identities = identities.Union(flow.IdentityList{verID})
+
+		epochBuilder := unittest.NewEpochBuilder(suite.T(), stateFixture.State)
+		epochBuilder.
+			UsingSetupOpts(unittest.WithParticipants(identities)).
+			BuildEpoch()
+	}
+
+	suite.verID = verID
+	suite.exeID = exeID
+	suite.participants = identities
+	suite.stateFixture = stateFixture
 }
