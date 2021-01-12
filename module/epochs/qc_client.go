@@ -38,16 +38,14 @@ type QCContractClient struct {
 func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 	accountKeyIndex uint, accessAddress, qcContractAddress string, signer sdkcrypto.Signer) (*QCContractClient, error) {
 
-	address := sdk.HexToAddress(accountAddress)
-
 	// create a new instance of flow-go-sdk client
 	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
 	if err != nil {
 		return nil, fmt.Errorf("could not create flow client: %w", err)
 	}
-
+	
 	// get account for given address
-	account, err := flowClient.GetAccount(context.Background(), address)
+	account, err := flowClient.GetAccount(context.Background(), sdk.HexToAddress(accountAddress))
 	if err != nil {
 		return nil, fmt.Errorf("could not get account: %w", err)
 	}
@@ -61,10 +59,10 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 		accessAddress:     accessAddress,
 		qcContractAddress: qcContractAddress,
 		client:            flowClient,
-		account:           account,
 		accountKeyIndex:   accountKeyIndex,
 		signer:            signer,
 		nodeID:            nodeID,
+		account: 	   account,
 	}, nil
 }
 
@@ -73,6 +71,13 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 // processed by the network. An error is returned if the transaction has
 // failed and should be re-submitted.
 func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
+	
+	// get account for given address
+	account, err := flowClient.GetAccount(context.Background(), c.account.Address)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account: %w", err)
+	}
+	c.account = account
 
 	// get latest sealed block to execute transaction
 	latestBlock, err := c.client.GetLatestBlock(ctx, true)
@@ -85,7 +90,9 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		SetScript(templates.GenerateSubmitVoteScript(c.getEnvironment())).
 		SetGasLimit(1000).
 		SetReferenceBlockID(latestBlock.ID).
-		SetPayer(c.account.Address)
+		SetProposalKey(c.account.Address, c.accountKeyIndex, b.account.SequenceNumber).
+		SetPayer(c.account.Address).
+		AddAuthorizer(c.account.Address)
 
 	// add signature data to the transaction and submit to node
 	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
