@@ -130,20 +130,24 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
-		} else {
-			return err
 		}
+		return err
 	}
 
 	block, err := v.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return engine.NewInvalidInputErrorf("no block found %v %w", result.BlockID, err)
-		} else {
-			return err
 		}
+		return err
 	}
 
+	// validating the PreviousResultID field
+	// ExecutionResult_X.PreviousResult.BlockID must equal to Block_X.ParentBlockID
+	// for instance: given the following chain
+	// A <- B <- C (ER_A) <- D
+	// a result ER_C with `ID(ER_A)` as its ER_C.Result.PreviousResultID
+	// would be invalid, because `ER_C.Result.PreviousResultID` must be ID(ER_B)
 	if prevResult.BlockID != block.ParentID {
 		return engine.NewInvalidInputErrorf("invalid block for previous result %v", prevResult.BlockID)
 	}
@@ -161,7 +165,7 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	identity, err := v.identityForNode(receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get executor identity %v, %w", receipt.ExecutorID, err)
 	}
 
 	err = v.ensureStakedNodeWithRole(identity, flow.RoleExecution)
@@ -185,4 +189,19 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	}
 
 	return nil
+}
+
+// check the receipt's data integrity by checking its result has
+// both final statecommitment and initial statecommitment
+func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.StateCommitment, error) {
+	final, ok := receipt.ExecutionResult.FinalStateCommitment()
+	if !ok {
+		return nil, nil, fmt.Errorf("execution receipt without FinalStateCommit: %x", receipt.ID())
+	}
+
+	init, ok := receipt.ExecutionResult.InitialStateCommit()
+	if !ok {
+		return nil, nil, fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
+	}
+	return init, final, nil
 }
