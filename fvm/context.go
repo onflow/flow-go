@@ -29,7 +29,6 @@ type Context struct {
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
-	StorageCapacityResolver          StorageCapacityResolver
 	Logger                           zerolog.Logger
 }
 
@@ -89,8 +88,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
 		},
-		StorageCapacityResolver: ResourceStorageCapacityResolver,
-		Logger:                  logger,
+		Logger: logger,
 	}
 }
 

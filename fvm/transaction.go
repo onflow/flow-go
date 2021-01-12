@@ -68,11 +68,11 @@ func (i *TransactionInvocator) Process(
 	st *state.State,
 ) error {
 	cst := st.Child()
-	env, err := newEnvironment(ctx, cst)
+	env, err := newEnvironment(ctx, vm, cst)
 	if err != nil {
 		return err
 	}
-	env.setTransaction(vm, proc.Transaction, proc.TxIndex)
+	env.setTransaction(proc.Transaction, proc.TxIndex)
 
 	location := runtime.TransactionLocation(proc.ID[:])
 

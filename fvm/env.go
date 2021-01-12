@@ -25,6 +25,7 @@ var _ runtime.HighLevelStorage = &hostEnv{}
 type hostEnv struct {
 	ctx              Context
 	st               *state.State
+	vm               *VirtualMachine
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *UUIDGenerator
@@ -46,7 +47,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
+func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv, error) {
 	accounts := state.NewAccounts(st)
 	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
@@ -59,6 +60,7 @@ func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
 	env := &hostEnv{
 		ctx:                ctx,
 		st:                 st,
+		vm:                 vm,
 		Metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
 		addressGenerator:   generator,
@@ -85,9 +87,9 @@ func (e *hostEnv) seedRNG(header *flow.Header) {
 	e.rng = rand.New(source)
 }
 
-func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, txIndex uint32) {
+func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	e.transactionEnv = newTransactionEnv(
-		vm,
+		e.vm,
 		e.ctx,
 		e.st,
 		e.accounts,
@@ -135,7 +137,49 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 }
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
-	return e.ctx.StorageCapacityResolver(e.st, flow.BytesToAddress(address.Bytes()), e.ctx)
+	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+
+	err = e.vm.Run(
+		e.ctx,
+		script,
+		e.st.Ledger(),
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	var balance uint64
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
+	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+	if script.Err == nil {
+		balance = script.Value.ToGoValue().(uint64)
+	}
+
+	return balance, nil
+}
+
+func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
+	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+
+	err = e.vm.Run(
+		e.ctx,
+		script,
+		e.st.Ledger(),
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	var balance uint64
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
+	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+	if script.Err == nil {
+		balance = script.Value.ToGoValue().(uint64)
+	}
+
+	return balance, nil
 }
 
 func (e *hostEnv) ResolveLocation(
@@ -253,6 +297,7 @@ func (e *hostEnv) Log(message string) error {
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
+
 	if e.transactionEnv == nil {
 		return errors.New("emitting events is not supported")
 	}
@@ -265,7 +310,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	e.totalEventByteSize += uint64(len(payload))
 
 	// skip limit if payer is service account
-	if e != nil && e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
+	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
 		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
 			return &EventLimitExceededError{
 				TotalByteSize: e.totalEventByteSize,

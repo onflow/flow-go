@@ -340,7 +340,9 @@ transaction(accountCreationFee: UFix64, minimumStorageReservation: UFix64) {
 `
 
 const setupStorageForServiceAccountsTemplate = `
+import FlowServiceAccount from 0x%s
 import FlowStorageFees from 0x%s
+import FungibleToken from 0x%s
 import FlowToken from 0x%s
 
 // This transaction sets up storage on any auth accounts that were created before the storage fees.
@@ -354,7 +356,13 @@ transaction() {
         
         for account in authAccounts {
             let storageReservation <- tokenVault.withdraw(amount: FlowStorageFees.minimumStorageReservation) as! @FlowToken.Vault
-            FlowStorageFees.setupAccountStorage(account: account, storageReservation: <-storageReservation)
+			let hasReceiver = account.getCapability(/public/flowTokenReceiver)!.check<&{FungibleToken.Receiver}>()
+			if !hasReceiver {
+				FlowServiceAccount.initDefaultToken(account)
+			}
+			let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() ?? panic("Could not borrow receiver reference to the recipient's Vault")
+
+            receiver.deposit(from: <-storageReservation)
         }
     }
 }
@@ -445,7 +453,7 @@ func setupStorageForServiceAccountsTransaction(
 ) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(setupStorageForServiceAccountsTemplate, service, flowToken))).
+			SetScript([]byte(fmt.Sprintf(setupStorageForServiceAccountsTemplate, service, service, fungibleToken, flowToken))).
 			AddAuthorizer(service).
 			AddAuthorizer(fungibleToken).
 			AddAuthorizer(flowToken).

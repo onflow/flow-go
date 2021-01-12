@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -11,7 +13,7 @@ func NewTransactionStorageLimiter() *TransactionStorageLimiter {
 }
 
 func (d *TransactionStorageLimiter) Process(
-	_ *VirtualMachine,
+	vm *VirtualMachine,
 	ctx Context,
 	_ *TransactionProcedure,
 	st *state.State,
@@ -20,7 +22,10 @@ func (d *TransactionStorageLimiter) Process(
 		return nil
 	}
 
-	storageCapacityResolver := ctx.StorageCapacityResolver
+	env, err := newEnvironment(ctx, vm, st)
+	if err != nil {
+		return err
+	}
 	accounts := state.NewAccounts(st)
 
 	addresses := st.UpdatedAddresses()
@@ -36,7 +41,7 @@ func (d *TransactionStorageLimiter) Process(
 			continue
 		}
 
-		capacity, err := storageCapacityResolver(st, address, ctx)
+		capacity, err := env.GetStorageCapacity(common.BytesToAddress(address.Bytes()))
 		if err != nil {
 			return err
 		}

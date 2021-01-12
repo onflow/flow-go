@@ -47,7 +47,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	account, err := getAccount(vm, ctx, st, ctx.Chain, address)
+	account, err := getAccount(vm, ctx, st, address)
 	if err != nil {
 		// TODO: wrap error
 		return nil, err

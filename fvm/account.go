@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +16,6 @@ func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
 	st *state.State,
-	chain flow.Chain,
 	address flow.Address,
 ) (*flow.Account, error) {
 	accounts := state.NewAccounts(st)
@@ -30,24 +30,13 @@ func getAccount(
 	}
 
 	if ctx.ServiceAccountEnabled {
-		script := getFlowTokenBalanceScript(address, chain.ServiceAddress())
-
-		err = vm.Run(
-			ctx,
-			script,
-			st.Ledger(),
-		)
+		env, err := newEnvironment(ctx, vm, st)
 		if err != nil {
 			return nil, err
 		}
-
-		var balance uint64
-
-		// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
-		// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-		// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-		if script.Err == nil {
-			balance = script.Value.ToGoValue().(uint64)
+		balance, err := env.GetAccountBalance(common.BytesToAddress(address.Bytes()))
+		if err != nil {
+			return nil, err
 		}
 
 		account.Balance = balance
@@ -71,6 +60,15 @@ transaction(restrictedAccountCreationEnabled: Bool) {
 `
 
 const getFlowTokenBalanceScriptTemplate = `
+import FlowServiceAccount from 0x%s
+
+pub fun main(): UFix64 {
+  let acct = getAccount(0x%s)
+  return FlowServiceAccount.defaultTokenBalance(acct)
+}
+`
+
+const getStorageCapacityScriptTemplate = `
 import FlowServiceAccount from 0x%s
 
 pub fun main(): UFix64 {
@@ -103,4 +101,8 @@ func initAccountTransaction(
 
 func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
 	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
+}
+
+func getStorageCapacityScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
+	return Script([]byte(fmt.Sprintf(getStorageCapacityScriptTemplate, serviceAddress, accountAddress)))
 }
