@@ -88,7 +88,7 @@ func (ms *MatchingSuite) SetupTest() {
 		receipts:                ms.ReceiptsPL,
 		approvals:               ms.ApprovalsPL,
 		seals:                   ms.SealsPL,
-		checkingSealing:         atomic.NewBool(false),
+		isCheckingSealing:       atomic.NewBool(false),
 		requestReceiptThreshold: 10,
 		maxResultsToRequest:     200,
 		assigner:                ms.Assigner,
@@ -385,45 +385,6 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 
 	_, err := ms.matching.sealableResults()
 	ms.Require().Error(err)
-}
-
-// Given an incorporated result in the mempool, whose previous result
-// (aka parent result) is not known:
-//   * skip this result
-//   * this result should not be removed from the mempool
-func (ms *MatchingSuite) TestSealableResultUnknownPrevious() {
-	subgrph := ms.ValidSubgraphFixture()
-	ms.AddSubgraphFixtureToMempools(subgrph)
-	delete(ms.PersistedResults, subgrph.PreviousResult.ID()) // remove previous execution result from storage layer
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with unsealed previous")
-
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "ByID", 1)
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Rem", 0)
-}
-
-// TestSealableResultsInvalidSubgraph tests matching.Engine.sealableResults():
-// let R1 be a result that references block A, and R2 be R1's parent result.
-//  * the execution results form a valid subgraph if and only if
-//    R2 should reference A's parent.
-// Method sealableResults() should
-//   * neither consider R1 nor R2 sealable incorporated results and
-//   * remove R1 from IncorporatedResults mempool, i.e. `ResultsPL`
-func (ms *MatchingSuite) TestSealableResultsInvalidSubgraph() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.PreviousResult.BlockID = unittest.IdentifierFixture() // invalidate subgraph
-	subgrph.Result.PreviousResultID = subgrph.PreviousResult.ID()
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid subgraph")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
 }
 
 // TestSealableResultsInvalidChunks tests that matching.Engine.sealableResults()

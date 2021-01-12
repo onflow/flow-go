@@ -187,3 +187,20 @@ func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	pInfo := peer.AddrInfo{ID: id, Addrs: []multiaddr.Multiaddr{maddr}}
 	return pInfo, err
 }
+
+// peerInfosFromIDs converts the given flow.Identities to peer.AddrInfo.
+// For each identity, if the conversion succeeds, the peer.AddrInfo is included in the result else it is
+// included in the error map with the corresponding error
+func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifier]error) {
+	validIDs := make([]peer.AddrInfo, 0, len(ids))
+	invalidIDs := make(map[flow.Identifier]error)
+	for _, id := range ids {
+		peerInfo, err := PeerAddressInfo(*id)
+		if err != nil {
+			invalidIDs[id.NodeID] = err
+			continue
+		}
+		validIDs = append(validIDs, peerInfo)
+	}
+	return validIDs, invalidIDs
+}
