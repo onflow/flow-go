@@ -57,6 +57,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
 
+	// TODO: store root QC
 	if s.blockID == root.ID() {
 		// TODO store root QC and return here
 		return nil, fmt.Errorf("root qc not stored")
@@ -259,6 +260,68 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 		return nil, fmt.Errorf("could not get look up sealed commit: %w", err)
 	}
 	return seal.FinalState, nil
+}
+
+func (s *Snapshot) LatestSeal() (*flow.Seal, error) {
+	seal, err := s.state.seals.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not look up latest seal: %w", err)
+	}
+	return seal, nil
+}
+
+// TODO inject results storage
+func (s *Snapshot) LatestResult() (*flow.ExecutionResult, error) {
+	seal, err := s.LatestSeal()
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest seal: %w", err)
+	}
+	result, err := s.state.results.ByID(seal.ResultID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest result: %w", err)
+	}
+	return result, nil
+}
+
+func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
+	seal, err := s.LatestSeal()
+	if err != nil {
+		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
+	}
+	head, err := s.state.blocks.ByID(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get head block: %w", err)
+	}
+
+	// if this snapshot references the root block, the sealing segment
+	// consists only of the root block
+	segment := []*flow.Block{head}
+	if s.blockID == seal.BlockID {
+		return segment, nil
+	}
+
+	// for all other cases we walk through the chain backward until we reach
+	// the block referenced by the latest seal - the returned segment includes
+	// this block
+	nextID := head.Header.ParentID
+	for {
+		next, err := s.state.blocks.ByID(nextID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get next block (id=%x): %w", nextID, err)
+		}
+
+		segment = append(segment, next)
+		if nextID == seal.BlockID {
+			break
+		}
+		nextID = next.Header.ParentID
+	}
+
+	// reverse the segment so it is in ascending order by height
+	for i, j := 0, len(segment)-1; i < j; i, j = i+1, j-1 {
+		segment[i], segment[j] = segment[j], segment[i]
+	}
+	return segment, nil
 }
 
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {

@@ -51,6 +51,9 @@ type Snapshot interface {
 	// height) is this snapshot's reference block and the tail (least height)
 	// is the most recently sealed block as of this snapshot (ie. the block
 	// referenced by LatestSeal).
+	//
+	// This segment is used as the initial state for non-spork and non-genesis
+	// root states.
 	SealingSegment() ([]*flow.Block, error)
 
 	// Pending returns the IDs of all descendants of the Head block. The IDs

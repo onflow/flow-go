@@ -21,6 +21,7 @@ type State struct {
 	db      *badger.DB
 	headers storage.Headers
 	blocks  storage.Blocks
+	results storage.ExecutionResults
 	seals   storage.Seals
 	epoch   struct {
 		setups   storage.EpochSetups
