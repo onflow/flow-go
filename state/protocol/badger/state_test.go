@@ -4,13 +4,14 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 // TestBootstrapAndOpen verifies after bootstraping with a state root,
