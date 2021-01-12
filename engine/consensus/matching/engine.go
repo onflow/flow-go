@@ -215,8 +215,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	case *messages.ApprovalResponse:
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
 		e.unit.Lock()
 		defer e.unit.Unlock()
+		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, &ev.Approval)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
@@ -854,7 +856,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) {
 	// clear the request tracker of all items corresponding to results that are
 	// no longer in the incorporated-results mempool
 	for resultID := range e.requestTracker.GetAll() {
-		if _, _, ok := e.incorporatedResults.ByResultID(resultID); ok {
+		if _, _, ok := e.incorporatedResults.ByResultID(resultID); !ok {
 			e.requestTracker.Remove(resultID)
 		}
 	}

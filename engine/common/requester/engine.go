@@ -331,7 +331,6 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		Nonce:     rand.Uint64(),
 		EntityIDs: entityIDs,
 	}
-
 	err = e.con.Unicast(req, providerID)
 	if err != nil {
 		return true, fmt.Errorf("could not send request: %w", err)
