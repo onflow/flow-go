@@ -5,6 +5,7 @@ package matching
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -76,28 +77,30 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
 
 	ms.matching = &Engine{
-		unit:                   unit,
-		log:                    log,
-		engineMetrics:          metrics,
-		mempool:                metrics,
-		metrics:                metrics,
-		state:                  ms.State,
-		receiptRequester:       ms.requester,
-		resultsDB:              ms.ResultsDB,
-		headersDB:              ms.HeadersDB,
-		indexDB:                ms.IndexDB,
-		incorporatedResults:    ms.ResultsPL,
-		receipts:               ms.ReceiptsPL,
-		approvals:              ms.ApprovalsPL,
-		seals:                  ms.SealsPL,
-		checkingSealing:        atomic.NewBool(false),
-		sealingThreshold:       10,
-		maxResultsToRequest:    200,
-		assigner:               ms.Assigner,
-		requireApprovals:       true,
-		receiptValidator:       ms.receiptValidator,
-		requestTracker:         NewRequestTracker(),
-		maxRequestsPerApproval: 10,
+		unit:                      unit,
+		log:                       log,
+		engineMetrics:             metrics,
+		mempool:                   metrics,
+		metrics:                   metrics,
+		state:                     ms.State,
+		receiptRequester:          ms.requester,
+		resultsDB:                 ms.ResultsDB,
+		headersDB:                 ms.HeadersDB,
+		indexDB:                   ms.IndexDB,
+		incorporatedResults:       ms.ResultsPL,
+		receipts:                  ms.ReceiptsPL,
+		approvals:                 ms.ApprovalsPL,
+		seals:                     ms.SealsPL,
+		checkingSealing:           atomic.NewBool(false),
+		sealingThreshold:          10,
+		maxResultsToRequest:       200,
+		assigner:                  ms.Assigner,
+		requireApprovals:          true,
+		receiptValidator:          ms.receiptValidator,
+		requestTracker:            NewRequestTracker(),
+		approvalRequestsThreshold: 10,
+		requestBlackoutMin:        1,
+		requestBlackoutMax:        3,
 	}
 }
 
@@ -694,7 +697,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	n := 100
 
 	// s is the number of incorporated results that have already collected at
-	// least onne approval per chunk, so they should not require any approval
+	// least one approval per chunk, so they should not require any approval
 	// requests
 	s := 50
 
@@ -813,18 +816,37 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	err := ms.matching.requestPendingApprovals()
 	ms.Require().NoError(err)
 
-	// We should have only sent requests for chunks that haven't collected any
-	// approvals
-	ms.Assert().Len(requests, len(expectedRequests))
+	// first time it goes through, no requests should be made because of the
+	// blackout period
+	ms.Assert().Len(requests, 0)
 
-	// Check the approval tracker
+	// Check the request tracker
 	ms.Assert().Equal(s, len(ms.matching.requestTracker.index))
 	for _, expectedRequest := range expectedRequests {
-		requestCount := ms.matching.requestTracker.Get(
+		requestItem, _ := ms.matching.requestTracker.Get(
 			expectedRequest.ResultID,
 			expectedRequest.ChunkIndex,
 		)
-		ms.Assert().Equal(uint(1), requestCount)
+		ms.Assert().Equal(uint(0), requestItem.Requests)
+	}
+
+	// wait for the max blackout period to elapse and retry
+	time.Sleep(time.Duration(2*ms.matching.requestBlackoutMax) * time.Second)
+	err = ms.matching.requestPendingApprovals()
+	ms.Require().NoError(err)
+
+	// now we expect that requests have been sent for the chunks that haven't
+	// collected any approvals
+	ms.Assert().Len(requests, len(expectedRequests))
+
+	// Check the request tracker
+	ms.Assert().Equal(s, len(ms.matching.requestTracker.index))
+	for _, expectedRequest := range expectedRequests {
+		requestItem, _ := ms.matching.requestTracker.Get(
+			expectedRequest.ResultID,
+			expectedRequest.ChunkIndex,
+		)
+		ms.Assert().Equal(uint(1), requestItem.Requests)
 	}
 }
 
