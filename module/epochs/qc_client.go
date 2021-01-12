@@ -73,7 +73,7 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
 	
 	// get account for given address
-	account, err := flowClient.GetAccount(context.Background(), c.account.Address)
+	account, err := flowClient.GetAccount(ctx, c.account.Address)
 	if err != nil {
 		return nil, fmt.Errorf("could not get account: %w", err)
 	}
