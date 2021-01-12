@@ -151,7 +151,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// If the leader is disqualified, all keys are ignored
 	// otherwise, the keys are valid
 	if s.disqualified {
-		return nil, nil, nil, nil
+		return nil, nil, nil, errors.New("leader is disquified")
 	}
 
 	// private key of the current node
@@ -231,7 +231,7 @@ func (s *feldmanVSSQualState) ForceDisqualify(node int) error {
 	}
 	if node >= s.Size() || node < 0 {
 		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
-			s.Size(), orig)
+			s.Size(), node)
 	}
 	if index(node) == s.leaderIndex {
 		s.disqualified = true

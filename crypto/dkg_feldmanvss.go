@@ -179,7 +179,7 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 	}
 	if node >= s.Size() || node < 0 {
 		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
-			s.Size(), orig)
+			s.Size(), node)
 	}
 	if index(node) == s.leaderIndex {
 		s.validKey = false

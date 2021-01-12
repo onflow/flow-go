@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var gt *testing.T
+
 func TestDKG(t *testing.T) {
 	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
 	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
@@ -40,26 +42,6 @@ func testFeldmanVSSSimple(t *testing.T) {
 	}
 }
 
-// Testing Feldman VSS with the qualification system by simulating a network of n nodes
-func testFeldmanVSSQual(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
-
-	n := 4
-	// happy path, test multiple values of thresold
-	for threshold := MinimumThreshold; threshold < n; threshold++ {
-		t.Run(fmt.Sprintf("FeldmanVSSQual (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
-			dkgCommonTest(t, feldmanVSSQual, n, threshold, happyPath)
-		})
-	}
-
-	n = 5
-	// unhappy path, with focus on the optimal threshold value
-	threshold := optimalThreshold(n)
-	t.Run(fmt.Sprintf("FeldmanVSSQual UnhappyPath (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
-		dkgCommonTest(t, feldmanVSSQual, n, threshold, invalidShares)
-	})
-}
-
 type testCase int
 type behavior int
 
@@ -69,11 +51,33 @@ const (
 	invalidVector
 	invalidComplaint
 	invalidComplaintAnswer
+)
 
+const (
 	honest behavior = iota
 	manyInvalidShares
-	fewInvalidShare
+	fewInvalidShares
 )
+
+// Testing Feldman VSS with the qualification system by simulating a network of n nodes
+func testFeldmanVSSQual(t *testing.T) {
+	log.SetLevel(log.ErrorLevel)
+
+	n := 4
+	// happy path, test multiple values of thresold
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
+		t.Run(fmt.Sprintf("FeldmanVSSQual_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+			dkgCommonTest(t, feldmanVSSQual, n, threshold, happyPath)
+		})
+	}
+
+	n = 5
+	// unhappy path, with focus on the optimal threshold value
+	threshold := optimalThreshold(n)
+	t.Run(fmt.Sprintf("FeldmanVSSQual_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+		dkgCommonTest(t, feldmanVSSQual, n, threshold, invalidShares)
+	})
+}
 
 // Testing JointFeldman by simulating a network of n nodes
 func testJointFeldman(t *testing.T) {
@@ -82,7 +86,7 @@ func testJointFeldman(t *testing.T) {
 	n := 4
 	// happy path, test multiple values of thresold
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
-		t.Run(fmt.Sprintf("JointFeldman (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+		t.Run(fmt.Sprintf("JointFeldman_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 			dkgCommonTest(t, jointFeldman, n, threshold, happyPath)
 		})
 	}
@@ -90,7 +94,7 @@ func testJointFeldman(t *testing.T) {
 	n = 5
 	// unhappy path, with invalid shares
 	threshold := optimalThreshold(n)
-	t.Run(fmt.Sprintf("JointFeldman_InvalidShares (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidShares)
 	})
 }
@@ -117,6 +121,7 @@ func newDKG(dkg int, size int, threshold int, currentIndex int,
 }
 
 func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
+	gt = t
 	log.Info("DKG protocol set up")
 
 	// create the node channels
@@ -125,16 +130,23 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		chans[i] = make(chan *message, 5*n)
 	}
 
+	// number of leaders in the protocol
+	var leaders int
+	if dkg == jointFeldman {
+		leaders = n
+	} else {
+		leaders = 1
+	}
+
 	// create n processors for all nodes
 	processors := make([]testDKGProcessor, 0, n)
 	for current := 0; current < n; current++ {
-		list := make(int, newSigner)
+		list := make([]bool, leaders)
 		processors = append(processors, testDKGProcessor{
-			current:   current,
-			threshold: threshold,
-			chans:     chans,
-			msgType:   dkgType,
-			malicious: honest,
+			current:      current,
+			chans:        chans,
+			msgType:      dkgType,
+			malicious:    honest,
 			disqualified: list,
 		})
 	}
@@ -146,16 +158,22 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	var r1, r2 int
 
 	switch test {
+	case happyPath:
+		// r1 = r2 = 0
+		break
 	case invalidShares:
-		r1 := mrand.Intn(n+1)      // leaders with invalid shares and will get disqualified
-		r2 := mrand.Intn(n - r1 + 1) // leaders with invalid shares but will recover
+		r1 = mrand.Intn(leaders + 1)      // leaders with invalid shares and will get disqualified
+		r2 = mrand.Intn(leaders - r1 + 1) // leaders with invalid shares but will recover
 		var i int
-		for i := 0; i < r1; i++ {
-			processors[i] = manyInvalidShares
+		for i = 0; i < r1; i++ {
+			processors[i].malicious = manyInvalidShares
 		}
 		for ; i < r1+r2; i++ {
-			processors[i] = fewInvalidShares
+			processors[i].malicious = fewInvalidShares
 		}
+		t.Logf("%d participants will be disqualified, %d participants will recover\n", r1, r2)
+	default:
+		panic("test case not supported")
 	}
 
 	// number of nodes to test
@@ -178,7 +196,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// start DKG in all nodes
 	// start listening on the channels
 	seed := make([]byte, SeedMinLenDKG)
-	read, err := rand.Read(seed)
+	read, err := mrand.Read(seed)
 	require.Equal(t, read, SeedMinLenDKG)
 	require.NoError(t, err)
 	sync.Add(n)
@@ -208,46 +226,61 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	sync.Wait()
 
 	switch test {
+	case happyPath:
+		fallthrough
 	case invalidShares:
 		// check the disqualified list for all non-disqualified participants
-		if n-r1 > 0 {
-			for i:= r1+1, i<n; i++ {
-				assert.Equal(t, processors[r1].disqualified, processors[i].disqualified)
-			}
+		expected := make([]bool, leaders)
+		for i := 0; i < r1; i++ {
+			expected[i] = true
+		}
+		for i := r1; i < n; i++ {
+			t.Logf("node %d is not disqualified, its disqualified list is:\n", i)
+			t.Log(processors[i].disqualified)
+			assert.Equal(t, expected, processors[i].disqualified)
 		}
 		// check if DKG is successful
-		if r1>threshold || (n-r1) <= threshold {
+		if (dkg == jointFeldman && (r1 > threshold || (n-r1) <= threshold)) ||
+			(r1 == 1) { // case of a single leader
+			t.Logf("dkg failed, there are %d disqualified nodes\n", r1)
 			// DKG has failed, check for final errors
-			for i:= r1, i<n; i++ {
-				assert.Nil(t, processors[i].finalError)
+			for i := r1; i < n; i++ {
+				assert.Error(t, processors[i].finalError)
 			}
-		}
-		else {
+		} else {
+			t.Logf("dkg succeeded, there are %d disqualified nodes\n", r1)
+			// DKG has succeeded, check for final errors
+			for i := r1; i < n; i++ {
+				assert.NoError(t, processors[i].finalError)
+			}
 			// DKG has succeeded, check the final keys
-			for i:= r1, i<n; i++ {
+			for i := r1; i < n; i++ {
 				assert.True(t, processors[r1].pk.Equals(processors[i].pk),
 					"2 group public keys are mismatching")
 			}
 		}
+	default:
+		log.Error("test case not supported")
 	}
 }
 
 // implements DKGProcessor interface
 type testDKGProcessor struct {
+	// instnce of DKG
+	dkg DKGState
+	// index of the current node in the protocol
 	current int
-	dkg     DKGState
-	chans   []chan *message
-	msgType int
-	// threshold
-	threshold int
-	// group public key, output of DKG 
+	// group public key, output of DKG
 	pk PublicKey
 	// final disqualified list
-	disqualified []int
+	disqualified []bool
 	// final output error of the DKG
 	finalError error
 	// type of malicious behavior
 	malicious behavior
+
+	chans   []chan *message
+	msgType int
 
 	// only used when testing the threshold signature stateful api
 	ts   *thresholdSigner
@@ -267,32 +300,51 @@ type message struct {
 
 // This is a testing function
 // it simulates sending a malicious message from one node to another
-// This function simulates the behavior of a malicious node
+// This function simulates the behavior of a malicious node.
 func (proc *testDKGProcessor) InvalidShareSend(dest int, data []byte) {
-	log.Infof("%d malicously Sending to %d:\n", proc.current, dest)
-	// TODO: malicious send 
-	// check for few or many invalid shares 
-	// check destination < or > threshold
-	// choose a random way for invalid share
 
-	log.Debug(data)
-	// simulate a wrong private share (the protocol should recover)
-	if proc.dkg.Size() > 2 && proc.current == 0 && dest < 2 {
-		data[8]++
+	// check the behavior
+	var recipients int // number of recipients to send invalid shares
+	if proc.malicious == manyInvalidShares {
+		recipients = proc.dkg.Threshold() + 1 //  t < recipients <= n
+	} else { // fewInvalidShares
+		recipients = proc.dkg.Threshold() //  0 <= recipients <= t
 	}
-	// simulate not sending a share at all (the protocol should recover)
-	if proc.dkg.Size() > 2 && proc.current == 0 && dest == 2 {
-		return
-	}
+
 	newMsg := &message{proc.current, proc.msgType, data}
+	// check destination
+	if dest < recipients || (proc.current < recipients && dest < recipients+1) {
+		// choose a random method to invalid share
+		coin := mrand.Intn(100)
+		gt.Logf("malicious send, coin is %d\n", coin%4)
+		switch coin % 4 {
+		case 0:
+			// value does't match the verification vector
+			newMsg.data[8]++
+		case 1:
+			// invalid length
+			newMsg.data = newMsg.data[:1]
+		case 2:
+			// invalid value
+			for i := 0; i < len(newMsg.data); i++ {
+				newMsg.data[i] = 0xFF
+			}
+		case 3:
+			// do not send the share at all
+			return
+		}
+	} else {
+		gt.Logf("turns out to be a honest send\n")
+	}
+	gt.Logf("%x\n", newMsg.data)
 	proc.chans[dest] <- newMsg
 }
 
 // This is a testing function
 // it simulates sending a honest message from one node to another
 func (proc *testDKGProcessor) honestSend(dest int, data []byte) {
-	log.Infof("%d Sending to %d:\n", proc.current, dest)
-	log.Debug(data)
+	gt.Logf("honest send\n")
+	gt.Logf("%x\n", data)
 	newMsg := &message{proc.current, proc.msgType, data}
 	proc.chans[dest] <- newMsg
 }
@@ -300,13 +352,18 @@ func (proc *testDKGProcessor) honestSend(dest int, data []byte) {
 // This is a testing function
 // it simulates sending a message from one node to another
 func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
-	switch proc.behavior {
+	gt.Logf("%d sending to %d", proc.current, dest)
+	switch proc.malicious {
 	case honest:
 		proc.honestSend(dest, data)
 		return
-	case fewInvlalidShares: 
+	case fewInvalidShares:
+		fallthrough
+	case manyInvalidShares:
 		proc.InvalidShareSend(dest, data)
-		return	
+		return
+	default:
+		log.Error()
 	}
 }
 
@@ -324,11 +381,12 @@ func (proc *testDKGProcessor) Broadcast(data []byte) {
 }
 
 func (proc *testDKGProcessor) Disqualify(node int, logInfo string) {
-	log.Infof("%d wants to Disqualify %d: %s", proc.current, node, logInfo)
+	gt.Logf("%d disqualifies %d, %s\n", proc.current, node, logInfo)
 	proc.disqualified[node] = true
 }
+
 func (proc *testDKGProcessor) FlagMisbehavior(node int, logInfo string) {
-	log.Infof("%d flags a misbehavior from %d: %s", proc.current, node, logInfo)
+	gt.Logf("%d flags a misbehavior from %d: %s", proc.current, node, logInfo)
 }
 
 // This is a testing function
@@ -356,8 +414,8 @@ func dkgRunChan(proc *testDKGProcessor,
 			case 2:
 				log.Infof("%d dkg ended \n", proc.current)
 				_, pk, _, err := proc.dkg.End()
-				proc.finalError := err
-				proc.pk := pk
+				proc.finalError = err
+				proc.pk = pk
 			}
 			sync.Done()
 			return
