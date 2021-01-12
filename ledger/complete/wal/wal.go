@@ -12,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 )
 
-const SegmentSize = 32 * 1024 * 1024
+// tmp test
+//const SegmentSize = 32 * 1024 * 1024
+const SegmentSize = 1 * 1024 * 1024
 
 type LedgerWAL struct {
 	wal            *prometheusWAL.WAL
