@@ -69,11 +69,10 @@ pub fun main(): UFix64 {
 `
 
 const getStorageCapacityScriptTemplate = `
-import FlowServiceAccount from 0x%s
+import FlowStorageFees from 0x%s
 
-pub fun main(): UFix64 {
-  let acct = getAccount(0x%s)
-  return FlowServiceAccount.defaultTokenBalance(acct)
+pub fun main(): UInt64 {
+	return FlowStorageFees.calculateAccountCapacity(0x%s)
 }
 `
 

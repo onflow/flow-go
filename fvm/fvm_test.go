@@ -549,22 +549,26 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
 				require.NoError(t, err)
 
+				// deposit more flow to increase capacity
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(fmt.Sprintf(`
-					import FlowStorageFees from %s
+					import FungibleToken from %s
 					import FlowToken from %s
-	
+
 					transaction {
-					  prepare(signer: AuthAccount, service: AuthAccount) {
-						signer.contracts.add(name: "%s", code: "%s".decodeHex())
-						
-						let vaultRef = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
-						// purchase additional storage
-						let payment <- vaultRef.withdraw(amount: 1.0) as! @FlowToken.Vault
-						FlowStorageFees.getStorageReservationReceiver(signer.address).deposit(from: <- payment)
-					  }
-					}`, chain.ServiceAddress().HexWithPrefix(),
-						"0x7e60df042a9c0868", // <- FlowToken address from bootstrapping
+						prepare(signer: AuthAccount, service: AuthAccount) {
+							signer.contracts.add(name: "%s", code: "%s".decodeHex())
+
+							let vaultRef = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+							// deposit additional flow
+							let payment <- vaultRef.withdraw(amount: 10.0) as! @FlowToken.Vault
+
+							let receiver = signer.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() 
+								?? panic("Could not borrow receiver reference to the recipient's Vault")
+							receiver.deposit(from: <-payment)
+						}
+					}`, fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+						fvm.FlowTokenAddress(chain).HexWithPrefix(),
 						"Container",
 						hex.EncodeToString([]byte(script))))).
 					AddAuthorizer(accounts[0]).

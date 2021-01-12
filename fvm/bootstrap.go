@@ -87,7 +87,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, st *state.Stat
 	fungibleToken := b.deployFungibleToken()
 	flowToken := b.deployFlowToken(service, fungibleToken)
 	feeContract := b.deployFlowFees(service, fungibleToken, flowToken)
-	b.deployStorageFees(service, flowToken)
+	b.deployStorageFees(service, fungibleToken, flowToken)
 
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
@@ -180,8 +180,9 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	return flowFees
 }
 
-func (b *BootstrapProcedure) deployStorageFees(service, flowToken flow.Address) {
+func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken flow.Address) {
 	contract := contracts.FlowStorageFees(
+		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
 	)
 
@@ -286,7 +287,7 @@ const deployStorageFeesTransactionTemplate = `
 transaction {
   prepare(serviceAccount: AuthAccount) {
     let adminAccount = serviceAccount
-    serviceAccount.contracts.add(name: "FlowStorageFees", code: "%s".decodeHex(), adminAccount: adminAccount)
+    serviceAccount.contracts.add(name: "FlowStorageFees", code: "%s".decodeHex())
   }
 }
 `
@@ -356,11 +357,11 @@ transaction() {
         
         for account in authAccounts {
             let storageReservation <- tokenVault.withdraw(amount: FlowStorageFees.minimumStorageReservation) as! @FlowToken.Vault
-			let hasReceiver = account.getCapability(/public/flowTokenReceiver)!.check<&{FungibleToken.Receiver}>()
-			if !hasReceiver {
-				FlowServiceAccount.initDefaultToken(account)
-			}
-			let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() ?? panic("Could not borrow receiver reference to the recipient's Vault")
+            let hasReceiver = account.getCapability(/public/flowTokenReceiver)!.check<&{FungibleToken.Receiver}>()
+            if !hasReceiver {
+                FlowServiceAccount.initDefaultToken(account)
+            }
+            let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() ?? panic("Could not borrow receiver reference to the recipient's Vault")
 
             receiver.deposit(from: <-storageReservation)
         }

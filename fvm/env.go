@@ -148,15 +148,15 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 		return 0, err
 	}
 
-	var balance uint64
+	var capacity uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
+		capacity = script.Value.ToGoValue().(uint64)
 	}
 
-	return balance, nil
+	return capacity, nil
 }
 
 func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err error) {

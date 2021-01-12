@@ -6,23 +6,48 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-type TransactionStorageLimiter struct{}
+type TransactionStorageLimiter struct {
+	// A function to create a function to get storage capacity from an address. This is to make this easily testable.
+	GetStorageCapacityFuncFactory func(
+		vm *VirtualMachine,
+		ctx Context,
+		tp *TransactionProcedure,
+		st *state.State,
+	) (func(address common.Address) (value uint64, err error), error)
+}
+
+func getStorageCapacityFuncFactory(
+	vm *VirtualMachine,
+	ctx Context,
+	_ *TransactionProcedure,
+	st *state.State,
+) (func(address common.Address) (value uint64, err error), error) {
+	env, err := newEnvironment(ctx, vm, st)
+	if err != nil {
+		return nil, err
+	}
+	return func(address common.Address) (value uint64, err error) {
+		return env.GetStorageCapacity(common.BytesToAddress(address.Bytes()))
+	}, nil
+}
 
 func NewTransactionStorageLimiter() *TransactionStorageLimiter {
-	return &TransactionStorageLimiter{}
+	return &TransactionStorageLimiter{
+		GetStorageCapacityFuncFactory: getStorageCapacityFuncFactory,
+	}
 }
 
 func (d *TransactionStorageLimiter) Process(
 	vm *VirtualMachine,
 	ctx Context,
-	_ *TransactionProcedure,
+	tp *TransactionProcedure,
 	st *state.State,
 ) error {
 	if !ctx.LimitAccountStorage {
 		return nil
 	}
 
-	env, err := newEnvironment(ctx, vm, st)
+	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, st)
 	if err != nil {
 		return err
 	}
@@ -41,7 +66,7 @@ func (d *TransactionStorageLimiter) Process(
 			continue
 		}
 
-		capacity, err := env.GetStorageCapacity(common.BytesToAddress(address.Bytes()))
+		capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
 		if err != nil {
 			return err
 		}
