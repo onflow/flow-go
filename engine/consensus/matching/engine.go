@@ -59,7 +59,7 @@ type Engine struct {
 	requireApprovals          bool                            // flag to disable verifying chunk approvals
 	receiptValidator          module.ReceiptValidator         // used to validate receipts
 	requestTracker            *RequestTracker                 // used to cout the number of approval requests by chunk ([result id][chunk index]=>count)
-	approvalRequestsThreshold uint                            // used to safeguard the engine from continuously requesting the same approval
+	approvalRequestsThreshold uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
 	requestBlackoutMin        int                             // min duration of approval-request blackout period (in seconds)
 	requestBlackoutMax        int                             // max duration of approval-request blackout period (in seconds)
 }
@@ -964,7 +964,13 @@ func (e *Engine) requestPendingReceipts() error {
 // requestPendingApprovals requests approvals for chunks that haven't collected
 // enough approvals. When the number of unsealed finalized blocks exceeds the
 // threshold, we go through the entire mempool of incorporated-results, which
-// haven't yet been sealed, and check which chunks need more approvals.
+// haven't yet been sealed, and check which chunks need more approvals. We only
+// request approvals if the block the result is for is below the threshold.
+//
+//                           threshold
+//                        |             |
+// ... <-- A <-- A+1 <--- D <-- D+1 <-- F
+//       sealed         buffer         final
 func (e *Engine) requestPendingApprovals() error {
 
 	// Skip requesting approvals if they are not required for sealing.
@@ -990,9 +996,11 @@ func (e *Engine) requestPendingApprovals() error {
 	log := e.log.With().
 		Uint64("finalized_height", final.Height).
 		Uint64("sealed_height", sealed.Height).
-		Uint("sealing_threshold", e.sealingThreshold).
+		Uint64("approval_requests_threshold", e.approvalRequestsThreshold).
 		Logger()
-	if uint(final.Height-sealed.Height) < e.sealingThreshold {
+
+	buffer := final.Height - e.approvalRequestsThreshold
+	if buffer <= sealed.Height {
 		log.Debug().Msg("skip requesting approvals as number of unsealed finalized blocks is below threshold")
 		return nil
 	}
@@ -1001,16 +1009,36 @@ func (e *Engine) requestPendingApprovals() error {
 	for _, r := range e.incorporatedResults.All() {
 		resultID := r.Result.ID()
 
-		// not finding the result's block is a fatal error at this stage because
-		// we should only create incorporated-results for known blocks.
-		block, err := e.headersDB.ByBlockID(r.Result.BlockID)
+		// not finding the block that the result was incorporated in is a fatal
+		// error at this stage
+		block, err := e.headersDB.ByBlockID(r.IncorporatedBlockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// do not request approvals for blocks that are sealed or not finalized
-		if block.Height <= sealed.Height ||
-			block.Height > final.Height {
+		// Skip results incorporated in blocks that are not yet finalized.
+		// To check if a block is finalized we try to see if it was indexed by
+		// height. Indeed, blocks are only ever indexed by height if they are
+		// finalized (cf Headers DB)
+		_, err = e.headersDB.ByHeight(block.Height)
+		if err != nil {
+			continue
+		}
+
+		// skip results incorporated in blocks that are above the approval
+		// request threshold
+		if block.Height > buffer {
+			continue
+		}
+
+		// Double check that the result the block is for has not aready been
+		// sealed. Normally such incorporated results should have been removed
+		// from the mempool...
+		resultBlock, err := e.headersDB.ByBlockID(r.Result.BlockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve block: %w", err)
+		}
+		if resultBlock.Height <= sealed.Height {
 			continue
 		}
 
@@ -1060,8 +1088,9 @@ func (e *Engine) requestPendingApprovals() error {
 			requestTrackerItem.Update()
 			e.requestTracker.Set(resultID, c.Index, requestTrackerItem)
 
-			// log requests if they exceed the threshold for monitoring purposes
-			if requestTrackerItem.Requests >= e.approvalRequestsThreshold {
+			// for monitoring/debugging purposes, log requests if we start
+			// making more than 10
+			if requestTrackerItem.Requests >= 10 {
 				e.log.Debug().Msgf("requesting approvals for result %v chunk %d: %d requests",
 					resultID,
 					c.Index,

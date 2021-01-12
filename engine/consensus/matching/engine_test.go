@@ -689,7 +689,8 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 
 // TestRequestPendingApprovals checks that requests are sent only for chunks
 // that have not collected any approvals yet, and are sent only to the verifiers
-// assigned to those chunks.
+// assigned to those chunks. It also check that the threshold and raite limiting
+// is respected.
 func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
 	// n is the total number of blocks and incorporated-results we add to the
@@ -733,7 +734,15 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	// each chunk is assigned to the single verifier we defined above
 	//
 	// we populate expectedRequests with requests for chunks that have no
-	// signatures
+	// signatures, and for results that are for block that meet the approval
+	// request threshold.
+	//
+	//
+	//     sealed          unseale/finalized
+	// |              ||                        |
+	// 1 <- 2 <- .. <- s <- s+1 <- .. <- n-t <- n
+	//                 |                  |
+	//                    expected reqs
 	for i := 0; i < n; i++ {
 
 		// Create an incorporated result for unsealedFinalizedBlocks[i].
@@ -743,6 +752,9 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 				unittest.ExecutionResultFixture(
 					unittest.WithBlock(&unsealedFinalizedBlocks[i]),
 				),
+			),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(
+				unsealedFinalizedBlocks[i].ID(),
 			),
 		)
 
@@ -759,16 +771,22 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 			if i < s {
 				ir.AddSignature(chunk.Index, unittest.IdentifierFixture(), unittest.SignatureFixture())
 			} else {
-				expectedRequests = append(expectedRequests,
-					&messages.ApprovalRequest{
-						ResultID:   ir.Result.ID(),
-						ChunkIndex: chunk.Index,
-					})
+
+				if i < n-int(ms.matching.approvalRequestsThreshold) {
+					expectedRequests = append(expectedRequests,
+						&messages.ApprovalRequest{
+							ResultID:   ir.Result.ID(),
+							ChunkIndex: chunk.Index,
+						})
+				}
+
 			}
 		}
 
 		ms.PendingResults[ir.ID()] = ir
 	}
+
+	exp := n - s - int(ms.matching.approvalRequestsThreshold)
 
 	// add an incorporated-result for a block that was already sealed. We
 	// expect that no approval requests will be sent for this result, even if it
@@ -778,6 +796,9 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 			unittest.ExecutionResultFixture(
 				unittest.WithBlock(&ms.LatestSealedBlock),
 			),
+		),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(
+			ms.LatestSealedBlock.ID(),
 		),
 	)
 	ms.PendingResults[sealedBlockIR.ID()] = sealedBlockIR
@@ -789,6 +810,9 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 			unittest.ExecutionResultFixture(
 				unittest.WithBlock(&unfinalizedBlock),
 			),
+		),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(
+			unfinalizedBlock.ID(),
 		),
 	)
 	ms.PendingResults[unfinalizedBlock.ID()] = unfinalizedBlockIR
@@ -821,7 +845,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	ms.Assert().Len(requests, 0)
 
 	// Check the request tracker
-	ms.Assert().Equal(s, len(ms.matching.requestTracker.index))
+	ms.Assert().Equal(exp, len(ms.matching.requestTracker.index))
 	for _, expectedRequest := range expectedRequests {
 		requestItem, _ := ms.matching.requestTracker.Get(
 			expectedRequest.ResultID,
@@ -840,7 +864,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	ms.Assert().Len(requests, len(expectedRequests))
 
 	// Check the request tracker
-	ms.Assert().Equal(s, len(ms.matching.requestTracker.index))
+	ms.Assert().Equal(exp, len(ms.matching.requestTracker.index))
 	for _, expectedRequest := range expectedRequests {
 		requestItem, _ := ms.matching.requestTracker.Get(
 			expectedRequest.ResultID,
