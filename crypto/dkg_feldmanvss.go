@@ -333,7 +333,7 @@ func readVerifVector(A []pointG2, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)),
 	) != valid {
-		return errors.New("the verifcation vector does not encode public keys correctly")
+		return errors.New("the verifcation vector does not serialize points correctly")
 	}
 	return nil
 }
