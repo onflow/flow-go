@@ -44,3 +44,20 @@ func (a *AggregatedSignature) Add(signerID Identifier, signature crypto.Signatur
 	a.SignerIDs = append(a.SignerIDs, signerID)
 	a.VerifierSignatures = append(a.VerifierSignatures, signature)
 }
+
+// Copy returns a deep copy of the AggregatedSignature
+func (a *AggregatedSignature) Copy() AggregatedSignature {
+	a.Lock()
+	defer a.Unlock()
+
+	signatures := make([]crypto.Signature, len(a.VerifierSignatures))
+	copy(signatures, a.VerifierSignatures)
+
+	signers := make([]Identifier, len(a.SignerIDs))
+	copy(signers, a.SignerIDs)
+
+	return AggregatedSignature{
+		VerifierSignatures: signatures,
+		SignerIDs:          signers,
+	}
+}

@@ -95,7 +95,7 @@ func (ir *IncorporatedResult) GetAggregatedSignatures() []AggregatedSignature {
 	for _, chunk := range ir.Result.Chunks {
 		as, ok := ir.aggregatedSignatures[chunk.Index]
 		if ok {
-			result = append(result, *as)
+			result = append(result, as.Copy())
 		}
 	}
 
