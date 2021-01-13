@@ -67,11 +67,11 @@ func (i *TransactionInvocator) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, st)
+	env, err := newEnvironment(ctx, vm, st)
 	if err != nil {
 		return err
 	}
-	env.setTransaction(vm, proc.Transaction, proc.TxIndex)
+	env.setTransaction(proc.Transaction, proc.TxIndex)
 
 	location := runtime.TransactionLocation(proc.ID[:])
 
@@ -83,12 +83,6 @@ func (i *TransactionInvocator) Process(
 	}
 
 	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
-
-	// commit changes
-	err = st.Commit()
-	if err != nil {
-		return err
-	}
 
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()

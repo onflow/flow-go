@@ -71,7 +71,7 @@ func (i ScriptInvocator) Process(
 	proc *ScriptProcedure,
 	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, st)
+	env, err := newEnvironment(ctx, vm, st)
 	if err != nil {
 		return err
 	}
