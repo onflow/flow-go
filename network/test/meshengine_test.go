@@ -344,6 +344,11 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	err := engs[unregisterIndex].con.Close()
 	assert.NoError(suite.T(), err)
 
+	// waits enough for peer manager to unsubscribe the node from the topic
+	// while libp2p is unsubscribing the node, the topology gets unstable
+	// and connections to the node may be refused (although very unlikely).
+	time.Sleep(2 * time.Second)
+
 	// each node attempts to broadcast a message to all others
 	for i := range suite.nets {
 		event := &message.TestMessage{
