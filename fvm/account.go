@@ -71,7 +71,7 @@ pub fun main(): UFix64 {
 const getStorageCapacityScriptTemplate = `
 import FlowStorageFees from 0x%s
 
-pub fun main(): UInt64 {
+pub fun main(): UFix64 {
 	return FlowStorageFees.calculateAccountCapacity(0x%s)
 }
 `

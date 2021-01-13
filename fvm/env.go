@@ -138,11 +138,12 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
 	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	cst := e.st.Child() // create child to avoid the script making changes
 
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.st.Ledger(),
+		cst,
 	)
 	if err != nil {
 		return 0, err
@@ -151,9 +152,13 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 	var capacity uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
+	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
+	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if script.Err == nil {
-		capacity = script.Value.ToGoValue().(uint64)
+		// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
+		// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
+		capacity = script.Value.ToGoValue().(uint64) / 100
 	}
 
 	return capacity, nil
@@ -161,11 +166,12 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 
 func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
 	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	cst := e.st.Child() // create child to avoid the script making changes
 
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.st.Ledger(),
+		cst,
 	)
 	if err != nil {
 		return 0, err
