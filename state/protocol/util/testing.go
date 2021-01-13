@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
-	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,7 +32,7 @@ func MockReceiptValidator() module.ReceiptValidator {
 // MockSealValidator returns a SealValidator that accepts
 // all seals without performing any
 // integrity checks, returns first seal in block as valid one
-func MockSealValidator(sealsDB *storage.Seals) module.SealValidator {
+func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
 	validator := &mock2.SealValidator{}
 	validator.On("Validate", mock.Anything).Return(
 		func(candidate *flow.Block) *flow.Seal {

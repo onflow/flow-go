@@ -85,7 +85,7 @@ func main() {
 		conMetrics       module.ConsensusMetrics
 		mainMetrics      module.HotstuffMetrics
 		receiptValidator module.ReceiptValidator
-		chunkAssigner    *chmodule.PublicAssignment
+		chunkAssigner    *chmodule.ChunkAssigner
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -116,7 +116,7 @@ func main() {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
 
-			chunkAssigner, err = chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
+			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
 			if err != nil {
 				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
 			}
@@ -205,11 +205,6 @@ func main() {
 			)
 			if err != nil {
 				return nil, err
-			}
-
-			assigner, err := chmodule.NewChunkAssigner(chunkAlpha, node.State)
-			if err != nil {
-				return nil, fmt.Errorf("could not create public assignment: %w", err)
 			}
 
 			match, err := matching.New(
