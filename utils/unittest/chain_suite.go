@@ -51,8 +51,11 @@ type BaseChainSuite struct {
 	PendingSeals map[flow.Identifier]*flow.IncorporatedResultSeal
 
 	// mock BLOCK STORAGE: backed by in-memory map Blocks
-	HeadersDB *storage.Headers // backed by map Blocks
-	IndexDB   *storage.Index   // backed by map Blocks
+	HeadersDB  *storage.Headers               // backed by map Blocks
+	IndexDB    *storage.Index                 // backed by map Blocks
+	PayloadsDB *storage.Payloads              // backed by map Blocks
+	SealsDB    *storage.Seals                 // backed by map SealsIndex
+	SealsIndex map[flow.Identifier]*flow.Seal // last valid seal for block
 
 	// mock mempool.Approvals: used to test whether or not Matching Engine stores approvals
 	ApprovalsPL *mempool.Approvals
@@ -60,7 +63,8 @@ type BaseChainSuite struct {
 	// mock mempool.Receipts: used to test whether or not Matching Engine stores receipts
 	ReceiptsPL *mempool.Receipts
 
-	Assigner *module.ChunkAssigner
+	Assigner    *module.ChunkAssigner
+	Assignments map[flow.Identifier]*chunks.Assignment // index for assignments for given execution result
 }
 
 func (bc *BaseChainSuite) SetupChain() {
@@ -231,6 +235,59 @@ func (bc *BaseChainSuite) SetupChain() {
 		},
 	)
 
+	bc.SealsIndex = make(map[flow.Identifier]*flow.Seal)
+	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.Header))
+	for id, block := range bc.Blocks {
+		if id != bc.RootBlock.ID() {
+			bc.SealsIndex[block.ID()] = firtSeal
+		}
+	}
+
+	bc.PayloadsDB = &storage.Payloads{}
+	bc.PayloadsDB.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.Payload {
+			block, found := bc.Blocks[blockID]
+			if !found {
+				return nil
+			}
+			if block.Payload == nil {
+				return nil
+			}
+			return block.Payload
+		},
+		func(blockID flow.Identifier) error {
+			block, found := bc.Blocks[blockID]
+			if !found {
+				return storerr.ErrNotFound
+			}
+			if block.Payload == nil {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
+	bc.SealsDB = &storage.Seals{}
+	bc.SealsDB.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.Seal {
+			seal, found := bc.SealsIndex[blockID]
+			if !found {
+				return nil
+			}
+			return seal
+		},
+		func(blockID flow.Identifier) error {
+			seal, found := bc.SealsIndex[blockID]
+			if !found {
+				return storerr.ErrNotFound
+			}
+			if seal == nil {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
 	// ~~~~~~~~~~~~~~~~ SETUP INCORPORATED RESULTS MEMPOOL ~~~~~~~~~~~~~~~~~ //
 	bc.PendingResults = make(map[flow.Identifier]*flow.IncorporatedResult)
 	bc.ResultsPL = &mempool.IncorporatedResults{}
@@ -268,6 +325,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	)
 
 	bc.Assigner = &module.ChunkAssigner{}
+	bc.Assignments = make(map[flow.Identifier]*chunks.Assignment)
 }
 
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
@@ -382,6 +440,46 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 		IncorporatedResult: incorporatedResult,
 		Assignment:         assignment,
 		Approvals:          approvals,
+	}
+}
+
+func (bc *BaseChainSuite) Extend(block *flow.Block) {
+	bc.Blocks[block.ID()] = block
+	bc.SealsIndex[block.ID()] = bc.SealsIndex[block.Header.ParentID]
+
+	for _, receipt := range block.Payload.Receipts {
+		// Exec Receipt for block with valid subgraph
+		// ATTENTION:
+		// Here, IncorporatedBlockID (the first argument) should be set
+		// to ancestorID, because that is the block that contains the
+		// ExecutionResult. However, in phase 2 of the sealing roadmap,
+		// we are still using a temporary sealing logic where the
+		// IncorporatedBlockID is expected to be the result's block ID.
+		incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(&receipt.ExecutionResult),
+			IncorporatedResult.WithIncorporatedBlockID(receipt.ExecutionResult.BlockID))
+
+		// assign each chunk to 50% of validation Nodes and generate respective approvals
+		assignment := chunks.NewAssignment()
+		assignedVerifiersPerChunk := uint(len(bc.Approvers) / 2)
+		approvals := make(map[uint64]map[flow.Identifier]*flow.ResultApproval)
+		for _, chunk := range incorporatedResult.Result.Chunks {
+			assignedVerifiers := bc.Approvers.Sample(assignedVerifiersPerChunk)
+			assignment.Add(chunk, assignedVerifiers.NodeIDs())
+
+			// generate approvals
+			chunkApprovals := make(map[flow.Identifier]*flow.ResultApproval)
+			for _, approver := range assignedVerifiers {
+				chunkApprovals[approver.NodeID] = ApprovalFor(incorporatedResult.Result, chunk.Index, approver.NodeID)
+			}
+			approvals[chunk.Index] = chunkApprovals
+		}
+
+		bc.Assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil).Maybe()
+		for index := uint64(0); index < uint64(len(incorporatedResult.Result.Chunks)); index++ {
+			bc.ApprovalsPL.On("ByChunk", incorporatedResult.Result.ID(), index).Return(approvals[index]).Maybe()
+		}
+
+		bc.Assignments[incorporatedResult.Result.ID()] = assignment
 	}
 }
 

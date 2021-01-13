@@ -6,22 +6,29 @@ import (
 
 // Assignment is assignment map of the chunks to the list of the verifier nodes
 type Assignment struct {
-	table map[uint64]map[flow.Identifier]struct{}
+	verifiersForChunk map[uint64]map[flow.Identifier]struct{}
 }
 
 func NewAssignment() *Assignment {
 	return &Assignment{
-		table: make(map[uint64]map[flow.Identifier]struct{}),
+		verifiersForChunk: make(map[uint64]map[flow.Identifier]struct{}),
 	}
 }
 
 // Verifiers returns the list of verifier nodes assigned to a chunk
 func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 	v := make([]flow.Identifier, 0)
-	for id := range a.table[chunk.Index] {
+	for id := range a.verifiersForChunk[chunk.Index] {
 		v = append(v, id)
 	}
 	return v
+}
+
+// HasVerifier checks if a chunk is assigned to the given verifier
+func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) bool {
+	assignedVerifiers := a.verifiersForChunk[chunk.Index]
+	_, isAssigned := assignedVerifiers[identifier]
+	return isAssigned
 }
 
 // Add records the list of verifier nodes as the assigned verifiers of the chunk
@@ -32,20 +39,18 @@ func (a *Assignment) Add(chunk *flow.Chunk, verifiers flow.IdentifierList) {
 	for _, id := range verifiers {
 		v[id] = struct{}{}
 	}
-	a.table[chunk.Index] = v
+	a.verifiersForChunk[chunk.Index] = v
 }
 
-func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
+// ByNodeID returns the indices of all chunks assigned to the given verifierID
+func (a *Assignment) ByNodeID(verifierID flow.Identifier) []uint64 {
 	var chunks []uint64
 
-	// iterates over pairs of (chunk, assigned verifiers)
-	for c, vList := range a.table {
-		// for each chunk iterates over identifiers
-		// of its assigned verifier nodes
-		for id := range vList {
-			if id == this {
-				chunks = append(chunks, c)
-			}
+	// iterates over pairs of (chunk index, assigned verifiers)
+	for chunkIdx, assignedVerifiers := range a.verifiersForChunk {
+		_, isAssigned := assignedVerifiers[verifierID]
+		if isAssigned {
+			chunks = append(chunks, chunkIdx)
 		}
 	}
 	return chunks
@@ -53,7 +58,7 @@ func (a *Assignment) ByNodeID(this flow.Identifier) []uint64 {
 
 // Len returns the number of chunks in the assignment
 func (a *Assignment) Len() int {
-	return len(a.table)
+	return len(a.verifiersForChunk)
 }
 
 // AssignmentDataPack

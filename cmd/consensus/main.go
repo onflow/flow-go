@@ -67,8 +67,8 @@ func main() {
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
-		requireOneApproval                     bool
 		chunkAlpha                             uint
+		requiredChunkApprovals                 uint
 
 		err              error
 		mutableState     protocol.MutableState
@@ -85,6 +85,7 @@ func main() {
 		conMetrics       module.ConsensusMetrics
 		mainMetrics      module.HotstuffMetrics
 		receiptValidator module.ReceiptValidator
+		chunkAssigner    *chmodule.PublicAssignment
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -104,8 +105,8 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+			flags.UintVar(&requiredChunkApprovals, "required-chunk-approvals", validation.DefaultRequiredChunkApprovals, "number of approvals that are required for each chunk")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -115,8 +116,15 @@ func main() {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
 
-			signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results, signatureVerifier)
+			chunkAssigner, err = chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
+			if err != nil {
+				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
+			}
+
+			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
+				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
+				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), requiredChunkApprovals)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -125,6 +133,7 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 				receiptValidator,
+				sealValidator,
 			)
 			return err
 		}).
@@ -220,9 +229,9 @@ func main() {
 				receipts,
 				approvals,
 				seals,
-				assigner,
+				chunkAssigner,
 				receiptValidator,
-				requireOneApproval,
+				requiredChunkApprovals,
 			)
 			requesterEng.WithHandle(match.HandleReceipt)
 			return match, err
