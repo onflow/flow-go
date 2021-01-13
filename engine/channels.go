@@ -51,18 +51,16 @@ func UniqueChannelIDsByRole(role flow.Role) []string {
 	// has already been added to uniques.
 	all := ChannelIDsByRole(role)
 	for _, channel := range all {
-		// cluster channels directly added to uniques without marked as added.
-		if _, ok := IsClusterChannelID(channel); ok {
-			uniques = append(uniques, channel)
+		id := channelIdMap[channel].ID()
+		if _, ok := added[id]; ok {
 			continue
 		}
 
-		// non-cluster channels only added to uniques if their id is not in added map.
-		id := channelIdMap[channel].ID()
-		if _, ok := added[id]; !ok {
+		if _, ok := IsClusterChannelID(channel); !ok {
 			added[id] = struct{}{}
-			uniques = append(uniques, channel)
 		}
+
+		uniques = append(uniques, channel)
 	}
 
 	return uniques
