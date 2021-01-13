@@ -357,6 +357,9 @@ func (lg *ContLoadGenerator) sendAccountCreationTX(workerID int) {
 	acc := <-lg.availableAccounts
 	defer func() { lg.availableAccounts <- acc }()
 
+	acc.signerLock.Lock()
+	defer acc.signerLock.Unlock()
+
 	lg.log.Trace().Msgf("creating transaction")
 
 	createAccountTx := flowsdk.NewTransaction().
@@ -394,11 +397,14 @@ func (lg *ContLoadGenerator) sendAccountCreationTX(workerID int) {
 	}
 
 	lg.log.Trace().Msgf("signing transaction")
-	err = acc.signTx(createAccountTx, 0)
+
+	err = createAccountTx.SignEnvelope(*acc.address, 0, acc.signer)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return
 	}
+
+	acc.seqNumber++
 
 	lg.sendTx(createAccountTx)
 }
