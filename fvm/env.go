@@ -554,6 +554,8 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+	
+	fmt.Println("HERE1 ", flowAddress)
 	if e.ctx.ServiceAccountEnabled {
 		err = e.vm.invokeMetaTransaction(
 			e.ctx,
@@ -593,6 +595,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		}
 	}
 
+	fmt.Println("HERE2> account created ", flowAddress)
 	return runtime.Address(flowAddress), nil
 }
 
