@@ -354,18 +354,17 @@ func (lg *ContLoadGenerator) sendAccountCreationTX(workerID int) {
 		return
 	}
 
+	acc := <-lg.availableAccounts
+	defer func() { lg.availableAccounts <- acc }()
+
 	lg.log.Trace().Msgf("creating transaction")
 
 	createAccountTx := flowsdk.NewTransaction().
 		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
 		SetReferenceBlockID(blockRef).
-		SetProposalKey(
-			*lg.serviceAccount.address,
-			lg.serviceAccount.accountKey.Index,
-			lg.serviceAccount.accountKey.SequenceNumber,
-		).
-		AddAuthorizer(*lg.serviceAccount.address).
-		SetPayer(*lg.serviceAccount.address)
+		SetProposalKey(*acc.address, 0, acc.seqNumber).
+		SetPayer(*acc.address).
+		AddAuthorizer(*acc.address)
 
 	publicKey := bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
 	count := cadence.NewInt(1)
@@ -395,7 +394,7 @@ func (lg *ContLoadGenerator) sendAccountCreationTX(workerID int) {
 	}
 
 	lg.log.Trace().Msgf("signing transaction")
-	err = lg.serviceAccount.signTx(createAccountTx, 0)
+	err = acc.signTx(createAccountTx, 0)
 	if err != nil {
 		lg.log.Error().Err(err).Msgf("error signing transaction")
 		return
