@@ -286,7 +286,6 @@ transaction {
 const deployStorageFeesTransactionTemplate = `
 transaction {
   prepare(serviceAccount: AuthAccount) {
-    let adminAccount = serviceAccount
     serviceAccount.contracts.add(name: "FlowStorageFees", code: "%s".decodeHex())
   }
 }
@@ -353,7 +352,8 @@ transaction() {
         let authAccounts = [service, fungibleToken, flowToken, feeContract]
 
         // take all the funds from the service account
-        let tokenVault = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) ?? panic("Unable to borrow reference to the default token vault")
+        let tokenVault = service.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+            ?? panic("Unable to borrow reference to the default token vault")
         
         for account in authAccounts {
             let storageReservation <- tokenVault.withdraw(amount: FlowStorageFees.minimumStorageReservation) as! @FlowToken.Vault
@@ -361,7 +361,8 @@ transaction() {
             if !hasReceiver {
                 FlowServiceAccount.initDefaultToken(account)
             }
-            let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>() ?? panic("Could not borrow receiver reference to the recipient's Vault")
+            let receiver = account.getCapability(/public/flowTokenReceiver)!.borrow<&{FungibleToken.Receiver}>()
+                ?? panic("Could not borrow receiver reference to the recipient's Vault")
 
             receiver.deposit(from: <-storageReservation)
         }

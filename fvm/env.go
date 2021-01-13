@@ -138,12 +138,11 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
 	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
-	cst := e.st.Child() // create child to avoid the script making changes
 
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		cst,
+		e.st,
 	)
 	if err != nil {
 		return 0, err
@@ -166,12 +165,11 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 
 func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
 	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
-	cst := e.st.Child() // create child to avoid the script making changes
 
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		cst,
+		e.st,
 	)
 	if err != nil {
 		return 0, err

@@ -55,15 +55,6 @@ func NewState(ledger Ledger, opts ...StateOption) *State {
 	return ctx
 }
 
-func (s *State) Child() *State {
-	cs := defaultState(s)
-	cs.interactionUsed = s.interactionUsed
-	cs.maxKeySizeAllowed = s.maxKeySizeAllowed
-	cs.maxValueSizeAllowed = s.maxValueSizeAllowed
-	cs.maxInteractionAllowed = s.maxInteractionAllowed
-	return cs
-}
-
 // WithMaxKeySizeAllowed sets limit on max key size
 func WithMaxKeySizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
