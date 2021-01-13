@@ -274,8 +274,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 
 		// if this is a retry attempt, wait for some time before retrying
 		if retries > 0 {
-			// choose a random interval between 10 and 20 ms to retry
-			r := rand.Intn(10) + 10
+			// choose a random interval between 0 to 5
+			r := rand.Intn(5)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
