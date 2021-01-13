@@ -280,6 +280,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 			"private share is received after the shares timeout")
 		return
 	}
+
 	// only accept private shares from the leader.
 	if origin != s.leaderIndex {
 		return
@@ -409,20 +410,36 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		return
 	}
 
-	if origin == s.leaderIndex {
-		return
-	}
-
 	if len(data) != complaintSize {
-		s.disqualified = true
-		s.processor.Disqualify(int(origin),
-			fmt.Sprintf("invalid complaint size, expects %d, got %d",
-				complaintSize, len(data)))
+		// only the leader of the instance gets disqualified
+		if origin == s.leaderIndex {
+			s.disqualified = true
+			s.processor.Disqualify(int(origin),
+				fmt.Sprintf("invalid complaint size, expects %d, got %d",
+					complaintSize, len(data)))
+		}
 		return
 	}
 
 	// the byte encodes the complainee
 	complainee := index(data[0])
+
+	// validate the complainee value
+	if int(complainee) >= s.size {
+		// only the leader of the instance gets disqualified
+		if origin == s.leaderIndex {
+			s.disqualified = true
+			s.processor.Disqualify(int(origin),
+				fmt.Sprintf("invalid complainee, should be less than %d, got %d",
+					s.size, complainee))
+		}
+		return
+	}
+
+	// if the complaint is coming from the leader, ignore it
+	if origin == s.leaderIndex {
+		return
+	}
 
 	// if the complainee is not the leader, ignore the complaint
 	if complainee != s.leaderIndex {
@@ -474,9 +491,12 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		return
 	}
 
-	if len(data) == 0 {
+	// check the answer format
+	if len(data) != complainAnswerSize {
 		s.disqualified = true
-		s.processor.Disqualify(int(origin), "complaint answer is empty")
+		s.processor.Disqualify(int(s.leaderIndex),
+			fmt.Sprintf("the complaint answer has an invalid length, expects %d, got %d",
+				complainAnswerSize, len(data)))
 		return
 	}
 
@@ -497,14 +517,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			received:       false,
 			answerReceived: true,
 		}
-		// check the answer format
-		if len(data) != complainAnswerSize {
-			s.disqualified = true
-			s.processor.Disqualify(int(s.leaderIndex),
-				fmt.Sprintf("the complaint answer has an invalid length, expects %d, got %d",
-					complainAnswerSize, len(data)))
-			return
-		}
+
 		// read the complainer private share
 		if C.bn_read_Zr_bin((*C.bn_st)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
@@ -524,15 +537,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			"complaint answer was already received")
 		return
 	}
-
 	c.answerReceived = true
-	if len(data) != complainAnswerSize {
-		s.disqualified = true
-		s.processor.Disqualify(int(s.leaderIndex),
-			fmt.Sprintf("invalid complaint answer length, expected %d, got %d",
-				complainAnswerSize, len(data)))
-		return
-	}
 
 	// first flag check is a sanity check
 	if c.received {

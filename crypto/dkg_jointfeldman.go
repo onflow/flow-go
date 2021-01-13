@@ -229,12 +229,12 @@ func (s *JointFeldmanState) ForceDisqualify(node int) error {
 	if !s.jointRunning {
 		return errors.New("dkg is not running")
 	}
-	for i := 0; i < s.size; i++ {
-		err := s.fvss[i].ForceDisqualify(node)
-		if err != nil {
-			return fmt.Errorf("disqualif has failed: %w", err)
-		}
+	// disqualify the node in the fvss instance where they are a leader
+	err := s.fvss[node].ForceDisqualify(node)
+	if err != nil {
+		return fmt.Errorf("disqualif has failed: %w", err)
 	}
+
 	return nil
 }
 
