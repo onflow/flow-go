@@ -207,6 +207,11 @@ func main() {
 				return nil, err
 			}
 
+			assigner, err := chmodule.NewChunkAssigner(chunkAlpha, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not create public assignment: %w", err)
+			}
+
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,

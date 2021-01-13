@@ -25,7 +25,7 @@ var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx              Context
-	ledger           state.Ledger
+	st               *state.State
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *UUIDGenerator
@@ -46,19 +46,19 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, ledger state.Ledger) (*hostEnv, error) {
-	accounts := state.NewAccounts(ledger)
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
+	accounts := state.NewAccounts(st)
+	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
 
-	uuids := state.NewUUIDs(ledger)
+	uuids := state.NewUUIDs(st)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
 	env := &hostEnv{
 		ctx:                ctx,
-		ledger:             ledger,
+		st:                 st,
 		Metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
 		addressGenerator:   generator,
@@ -89,7 +89,7 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, t
 	e.transactionEnv = newTransactionEnv(
 		vm,
 		e.ctx,
-		e.ledger,
+		e.st,
 		e.accounts,
 		e.addressGenerator,
 		tx,
@@ -254,6 +254,10 @@ func (e *hostEnv) Log(message string) error {
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
 
+	if e.transactionEnv == nil {
+		return errors.New("emitting events is not supported")
+	}
+
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
 		return fmt.Errorf("failed to json encode a cadence event: %w", err)
@@ -353,7 +357,7 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 // GetCurrentBlockHeight returns the current block height.
 func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	if e.ctx.BlockHeader == nil {
-		return 0, errors.New("GetCurrentBlockHeight is not supported by this environment")
+		return 0, errors.New("getting the current block height is not supported")
 	}
 	return e.ctx.BlockHeader.Height, nil
 }
@@ -362,7 +366,7 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 // secure.
 func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	if e.rng == nil {
-		return 0, errors.New("UnsafeRandom is not supported by this environment")
+		return 0, errors.New("unsafe random is not supported")
 	}
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
@@ -381,7 +385,7 @@ func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	if e.ctx.Blocks == nil {
-		panic("GetBlockAtHeight is not supported by this environment")
+		return runtime.Block{}, false, errors.New("getting block information is not supported")
 	}
 
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
@@ -405,7 +409,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 
 func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	if e.transactionEnv == nil {
-		panic("CreateAccount is not supported by this environment")
+		return runtime.Address{}, errors.New("creating accounts is not supported")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -414,7 +418,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 
 func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	if e.transactionEnv == nil {
-		panic("AddAccountKey is not supported by this environment")
+		return errors.New("adding account keys is not supported")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -423,7 +427,7 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 
 func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	if e.transactionEnv == nil {
-		panic("RemoveAccountKey is not supported by this environment")
+		return nil, errors.New("removing account keys is not supported")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -432,7 +436,7 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	if e.transactionEnv == nil {
-		panic("UpdateAccountContractCode is not supported by this environment")
+		return errors.New("updating account contract code is not supported")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -448,7 +452,7 @@ func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (
 
 func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	if e.transactionEnv == nil {
-		panic("RemoveAccountContractCode is not supported by this environment")
+		return errors.New("removing account contracts is not supported")
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -461,7 +465,7 @@ func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name
 	// must be signed by the service account
 	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("code deployment requires authorization from the service account")
+		return errors.New("code deployment requires authorization from the service account")
 	}
 
 	return e.accounts.SetContract(name, accountAddress, code)
@@ -473,7 +477,7 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 	// must be signed by the service account
 	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("code deployment requires authorization from the service account")
+		return errors.New("code deployment requires authorization from the service account")
 	}
 
 	return e.accounts.DeleteContract(name, accountAddress)
@@ -481,7 +485,7 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	if e.transactionEnv == nil {
-		return nil, errors.New("GetSigningAccounts is not supported by this environment")
+		return nil, errors.New("getting signer accounts is not supported")
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
@@ -492,7 +496,7 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
-	ledger           state.Ledger
+	st               *state.State
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 
@@ -506,7 +510,7 @@ type transactionEnv struct {
 func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
-	ledger state.Ledger,
+	st *state.State,
 	accounts *state.Accounts,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
@@ -516,7 +520,7 @@ func newTransactionEnv(
 	return &transactionEnv{
 		vm:               vm,
 		ctx:              ctx,
-		ledger:           ledger,
+		st:               st,
 		accounts:         accounts,
 		addressGenerator: addressGenerator,
 		tx:               tx,
@@ -558,7 +562,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled,
 			),
-			e.ledger,
+			e.st,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -581,7 +585,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		err = e.vm.invokeMetaTransaction(
 			e.ctx,
 			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
-			e.ledger,
+			e.st,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202

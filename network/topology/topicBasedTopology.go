@@ -15,11 +15,11 @@ import (
 // TopicBasedTopology is a deterministic topology mapping that creates a connected graph component among the nodes
 // involved in each topic.
 type TopicBasedTopology struct {
-	me      flow.Identifier             // used to keep identifier of the node
-	state   protocol.State              // used to keep a read only protocol state
-	subMngr network.SubscriptionManager // used to keep track topics the node subscribed to
-	logger  zerolog.Logger
-	seed    int64
+	myNodeID flow.Identifier             // used to keep identifier of the node
+	state    protocol.State              // used to keep a read only protocol state
+	subMngr  network.SubscriptionManager // used to keep track topics the node subscribed to
+	logger   zerolog.Logger
+	seed     int64
 }
 
 // NewTopicBasedTopology returns an instance of the TopicBasedTopology.
@@ -27,17 +27,17 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 	logger zerolog.Logger,
 	state protocol.State,
 	subMngr network.SubscriptionManager) (*TopicBasedTopology, error) {
-	seed, err := seedFromID(nodeID)
+	seed, err := intSeedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
 	}
 
 	t := &TopicBasedTopology{
-		me:      nodeID,
-		state:   state,
-		seed:    seed,
-		subMngr: subMngr,
-		logger:  logger.With().Str("component:", "topic-based-topology").Logger(),
+		myNodeID: nodeID,
+		state:    state,
+		seed:     seed,
+		subMngr:  subMngr,
+		logger:   logger.With().Str("component:", "topic-based-topology").Logger(),
 	}
 
 	return t, nil
@@ -123,12 +123,12 @@ func (t TopicBasedTopology) subsetRole(ids flow.IdentityList, shouldHave flow.Id
 	// excludes irrelevant roles and the node itself from both should have and ids set
 	shouldHave = shouldHave.Filter(filter.And(
 		filter.HasRole(roles...),
-		filter.Not(filter.HasNodeID(t.me)),
+		filter.Not(filter.HasNodeID(t.myNodeID)),
 	))
 
 	ids = ids.Filter(filter.And(
 		filter.HasRole(roles...),
-		filter.Not(filter.HasNodeID(t.me)),
+		filter.Not(filter.HasNodeID(t.myNodeID)),
 	))
 
 	sample, err := t.sampleConnectedGraph(ids, shouldHave)
@@ -183,28 +183,18 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 
 }
 
-// clusterPeers returns the list of other nodes within the same cluster as this node.
-func (t TopicBasedTopology) clusterPeers() (flow.IdentityList, error) {
-	currentEpoch := t.state.Final().Epochs().Current()
-	clusterList, err := currentEpoch.Clustering()
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract cluster list %w", err)
-	}
-
-	myCluster, _, found := clusterList.ByNodeID(t.me)
-	if !found {
-		return nil, fmt.Errorf("failed to find the cluster for node ID %s", t.me.String())
-	}
-
-	return myCluster, nil
-}
-
 // clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
 func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityList) (flow.IdentityList, error) {
 	// extracts cluster peer ids to which the node belongs to.
-	clusterPeers, err := t.clusterPeers()
+	clusterPeers, err := clusterPeers(t.myNodeID, t.state)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", t.me.String(), err)
+		return nil, fmt.Errorf("failed to find cluster peers for node %s: %w", t.myNodeID.String(), err)
+	}
+
+	// checks all cluster peers belong to the passed ids list
+	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
+	if len(nonMembers) > 0 {
+		return nil, fmt.Errorf("cluster peers not belonged to sample space: %v", nonMembers)
 	}
 
 	// samples a connected graph topology from the cluster peers
