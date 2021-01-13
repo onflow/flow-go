@@ -72,7 +72,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
-		RestrictedAccountCreationEnabled: true,
+		RestrictedAccountCreationEnabled: false,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
 		SetValueHandler:                  nil,
