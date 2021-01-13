@@ -236,3 +236,12 @@ func WithSetValueHandler(handler SetValueHandler) Option {
 		return ctx
 	}
 }
+
+// WithAccountStorageLimit enables or disables checking if account storage used is
+// over its storage capacity
+func WithAccountStorageLimit(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.LimitAccountStorage = enabled
+		return ctx
+	}
+}
