@@ -19,11 +19,12 @@ import (
 type LoadType string
 
 const (
-	TokenTransferLoadType LoadType = "token-transfer"
-	TokenAddKeysLoadType  LoadType = "add-keys"
-	CompHeavyLoadType     LoadType = "computation-heavy"
-	EventHeavyLoadType    LoadType = "event-heavy"
-	LedgerHeavyLoadType   LoadType = "ledger-heavy"
+	TokenTransferLoadType   LoadType = "token-transfer"
+	TokenAddKeysLoadType    LoadType = "add-keys"
+	CompHeavyLoadType       LoadType = "computation-heavy"
+	EventHeavyLoadType      LoadType = "event-heavy"
+	LedgerHeavyLoadType     LoadType = "ledger-heavy"
+	AccountCreationLoadType LoadType = "account-creation"
 )
 
 const accountCreationBatchSize = 100
@@ -180,6 +181,8 @@ func (lg *ContLoadGenerator) Start() {
 			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
 		case TokenAddKeysLoadType:
 			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
+		case AccountCreationLoadType:
+			worker = NewWorker(i, 1*time.Second, lg.sendAccountCreationTX)
 		// other types
 		default:
 			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
@@ -341,6 +344,64 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	lg.log.Info().Msgf("created %d accounts", len(lg.accounts))
 
 	return nil
+}
+
+func (lg *ContLoadGenerator) sendAccountCreationTX(workerID int) {
+
+	blockRef, err := lg.blockRef.Get()
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error getting reference block")
+		return
+	}
+
+	lg.log.Trace().Msgf("creating transaction")
+
+	createAccountTx := flowsdk.NewTransaction().
+		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
+		SetReferenceBlockID(blockRef).
+		SetProposalKey(
+			*lg.serviceAccount.address,
+			lg.serviceAccount.accountKey.Index,
+			lg.serviceAccount.accountKey.SequenceNumber,
+		).
+		AddAuthorizer(*lg.serviceAccount.address).
+		SetPayer(*lg.serviceAccount.address)
+
+	publicKey := bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
+	count := cadence.NewInt(1)
+
+	initialTokenAmount, err := cadence.NewUFix64FromParts(
+		24*60*60*tokensPerTransfer, //  (24 hours at 1 block per second and 10 tokens sent)
+		0,
+	)
+
+	if err != nil {
+		return
+	}
+
+	err = createAccountTx.AddArgument(publicKey)
+	if err != nil {
+		return
+	}
+
+	err = createAccountTx.AddArgument(count)
+	if err != nil {
+		return
+	}
+
+	err = createAccountTx.AddArgument(initialTokenAmount)
+	if err != nil {
+		return
+	}
+
+	lg.log.Trace().Msgf("signing transaction")
+	err = lg.serviceAccount.signTx(createAccountTx, 0)
+	if err != nil {
+		lg.log.Error().Err(err).Msgf("error signing transaction")
+		return
+	}
+
+	lg.sendTx(createAccountTx)
 }
 
 func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
