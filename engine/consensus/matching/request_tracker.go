@@ -23,7 +23,7 @@ type RequestTrackerItem struct {
 
 // NewRequestTrackerItem instantiates a new RequestTrackerItem where the
 // NextTimeout is evaluated to the current time plus a random blackout period
-// contained by the provided min and max.
+// contained between min and max.
 func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) *RequestTrackerItem {
 	item := &RequestTrackerItem{
 		blackoutPeriodMin: blackoutPeriodMin,
@@ -39,8 +39,12 @@ func (i *RequestTrackerItem) Update() {
 	i.NextTimeout = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)
 }
 
+func (i *RequestTrackerItem) IsBlackout() bool {
+	return time.Now().Before(i.NextTimeout)
+}
+
 func randBlackout(min int, max int) time.Time {
-	blackoutSeconds := rand.Intn(max-min) + min
+	blackoutSeconds := rand.Intn(max-min+1) + min
 	blackout := time.Now().Add(time.Duration(blackoutSeconds) * time.Second)
 	return blackout
 }
@@ -53,13 +57,18 @@ RequestTracker
 // ID and chunk index.
 // It is not concurrency-safe.
 type RequestTracker struct {
-	index map[flow.Identifier]map[uint64]*RequestTrackerItem
+	index             map[flow.Identifier]map[uint64]*RequestTrackerItem
+	blackoutPeriodMin int
+	blackoutPeriodMax int
 }
 
-// NewRequestTracker instantiates a new RequestTracker.
-func NewRequestTracker() *RequestTracker {
+// NewRequestTracker instantiates a new RequestTracker with blackout periods
+// between min and max seconds.
+func NewRequestTracker(blackoutPeriodMin, blackoutPeriodMax int) *RequestTracker {
 	return &RequestTracker{
-		index: make(map[flow.Identifier]map[uint64]*RequestTrackerItem),
+		index:             make(map[flow.Identifier]map[uint64]*RequestTrackerItem),
+		blackoutPeriodMin: blackoutPeriodMin,
+		blackoutPeriodMax: blackoutPeriodMax,
 	}
 }
 
@@ -69,10 +78,15 @@ func (rt *RequestTracker) GetAll() map[flow.Identifier]map[uint64]*RequestTracke
 	return rt.index
 }
 
-// Get returns the tracker item for a specific chunk.
-func (rt *RequestTracker) Get(resultID flow.Identifier, chunkIndex uint64) (*RequestTrackerItem, bool) {
+// Get returns the tracker item for a specific chunk, and creates a new one if
+// it doesn't exist.
+func (rt *RequestTracker) Get(resultID flow.Identifier, chunkIndex uint64) *RequestTrackerItem {
 	item, ok := rt.index[resultID][chunkIndex]
-	return item, ok
+	if !ok {
+		item = NewRequestTrackerItem(rt.blackoutPeriodMin, rt.blackoutPeriodMax)
+		rt.Set(resultID, chunkIndex, item)
+	}
+	return item
 }
 
 // Set inserts or updates the tracker item for a specific chunk.

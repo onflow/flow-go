@@ -17,10 +17,10 @@ func RetrieveResultApproval(approvalID flow.Identifier, approval *flow.ResultApp
 }
 
 // IndexResultApproval inserts a ResultApproval ID keyed by ExecutionResult ID
-// and chunk index, and overwrites any pre-existing item for this key. This
-// operation is only used by the ResultApprovals store, which is only used
-// within a Verification node, where it is assumed that there is only one
-// approval per chunk.
+// and chunk index. If a value for this key exists, a storage.ErrAlreadyExists
+// error is returned. This operation is only used by the ResultApprovals store,
+// which is only used within a Verification node, where it is assumed that there
+// is only one approval per chunk.
 func IndexResultApproval(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeIndexResultApprovalByChunk, resultID, chunkIndex), approvalID)
 }

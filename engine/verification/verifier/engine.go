@@ -140,7 +140,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		// logs the error instead of returning that.
 		// returning error would be projected at a higher level by network layer.
 		// however, this is an engine-level error, and not network layer error.
-		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+		e.log.Warn().Err(err).Msg("engine could not process event successfully")
 	}
 
 	return nil

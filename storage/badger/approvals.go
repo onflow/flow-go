@@ -110,8 +110,9 @@ func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(approval))
 }
 
-// Index indexes a ResultApproval by chunk ( ResultID + chunk index ), and
-// overrides any pre-existing entry for this key.
+// Index indexes a ResultApproval by chunk (ResultID + chunk index).
+// operation is idempotent (repeated calls with the same value are equivalent to
+// just calling the method once; still the method succeeds on each call).
 func (r *ResultApprovals) Index(resultID flow.Identifier, chunkIndex uint64, approvalID flow.Identifier) error {
 	err := operation.RetryOnConflict(r.db.Update, r.index(resultID, chunkIndex, approvalID))
 	if err != nil {

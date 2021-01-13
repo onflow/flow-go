@@ -97,10 +97,8 @@ func (ms *MatchingSuite) SetupTest() {
 		assigner:                  ms.Assigner,
 		requireApprovals:          true,
 		receiptValidator:          ms.receiptValidator,
-		requestTracker:            NewRequestTracker(),
+		requestTracker:            NewRequestTracker(1, 3),
 		approvalRequestsThreshold: 10,
-		requestBlackoutMin:        1,
-		requestBlackoutMax:        3,
 	}
 }
 
@@ -847,7 +845,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	// Check the request tracker
 	ms.Assert().Equal(exp, len(ms.matching.requestTracker.index))
 	for _, expectedRequest := range expectedRequests {
-		requestItem, _ := ms.matching.requestTracker.Get(
+		requestItem := ms.matching.requestTracker.Get(
 			expectedRequest.ResultID,
 			expectedRequest.ChunkIndex,
 		)
@@ -855,7 +853,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	}
 
 	// wait for the max blackout period to elapse and retry
-	time.Sleep(time.Duration(2*ms.matching.requestBlackoutMax) * time.Second)
+	time.Sleep(3 * time.Second)
 	err = ms.matching.requestPendingApprovals()
 	ms.Require().NoError(err)
 
@@ -866,7 +864,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	// Check the request tracker
 	ms.Assert().Equal(exp, len(ms.matching.requestTracker.index))
 	for _, expectedRequest := range expectedRequests {
-		requestItem, _ := ms.matching.requestTracker.Get(
+		requestItem := ms.matching.requestTracker.Get(
 			expectedRequest.ResultID,
 			expectedRequest.ChunkIndex,
 		)

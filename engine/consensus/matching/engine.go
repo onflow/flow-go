@@ -60,8 +60,6 @@ type Engine struct {
 	receiptValidator          module.ReceiptValidator         // used to validate receipts
 	requestTracker            *RequestTracker                 // used to cout the number of approval requests by chunk ([result id][chunk index]=>count)
 	approvalRequestsThreshold uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
-	requestBlackoutMin        int                             // min duration of approval-request blackout period (in seconds)
-	requestBlackoutMax        int                             // max duration of approval-request blackout period (in seconds)
 }
 
 // New creates a new collection propagation engine.
@@ -112,10 +110,8 @@ func New(
 		assigner:                  assigner,
 		requireApprovals:          requireApprovals,
 		receiptValidator:          validator,
-		requestTracker:            NewRequestTracker(),
+		requestTracker:            NewRequestTracker(10, 30),
 		approvalRequestsThreshold: 10,
-		requestBlackoutMin:        10,
-		requestBlackoutMax:        30,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -965,12 +961,13 @@ func (e *Engine) requestPendingReceipts() error {
 // enough approvals. When the number of unsealed finalized blocks exceeds the
 // threshold, we go through the entire mempool of incorporated-results, which
 // haven't yet been sealed, and check which chunks need more approvals. We only
-// request approvals if the block the result is for is below the threshold.
+// request approvals if the block incorporating the result is below the
+// threshold.
 //
-//                           threshold
-//                        |             |
-// ... <-- A <-- A+1 <--- D <-- D+1 <-- F
-//       sealed         buffer         final
+//                                   threshold
+//                              |                   |
+// ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
+//       sealed       maxHeightForRequesting      final
 func (e *Engine) requestPendingApprovals() error {
 
 	// Skip requesting approvals if they are not required for sealing.
@@ -999,8 +996,8 @@ func (e *Engine) requestPendingApprovals() error {
 		Uint64("approval_requests_threshold", e.approvalRequestsThreshold).
 		Logger()
 
-	buffer := final.Height - e.approvalRequestsThreshold
-	if buffer <= sealed.Height {
+	maxHeightForRequesting := final.Height - e.approvalRequestsThreshold
+	if maxHeightForRequesting <= sealed.Height {
 		log.Debug().Msg("skip requesting approvals as number of unsealed finalized blocks is below threshold")
 		return nil
 	}
@@ -1016,24 +1013,29 @@ func (e *Engine) requestPendingApprovals() error {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// Skip results incorporated in blocks that are not yet finalized.
-		// To check if a block is finalized we try to see if it was indexed by
-		// height. Indeed, blocks are only ever indexed by height if they are
-		// finalized (cf Headers DB)
-		_, err = e.headersDB.ByHeight(block.Height)
+		// Skip results incorporated in blocks that are above the approval
+		// request threshold. If this check passes, height `block.Height` must
+		// be finalized, because maxHeightForRequesting is lower than the
+		// finalized height.
+		if block.Height > maxHeightForRequesting {
+			continue
+		}
+
+		// Skip result if it is incorporated in a block that is _not_ part of
+		// the finalized fork.
+		finalizedBlockAtHeight, err := e.headersDB.ByHeight(block.Height)
 		if err != nil {
+			return fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
+		}
+		if finalizedBlockAtHeight.ID() != r.IncorporatedBlockID {
+			// block is in an orphaned fork
 			continue
 		}
 
-		// skip results incorporated in blocks that are above the approval
-		// request threshold
-		if block.Height > buffer {
-			continue
-		}
-
-		// Double check that the result the block is for has not aready been
-		// sealed. Normally such incorporated results should have been removed
-		// from the mempool...
+		// Skip results for already-sealed blocks. While such incorporated
+		// results will eventually be removed from the mempool, there is a small
+		// period, where they might still be in the mempool (until the cleanup
+		// algorithm has caught them).
 		resultBlock, err := e.headersDB.ByBlockID(r.Result.BlockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
@@ -1047,9 +1049,6 @@ func (e *Engine) requestPendingApprovals() error {
 		// assigner keeps a cache of computed assignments, so this is not
 		// necessarily an expensive operation.
 		assignment, err := e.assigner.Assign(r.Result, r.IncorporatedBlockID)
-		if state.IsNoValidChildBlockError(err) {
-			continue
-		}
 		if err != nil {
 			// at this point, we know the block and a valid child block exists.
 			// Not being able to compute the assignment constitutes a fatal
@@ -1069,24 +1068,14 @@ func (e *Engine) requestPendingApprovals() error {
 				continue
 			}
 
-			// retrieve information about requests made for this chunk
-			requestTrackerItem, ok := e.requestTracker.Get(resultID, c.Index)
-			if !ok {
-				// if this is the first time we consider requesting approvals
-				// for this chunk, create a new tracking item with a blackout
-				// period comprised between the configured limits.
-				requestTrackerItem = NewRequestTrackerItem(e.requestBlackoutMin, e.requestBlackoutMax)
-				e.requestTracker.Set(resultID, c.Index, requestTrackerItem)
-			}
-
-			// do not request approvals before the blackout period has expired
-			if time.Now().Before(requestTrackerItem.NextTimeout) {
+			// Retrieve information about requests made for this chunk. Skip
+			// requesting if the blackout period hasn't expired. Otherwise,
+			// update request count and reset blackout period.
+			requestTrackerItem := e.requestTracker.Get(resultID, c.Index)
+			if requestTrackerItem.IsBlackout() {
 				continue
 			}
-
-			// increment the number of requests and recompute the next timeout
 			requestTrackerItem.Update()
-			e.requestTracker.Set(resultID, c.Index, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10
