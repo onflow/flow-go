@@ -40,6 +40,34 @@ func ChannelIDsByRole(role flow.Role) []string {
 	return channels
 }
 
+// UniqueChannelIDsByRole returns list of non-cluster channel IDs with unique identifiers accompanied
+// with the list of cluster channel IDs, which the role subscribed to.
+func UniqueChannelIDsByRole(role flow.Role) []string {
+	added := make(map[flow.Identifier]struct{})
+	uniques := make([]string, 0)
+
+	// a channel is added to uniques if it is either a
+	// cluster channel, or no non-cluster channel with the same id
+	// has already been added to uniques.
+	all := ChannelIDsByRole(role)
+	for _, channel := range all {
+		// cluster channels directly added to uniques without marked as added.
+		if _, ok := IsClusterChannelID(channel); ok {
+			uniques = append(uniques, channel)
+			continue
+		}
+
+		// non-cluster channels only added to uniques if their id is not in added map.
+		id := channelIdMap[channel].ID()
+		if _, ok := added[id]; !ok {
+			added[id] = struct{}{}
+			uniques = append(uniques, channel)
+		}
+	}
+
+	return uniques
+}
+
 // ChannelIDs returns all channelIDs nodes of any role have subscribed to.
 func ChannelIDs() []string {
 	channelIDs := make([]string, 0)
