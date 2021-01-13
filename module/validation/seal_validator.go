@@ -50,23 +50,23 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.AggregatedSignature,
 	chunk *flow.Chunk, executionResultID flow.Identifier) error {
 	// TODO: replace implementation once proper aggregation is used for Verifiers' attestation signatures.
+
+	atst := flow.Attestation{
+		BlockID:           chunk.BlockID,
+		ExecutionResultID: executionResultID,
+		ChunkIndex:        chunk.Index,
+	}
+	atstID := atst.ID()
+
 	for i, signature := range aggregatedSignatures.VerifierSignatures {
 		signerId := aggregatedSignatures.SignerIDs[i]
 
 		nodeIdentity, err := identityForNode(s.state, chunk.BlockID, signerId)
-
 		if err != nil {
 			return err
 		}
 
-		atst := flow.Attestation{
-			BlockID:           chunk.BlockID,
-			ExecutionResultID: executionResultID,
-			ChunkIndex:        chunk.Index,
-		}
-		atstID := atst.ID()
 		valid, err := s.verifier.Verify(atstID[:], signature, nodeIdentity.StakingPubKey)
-
 		if err != nil {
 			return fmt.Errorf("failed to verify signature: %w", err)
 		}
@@ -213,12 +213,12 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 				// TODO: this is only here temporarily to ease the migration to new chunk
 				// based sealing.
 				if s.requiredChunkApprovals == 0 {
-					log.Warn().Msgf("payload includes invalid seal, continuing validation (%x), %s", seal.ID(), err.Error())
+					log.Warn().Msgf("payload includes invalid seal, continuing validation (%x): %s", seal.ID(), err.Error())
 				} else {
-					return nil, fmt.Errorf("payload includes invalid seal (%x), %w", seal.ID(), err)
+					return nil, fmt.Errorf("payload includes invalid seal (%x): %w", seal.ID(), err)
 				}
 			} else {
-				return nil, fmt.Errorf("unexpected seal validation error %w", err)
+				return nil, fmt.Errorf("unexpected seal validation error: %w", err)
 			}
 		}
 
