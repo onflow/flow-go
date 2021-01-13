@@ -171,30 +171,16 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	// from the previous epoch that are now un-staking
 	case flow.EpochPhaseStaking:
 
-		first, err := s.state.AtBlockID(status.FirstBlockID).Head()
-		if err != nil {
-			return nil, fmt.Errorf("could not get first block of epoch: %w", err)
-		}
-		// check whether this is the first epoch after the root block - in this
-		// case there are no previous epoch identities to check anyway
-		root, err := s.state.Params().Root()
-		if err != nil {
-			return nil, fmt.Errorf("could not get root block: %w", err)
-		}
-		if first.ID() == root.ID() {
+		if !status.HasPrevious() {
 			break
 		}
 
-		lastStatus, err := s.state.epoch.statuses.ByBlockID(first.ParentID)
+		previousSetup, err := s.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get last epoch status: %w", err)
-		}
-		lastSetup, err := s.state.epoch.setups.ByID(lastStatus.CurrentEpoch.SetupID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get last epoch setup event: %w", err)
+			return nil, fmt.Errorf("could not get previous epoch setup event: %w", err)
 		}
 
-		for _, identity := range lastSetup.Participants {
+		for _, identity := range previousSetup.Participants {
 			_, exists := lookup[identity.NodeID]
 			// add identity from previous epoch that is not in current epoch
 			if !exists {
@@ -433,23 +419,23 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpoch(err)
 	}
-	first, err := q.snap.state.headers.ByBlockID(status.FirstBlockID)
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
 
-	// CASE 1: we are in the first epoch after the root block, in which case
-	// we return a sentinel error
-	root, err := q.snap.state.Params().Root()
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
-	if first.ID() == root.ID() {
+	// CASE 1: there is no previous epoch - this indicates we are in the first
+	// epoch after a spork root or genesis block
+	if !status.HasPrevious() {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
-	// CASE 2: we are in any other epoch, return the current epoch w.r.t. the
-	// parent block of the first block in this epoch, which must be in the
-	// previous epoch
-	return q.snap.state.AtBlockID(first.ParentID).Epochs().Current()
+	// CASE 2: we are in any other epoch - retrieve the setup and commit events
+	// for the previous epoch
+	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+
+	return NewCommittedEpoch(setup, commit)
 }
