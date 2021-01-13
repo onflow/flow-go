@@ -263,9 +263,9 @@ func (part DKGParticipant) EncodeRLP(w io.Writer) error {
 // service events emitted as of the reference block. Events not yet emitted are
 // represented by ZeroID.
 type EpochStatus struct {
-	FirstBlockID Identifier // ID of the first block in current epoch
-	CurrentEpoch EventIDs   // EpochSetup and EpochCommit events for the current epoch
-	NextEpoch    EventIDs   // EpochSetup and EpochCommit events for the next epoch
+	PreviousEpoch EventIDs // EpochSetup and EpochCommit events for the previous epoch
+	CurrentEpoch  EventIDs // EpochSetup and EpochCommit events for the current epoch
+	NextEpoch     EventIDs // EpochSetup and EpochCommit events for the next epoch
 }
 
 // EventIDs is a container for IDs of epoch service events.
@@ -276,9 +276,12 @@ type EventIDs struct {
 	CommitID Identifier
 }
 
-func NewEpochStatus(firstBlockID, currentSetup, currentCommit, nextSetup, nextCommit Identifier) (*EpochStatus, error) {
+func NewEpochStatus(previousSetup, previousCommit, currentSetup, currentCommit, nextSetup, nextCommit Identifier) (*EpochStatus, error) {
 	status := &EpochStatus{
-		FirstBlockID: firstBlockID,
+		PreviousEpoch: EventIDs{
+			SetupID:  previousSetup,
+			CommitID: previousCommit,
+		},
 		CurrentEpoch: EventIDs{
 			SetupID:  currentSetup,
 			CommitID: currentCommit,
@@ -289,22 +292,22 @@ func NewEpochStatus(firstBlockID, currentSetup, currentCommit, nextSetup, nextCo
 		},
 	}
 
-	err := status.check()
+	err := status.Check()
 	if err != nil {
 		return nil, err
 	}
 	return status, nil
 }
 
-// check checks that the status is well-formed, returning an error if it is not.
-func (es *EpochStatus) check() error {
+// Check checks that the status is well-formed, returning an error if it is not.
+func (es *EpochStatus) Check() error {
 
 	if es == nil {
 		return fmt.Errorf("nil epoch status")
 	}
-	// must reference first block of current epoch
-	if es.FirstBlockID == ZeroID {
-		return fmt.Errorf("epoch status with empty first block")
+	// must reference either both or neither event IDs for previous epoch
+	if (es.PreviousEpoch.SetupID == ZeroID) != (es.PreviousEpoch.CommitID == ZeroID) {
+		return fmt.Errorf("epoch status with only setup or only commit service event")
 	}
 	// must reference event IDs for current epoch
 	if es.CurrentEpoch.SetupID == ZeroID || es.CurrentEpoch.CommitID == ZeroID {
@@ -320,7 +323,7 @@ func (es *EpochStatus) check() error {
 // Phase returns the phase for the CURRENT epoch, given this epoch status.
 func (es *EpochStatus) Phase() (EpochPhase, error) {
 
-	err := es.check()
+	err := es.Check()
 	if err != nil {
 		return EpochPhaseUndefined, err
 	}
@@ -331,4 +334,8 @@ func (es *EpochStatus) Phase() (EpochPhase, error) {
 		return EpochPhaseSetup, nil
 	}
 	return EpochPhaseCommitted, nil
+}
+
+func (es *EpochStatus) HasPrevious() bool {
+	return es.PreviousEpoch.SetupID != ZeroID && es.PreviousEpoch.CommitID != ZeroID
 }
