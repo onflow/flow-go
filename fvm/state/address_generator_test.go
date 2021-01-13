@@ -9,36 +9,46 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func Test_NewLedgerBoundAddressGenerator_NoError(t *testing.T) {
+func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 	ledger := state.NewMapLedger()
 	chain := flow.MonotonicEmulator.Chain()
-	_, err := state.NewLedgerBoundAddressGenerator(ledger, chain)
+	st := state.NewState(ledger)
+	_, err := state.NewStateBoundAddressGenerator(st, chain)
 	require.NoError(t, err)
 }
 
-func Test_NewLedgerBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
+func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	ledger := state.NewMapLedger()
 	chain := flow.MonotonicEmulator.Chain()
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, chain)
+	st := state.NewState(ledger)
+	generator, err := state.NewStateBoundAddressGenerator(st, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
+	err = st.Commit()
+	require.NoError(t, err)
 	stateBytes, err := ledger.Get("", "", "account_address_state")
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("01"))
 }
 
-func Test_NewLedgerBoundAddressGenerator_UsesLedgerState(t *testing.T) {
+func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	ledger := state.NewMapLedger()
-	ledger.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
+	err := ledger.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
+	require.NoError(t, err)
+
 	chain := flow.MonotonicEmulator.Chain()
-	generator, err := state.NewLedgerBoundAddressGenerator(ledger, chain)
+	st := state.NewState(ledger)
+	generator, err := state.NewStateBoundAddressGenerator(st, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
+	require.NoError(t, err)
+
+	err = st.Commit()
 	require.NoError(t, err)
 
 	stateBytes, err := ledger.Get("", "", "account_address_state")

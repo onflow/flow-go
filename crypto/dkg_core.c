@@ -112,7 +112,7 @@ int ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     return RLC_OK;
 }
 
-// returns 1 if g2^x = y, where g2 is the generatot of G2
+// returns 1 if g2^x = y, where g2 is the generator of G2
 // returns 0 otherwise
 int verifyshare(const bn_t x, const ep2_t y) {
     ep2_t res;
@@ -120,3 +120,4 @@ int verifyshare(const bn_t x, const ep2_t y) {
     g2_mul_gen(res, (bn_st*)x);
     return (ep2_cmp(res, (ep2_st*)y) == RLC_EQ);
 }
+
