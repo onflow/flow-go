@@ -373,7 +373,7 @@ func (lg *ContLoadGenerator) sendAccountCreationTX(workerID int) {
 	count := cadence.NewInt(1)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(
-		24*60*60*tokensPerTransfer, //  (24 hours at 1 block per second and 10 tokens sent)
+		1, //  (24 hours at 1 block per second and 10 tokens sent)
 		0,
 	)
 
