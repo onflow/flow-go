@@ -143,10 +143,10 @@ func GenerateNetworks(t *testing.T,
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	logger zerolog.Logger) (flow.IdentityList,
+	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList,
 	[]*p2p.Middleware) {
 
-	ids, libP2PNodes := GenerateIDs(t, logger, n, dryRunMode)
+	ids, libP2PNodes := GenerateIDs(t, logger, n, dryRunMode, opts...)
 	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes)
 	return ids, mws
 }
@@ -156,8 +156,8 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
-	dryRun bool) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network) {
-	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
+	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network) {
+	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
 	return ids, mws, networks
