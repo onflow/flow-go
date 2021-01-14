@@ -240,7 +240,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
-	requesterEng, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
@@ -258,7 +258,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Net,
 		node.State,
 		node.Me,
-		requesterEng,
+		receiptRequester,
 		resultsDB,
 		node.Headers,
 		node.Index,
@@ -703,13 +703,16 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 
+		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
+
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,
 			node.Tracer,
 			node.Net,
 			node.State,
 			node.Me,
-			chunkVerifier)
+			chunkVerifier,
+			approvalStorage)
 		require.Nil(t, err)
 	}
 

@@ -80,7 +80,7 @@ func main() {
 		approvals        mempool.Approvals
 		seals            mempool.IncorporatedResultSeals
 		prov             *provider.Engine
-		requesterEng     *requester.Engine
+		receiptRequester *requester.Engine
 		syncCore         *synchronization.Core
 		comp             *compliance.Engine
 		conMetrics       module.ConsensusMetrics
@@ -201,7 +201,7 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			requesterEng, err = requester.New(
+			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -225,7 +225,7 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
-				requesterEng,
+				receiptRequester,
 				node.Storage.Results,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -237,7 +237,9 @@ func main() {
 				receiptValidator,
 				requiredApprovalsForSealConstruction,
 			)
-			requesterEng.WithHandle(match.HandleReceipt)
+
+			receiptRequester.WithHandle(match.HandleReceipt)
+
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -418,9 +420,9 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// created with matching engine
-			return requesterEng, nil
+			return receiptRequester, nil
 		}).
 		Run()
 }

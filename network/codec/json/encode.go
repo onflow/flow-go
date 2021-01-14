@@ -71,6 +71,12 @@ func encode(v interface{}) (*Envelope, error) {
 	case *messages.ChunkDataResponse:
 		code = CodeChunkDataResponse
 
+	// result approvals
+	case *messages.ApprovalRequest:
+		code = CodeApprovalRequest
+	case *messages.ApprovalResponse:
+		code = CodeApprovalResponse
+
 	// generic entity exchange engines
 	case *messages.EntityRequest:
 		code = CodeEntityRequest
