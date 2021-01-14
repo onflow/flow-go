@@ -10,12 +10,12 @@ import (
 )
 
 // TestGetRolesByChannelID_NonClusterChannelID evaluates correctness of GetRoleByChannelID function against
-// inclusion and exclusion of roles. Essentially, the test evaluates that RolesByChannelID
-// operates on top of channelIdMap.
+// inclusion and exclusion of roles. Essentially, the test evaluates that RolesByChannel
+// operates on top of channelRoleMap.
 func TestGetRolesByChannelID_NonClusterChannelID(t *testing.T) {
 	// asserts existing topic with its role
 	// the roles list should contain collection and consensus roles
-	roles, ok := RolesByChannelID(PushGuarantees)
+	roles, ok := RolesByChannel(PushGuarantees)
 	assert.True(t, ok)
 	assert.Len(t, roles, 2)
 	assert.Contains(t, roles, flow.RoleConsensus)
@@ -25,20 +25,20 @@ func TestGetRolesByChannelID_NonClusterChannelID(t *testing.T) {
 	assert.NotContains(t, roles, flow.RoleAccess)
 
 	// asserts a non-existing topic
-	roles, ok = RolesByChannelID("non-existing-topic")
+	roles, ok = RolesByChannel("non-existing-topic")
 	assert.False(t, ok)
 	assert.Nil(t, roles)
 }
 
 // TestGetRolesByChannelID_ClusterChannelID evaluates correctness of GetRoleByChannelID function against
-// cluster channel ids. Essentially, the test evaluates that RolesByChannelID
-// operates on top of channelIdMap, and correctly identifies and strips of the cluster channel ids.
+// cluster channel ids. Essentially, the test evaluates that RolesByChannel
+// operates on top of channelRoleMap, and correctly identifies and strips of the cluster channel ids.
 func TestGetRolesByChannelID_ClusterChannelID(t *testing.T) {
 	// creates a cluster channel id
 	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
 
 	// the roles list should contain collection
-	roles, ok := RolesByChannelID(conClusterChannel)
+	roles, ok := RolesByChannel(conClusterChannel)
 	assert.True(t, ok)
 	assert.Len(t, roles, 1)
 	assert.Contains(t, roles, flow.RoleCollection)
@@ -67,23 +67,23 @@ func TestGetChannelIDByRole(t *testing.T) {
 	assert.Contains(t, topics, TestNetwork)
 }
 
-// TestIsClusterChannelID verifies the correctness of IsClusterChannelID method
+// TestIsClusterChannelID verifies the correctness of IsClusterChannel method
 // against cluster and non-cluster channel ids.
 func TestIsClusterChannelID(t *testing.T) {
 	// creates a consensus cluster channel and verifies it
 	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
-	clusterChannelID, ok := IsClusterChannelID(conClusterChannel)
+	clusterChannelID, ok := IsClusterChannel(conClusterChannel)
 	require.True(t, ok)
 	require.Equal(t, clusterChannelID, consensusClusterPrefix)
 
 	// creates a sync cluster channel and verifies it
 	syncClusterID := ChannelSyncCluster("some-sync-cluster-id")
-	clusterChannelID, ok = IsClusterChannelID(syncClusterID)
+	clusterChannelID, ok = IsClusterChannel(syncClusterID)
 	require.True(t, ok)
 	require.Equal(t, clusterChannelID, syncClusterPrefix)
 
 	// non-cluster channel should not be verified
-	clusterChannelID, ok = IsClusterChannelID("non-cluster-channel-id")
+	clusterChannelID, ok = IsClusterChannel("non-cluster-channel-id")
 	require.False(t, ok)
 	require.Empty(t, clusterChannelID)
 }
@@ -95,12 +95,12 @@ func TestUniqueChannelIDsByRole_Uniqueness(t *testing.T) {
 		channels := UniqueChannelIDsByRole(role)
 		visited := make(map[flow.Identifier]struct{})
 		for _, channel := range channels {
-			if _, ok := IsClusterChannelID(channel); ok {
+			if _, ok := IsClusterChannel(channel); ok {
 				continue
 			}
 
 			// non-cluster channels should be unique in their id
-			id := channelIdMap[channel].ID()
+			id := channelRoleMap[channel].ID()
 			_, ok := visited[id]
 			require.False(t, ok)
 

@@ -11,53 +11,53 @@ import (
 )
 
 // init is called first time this package is imported.
-// It creates and initializes the channel ID map.
+// It creates and initializes the channelRoleMap map.
 func init() {
 	initializeChannelIdMap()
 }
 
-// channelIdMap keeps a map between channel IDs and list of flow roles involved in that channel ID.
-var channelIdMap map[string]flow.RoleList
+// channelRoleMap keeps a map between channels and the list of flow roles involved in them.
+var channelRoleMap map[network.Channel]flow.RoleList
 
-// RolesByChannelID returns list of flow roles involved in the channelID.
-func RolesByChannelID(channelID string) (flow.RoleList, bool) {
-	if clusterChannelID, isCluster := IsClusterChannelID(channelID); isCluster {
+// RolesByChannel returns list of flow roles involved in the channel.
+func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
+	if clusterChannel, isCluster := IsClusterChannel(channel); isCluster {
 		// replaces channelID with the stripped-off channel prefix
-		channelID = clusterChannelID
+		channel = clusterChannel
 	}
-	roles, ok := channelIdMap[channelID]
+	roles, ok := channelRoleMap[channel]
 	return roles, ok
 }
 
 // ChannelIDsByRole returns a list of all channel IDs the role subscribes to.
-func ChannelIDsByRole(role flow.Role) []string {
-	channels := make([]string, 0)
-	for channelID, roles := range channelIdMap {
+func ChannelIDsByRole(role flow.Role) network.ChannelList {
+	channels := make(network.ChannelList, 0)
+	for channel, roles := range channelRoleMap {
 		if roles.Contains(role) {
-			channels = append(channels, channelID)
+			channels = append(channels, channel)
 		}
 	}
 
 	return channels
 }
 
-// UniqueChannelIDsByRole returns list of non-cluster channel IDs with unique identifiers accompanied
+// UniqueChannelIDsByRole returns list of non-cluster channels with unique identifiers accompanied
 // with the list of cluster channel IDs, which the role subscribed to.
-func UniqueChannelIDsByRole(role flow.Role) []string {
+func UniqueChannelIDsByRole(role flow.Role) network.ChannelList {
 	added := make(map[flow.Identifier]struct{})
-	uniques := make([]string, 0)
+	uniques := make(network.ChannelList, 0)
 
 	// a channel is added to uniques if it is either a
 	// cluster channel, or no non-cluster channel with the same id
 	// has already been added to uniques.
 	all := ChannelIDsByRole(role)
 	for _, channel := range all {
-		id := channelIdMap[channel].ID()
+		id := channelRoleMap[channel].ID()
 		if _, ok := added[id]; ok {
 			continue
 		}
 
-		if _, ok := IsClusterChannelID(channel); !ok {
+		if _, ok := IsClusterChannel(channel); !ok {
 			added[id] = struct{}{}
 		}
 
@@ -67,17 +67,17 @@ func UniqueChannelIDsByRole(role flow.Role) []string {
 	return uniques
 }
 
-// ChannelIDs returns all channelIDs nodes of any role have subscribed to.
-func ChannelIDs() []string {
-	channelIDs := make([]string, 0)
-	for channelID := range channelIdMap {
+// ChannelIDs returns all channels that npdes of any role have subscribed to.
+func ChannelIDs() network.ChannelList {
+	channelIDs := make(network.ChannelList, 0)
+	for channelID := range channelRoleMap {
 		channelIDs = append(channelIDs, channelID)
 	}
 
 	return channelIDs
 }
 
-// channel IDs
+// channels
 const (
 
 	// Channels used for testing
@@ -117,64 +117,64 @@ const (
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 )
 
-// initializeChannelIdMap initializes an instance of channelIdMap and populates it with the channel IDs and their
+// initializeChannelIdMap initializes an instance of channelRoleMap and populates it with the channel IDs and their
 // Note: Please update this map, if a new channel is defined or a the roles subscribing to a channel have changed
 // corresponding list of roles.
 func initializeChannelIdMap() {
-	channelIdMap = make(map[string]flow.RoleList)
+	channelRoleMap = make(map[network.Channel]flow.RoleList)
 
 	// Channels for test
-	channelIdMap[TestNetwork] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	channelRoleMap[TestNetwork] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
-	channelIdMap[TestMetrics] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	channelRoleMap[TestMetrics] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
 
 	// Channels for consensus protocols
-	channelIdMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
+	channelRoleMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for protocols actively synchronizing state across nodes
-	channelIdMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
-	channelIdMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
+	channelRoleMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
+	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for actively pushing entities to subscribers
-	channelIdMap[PushTransactions] = flow.RoleList{flow.RoleCollection}
-	channelIdMap[PushGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
-	channelIdMap[PushBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	channelRoleMap[PushTransactions] = flow.RoleList{flow.RoleCollection}
+	channelRoleMap[PushGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
+	channelRoleMap[PushBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
-	channelIdMap[PushReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
+	channelRoleMap[PushReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
 		flow.RoleAccess}
-	channelIdMap[PushApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+	channelRoleMap[PushApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	// Channels for actively requesting missing entities
-	channelIdMap[RequestCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
-	channelIdMap[RequestChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
-	channelIdMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	channelRoleMap[RequestCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
+	channelRoleMap[RequestChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
+	channelRoleMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 
 	// Channel aliases to make the code more readable / more robust to errors
-	channelIdMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
-	channelIdMap[ReceiveBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
+	channelRoleMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
+	channelRoleMap[ReceiveBlocks] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus, flow.RoleExecution,
 		flow.RoleVerification, flow.RoleAccess}
-	channelIdMap[ReceiveReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
+	channelRoleMap[ReceiveReceipts] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification,
 		flow.RoleAccess}
-	channelIdMap[ReceiveApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+	channelRoleMap[ReceiveApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
-	channelIdMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
-	channelIdMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
-	channelIdMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	channelRoleMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
+	channelRoleMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
+	channelRoleMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 
-	channelIdMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
-	channelIdMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
+	channelRoleMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
+	channelRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
 }
 
-// IsClusterChannelID returns true if channel ID is a cluster-related channel ID.
-// At the current implementation, only collection nodes are involved in a cluster-related channel ID.
-// If the channel ID is a cluster-related one, this method also strips off the channel prefix and returns it.
-func IsClusterChannelID(channelID string) (string, bool) {
-	if strings.HasPrefix(channelID, syncClusterPrefix) {
+// IsClusterChannel returns true if channel is cluster-based.
+// At the current implementation, only collection nodes are involved in a cluster-based channels.
+// If the channel is a cluster-based one, this method also strips off the channel prefix and returns it.
+func IsClusterChannel(channel network.Channel) (network.Channel, bool) {
+	if strings.HasPrefix(channel.String(), syncClusterPrefix) {
 		return syncClusterPrefix, true
 	}
 
-	if strings.HasPrefix(channelID, consensusClusterPrefix) {
+	if strings.HasPrefix(channel.String(), consensusClusterPrefix) {
 		return consensusClusterPrefix, true
 	}
 
