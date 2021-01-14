@@ -398,6 +398,23 @@ func Test_Checkpointing(t *testing.T) {
 			err = wal6.Close()
 			require.NoError(t, err)
 
+			// check if the latest data is still there
+			query, err := ledger.NewQuery(rootHash, keys2)
+			require.NoError(t, err)
+			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
+			require.NoError(t, err)
+
+			payloads, err := f.Read(trieRead)
+			require.NoError(t, err)
+
+			payloads6, err := f6.Read(trieRead)
+			require.NoError(t, err)
+
+			for i := range keys2 {
+				require.Equal(t, values2[i], payloads[i].Value)
+				require.Equal(t, values2[i], payloads6[i].Value)
+			}
+
 		})
 	})
 }
