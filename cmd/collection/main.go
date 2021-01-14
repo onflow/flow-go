@@ -384,7 +384,7 @@ func main() {
 
 			// loads the private account info for this node from disk for use in the QCContractClient.
 			accountInfo, err := func() (*bootstrap.NodeMachineAccountInfo, error) {
-				data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathQCNodeInfoPriv, node.Me.NodeID())))
+				data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
 				if err != nil {
 					return nil, err
 				}
