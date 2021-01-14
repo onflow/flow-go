@@ -67,7 +67,7 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 		}
 
 		var msg message.Message
-		// read the nex message (blocking call)
+		// read the next message (blocking call)
 		err := r.ReadMsg(&msg)
 
 		// error handling done similar to comm.go in pubsub (as suggested by libp2p folks)
@@ -75,16 +75,25 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 			// if the sender closes the connection an EOF is received otherwise an actual error is received
 			if err != io.EOF {
 				rc.log.Error().Err(err)
-				err = rc.stream.Reset()
-				if err != nil {
-					rc.log.Error().Err(err)
-				}
+				rc.resetStream()
 			} else {
-				err = rc.stream.Close()
-				if err != nil {
-					rc.log.Error().Err(err)
-				}
+				rc.closeStream()
 			}
+			return
+		}
+
+		// check message size
+		maxSize := unicastMaxMsgSize(&msg)
+		if msg.Size() > maxSize {
+			// if message size exceeded, close stream and log error
+			rc.closeStream()
+			rc.log.Error().
+				Hex("sender", msg.OriginID).
+				Hex("event_id", msg.EventID).
+				Str("event_type", msg.Type).
+				Str("channel_id", msg.ChannelID).
+				Int("maxSize", maxSize).
+				Msg("received message exceeded permissible message maxSize")
 			return
 		}
 
@@ -93,5 +102,19 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 
 		// call the callback
 		rc.callback(&msg)
+	}
+}
+
+func (rc *readConnection) closeStream() {
+	err := rc.stream.Close()
+	if err != nil {
+		rc.log.Error().Err(err)
+	}
+}
+
+func (rc *readConnection) resetStream() {
+	err := rc.stream.Reset()
+	if err != nil {
+		rc.log.Error().Err(err)
 	}
 }
