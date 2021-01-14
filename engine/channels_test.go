@@ -86,5 +86,25 @@ func TestIsClusterChannelID(t *testing.T) {
 	clusterChannelID, ok = IsClusterChannelID("non-cluster-channel-id")
 	require.False(t, ok)
 	require.Empty(t, clusterChannelID)
+}
 
+// TestUniqueChannelIDsByRole_Uniqueness verifies that non-cluster channel IDs returned by
+// UniqueChannelIDsByRole are unique based on their ids.
+func TestUniqueChannelIDsByRole_Uniqueness(t *testing.T) {
+	for _, role := range flow.Roles() {
+		channels := UniqueChannelIDsByRole(role)
+		visited := make(map[flow.Identifier]struct{})
+		for _, channel := range channels {
+			if _, ok := IsClusterChannelID(channel); ok {
+				continue
+			}
+
+			// non-cluster channels should be unique in their id
+			id := channelIdMap[channel].ID()
+			_, ok := visited[id]
+			require.False(t, ok)
+
+			visited[id] = struct{}{}
+		}
+	}
 }
