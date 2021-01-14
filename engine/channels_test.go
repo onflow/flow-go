@@ -45,7 +45,7 @@ func TestGetRolesByChannelID_ClusterChannelID(t *testing.T) {
 }
 
 // TestGetChannelIDByRole evaluates retrieving channel IDs associated with a role from the
-// channel IDs map using ChannelIDsByRole. Essentially it evaluates that ChannelIDsByRole
+// channel IDs map using ChannelsByRole. Essentially it evaluates that ChannelsByRole
 // operates on top of channelIDMap.
 func TestGetChannelIDByRole(t *testing.T) {
 	// asserts topics by the role for verification node
@@ -57,7 +57,7 @@ func TestGetChannelIDByRole(t *testing.T) {
 	// - TestNetwork
 	// - TestMetric
 	// the roles list should contain collection and consensus roles
-	topics := ChannelIDsByRole(flow.RoleVerification)
+	topics := ChannelsByRole(flow.RoleVerification)
 	assert.Len(t, topics, 6)
 	assert.Contains(t, topics, PushBlocks)
 	assert.Contains(t, topics, PushReceipts)

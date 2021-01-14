@@ -13,7 +13,7 @@ import (
 // init is called first time this package is imported.
 // It creates and initializes the channelRoleMap map.
 func init() {
-	initializeChannelIdMap()
+	initializeChannelRoleMap()
 }
 
 // channelRoleMap keeps a map between channels and the list of flow roles involved in them.
@@ -22,15 +22,15 @@ var channelRoleMap map[network.Channel]flow.RoleList
 // RolesByChannel returns list of flow roles involved in the channel.
 func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 	if clusterChannel, isCluster := IsClusterChannel(channel); isCluster {
-		// replaces channelID with the stripped-off channel prefix
+		// replaces channel with the stripped-off prefix
 		channel = clusterChannel
 	}
 	roles, ok := channelRoleMap[channel]
 	return roles, ok
 }
 
-// ChannelIDsByRole returns a list of all channel IDs the role subscribes to.
-func ChannelIDsByRole(role flow.Role) network.ChannelList {
+// ChannelsByRole returns a list of all channels the role subscribes to.
+func ChannelsByRole(role flow.Role) network.ChannelList {
 	channels := make(network.ChannelList, 0)
 	for channel, roles := range channelRoleMap {
 		if roles.Contains(role) {
@@ -41,14 +41,14 @@ func ChannelIDsByRole(role flow.Role) network.ChannelList {
 	return channels
 }
 
-// Channels returns all channels that npdes of any role have subscribed to.
+// Channels returns all channels that nodes of any role have subscribed to.
 func Channels() network.ChannelList {
-	channelIDs := make(network.ChannelList, 0)
-	for channelID := range channelRoleMap {
-		channelIDs = append(channelIDs, channelID)
+	channels := make(network.ChannelList, 0)
+	for channel := range channelRoleMap {
+		channels = append(channels, channel)
 	}
 
-	return channelIDs
+	return channels
 }
 
 // channels
@@ -91,10 +91,10 @@ const (
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 )
 
-// initializeChannelIdMap initializes an instance of channelRoleMap and populates it with the channels and their
+// initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
 // Note: Please update this map, if a new channel is defined or a the roles subscribing to a channel have changed
 // corresponding list of roles.
-func initializeChannelIdMap() {
+func initializeChannelRoleMap() {
 	channelRoleMap = make(map[network.Channel]flow.RoleList)
 
 	// Channels for test
