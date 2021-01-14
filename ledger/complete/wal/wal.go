@@ -136,6 +136,8 @@ func (w *LedgerWAL) replay(
 	useCheckpoints bool,
 ) error {
 
+	w.log.Debug().Msgf("replaying WAL from %d to %d", from, to)
+
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
 	}
@@ -173,6 +175,8 @@ func (w *LedgerWAL) replay(
 				availableCheckpoints = availableCheckpoints[:len(availableCheckpoints)-1]
 				continue
 			}
+			w.log.Info().Int("checkpoint", latestCheckpoint).Err(err).
+				Msg("checkpoint loaded")
 			err = checkpointFn(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("error while handling checkpoint: %w", err)
@@ -206,6 +210,8 @@ func (w *LedgerWAL) replay(
 			}
 		}
 	}
+
+	w.log.Debug().Msgf("replying segments from %d to %d", startSegment, to)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
@@ -245,6 +251,9 @@ func (w *LedgerWAL) replay(
 			return fmt.Errorf("cannot read LedgerWAL: %w", err)
 		}
 	}
+
+	w.log.Debug().Msgf("finished replaying WAL from %d to %d", from, to)
+
 	return nil
 }
 
