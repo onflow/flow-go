@@ -49,7 +49,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
 func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
-	myChannelIDs := t.subMngr.GetChannelIDs()
+	myChannelIDs := t.subMngr.Channels()
 	if len(myChannelIDs) == 0 {
 		// no subscribed channel id, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before

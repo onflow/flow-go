@@ -67,7 +67,7 @@ func NewRandomizedTopology(nodeID flow.Identifier,
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
 func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
-	myChannelIDs := r.subMngr.GetChannelIDs()
+	myChannelIDs := r.subMngr.Channels()
 	if len(myChannelIDs) == 0 {
 		// no subscribed channel id, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before

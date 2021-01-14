@@ -70,7 +70,7 @@ func Connected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids f
 }
 
 // MockSubscriptionManager returns a list of mocked subscription manages for the input
-// identities. It only mocks the GetChannelIDs method of the subscription manager. Other methods
+// identities. It only mocks the Channels method of the subscription manager. Other methods
 // return an error, as they are not supposed to be invoked.
 func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.SubscriptionManager {
 	require.NotEmpty(t, ids)
@@ -82,7 +82,7 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.Subs
 		sm.On("Register", mock.Anything, mock.Anything).Return(err)
 		sm.On("Unregister", mock.Anything).Return(err)
 		sm.On("GetEngine", mock.Anything).Return(err)
-		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
+		sm.On("Channels").Return(engine.ChannelIDsByRole(id.Role))
 		sms[i] = sm
 	}
 
