@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
@@ -182,4 +183,37 @@ func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
 // ClusterFromEncodable returns a Cluster backed by the given encodable representation.
 func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 	return &Cluster{enc}, nil
+}
+
+func SnapshotFromBootstrapState(root *flow.Block, seal *flow.Seal, result *flow.ExecutionResult, qc *flow.QuorumCertificate) (*Snapshot, error) {
+
+	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	if !ok {
+		return nil, fmt.Errorf("invalid setup event type (%T)", seal.ServiceEvents[0].Event)
+	}
+	commit, ok := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+	if !ok {
+		return nil, fmt.Errorf("invalid commit event type (%T)", seal.ServiceEvents[1].Event)
+	}
+
+	// TODO consolidate with inmem.Epoch
+	current, err := FromEpoch(bprotocol.NewCommittedEpoch(setup, commit))
+	if err != nil {
+		return nil, fmt.Errorf("could not convert epoch: %w", err)
+	}
+	epochs := EncodableEpochs{
+		Current: current.enc,
+	}
+
+	snap := SnapshotFromEncodable(EncodableSnapshot{
+		Head:              root.Header,
+		Identities:        setup.Participants,
+		LatestSeal:        seal,
+		LatestResult:      result,
+		SealingSegment:    []*flow.Block{root},
+		QuorumCertificate: qc,
+		Phase:             flow.EpochPhaseStaking,
+		Epochs:            epochs,
+	})
+	return snap, nil
 }

@@ -7,6 +7,7 @@ import (
 )
 
 // StateRoot is the root information required to bootstrap the protocol state
+// TODO remove
 type StateRoot struct {
 	block          *flow.Block
 	result         *flow.ExecutionResult

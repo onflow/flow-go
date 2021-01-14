@@ -133,5 +133,3 @@ func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommi
 		commitEvent: commitEvent,
 	}
 }
-
-// ****************************************
