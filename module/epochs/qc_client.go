@@ -21,6 +21,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// TransactionSubmissionTimeout is the time after which we return an error.
+const TransactionSubmissionTimeout = 5 * time.Minute
+
 // QCContractClient is a client to the Quorum Certificate contract. Allows the client to
 // functionality to submit a vote and check if collection node has voted already.
 type QCContractClient struct {
@@ -72,8 +75,8 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 // failed and should be re-submitted.
 func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
 
-	// add a 10 second timeout to the context
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	// add a timeout to the context
+	ctx, cancel := context.WithTimeout(ctx, TransactionSubmissionTimeout)
 	defer cancel()
 
 	// get account for given address
