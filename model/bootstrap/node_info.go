@@ -4,6 +4,8 @@ package bootstrap
 import (
 	"fmt"
 
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,15 +26,15 @@ var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a
 
 // NodeMachineAccountInfo defines the structure for a bootstrapping file containing
 // private information about the node's machine account. The machine account is used
-// by the protocol software to interact with Flow as a client autonomously as needed, in 
+// by the protocol software to interact with Flow as a client autonomously as needed, in
 // particular to run the DKG and generate root cluster quorum certificates when preparing
 // for an epoch.
 type NodeMachineAccountInfo struct {
-	Address          string
-	EncodedPrivateKey       []byte
-	KeyIndex         uint
-	SigningAlgorithm sdkcrypto.SigningAlgorithm
-	HashAlgorithm    sdkcrypto.HashAlgorithm
+	Address           string
+	EncodedPrivateKey []byte
+	KeyIndex          uint
+	SigningAlgorithm  sdkcrypto.SignatureAlgorithm
+	HashAlgorithm     sdkcrypto.HashAlgorithm
 }
 
 // NodeConfig contains configuration information used as input to the
