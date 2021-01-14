@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
@@ -399,8 +398,6 @@ func Test_Checkpointing(t *testing.T) {
 			err = wal6.Close()
 			require.NoError(t, err)
 
-			tmpListDir(dir)
-
 		})
 	})
 }
@@ -431,15 +428,6 @@ func randomlyModifyFile(t *testing.T, filename string) {
 
 	_, err = file.WriteAt(buf, offset)
 	require.NoError(t, err)
-}
-
-func tmpListDir(dir string) {
-	fmt.Println("----------")
-	files, _ := ioutil.ReadDir(dir)
-
-	for _, f := range files {
-		fmt.Println(f.Name())
-	}
 }
 
 func Test_StoringLoadingCheckpoints(t *testing.T) {
