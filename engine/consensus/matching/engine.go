@@ -40,7 +40,7 @@ type Engine struct {
 	state                   protocol.State                  // used to access the  protocol state
 	me                      module.Local                    // used to access local node information
 	requester               module.Requester                // used to request missing execution receipts by block ID
-	receiptsDB              storage.ExecutionReceipts       // used to store execution receipts when we get it as part of gossip protocol
+	receiptsDB              storage.ExecutionReceipts       // to persist received execution receipts
 	headersDB               storage.Headers                 // used to check sealed headers
 	indexDB                 storage.Index                   // used to check payloads for results
 	incorporatedResults     mempool.IncorporatedResults     // holds incorporated results in memory
@@ -333,7 +333,6 @@ func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 	}
 	// TODO if the second operation fails we should remove stored execution result
 	// This is global execution storage problem - see TODO at the top
-	err = e.receiptsDB.Index(receipt.ExecutionResult.BlockID, receipt.ID())
 	if err != nil {
 		return fmt.Errorf("could not index execution receipt: %w", err)
 	}
@@ -554,7 +553,7 @@ RES_LOOP:
 
 		// At this point we can be sure that all needed checks on validity of ER
 		// were executed prior to this point, since we perform validation of every ER
-		// before adding it into mempool, that's why mempool can contain only valid entries.
+		// before adding it into mempool. Hence, the mempool can contain only valid entries.
 
 		// the chunk assigment is based on the first block in its fork which
 		// contains a receipt that commits to this result.

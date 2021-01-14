@@ -155,8 +155,9 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResul
 	return nil
 }
 
+// resultChainCheck enforces that the end state of the parent result
+// matches the current result's start state
 func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
-	//  enforce that execution results form chain
 	finalState, isOk := prevResult.FinalStateCommitment()
 	if !isOk {
 		return fmt.Errorf("missing final state commitment in execution result %v", prevResult.ID())
