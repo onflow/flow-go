@@ -168,12 +168,12 @@ func FullyQualifiedChannelName(channel network.Channel, rootBlockID string) stri
 
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on
 // the chain ID of the cluster in question.
-func ChannelConsensusCluster(clusterID flow.ChainID) string {
-	return fmt.Sprintf("%s-%s", consensusClusterPrefix, clusterID)
+func ChannelConsensusCluster(clusterID flow.ChainID) network.Channel {
+	return network.Channel(fmt.Sprintf("%s-%s", consensusClusterPrefix, clusterID))
 }
 
 // ChannelSyncCluster returns a dynamic cluster sync channel based on the chain
 // ID of the cluster in question.
-func ChannelSyncCluster(clusterID flow.ChainID) string {
-	return fmt.Sprintf("%s-%s", syncClusterPrefix, clusterID)
+func ChannelSyncCluster(clusterID flow.ChainID) network.Channel {
+	return network.Channel(fmt.Sprintf("%s-%s", syncClusterPrefix, clusterID))
 }

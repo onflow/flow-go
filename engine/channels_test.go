@@ -9,10 +9,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TestGetRolesByChannelID_NonClusterChannelID evaluates correctness of GetRoleByChannelID function against
+// TestGetRolesByChannel_NonClusterChannel evaluates correctness of RolesByChannel function against
 // inclusion and exclusion of roles. Essentially, the test evaluates that RolesByChannel
 // operates on top of channelRoleMap.
-func TestGetRolesByChannelID_NonClusterChannelID(t *testing.T) {
+func TestGetRolesByChannel_NonClusterChannel(t *testing.T) {
 	// asserts existing topic with its role
 	// the roles list should contain collection and consensus roles
 	roles, ok := RolesByChannel(PushGuarantees)
@@ -30,11 +30,11 @@ func TestGetRolesByChannelID_NonClusterChannelID(t *testing.T) {
 	assert.Nil(t, roles)
 }
 
-// TestGetRolesByChannelID_ClusterChannelID evaluates correctness of GetRoleByChannelID function against
-// cluster channel ids. Essentially, the test evaluates that RolesByChannel
-// operates on top of channelRoleMap, and correctly identifies and strips of the cluster channel ids.
-func TestGetRolesByChannelID_ClusterChannelID(t *testing.T) {
-	// creates a cluster channel id
+// TestGetRolesByChannel_ClusterChannel evaluates correctness of RolesByChannel function against
+// cluster channels. Essentially, the test evaluates that RolesByChannel
+// operates on top of channelRoleMap, and correctly identifies and strips of the cluster channel.
+func TestGetRolesByChannel_ClusterChannel(t *testing.T) {
+	// creates a cluster channel.
 	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
 
 	// the roles list should contain collection
@@ -44,10 +44,10 @@ func TestGetRolesByChannelID_ClusterChannelID(t *testing.T) {
 	assert.Contains(t, roles, flow.RoleCollection)
 }
 
-// TestGetChannelIDByRole evaluates retrieving channel IDs associated with a role from the
-// channel IDs map using ChannelsByRole. Essentially it evaluates that ChannelsByRole
-// operates on top of channelIDMap.
-func TestGetChannelIDByRole(t *testing.T) {
+// TestGetChannelByRole evaluates retrieving channels associated with a role from the
+// channelRoleMap using ChannelsByRole. Essentially it evaluates that ChannelsByRole
+// operates on top of channelRoleMap.
+func TestGetChannelByRole(t *testing.T) {
 	// asserts topics by the role for verification node
 	// it should have the topics of
 	// - PushBlocks
@@ -67,44 +67,23 @@ func TestGetChannelIDByRole(t *testing.T) {
 	assert.Contains(t, topics, TestNetwork)
 }
 
-// TestIsClusterChannelID verifies the correctness of IsClusterChannel method
-// against cluster and non-cluster channel ids.
-func TestIsClusterChannelID(t *testing.T) {
+// TestIsClusterChannel verifies the correctness of IsClusterChannel method
+// against cluster and non-cluster channel.
+func TestIsClusterChannel(t *testing.T) {
 	// creates a consensus cluster channel and verifies it
 	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
-	clusterChannelID, ok := IsClusterChannel(conClusterChannel)
+	clusterChannel, ok := IsClusterChannel(conClusterChannel)
 	require.True(t, ok)
-	require.Equal(t, clusterChannelID, consensusClusterPrefix)
+	require.Equal(t, clusterChannel, consensusClusterPrefix)
 
 	// creates a sync cluster channel and verifies it
-	syncClusterID := ChannelSyncCluster("some-sync-cluster-id")
-	clusterChannelID, ok = IsClusterChannel(syncClusterID)
+	syncClusterChannel := ChannelSyncCluster("some-sync-cluster-id")
+	clusterChannel, ok = IsClusterChannel(syncClusterChannel)
 	require.True(t, ok)
-	require.Equal(t, clusterChannelID, syncClusterPrefix)
+	require.Equal(t, clusterChannel, syncClusterPrefix)
 
 	// non-cluster channel should not be verified
-	clusterChannelID, ok = IsClusterChannel("non-cluster-channel-id")
+	clusterChannel, ok = IsClusterChannel("non-cluster-channel-id")
 	require.False(t, ok)
-	require.Empty(t, clusterChannelID)
-}
-
-// TestUniqueChannelIDsByRole_Uniqueness verifies that non-cluster channel IDs returned by
-// UniqueChannelIDsByRole are unique based on their ids.
-func TestUniqueChannelIDsByRole_Uniqueness(t *testing.T) {
-	for _, role := range flow.Roles() {
-		channels := UniqueChannelIDsByRole(role)
-		visited := make(map[flow.Identifier]struct{})
-		for _, channel := range channels {
-			if _, ok := IsClusterChannel(channel); ok {
-				continue
-			}
-
-			// non-cluster channels should be unique in their id
-			id := channelRoleMap[channel].ID()
-			_, ok := visited[id]
-			require.False(t, ok)
-
-			visited[id] = struct{}{}
-		}
-	}
+	require.Empty(t, clusterChannel)
 }
