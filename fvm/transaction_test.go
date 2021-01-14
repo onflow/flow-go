@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"testing"
@@ -10,8 +9,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -39,37 +36,7 @@ func (m mockRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) err
 	return m.executeTxResult
 }
 
-func (m mockRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*sema.Checker, error) {
-	panic("should not be used")
-}
-
-func prepare(executeTxResult error) (error, *bytes.Buffer) {
-
-	buffer := &bytes.Buffer{}
-	log := zerolog.New(buffer)
-	txInvocator := NewTransactionInvocator(log)
-
-	runtime := mockRuntime{executeTxResult: executeTxResult}
-	vm := New(runtime)
-
-	proc := Transaction(&flow.TransactionBody{}, 0)
-
-	ledger := state.NewMapLedger()
-
-	context := NewContext(log)
-
-	err := txInvocator.Process(vm, context, proc, ledger)
-
-	return err, buffer
-}
-
 func TestSafetyCheck(t *testing.T) {
-
-	t.Run("logs nothing for successful tx", func(t *testing.T) {
-		err, buffer := prepare(nil)
-		require.NoError(t, err)
-		require.Equal(t, 0, buffer.Len())
-	})
 
 	// We are now logging for all failed Tx
 	// t.Run("logs for failing tx but not related to TopShot", func(t *testing.T) {
@@ -91,63 +58,7 @@ func TestSafetyCheck(t *testing.T) {
 	// 	require.Equal(t, 0, buffer.Len())
 	// })
 
-	t.Run("non-parsing/checking error", func(t *testing.T) {
-
-		topShotContract, err := hex.DecodeString(TopShotContractAddress)
-		require.NoError(t, err)
-
-		runtimeError := runtime.Error{
-			Err: sema.CheckerError{
-				Errors: []error{
-					&sema.ImportedProgramError{
-						CheckerError: &sema.CheckerError{},
-						Location: common.AddressLocation{
-							Name:    "Topshot",
-							Address: common.BytesToAddress(topShotContract),
-						},
-					},
-				},
-			},
-		}
-
-		err, buffer := prepare(runtimeError)
-		require.Error(t, err)
-
-		require.NotContains(t, buffer.String(), "extended_error")
-	})
-
-	t.Run("parsing/checking error", func(t *testing.T) {
-
-		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
-
-		runtimeError := runtime.Error{
-			Err: &runtime.ParsingCheckingError{
-				Err: sema.CheckerError{
-					Errors: []error{
-						&sema.ImportedProgramError{
-							CheckerError: &sema.CheckerError{},
-							Location: common.AddressLocation{
-								Name:    "TopShot",
-								Address: common.BytesToAddress(topShotContractAddress.Bytes()),
-							},
-						},
-					},
-				},
-				Code:     []byte("tx_code"),
-				Location: nil,
-				Options:  nil,
-				UseCache: false,
-				Checker:  nil,
-			},
-		}
-
-		err, buffer := prepare(runtimeError)
-		require.Error(t, err)
-
-		require.Contains(t, buffer.String(), "extended_error")
-	})
-
-	t.Run("parsing/checking error in real environment", func(t *testing.T) {
+	t.Run("parsing error in imported contract", func(t *testing.T) {
 
 		rt := runtime.NewInterpreterRuntime()
 
@@ -158,57 +69,145 @@ func TestSafetyCheck(t *testing.T) {
 		vm := New(rt)
 
 		code := `
-			import TopShot from 0x0b2a3299cc857e29
-
-			transaction {
-				prepare(acct: AuthAccount) {
-					let nftCollection = acct.borrow<&TopShot.Collection>(from: /storage/MomentCollection)
-						?? panic("Could not borrow from MomentCollection in storage")
-			
-							
-					nftCollection.deposit(token: <-token)
-				}
-			}
+			import 0x0b2a3299cc857e29
+			transaction {}
 		`
 
-		proc := Transaction(&flow.TransactionBody{
-			ReferenceBlockID:   flow.Identifier{},
-			Script:             []byte(code),
-			Arguments:          nil,
-			GasLimit:           0,
-			ProposalKey:        flow.ProposalKey{},
-			Payer:              flow.Address{},
-			Authorizers:        nil,
-			PayloadSignatures:  nil,
-			EnvelopeSignatures: nil,
-		}, 0)
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
+		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
 		ledger := state.NewMapLedger()
 
-		topShotCode := `
-			pub contract TopShot {
-				 init() {
-					self.currentSeries = 0
-    			}
-			}
-		`
+		contractCode := `X`
 
-		encodedName, err := encodeContractNames([]string{"TopShot"})
+		// TODO: refactor this manual deployment by setting ledger keys
+		//   into a proper deployment of the contract
+
+		encodedName, err := encodeContractNames([]string{"TestContract"})
 		require.NoError(t, err)
 
-		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "contract_names", encodedName)
-		ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code.TopShot", []byte(topShotCode))
+		ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"contract_names",
+			encodedName,
+		)
+
+		ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"code.TestContract",
+			[]byte(contractCode),
+		)
 
 		context := NewContext(log)
 
 		err = txInvocator.Process(vm, context, proc, ledger)
 		require.Error(t, err)
 
-		require.Contains(t, buffer.String(), "extended_error")
+		require.Contains(t, buffer.String(), "programs")
+		require.Contains(t, buffer.String(), "codes")
 	})
 
+	t.Run("checking error in imported contract", func(t *testing.T) {
+
+		rt := runtime.NewInterpreterRuntime()
+
+		buffer := &bytes.Buffer{}
+		log := zerolog.New(buffer)
+		txInvocator := NewTransactionInvocator(log)
+
+		vm := New(rt)
+
+		code := `
+			import 0x0b2a3299cc857e29
+			transaction {}
+		`
+
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+
+		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
+
+		ledger := state.NewMapLedger()
+
+		contractCode := `pub contract TestContract: X {}`
+
+		// TODO: refactor this manual deployment by setting ledger keys
+		//   into a proper deployment of the contract
+
+		encodedName, err := encodeContractNames([]string{"TestContract"})
+		require.NoError(t, err)
+
+		ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"contract_names",
+			encodedName,
+		)
+		ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"code.TestContract",
+			[]byte(contractCode),
+		)
+
+		context := NewContext(log)
+
+		err = txInvocator.Process(vm, context, proc, ledger)
+		require.Error(t, err)
+
+		require.Contains(t, buffer.String(), "programs")
+		require.Contains(t, buffer.String(), "codes")
+	})
+
+	t.Run("parsing error in transaction", func(t *testing.T) {
+
+		rt := runtime.NewInterpreterRuntime()
+
+		buffer := &bytes.Buffer{}
+		log := zerolog.New(buffer)
+		txInvocator := NewTransactionInvocator(log)
+
+		vm := New(rt)
+
+		code := `X`
+
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+
+		ledger := state.NewMapLedger()
+		context := NewContext(log)
+
+		err := txInvocator.Process(vm, context, proc, ledger)
+		require.Error(t, err)
+
+		require.NotContains(t, buffer.String(), "programs")
+		require.NotContains(t, buffer.String(), "codes")
+	})
+
+	t.Run("checking error in transaction", func(t *testing.T) {
+
+		rt := runtime.NewInterpreterRuntime()
+
+		buffer := &bytes.Buffer{}
+		log := zerolog.New(buffer)
+		txInvocator := NewTransactionInvocator(log)
+
+		vm := New(rt)
+
+		code := `transaction(arg: X) { }`
+
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+
+		ledger := state.NewMapLedger()
+		context := NewContext(log)
+
+		err := txInvocator.Process(vm, context, proc, ledger)
+		require.Error(t, err)
+
+		require.NotContains(t, buffer.String(), "programs")
+		require.NotContains(t, buffer.String(), "codes")
+	})
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {

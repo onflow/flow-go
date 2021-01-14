@@ -1,11 +1,12 @@
 package fvm
 
 import (
+	"encoding/json"
 	"errors"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -103,15 +104,54 @@ func (i *TransactionInvocator) Process(
 // Parsing and checking of deployed contracts should normally succeed.
 // This is a temporary measure.
 func (i *TransactionInvocator) safetyErrorCheck(err error) {
+
+	// Only runtime errors, in particular only parsing/checking errors
+
+	var runtimeErr runtime.Error
+	if !errors.As(err, &runtimeErr) {
+		return
+	}
+
 	var parsingCheckingError *runtime.ParsingCheckingError
 	if !errors.As(err, &parsingCheckingError) {
 		return
 	}
 
-	// serializing such large and complex objects to JSON
-	// causes stack overflow, spew works fine
-	spew.Config.DisableMethods = true
-	dump := spew.Sdump(parsingCheckingError)
+	// Only consider errors in deployed contracts.
+	// If the error is not in a address location,
+	// it must be an imported program error
 
-	i.logger.Error().Str("extended_error", dump).Msg("checking failed")
+	checkerError, ok := parsingCheckingError.Err.(*sema.CheckerError)
+	if !ok {
+		return
+	}
+
+	var foundImportedProgramError bool
+
+	for _, checkingErr := range checkerError.Errors {
+		importedProgramError, ok := checkingErr.(*sema.ImportedProgramError)
+		if !ok {
+			continue
+		}
+
+		_, ok = importedProgramError.Location.(common.AddressLocation)
+		if !ok {
+			continue
+		}
+
+		foundImportedProgramError = true
+		break
+	}
+
+	if !foundImportedProgramError {
+		return
+	}
+
+	codesJSON, _ := json.Marshal(runtimeErr.Codes)
+	programsJSON, _ := json.Marshal(runtimeErr.Programs)
+
+	i.logger.Error().
+		Str("codes", string(codesJSON)).
+		Str("programs", string(programsJSON)).
+		Msg("checking failed")
 }
