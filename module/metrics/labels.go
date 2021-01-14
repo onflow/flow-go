@@ -50,7 +50,8 @@ const (
 	ResourceTransaction              = "transaction"
 	ResourceClusterPayload           = "cluster_payload"
 	ResourceClusterProposal          = "cluster_proposal"
-	ResourceProcessedResultID        = "processed_result_ids"         // verification node, finder engine
+	ResourceProcessedResultID        = "processed_result_id"          // verification node, finder engine
+	ResourceDiscardedResultID        = "discarded_result_id"          // verification node, finder engine
 	ResourcePendingReceipt           = "pending_receipt"              // verification node, finder engine
 	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
 	ResourcePendingReceiptIDsByBlock = "pending_receipt_ids_by_block" // verification node, finder engine

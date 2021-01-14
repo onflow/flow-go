@@ -36,8 +36,7 @@ type SnapshotSuite struct {
 
 	protoState protocol.State
 
-	state   cluster.State
-	mutator cluster.Mutator
+	state cluster.MutableState
 }
 
 // runs before each test runs
@@ -56,12 +55,15 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, _, _, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, _, _, blocks, setups, commits, statuses, _ := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	suite.state, err = NewState(suite.db, tracer, suite.chainID, headers, colPayloads)
+	clusterStateRoot, err := NewStateRoot(suite.genesis)
 	suite.Assert().Nil(err)
-	suite.mutator = suite.state.Mutate()
+	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	suite.Assert().Nil(err)
+	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.Assert().Nil(err)
 
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	genesis, result, seal := unittest.BootstrapFixture(participants)
@@ -72,8 +74,6 @@ func (suite *SnapshotSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	suite.Require().Nil(err)
-
-	suite.Bootstrap()
 }
 
 // runs after each test finishes
@@ -81,11 +81,6 @@ func (suite *SnapshotSuite) TearDownTest() {
 	err := suite.db.Close()
 	suite.Assert().Nil(err)
 	err = os.RemoveAll(suite.dbdir)
-	suite.Assert().Nil(err)
-}
-
-func (suite *SnapshotSuite) Bootstrap() {
-	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Nil(err)
 }
 
@@ -197,17 +192,17 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 
 	// create a new finalized block on genesis (height=1)
 	finalizedBlock1 := suite.Block()
-	err := suite.mutator.Extend(&finalizedBlock1)
+	err := suite.state.Extend(&finalizedBlock1)
 	assert.Nil(t, err)
 
 	// create an un-finalized block on genesis (height=1)
 	unFinalizedBlock1 := suite.Block()
-	err = suite.mutator.Extend(&unFinalizedBlock1)
+	err = suite.state.Extend(&unFinalizedBlock1)
 	assert.Nil(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
 	unFinalizedBlock2 := suite.BlockWithParent(&finalizedBlock1)
-	err = suite.mutator.Extend(&unFinalizedBlock2)
+	err = suite.state.Extend(&unFinalizedBlock2)
 	assert.Nil(t, err)
 
 	// finalize the block
