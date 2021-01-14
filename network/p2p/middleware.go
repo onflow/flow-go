@@ -190,9 +190,9 @@ func (m *Middleware) Stop() {
 // Deprecated: Send exists for historical compatibility, and should not be used on new
 // developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
 // Publish are recommended instead.
-func (m *Middleware) Send(channelID string, msg *message.Message, targetIDs ...flow.Identifier) error {
+func (m *Middleware) Send(channel network.Channel, msg *message.Message, targetIDs ...flow.Identifier) error {
 	var err error
-	mode := m.chooseMode(channelID, msg, targetIDs...)
+	mode := m.chooseMode(channel, msg, targetIDs...)
 	// decide what mode of communication to use
 	switch mode {
 	case NoOp:
@@ -209,7 +209,7 @@ func (m *Middleware) Send(channelID string, msg *message.Message, targetIDs ...f
 		}
 		err = m.SendDirect(msg, targetIDs[0])
 	case OneToK:
-		err = m.Publish(msg, channelID)
+		err = m.Publish(msg, channel)
 	default:
 		err = fmt.Errorf("invalid communcation mode: %d", mode)
 	}
@@ -221,7 +221,7 @@ func (m *Middleware) Send(channelID string, msg *message.Message, targetIDs ...f
 }
 
 // chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ string, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
+func (m *Middleware) chooseMode(_ network.Channel, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
 	switch len(targetIDs) {
 	case 0:
 		return NoOp
@@ -339,14 +339,14 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	go conn.receiveLoop(m.wg)
 }
 
-// Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
-func (m *Middleware) Subscribe(channelID string) error {
+// Subscribe subscribes the middleware to a channel.
+func (m *Middleware) Subscribe(channel network.Channel) error {
 
-	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
+	topic := engine.FullyQualifiedChannelName(channel, m.rootBlockID)
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
-		return fmt.Errorf("failed to subscribe for channel %s: %w", channelID, err)
+		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
 
 	// create a new readSubscription with the context of the middleware
@@ -362,12 +362,12 @@ func (m *Middleware) Subscribe(channelID string) error {
 	return nil
 }
 
-// Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
-func (m *Middleware) Unsubscribe(channelID string) error {
-	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
+// Unsubscribe unsubscribes the middleware from a channel.
+func (m *Middleware) Unsubscribe(channel network.Channel) error {
+	topic := engine.FullyQualifiedChannelName(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
-		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channelID, err)
+		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
 	}
 	// update peers to remove nodes subscribed to channelID
 	m.peerManager.RequestPeerUpdate()
@@ -393,10 +393,10 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	}
 }
 
-// Publish publishes msg on the channel. It models a distributed broadcast where the message is meant for all or
-// a many nodes subscribing to the channel ID. It does not guarantee the delivery though, and operates on a best
+// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
+// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
-func (m *Middleware) Publish(msg *message.Message, channelID string) error {
+func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 
 	// convert the message to bytes to be put on the wire.
 	data, err := msg.Marshal()
@@ -411,7 +411,7 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
 	}
 
-	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
+	topic := engine.FullyQualifiedChannelName(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
@@ -419,7 +419,7 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
 
-	m.metrics.NetworkMessageSent(len(data), channelID, msg.Type)
+	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
 
 	return nil
 }
