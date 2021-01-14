@@ -59,7 +59,7 @@ type Engine struct {
 	maxResultsToRequest       int                             // max number of finalized blocks for which we request execution results
 	requiredChunkApprovals    uint                            // required number of chunk approvals
 	receiptValidator          module.ReceiptValidator         // used to validate receipts
-	requestTracker            *RequestTracker                 // used to cout the number of approval requests by chunk ([result id][chunk index]=>count)
+	requestTracker            *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
 	approvalRequestsThreshold uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
 }
 
