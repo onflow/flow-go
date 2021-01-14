@@ -9,6 +9,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Channel specifies a virtual and isolated communication medium.
+// Nodes subscribed to the same channel can disseminate epidemic messages among
+// each other, i.e.. multicast and publish.
+type Channel string
+
 // Conduit represents the interface for engines to communicate over the
 // peer-to-peer network. Upon registration with the network, each engine is
 // assigned a conduit, which it can use to communicate across the network in
