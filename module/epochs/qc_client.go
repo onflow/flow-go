@@ -43,7 +43,7 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 	if err != nil {
 		return nil, fmt.Errorf("could not create flow client: %w", err)
 	}
-	
+
 	// get account for given address
 	account, err := flowClient.GetAccount(context.Background(), sdk.HexToAddress(accountAddress))
 	if err != nil {
@@ -62,7 +62,7 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 		accountKeyIndex:   accountKeyIndex,
 		signer:            signer,
 		nodeID:            nodeID,
-		account: 	   account,
+		account:           account,
 	}, nil
 }
 
@@ -71,11 +71,15 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 // processed by the network. An error is returned if the transaction has
 // failed and should be re-submitted.
 func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
-	
+
+	// add a 10 second timeout to the context
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	// get account for given address
-	account, err := flowClient.GetAccount(ctx, c.account.Address)
+	account, err := c.client.GetAccount(ctx, c.account.Address)
 	if err != nil {
-		return nil, fmt.Errorf("could not get account: %w", err)
+		return fmt.Errorf("could not get account: %w", err)
 	}
 	c.account = account
 
@@ -86,11 +90,12 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// attach submit vote transaction template and build transaction
+	seqNumber := c.account.Keys[int(c.accountKeyIndex)].SequenceNumber
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSubmitVoteScript(c.getEnvironment())).
 		SetGasLimit(1000).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(c.account.Address, c.accountKeyIndex, b.account.SequenceNumber).
+		SetProposalKey(c.account.Address, int(c.accountKeyIndex), seqNumber).
 		SetPayer(c.account.Address).
 		AddAuthorizer(c.account.Address)
 
