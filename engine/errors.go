@@ -68,6 +68,29 @@ func IsOutdatedInputError(err error) bool {
 	return errors.As(err, &errOutdatedInputError)
 }
 
+type DuplicatedEntryError struct {
+	err error
+}
+
+func NewDuplicatedEntryErrorf(msg string, args ...interface{}) error {
+	return DuplicatedEntryError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e DuplicatedEntryError) Unwrap() error {
+	return e.err
+}
+
+func (e DuplicatedEntryError) Error() string {
+	return e.err.Error()
+}
+
+func IsDuplicatedEntryError(err error) bool {
+	var errDuplicatedEntryError DuplicatedEntryError
+	return errors.As(err, &errDuplicatedEntryError)
+}
+
 // LogError logs the engine processing error
 func LogError(log zerolog.Logger, err error) {
 

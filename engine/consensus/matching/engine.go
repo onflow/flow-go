@@ -263,23 +263,61 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to process execution receipt: %w", err)
 	}
 
-	// add the receipt to the mempool so that the builder can incorporate it in
-	// a block payload
+	err = e.storeReceipt(receipt, &log)
+	if err != nil {
+		if engine.IsDuplicatedEntryError(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to store receipt: %w", err)
+	}
+
+	err = e.storeIncorporatedResult(receipt, &log)
+	if err != nil {
+		if engine.IsDuplicatedEntryError(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to store incorporated result: %w", err)
+	}
+
+	// kick off a check for potential seal formation
+	e.unit.Launch(e.checkSealing)
+
+	return nil
+}
+
+// storeReceipt adds the receipt to the receipts mempool as well as to the persistent storage layer.
+// Return values:
+// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool and we don't need to process this again
+//	* exception in case something went wrong
+// 	* nil in case of success
+func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
+	// add the receipt to the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
 		log.Debug().Msg("skipping receipt already in mempool")
-		return nil
+		return engine.NewDuplicatedEntryErrorf("")
 	}
 
 	log.Info().Msg("execution receipt added to mempool")
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
-	err = e.persistExecutionReceipt(receipt)
-	if err != nil {
-		return fmt.Errorf("failed to persist execution receipt: %w", err)
+	// persist receipt in database. Even if the receipt is already in persistent storage,
+	// we still need to process it, as it is not in the mempool. This can happen if the
+	// mempool got wiped during a node crash.
+	err := e.receiptsDB.Store(receipt) // internally de-duplicates
+	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+		return fmt.Errorf("could not persist receipt: %w", err)
 	}
+	return nil
+}
 
-	// We do _not_ return here if receiptsDB already contained receipt! 
+// storeIncorporatedResult creates an `IncorporatedResult` and adds it to incorporated results mempool
+// Error returns:
+// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool
+//	* exception in case something went wrong
+// 	* nil in case of success
+func (e *Engine) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
+	// We do _not_ return here if receiptsDB already contained receipt!
 	// receiptsDB is persistent storage while Mempools are in-memory only.
 	// After a crash, the replica still needs to be able to generate a seal
 	// for an Result even if it had stored the Result (as part of a Receipt) before the crash.
@@ -302,7 +340,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
 	// will be the ID of the first block on its fork that contains a receipt
 	// committing to this result.
-	added, err = e.incorporatedResults.Add(
+	added, err := e.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
 			receipt.ExecutionResult.BlockID,
 			&receipt.ExecutionResult,
@@ -314,28 +352,10 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 	if !added {
 		log.Debug().Msg("skipping result already in mempool")
-		return nil
+		return engine.NewDuplicatedEntryErrorf("")
 	}
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
 	log.Info().Msg("execution result added to mempool")
-
-	// kick off a check for potential seal formation
-	e.unit.Launch(e.checkSealing)
-
-	return nil
-}
-
-func (e *Engine) persistExecutionReceipt(receipt *flow.ExecutionReceipt) error {
-	// store the receipt to make it persistent for later
-	err := e.receiptsDB.Store(receipt) // internally de-duplicates
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store receipt: %w", err)
-	}
-	// TODO if the second operation fails we should remove stored execution result
-	// This is global execution storage problem - see TODO at the top
-	if err != nil {
-		return fmt.Errorf("could not index execution receipt: %w", err)
-	}
 	return nil
 }
 
@@ -678,14 +698,6 @@ func (e *Engine) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.He
 // sealResult creates a seal for the incorporated result and adds it to the
 // seals mempool.
 func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
-
-	// at this point we expect to have receipt stored in database. Check our state before sealing.
-	// Failing here means implementation flaw.
-	_, err := e.receiptsDB.ByBlockID(incorporatedResult.Result.BlockID)
-	if err != nil {
-		return fmt.Errorf("missing receipt for execution result: %w", err)
-	}
-
 	// collect aggregate signatures
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
@@ -707,7 +719,7 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err = e.seals.Add(&flow.IncorporatedResultSeal{
+	_, err := e.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})
