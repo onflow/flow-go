@@ -15,6 +15,10 @@ import (
 type Channel string
 type ChannelList []Channel
 
+func (c Channel) String() string {
+	return string(c)
+}
+
 // Conduit represents the interface for engines to communicate over the
 // peer-to-peer network. Upon registration with the network, each engine is
 // assigned a conduit, which it can use to communicate across the network in
