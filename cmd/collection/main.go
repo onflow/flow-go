@@ -397,12 +397,11 @@ func main() {
 			}
 
 			// construct signer from private key
-			privateKeyBytes := accountInfo.PrivateKey.Encode()
-			sk, err := sdkcrypto.DecodePrivateKey(sdkcrypto.SignatureAlgorithm(accountInfo.SigningAlgorithm), privateKeyBytes)
+			sk, err := sdkcrypto.DecodePrivateKey(accountInfo.SigningAlgorithm, accountInfo.EncodedPrivateKey)
 			if err != nil {
 				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
 			}
-			txSigner := sdkcrypto.NewInMemorySigner(sk, sdkcrypto.HashAlgorithm(accountInfo.HashAlgorithm))
+			txSigner := sdkcrypto.NewInMemorySigner(sk, accountInfo.HashAlgorithm)
 
 			// create QC vote client
 			qcContractClient, err := epochs.NewQCContractClient(node.Me.NodeID(), accountInfo.Address, accountInfo.KeyIndex, accessAddress, qcContractAddress, txSigner)
