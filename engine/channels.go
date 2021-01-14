@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 )
 
 // init is called first time this package is imported.
@@ -182,13 +183,13 @@ func IsClusterChannelID(channelID string) (string, bool) {
 
 // FullyQualifiedChannelName returns the unique channel name made up of channel name string suffixed with root block id
 // The root block id is used to prevent cross talks between nodes on different sporks
-func FullyQualifiedChannelName(channelID string, rootBlockID string) string {
+func FullyQualifiedChannelName(channel network.Channel, rootBlockID string) string {
 	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
 	// unique for each epoch
-	if strings.HasPrefix(channelID, syncClusterPrefix) || strings.HasPrefix(channelID, consensusClusterPrefix) {
-		return channelID
+	if strings.HasPrefix(string(channel), syncClusterPrefix) || strings.HasPrefix(string(channel), consensusClusterPrefix) {
+		return string(channel)
 	}
-	return fmt.Sprintf("%s/%s", channelID, rootBlockID)
+	return fmt.Sprintf("%s/%s", string(channel), rootBlockID)
 }
 
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on
