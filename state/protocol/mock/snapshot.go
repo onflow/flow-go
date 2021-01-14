@@ -14,29 +14,6 @@ type Snapshot struct {
 	mock.Mock
 }
 
-// Commit provides a mock function with given fields:
-func (_m *Snapshot) Commit() ([]byte, error) {
-	ret := _m.Called()
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func() []byte); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Epochs provides a mock function with given fields:
 func (_m *Snapshot) Epochs() protocol.EpochQuery {
 	ret := _m.Called()
@@ -122,6 +99,52 @@ func (_m *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return r0, r1
 }
 
+// LatestResult provides a mock function with given fields:
+func (_m *Snapshot) LatestResult() (*flow.ExecutionResult, error) {
+	ret := _m.Called()
+
+	var r0 *flow.ExecutionResult
+	if rf, ok := ret.Get(0).(func() *flow.ExecutionResult); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ExecutionResult)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// LatestSeal provides a mock function with given fields:
+func (_m *Snapshot) LatestSeal() (*flow.Seal, error) {
+	ret := _m.Called()
+
+	var r0 *flow.Seal
+	if rf, ok := ret.Get(0).(func() *flow.Seal); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Seal)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Pending provides a mock function with given fields:
 func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
 	ret := _m.Called()
@@ -176,6 +199,29 @@ func (_m *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.QuorumCertificate)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SealingSegment provides a mock function with given fields:
+func (_m *Snapshot) SealingSegment() ([]*flow.Block, error) {
+	ret := _m.Called()
+
+	var r0 []*flow.Block
+	if rf, ok := ret.Get(0).(func() []*flow.Block); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*flow.Block)
 		}
 	}
 
