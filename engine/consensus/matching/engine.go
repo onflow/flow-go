@@ -27,34 +27,38 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
+// for subsequent inclusion in block.
+const DefaultRequiredApprovalsForSealConstruction = 1
+
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
 // from verification nodes), and saves the seals into seals mempool for adding
 // into a new block.
 type Engine struct {
-	unit                    *engine.Unit                    // used to control startup/shutdown
-	log                     zerolog.Logger                  // used to log relevant actions with context
-	engineMetrics           module.EngineMetrics            // used to track sent and received messages
-	tracer                  module.Tracer                   // used to trace execution
-	mempool                 module.MempoolMetrics           // used to track mempool size
-	metrics                 module.ConsensusMetrics         // used to track consensus metrics
-	state                   protocol.State                  // used to access the  protocol state
-	me                      module.Local                    // used to access local node information
-	requester               module.Requester                // used to request missing execution receipts by block ID
-	resultsDB               storage.ExecutionResults        // used to check previous results are known
-	headersDB               storage.Headers                 // used to check sealed headers
-	indexDB                 storage.Index                   // used to check payloads for results
-	incorporatedResults     mempool.IncorporatedResults     // holds incorporated results in memory
-	receipts                mempool.Receipts                // holds execution receipts in memory
-	approvals               mempool.Approvals               // holds result approvals in memory
-	seals                   mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
-	missing                 map[flow.Identifier]uint        // track how often a block was missing
-	assigner                module.ChunkAssigner            // chunk assignment object
-	isCheckingSealing       *atomic.Bool                    // used to rate limit the checkingSealing calls
-	requestReceiptThreshold uint                            // how many blocks between sealed/finalized before we request execution receipts
-	maxResultsToRequest     int                             // max number of finalized blocks for which we request execution results
-	requiredChunkApprovals  uint                            // required number of chunk approvals
-	receiptValidator        module.ReceiptValidator         // used to validate receipts
+	unit                                 *engine.Unit                    // used to control startup/shutdown
+	log                                  zerolog.Logger                  // used to log relevant actions with context
+	engineMetrics                        module.EngineMetrics            // used to track sent and received messages
+	tracer                               module.Tracer                   // used to trace execution
+	mempool                              module.MempoolMetrics           // used to track mempool size
+	metrics                              module.ConsensusMetrics         // used to track consensus metrics
+	state                                protocol.State                  // used to access the  protocol state
+	me                                   module.Local                    // used to access local node information
+	requester                            module.Requester                // used to request missing execution receipts by block ID
+	resultsDB                            storage.ExecutionResults        // used to check previous results are known
+	headersDB                            storage.Headers                 // used to check sealed headers
+	indexDB                              storage.Index                   // used to check payloads for results
+	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results in memory
+	receipts                             mempool.Receipts                // holds execution receipts in memory
+	approvals                            mempool.Approvals               // holds result approvals in memory
+	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
+	missing                              map[flow.Identifier]uint        // track how often a block was missing
+	assigner                             module.ChunkAssigner            // chunk assignment object
+	isCheckingSealing                    *atomic.Bool                    // used to rate limit the checkingSealing calls
+	requestReceiptThreshold              uint                            // how many blocks between sealed/finalized before we request execution receipts
+	maxResultsToRequest                  int                             // max number of finalized blocks for which we request execution results
+	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
+	receiptValidator                     module.ReceiptValidator         // used to validate receipts
 }
 
 // New creates a new collection propagation engine.
@@ -77,34 +81,34 @@ func New(
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
 	validator module.ReceiptValidator,
-	requiredChunkApprovals uint,
+	requiredApprovalsForSealConstruction uint,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:                    engine.NewUnit(),
-		log:                     log.With().Str("engine", "matching").Logger(),
-		engineMetrics:           engineMetrics,
-		tracer:                  tracer,
-		mempool:                 mempool,
-		metrics:                 conMetrics,
-		state:                   state,
-		me:                      me,
-		requester:               requester,
-		resultsDB:               resultsDB,
-		headersDB:               headersDB,
-		indexDB:                 indexDB,
-		incorporatedResults:     incorporatedResults,
-		receipts:                receipts,
-		approvals:               approvals,
-		seals:                   seals,
-		missing:                 make(map[flow.Identifier]uint),
-		isCheckingSealing:       atomic.NewBool(false),
-		requestReceiptThreshold: 10,
-		maxResultsToRequest:     200,
-		assigner:                assigner,
-		requiredChunkApprovals:  requiredChunkApprovals,
-		receiptValidator:        validator,
+		unit:                                 engine.NewUnit(),
+		log:                                  log.With().Str("engine", "matching").Logger(),
+		engineMetrics:                        engineMetrics,
+		tracer:                               tracer,
+		mempool:                              mempool,
+		metrics:                              conMetrics,
+		state:                                state,
+		me:                                   me,
+		requester:                            requester,
+		resultsDB:                            resultsDB,
+		headersDB:                            headersDB,
+		indexDB:                              indexDB,
+		incorporatedResults:                  incorporatedResults,
+		receipts:                             receipts,
+		approvals:                            approvals,
+		seals:                                seals,
+		missing:                              make(map[flow.Identifier]uint),
+		isCheckingSealing:                    atomic.NewBool(false),
+		requestReceiptThreshold:              10,
+		maxResultsToRequest:                  200,
+		assigner:                             assigner,
+		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
+		receiptValidator:                     validator,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -655,7 +659,7 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 		validApprovals++
 	}
 
-	return validApprovals >= e.requiredChunkApprovals, nil
+	return validApprovals >= e.requiredApprovalsForSealConstruction, nil
 }
 
 // TODO: to be extracted as a common function in state/protocol/state.go

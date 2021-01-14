@@ -12,36 +12,36 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// DefaultRequiredChunkApprovals is the default number of approvals that should be
+// DefaultRequiredApprovalsForSealValidation is the default number of approvals that should be
 // present and valid for each chunk. Setting this to 0 will disable counting of chunk approvals
 // this can be used temporarily to ease the migration to new chunk based sealing.
 // TODO:
 //   * This value is for the happy path (requires just one approval per chunk).
 //   * Full protocol should be +2/3 of all currently staked verifiers.
-const DefaultRequiredChunkApprovals = 1
+const DefaultRequiredApprovalsForSealValidation = 0
 
 // sealValidator holds all needed context for checking seal
 // validity against current protocol state.
 type sealValidator struct {
-	state                  protocol.State
-	assigner               module.ChunkAssigner
-	verifier               module.Verifier
-	seals                  storage.Seals
-	headers                storage.Headers
-	payloads               storage.Payloads
-	requiredChunkApprovals uint
+	state                                protocol.State
+	assigner                             module.ChunkAssigner
+	verifier                             module.Verifier
+	seals                                storage.Seals
+	headers                              storage.Headers
+	payloads                             storage.Payloads
+	requiredApprovalsForSealVerification uint
 }
 
 func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
-	assigner module.ChunkAssigner, verifier module.Verifier, requiredChunkApprovals uint) *sealValidator {
+	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint) *sealValidator {
 	rv := &sealValidator{
-		state:                  state,
-		assigner:               assigner,
-		verifier:               verifier,
-		headers:                headers,
-		seals:                  seals,
-		payloads:               payloads,
-		requiredChunkApprovals: requiredChunkApprovals,
+		state:                                state,
+		assigner:                             assigner,
+		verifier:                             verifier,
+		headers:                              headers,
+		seals:                                seals,
+		payloads:                             payloads,
+		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
 	}
 
 	return rv
@@ -212,7 +212,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 				// because we still want to test that the above code doesn't panic.
 				// TODO: this is only here temporarily to ease the migration to new chunk
 				// based sealing.
-				if s.requiredChunkApprovals == 0 {
+				if s.requiredApprovalsForSealVerification == 0 {
 					log.Warn().Msgf("payload includes invalid seal, continuing validation (%x): %s", seal.ID(), err.Error())
 				} else {
 					return nil, fmt.Errorf("payload includes invalid seal (%x): %w", seal.ID(), err)
@@ -259,9 +259,9 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := seal.AggregatedApprovalSigs[chunk.Index]
 		numberApprovals := len(chunkSigs.SignerIDs)
-		if uint(numberApprovals) < s.requiredChunkApprovals {
+		if uint(numberApprovals) < s.requiredApprovalsForSealVerification {
 			return engine.NewInvalidInputErrorf("not enough chunk approvals %d vs %d",
-				numberApprovals, s.requiredChunkApprovals)
+				numberApprovals, s.requiredApprovalsForSealVerification)
 		}
 
 		lenVerifierSigs := len(chunkSigs.VerifierSignatures)
