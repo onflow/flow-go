@@ -32,19 +32,30 @@ const (
 )
 
 const (
-	mb = 1 << 20
+	_ = iota
+	_ = 1 << (10 * iota)
+	mb
+	gb
+)
+
+const (
 
 	// defines maximum message size in publish and multicast modes
 	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
 
-	// defines maximum message size in unicast mode
+	// defines maximum message size in unicast mode for most messages
 	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
 
-	// maximum time to wait for a unicast request to complete
-	DefaultUnicastTimeout = 2 * time.Second
-)
+	// defines maximum message size in unicast mode for large messages
+	LargeMsgMaxUnicastMsgSize = gb // 1 gb
 
-var unicastTimeout = DefaultUnicastTimeout
+	// default maximum time to wait for a default unicast request to complete
+	// assuming at least a 1mb/sec connection
+	DefaultUnicastTimeout = 2 * time.Second
+
+	// maximum time to wait for a unicast request to complete for large message size
+	LargeMsgUnicastTimeout = 1000 * time.Second
+)
 
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
@@ -247,15 +258,16 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
-	if msg.Size() > m.maxUnicastMsgSize {
+	maxMsgSize, maxTimeout := unicastMaxMsgSizeAndDuration(msg)
+	if msg.Size() > maxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
 		// delivery failure.
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), m.maxUnicastMsgSize)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
 	}
 
 	// pass in a context with timeout to make the unicast call fail fast
-	ctx, cancel := context.WithTimeout(m.ctx, unicastTimeout)
+	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
 	defer cancel()
 
 	// create new stream
@@ -460,4 +472,15 @@ func (m *Middleware) UpdateAllowList() error {
 // IsConnected returns true if this node is connected to the node with id nodeID.
 func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
 	return m.libP2PNode.IsConnected(identity)
+}
+
+// unicastMaxMsgSizeAndDuration returns the max permissible size for a unicast message and the max timeout duration
+// for a given outbound unicast message
+func unicastMaxMsgSizeAndDuration(msg *message.Message) (int, time.Duration) {
+	switch msg.Type {
+	case "messages.ChunkDataResponse":
+		return LargeMsgMaxUnicastMsgSize, LargeMsgUnicastTimeout
+	default:
+		return DefaultMaxUnicastMsgSize, DefaultUnicastTimeout
+	}
 }
