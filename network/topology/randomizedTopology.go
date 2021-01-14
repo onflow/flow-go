@@ -99,12 +99,12 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 // subsetChannel returns a random subset of the identity list that is passed.
 // Returned identities should all subscribed to the specified `channel`.
 // Note: this method should not include identity of its executor.
-func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
+func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
 	// excludes node itself
 	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
 
 	// samples a random graph based on whether channel is cluster-based or not.
-	if _, ok := engine.IsClusterChannelID(channel); ok {
+	if _, ok := engine.IsClusterChannel(channel); ok {
 		return r.clusterChannelHandler(sampleSpace)
 	}
 	return r.nonClusterChannelHandler(sampleSpace, channel)
@@ -154,13 +154,13 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 }
 
 // clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
-func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel string) (flow.IdentityList, error) {
-	if _, ok := engine.IsClusterChannelID(channel); ok {
+func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+	if _, ok := engine.IsClusterChannel(channel); ok {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
 
 	// extracts flow roles subscribed to topic.
-	roles, ok := engine.RolesByChannelID(channel)
+	roles, ok := engine.RolesByChannel(channel)
 	if !ok {
 		return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", channel)
 	}
