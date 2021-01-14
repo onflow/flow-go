@@ -130,7 +130,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// spork topic is derived by suffixing the channelID with the root block ID
+	// spork topic is derived by suffixing the channel with the root block ID
 	topicBeforeSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDBeforeSpork)
 
 	// both nodes are initially on the same spork and subscribed to the same topic

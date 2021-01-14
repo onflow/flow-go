@@ -369,7 +369,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
 	}
-	// update peers to remove nodes subscribed to channelID
+	// update peers to remove nodes subscribed to channel
 	m.peerManager.RequestPeerUpdate()
 
 	return nil
