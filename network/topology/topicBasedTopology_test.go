@@ -63,12 +63,12 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 		top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.logger, suite.state, suite.subMngr[0])
 		require.NoError(suite.T(), err)
 
-		topics := engine.ChannelIDsByRole(suite.all[0].Role)
+		topics := engine.ChannelsByRole(suite.all[0].Role)
 		require.Greater(suite.T(), len(topics), 1)
 
 		for _, topic := range topics {
 			// extracts total number of nodes subscribed to topic
-			roles, ok := engine.RolesByChannelID(topic)
+			roles, ok := engine.RolesByChannel(topic)
 			require.True(suite.T(), ok)
 
 			ids, err := top.subsetChannel(suite.all, nil, topic)
@@ -90,7 +90,7 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.logger, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
-	topics := engine.ChannelIDsByRole(suite.all[0].Role)
+	topics := engine.ChannelsByRole(suite.all[0].Role)
 	require.Greater(suite.T(), len(topics), 1)
 
 	// for each topic samples 100 topologies
@@ -139,7 +139,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 
 	// for each topic samples 100 topologies
 	// all topologies for a topic should be the same
-	topics := engine.ChannelIDsByRole(flow.RoleConsensus)
+	topics := engine.ChannelsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
 	for i, identity := range suite.all {
@@ -193,14 +193,14 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 		channelIDAdjMap[id.NodeID] = subset
 	}
 
-	connectednessByChannelID(suite.T(), channelIDAdjMap, suite.all, channelID)
+	connectednessByChannel(suite.T(), channelIDAdjMap, suite.all, channelID)
 }
 
 // TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
 // cluster channel ID are individually connected.
 func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 	// picks one cluster channel ID as sample
-	channelID := clusterChannelIDs(suite.T())[0]
+	channelID := clusterChannels(suite.T())[0]
 
 	// adjacency map keeps graph component of a single channel ID
 	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)

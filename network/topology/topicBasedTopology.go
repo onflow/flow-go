@@ -61,7 +61,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 	// finds all interacting roles with this node
 	myInteractingRoles := flow.RoleList{}
 	for _, myChannel := range myChannelIDs {
-		roles, ok := engine.RolesByChannelID(myChannel)
+		roles, ok := engine.RolesByChannel(myChannel)
 		if !ok {
 			return nil, fmt.Errorf("could not extract roles for channel: %s", myChannel)
 		}
@@ -107,9 +107,8 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 // identities that should be included in the returned subset.
 // Returned identities should all subscribed to the specified `channel`.
 // Note: this method should not include identity of its executor.
-func (t *TopicBasedTopology) subsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList,
-	channel string) (flow.IdentityList, error) {
-	if _, ok := engine.IsClusterChannelID(channel); ok {
+func (t *TopicBasedTopology) subsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+	if _, ok := engine.IsClusterChannel(channel); ok {
 		return t.clusterChannelHandler(ids, shouldHave)
 	}
 	return t.nonClusterChannelHandler(ids, shouldHave, channel)
@@ -203,13 +202,13 @@ func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityL
 
 // nonClusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
 // The returned sample contains `shouldHave` ones that also subscribed to `channel`.
-func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.IdentityList, channel string) (flow.IdentityList, error) {
-	if _, ok := engine.IsClusterChannelID(channel); ok {
+func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+	if _, ok := engine.IsClusterChannel(channel); ok {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
 
 	// extracts flow roles subscribed to topic.
-	roles, ok := engine.RolesByChannelID(channel)
+	roles, ok := engine.RolesByChannel(channel)
 	if !ok {
 		return nil, fmt.Errorf("unknown topic with no subscribed roles: %s", channel)
 	}
