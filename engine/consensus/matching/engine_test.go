@@ -81,7 +81,7 @@ func (ms *MatchingSuite) SetupTest() {
 		metrics:                 metrics,
 		state:                   ms.State,
 		requester:               ms.requester,
-		resultsDB:               ms.ResultsDB,
+		receiptsDB:              ms.ReceiptsDB,
 		headersDB:               ms.HeadersDB,
 		indexDB:                 ms.IndexDB,
 		incorporatedResults:     ms.ResultsPL,
@@ -122,7 +122,7 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for sealed result")
 
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -173,7 +173,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for already pending result")
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 
 	// resubmit receipt
 	err = ms.matching.onReceipt(receipt.ExecutorID, receipt)
@@ -225,7 +225,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	ms.Assert().True(engine.IsInvalidInputError(err))
 
 	ms.receiptValidator.AssertExpectations(ms.T())
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -385,176 +385,6 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 
 	_, err := ms.matching.sealableResults()
 	ms.Require().Error(err)
-}
-
-// Given an incorporated result in the mempool, whose previous result
-// (aka parent result) is not known:
-//   * skip this result
-//   * this result should not be removed from the mempool
-func (ms *MatchingSuite) TestSealableResultUnknownPrevious() {
-	subgrph := ms.ValidSubgraphFixture()
-	ms.AddSubgraphFixtureToMempools(subgrph)
-	delete(ms.PersistedResults, subgrph.PreviousResult.ID()) // remove previous execution result from storage layer
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with unsealed previous")
-
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "ByID", 1)
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Rem", 0)
-}
-
-// TestSealableResultsInvalidSubgraph tests matching.Engine.sealableResults():
-// let R1 be a result that references block A, and R2 be R1's parent result.
-//  * the execution results form a valid subgraph if and only if
-//    R2 should reference A's parent.
-// Method sealableResults() should
-//   * neither consider R1 nor R2 sealable incorporated results and
-//   * remove R1 from IncorporatedResults mempool, i.e. `ResultsPL`
-func (ms *MatchingSuite) TestSealableResultsInvalidSubgraph() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.PreviousResult.BlockID = unittest.IdentifierFixture() // invalidate subgraph
-	subgrph.Result.PreviousResultID = subgrph.PreviousResult.ID()
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid subgraph")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResultsInvalidChunks tests that matching.Engine.sealableResults()
-// performs the following chunk checks on the result:
-//   * the number k of chunks in the execution result equals to
-//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
-//   * for each index idx := 0, 1, ..., k
-//     there exists once chunk
-// Here we test that an IncorporatedResult with too _few_ chunks is not sealed and removed from the mempool
-func (ms *MatchingSuite) TestSealableResults_TooFewChunks() {
-	subgrph := ms.ValidSubgraphFixture()
-	chunks := subgrph.Result.Chunks
-	subgrph.Result.Chunks = chunks[0 : len(chunks)-2] // drop the last chunk
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with too many chunks")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_TooManyChunks tests that matching.Engine.sealableResults()
-// performs the following chunk checks on the result:
-//   * the number k of chunks in the execution result equals to
-//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
-//   * for each index idx := 0, 1, ..., k
-//     there exists once chunk
-// Here we test that an IncorporatedResult with too _many_ chunks is not sealed and removed from the mempool
-func (ms *MatchingSuite) TestSealableResults_TooManyChunks() {
-	subgrph := ms.ValidSubgraphFixture()
-	chunks := subgrph.Result.Chunks
-	subgrph.Result.Chunks = append(chunks, chunks[len(chunks)-1]) // duplicate the last entry
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with too few chunks")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_InvalidChunks tests that matching.Engine.sealableResults()
-// performs the following chunk checks on the result:
-//   * the number k of chunks in the execution result equals to
-//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
-//   * for each index idx := 0, 1, ..., k
-//     there exists once chunk
-// Here we test that an IncorporatedResult with
-//   * correct number of chunks
-//   * but one missing chunk and one duplicated chunk
-// is not sealed and removed from the mempool
-func (ms *MatchingSuite) TestSealableResults_InvalidChunks() {
-	subgrph := ms.ValidSubgraphFixture()
-	chunks := subgrph.Result.Chunks
-	chunks[len(chunks)-2] = chunks[len(chunks)-1] // overwrite second-last with last entry, which is now duplicated
-	// yet we have the correct number of elements in the chunk list
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_NoPayload_MissingChunk tests that matching.Engine.sealableResults()
-// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
-//  * execution receipt with missing system chunk should be rejected
-func (ms *MatchingSuite) TestSealableResults_NoPayload_MissingChunk() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.Block.Payload = nil                                                              // override block's payload to nil
-	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
-	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
-	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[0:0] // empty chunk list
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	// the result should not be matched
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_NoPayload_TooManyChunk tests that matching.Engine.sealableResults()
-// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
-//  * execution receipt with more than one chunk should be rejected
-func (ms *MatchingSuite) TestSealableResults_NoPayload_TooManyChunk() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.Block.Payload = nil                                                              // override block's payload to nil
-	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
-	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
-	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[0:2] // two chunks
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_NoPayload_WrongIndexChunk tests that matching.Engine.sealableResults()
-// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
-//  * execution receipt with a single chunk, but wrong chunk index, should be rejected
-func (ms *MatchingSuite) TestSealableResults_NoPayload_WrongIndexChunk() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.Block.Payload = nil                                                              // override block's payload to nil
-	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
-	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
-	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[2:2] // chunk with chunkIndex == 2
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
 }
 
 // TestSealableResultsUnassignedVerifiers tests that matching.Engine.sealableResults():
