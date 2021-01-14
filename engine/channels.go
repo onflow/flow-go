@@ -55,29 +55,29 @@ func Channels() network.ChannelList {
 const (
 
 	// Channels used for testing
-	TestNetwork = "test-network"
-	TestMetrics = "test-metrics"
+	TestNetwork = network.Channel("test-network")
+	TestMetrics = network.Channel("test-metrics")
 
 	// Channels for consensus protocols
-	ConsensusCommittee     = "consensus-committee"
-	consensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
+	ConsensusCommittee     = network.Channel("consensus-committee")
+	consensusClusterPrefix = network.Channel("consensus-cluster") // dynamic channel, use ChannelConsensusCluster function
 
 	// Channels for protocols actively synchronizing state across nodes
-	SyncCommittee     = "sync-committee"
-	syncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
-	SyncExecution     = "sync-execution"
+	SyncCommittee     = network.Channel("sync-committee")
+	syncClusterPrefix = network.Channel("sync-cluster") // dynamic channel, use ChannelSyncCluster function
+	SyncExecution     = network.Channel("sync-execution")
 
 	// Channels for actively pushing entities to subscribers
-	PushTransactions = "push-transactions"
-	PushGuarantees   = "push-guarantees"
-	PushBlocks       = "push-blocks"
-	PushReceipts     = "push-receipts"
-	PushApprovals    = "push-approvals"
+	PushTransactions = network.Channel("push-transactions")
+	PushGuarantees   = network.Channel("push-guarantees")
+	PushBlocks       = network.Channel("push-blocks")
+	PushReceipts     = network.Channel("push-receipts")
+	PushApprovals    = network.Channel("push-approvals")
 
 	// Channels for actively requesting missing entities
-	RequestCollections       = "request-collections"
-	RequestChunks            = "request-chunks"
-	RequestReceiptsByBlockID = "request-receipts-by-block-id"
+	RequestCollections       = network.Channel("request-collections")
+	RequestChunks            = network.Channel("request-chunks")
+	RequestReceiptsByBlockID = network.Channel("request-receipts-by-block-id")
 
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
@@ -144,11 +144,11 @@ func initializeChannelRoleMap() {
 // At the current implementation, only collection nodes are involved in a cluster-based channels.
 // If the channel is a cluster-based one, this method also strips off the channel prefix and returns it.
 func IsClusterChannel(channel network.Channel) (network.Channel, bool) {
-	if strings.HasPrefix(channel.String(), syncClusterPrefix) {
+	if strings.HasPrefix(channel.String(), syncClusterPrefix.String()) {
 		return syncClusterPrefix, true
 	}
 
-	if strings.HasPrefix(channel.String(), consensusClusterPrefix) {
+	if strings.HasPrefix(channel.String(), consensusClusterPrefix.String()) {
 		return consensusClusterPrefix, true
 	}
 
@@ -160,8 +160,8 @@ func IsClusterChannel(channel network.Channel) (network.Channel, bool) {
 func FullyQualifiedChannelName(channel network.Channel, rootBlockID string) string {
 	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
 	// unique for each epoch
-	if strings.HasPrefix(string(channel), syncClusterPrefix) || strings.HasPrefix(string(channel), consensusClusterPrefix) {
-		return string(channel)
+	if strings.HasPrefix(channel.String(), syncClusterPrefix.String()) || strings.HasPrefix(string(channel), consensusClusterPrefix.String()) {
+		return channel.String()
 	}
 	return fmt.Sprintf("%s/%s", string(channel), rootBlockID)
 }
