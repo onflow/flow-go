@@ -2,16 +2,12 @@ package fvm
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -19,113 +15,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const TopShotContractAddress = "0b2a3299cc857e29"
-
-// Runtime is Cadence interface hence it would be hard to mock it
-// implementation for our needs is simple enough though
-type mockRuntime struct {
-	executeTxResult error
-}
-
-func (m mockRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
-	panic("should not be used")
-}
-
-func (m mockRuntime) ExecuteScript(_ runtime.Script, _ runtime.Context) (cadence.Value, error) {
-	panic("should not be used")
-}
-
-func (m mockRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
-	return m.executeTxResult
-}
-
-func (m mockRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*sema.Checker, error) {
-	panic("should not be used")
-}
-
-func prepare(executeTxResult error) (error, *bytes.Buffer) {
-
-	buffer := &bytes.Buffer{}
-	log := zerolog.New(buffer)
-	txInvocator := NewTransactionInvocator(log)
-
-	runtime := mockRuntime{executeTxResult: executeTxResult}
-	vm := New(runtime)
-
-	proc := Transaction(&flow.TransactionBody{}, 0)
-
-	ledger := state.NewMapLedger()
-
-	context := NewContext(log)
-
-	st := state.NewState(ledger, state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize))
-
-	err := txInvocator.Process(vm, context, proc, st)
-
-	return err, buffer
-}
-
 func TestSafetyCheck(t *testing.T) {
 
-	t.Run("non-parsing/checking error", func(t *testing.T) {
-
-		topShotContract, err := hex.DecodeString(TopShotContractAddress)
-		require.NoError(t, err)
-
-		runtimeError := runtime.Error{
-			Err: sema.CheckerError{
-				Errors: []error{
-					&sema.ImportedProgramError{
-						CheckerError: &sema.CheckerError{},
-						Location: common.AddressLocation{
-							Name:    "Topshot",
-							Address: common.BytesToAddress(topShotContract),
-						},
-					},
-				},
-			},
-		}
-
-		err, buffer := prepare(runtimeError)
-		require.Error(t, err)
-
-		require.NotContains(t, buffer.String(), "extended_error")
-	})
-
-	t.Run("parsing/checking error", func(t *testing.T) {
-
-		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
-
-		runtimeError := runtime.Error{
-			Err: &runtime.ParsingCheckingError{
-				Err: sema.CheckerError{
-					Errors: []error{
-						&sema.ImportedProgramError{
-							CheckerError: &sema.CheckerError{},
-							Location: common.AddressLocation{
-								Name:    "TopShot",
-								Address: common.BytesToAddress(topShotContractAddress.Bytes()),
-							},
-						},
-					},
-				},
-				Code:     []byte("tx_code"),
-				Location: nil,
-				Options:  nil,
-				UseCache: false,
-				Checker:  nil,
-			},
-		}
-
-		err, buffer := prepare(runtimeError)
-		require.Error(t, err)
-
-		require.Contains(t, buffer.String(), "extended_error")
-	})
-
-	t.Run("parsing/checking error in real environment", func(t *testing.T) {
+	t.Run("parsing error in imported contract", func(t *testing.T) {
 
 		rt := runtime.NewInterpreterRuntime()
 
@@ -136,62 +28,179 @@ func TestSafetyCheck(t *testing.T) {
 		vm := New(rt)
 
 		code := `
-			import TopShot from 0x0b2a3299cc857e29
+			import 0x0b2a3299cc857e29
 
-			transaction {
-				prepare(acct: AuthAccount) {
-					let nftCollection = acct.borrow<&TopShot.Collection>(from: /storage/MomentCollection)
-						?? panic("Could not borrow from MomentCollection in storage")
-			
-							
-					nftCollection.deposit(token: <-token)
-				}
-			}
+			transaction {}
 		`
 
-		proc := Transaction(&flow.TransactionBody{
-			ReferenceBlockID:   flow.Identifier{},
-			Script:             []byte(code),
-			Arguments:          nil,
-			GasLimit:           0,
-			ProposalKey:        flow.ProposalKey{},
-			Payer:              flow.Address{},
-			Authorizers:        nil,
-			PayloadSignatures:  nil,
-			EnvelopeSignatures: nil,
-		}, 0)
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		topShotContractAddress := flow.HexToAddress(TopShotContractAddress)
+		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
 		ledger := state.NewMapLedger()
 
-		topShotCode := `
-			pub contract TopShot {
-				 init() {
-					self.currentSeries = 0
-    			}
-			}
-		`
+		contractCode := `X`
 
-		encodedName, err := encodeContractNames([]string{"TopShot"})
+		// TODO: refactor this manual deployment by setting ledger keys
+		//   into a proper deployment of the contract
+
+		encodedName, err := encodeContractNames([]string{"TestContract"})
 		require.NoError(t, err)
 
-		err = ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "contract_names", encodedName)
+		err = ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"contract_names",
+			encodedName,
+		)
 		require.NoError(t, err)
-		err = ledger.Set(string(topShotContractAddress.Bytes()), string(topShotContractAddress.Bytes()), "code.TopShot", []byte(topShotCode))
+		err = ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"code.TestContract",
+			[]byte(contractCode),
+		)
 		require.NoError(t, err)
 
 		context := NewContext(log)
 
-		st := state.NewState(ledger, state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+		st := state.NewState(
+			ledger,
+			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize))
+			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+		)
 
 		err = txInvocator.Process(vm, context, proc, st)
 		require.Error(t, err)
 
-		require.Contains(t, buffer.String(), "extended_error")
+		require.Contains(t, buffer.String(), "programs")
+		require.Contains(t, buffer.String(), "codes")
 	})
+
+	t.Run("checking error in imported contract", func(t *testing.T) {
+
+		rt := runtime.NewInterpreterRuntime()
+
+		buffer := &bytes.Buffer{}
+		log := zerolog.New(buffer)
+		txInvocator := NewTransactionInvocator(log)
+
+		vm := New(rt)
+
+		code := `
+			import 0x0b2a3299cc857e29
+
+			transaction {}
+		`
+
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+
+		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
+
+		ledger := state.NewMapLedger()
+
+		contractCode := `pub contract TestContract: X {}`
+
+		// TODO: refactor this manual deployment by setting ledger keys
+		//   into a proper deployment of the contract
+
+		encodedName, err := encodeContractNames([]string{"TestContract"})
+		require.NoError(t, err)
+
+		err = ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"contract_names",
+			encodedName,
+		)
+		require.NoError(t, err)
+		err = ledger.Set(
+			string(contractAddress.Bytes()),
+			string(contractAddress.Bytes()),
+			"code.TestContract",
+			[]byte(contractCode),
+		)
+		require.NoError(t, err)
+
+		context := NewContext(log)
+
+		st := state.NewState(
+			ledger,
+			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+		)
+
+		err = txInvocator.Process(vm, context, proc, st)
+		require.Error(t, err)
+
+		require.Contains(t, buffer.String(), "programs")
+		require.Contains(t, buffer.String(), "codes")
+	})
+
+	t.Run("parsing error in transaction", func(t *testing.T) {
+
+		rt := runtime.NewInterpreterRuntime()
+
+		buffer := &bytes.Buffer{}
+		log := zerolog.New(buffer)
+		txInvocator := NewTransactionInvocator(log)
+
+		vm := New(rt)
+
+		code := `X`
+
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+
+		ledger := state.NewMapLedger()
+		context := NewContext(log)
+
+		st := state.NewState(
+			ledger,
+			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+		)
+
+		err := txInvocator.Process(vm, context, proc, st)
+		require.Error(t, err)
+
+		require.NotContains(t, buffer.String(), "programs")
+		require.NotContains(t, buffer.String(), "codes")
+	})
+
+	t.Run("checking error in transaction", func(t *testing.T) {
+
+		rt := runtime.NewInterpreterRuntime()
+
+		buffer := &bytes.Buffer{}
+		log := zerolog.New(buffer)
+		txInvocator := NewTransactionInvocator(log)
+
+		vm := New(rt)
+
+		code := `transaction(arg: X) { }`
+
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+
+		ledger := state.NewMapLedger()
+		context := NewContext(log)
+
+		st := state.NewState(
+			ledger,
+			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+		)
+
+		err := txInvocator.Process(vm, context, proc, st)
+		require.Error(t, err)
+
+		require.NotContains(t, buffer.String(), "programs")
+		require.NotContains(t, buffer.String(), "codes")
+	})
+
 
 }
 
