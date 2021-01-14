@@ -25,9 +25,12 @@ type xorshiftp struct {
 var zeroSeed = []byte("NothingUpMySleeve")
 
 // NewRand returns a new PRG that is a set of xorshift128+ PRGs, seeded with the input seed.
+// Although xorshift+ passes several randomness tests, it is not a cryptographically secure
+// PRG and must be used only for applications that do not require the CSPRG properties.
 //
 // The input seed is the initial state of the PRG, it is recommended to sample the
 // seed uniformly at random.
+//
 // The length of the seed fixes the number of xorshift128+ to initialize:
 // each 16 bytes of the seed initilize an xorshift128+ instance. The seed length
 // has to be a multiple of 16 (the PRG state size).
