@@ -41,34 +41,8 @@ func ChannelIDsByRole(role flow.Role) network.ChannelList {
 	return channels
 }
 
-// UniqueChannelIDsByRole returns list of non-cluster channels with unique identifiers accompanied
-// with the list of cluster channel IDs, which the role subscribed to.
-func UniqueChannelIDsByRole(role flow.Role) network.ChannelList {
-	added := make(map[flow.Identifier]struct{})
-	uniques := make(network.ChannelList, 0)
-
-	// a channel is added to uniques if it is either a
-	// cluster channel, or no non-cluster channel with the same id
-	// has already been added to uniques.
-	all := ChannelIDsByRole(role)
-	for _, channel := range all {
-		id := channelRoleMap[channel].ID()
-		if _, ok := added[id]; ok {
-			continue
-		}
-
-		if _, ok := IsClusterChannel(channel); !ok {
-			added[id] = struct{}{}
-		}
-
-		uniques = append(uniques, channel)
-	}
-
-	return uniques
-}
-
-// ChannelIDs returns all channels that npdes of any role have subscribed to.
-func ChannelIDs() network.ChannelList {
+// Channels returns all channels that npdes of any role have subscribed to.
+func Channels() network.ChannelList {
 	channelIDs := make(network.ChannelList, 0)
 	for channelID := range channelRoleMap {
 		channelIDs = append(channelIDs, channelID)
@@ -117,7 +91,7 @@ const (
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 )
 
-// initializeChannelIdMap initializes an instance of channelRoleMap and populates it with the channel IDs and their
+// initializeChannelIdMap initializes an instance of channelRoleMap and populates it with the channels and their
 // Note: Please update this map, if a new channel is defined or a the roles subscribing to a channel have changed
 // corresponding list of roles.
 func initializeChannelIdMap() {
