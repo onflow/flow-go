@@ -980,13 +980,16 @@ func (e *Engine) requestPendingApprovals() error {
 		Uint64("approval_requests_threshold", e.approvalRequestsThreshold).
 		Logger()
 
-	maxHeightForRequesting := final.Height - e.approvalRequestsThreshold
-	if maxHeightForRequesting <= sealed.Height {
+	if sealed.Height+e.approvalRequestsThreshold >= final.Height {
 		log.Debug().Msg("skip requesting approvals as number of unsealed finalized blocks is below threshold")
 		return nil
 	}
+	// Reaching the following code implies:
+	// 0 <= sealed.Height < final.Height - approvalRequestsThreshold
+	// Hence, the following operation cannot underflow
+	maxHeightForRequesting := final.Height - e.approvalRequestsThreshold
 
-	log.Info().Msg("requesting approvals")
+	requestCount := 0
 	for _, r := range e.incorporatedResults.All() {
 		resultID := r.Result.ID()
 
@@ -1082,12 +1085,15 @@ func (e *Engine) requestPendingApprovals() error {
 			targetIDs := assignment.Verifiers(c)
 
 			// publish the approval request to the network
+			requestCount++
 			err = e.approvalConduit.Publish(req, targetIDs...)
 			if err != nil {
 				return fmt.Errorf("could not publish approval request for chunk (id=%s): %w", c.ID(), err)
 			}
 		}
 	}
+
+	log.Info().Msgf("requested %d approvals", requestCount)
 
 	return nil
 }
