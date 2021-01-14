@@ -14,7 +14,7 @@ import (
 )
 
 // tmp for tests on benchnet
-const SegmentSize = 1 * 1024 * 1024
+const SegmentSize = 64 * 1024
 
 type LedgerWAL struct {
 	wal            *prometheusWAL.WAL
