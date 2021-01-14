@@ -105,7 +105,8 @@ func (i *TransactionInvocator) Process(
 // This is a temporary measure.
 func (i *TransactionInvocator) safetyErrorCheck(err error) {
 
-	// Only runtime errors, in particular only parsing/checking errors
+	// Only consider runtime errors,
+	// in particular only consider parsing/checking errors
 
 	var runtimeErr runtime.Error
 	if !errors.As(err, &runtimeErr) {
@@ -118,8 +119,6 @@ func (i *TransactionInvocator) safetyErrorCheck(err error) {
 	}
 
 	// Only consider errors in deployed contracts.
-	// If the error is not in a address location,
-	// it must be an imported program error
 
 	checkerError, ok := parsingCheckingError.Err.(*sema.CheckerError)
 	if !ok {
