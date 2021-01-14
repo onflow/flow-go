@@ -2,6 +2,7 @@ package wal
 
 import (
 	"fmt"
+	"sort"
 
 	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,6 +20,7 @@ type LedgerWAL struct {
 	paused         bool
 	forestCapacity int
 	pathByteSize   int
+	log            zerolog.Logger
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
@@ -32,6 +34,7 @@ func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forest
 		paused:         false,
 		forestCapacity: forestCapacity,
 		pathByteSize:   pathByteSize,
+		log:            logger,
 	}, nil
 }
 
@@ -137,7 +140,7 @@ func (w *LedgerWAL) replay(
 		return fmt.Errorf("end of range cannot be smaller than beginning")
 	}
 
-	loadedCheckpoint := false
+	loadedCheckpoint := -1
 	startSegment := from
 
 	checkpointer, err := w.NewCheckpointer()
@@ -146,33 +149,48 @@ func (w *LedgerWAL) replay(
 	}
 
 	if useCheckpoints {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
+		allCheckpoints, err := checkpointer.ListCheckpoints()
 		if err != nil {
-			return fmt.Errorf("cannot get latest checkpoint: %w", err)
+			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}
 
-		if latestCheckpoint != -1 && latestCheckpoint+1 >= from { //+1 to account for connected checkpoint and segments
+		var availableCheckpoints []int
+
+		// if there are no checkpoints already, don't bother
+		if len(allCheckpoints) > 0 {
+			// from-1 to account for checkpoints connected to segments, ie. checkpoint 8 if replaying segments 9-12
+			availableCheckpoints = getPossibleCheckpoints(allCheckpoints, from-1, to)
+		}
+
+		for len(availableCheckpoints) > 0 { // as long as there are checkpoints to try
+			latestCheckpoint := availableCheckpoints[len(availableCheckpoints)-1]
+
 			forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
 			if err != nil {
-				return fmt.Errorf("cannot load checkpoint %d: %w", latestCheckpoint, err)
+				w.log.Warn().Int("checkpoint", latestCheckpoint).Err(err).
+					Msg("checkpoint loading failed")
+
+				availableCheckpoints = availableCheckpoints[:len(availableCheckpoints)-1]
+				continue
 			}
 			err = checkpointFn(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("error while handling checkpoint: %w", err)
 			}
-			loadedCheckpoint = true
+			loadedCheckpoint = latestCheckpoint
+			break
 		}
 
-		if loadedCheckpoint && to == latestCheckpoint {
+		if loadedCheckpoint != -1 && to == loadedCheckpoint {
 			return nil
 		}
 
-		if loadedCheckpoint {
-			startSegment = latestCheckpoint + 1
+		if loadedCheckpoint >= 0 {
+			startSegment = loadedCheckpoint + 1
 		}
 	}
 
-	if !loadedCheckpoint && startSegment == 0 {
+	if loadedCheckpoint == -1 && startSegment == 0 {
 		hasRootCheckpoint, err := checkpointer.HasRootCheckpoint()
 		if err != nil {
 			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
@@ -228,6 +246,29 @@ func (w *LedgerWAL) replay(
 		}
 	}
 	return nil
+}
+
+func getPossibleCheckpoints(allCheckpoints []int, from, to int) []int {
+	//list of checkpoints is sorted
+	indexFrom := sort.SearchInts(allCheckpoints, from)
+	indexTo := sort.SearchInts(allCheckpoints, to)
+
+	// all checkpoints are earlier, return last one
+	if indexTo == len(allCheckpoints) {
+		return allCheckpoints[indexFrom:indexTo]
+	}
+
+	// exact match
+	if allCheckpoints[indexTo] == to {
+		return allCheckpoints[indexFrom : indexTo+1]
+	}
+
+	// earliest checkpoint from list doesn't match, index 0 means no match at all
+	if indexTo == 0 {
+		return nil
+	}
+
+	return allCheckpoints[indexFrom:indexTo]
 }
 
 // NewCheckpointer returns a Checkpointer for this WAL

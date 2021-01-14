@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"math/rand"
+	"os"
 	"path"
 	"testing"
 	"time"
@@ -22,31 +25,8 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
-	f := names[len(names)-1].(func(*testing.T, *realWAL.LedgerWAL, *realWAL.Checkpointer))
-
-	fileNames := make([]string, len(names)-1)
-
-	for i := 0; i <= len(names)-2; i++ {
-		fileNames[i] = names[i].(string)
-	}
-
-	unittest.RunWithTempDir(t, func(dir string) {
-		util.CreateFiles(t, dir, fileNames...)
-
-		wal, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, 10, pathByteSize, segmentSize)
-		require.NoError(t, err)
-
-		checkpointer, err := wal.NewCheckpointer()
-		require.NoError(t, err)
-
-		f(t, wal, checkpointer)
-	})
-}
 
 var (
 	numInsPerStep      = 2
@@ -265,17 +245,17 @@ func Test_Checkpointing(t *testing.T) {
 					paths = append(paths, path)
 				}
 
-				fmt.Printf("Querying with %x\n", rootHash)
+				//fmt.Printf("Querying with %x\n", rootHash)
 
-				fmt.Println(f.GetTrie(ledger.RootHash(rootHash)))
+				//fmt.Println(f.GetTrie(ledger.RootHash(rootHash)))
 				payloads1, err := f.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
-				fmt.Println(f2.GetTrie(ledger.RootHash(rootHash)))
+				//fmt.Println(f2.GetTrie(ledger.RootHash(rootHash)))
 				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
-				fmt.Println(f3.GetTrie(ledger.RootHash(rootHash)))
+				//fmt.Println(f3.GetTrie(ledger.RootHash(rootHash)))
 				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
@@ -366,7 +346,113 @@ func Test_Checkpointing(t *testing.T) {
 				require.Equal(t, values2[i], payloads5[i].Value)
 			}
 		})
+
+		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
+
+			f6, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+			require.NoError(t, err)
+
+			wal6, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize)
+			require.NoError(t, err)
+
+			// make sure no earlier checkpoints exist
+			require.NoFileExists(t, path.Join(dir, "checkpoint.0000008"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.0000006"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.0000004"))
+
+			require.FileExists(t, path.Join(dir, "checkpoint.00000010"))
+
+			// create missing checkpoints
+			checkpointer, err := wal6.NewCheckpointer()
+			require.NoError(t, err)
+
+			err = checkpointer.Checkpoint(4, func() (io.WriteCloser, error) {
+				return checkpointer.CheckpointWriter(4)
+			})
+			require.NoError(t, err)
+			require.FileExists(t, path.Join(dir, "checkpoint.00000004"))
+
+			err = checkpointer.Checkpoint(6, func() (io.WriteCloser, error) {
+				return checkpointer.CheckpointWriter(6)
+			})
+			require.NoError(t, err)
+			require.FileExists(t, path.Join(dir, "checkpoint.00000006"))
+
+			err = checkpointer.Checkpoint(8, func() (io.WriteCloser, error) {
+				return checkpointer.CheckpointWriter(8)
+			})
+			require.NoError(t, err)
+			require.FileExists(t, path.Join(dir, "checkpoint.00000008"))
+
+			// corrupt checkpoints
+			randomlyModifyFile(t, path.Join(dir, "checkpoint.00000006"))
+			randomlyModifyFile(t, path.Join(dir, "checkpoint.00000008"))
+			randomlyModifyFile(t, path.Join(dir, "checkpoint.00000010"))
+
+			// make sure 10 is latest checkpoint
+			latestCheckpoint, err := checkpointer.LatestCheckpoint()
+			require.NoError(t, err)
+			require.Equal(t, 10, latestCheckpoint)
+
+			// at this stage, number 4 should be the latest valid checkpoint
+			// check other fail to load
+
+			_, err = checkpointer.LoadCheckpoint(10)
+			require.Error(t, err)
+			_, err = checkpointer.LoadCheckpoint(8)
+			require.Error(t, err)
+			_, err = checkpointer.LoadCheckpoint(6)
+			require.Error(t, err)
+			_, err = checkpointer.LoadCheckpoint(4)
+			require.NoError(t, err)
+
+			err = wal6.ReplayOnForest(f6)
+			require.NoError(t, err)
+
+			err = wal6.Close()
+			require.NoError(t, err)
+
+			tmpListDir(dir)
+
+		})
 	})
+}
+
+// randomlyModifyFile picks random byte and modifies it
+// this should be enough to cause checkpoint loading to fail
+// as it contains checksum
+func randomlyModifyFile(t *testing.T, filename string) {
+
+	file, err := os.OpenFile(filename, os.O_RDWR, 0644)
+	require.NoError(t, err)
+
+	fileInfo, err := file.Stat()
+	require.NoError(t, err)
+
+	fileSize := fileInfo.Size()
+
+	buf := make([]byte, 1)
+
+	// get some random offset
+	offset := int64(rand.Int()) % (fileSize + int64(len(buf)))
+
+	_, err = file.ReadAt(buf, offset)
+	require.NoError(t, err)
+
+	// byte addition will simply wrap around
+	buf[0] += 1
+
+	_, err = file.WriteAt(buf, offset)
+	require.NoError(t, err)
+}
+
+func tmpListDir(dir string) {
+	fmt.Println("----------")
+	files, _ := ioutil.ReadDir(dir)
+
+	for _, f := range files {
+		fmt.Println(f.Name())
+	}
 }
 
 func Test_StoringLoadingCheckpoints(t *testing.T) {
