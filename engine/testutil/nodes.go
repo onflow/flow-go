@@ -243,7 +243,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	requesterEng, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
-	assigner, err := chunks.NewPublicAssignment(chunks.DefaultChunkAssignmentAlpha, node.State)
+	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
 	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
