@@ -11,5 +11,5 @@ type SubscriptionManager interface {
 	GetEngine(channel Channel) (Engine, error)
 
 	// Channels returns all the channels registered in this subscription manager.
-	Channels() []ChannelList
+	Channels() ChannelList
 }
