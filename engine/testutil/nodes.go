@@ -152,7 +152,7 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator())
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -249,8 +249,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
 	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
 
-	requireApprovals := true
-
 	matchingEngine, err := matching.New(
 		node.Log,
 		node.Metrics,
@@ -270,7 +268,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		seals,
 		assigner,
 		validator,
-		requireApprovals)
+		validation.DefaultRequiredChunkApprovals)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -95,10 +96,10 @@ func (ms *MatchingSuite) SetupTest() {
 		sealingThreshold:          10,
 		maxResultsToRequest:       200,
 		assigner:                  ms.Assigner,
-		requireApprovals:          true,
 		receiptValidator:          ms.receiptValidator,
 		requestTracker:            NewRequestTracker(1, 3),
 		approvalRequestsThreshold: 10,
+		requiredChunkApprovals:    validation.DefaultRequiredChunkApprovals,
 	}
 }
 

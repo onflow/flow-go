@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// receiptValidator holds all needed context for checking
+// receipt validity against current protocol state.
 type receiptValidator struct {
 	state    protocol.State
 	index    storage.Index
@@ -50,25 +52,6 @@ func (v *receiptValidator) ensureStakedNodeWithRole(identity *flow.Identity, exp
 
 	// TODO: check if node was ejected
 	return nil
-}
-
-// identityForNode ensures that `nodeID` is an authorized member of the network
-// at the given block and returns the corresponding node's full identity.
-// Error returns:
-//   * sentinel engine.InvalidInputError is nodeID is NOT an authorized member of the network
-//   * generic error indicating a fatal internal problem
-func (v *receiptValidator) identityForNode(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
-	// get the identity of the origin node
-	identity, err := v.state.AtBlockID(blockID).Identity(nodeID)
-	if err != nil {
-		if protocol.IsIdentityNotFound(err) {
-			return nil, engine.NewInvalidInputErrorf("unknown node identity: %w", err)
-		}
-		// unexpected exception
-		return nil, fmt.Errorf("failed to retrieve node identity: %w", err)
-	}
-
-	return identity, nil
 }
 
 func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceipt, nodeIdentity *flow.Identity) error {
@@ -163,7 +146,7 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
 // 	* execution result has a valid parent
 // Returns nil if all checks passed successfully
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
-	identity, err := v.identityForNode(receipt.ExecutionResult.BlockID, receipt.ExecutorID)
+	identity, err := identityForNode(v.state, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf("failed to get executor identity %v, %w", receipt.ExecutorID, err)
 	}

@@ -145,7 +145,7 @@ func createNode(
 	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, blocksDB, setupsDB, commitsDB, statusesDB, stateRoot)
 	require.NoError(t, err)
 
-	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator())
+	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 
 	localID := identity.ID()

@@ -57,7 +57,7 @@ type Engine struct {
 	isCheckingSealing         *atomic.Bool                    // used to rate limit the checksealing call
 	sealingThreshold          uint                            // how many blocks between sealed/finalized before we request execution receipts and approvals
 	maxResultsToRequest       int                             // max number of finalized blocks for which we request execution results
-	requireApprovals          bool                            // flag to disable verifying chunk approvals
+	requiredChunkApprovals    uint                            // required number of chunk approvals
 	receiptValidator          module.ReceiptValidator         // used to validate receipts
 	requestTracker            *RequestTracker                 // used to cout the number of approval requests by chunk ([result id][chunk index]=>count)
 	approvalRequestsThreshold uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
@@ -83,7 +83,7 @@ func New(
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
 	validator module.ReceiptValidator,
-	requireApprovals bool,
+	requiredChunkApprovals uint,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -109,7 +109,7 @@ func New(
 		sealingThreshold:          10,
 		maxResultsToRequest:       200,
 		assigner:                  assigner,
-		requireApprovals:          requireApprovals,
+		requiredChunkApprovals:    requiredChunkApprovals,
 		receiptValidator:          validator,
 		requestTracker:            NewRequestTracker(10, 30),
 		approvalRequestsThreshold: 10,
@@ -648,7 +648,7 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 	// get all the chunk approvals from mempool
 	approvals := e.approvals.ByChunk(incorporatedResult.Result.ID(), chunk.Index)
 
-	validApprovals := 0
+	validApprovals := uint(0)
 	for approverID, approval := range approvals {
 		// skip if the incorporated result already has a signature for that
 		// chunk and verifier
@@ -681,18 +681,7 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 		validApprovals++
 	}
 
-	// skip counting approvals. We don't put this earlier in the function
-	// because we still want to test that the above code doesn't panic.
-	// TODO: this is only here temporarily to ease the migration to new chunk
-	// based sealing.
-	if !e.requireApprovals {
-		return true, nil
-	}
-
-	// TODO:
-	//   * This is the happy path (requires just one approval per chunk).
-	//   * Full protocol should be +2/3 of all currently staked verifiers.
-	return validApprovals > 0, nil
+	return validApprovals >= e.requiredChunkApprovals, nil
 }
 
 // TODO: to be extracted as a common function in state/protocol/state.go
@@ -957,7 +946,7 @@ func (e *Engine) requestPendingApprovals() error {
 	// Skip requesting approvals if they are not required for sealing.
 	// TODO: this is only here temporarily to ease the migration to new chunk
 	// based sealing.
-	if !e.requireApprovals {
+	if e.requiredChunkApprovals <= 0 {
 		return nil
 	}
 
