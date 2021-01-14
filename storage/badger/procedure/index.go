@@ -46,7 +46,6 @@ func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.T
 		}
 
 		*index = flow.Index{
-			NodeIDs:       nil,
 			CollectionIDs: collIDs,
 			SealIDs:       sealIDs,
 			ReceiptIDs:    receiptIDs,

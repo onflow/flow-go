@@ -1058,7 +1058,6 @@ func EpochStatusFixture() *flow.EpochStatus {
 
 func IndexFixture() *flow.Index {
 	return &flow.Index{
-		NodeIDs:       nil,
 		CollectionIDs: IdentifierListFixture(5),
 		SealIDs:       IdentifierListFixture(5),
 		ReceiptIDs:    IdentifierListFixture(5),
