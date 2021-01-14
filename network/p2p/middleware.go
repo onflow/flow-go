@@ -32,11 +32,13 @@ const (
 )
 
 const (
+	mb = 1 << 20
+
 	// defines maximum message size in publish and multicast modes
-	DefaultMaxPubSubMsgSize = 1 << 21 // 2 mb
+	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
 
 	// defines maximum message size in unicast mode
-	DefaultMaxUnicastMsgSize = 5 * DefaultMaxPubSubMsgSize // 10 mb
+	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
 
 	// maximum time to wait for a unicast request to complete
 	DefaultUnicastTimeout = 2 * time.Second
