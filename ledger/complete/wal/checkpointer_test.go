@@ -110,14 +110,6 @@ func Test_WAL(t *testing.T) {
 
 func Test_Checkpointing(t *testing.T) {
 
-	// numInsPerStep := 2
-	// keyNumberOfParts := 10
-	// keyPartMinByteSize := 1
-	// keyPartMaxByteSize := 100
-	// valueMaxByteSize := 2 << 16 //16kB
-	// size := 10
-	// metricsCollector := &metrics.NoopCollector{}
-
 	unittest.RunWithTempDir(t, func(dir string) {
 
 		f, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
@@ -245,17 +237,12 @@ func Test_Checkpointing(t *testing.T) {
 					paths = append(paths, path)
 				}
 
-				//fmt.Printf("Querying with %x\n", rootHash)
-
-				//fmt.Println(f.GetTrie(ledger.RootHash(rootHash)))
 				payloads1, err := f.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
-				//fmt.Println(f2.GetTrie(ledger.RootHash(rootHash)))
 				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
-				//fmt.Println(f3.GetTrie(ledger.RootHash(rootHash)))
 				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
 				require.NoError(t, err)
 
