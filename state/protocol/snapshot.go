@@ -47,6 +47,10 @@ type Snapshot interface {
 	// included seal as of this block (see LatestSeal).
 	LatestResult() (*flow.ExecutionResult, error)
 
+	// Commit returns the state commitment of the most recently included seal
+	// as of this block. It represents the sealed state.
+	Commit() (flow.StateCommitment, error)
+
 	// SealingSegment returns the chain segment such that the head (greatest
 	// height) is this snapshot's reference block and the tail (least height)
 	// is the most recently sealed block as of this snapshot (ie. the block
