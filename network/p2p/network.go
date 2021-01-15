@@ -203,7 +203,7 @@ func (n *Network) SetIDs(ids flow.IdentityList) error {
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
-	if n.rcache.add(message.EventID, message.ChannelID) {
+	if n.rcache.add(message.EventID, network.Channel(message.ChannelID)) {
 		log := n.logger.With().
 			Hex("sender_id", senderID[:]).
 			Hex("event_id", message.EventID).
