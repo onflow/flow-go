@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
-	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 )
 
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
@@ -185,7 +184,7 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 	return &Cluster{enc}, nil
 }
 
-func SnapshotFromBootstrapState(root *flow.Block, seal *flow.Seal, result *flow.ExecutionResult, qc *flow.QuorumCertificate) (*Snapshot, error) {
+func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
 
 	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -196,8 +195,8 @@ func SnapshotFromBootstrapState(root *flow.Block, seal *flow.Seal, result *flow.
 		return nil, fmt.Errorf("invalid commit event type (%T)", seal.ServiceEvents[1].Event)
 	}
 
-	// TODO consolidate with inmem.Epoch
-	current, err := FromEpoch(bprotocol.NewCommittedEpoch(setup, commit))
+	// TODO consolidate with inmem.Epoch (copied from badger currently)
+	current, err := FromEpoch(NewCommittedEpoch(setup, commit))
 	if err != nil {
 		return nil, fmt.Errorf("could not convert epoch: %w", err)
 	}
