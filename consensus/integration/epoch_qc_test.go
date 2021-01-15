@@ -1,17 +1,22 @@
 package integration_test
 
 import (
+	"crypto"
 	"testing"
 
 	emulator "github.com/onflow/flow-emulator"
+	"github.com/onflow/flow-go-sdk"
+	sdk "github.com/onflow/flow-go-sdk"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 
-	"github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/test"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 /**
@@ -25,13 +30,18 @@ import (
 6. Start the QCVoter for each collection node (essentially mocking the EpochSetup service event being emitted)
 **/
 
+type ClusterNode struct {
+	Signer  crypto.Signer
+	Key     sdk.AccountKey
+	Address sdk.Address
+	Voter   module.QCVoter
+}
+
 func TestQuroumCertificate(t *testing.T) {
 
 	// create a new instance of the emulated blockchain
 	blockchain, err := emulator.NewBlockchain()
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(err)
 
 	accountKeys := test.AccountKeyGenerator()
 
@@ -46,14 +56,45 @@ func TestQuroumCertificate(t *testing.T) {
 			Source: string(QCCode),
 		},
 	})
-	if !assert.NoError(t, err) {
-		t.Log(err.Error())
+	require.NoError(err)
+
+	env := templates.Environment{
+		QuorumCertificateAddress: QCAddress.Hex(),
 	}
-	env := te\mplates.Environment{
-		QuorumCertificateAddress: QCAddress.String(),
-	}
-```
+
 	// create clusters
 	numberOfClusters := 3
 	numberOfNodesPerCluster := 10
+
+	// create flow keys
+	clusters := make([][]ClusterNode, numberOfClusters)
+
+	// create QC voter for each node in the cluster
+	for i := 1; i <= numberOfClusters; i++ {
+		for j := 1; j <= numberOfNodesPerCluster; i++ {
+			key, signer := accountKeys.NewWithSigner()
+
+			// create flow account
+			address, err := blockchain.CreateAccount([]*flow.AccountKey{key})
+			require.NoError(err)
+
+			// create QC client for clustesrs node
+			client, err := module.QCClient(unittest.IdentifierFixture(), address.String(), key.Index,
+				"ACCESS_ADDRESS", QCAddress.String(), signer)
+			require.NoError(err)
+
+			// create QCVoter object
+			voter := module.QCVoter()
+
+			node := ClusterNode{
+				Signer:  signer,
+				Key:     key,
+				Address: address,
+				Voter:   voter,
+			}
+
+			// set node voter object
+			clusters[i][j] = node
+		}
+	}
 }
