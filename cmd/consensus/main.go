@@ -119,10 +119,10 @@ func main() {
 			}
 
 			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
-				return fmt.Errorf("invalid consesus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
 			}
 			if requiredApprovalsForSealConstruction > chunkAlpha {
-				return fmt.Errorf("invalid consesus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
 			}
 
 			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
