@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 
@@ -104,19 +105,23 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	return nil
 }
 
+func (v *receiptValidator) previousResult(result *flow.ExecutionResult) (*flow.ExecutionResult, error) {
+	prevResult, err := v.results.ByID(result.PreviousResultID)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
+		} else {
+			return nil, err
+		}
+	}
+	return prevResult, nil
+}
+
 // subgraphCheck enforces that result forms a valid sub-graph:
 // Let R1 be a result that references block A, and R2 be R1's parent result.
 // The execution results form a valid subgraph if and only if R2 references
 // A's parent.
-func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
-	prevResult, err := v.results.ByID(result.PreviousResultID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			return engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
-		}
-		return err
-	}
-
+func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
 	block, err := v.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
@@ -135,6 +140,23 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult) error {
 		return engine.NewInvalidInputErrorf("invalid block for previous result %v", prevResult.BlockID)
 	}
 
+	return nil
+}
+
+// resultChainCheck enforces that the end state of the parent result
+// matches the current result's start state
+func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
+	finalState, isOk := prevResult.FinalStateCommitment()
+	if !isOk {
+		return fmt.Errorf("missing final state commitment in execution result %v", prevResult.ID())
+	}
+	initialState, isOK := result.InitialStateCommit()
+	if !isOK {
+		return fmt.Errorf("missing initial state commitment in execution result %v", result.ID())
+	}
+	if !bytes.Equal(initialState, finalState) {
+		return engine.NewInvalidInputError("execution results do not form chain")
+	}
 	return nil
 }
 
@@ -166,9 +188,19 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 		return fmt.Errorf("invalid chunks format: %w", err)
 	}
 
-	err = v.subgraphCheck(&receipt.ExecutionResult)
+	prevResult, err := v.previousResult(&receipt.ExecutionResult)
+	if err != nil {
+		return err
+	}
+
+	err = v.subgraphCheck(&receipt.ExecutionResult, prevResult)
 	if err != nil {
 		return fmt.Errorf("invalid execution result: %w", err)
+	}
+
+	err = v.resultChainCheck(&receipt.ExecutionResult, prevResult)
+	if err != nil {
+		return fmt.Errorf("invalid execution results chain: %w", err)
 	}
 
 	return nil

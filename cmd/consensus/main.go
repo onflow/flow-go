@@ -217,7 +217,7 @@ func main() {
 				node.State,
 				node.Me,
 				receiptRequester,
-				node.Storage.Results,
+				node.Storage.Receipts,
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,

@@ -38,7 +38,11 @@ type BaseChainSuite struct {
 	FinalSnapshot  *protocol.Snapshot
 
 	// MEMPOOLS and STORAGE which are injected into Matching Engine
-	// mock storage.ExecutionResults: backed by in-memory map PersistedResults
+	// mock storage.ExecutionReceipts: backed by in-memory map PersistedReceipts
+	ReceiptsDB             *storage.ExecutionReceipts
+	PersistedReceipts      map[flow.Identifier]*flow.ExecutionReceipt
+	PersistedReceiptsIndex map[flow.Identifier]flow.Identifier // index ExecutionResult.BlockID -> ExecutionReceipt.ID
+
 	ResultsDB        *storage.ExecutionResults
 	PersistedResults map[flow.Identifier]*flow.ExecutionResult
 
@@ -165,7 +169,58 @@ func (bc *BaseChainSuite) SetupChain() {
 	).Maybe()
 	bc.ResultsDB.On("Store", mock.Anything).Return(
 		func(result *flow.ExecutionResult) error {
-			_, found := bc.PersistedResults[result.BlockID]
+			_, found := bc.PersistedResults[result.ID()]
+			if found {
+				return storerr.ErrAlreadyExists
+			}
+			return nil
+		},
+	).Maybe() // this call is optional
+	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
+	bc.PersistedReceipts = make(map[flow.Identifier]*flow.ExecutionReceipt)
+	bc.PersistedReceiptsIndex = make(map[flow.Identifier]flow.Identifier)
+	bc.ReceiptsDB = &storage.ExecutionReceipts{}
+	bc.ReceiptsDB.On("ByID", mock.Anything).Return(
+		func(receiptID flow.Identifier) *flow.ExecutionReceipt {
+			return bc.PersistedReceipts[receiptID]
+		},
+		func(receiptID flow.Identifier) error {
+			_, found := bc.PersistedReceipts[receiptID]
+			if !found {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	).Maybe()
+	bc.ReceiptsDB.On("Index", mock.Anything, mock.Anything).Return(
+		func(blockID flow.Identifier, receiptID flow.Identifier) error {
+			_, found := bc.PersistedReceiptsIndex[receiptID]
+			if found {
+				return storerr.ErrAlreadyExists
+			}
+			bc.PersistedReceiptsIndex[blockID] = receiptID
+			return nil
+		},
+	)
+	bc.ReceiptsDB.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.ExecutionReceipt {
+			receiptID, found := bc.PersistedReceiptsIndex[blockID]
+			if !found {
+				return nil
+			}
+			return bc.PersistedReceipts[receiptID]
+		},
+		func(blockID flow.Identifier) error {
+			_, found := bc.PersistedReceiptsIndex[blockID]
+			if !found {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	).Maybe()
+	bc.ReceiptsDB.On("Store", mock.Anything).Return(
+		func(receipt *flow.ExecutionReceipt) error {
+			_, found := bc.PersistedReceipts[receipt.ID()]
 			if found {
 				return storerr.ErrAlreadyExists
 			}

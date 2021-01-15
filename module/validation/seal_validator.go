@@ -257,7 +257,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 	executionResultID := executionResult.ID()
 	for _, chunk := range executionResult.Chunks {
-		chunkSigs := seal.AggregatedApprovalSigs[chunk.Index]
+		chunkSigs := &seal.AggregatedApprovalSigs[chunk.Index]
 		numberApprovals := len(chunkSigs.SignerIDs)
 		if uint(numberApprovals) < s.requiredChunkApprovals {
 			return engine.NewInvalidInputErrorf("not enough chunk approvals %d vs %d",
@@ -276,7 +276,7 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			}
 		}
 
-		err := s.verifySealSignature(&chunkSigs, chunk, executionResultID)
+		err := s.verifySealSignature(chunkSigs, chunk, executionResultID)
 		if err != nil {
 			return fmt.Errorf("invalid seal signature: %w", err)
 		}
