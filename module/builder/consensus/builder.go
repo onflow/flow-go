@@ -19,6 +19,10 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+// DefaultPayloadMaximumReceipts is a maximum number of receipts that can be included in block payload. Reason for that
+// is that the receipts could be too big, and it won't be possible to send a network message.
+const DefaultPayloadMaximumReceipts = 20
+
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
@@ -107,6 +111,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	insertableReceipts, err := b.getInsertableReceipts(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not insert receipts: %w", err)
+	}
+
+	if len(insertableReceipts) > DefaultPayloadMaximumReceipts {
+		insertableReceipts = insertableReceipts[:DefaultPayloadMaximumReceipts]
 	}
 
 	// assemble the block proposal
