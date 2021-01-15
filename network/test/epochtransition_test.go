@@ -276,6 +276,7 @@ func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids 
 				connections++
 			}
 		}
+		fmt.Printf("\n connections: %d threshold: %d", connections, threshold)
 		return connections >= threshold
 	}, 5*time.Second, time.Millisecond*100)
 }
