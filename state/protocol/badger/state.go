@@ -171,12 +171,18 @@ func Bootstrap(
 	return state, nil
 }
 
+// bootstrapEpoch bootstraps the protocol state database with information about
+// the previous, current, and next epochs as of the root snapshot.
+//
+// The root snapshot's sealing segment must not straddle any epoch transitions
+// or epoch phase transitions.
 func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		previous := root.Epochs().Previous()
 		current := root.Epochs().Current()
 		next := root.Epochs().Next()
 
+		// build the status as we go
 		status := new(flow.EpochStatus)
 		var setups []*flow.EpochSetup
 		var commits []*flow.EpochCommit
@@ -218,6 +224,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 		status.CurrentEpoch.SetupID = setup.ID()
 		status.CurrentEpoch.CommitID = commit.ID()
 
+		// insert next epoch, if it exists
 		_, err = next.Counter()
 		if err != nil && !errors.Is(err, protocol.ErrNextEpochNotSetup) {
 			return fmt.Errorf("could not get next epoch: %w", err)
@@ -245,6 +252,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			return fmt.Errorf("bootstrapping resulting in invalid epoch status: %w", err)
 		}
 
+		// insert all epoch setup/commit service events
 		for _, setup := range setups {
 			err = state.epoch.setups.StoreTx(setup)(tx)
 			if err != nil {
@@ -258,7 +266,8 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			}
 		}
 
-		// TODO: handle or document constraint - sealing segment must not contain epoch or epoch phase transitions
+		// NOTE: as specified in the godoc, this code assumes that each block
+		// in the sealing segment in within the same phase within the same epoch.
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
