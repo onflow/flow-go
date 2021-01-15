@@ -1055,7 +1055,10 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 
 func EpochStatusFixture() *flow.EpochStatus {
 	return &flow.EpochStatus{
-		FirstBlockID: IdentifierFixture(),
+		PreviousEpoch: flow.EventIDs{
+			SetupID:  IdentifierFixture(),
+			CommitID: IdentifierFixture(),
+		},
 		CurrentEpoch: flow.EventIDs{
 			SetupID:  IdentifierFixture(),
 			CommitID: IdentifierFixture(),
