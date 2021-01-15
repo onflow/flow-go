@@ -1,14 +1,12 @@
 package dkg
 
-import "github.com/onflow/flow-go/model/flow"
-
 type DKGMessage struct {
 	Orig    int
 	Data    []byte
-	EpochID flow.Identifier
+	EpochID uint64
 }
 
-func NewDKGMessage(orig int, data []byte, epoch flow.Identifier) DKGMessage {
+func NewDKGMessage(orig int, data []byte, epoch uint64) DKGMessage {
 	return DKGMessage{
 		Orig:    orig,
 		Data:    data,

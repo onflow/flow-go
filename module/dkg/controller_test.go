@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // node is a test object that simulates a running instance of the DKG protocol
@@ -92,7 +91,7 @@ type processor struct {
 	id       int
 	channels []chan DKGMessage
 	logger   zerolog.Logger
-	epoch    flow.Identifier
+	epoch    uint64
 }
 
 func (proc *processor) PrivateSend(dest int, data []byte) {

@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"math/rand"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := unittest.IdentifierFixture()
+	epochID := rand.Uint64()
 
 	// send a msg from the first node to the second node
 	orig := 0
@@ -91,7 +92,7 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := unittest.IdentifierFixture()
+	epochID := rand.Uint64()
 
 	// send a msg from the first node on the list to second node on the list
 	orig := 0
@@ -132,7 +133,7 @@ func TestProcessDKGMessage_Valid(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := unittest.IdentifierFixture()
+	epochID := rand.Uint64()
 
 	// send a msg from the first node to the second node
 	orig := 0
@@ -166,30 +167,24 @@ func TestProcessDKGMessage_Valid(t *testing.T) {
 	require.NoError(t, err)
 
 	// launch a background routine to capture messages forwarded to the msgCh
-	var receivedMessage dkg.DKGMessage
-	received := false
+	var receivedMsg dkg.DKGMessage
+	doneCh := make(chan struct{})
 	go func() {
-		receivedMessage = <-msgCh
-		received = true
+		receivedMsg = <-msgCh
+		close(doneCh)
 	}()
 
 	err = engine.Process(committee[orig], msg)
 	require.NoError(t, err)
 
-	// check that the message has been received and forwarded to the msgCh
-	timeout := time.After(1 * time.Second)
-	for {
-		select {
-		case <-timeout:
-			t.Fatal("Timeout waiting for dkg message")
-		default:
-			if received {
-				require.Equal(t, msg, receivedMessage)
-				return
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
+	//check that the message has been received and forwarded to the msgCh
+	unittest.AssertReturnsBefore(
+		t,
+		func() {
+			<-doneCh
+		},
+		time.Second)
+	require.Equal(t, msg, receivedMsg)
 }
 
 // TestProcessDKGMessage checks that incoming DKG messages are discarded with an
@@ -202,7 +197,7 @@ func TestProcessDKGMessage_InvalidOrigin(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := unittest.IdentifierFixture()
+	epochID := rand.Uint64()
 
 	network := new(module.Network)
 	network.On("Register", mock.Anything, mock.Anything).

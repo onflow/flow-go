@@ -3,7 +3,6 @@ package processor
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -20,20 +19,19 @@ import (
 // SetEpoch, such that DKGMessages can be prepended with the appropriate epoch
 // ID.
 type Engine struct {
-	unit        *engine.Unit
-	log         zerolog.Logger
-	me          module.Local
-	conduit     network.Conduit
-	msgCh       chan dkg.DKGMessage
-	committee   flow.IdentifierList
-	myIndex     int
-	epochID     flow.Identifier
-	epochIDLock sync.Mutex
+	unit      *engine.Unit
+	log       zerolog.Logger
+	me        module.Local
+	conduit   network.Conduit
+	msgCh     chan dkg.DKGMessage
+	committee flow.IdentifierList
+	myIndex   int
+	epochID   uint64
 }
 
-// New returns a new DKGProcessor engine. Instances participanting in a common
-// DKG protocol should use the same _ordered_ list of committee identifiers,
-// because senders and recipients are identified by their index in this list.
+// New returns a new DKGProcessor engine. Instances participating in a common
+// DKG protocol must use the same _ordered_ list of node identifiers, because
+// senders and recipients are identified by their index in this list.
 // The msgCh is used to forward incoming DKG messages to the consumer, such as
 // the Controller implemented in the DKG module.
 func New(
@@ -42,7 +40,7 @@ func New(
 	me module.Local,
 	msgCh chan dkg.DKGMessage,
 	committee flow.IdentifierList,
-	epochID flow.Identifier) (*Engine, error) {
+	epochID uint64) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
 
@@ -76,9 +74,9 @@ func New(
 }
 
 // SetEpoch changes the epoch ID of the engine.
-func (e *Engine) SetEpoch(epochID flow.Identifier) {
-	e.epochIDLock.Lock()
-	defer e.epochIDLock.Unlock()
+func (e *Engine) SetEpoch(epochID uint64) {
+	e.unit.Lock()
+	defer e.unit.Unlock()
 	e.epochID = epochID
 }
 
@@ -134,10 +132,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) onDKGMessage(originID flow.Identifier, msg dkg.DKGMessage) error {
 
 	// check that the message corresponds to the current epoch
-	e.epochIDLock.Lock()
-	defer e.epochIDLock.Unlock()
-	if !bytes.Equal(e.epochID[:], msg.EpochID[:]) {
-		return fmt.Errorf("wrong epoch id. Got %v, want %v", msg.EpochID, e.epochID)
+	e.unit.Lock()
+	defer e.unit.Unlock()
+	if e.epochID != msg.EpochID {
+		return fmt.Errorf("wrong epoch id. Got %d, want %d", msg.EpochID, e.epochID)
 	}
 
 	// check that the message's origin is not out of range
@@ -146,9 +144,9 @@ func (e *Engine) onDKGMessage(originID flow.Identifier, msg dkg.DKGMessage) erro
 	}
 
 	// check that the message's origin matches the sender's flow identifier
-	committeeID := e.committee[msg.Orig]
-	if !bytes.Equal(committeeID[:], originID[:]) {
-		return fmt.Errorf("OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, committeeID)
+	nodeID := e.committee[msg.Orig]
+	if !bytes.Equal(nodeID[:], originID[:]) {
+		return fmt.Errorf("OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 	}
 
 	e.log.Debug().Msgf("forwarding DKGMessage to controller")
