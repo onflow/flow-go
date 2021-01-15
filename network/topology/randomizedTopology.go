@@ -69,7 +69,7 @@ func NewRandomizedTopology(nodeID flow.Identifier,
 func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	myChannelIDs := r.subMngr.Channels()
 	if len(myChannelIDs) == 0 {
-		// no subscribed channel id, hence skip topology creation
+		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
 		r.logger.Warn().Msg("skips generating fanout with no subscribed channels")

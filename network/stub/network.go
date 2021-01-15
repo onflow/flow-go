@@ -52,7 +52,7 @@ func (n *Network) GetID() flow.Identifier {
 	return n.me.NodeID()
 }
 
-// Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
+// Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
 func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
 	n.Lock()
@@ -134,8 +134,8 @@ func (n *Network) multicast(channel network.Channel, event interface{}, num uint
 // haveSeen returns true if the node attached to this Network instance has seen the event ID.
 // Otherwise, it returns false.
 //
-// Note: eventIDs are computed in a collision-resistant manner using channel IDs, hence, an event ID
-// is uniquely bound to a channel ID. Seeing an event ID by a node implies receiving its corresponding
+// Note: eventIDs are computed in a collision-resistant manner using channels, hence, an event ID
+// is uniquely bound to a channel. Seeing an event ID by a node implies receiving its corresponding
 // event by any of the attached engines of that node.
 func (n *Network) haveSeen(eventID string) bool {
 	seen, ok := n.seenEventIDs.Load(eventID)
@@ -148,8 +148,8 @@ func (n *Network) haveSeen(eventID string) bool {
 // seen marks the eventID as seen for the node attached to this instance of Network.
 // This method is mainly utilized for deduplicating message delivery.
 //
-// Note: eventIDs are computed in a collision-resistant manner using channel IDs, hence, an event ID
-// is uniquely bound to a channel ID. Seeing an event ID by a node implies receiving its corresponding
+// Note: eventIDs are computed in a collision-resistant manner using channels, hence, an event ID
+// is uniquely bound to a channel. Seeing an event ID by a node implies receiving its corresponding
 // event by any of the attached engines of that node.
 func (n *Network) seen(eventID string) {
 	n.seenEventIDs.Store(eventID, true)

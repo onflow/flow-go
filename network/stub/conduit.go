@@ -50,7 +50,7 @@ func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Ident
 
 func (c *Conduit) Close() error {
 	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel ID %s closed", c.channel)
+		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 	c.cancel()
 	return c.close(c.channel)

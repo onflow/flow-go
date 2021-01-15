@@ -46,7 +46,7 @@ type Conduit struct {
 // for events of the engine it was initialized with.
 func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel ID %s closed", c.channel)
+		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 	return c.submit(c.channel, event, targetIDs...)
 }
@@ -57,7 +57,7 @@ func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error 
 // recipients received the event.
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel ID %s closed", c.channel)
+		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 	return c.publish(c.channel, event, targetIDs...)
 }
@@ -67,7 +67,7 @@ func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error
 // It returns an error if the unicast fails.
 func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel ID %s closed", c.channel)
+		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 	return c.unicast(c.channel, event, targetID)
 }
@@ -76,14 +76,14 @@ func (c *Conduit) Unicast(event interface{}, targetID flow.Identifier) error {
 // The recipients are selected randomly from targetIDs
 func (c *Conduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
 	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel ID %s closed", c.channel)
+		return fmt.Errorf("conduit for channel %s closed", c.channel)
 	}
 	return c.multicast(c.channel, event, num, targetIDs...)
 }
 
 func (c *Conduit) Close() error {
 	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel ID %s already closed", c.channel)
+		return fmt.Errorf("conduit for channel %s already closed", c.channel)
 	}
 	// close the conduit context
 	c.cancel()

@@ -37,11 +37,11 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 
 	channelID := req.GetChannelId()
 
-	// find the conduit for the channel ID
+	// find the conduit for the channel
 	conduit, found := h.conduitMap[network.Channel(channelID)]
 
 	if !found {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("conduit not found for given channel id %v", channelID))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("conduit not found for given channel %v", channelID))
 	}
 
 	message := req.GetMessage()

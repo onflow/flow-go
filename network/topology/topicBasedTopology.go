@@ -51,7 +51,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	myChannelIDs := t.subMngr.Channels()
 	if len(myChannelIDs) == 0 {
-		// no subscribed channel id, hence skip topology creation
+		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
 		t.logger.Warn().Msg("skips generating fanout with no subscribed channels")
@@ -83,7 +83,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 		myFanout = myFanout.Union(roleFanout)
 	}
 
-	// stitches the role-based components that subscribed to the same channel id together.
+	// stitches the role-based components that subscribed to the same channel together.
 	for _, myChannel := range myChannelIDs {
 		shouldHave := myFanout.Copy()
 

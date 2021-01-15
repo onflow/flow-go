@@ -40,7 +40,7 @@ type Conduit interface {
 	// to subscribers of the given event on the network layer. It uses a
 	// publish-subscribe layer and can thus not guarantee that the specified
 	// recipients received the event.
-	// The event is published on the channel ID of this Conduit and will be received
+	// The event is published on the channels of this Conduit and will be received
 	// by the nodes specified as part of the targetIDs
 	Publish(event interface{}, targetIDs ...flow.Identifier) error
 
@@ -54,7 +54,7 @@ type Conduit interface {
 	// The recipients are selected randomly from the targetIDs.
 	Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error
 
-	// Close unsubscribes from the channel ID of this conduit. After calling close,
+	// Close unsubscribes from the channels of this conduit. After calling close,
 	// the conduit can no longer be used to send a message.
 	Close() error
 }

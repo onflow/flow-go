@@ -82,7 +82,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, state protocol
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
 func registerConduits(net module.Network, state protocol.State, eng network.Engine) (map[network.Channel]network.Conduit, error) {
 
-	// create a list of all channel IDs that don't change over time
+	// create a list of all channels that don't change over time
 	channelIDs := network.ChannelList{
 		engine.ConsensusCommittee,
 		engine.SyncCommittee,
@@ -96,7 +96,7 @@ func registerConduits(net module.Network, state protocol.State, eng network.Engi
 		engine.RequestChunks,
 	}
 
-	// add channel IDs that are dependent on protocol state and change over time
+	// add channels that are dependent on protocol state and change over time
 	// TODO need to update to register dynamic channels that are created on later epoch transitions
 	epoch := state.Final().Epochs().Current()
 
