@@ -49,7 +49,7 @@ type Conduit interface {
 	// It returns an error if the unicast fails.
 	Unicast(event interface{}, targetID flow.Identifier) error
 
-	// Multicast unreliably sends the specified event over the channelID
+	// Multicast unreliably sends the specified event over the channel
 	// to the specified number of recipients selected from the specified subset.
 	// The recipients are selected randomly from the targetIDs.
 	Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error

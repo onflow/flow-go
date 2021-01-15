@@ -83,7 +83,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, state protocol
 func registerConduits(net module.Network, state protocol.State, eng network.Engine) (map[network.Channel]network.Conduit, error) {
 
 	// create a list of all channels that don't change over time
-	channelIDs := network.ChannelList{
+	channels := network.ChannelList{
 		engine.ConsensusCommittee,
 		engine.SyncCommittee,
 		engine.SyncExecution,
@@ -113,17 +113,17 @@ func registerConduits(net module.Network, state protocol.State, eng network.Engi
 		clusterID := cluster.RootBlock().Header.ChainID
 
 		// add the dynamic channels for the cluster
-		channelIDs = append(
-			channelIDs,
+		channels = append(
+			channels,
 			engine.ChannelConsensusCluster(clusterID),
 			engine.ChannelSyncCluster(clusterID),
 		)
 	}
 
-	conduitMap := make(map[network.Channel]network.Conduit, len(channelIDs))
+	conduitMap := make(map[network.Channel]network.Conduit, len(channels))
 
 	// Register for ALL channels here and return a map of conduits
-	for _, e := range channelIDs {
+	for _, e := range channels {
 		c, err := net.Register(e, eng)
 		if err != nil {
 			return nil, fmt.Errorf("could not register collection provider engine: %w", err)

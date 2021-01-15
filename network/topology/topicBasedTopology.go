@@ -49,8 +49,8 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
 func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
-	myChannelIDs := t.subMngr.Channels()
-	if len(myChannelIDs) == 0 {
+	myChannels := t.subMngr.Channels()
+	if len(myChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
@@ -60,7 +60,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 
 	// finds all interacting roles with this node
 	myInteractingRoles := flow.RoleList{}
-	for _, myChannel := range myChannelIDs {
+	for _, myChannel := range myChannels {
 		roles, ok := engine.RolesByChannel(myChannel)
 		if !ok {
 			return nil, fmt.Errorf("could not extract roles for channel: %s", myChannel)
@@ -84,7 +84,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 	}
 
 	// stitches the role-based components that subscribed to the same channel together.
-	for _, myChannel := range myChannelIDs {
+	for _, myChannel := range myChannels {
 		shouldHave := myFanout.Copy()
 
 		topicFanout, err := t.subsetChannel(ids, shouldHave, myChannel)
