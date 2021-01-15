@@ -14,7 +14,6 @@ type AssignmentList [][]Identifier
 type ClusterList []IdentityList
 
 // Assignments returns the assignment list for a cluster.
-// TODO test
 func (clusters ClusterList) Assignments() AssignmentList {
 	assignments := make(AssignmentList, 0, len(clusters))
 	for _, cluster := range clusters {
