@@ -1,13 +1,13 @@
 package integration_test
 
 import (
-	"crypto"
 	"testing"
 
 	emulator "github.com/onflow/flow-emulator"
 	"github.com/onflow/flow-go-sdk"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go-sdk/test"
 	"github.com/stretchr/testify/require"
@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,10 +32,10 @@ import (
 **/
 
 type ClusterNode struct {
-	Signer  crypto.Signer
+	NodeID  flow.Identifier
 	Key     sdk.AccountKey
 	Address sdk.Address
-	Voter   module.QCVoter
+	Voter   module.ClusterRootQCVoter
 }
 
 func TestQuroumCertificate(t *testing.T) {
@@ -72,6 +73,7 @@ func TestQuroumCertificate(t *testing.T) {
 	// create QC voter for each node in the cluster
 	for i := 1; i <= numberOfClusters; i++ {
 		for j := 1; j <= numberOfNodesPerCluster; i++ {
+			nodeID := unittest.IdentifierFixture()
 			key, signer := accountKeys.NewWithSigner()
 
 			// create flow account
@@ -79,15 +81,15 @@ func TestQuroumCertificate(t *testing.T) {
 			require.NoError(err)
 
 			// create QC client for clustesrs node
-			client, err := module.QCClient(unittest.IdentifierFixture(), address.String(), key.Index,
+			client, err := epochs.NewQCContractClient(nodeID, address.String(), key.Index,
 				"ACCESS_ADDRESS", QCAddress.String(), signer)
 			require.NoError(err)
 
 			// create QCVoter object
-			voter := module.QCVoter()
+			voter := epochs.NewRootQCVoter(zerolog.Logger{})
 
 			node := ClusterNode{
-				Signer:  signer,
+				NodeID:  nodeID,
 				Key:     key,
 				Address: address,
 				Voter:   voter,
