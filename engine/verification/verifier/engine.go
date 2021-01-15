@@ -16,10 +16,12 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -32,12 +34,14 @@ type Engine struct {
 	log         zerolog.Logger             // used to log relevant actions
 	metrics     module.VerificationMetrics // used to capture the performance metrics
 	tracer      module.Tracer              // used for tracing
-	con         network.Conduit            // used to propagate result approvals
+	pushConduit network.Conduit            // used to push result approvals
+	pullConduit network.Conduit            // used to respond to requests for result approvals
 	me          module.Local               // used to access local node information
 	state       protocol.State             // used to access the protocol state
 	rah         hash.Hasher                // used as hasher to sign the result approvals
 	chVerif     module.ChunkVerifier       // used to verify chunks
 	spockHasher hash.Hasher                // used for generating spocks
+	approvals   storage.ResultApprovals    // used to store result approvals
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -49,6 +53,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	chVerif module.ChunkVerifier,
+	approvals storage.ResultApprovals,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -61,12 +66,18 @@ func New(
 		chVerif:     chVerif,
 		rah:         utils.NewResultApprovalHasher(),
 		spockHasher: crypto.NewBLSKMAC(encoding.SPOCKTag),
+		approvals:   approvals,
 	}
 
 	var err error
-	e.con, err = net.Register(engine.PushApprovals, e)
+	e.pushConduit, err = net.Register(engine.PushApprovals, e)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
+		return nil, fmt.Errorf("could not register engine on approval push channel: %w", err)
+	}
+
+	e.pullConduit, err = net.Register(engine.ProvideApprovalsByChunk, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine on approval pull channel: %w", err)
 	}
 
 	return e, nil
@@ -119,6 +130,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *verification.VerifiableChunkData:
 		err = e.verifiableChunkHandler(originID, resource)
+	case *messages.ApprovalRequest:
+		err = e.approvalRequestHandler(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -127,7 +140,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		// logs the error instead of returning that.
 		// returning error would be projected at a higher level by network layer.
 		// however, this is an engine-level error, and not network layer error.
-		e.log.Debug().Err(err).Msg("engine could not process event successfully")
+		e.log.Warn().Err(err).Msg("engine could not process event successfully")
 	}
 
 	return nil
@@ -208,6 +221,16 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		return fmt.Errorf("couldn't generate a result approval: %w", err)
 	}
 
+	err = e.approvals.Store(approval)
+	if err != nil {
+		return fmt.Errorf("could not store approval: %w", err)
+	}
+
+	err = e.approvals.Index(approval.Body.ExecutionResultID, approval.Body.ChunkIndex, approval.ID())
+	if err != nil {
+		return fmt.Errorf("could not index approval: %w", err)
+	}
+
 	// Extracting consensus node ids
 	// TODO state extraction should be done based on block references
 	consensusNodes, err := e.state.Final().
@@ -218,7 +241,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 
 	// broadcast result approval to the consensus nodes
-	err = e.con.Publish(approval, consensusNodes.NodeIDs()...)
+	err = e.pushConduit.Publish(approval, consensusNodes.NodeIDs()...)
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
@@ -308,5 +331,47 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	}
 
 	// closes verification performance metrics trackers
+	return nil
+}
+
+func (e *Engine) approvalRequestHandler(originID flow.Identifier, req *messages.ApprovalRequest) error {
+
+	log := e.log.With().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("result_id", logging.ID(req.ResultID)).
+		Uint64("chunk_index", req.ChunkIndex).
+		Logger()
+
+	origin, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", originID, err)
+	}
+
+	if origin.Role != flow.RoleConsensus {
+		return engine.NewInvalidInputErrorf("invalid role for requesting approvals: %s", origin.Role)
+	}
+
+	approval, err := e.approvals.ByChunk(req.ResultID, req.ChunkIndex)
+	if err != nil {
+		return fmt.Errorf("could not retrieve approval for chunk (result: %s, chunk index: %d): %w",
+			req.ResultID,
+			req.ChunkIndex,
+			err)
+	}
+
+	response := &messages.ApprovalResponse{
+		Nonce:    req.Nonce,
+		Approval: *approval,
+	}
+
+	err = e.pullConduit.Unicast(response, originID)
+	if err != nil {
+		return fmt.Errorf("could not send requested approval to %s: %w",
+			originID,
+			err)
+	}
+
+	log.Debug().Msg("succesfully replied to approval request")
+
 	return nil
 }

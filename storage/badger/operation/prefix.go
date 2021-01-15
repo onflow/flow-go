@@ -35,6 +35,7 @@ const (
 	codeCollection           = 35
 	codeExecutionResult      = 36
 	codeExecutionReceiptMeta = 36
+	codeResultApproval       = 37
 
 	// codes for indexing single identifier by identifier
 	codeHeightToBlock       = 40 // index mapping height to block ID
@@ -66,6 +67,7 @@ const (
 	codeIndexCollection              = 200
 	codeIndexExecutionResultByBlock  = 202
 	codeIndexCollectionByTransaction = 203
+	codeIndexResultApprovalByChunk   = 204
 
 	// internal failure information that should be preserved across restarts
 	codeExecutionFork = 254

@@ -264,15 +264,20 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
 			rt := runtime.NewInterpreterRuntime()
-
 			vm := fvm.New(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
-			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
-				chunkVerifier)
+			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)
+			verifierEng, err = verifier.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Network,
+				node.State,
+				node.Me,
+				chunkVerifier,
+				approvalStorage)
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
