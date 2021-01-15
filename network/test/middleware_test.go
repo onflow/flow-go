@@ -261,7 +261,8 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	require.Error(m.Suite.T(), err)
 }
 
-// TestLargeMessageSize_SendDirect asserts that a large message can be unicasted successfully
+// TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
+// successfully even though it's size is greater than the default message size.
 func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	first := 0
 	last := m.size - 1
