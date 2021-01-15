@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/seed"
 )
 
+// Epoch is a memory-backed implementation of protocol.Epoch.
 type Epoch struct {
 	enc EncodableEpoch
 }
@@ -74,32 +75,26 @@ func (eq Epochs) Next() protocol.Epoch {
 	return invalid.NewEpoch(protocol.ErrNextEpochNotSetup)
 }
 
-// =====
-// from badger
-// TODO consolidate this with above
-// =====
-
-// SetupEpoch represents an epoch that has been setup, but not committed.
-// Only the EpochSetup event for the epoch has been emitted as of the point
-// at which the epoch was queried.
-type SetupEpoch struct {
+// setupEpoch is an implementation of protocol.Epoch backed by an EpochSetup
+// service event. This is used for converting service events to inmem.Epoch.
+type setupEpoch struct {
 	// EpochSetup service event
 	setupEvent *flow.EpochSetup
 }
 
-func (es *SetupEpoch) Counter() (uint64, error) {
+func (es *setupEpoch) Counter() (uint64, error) {
 	return es.setupEvent.Counter, nil
 }
 
-func (es *SetupEpoch) FirstView() (uint64, error) {
+func (es *setupEpoch) FirstView() (uint64, error) {
 	return es.setupEvent.FirstView, nil
 }
 
-func (es *SetupEpoch) FinalView() (uint64, error) {
+func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }
 
-func (es *SetupEpoch) InitialIdentities() (flow.IdentityList, error) {
+func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 
 	identities := es.setupEvent.Participants.Filter(filter.Any)
 	// apply a deterministic sort to the participants
@@ -108,7 +103,7 @@ func (es *SetupEpoch) InitialIdentities() (flow.IdentityList, error) {
 	return identities, nil
 }
 
-func (es *SetupEpoch) Clustering() (flow.ClusterList, error) {
+func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
 
 	collectorFilter := filter.And(filter.HasStake(true), filter.HasRole(flow.RoleCollection))
 	clustering, err := flow.NewClusterList(es.setupEvent.Assignments, es.setupEvent.Participants.Filter(collectorFilter))
@@ -118,39 +113,31 @@ func (es *SetupEpoch) Clustering() (flow.ClusterList, error) {
 	return clustering, nil
 }
 
-func (es *SetupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
+func (es *setupEpoch) Cluster(_ uint) (protocol.Cluster, error) {
 	return nil, protocol.ErrEpochNotCommitted
 }
 
-func (es *SetupEpoch) DKG() (protocol.DKG, error) {
+func (es *setupEpoch) DKG() (protocol.DKG, error) {
 	return nil, protocol.ErrEpochNotCommitted
 }
 
-func (es *SetupEpoch) RandomSource() ([]byte, error) {
+func (es *setupEpoch) RandomSource() ([]byte, error) {
 	return es.setupEvent.RandomSource, nil
 }
 
-func (es *SetupEpoch) Seed(indices ...uint32) ([]byte, error) {
+func (es *setupEpoch) Seed(indices ...uint32) ([]byte, error) {
 	return seed.FromRandomSource(indices, es.setupEvent.RandomSource)
 }
 
-func NewSetupEpoch(setupEvent *flow.EpochSetup) *SetupEpoch {
-	return &SetupEpoch{
-		setupEvent: setupEvent,
-	}
-}
-
-// ****************************************
-
-// CommittedEpoch represents an epoch that has been committed.
-// Both the EpochSetup and EpochCommitted events for the epoch have been emitted
-// as of the point at which the epoch was queried.
-type CommittedEpoch struct {
-	SetupEpoch
+// committedEpoch is an implementation of protocol.Epoch backed by an EpochSetup
+// and EpochCommit service event. This is used for converting service events to
+// inmem.Epoch.
+type committedEpoch struct {
+	setupEpoch
 	commitEvent *flow.EpochCommit
 }
 
-func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
+func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 
 	qcs := es.commitEvent.ClusterQCs
 	if uint(len(qcs)) <= index {
@@ -179,7 +166,7 @@ func (es *CommittedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	return cluster, err
 }
 
-func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
+func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	dkg, err := DKGFromEncodable(EncodableDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
 			PublicKey: es.commitEvent.DKGGroupKey,
@@ -189,11 +176,24 @@ func (es *CommittedEpoch) DKG() (protocol.DKG, error) {
 	return dkg, err
 }
 
-func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) *CommittedEpoch {
-	return &CommittedEpoch{
-		SetupEpoch: SetupEpoch{
+// NewSetupEpoch returns an memory-backed epoch implementation based on an
+// EpochSetup event. Epoch information available after the setup phase will
+// not be accessible in the resulting epoch instance.
+func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
+	convertible := &setupEpoch{
+		setupEvent: setupEvent,
+	}
+	return FromEpoch(convertible)
+}
+
+// NewSetupEpoch returns an memory-backed epoch implementation based on an
+// EpochSetup and EpochCommit event.
+func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) (*Epoch, error) {
+	convertible := &committedEpoch{
+		setupEpoch: setupEpoch{
 			setupEvent: setupEvent,
 		},
 		commitEvent: commitEvent,
 	}
+	return FromEpoch(convertible)
 }

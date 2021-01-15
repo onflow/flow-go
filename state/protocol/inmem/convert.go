@@ -195,8 +195,7 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		return nil, fmt.Errorf("invalid commit event type (%T)", seal.ServiceEvents[1].Event)
 	}
 
-	// TODO consolidate with inmem.Epoch (copied from badger currently)
-	current, err := FromEpoch(NewCommittedEpoch(setup, commit))
+	current, err := NewCommittedEpoch(setup, commit)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert epoch: %w", err)
 	}
