@@ -278,7 +278,7 @@ func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids 
 		}
 		fmt.Printf("\n connections: %d threshold: %d", connections, threshold)
 		return connections >= threshold
-	}, 5*time.Second, time.Millisecond*100)
+	}, 5*time.Second, time.Second)
 }
 
 // assertDisconnected checks that the middleware of a node is not connected to any of the other nodes specified in the
