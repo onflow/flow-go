@@ -175,11 +175,11 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 }
 
 // TestConnectedness_NonClusterTopics checks whether graph components corresponding to a
-// non-cluster channel ID are individually connected.
-func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID() {
-	channelID := engine.TestNetwork
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+// non-cluster channel are individually connected.
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannel() {
+	channel := engine.TestNetwork
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	for i, id := range suite.all {
 		// creates a topic-based topology for node
@@ -187,40 +187,40 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, nil, channel)
 		require.NoError(suite.T(), err)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
-	connectednessByChannel(suite.T(), channelIDAdjMap, suite.all, channelID)
+	connectednessByChannel(suite.T(), channelAdjMap, suite.all, channel)
 }
 
-// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
-// cluster channel ID are individually connected.
-func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
-	// picks one cluster channel ID as sample
-	channelID := clusterChannels(suite.T())[0]
+// TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
+// cluster channel are individually connected.
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannel() {
+	// picks one cluster channel as sample
+	channel := clusterChannels(suite.T())[0]
 
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	// iterates over collection nodes
 	for i, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
-		// creates a channelID-based topology for node
+		// creates a channel-based topology for node
 		top, err := NewTopicBasedTopology(id.NodeID, suite.logger, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, nil, channel)
 		require.NoError(suite.T(), err)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
 	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusters {
-		connectedByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
+		connectedByCluster(suite.T(), channelAdjMap, suite.all, cluster)
 	}
 }
 
