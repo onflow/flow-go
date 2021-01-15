@@ -127,12 +127,12 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 	}
 }
 
-// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
-// non-cluster channel ID are individually connected.
-func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannelID() {
+// TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
+// non-cluster channel are individually connected.
+func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannel() {
 	channel := engine.TestNetwork
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	for i, id := range suite.all {
 		// creates a topic-based topology for node
@@ -145,20 +145,20 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 
 		uniquenessCheck(suite.T(), subset)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
-	connectednessByChannel(suite.T(), channelIDAdjMap, suite.all, channel)
+	connectednessByChannel(suite.T(), channelAdjMap, suite.all, channel)
 }
 
-// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
-// cluster channel ID are individually connected.
-func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
-	// picks one cluster channel ID as sample
+// TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
+// cluster channel are individually connected.
+func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannel() {
+	// picks one cluster channel as sample
 	channel := clusterChannels(suite.T())[0]
 
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	// iterates over collection nodes
 	for i, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
@@ -172,11 +172,11 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 
 		uniquenessCheck(suite.T(), subset)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
 	for _, cluster := range suite.clusters {
-		connectedByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
+		connectedByCluster(suite.T(), channelAdjMap, suite.all, cluster)
 	}
 }
 
