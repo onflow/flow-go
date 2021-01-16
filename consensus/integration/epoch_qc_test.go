@@ -56,7 +56,7 @@ func TestQuroumCertificate(t *testing.T) {
 	QCCode := contracts.FlowQC()
 
 	// deploy the contract to the emulator
-	QCAddress, err := blockchain.CreateAccount([]*flow.AccountKey{QCAccountKey}, []sdktemplates.Contract{
+	QCAddress, err := blockchain.CreateAccount([]*sdk.AccountKey{QCAccountKey}, []sdktemplates.Contract{
 		{
 			Name:   "FlowEpochClusterQC",
 			Source: string(QCCode),
