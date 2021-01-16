@@ -135,7 +135,7 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 	suite.removedTestNodes = newTestNodeList()
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
-	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 
 	suite.setupStateMock()
