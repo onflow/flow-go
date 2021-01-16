@@ -50,7 +50,8 @@ type testNode struct {
 	idRefresher *p2p.NodeIDRefresher
 }
 
-// testNodeList is a list of test node and has functions to retrieve the different elements of the test nodes
+// testNodeList encapsulates a list of test node and
+// has functions to retrieve the different elements of the test nodes in a concurrency safe manner
 type testNodeList struct {
 	sync.RWMutex
 	nodes []testNode
@@ -324,7 +325,7 @@ func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids 
 			Int("connections", connections).
 			Msg("current connection count")
 		return connections >= threshold
-	}, 5*time.Second, time.Second, "node is not connected to enough nodes")
+	}, 5*time.Second, 100*time.Millisecond, "node is not connected to enough nodes")
 }
 
 // assertDisconnected checks that the middleware of a node is not connected to any of the other nodes specified in the
@@ -340,7 +341,7 @@ func (suite *MutableIdentityTableSuite) assertDisconnected(mw *p2p.Middleware, i
 			}
 		}
 		return true
-	}, 5*time.Second, time.Second, "node is still connected")
+	}, 5*time.Second, 100*time.Millisecond, "node is still connected")
 }
 
 // assertNetworkPrimitives asserts that allowed engines can exchange messages between themselves but not with the
