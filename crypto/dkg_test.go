@@ -33,7 +33,7 @@ func testFeldmanVSSSimple(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 
 	n := 4
-	for threshold := 0; threshold < n; threshold++ {
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		t.Run(fmt.Sprintf("FeldmanVSS (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 			dkgCommonTest(t, feldmanVSS, n, threshold, false)
 		})
@@ -46,7 +46,7 @@ func testFeldmanVSSQual(t *testing.T) {
 
 	n := 4
 	// happy path, test multiple values of thresold
-	for threshold := 0; threshold < n; threshold++ {
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		t.Run(fmt.Sprintf("FeldmanVSSQual (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 			dkgCommonTest(t, feldmanVSSQual, n, threshold, false)
 		})
@@ -67,7 +67,7 @@ func testJointFeldman(t *testing.T) {
 
 	n := 4
 	// happy path, test multiple values of thresold
-	for threshold := 0; threshold < n; threshold++ {
+	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		t.Run(fmt.Sprintf("JointFeldman (n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 			dkgCommonTest(t, jointFeldman, n, threshold, false)
 		})

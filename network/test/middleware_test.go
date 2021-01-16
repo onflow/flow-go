@@ -261,6 +261,36 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	require.Error(m.Suite.T(), err)
 }
 
+// TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
+// successfully even though it's size is greater than the default message size.
+func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
+	first := 0
+	last := m.size - 1
+	firstNode := m.ids[first].NodeID
+	lastNode := m.ids[last].NodeID
+
+	msg := createMessage(firstNode, lastNode, "")
+
+	// creates a network payload with a size greater than the default max size
+	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxUnicastMsgSize)+1000)
+	event := &libp2pmessage.TestMessage{
+		Text: string(payload),
+	}
+
+	// set the message type to a known large message type
+	msg.Type = "messages.ChunkDataResponse"
+
+	codec := json.NewCodec()
+	encodedEvent, err := codec.Encode(event)
+	require.NoError(m.T(), err)
+
+	msg.Payload = encodedEvent
+
+	// sends a direct message from first node to the last node
+	err = m.mws[first].SendDirect(msg, lastNode)
+	require.NoError(m.Suite.T(), err)
+}
+
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
 // size beyond the permissible publish message size returns an error.
 func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {

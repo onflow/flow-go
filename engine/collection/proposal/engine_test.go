@@ -36,9 +36,8 @@ type Suite struct {
 	}
 	// cluster state
 	cluster struct {
-		state    *clusterstate.State
+		state    *clusterstate.MutableState
 		snapshot *clusterstate.Snapshot
-		mutator  *clusterstate.Mutator
 		params   *clusterstate.Params
 	}
 
@@ -83,12 +82,10 @@ func (suite *Suite) SetupTest() {
 	clusterID := flow.ChainID("cluster-id")
 
 	// mock out cluster state
-	suite.cluster.state = new(clusterstate.State)
+	suite.cluster.state = new(clusterstate.MutableState)
 	suite.cluster.snapshot = new(clusterstate.Snapshot)
-	suite.cluster.mutator = new(clusterstate.Mutator)
 	suite.cluster.params = new(clusterstate.Params)
 	suite.cluster.state.On("Final").Return(suite.cluster.snapshot)
-	suite.cluster.state.On("Mutate").Return(suite.cluster.mutator)
 	suite.cluster.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.cluster.state.On("Params").Return(suite.cluster.params)
 	suite.cluster.params.On("ChainID").Return(clusterID, nil)
@@ -153,7 +150,7 @@ func (suite *Suite) TestHandleProposal() {
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
 	suite.headers.On("Store", mock.Anything).Return(nil).Once()
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
+	suite.cluster.state.On("Extend", &block).Return(nil).Once()
 	// should submit to consensus algo
 	suite.hotstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
@@ -271,13 +268,13 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	headersDB[parent.ID()] = parent.Header
 	suite.pending.On("ByID", parent.ID()).Return(nil, false)
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", &block).
+	suite.cluster.state.On("Extend", &block).
 		Run(func(_ mock.Arguments) {
 			// once we add the block to the state, ensure it is retrievable from storage
 			headersDB[block.ID()] = block.Header
 		}).
 		Return(nil).Once()
-	suite.cluster.mutator.On("Extend", &child).Return(nil).Once()
+	suite.cluster.state.On("Extend", &child).Return(nil).Once()
 	// should submit to consensus algo
 	suite.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Twice()
 	// should return the pending child
