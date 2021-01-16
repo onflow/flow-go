@@ -730,6 +730,8 @@ github.com/onflow/flow-go v0.12.6/go.mod h1:pI3ti2hgcitVYyc1w0kHcamJUGez0LOUYHm+
 github.com/onflow/flow-go-sdk v0.4.0/go.mod h1:MHn8oQCkBNcl2rXdYSm9VYYK4ogwEpyrdM/XK/czdlM=
 github.com/onflow/flow-go-sdk v0.12.2 h1:ukIAek19pwYoHmSSYeaJ729vCA+04VEv6tCRlxwiWRI=
 github.com/onflow/flow-go-sdk v0.12.2/go.mod h1:jWwkpCkhxzeGmCs7oV6ydx50svez/PYUuhg8Y7dY0Ko=
+github.com/onflow/flow-go-sdk v0.12.3 h1:0ZEQkBT6oAGq/5KFHuqY/7D60GDQj3MwSAdOsv57Fg8=
+github.com/onflow/flow-go-sdk v0.12.3/go.mod h1:hunoNjvb+GVOfSYE7kKkgXE9zq9sTweFaDxlbF/BL6g=
 github.com/onflow/flow/protobuf/go/flow v0.1.5-0.20200601215056-34a11def1d6b/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.1.8 h1:jBR8aXEL0MOh3gVJmCr0KYXmtG3JUBhzADonKkYE6oI=
 github.com/onflow/flow/protobuf/go/flow v0.1.8/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
