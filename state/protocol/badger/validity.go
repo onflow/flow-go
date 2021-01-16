@@ -110,8 +110,3 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 
 	return nil
 }
-
-// TODO
-func validSealingSegment(segment []*flow.Block) error {
-	return nil
-}
