@@ -25,6 +25,14 @@ import (
 
 type communicationMode int
 
+// Topic is the internal type of libp2p which corresponds to the Channel in the network level.
+// It is a virtual medium enabling nodes to subscribe and communicate over epidemic dissemination.
+type Topic string
+
+func (t Topic) String() string {
+	return string(t)
+}
+
 const (
 	NoOp communicationMode = iota
 	OneToOne
@@ -342,7 +350,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 // Subscribe subscribes the middleware to a channel.
 func (m *Middleware) Subscribe(channel network.Channel) error {
 
-	topic := engine.FullyQualifiedChannelName(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
@@ -364,7 +372,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 // Unsubscribe unsubscribes the middleware from a channel.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
-	topic := engine.FullyQualifiedChannelName(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 	err := m.libP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
@@ -411,7 +419,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
 	}
 
-	topic := engine.FullyQualifiedChannelName(channel, m.rootBlockID)
+	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
 	err = m.libP2PNode.Publish(m.ctx, topic, data)
