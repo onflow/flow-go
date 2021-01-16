@@ -110,7 +110,7 @@ func (n *Network) Done() <-chan struct{} {
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
-	if _, ok := channels.RolesByChannel(channel); !ok {
+	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
 
