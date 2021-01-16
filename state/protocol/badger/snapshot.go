@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/storage"
@@ -374,7 +375,11 @@ func (q *EpochQuery) Current() protocol.Epoch {
 		return invalid.NewEpoch(err)
 	}
 
-	return NewCommittedEpoch(setup, commit)
+	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	return epoch
 }
 
 // Next returns the next epoch, if it is available.
@@ -399,7 +404,11 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 	}
 	if phase == flow.EpochPhaseSetup {
-		return NewSetupEpoch(nextSetup)
+		epoch, err := inmem.NewSetupEpoch(nextSetup)
+		if err != nil {
+			return invalid.NewEpoch(err)
+		}
+		return epoch
 	}
 
 	// if we are in committed phase, return a CommittedEpoch
@@ -407,7 +416,11 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 	}
-	return NewCommittedEpoch(nextSetup, nextCommit)
+	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	return epoch
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
@@ -437,5 +450,9 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 		return invalid.NewEpoch(err)
 	}
 
-	return NewCommittedEpoch(setup, commit)
+	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	return epoch
 }
