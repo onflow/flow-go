@@ -51,35 +51,71 @@ type testNode struct {
 }
 
 // testNodeList is a list of test node and has functions to retrieve the different elements of the test nodes
-type testNodeList []testNode
+type testNodeList struct {
+	sync.RWMutex
+	nodes []testNode
+}
 
-func (t testNodeList) ids() flow.IdentityList {
-	ids := make(flow.IdentityList, len(t))
-	for i, node := range t {
+func (t *testNodeList) append(node testNode) {
+	t.Lock()
+	defer t.Unlock()
+	t.nodes = append(t.nodes, node)
+}
+
+func (t *testNodeList) remove() testNode {
+	t.Lock()
+	defer t.Unlock()
+	// choose a random node to remove
+	i := rand.Intn(len(t.nodes))
+	removedNode := t.nodes[i]
+	t.nodes = append(t.nodes[:i], t.nodes[i+1:]...)
+	return removedNode
+}
+
+func (t *testNodeList) ids() flow.IdentityList {
+	t.RLock()
+	defer t.RUnlock()
+	ids := make(flow.IdentityList, len(t.nodes))
+	for i, node := range t.nodes {
 		ids[i] = node.id
 	}
 	return ids
 }
 
-func (t testNodeList) engines() []*MeshEngine {
-	engs := make([]*MeshEngine, len(t))
-	for i, node := range t {
+func (t *testNodeList) lastAdded() *testNode {
+	t.RLock()
+	defer t.RUnlock()
+	if len(t.nodes) > 0 {
+		return &t.nodes[len(t.nodes)-1]
+	}
+	return nil
+}
+
+func (t *testNodeList) engines() []*MeshEngine {
+	t.RLock()
+	defer t.RUnlock()
+	engs := make([]*MeshEngine, len(t.nodes))
+	for i, node := range t.nodes {
 		engs[i] = node.engine
 	}
 	return engs
 }
 
-func (t testNodeList) idRefreshers() []*p2p.NodeIDRefresher {
-	idRefreshers := make([]*p2p.NodeIDRefresher, len(t))
-	for i, node := range t {
+func (t *testNodeList) idRefreshers() []*p2p.NodeIDRefresher {
+	t.RLock()
+	defer t.RUnlock()
+	idRefreshers := make([]*p2p.NodeIDRefresher, len(t.nodes))
+	for i, node := range t.nodes {
 		idRefreshers[i] = node.idRefresher
 	}
 	return idRefreshers
 }
 
-func (t testNodeList) networks() []*p2p.Network {
-	nets := make([]*p2p.Network, len(t))
-	for i, node := range t {
+func (t *testNodeList) networks() []*p2p.Network {
+	t.RLock()
+	defer t.RUnlock()
+	nets := make([]*p2p.Network, len(t.nodes))
+	for i, node := range t.nodes {
 		nets[i] = node.net
 	}
 	return nets
@@ -90,7 +126,6 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 }
 
 func (suite *MutableIdentityTableSuite) SetupTest() {
-	suite.testNodes = nil
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
@@ -130,6 +165,7 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 
 // addNodes creates count many new nodes and appends them to the suite state variables
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
+
 	// create the ids, middlewares and networks
 	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
 
@@ -148,17 +184,14 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 			engine:      engines[i],
 			idRefresher: idRefereshers[i],
 		}
-		suite.testNodes = append(suite.testNodes, node)
+		suite.testNodes.append(node)
 	}
 }
 
 // removeNode removes a randomly chosen test node from suite.testNodes and adds it to suite.removedTestNodes
 func (suite *MutableIdentityTableSuite) removeNode() testNode {
-	// choose a random node to remove
-	i := rand.Intn(len(suite.testNodes))
-	removedNode := suite.testNodes[i]
-	suite.removedTestNodes = append(suite.removedTestNodes, removedNode)
-	suite.testNodes = append(suite.testNodes[:i], suite.testNodes[i+1:]...)
+	removedNode := suite.testNodes.remove()
+	suite.removedTestNodes.append(removedNode)
 	return removedNode
 }
 
@@ -169,7 +202,7 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 	// add a new node the current list of nodes
 	suite.addNodes(1)
 
-	newNode := suite.testNodes[len(suite.testNodes)-1]
+	newNode := *suite.testNodes.lastAdded()
 	newID := newNode.id
 	newMiddleware := newNode.mw
 
@@ -195,7 +228,7 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 // list (ie. as a result of an ejection or transition into an epoch where that node
 // has un-staked) then it cannot connect to the network.
 func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
-	suite.T().Skip()
+
 	// removed a node
 	removedNode := suite.removeNode()
 	removedID := removedNode.id
@@ -225,10 +258,10 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 // a. a newly added node can exchange messages with the existing nodes
 // b. a node that has has been removed cannot exchange messages with the existing nodes
 func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
-	suite.T().Skip()
+
 	// add a node
 	suite.addNodes(1)
-	newNode := suite.testNodes[len(suite.testNodes)-1]
+	newNode := *suite.testNodes.lastAdded()
 	newID := newNode.id
 	newMiddleware := newNode.mw
 
