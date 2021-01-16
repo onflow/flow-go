@@ -25,14 +25,6 @@ import (
 
 type communicationMode int
 
-// Topic is the internal type of libp2p which corresponds to the Channel in the network level.
-// It is a virtual medium enabling nodes to subscribe and communicate over epidemic dissemination.
-type Topic string
-
-func (t Topic) String() string {
-	return string(t)
-}
-
 const (
 	NoOp communicationMode = iota
 	OneToOne

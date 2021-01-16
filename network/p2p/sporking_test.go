@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -188,7 +189,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic Topic) {
+	topic network.Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")
@@ -209,7 +210,7 @@ func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic Topic) {
+	topic network.Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")

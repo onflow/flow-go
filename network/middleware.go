@@ -9,6 +9,14 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
+// Topic is the internal type of Libp2p which corresponds to the Channel in the network level.
+// It is a virtual medium enabling nodes to subscribe and communicate over epidemic dissemination.
+type Topic string
+
+func (t Topic) String() string {
+	return string(t)
+}
+
 // Middleware represents the middleware layer, which manages the connections to
 // our direct neighbours on the network. It handles the creation & teardown of
 // connections, as well as reading & writing to/from the connections.

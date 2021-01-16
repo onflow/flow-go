@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 // init is called first time this package is imported.
@@ -159,13 +158,13 @@ func IsClusterChannel(channel network.Channel) (network.Channel, bool) {
 // TopicFromChannel returns the unique LibP2P topic form the channel.
 // The channel is made up of name string suffixed with root block id.
 // The root block id is used to prevent cross talks between nodes on different sporks.
-func TopicFromChannel(channel network.Channel, rootBlockID string) p2p.Topic {
+func TopicFromChannel(channel network.Channel, rootBlockID string) network.Topic {
 	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
 	// unique for each epoch
 	if strings.HasPrefix(channel.String(), syncClusterPrefix.String()) || strings.HasPrefix(string(channel), consensusClusterPrefix.String()) {
-		return p2p.Topic(channel)
+		return network.Topic(channel)
 	}
-	return p2p.Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID))
+	return network.Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID))
 }
 
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on
