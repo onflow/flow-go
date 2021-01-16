@@ -56,6 +56,10 @@ type testNodeList struct {
 	nodes []testNode
 }
 
+func newTestNodeList() testNodeList {
+	return testNodeList{}
+}
+
 func (t *testNodeList) append(node testNode) {
 	t.Lock()
 	defer t.Unlock()
@@ -126,6 +130,8 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 }
 
 func (suite *MutableIdentityTableSuite) SetupTest() {
+	suite.testNodes = newTestNodeList()
+	suite.removedTestNodes = newTestNodeList()
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
