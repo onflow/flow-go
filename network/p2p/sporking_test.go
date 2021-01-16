@@ -131,7 +131,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	defer cancel()
 
 	// spork topic is derived by suffixing the channel with the root block ID
-	topicBeforeSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDBeforeSpork)
+	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDBeforeSpork)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err := node1.Subscribe(ctx, topicBeforeSpork)
@@ -153,7 +153,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	rootIDAfterSpork := unittest.BlockFixture().ID().String()
 
 	// topic after the spork
-	topicAfterSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDAfterSpork)
+	topicAfterSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
@@ -188,7 +188,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic string) {
+	topic Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")
@@ -209,7 +209,7 @@ func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic string) {
+	topic Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")
