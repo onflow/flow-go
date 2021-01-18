@@ -35,7 +35,6 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.12.3
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.6.1-0.20210118195514-4f8ee26d9778
-	github.com/onflow/flow-ft/contracts v0.1.3 // indirect
 	github.com/onflow/flow-go-sdk v0.14.0
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
@@ -58,6 +57,7 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
