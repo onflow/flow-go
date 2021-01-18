@@ -30,12 +30,14 @@ type Hasher interface {
 	Algorithm() HashingAlgorithm
 	// Size returns the hash output length
 	Size() int
-	// ComputeHash returns the hash output regardless of the hash state
+	// ComputeHash returns the hash output regardless of the existing hash state.
+	// It may update the state or not depending on the implementation.
 	ComputeHash([]byte) Hash
 	// Write([]bytes) (using the io.Writer interface) adds more bytes to the
 	// current hash state
 	io.Writer
-	// SumHash returns the hash output and resets the hash state
+	// SumHash returns the hash output.
+	// It does not reset the state to allow further writing.
 	SumHash() Hash
 	// Reset resets the hash state
 	Reset()

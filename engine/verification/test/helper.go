@@ -25,7 +25,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mock"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -71,34 +71,9 @@ func VerificationHappyPath(t *testing.T,
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
 	identities = append(identities, verIdentities...)
 
-	// Execution receipt and chunk assignment
-	//
-	// creates an execution receipt and its associated data
-	// with `chunkNum` chunks
-	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain())
-	result := &completeER.Receipt.ExecutionResult
-
-	// mocks the assignment to only assign "some" chunks to the verIdentity
-	// the assignment is done based on `isAssgined` function
-	assigner := &mock.ChunkAssigner{}
-	a := chmodel.NewAssignment()
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		assignees := make([]flow.Identifier, 0)
-		for _, verIdentity := range verIdentities {
-			if IsAssigned(chunk.Index, len(completeER.Receipt.ExecutionResult.Chunks)) {
-				assignees = append(assignees, verIdentity.NodeID)
-			}
-		}
-		a.Add(chunk, assignees)
-	}
-
-	// nodes and engines
-	//
-	// verification node
+	// creates verification nodes
 	verNodes := make([]mock2.VerificationNode, 0)
-
-	assigner.On("Assign", result, result.BlockID).Return(a, nil)
-
+	assigner := &mock.ChunkAssigner{}
 	for _, verIdentity := range verIdentities {
 		verNode := testutil.VerificationNode(t,
 			hub,
@@ -119,12 +94,45 @@ func VerificationHappyPath(t *testing.T,
 		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
 		<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
 
-		// assumes the verification node has received the block
-		err := verNode.Blocks.Store(completeER.Block)
-		assert.Nil(t, err)
-
 		verNodes = append(verNodes, verNode)
 	}
+
+	// extracts root block (at height 0) to build a child block succeeding that.
+	// since all nodes bootstrapped with same fixture, their root block is same.
+	root, err := verNodes[0].State.Params().Root()
+	require.NoError(t, err)
+
+	// creates a child block of root, with its corresponding execution result.
+	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain(), root)
+	result := &completeER.Receipt.ExecutionResult
+
+	// imitates follower engine on verification nodes
+	// received block of `completeER` and mutate state accordingly.
+	for _, node := range verNodes {
+		// ensures all nodes have same root block
+		// this is necessary for state mutation.
+		rootBlock, err := node.State.Params().Root()
+		require.NoError(t, err)
+		require.Equal(t, root, rootBlock)
+
+		// extends state of node by block of `completeER`.
+		err = node.State.Extend(completeER.Block)
+		assert.Nil(t, err)
+	}
+
+	// mocks the assignment to only assign "some" chunks to each verification node.
+	// the assignment is done based on `isAssigned` function
+	a := chmodel.NewAssignment()
+	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+		assignees := make([]flow.Identifier, 0)
+		for _, verIdentity := range verIdentities {
+			if IsAssigned(chunk.Index, len(completeER.Receipt.ExecutionResult.Chunks)) {
+				assignees = append(assignees, verIdentity.NodeID)
+			}
+		}
+		a.Add(chunk, assignees)
+	}
+	assigner.On("Assign", result, result.BlockID).Return(a, nil)
 
 	// mock execution node
 	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
@@ -227,11 +235,11 @@ func SetupMockExeNode(t *testing.T,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	chainID flow.ChainID,
-	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *network.Engine) {
+	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *mocknetwork.Engine) {
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity, chainID)
-	exeEngine := new(network.Engine)
+	exeEngine := new(mocknetwork.Engine)
 
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
@@ -304,7 +312,7 @@ func SetupMockConsensusNode(t *testing.T,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeER utils.CompleteExecutionResult,
-	chainID flow.ChainID) (*mock2.GenericNode, *network.Engine, *sync.WaitGroup) {
+	chainID flow.ChainID) (*mock2.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
@@ -324,7 +332,7 @@ func SetupMockConsensusNode(t *testing.T,
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
 	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
-	conEngine := new(network.Engine)
+	conEngine := new(mocknetwork.Engine)
 
 	// map form verIds --> result approval ID
 	resultApprovalSeen := make(map[flow.Identifier]map[flow.Identifier]struct{})
@@ -396,8 +404,8 @@ func SetupMockConsensusNode(t *testing.T,
 // SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
 func SetupMockVerifierEng(t testing.TB,
 	vChunks []*verification.VerifiableChunkData,
-	completeER *utils.CompleteExecutionResult) (*network.Engine, *sync.WaitGroup) {
-	eng := new(network.Engine)
+	completeER *utils.CompleteExecutionResult) (*mocknetwork.Engine, *sync.WaitGroup) {
+	eng := new(mocknetwork.Engine)
 
 	// keep track of which verifiable chunks we have received
 	receivedChunks := make(map[flow.Identifier]struct{})

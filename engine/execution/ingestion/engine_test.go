@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	mathRand "math/rand"
 	"sync"
 	"testing"
 	"time"
-
-	mathRand "math/rand"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -22,14 +21,14 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	state "github.com/onflow/flow-go/engine/execution/state/mock"
 	executionUnittest "github.com/onflow/flow-go/engine/execution/state/unittest"
-	mocklocal "github.com/onflow/flow-go/engine/testutil/mocklocal"
+	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/trace"
-	network "github.com/onflow/flow-go/network/mocks"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
@@ -57,8 +56,8 @@ type testingContext struct {
 	blocks             *storage.MockBlocks
 	collections        *storage.MockCollections
 	state              *protocol.State
-	conduit            *network.MockConduit
-	collectionConduit  *network.MockConduit
+	conduit            *mocknetwork.Conduit
+	collectionConduit  *mocknetwork.Conduit
 	computationManager *computation.ComputationManager
 	providerEngine     *provider.ProviderEngine
 	executionState     *state.ExecutionState
@@ -74,9 +73,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	request := module.NewMockRequester(ctrl)
 
 	// initialize the mocks and engine
-	conduit := network.NewMockConduit(ctrl)
-	collectionConduit := network.NewMockConduit(ctrl)
-	syncConduit := network.NewMockConduit(ctrl)
+	conduit := &mocknetwork.Conduit{}
+	collectionConduit := &mocknetwork.Conduit{}
+	syncConduit := &mocknetwork.Conduit{}
 
 	// generates signing identity including staking key for signing
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
@@ -587,7 +586,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	ctrl := gomock.NewController(t)
 	net := module.NewMockNetwork(ctrl)
 	request := module.NewMockRequester(ctrl)
-	syncConduit := network.NewMockConduit(ctrl)
+	syncConduit := &mocknetwork.Conduit{}
 	var engine *Engine
 	net.EXPECT().Register(gomock.Eq(engineCommon.SyncExecution), gomock.AssignableToTypeOf(engine)).Return(syncConduit, nil)
 
@@ -654,7 +653,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -675,11 +674,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -700,11 +699,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -728,13 +727,13 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -759,13 +758,13 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -790,12 +789,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
-		require.NoError(t, ps.Mutate().Finalize(blockA.ID()))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
+		require.NoError(t, ps.Finalize(blockA.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -837,20 +836,20 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		logChain(fork2)
 		logChain(fork3)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockI))
-		require.NoError(t, ps.Mutate().Extend(blockJ))
-		require.NoError(t, ps.Mutate().Extend(blockK))
-		require.NoError(t, ps.Mutate().Extend(blockD))
-		require.NoError(t, ps.Mutate().Extend(blockE))
-		require.NoError(t, ps.Mutate().Extend(blockF))
-		require.NoError(t, ps.Mutate().Extend(blockG))
-		require.NoError(t, ps.Mutate().Extend(blockH))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockI))
+		require.NoError(t, ps.Extend(blockJ))
+		require.NoError(t, ps.Extend(blockK))
+		require.NoError(t, ps.Extend(blockD))
+		require.NoError(t, ps.Extend(blockE))
+		require.NoError(t, ps.Extend(blockF))
+		require.NoError(t, ps.Extend(blockG))
+		require.NoError(t, ps.Extend(blockH))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 
@@ -876,4 +875,41 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
+}
+
+func TestChunkifyEvents(t *testing.T) {
+	// generate events
+	var events []flow.Event
+	for j := 0; j < 10; j++ {
+		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture()))
+	}
+
+	// chunk size be 0
+	ret := ChunkifyEvents(events, 0)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
+
+	// chunk size be 1
+	ret = ChunkifyEvents(events, 1)
+	assert.Equal(t, len(ret), 10)
+	for i := 0; i < len(events); i++ {
+		assert.Equal(t, ret[i], events[i:i+1])
+	}
+
+	// chunk size smaller than events
+	ret = ChunkifyEvents(events, 2)
+	assert.Equal(t, len(ret), 5)
+	for i := 0; i < len(ret); i++ {
+		assert.Equal(t, ret[i], events[i*2:i*2+2])
+	}
+
+	// chunk size equal to the size of events
+	ret = ChunkifyEvents(events, 10)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
+
+	// chunk bigger than the slice
+	ret = ChunkifyEvents(events, 12)
+	assert.Equal(t, len(ret), 1)
+	assert.Equal(t, ret[0], events[:])
 }

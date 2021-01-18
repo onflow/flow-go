@@ -18,7 +18,7 @@ import (
 type BootstrapProcedure struct {
 	vm       *VirtualMachine
 	ctx      Context
-	ledger   state.Ledger
+	st       *state.State
 	accounts *state.Accounts
 
 	// genesis parameters
@@ -39,14 +39,14 @@ func Bootstrap(
 	}
 }
 
-func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
-	b.ledger = ledger
+	b.st = st
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(ledger)
-	addressGenerator, err := state.NewLedgerBoundAddressGenerator(ledger, ctx.Chain)
+	b.accounts = state.NewAccounts(st)
+	addressGenerator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
 	}
@@ -101,7 +101,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
@@ -118,7 +118,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
@@ -138,7 +138,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
@@ -157,7 +157,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy service account contract: %s", err.Error()))
@@ -171,7 +171,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
-		b.ledger,
+		b.st,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to mint initial token supply: %s", err.Error()))
@@ -219,7 +219,7 @@ transaction(amount: UFix64) {
 	  ?? panic("Signer is not the token admin")
 
 	self.tokenReceiver = signer
-	  .getCapability(/public/flowTokenReceiver)!
+	  .getCapability(/public/flowTokenReceiver)
 	  .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
 	  ?? panic("Unable to borrow receiver reference for recipient")
   }
@@ -240,6 +240,7 @@ func deployContractTransaction(address flow.Address, contract []byte, contractNa
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deployContractTransactionTemplate, contractName, hex.EncodeToString(contract)))).
 			AddAuthorizer(address),
+		0,
 	)
 }
 
@@ -249,6 +250,7 @@ func deployFlowTokenTransaction(flowToken, service flow.Address, contract []byte
 			SetScript([]byte(fmt.Sprintf(deployFlowTokenTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(flowToken).
 			AddAuthorizer(service),
+		0,
 	)
 }
 
@@ -258,6 +260,7 @@ func deployFlowFeesTransaction(flowFees, service flow.Address, contract []byte) 
 			SetScript([]byte(fmt.Sprintf(deployFlowFeesTransactionTemplate, hex.EncodeToString(contract)))).
 			AddAuthorizer(flowFees).
 			AddAuthorizer(service),
+		0,
 	)
 }
 
@@ -275,6 +278,7 @@ func mintFlowTokenTransaction(
 			SetScript([]byte(fmt.Sprintf(mintFlowTokenTransactionTemplate, fungibleToken, flowToken))).
 			AddArgument(initialSupplyArg).
 			AddAuthorizer(service),
+		0,
 	)
 }
 

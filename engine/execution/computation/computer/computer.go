@@ -247,7 +247,7 @@ func (e *blockComputer) executeTransaction(
 
 	txView := collectionView.NewChild()
 
-	tx := fvm.Transaction(txBody)
+	tx := fvm.Transaction(txBody, txIndex)
 
 	err := e.vm.Run(ctx, tx, txView)
 

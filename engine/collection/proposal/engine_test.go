@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	network "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
@@ -29,23 +29,21 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.State
+		state    *protocol.MutableState
 		snapshot *protocol.Snapshot
 		query    *protocol.EpochQuery
 		epoch    *protocol.Epoch
-		mutator  *protocol.Mutator
 	}
 	// cluster state
 	cluster struct {
-		state    *clusterstate.State
+		state    *clusterstate.MutableState
 		snapshot *clusterstate.Snapshot
-		mutator  *clusterstate.Mutator
 		params   *clusterstate.Params
 	}
 
 	me           *module.Local
 	net          *module.Network
-	conduit      *network.Conduit
+	conduit      *mocknetwork.Conduit
 	transactions *storage.Transactions
 	headers      *storage.Headers
 	payloads     *storage.ClusterPayloads
@@ -68,13 +66,11 @@ func (suite *Suite) SetupTest() {
 	me := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.State)
+	suite.proto.state = new(protocol.MutableState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.query = new(protocol.EpochQuery)
 	suite.proto.epoch = new(protocol.Epoch)
-	suite.proto.mutator = new(protocol.Mutator)
 	suite.proto.state.On("Final").Return(suite.proto.snapshot)
-	suite.proto.state.On("Mutate").Return(suite.proto.mutator)
 	suite.proto.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.proto.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
 	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)
@@ -86,12 +82,10 @@ func (suite *Suite) SetupTest() {
 	clusterID := flow.ChainID("cluster-id")
 
 	// mock out cluster state
-	suite.cluster.state = new(clusterstate.State)
+	suite.cluster.state = new(clusterstate.MutableState)
 	suite.cluster.snapshot = new(clusterstate.Snapshot)
-	suite.cluster.mutator = new(clusterstate.Mutator)
 	suite.cluster.params = new(clusterstate.Params)
 	suite.cluster.state.On("Final").Return(suite.cluster.snapshot)
-	suite.cluster.state.On("Mutate").Return(suite.cluster.mutator)
 	suite.cluster.snapshot.On("Head").Return(&flow.Header{}, nil)
 	suite.cluster.state.On("Params").Return(suite.cluster.params)
 	suite.cluster.params.On("ChainID").Return(clusterID, nil)
@@ -100,7 +94,7 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(me.NodeID)
 
 	suite.net = new(module.Network)
-	suite.conduit = new(network.Conduit)
+	suite.conduit = new(mocknetwork.Conduit)
 	suite.net.On("Register", engine.ChannelConsensusCluster(clusterID), mock.Anything).Return(suite.conduit, nil)
 	suite.conduit.On("Close").Return(nil).Maybe()
 
@@ -156,7 +150,7 @@ func (suite *Suite) TestHandleProposal() {
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
 	suite.headers.On("Store", mock.Anything).Return(nil).Once()
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", &block).Return(nil).Once()
+	suite.cluster.state.On("Extend", &block).Return(nil).Once()
 	// should submit to consensus algo
 	suite.hotstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
 	// we don't have any cached children
@@ -274,13 +268,13 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	headersDB[parent.ID()] = parent.Header
 	suite.pending.On("ByID", parent.ID()).Return(nil, false)
 	// should extend state with new block
-	suite.cluster.mutator.On("Extend", &block).
+	suite.cluster.state.On("Extend", &block).
 		Run(func(_ mock.Arguments) {
 			// once we add the block to the state, ensure it is retrievable from storage
 			headersDB[block.ID()] = block.Header
 		}).
 		Return(nil).Once()
-	suite.cluster.mutator.On("Extend", &child).Return(nil).Once()
+	suite.cluster.state.On("Extend", &child).Return(nil).Once()
 	// should submit to consensus algo
 	suite.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Twice()
 	// should return the pending child

@@ -9,8 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -29,6 +28,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
@@ -52,6 +53,7 @@ const (
 
 func main() {
 	var (
+		followerState       protocol.MutableState
 		err                 error
 		receiptLimit        uint                       // size of execution-receipt/result related mempools
 		chunkAlpha          uint                       // number of verifiers assigned per chunk
@@ -61,6 +63,7 @@ func main() {
 		readyReceipts       *stdmap.ReceiptDataPacks   // used in finder engine
 		blockIDsCache       *stdmap.Identifiers        // used in finder engine
 		processedResultsIDs *stdmap.Identifiers        // used in finder engine
+		discardedResultIDs  *stdmap.Identifiers        // used in finder engine
 		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
 		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
 		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
@@ -81,6 +84,22 @@ func main() {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badgerState.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
@@ -212,6 +231,18 @@ func main() {
 			}
 			return nil
 		}).
+		Module("discarded results ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			discardedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
+			if err != nil {
+				return err
+			}
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceDiscardedResultID, discardedResultIDs.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
+		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
 			pendingBlocks = buffer.NewPendingBlocks()
@@ -245,7 +276,7 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewPublicAssignment(int(chunkAlpha), node.State)
+			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
 			if err != nil {
 				return nil, err
 			}
@@ -271,12 +302,14 @@ func main() {
 				node.Tracer,
 				node.Network,
 				node.Me,
+				node.State,
 				matchEng,
 				cachedReceipts,
 				pendingReceipts,
 				readyReceipts,
 				headerStorage,
 				processedResultsIDs,
+				discardedResultIDs,
 				receiptIDsByBlock,
 				receiptIDsByResult,
 				blockIDsCache,
@@ -290,29 +323,23 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 			merger := signature.NewCombiner()
 
-			// initialize and pre-generate leader selections from the seed
-			selection, err := leader.NewSelectionForConsensus(leader.EstimatedSixMonthOfViews, node.RootBlock.Header, node.RootQC, node.State)
-			if err != nil {
-				return nil, fmt.Errorf("could not create leader selection for main consensus: %w", err)
-			}
-
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committee.NewMainConsensusCommitteeState(node.State, node.Me.NodeID(), selection)
+			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 
 			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
+			verifier := verification.NewCombinedVerifier(committee, staking, beacon, merger)
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
@@ -321,7 +348,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, mainConsensusCommittee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -335,7 +362,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				pendingBlocks,
 				followerCore,
 				syncCore,

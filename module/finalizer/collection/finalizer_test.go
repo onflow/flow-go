@@ -16,10 +16,8 @@ import (
 	"github.com/onflow/flow-go/module/finalizer/collection"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/trace"
-	networkmock "github.com/onflow/flow-go/network/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	cluster "github.com/onflow/flow-go/state/cluster/badger"
-	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,14 +31,8 @@ func TestFinalizer(t *testing.T) {
 		genesis := model.Genesis()
 
 		metrics := metrics.NewNoopCollector()
-		tracer := trace.NewNoopTracer()
 
-		headers := storage.NewHeaders(metrics, db)
-		payloads := storage.NewClusterPayloads(metrics, db)
-
-		state, err := cluster.NewState(db, tracer, genesis.Header.ChainID, headers, payloads)
-		require.NoError(t, err)
-		mutator := state.Mutate()
+		var state *cluster.State
 
 		pool := stdmap.NewTransactions(1000)
 
@@ -57,13 +49,15 @@ func TestFinalizer(t *testing.T) {
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {
-			err = mutator.Bootstrap(genesis)
-			assert.Nil(t, err)
+			stateRoot, err := cluster.NewStateRoot(genesis)
+			require.NoError(t, err)
+			state, err = cluster.Bootstrap(db, stateRoot)
+			require.NoError(t, err)
 		}
 
 		// a helper function to insert a block
 		insert := func(block model.Block) {
-			err = db.Update(procedure.InsertClusterBlock(&block))
+			err := db.Update(procedure.InsertClusterBlock(&block))
 			assert.Nil(t, err)
 		}
 
@@ -71,7 +65,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -84,7 +78,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -110,7 +104,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -128,7 +122,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
 			// create a block with empty payload on genesis
@@ -153,7 +147,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -200,7 +194,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -256,7 +250,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
@@ -308,7 +302,7 @@ func TestFinalizer(t *testing.T) {
 			bootstrap()
 			defer cleanup()
 
-			prov := new(networkmock.Engine)
+			prov := new(mocknetwork.Engine)
 			prov.On("SubmitLocal", mock.Anything)
 			finalizer := collection.NewFinalizer(db, pool, prov, metrics)
 
