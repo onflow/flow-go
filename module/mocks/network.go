@@ -5,13 +5,12 @@
 package mocks
 
 import (
-	reflect "reflect"
-
 	gomock "github.com/golang/mock/gomock"
 	crypto "github.com/onflow/flow-go/crypto"
 	hash "github.com/onflow/flow-go/crypto/hash"
 	flow "github.com/onflow/flow-go/model/flow"
 	network "github.com/onflow/flow-go/network"
+	reflect "reflect"
 )
 
 // MockNetwork is a mock of Network interface
