@@ -47,6 +47,7 @@ type ComplianceMetrics interface {
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
+	EmergencySeal()
 }
 
 type CleanerMetrics interface {

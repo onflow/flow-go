@@ -131,10 +131,21 @@ func main() {
 				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
 			}
 
-			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
+			receiptValidator = validation.NewReceiptValidator(
+				node.State,
+				node.Storage.Index,
+				node.Storage.Results,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
-				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), requiredApprovalsForSealVerification)
+
+			sealValidator := validation.NewSealValidator(
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.Storage.Seals,
+				chunkAssigner,
+				signature.NewAggregationVerifier(encoding.ResultApprovalTag),
+				requiredApprovalsForSealVerification,
+				node.Metrics.Compliance)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -143,8 +154,7 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 				receiptValidator,
-				sealValidator,
-			)
+				sealValidator)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {

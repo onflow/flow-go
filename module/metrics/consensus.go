@@ -38,9 +38,7 @@ func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Name:      "check_sealing_duration_s",
 		Help:      "duration of consensus match engine sealing check in seconds",
 	})
-
 	registerer.MustRegister(checkSealingDuration)
-
 	cc := &ConsensusCollector{
 		tracer:               tracer,
 		checkSealingDuration: checkSealingDuration,

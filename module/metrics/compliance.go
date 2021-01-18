@@ -14,6 +14,7 @@ type ComplianceCollector struct {
 	sealedHeight             prometheus.Gauge
 	finalizedBlocks          prometheus.Counter
 	sealedBlocks             prometheus.Counter
+	emergencySealedBlocks    prometheus.Counter
 	finalizedPayload         *prometheus.CounterVec
 	sealedPayload            *prometheus.CounterVec
 	lastBlockFinalizedAt     time.Time
@@ -50,6 +51,13 @@ func NewComplianceCollector() *ComplianceCollector {
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of sealed blocks",
+		}),
+
+		emergencySealedBlocks: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "emergency_sealed_blocks_total",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the number of blocks sealed in emergency mode",
 		}),
 
 		finalizedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -115,4 +123,9 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 	cc.sealedBlocks.Inc()
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
+}
+
+// EmergencySeal increments the counter of emergency seals.
+func (cc *ComplianceCollector) EmergencySeal() {
+	cc.emergencySealedBlocks.Inc()
 }

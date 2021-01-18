@@ -298,9 +298,10 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		// before the crash.
 		// TODO: This exception to the rule must be removed in phase 3, because
 		// the IR mempool will be populated by another function.
-		if !engine.IsDuplicatedEntryError(err) {
-			return fmt.Errorf("failed to store receipt: %w", err)
+		if engine.IsDuplicatedEntryError(err) {
+			return nil
 		}
+		return fmt.Errorf("failed to store receipt: %w", err)
 	}
 
 	// ATTENTION:
