@@ -10,7 +10,6 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
-	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
@@ -282,7 +281,10 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	}
 
 	// close the stream immediately
-	go helpers.FullClose(stream)
+	err = stream.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close the stream for %s: %w", targetID.String(), err)
+	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
 	m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
