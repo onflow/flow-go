@@ -26,7 +26,7 @@ type Engine struct {
 	msgCh     chan dkg.DKGMessage
 	committee flow.IdentifierList
 	myIndex   int
-	epochID   uint64
+	epochCounter   uint64
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
