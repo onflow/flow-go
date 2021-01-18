@@ -19,14 +19,14 @@ import (
 // SetEpoch, such that DKGMessages can be prepended with the appropriate epoch
 // ID.
 type Engine struct {
-	unit      *engine.Unit
-	log       zerolog.Logger
-	me        module.Local
-	conduit   network.Conduit
-	msgCh     chan dkg.DKGMessage
-	committee flow.IdentifierList
-	myIndex   int
-	epochCounter   uint64
+	unit         *engine.Unit
+	log          zerolog.Logger
+	me           module.Local
+	conduit      network.Conduit
+	msgCh        chan dkg.DKGMessage
+	committee    flow.IdentifierList
+	myIndex      int
+	epochCounter uint64
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -40,7 +40,7 @@ func New(
 	me module.Local,
 	msgCh chan dkg.DKGMessage,
 	committee flow.IdentifierList,
-	epochID uint64) (*Engine, error) {
+	epochCounter uint64) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
 
@@ -48,6 +48,7 @@ func New(
 	for i, id := range committee {
 		if id == me.NodeID() {
 			index = i
+			break
 		}
 	}
 	if index < 0 {
@@ -55,13 +56,13 @@ func New(
 	}
 
 	eng := Engine{
-		unit:      engine.NewUnit(),
-		log:       log,
-		me:        me,
-		msgCh:     msgCh,
-		committee: committee,
-		myIndex:   index,
-		epochID:   epochID,
+		unit:         engine.NewUnit(),
+		log:          log,
+		me:           me,
+		msgCh:        msgCh,
+		committee:    committee,
+		myIndex:      index,
+		epochCounter: epochCounter,
 	}
 
 	var err error
@@ -73,11 +74,11 @@ func New(
 	return &eng, nil
 }
 
-// SetEpoch changes the epoch ID of the engine.
-func (e *Engine) SetEpoch(epochID uint64) {
+// SetEpoch changes the epoch counter of the engine.
+func (e *Engine) SetEpoch(epochCounter uint64) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
-	e.epochID = epochID
+	e.epochCounter = epochCounter
 }
 
 // Ready implements the module ReadyDoneAware interface. It returns a channel
@@ -134,8 +135,8 @@ func (e *Engine) onDKGMessage(originID flow.Identifier, msg dkg.DKGMessage) erro
 	// check that the message corresponds to the current epoch
 	e.unit.Lock()
 	defer e.unit.Unlock()
-	if e.epochID != msg.EpochID {
-		return fmt.Errorf("wrong epoch id. Got %d, want %d", msg.EpochID, e.epochID)
+	if e.epochCounter != msg.EpochCounter {
+		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, e.epochCounter)
 	}
 
 	// check that the message's origin is not out of range
@@ -173,7 +174,7 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 	dkgMessage := dkg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.epochID,
+		e.epochCounter,
 	)
 
 	err := e.conduit.Unicast(dkgMessage, destID)

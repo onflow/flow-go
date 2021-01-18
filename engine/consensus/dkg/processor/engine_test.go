@@ -34,7 +34,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := rand.Uint64()
+	epochCounter := rand.Uint64()
 
 	// send a msg from the first node to the second node
 	orig := 0
@@ -44,7 +44,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 	msg := dkg.NewDKGMessage(
 		orig,
 		msgb,
-		epochID,
+		epochCounter,
 	)
 
 	conduit := &mocknetwork.Conduit{}
@@ -74,7 +74,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 		me,
 		make(chan dkg.DKGMessage),
 		committee,
-		epochID,
+		epochCounter,
 	)
 	require.NoError(t, err)
 
@@ -92,7 +92,7 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := rand.Uint64()
+	epochCounter := rand.Uint64()
 
 	// send a msg from the first node on the list to second node on the list
 	orig := 0
@@ -113,7 +113,7 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 		me,
 		make(chan dkg.DKGMessage),
 		committee,
-		epochID,
+		epochCounter,
 	)
 	require.NoError(t, err)
 
@@ -133,7 +133,7 @@ func TestProcessDKGMessage_Valid(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := rand.Uint64()
+	epochCounter := rand.Uint64()
 
 	// send a msg from the first node to the second node
 	orig := 0
@@ -143,7 +143,7 @@ func TestProcessDKGMessage_Valid(t *testing.T) {
 	msg := dkg.NewDKGMessage(
 		orig,
 		msgb,
-		epochID,
+		epochCounter,
 	)
 
 	network := new(module.Network)
@@ -162,7 +162,7 @@ func TestProcessDKGMessage_Valid(t *testing.T) {
 		me,
 		msgCh,
 		committee,
-		epochID,
+		epochCounter,
 	)
 	require.NoError(t, err)
 
@@ -197,7 +197,7 @@ func TestProcessDKGMessage_InvalidOrigin(t *testing.T) {
 	committee := unittest.IdentifierListFixture(2)
 
 	// define epoch ID
-	epochID := rand.Uint64()
+	epochCounter := rand.Uint64()
 
 	network := new(module.Network)
 	network.On("Register", mock.Anything, mock.Anything).
@@ -215,7 +215,7 @@ func TestProcessDKGMessage_InvalidOrigin(t *testing.T) {
 		me,
 		msgCh,
 		committee,
-		epochID,
+		epochCounter,
 	)
 	require.NoError(t, err)
 
@@ -223,7 +223,7 @@ func TestProcessDKGMessage_InvalidOrigin(t *testing.T) {
 	msg := dkg.NewDKGMessage(
 		2,
 		[]byte{},
-		epochID,
+		epochCounter,
 	)
 
 	err = engine.Process(unittest.IdentifierFixture(), msg)
@@ -232,7 +232,7 @@ func TestProcessDKGMessage_InvalidOrigin(t *testing.T) {
 	msg = dkg.NewDKGMessage(
 		-1,
 		[]byte{},
-		epochID,
+		epochCounter,
 	)
 
 	err = engine.Process(unittest.IdentifierFixture(), msg)
@@ -243,7 +243,7 @@ func TestProcessDKGMessage_InvalidOrigin(t *testing.T) {
 	msg = dkg.NewDKGMessage(
 		0,
 		[]byte{},
-		epochID,
+		epochCounter,
 	)
 
 	err = engine.Process(unittest.IdentifierFixture(), msg)
