@@ -485,6 +485,28 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	ms.Assert().Empty(results, "expecting no sealable result")
 }
 
+// TestSealableResultsEmergencySealingMultipleCandidates tests matching.Engine.sealableResults():
+// When emergency sealing is active we should be able to identify and pick as candidates incorporated results
+// that are deep enough but still without verifications.
+func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates() {
+	for i := 0; i < 10; i++ {
+		lastFinalizedBlock := ms.LatestFinalizedBlock
+		block := unittest.BlockWithParentFixture(lastFinalizedBlock.Header)
+		receipt := unittest.ExecutionReceiptFixture(
+			unittest.WithExecutorID(ms.ExeID),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&lastFinalizedBlock))),
+		)
+		block.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{receipt},
+		})
+		ms.Extend(&block)
+	}
+
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "expecting no sealable result")
+}
+
 // TestRequestPendingReceipts tests matching.Engine.requestPendingReceipts():
 //   * generate n=100 consecutive blocks, where the first one is sealed and the last one is final
 func (ms *MatchingSuite) TestRequestPendingReceipts() {

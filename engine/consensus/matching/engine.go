@@ -33,6 +33,7 @@ import (
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
 // for subsequent inclusion in block.
 const DefaultRequiredApprovalsForSealConstruction = 1
+const DefaultEmergencySealingThreshold = 400
 
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
@@ -591,9 +592,13 @@ func (e *Engine) checkingSealing() {
 func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 	var results []*flow.IncorporatedResult
 
+	lastFinalized, err := e.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last finalized block: %w", err)
+	}
+
 	// go through the results mempool and check which ones we have collected
 	// enough approvals for
-RES_LOOP:
 	for _, incorporatedResult := range e.incorporatedResults.All() {
 		// not finding the block header for an incorporated result is a fatal
 		// implementation bug, as we only add results to the IncorporatedResults
@@ -620,14 +625,34 @@ RES_LOOP:
 			return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 		}
 
-		// check that each chunk collects enough approvals
-		for _, chunk := range incorporatedResult.Result.Chunks {
-			matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
-			if err != nil {
-				return nil, fmt.Errorf("could not match chunk: %w", err)
+		checkApprovals := func(incorporatedResult *flow.IncorporatedResult) (bool, error) {
+			// check that each chunk collects enough approvals
+			for _, chunk := range incorporatedResult.Result.Chunks {
+				matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
+				if err != nil {
+					return false, fmt.Errorf("could not match chunk: %w", err)
+				}
+				if !matched {
+					return false, nil
+				}
 			}
-			if !matched {
-				continue RES_LOOP
+			return true, nil
+		}
+
+		checked, err := checkApprovals(incorporatedResult)
+		if err != nil {
+			return nil, err
+		}
+
+		if !checked {
+			//
+			block, err := e.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
+			if err != nil {
+				continue
+			}
+
+			if lastFinalized.Height < block.Height+DefaultEmergencySealingThreshold {
+				continue
 			}
 		}
 
