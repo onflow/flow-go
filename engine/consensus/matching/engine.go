@@ -49,7 +49,7 @@ type Engine struct {
 	me                                   module.Local                    // used to access local node information
 	receiptRequester                     module.Requester                // used to request missing execution receipts by block ID
 	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
-	resultsDB                            storage.ExecutionResults        // used to check previous results are known
+	receiptsDB                           storage.ExecutionReceipts       // to persist received execution receipts
 	headersDB                            storage.Headers                 // used to check sealed headers
 	indexDB                              storage.Index                   // used to check payloads for results
 	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results in memory
@@ -78,7 +78,7 @@ func New(
 	state protocol.State,
 	me module.Local,
 	receiptRequester module.Requester,
-	resultsDB storage.ExecutionResults,
+	receiptsDB storage.ExecutionReceipts,
 	headersDB storage.Headers,
 	indexDB storage.Index,
 	incorporatedResults mempool.IncorporatedResults,
@@ -101,7 +101,7 @@ func New(
 		state:                                state,
 		me:                                   me,
 		receiptRequester:                     receiptRequester,
-		resultsDB:                            resultsDB,
+		receiptsDB:                           receiptsDB,
 		headersDB:                            headersDB,
 		indexDB:                              indexDB,
 		incorporatedResults:                  incorporatedResults,
@@ -286,25 +286,66 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
-	// add the receipt to the mempool so that the builder can incorporate it in
-	// a block payload
+	err = e.storeReceipt(receipt, &log)
+	if err != nil {
+		if engine.IsDuplicatedEntryError(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to store receipt: %w", err)
+	}
+
+	err = e.storeIncorporatedResult(receipt, &log)
+	if err != nil {
+		if engine.IsDuplicatedEntryError(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to store incorporated result: %w", err)
+	}
+
+	// kick off a check for potential seal formation
+	e.unit.Launch(e.checkSealing)
+
+	return nil
+}
+
+// storeReceipt adds the receipt to the receipts mempool as well as to the persistent storage layer.
+// Return values:
+// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool and we don't need to process this again
+//	* exception in case something went wrong
+// 	* nil in case of success
+func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
+	// add the receipt to the mempool
 	added := e.receipts.Add(receipt)
 	if !added {
 		log.Debug().Msg("skipping receipt already in mempool")
-		return nil
+		return engine.NewDuplicatedEntryErrorf("")
 	}
 
 	log.Info().Msg("execution receipt added to mempool")
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
-	// store the result to make it persistent for later
-	result := &receipt.ExecutionResult
-	err = e.resultsDB.Store(result) // internally de-duplicates
+	// persist receipt in database. Even if the receipt is already in persistent storage,
+	// we still need to process it, as it is not in the mempool. This can happen if the
+	// mempool got wiped during a node crash.
+	err := e.receiptsDB.Store(receipt) // internally de-duplicates
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store sealing result: %w", err)
+		return fmt.Errorf("could not persist receipt: %w", err)
 	}
+	return nil
+}
 
-	// We do _not_ return here if resultsDB already contained result!
+// storeIncorporatedResult creates an `IncorporatedResult` and adds it to incorporated results mempool
+// Error returns:
+// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool
+//	* exception in case something went wrong
+// 	* nil in case of success
+func (e *Engine) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
+	// We do _not_ return here if receiptsDB already contained receipt!
+	// receiptsDB is persistent storage while Mempools are in-memory only.
+	// After a crash, the replica still needs to be able to generate a seal
+	// for an Result even if it had stored the Result (as part of a Receipt) before the crash.
+	// Otherwise, a stored result might never get sealed, and
+	// liveness of sealing is undermined.
 	// resultsDB is persistent storage while Mempools are in-memory only.
 	// After a crash, the replica still needs to be able to generate a seal
 	// for an Result even if it had stored the Result before the crash.
@@ -322,7 +363,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
 	// will be the ID of the first block on its fork that contains a receipt
 	// committing to this result.
-	added, err = e.incorporatedResults.Add(
+	added, err := e.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
 			receipt.ExecutionResult.BlockID,
 			&receipt.ExecutionResult,
@@ -333,14 +374,10 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	}
 	if !added {
 		log.Debug().Msg("skipping result already in mempool")
-		return nil
+		return engine.NewDuplicatedEntryErrorf("")
 	}
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
 	log.Info().Msg("execution result added to mempool")
-
-	// kick off a check for potential seal formation
-	e.unit.Launch(e.checkSealing)
-
 	return nil
 }
 
@@ -558,7 +595,6 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 	// enough approvals for
 RES_LOOP:
 	for _, incorporatedResult := range e.incorporatedResults.All() {
-
 		// not finding the block header for an incorporated result is a fatal
 		// implementation bug, as we only add results to the IncorporatedResults
 		// mempool, where _both_ the block that incorporates the result as well
@@ -568,31 +604,9 @@ RES_LOOP:
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// we create one chunk per collection, plus the
-		// system chunk. so we can check if the chunk number matches with the
-		// number of guarantees plus one; this will ensure the execution receipt
-		// cannot lie about having less chunks and having the remaining ones
-		// approved
-		requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
-
-		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
-		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return nil, err
-			}
-			// reaching this line means the block is empty, i.e. it has no payload => we expect only the system chunk
-		} else {
-			requiredChunks += len(index.CollectionIDs)
-		}
-
-		if incorporatedResult.Result.Chunks.Len() != requiredChunks {
-			_ = e.incorporatedResults.Rem(incorporatedResult)
-			e.log.Warn().
-				Int("result_chunks", len(incorporatedResult.Result.Chunks)).
-				Int("required_chunks", requiredChunks).
-				Msg("removing result with invalid number of chunks")
-			continue
-		}
+		// At this point we can be sure that all needed checks on validity of ER
+		// were executed prior to this point, since we perform validation of every ER
+		// before adding it into mempool. Hence, the mempool can contain only valid entries.
 
 		// the chunk assigment is based on the first block in its fork which
 		// contains a receipt that commits to this result.
@@ -607,27 +621,7 @@ RES_LOOP:
 		}
 
 		// check that each chunk collects enough approvals
-		for i := 0; i < requiredChunks; i++ {
-			// arriving at a failure condition here means that the execution
-			// result is invalid; we should skip it and move on to the next
-			// execution result.
-
-			// get chunk at position i
-			chunk, ok := incorporatedResult.Result.Chunks.ByIndex(uint64(i))
-			if !ok {
-				e.log.Warn().Msgf("chunk out of range requested: %d", i)
-				_ = e.incorporatedResults.Rem(incorporatedResult)
-				continue RES_LOOP
-			}
-
-			// Check if chunk index matches its position. This ensures that the
-			// result contains all chunks and no duplicates.
-			if chunk.Index != uint64(i) {
-				e.log.Warn().Msgf("chunk out of place: pos = %d, index = %d", i, chunk.Index)
-				_ = e.incorporatedResults.Rem(incorporatedResult)
-				continue RES_LOOP
-			}
-
+		for _, chunk := range incorporatedResult.Result.Chunks {
 			matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
 			if err != nil {
 				return nil, fmt.Errorf("could not match chunk: %w", err)
@@ -727,13 +721,6 @@ func (e *Engine) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.He
 // sealResult creates a seal for the incorporated result and adds it to the
 // seals mempool.
 func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
-
-	// store the result to make it persistent for later checks
-	err := e.resultsDB.Store(incorporatedResult.Result)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not store sealing result: %w", err)
-	}
-
 	// collect aggregate signatures
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
@@ -755,7 +742,7 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err = e.seals.Add(&flow.IncorporatedResultSeal{
+	_, err := e.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})

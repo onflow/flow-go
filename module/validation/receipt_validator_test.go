@@ -140,6 +140,25 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptTooManyChunks tests that we reject receipt with more chunks than expected
+func (s *ReceiptValidationSuite) TestReceiptTooManyChunks() {
+	valSubgrph := s.ValidSubgraphFixture()
+	chunks := valSubgrph.Result.Chunks
+	valSubgrph.Result.Chunks = append(chunks, chunks[len(chunks)-1]) // duplicate the last chunk
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.verifier.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe()
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject with invalid chunks")
+	s.Assert().True(engine.IsInvalidInputError(err))
+}
+
 // TestReceiptChunkInvalidBlockID tests that we reject receipt with invalid chunk blockID
 func (s *ReceiptValidationSuite) TestReceiptChunkInvalidBlockID() {
 	valSubgrph := s.ValidSubgraphFixture()
@@ -201,6 +220,24 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 	// invalidate prev execution result blockID, this should fail because
 	// prev result points to wrong block
 	valSubgrph.PreviousResult.BlockID = unittest.IdentifierFixture()
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.verifier.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe()
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject invalid previous result")
+}
+
+func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
+	valSubgrph := s.ValidSubgraphFixture()
+	// invalidate prev execution result blockID, this should fail because
+	// prev result points to wrong block
+	valSubgrph.PreviousResult.Chunks[len(valSubgrph.Result.Chunks)-1].EndState = unittest.StateCommitmentFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
