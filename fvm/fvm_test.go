@@ -497,8 +497,8 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 			}`, longString)
 
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
-		fvm.WithAccountCreationFee(10000000),
-		fvm.WithMinimumStorageReservation(10000000),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 	}
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).

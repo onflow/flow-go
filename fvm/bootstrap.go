@@ -39,6 +39,22 @@ func WithInitialTokenSupply(supply cadence.UFix64) BootstrapProcedureOption {
 	}
 }
 
+var DefaultAccountCreationFee = func() cadence.UFix64 {
+	value, err := cadence.NewUFix64("0.10000000")
+	if err != nil {
+		panic(fmt.Errorf("invalid default account creation fee: %w", err))
+	}
+	return value
+}()
+
+var DefaultMinimumStorageReservation = func() cadence.UFix64 {
+	value, err := cadence.NewUFix64("0.10000000")
+	if err != nil {
+		panic(fmt.Errorf("invalid default minimum storage reservation: %w", err))
+	}
+	return value
+}()
+
 func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.accountCreationFee = fee
