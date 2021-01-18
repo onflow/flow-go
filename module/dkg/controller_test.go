@@ -91,10 +91,11 @@ type processor struct {
 	id       int
 	channels []chan DKGMessage
 	logger   zerolog.Logger
+	epoch    uint64
 }
 
 func (proc *processor) PrivateSend(dest int, data []byte) {
-	proc.channels[dest] <- DKGMessage{Orig: proc.id, Data: data}
+	proc.channels[dest] <- NewDKGMessage(proc.id, data, proc.epoch)
 }
 
 // ATTENTION: Normally the processor requires Broadcast to provide guaranteed
@@ -107,12 +108,12 @@ func (proc *processor) Broadcast(data []byte) {
 		if i == proc.id {
 			continue
 		}
-		proc.channels[i] <- DKGMessage{Orig: proc.id, Data: data}
+		proc.channels[i] <- NewDKGMessage(proc.id, data, proc.epoch)
 	}
 }
 
-func (proc *processor) Blacklist(node int) {
-	proc.logger.Debug().Msgf("node %d blacklisted node %d", proc.id, node)
+func (proc *processor) Disqualify(node int, log string) {
+	proc.logger.Debug().Msgf("node %d disqualified node %d: %s", proc.id, node, log)
 }
 
 func (proc *processor) FlagMisbehavior(node int, logData string) {

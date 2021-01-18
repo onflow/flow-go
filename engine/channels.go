@@ -66,6 +66,9 @@ const (
 	syncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
 	SyncExecution     = "sync-execution"
 
+	// Channels for dkg communication
+	DKGCommittee = "dkg-committee"
+
 	// Channels for actively pushing entities to subscribers
 	PushTransactions = "push-transactions"
 	PushGuarantees   = "push-guarantees"
@@ -108,6 +111,9 @@ func initializeChannelIdMap() {
 	// Channels for protocols actively synchronizing state across nodes
 	channelIdMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
 	channelIdMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
+
+	// Channels for DKG communication
+	channelIdMap[DKGCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for actively pushing entities to subscribers
 	channelIdMap[PushTransactions] = flow.RoleList{flow.RoleCollection}
