@@ -67,8 +67,8 @@ func NewRandomizedTopology(nodeID flow.Identifier,
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
 func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
-	myChannels := r.subMngr.Channels()
-	if len(myChannels) == 0 {
+	myUniqueChannels := engine.UniqueChannels(r.subMngr.Channels())
+	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
@@ -79,7 +79,7 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList) (flow.Identity
 	var myFanout flow.IdentityList
 
 	// generates a randomized subgraph per channel
-	for _, myChannel := range myChannels {
+	for _, myChannel := range myUniqueChannels {
 		topicFanout, err := r.subsetChannel(ids, myChannel)
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
