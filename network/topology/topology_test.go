@@ -76,7 +76,7 @@ func (suite *TopologyTestSuite) TestLowScaleLinearFanout() {
 // and builds a randomized topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *TopologyTestSuite) TestLowScaleRandomized() {
-	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 200, 10, 100, 120, 5, 100, 4)
+	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 10, 100, 120, 5, 100, 4)
 }
 
 // TestModerateScaleLinearFanout creates systems with
