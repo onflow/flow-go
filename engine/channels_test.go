@@ -106,7 +106,7 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 				continue
 			}
 
-			// non-cluster channels should be unique in their id
+			// non-cluster channels should be unique based on their RoleList identifier.
 			id := channelRoleMap[channel].ID()
 			_, ok := visited[id]
 			require.False(t, ok)
