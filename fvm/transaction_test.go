@@ -201,7 +201,6 @@ func TestSafetyCheck(t *testing.T) {
 		require.NotContains(t, buffer.String(), "codes")
 	})
 
-
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {
