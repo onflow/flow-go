@@ -79,8 +79,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			factory,
 			id.NodeID,
 			metrics,
-			p2p.DefaultMaxUnicastMsgSize,
-			p2p.DefaultMaxPubSubMsgSize,
 			rootBlockID)
 	}
 	return mws

@@ -32,17 +32,30 @@ const (
 )
 
 const (
-	// defines maximum message size in publish and multicast modes
-	DefaultMaxPubSubMsgSize = 1 << 21 // 2 mb
-
-	// defines maximum message size in unicast mode
-	DefaultMaxUnicastMsgSize = 5 * DefaultMaxPubSubMsgSize // 10 mb
-
-	// maximum time to wait for a unicast request to complete
-	DefaultUnicastTimeout = 2 * time.Second
+	_ = iota
+	_ = 1 << (10 * iota)
+	mb
+	gb
 )
 
-var unicastTimeout = DefaultUnicastTimeout
+const (
+
+	// defines maximum message size in publish and multicast modes
+	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
+
+	// defines maximum message size in unicast mode for most messages
+	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
+
+	// defines maximum message size in unicast mode for large messages
+	LargeMsgMaxUnicastMsgSize = gb // 1 gb
+
+	// default maximum time to wait for a default unicast request to complete
+	// assuming at least a 1mb/sec connection
+	DefaultUnicastTimeout = 2 * time.Second
+
+	// maximum time to wait for a unicast request to complete for large message size
+	LargeMsgUnicastTimeout = 1000 * time.Second
+)
 
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
@@ -57,8 +70,6 @@ type Middleware struct {
 	libP2PNodeFactory LibP2PFactoryFunc
 	me                flow.Identifier
 	metrics           module.NetworkMetrics
-	maxPubSubMsgSize  int // used to define maximum message size in pub/sub
-	maxUnicastMsgSize int // used to define maximum message size in unicast mode
 	rootBlockID       string
 	validators        []network.MessageValidator
 	peerManager       *PeerManager
@@ -70,22 +81,12 @@ func NewMiddleware(log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
-	maxUnicastMsgSize int,
-	maxPubSubMsgSize int,
 	rootBlockID string,
 	validators ...network.MessageValidator) *Middleware {
 
 	if len(validators) == 0 {
 		// add default validators to filter out unwanted messages received by this node
 		validators = defaultValidators(log, flowID)
-	}
-
-	if maxPubSubMsgSize <= 0 {
-		maxPubSubMsgSize = DefaultMaxPubSubMsgSize
-	}
-
-	if maxUnicastMsgSize <= 0 {
-		maxUnicastMsgSize = DefaultMaxUnicastMsgSize
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -99,8 +100,6 @@ func NewMiddleware(log zerolog.Logger,
 		me:                flowID,
 		libP2PNodeFactory: libP2PNodeFactory,
 		metrics:           metrics,
-		maxPubSubMsgSize:  maxPubSubMsgSize,
-		maxUnicastMsgSize: maxUnicastMsgSize,
 		rootBlockID:       rootBlockID,
 		validators:        validators,
 	}
@@ -245,15 +244,17 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
-	if msg.Size() > m.maxUnicastMsgSize {
+	maxMsgSize := unicastMaxMsgSize(msg)
+	if msg.Size() > maxMsgSize {
 		// message size goes beyond maximum size that the serializer can handle.
 		// proceeding with this message results in closing the connection by the target side, and
 		// delivery failure.
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), m.maxUnicastMsgSize)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
 	}
 
+	maxTimeout := unicastMaxMsgDuration(msg)
 	// pass in a context with timeout to make the unicast call fail fast
-	ctx, cancel := context.WithTimeout(m.ctx, unicastTimeout)
+	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
 	defer cancel()
 
 	// create new stream
@@ -332,7 +333,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	log.Info().Msg("incoming connection established")
 
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, m.maxUnicastMsgSize)
+	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize)
 
 	// kick off the receive loop to continuously receive messages
 	m.wg.Add(1)
@@ -405,10 +406,10 @@ func (m *Middleware) Publish(msg *message.Message, channelID string) error {
 	}
 
 	msgSize := len(data)
-	if msgSize > m.maxPubSubMsgSize {
+	if msgSize > DefaultMaxPubSubMsgSize {
 		// libp2p pubsub will silently drop the message if its size is greater than the configured pubsub max message size
 		// hence return an error as this message is undeliverable
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, m.maxPubSubMsgSize)
+		return fmt.Errorf("message size %d exceeds configured max message size %d", msgSize, DefaultMaxPubSubMsgSize)
 	}
 
 	topic := engine.FullyQualifiedChannelName(channelID, m.rootBlockID)
@@ -458,4 +459,24 @@ func (m *Middleware) UpdateAllowList() error {
 // IsConnected returns true if this node is connected to the node with id nodeID.
 func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
 	return m.libP2PNode.IsConnected(identity)
+}
+
+// unicastMaxMsgSize returns the max permissible size for a unicast message
+func unicastMaxMsgSize(msg *message.Message) int {
+	switch msg.Type {
+	case "messages.ChunkDataResponse":
+		return LargeMsgMaxUnicastMsgSize
+	default:
+		return DefaultMaxUnicastMsgSize
+	}
+}
+
+// unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
+func unicastMaxMsgDuration(msg *message.Message) time.Duration {
+	switch msg.Type {
+	case "messages.ChunkDataResponse":
+		return LargeMsgUnicastTimeout
+	default:
+		return DefaultUnicastTimeout
+	}
 }
