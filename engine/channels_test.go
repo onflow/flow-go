@@ -115,3 +115,18 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 		}
 	}
 }
+
+// TestUniqueChannels_ClusterChannels verifies that if cluster channels have the RoleList as
+// single non-cluster channel, then all cluster channels as well as the one non-cluster channel are returned
+// by the UniqueChannels. In other words, cluster channels are not deduplicated in the favor of non-cluster
+// channels.
+// We use the identifier of RoleList to determine their uniqueness.
+func TestUniqueChannels_ClusterChannels(t *testing.T) {
+	channels := ChannelsByRole(flow.RoleCollection)
+	uniques := UniqueChannels(channels)
+	// collection role has two cluster and one non-cluster channels all with the same RoleList.
+	// Hence all of them should be returned as unique channels.
+	require.Contains(t, uniques, syncClusterPrefix)      // cluster channel
+	require.Contains(t, uniques, consensusClusterPrefix) // cluster channel
+	require.Contains(t, uniques, PushTransactions)       // non-cluster channel
+}
