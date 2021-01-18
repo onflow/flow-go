@@ -256,6 +256,11 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 	}
 
 	executionResultID := executionResult.ID()
+	// if a valid seal doesn't require any approval, we could just skip
+	if s.requiredApprovalsForSealVerification == 0 {
+		return nil
+	}
+	
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := &seal.AggregatedApprovalSigs[chunk.Index]
 		numberApprovals := len(chunkSigs.SignerIDs)

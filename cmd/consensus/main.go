@@ -118,6 +118,7 @@ func main() {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
 
+			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
 			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
 				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
 			}
