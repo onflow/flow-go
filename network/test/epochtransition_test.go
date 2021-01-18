@@ -87,13 +87,13 @@ func (t *testNodeList) ids() flow.IdentityList {
 	return ids
 }
 
-func (t *testNodeList) lastAdded() *testNode {
+func (t *testNodeList) lastAdded() (testNode, error) {
 	t.RLock()
 	defer t.RUnlock()
 	if len(t.nodes) > 0 {
-		return &t.nodes[len(t.nodes)-1]
+		return t.nodes[len(t.nodes)-1], nil
 	}
-	return nil
+	return testNode{}, fmt.Errorf("node list empty")
 }
 
 func (t *testNodeList) engines() []*MeshEngine {
@@ -209,7 +209,8 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 	// add a new node the current list of nodes
 	suite.addNodes(1)
 
-	newNode := *suite.testNodes.lastAdded()
+	newNode, err := suite.testNodes.lastAdded()
+	require.NoError(suite.T(), err)
 	newID := newNode.id
 	newMiddleware := newNode.mw
 
@@ -266,17 +267,18 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 // b. a node that has has been removed cannot exchange messages with the existing nodes
 func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 
-	// add a node
-	suite.addNodes(1)
-	newNode := *suite.testNodes.lastAdded()
-	newID := newNode.id
-	newMiddleware := newNode.mw
-
 	// remove a node
 	removedNode := suite.removeNode()
 	removedID := removedNode.id
 	removedMiddleware := removedNode.mw
 	removedEngine := removedNode.engine
+
+	// add a node
+	suite.addNodes(1)
+	newNode, err := suite.testNodes.lastAdded()
+	require.NoError(suite.T(), err)
+	newID := newNode.id
+	newMiddleware := newNode.mw
 
 	// update all current nodes
 	suite.signalIdentityChanged()

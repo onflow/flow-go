@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const testChannel = "test-channel"
@@ -291,7 +292,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	ch := make(chan struct{})
 	m.ov[targetIndex].On("Receive", sourceNode, msg).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
-			ch <- struct{}{}
+			close(ch)
 		})
 
 	// sends a direct message from source node to the target node
@@ -300,11 +301,8 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	require.NoError(m.Suite.T(), err)
 
 	// check message reception on target
-	select {
-	case <-ch:
-	case <-time.After(3 * time.Second):
-		assert.Fail(m.T(), "source node failed to send large message to target")
-	}
+	unittest.RequireCloseBefore(m.T(), ch, 3*time.Second, "source node failed to send large message to target")
+
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
 
