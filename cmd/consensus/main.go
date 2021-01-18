@@ -68,7 +68,8 @@ func main() {
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
 		chunkAlpha                             uint
-		requiredChunkApprovals                 uint
+		requiredApprovalsForSealVerification   uint
+		requiredApprovalsForSealConstruction   uint
 
 		err              error
 		mutableState     protocol.MutableState
@@ -106,7 +107,8 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
-			flags.UintVar(&requiredChunkApprovals, "required-chunk-approvals", validation.DefaultRequiredChunkApprovals, "number of approvals that are required for each chunk")
+			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
+			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", matching.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to verify a seal")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -114,6 +116,14 @@ func main() {
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+
+			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
+			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
+			}
+			if requiredApprovalsForSealConstruction > chunkAlpha {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
 			}
 
 			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
@@ -124,7 +134,7 @@ func main() {
 			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
-				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), requiredChunkApprovals)
+				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), requiredApprovalsForSealVerification)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -226,7 +236,7 @@ func main() {
 				seals,
 				chunkAssigner,
 				receiptValidator,
-				requiredChunkApprovals,
+				requiredApprovalsForSealConstruction,
 			)
 
 			receiptRequester.WithHandle(match.HandleReceipt)

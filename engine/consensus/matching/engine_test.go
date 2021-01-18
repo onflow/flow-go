@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -78,28 +77,28 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
 
 	ms.matching = &Engine{
-		unit:                      unit,
-		log:                       log,
-		engineMetrics:             metrics,
-		mempool:                   metrics,
-		metrics:                   metrics,
-		state:                     ms.State,
-		receiptRequester:          ms.requester,
-		receiptsDB:                ms.ReceiptsDB,
-		headersDB:                 ms.HeadersDB,
-		indexDB:                   ms.IndexDB,
-		incorporatedResults:       ms.ResultsPL,
-		receipts:                  ms.ReceiptsPL,
-		approvals:                 ms.ApprovalsPL,
-		seals:                     ms.SealsPL,
-		isCheckingSealing:         atomic.NewBool(false),
-		sealingThreshold:          10,
-		maxResultsToRequest:       200,
-		assigner:                  ms.Assigner,
-		receiptValidator:          ms.receiptValidator,
-		requestTracker:            NewRequestTracker(1, 3),
-		approvalRequestsThreshold: 10,
-		requiredChunkApprovals:    validation.DefaultRequiredChunkApprovals,
+		unit:                                 unit,
+		log:                                  log,
+		engineMetrics:                        metrics,
+		mempool:                              metrics,
+		metrics:                              metrics,
+		state:                                ms.State,
+		receiptRequester:                     ms.requester,
+		receiptsDB:                           ms.ReceiptsDB,
+		headersDB:                            ms.HeadersDB,
+		indexDB:                              ms.IndexDB,
+		incorporatedResults:                  ms.ResultsPL,
+		receipts:                             ms.ReceiptsPL,
+		approvals:                            ms.ApprovalsPL,
+		seals:                                ms.SealsPL,
+		isCheckingSealing:                    atomic.NewBool(false),
+		sealingThreshold:                     10,
+		maxResultsToRequest:                  200,
+		assigner:                             ms.Assigner,
+		receiptValidator:                     ms.receiptValidator,
+		requestTracker:                       NewRequestTracker(1, 3),
+		approvalRequestsThreshold:            10,
+		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
 	}
 }
 

@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/validation"
 )
 
 // timeout for individual actions
@@ -28,7 +27,8 @@ func TestMVP_Network(t *testing.T) {
 	}
 
 	consensusConfigs := append(collectionConfigs,
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-chunk-approvals=%d", validation.DefaultRequiredChunkApprovals)), // require one approval per chunk when sealing)
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 
