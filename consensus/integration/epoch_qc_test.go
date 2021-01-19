@@ -24,8 +24,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/module/epochs"
 	modulemock "github.com/onflow/flow-go/module/mock"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
 	protomock "github.com/onflow/flow-go/state/protocol/mock"
 )
 
@@ -40,8 +42,10 @@ type ClusterNode struct {
 type ClusterEpochTestSuite struct {
 	suite.Suite
 
-	env        templates.Environment
-	blockchain *emulator.Blockchain
+	env          templates.Environment
+	blockchain   *emulator.Blockchain
+	qcAddress    sdk.Address
+	qcAccountKey *sdk.AccountKey
 }
 
 // SetupTest creates an instance of the emulated chain and deploys the EpochQC contract
@@ -51,6 +55,10 @@ func (s *ClusterEpochTestSuite) SetupTest() {
 	blockchain, err := emulator.NewBlockchain()
 	require.NoError(s.T(), err)
 	s.blockchain = blockchain
+
+	qcAddress, accountKey := s.DeployEpochQCContract()
+	s.qcAddress = qcAddress
+	s.qcAccountKey = accountKey
 }
 
 // TestQuroumCertificate tests one Epoch of the EpochClusterQC contract
@@ -61,21 +69,21 @@ func (s *ClusterEpochTestSuite) TestQuroumCertificate() {
 	nodeCount := 30
 
 	s.SetupTest()
-	_ = s.DeployEpochQCContract()
 
 	// create clustering with x clusters with x*y nodes
-	clustering, nodes := s.CreateClustering(clusterCount, nodeCount)
+	clustering, nodes := s.CreateClusterList(clusterCount, nodeCount)
 
 	// create initial cluster map
 	_ = make([][]ClusterNode, clusterCount)
 
 	// mock the epoch object to return counter 0 and clustering as our clusterList
 	epoch := &protomock.Epoch{}
-	epoch.On("Counter").Return(0, nil)
+	epoch.On("Counter").Return(1, nil)
 	epoch.On("Clustering").Return(clustering, nil)
 
 	for _, node := range nodes {
-		_ = s.CreateNode(node)
+		cluster, _, _ := clustering.ByNodeID(node.NodeID)
+		_ = s.CreateNode(1, cluster, node)
 	}
 
 	// submit admin transaction to start voting
@@ -83,7 +91,7 @@ func (s *ClusterEpochTestSuite) TestQuroumCertificate() {
 
 // DeployEpochQCContract deploys the `EpochQC` contract to the emulated chain and returns the
 // Account key used along with the signer and the environment with the QC address set
-func (s *ClusterEpochTestSuite) DeployEpochQCContract() *sdk.AccountKey {
+func (s *ClusterEpochTestSuite) DeployEpochQCContract() (sdk.Address, *sdk.AccountKey) {
 	// TODO: this method needs to return the QCSigner as it will be used to start the voting
 
 	// create new account keys for the Quorum Certificate account
@@ -104,15 +112,14 @@ func (s *ClusterEpochTestSuite) DeployEpochQCContract() *sdk.AccountKey {
 	}
 	s.env = env
 
-	return QCAccountKey
+	return QCAddress, QCAccountKey
 }
 
-// CreateClustering creates a clustering with the nodes split evenly and returns the resulting `ClusterList`
-func (s *ClusterEpochTestSuite) CreateClustering(clusterCount, nodeCount int) (flow.ClusterList, flow.IdentityList) {
+// CreateClusterList creates a clustering with the nodes split evenly and returns the resulting `ClusterList`
+func (s *ClusterEpochTestSuite) CreateClusterList(clusterCount, nodeCount int) (flow.ClusterList, flow.IdentityList) {
 
 	// create list of nodes to be used for the clustering
 	nodes := unittest.IdentityListFixture(nodeCount, unittest.WithRole(flow.RoleCollection))
-
 	// create cluster assignment
 	clusterAssignment := unittest.ClusterAssignment(uint(clusterCount), nodes)
 
@@ -123,9 +130,8 @@ func (s *ClusterEpochTestSuite) CreateClustering(clusterCount, nodeCount int) (f
 	return clusterList, nodes
 }
 
-func (s *ClusterEpochTestSuite) CreateNode(me *flow.Identity) *ClusterNode {
+func (s *ClusterEpochTestSuite) CreateNode(epoch uint64, cluster flow.IdentityList, me *flow.Identity) *ClusterNode {
 
-	// TODO: might need the signer but the vote could still be signed by the
 	key, signer := test.AccountKeyGenerator().NewWithSigner()
 
 	// create account on emualted chain
@@ -153,28 +159,24 @@ func (s *ClusterEpochTestSuite) CreateNode(me *flow.Identity) *ClusterNode {
 	// mock `SubmitVote`
 	mockSubmitVote := client.On("SubmitVote", mock.Anything)
 	mockSubmitVote.RunFn = func(args mock.Arguments) {
+
+		vote := args[0].(hotstuffmodel.Vote)
 		address := sdk.HexToAddress(me.Address)
-		_, err := s.blockchain.GetAccount(address)
-		require.NoError(s.T(), err)
 
-		block, err := s.blockchain.GetLatestBlock()
-		require.NoError(s.T(), err)
-
-		// TODO: can this be paid by the service account to skip over funding the
-		// cluster nodes account?
 		tx := sdk.NewTransaction().
 			SetScript(templates.GenerateSubmitVoteScript(s.env)).
 			SetGasLimit(1000).
-			SetReferenceBlockID(sdk.Identifier(block.ID())).
-			SetProposalKey(address, int(key.Index), key.SequenceNumber).
-			SetPayer(address).
-			AddAuthorizer(address)
+			SetProposalKey(s.blockchain.ServiceKey().Address,
+				s.blockchain.ServiceKey().Index,
+				s.blockchain.ServiceKey().SequenceNumber).
+			SetPayer(s.blockchain.ServiceKey().Address).
+			AddAuthorizer(s.qcAddress)
 
-		// TODO: change vote sigdata
-		err = tx.AddArgument(cadence.NewString(hex.EncodeToString([]byte{})))
+		err := tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
 		require.NoError(s.T(), err)
 
-		err = tx.SignPayload(address, key.Index, signer)
+		// TODO: needs to be signed by service account and qc address
+		err = tx.SignPayload(address, 0, signer)
 		require.NoError(s.T(), err)
 
 		// submit transaction
@@ -188,15 +190,18 @@ func (s *ClusterEpochTestSuite) CreateNode(me *flow.Identity) *ClusterNode {
 	local.On("NodeID").Return(me.NodeID)
 
 	// TODO: return hotstuff.Vote object
+	vote := hotstuffmodel.VoteFromFlow(me.NodeID, unittest.IdentifierFixture(), 0, unittest.SignatureFixture())
+
 	hotSigner := &hotstuff.Signer{}
-	hotSigner.On("CreateVote", mock.Anything).Return()
+	hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
 
 	snapshot := &protomock.Snapshot{}
 	snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
 
-	// TODO: create acanonical root block
+	// TODO: create a canonical root block
+	rootBlock := clusterstate.CanonicalRootBlock(epoch, cluster)
 	state := &protomock.State{}
-	state.On("CanonicalRootBlock").Return()
+	state.On("CanonicalRootBlock").Return(rootBlock)
 	state.On("Final").Return(snapshot)
 
 	// create QC voter object to be used for voting for the root QC contract
@@ -222,7 +227,7 @@ func (s *ClusterEpochTestSuite) Submit(tx *sdk.Transaction) {
 	require.NoError(s.T(), err)
 
 	if !assert.True(s.T(), result.Succeeded()) {
-		// TODO: handle error is submitting TX
+		// TODO: handle error in submitting tx
 	}
 
 	_, err = s.blockchain.CommitBlock()
