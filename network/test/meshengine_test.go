@@ -321,7 +321,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	}
 }
 
-// conduitCloseScenario tests after a Conduit is closed, an engine cannot send or receive a message for that channel ID
+// conduitCloseScenario tests after a Conduit is closed, an engine cannot send or receive a message for that channel.
 func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFunc) {
 
 	optionalSleep(send)
