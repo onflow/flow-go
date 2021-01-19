@@ -1,9 +1,13 @@
 package match_test
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,4 +28,17 @@ func TestCanTry(t *testing.T) {
 		}
 		require.Equal(t, []bool{true, true, true, false, false}, results)
 	})
+}
+
+// determine size of encoded Execution Receipts and results
+func TestExecutionResultSize(t *testing.T) {
+	result := unittest.ExecutionResultFixture()
+	jsonResult, _ := json.Marshal(result)
+	fmt.Printf("ExecutionResult:\n %s\n", string(jsonResult))
+	fmt.Printf("sizeof(ExecutionResult) = %d bytes\n", len(jsonResult))
+
+	receipt := unittest.ExecutionReceiptFixture()
+	jsonReceipt, _ := json.Marshal(receipt)
+	fmt.Printf("ExecutionReceipt:\n %s\n", string(jsonReceipt))
+	fmt.Printf("sizeof(ExecutionReceipt) = %d bytes\n", len(jsonReceipt))
 }

@@ -439,7 +439,7 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 	receipt := &flow.ExecutionReceipt{
 		ExecutorID:        IdentifierFixture(),
 		ExecutionResult:   *ExecutionResultFixture(),
-		Spocks:            nil,
+		Spocks:            SignaturesFixture(5),
 		ExecutorSignature: SignatureFixture(),
 	}
 
@@ -490,9 +490,9 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          IdentifierFixture(),
-			Chunks:           ChunksFixture(2, blockID),
+			Chunks:           ChunksFixture(5, blockID),
 		},
-		Signatures: SignaturesFixture(6),
+		Signatures: SignaturesFixture(1),
 	}
 
 	for _, apply := range opts {
