@@ -643,7 +643,6 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 		}
 
 		if !checked {
-			//
 			block, err := e.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
 			if err != nil {
 				continue
@@ -653,7 +652,6 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 				continue
 			}
 		}
-
 		// add the result to the results that should be sealed
 		results = append(results, incorporatedResult)
 	}

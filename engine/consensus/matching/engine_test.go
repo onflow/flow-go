@@ -489,9 +489,15 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 // When emergency sealing is active we should be able to identify and pick as candidates incorporated results
 // that are deep enough but still without verifications.
 func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates() {
-	for i := 0; i < 10; i++ {
-		lastFinalizedBlock := ms.LatestFinalizedBlock
+
+	emergencySealingCandidates := make([]flow.Identifier, 10)
+
+	lastFinalizedBlock := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
+	ms.Extend(&lastFinalizedBlock)
+
+	for i, _ := range emergencySealingCandidates {
 		block := unittest.BlockWithParentFixture(lastFinalizedBlock.Header)
+		emergencySealingCandidates[i] = block.ID()
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(ms.ExeID),
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&lastFinalizedBlock))),
@@ -500,11 +506,27 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 			Receipts: []*flow.ExecutionReceipt{receipt},
 		})
 		ms.Extend(&block)
+		delete(ms.PendingApprovals[receipt.ExecutionResult.ID()], uint64(len(receipt.ExecutionResult.Chunks)-1))
+		lastFinalizedBlock = block
 	}
 
+	// at this point we have results without enough approvals
+	// no sealable results expected
 	results, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "expecting no sealable result")
+
+	// setup a new finalized block which is new enough that satisfies emergency sealing condition
+	newFinalizedBlock := unittest.BlockFixture()
+	newFinalizedBlock.Header.Height = lastFinalizedBlock.Header.Height + DefaultEmergencySealingThreshold
+	ms.LatestFinalizedBlock = newFinalizedBlock
+
+	// once emergency sealing is active and ERs are deep enough in chain
+	// we are expecting all stalled seals to be selected as candidates
+	results, err = ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Equal(len(emergencySealingCandidates), len(results), "expecting valid number of sealable results")
+
 }
 
 // TestRequestPendingReceipts tests matching.Engine.requestPendingReceipts():
