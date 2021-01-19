@@ -19,7 +19,7 @@ func NewUUIDs(state *State) *UUIDs {
 }
 
 func (u *UUIDs) GetUUID() (uint64, error) {
-	stateBytes, err := u.state.Read("", "", keyUUID)
+	stateBytes, err := u.state.Get("", "", keyUUID)
 	if err != nil {
 		return 0, err
 	}
@@ -31,7 +31,7 @@ func (u *UUIDs) GetUUID() (uint64, error) {
 func (u *UUIDs) SetUUID(uuid uint64) {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	err := u.state.Update("", "", keyUUID, bytes)
+	err := u.state.Set("", "", keyUUID, bytes)
 	// TODO return the error instead
 	if err != nil {
 		panic(err)
