@@ -19,6 +19,11 @@ func (_m *ConsensusMetrics) CheckSealingDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// EmergencySeal provides a mock function with given fields:
+func (_m *ConsensusMetrics) EmergencySeal() {
+	_m.Called()
+}
+
 // FinishBlockToSeal provides a mock function with given fields: blockID
 func (_m *ConsensusMetrics) FinishBlockToSeal(blockID flow.Identifier) {
 	_m.Called(blockID)

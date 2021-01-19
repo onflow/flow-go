@@ -30,10 +30,12 @@ type sealValidator struct {
 	headers                              storage.Headers
 	payloads                             storage.Payloads
 	requiredApprovalsForSealVerification uint
+	metrics                              module.ConsensusMetrics
 }
 
 func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
-	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint) *sealValidator {
+	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint, metrics module.ConsensusMetrics) *sealValidator {
+
 	rv := &sealValidator{
 		state:                                state,
 		assigner:                             assigner,
@@ -42,6 +44,7 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 		seals:                                seals,
 		payloads:                             payloads,
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
+		metrics:                              metrics,
 	}
 
 	return rv
@@ -244,7 +247,19 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 // * exception - in case of unexpected error
 func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.IncorporatedResult) error {
 	executionResult := incorporatedResult.Result
+
+	// check that each chunk has an AggregatedSignature
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {
+		// this is not an error if we don't require any approvals
+		if s.requiredApprovalsForSealVerification == 0 {
+			// TODO: remove this metric after emergency-sealing development
+			// phase. Here we assume that the seal was created in emergency-mode
+			// (because the flag required-contruction-seal-approvals is > 0),
+			// so we increment the related metric and accept the seal.
+			s.metrics.EmergencySeal()
+			return nil
+		}
+
 		return engine.NewInvalidInputErrorf("mismatching signatures, expected: %d, got: %d",
 			executionResult.Chunks.Len(),
 			len(seal.AggregatedApprovalSigs))
@@ -255,12 +270,9 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 		return fmt.Errorf("could not retreive assignments for block: %v, %w", seal.BlockID, err)
 	}
 
+	// Check that each AggregatedSignature has enough valid signatures from
+	// verifiers that were assigned to the corresponding chunk.
 	executionResultID := executionResult.ID()
-	// if a valid seal doesn't require any approval, we could just skip
-	if s.requiredApprovalsForSealVerification == 0 {
-		return nil
-	}
-	
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := &seal.AggregatedApprovalSigs[chunk.Index]
 		numberApprovals := len(chunkSigs.SignerIDs)

@@ -110,6 +110,10 @@ func main() {
 			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", matching.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to verify a seal")
 		}).
+		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
+			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
+		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -131,10 +135,21 @@ func main() {
 				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
 			}
 
-			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results,
+			receiptValidator = validation.NewReceiptValidator(
+				node.State,
+				node.Storage.Index,
+				node.Storage.Results,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-			sealValidator := validation.NewSealValidator(node.State, node.Storage.Headers, node.Storage.Payloads,
-				node.Storage.Seals, chunkAssigner, signature.NewAggregationVerifier(encoding.ResultApprovalTag), requiredApprovalsForSealVerification)
+
+			sealValidator := validation.NewSealValidator(
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.Storage.Seals,
+				chunkAssigner,
+				signature.NewAggregationVerifier(encoding.ResultApprovalTag),
+				requiredApprovalsForSealVerification,
+				conMetrics)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -143,8 +158,7 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 				receiptValidator,
-				sealValidator,
-			)
+				sealValidator)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
@@ -186,10 +200,6 @@ func main() {
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
-			return nil
-		}).
-		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {

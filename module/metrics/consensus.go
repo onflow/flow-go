@@ -28,6 +28,9 @@ type ConsensusCollector struct {
 
 	// The duration of the full sealing check
 	checkSealingDuration prometheus.Histogram
+
+	// The number of emergency seals
+	emergencySealedBlocks prometheus.Counter
 }
 
 // NewConsensusCollector created a new consensus collector
@@ -38,12 +41,17 @@ func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Name:      "check_sealing_duration_s",
 		Help:      "duration of consensus match engine sealing check in seconds",
 	})
-
-	registerer.MustRegister(checkSealingDuration)
-
+	emergencySealedBlocks := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "emergency_sealed_blocks_total",
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemCompliance,
+		Help:      "the number of blocks sealed in emergency mode",
+	})
+	registerer.MustRegister(checkSealingDuration, emergencySealedBlocks)
 	cc := &ConsensusCollector{
-		tracer:               tracer,
-		checkSealingDuration: checkSealingDuration,
+		tracer:                tracer,
+		checkSealingDuration:  checkSealingDuration,
+		emergencySealedBlocks: emergencySealedBlocks,
 	}
 
 	return cc
@@ -72,4 +80,9 @@ func (cc *ConsensusCollector) FinishBlockToSeal(blockID flow.Identifier) {
 // CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
 func (cc *ConsensusCollector) CheckSealingDuration(duration time.Duration) {
 	cc.checkSealingDuration.Observe(duration.Seconds())
+}
+
+// EmergencySeal increments the counter of emergency seals.
+func (cc *ConsensusCollector) EmergencySeal() {
+	cc.emergencySealedBlocks.Inc()
 }

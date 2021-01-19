@@ -289,12 +289,31 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	err = e.storeReceipt(receipt, &log)
 	if err != nil {
+		// We do _not_ return here if receiptsDB already contained the receipt,
+		// because we still need to create a corresponding IncorporatedResult,
+		// and push it to the mempool, otherwise liveness of sealing is
+		// undermined.
+		// receiptsDB is persistent storage while Mempools are in-memory only.
+		// After a crash, the replica still needs to be able to generate a seal
+		// for an Result even if it had stored the Result (as part of a Receipt)
+		// before the crash.
+		// TODO: This exception to the rule must be removed in phase 3, because
+		// the IR mempool will be populated by another function.
 		if engine.IsDuplicatedEntryError(err) {
 			return nil
 		}
 		return fmt.Errorf("failed to store receipt: %w", err)
 	}
 
+	// ATTENTION:
+	//
+	// In phase 2, we artificially create IncorporatedResults from incoming
+	// receipts and set the IncorporatedBlockID to the result's block ID.
+	//
+	// In phase 3, the incorporated results mempool will be populated by the
+	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
+	// will be the ID of the first block on its fork that contains a receipt
+	// committing to this result.
 	err = e.storeIncorporatedResult(receipt, &log)
 	if err != nil {
 		if engine.IsDuplicatedEntryError(err) {
@@ -341,29 +360,8 @@ func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, log *zerolog.Logge
 //	* exception in case something went wrong
 // 	* nil in case of success
 func (e *Engine) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
-	// We do _not_ return here if receiptsDB already contained receipt!
-	// receiptsDB is persistent storage while Mempools are in-memory only.
-	// After a crash, the replica still needs to be able to generate a seal
-	// for an Result even if it had stored the Result (as part of a Receipt) before the crash.
-	// Otherwise, a stored result might never get sealed, and
-	// liveness of sealing is undermined.
-	// resultsDB is persistent storage while Mempools are in-memory only.
-	// After a crash, the replica still needs to be able to generate a seal
-	// for an Result even if it had stored the Result before the crash.
-	// Otherwise, a stored result might never get sealed, and
-	// liveness of sealing is undermined.
 
 	// Create an IncorporatedResult and add it to the mempool
-	//
-	// ATTENTION:
-	//
-	// In phase 2, we artificially create IncorporatedResults from incoming
-	// receipts and set the IncorporatedBlockID to the result's block ID.
-	//
-	// In phase 3, the incorporated results mempool will be populated by the
-	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
-	// will be the ID of the first block on its fork that contains a receipt
-	// committing to this result.
 	added, err := e.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
 			receipt.ExecutionResult.BlockID,
