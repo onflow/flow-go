@@ -102,6 +102,12 @@ func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error
 		return nil, err
 	}
 
+	err = st.Commit()
+
+	if err != nil {
+		return nil, err
+	}
+
 	return l.Payloads(), nil
 }
 
@@ -147,10 +153,6 @@ func (l *led) Set(owner, controller, key string, value flow.RegisterValue) error
 func (l *led) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	fk := fullKey(owner, controller, key)
 	return flow.RegisterValue(l.payloads[fk].Value), nil
-}
-
-func (l *led) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	panic("this method shouldn't be used here")
 }
 
 func (l *led) Delete(owner, controller, key string) error {

@@ -17,7 +17,7 @@ type StateBoundAddressGenerator struct {
 }
 
 func NewStateBoundAddressGenerator(state *State, chain flow.Chain) (*StateBoundAddressGenerator, error) {
-	stateBytes, err := state.Read("", "", keyAddressState)
+	stateBytes, err := state.Get("", "", keyAddressState)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (g *StateBoundAddressGenerator) NextAddress() (flow.Address, error) {
 
 	// update the ledger state
 	stateBytes := g.generator.Bytes()
-	err = g.state.Update("", "", keyAddressState, stateBytes)
+	err = g.state.Set("", "", keyAddressState, stateBytes)
 	if err != nil {
 		return address, fmt.Errorf("failed to update the ledger: %w", err)
 	}

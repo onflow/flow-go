@@ -8,7 +8,6 @@ require (
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
-	github.com/davecgh/go-spew v1.1.1
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
@@ -34,9 +33,9 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.10.5
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.3.1-0.20201122012505-4061d358b8db
-	github.com/onflow/flow-go-sdk v0.12.3
+	github.com/onflow/cadence v0.12.3
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.6.1-0.20210118202839-f8f9d9a04bcb
+	github.com/onflow/flow-go-sdk v0.14.1
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
@@ -58,6 +57,7 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
