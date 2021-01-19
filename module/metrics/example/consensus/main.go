@@ -63,8 +63,8 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collProvider := engine.TestNetwork
-			collIngest := engine.TestMetrics
+			collProvider := engine.TestNetwork.String()
+			collIngest := engine.TestMetrics.String()
 			message1 := "CollectionRequest"
 			message2 := "ClusterBlockProposal"
 
