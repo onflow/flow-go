@@ -14,7 +14,8 @@ type ExecutionResultBody struct {
 // ExecutionResult ...
 type ExecutionResult struct {
 	ExecutionResultBody
-	Signatures []crypto.Signature
+	Signatures    []crypto.Signature
+	ServiceEvents []Event
 }
 
 // ID returns the hash of the execution result body

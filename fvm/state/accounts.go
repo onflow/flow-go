@@ -20,12 +20,14 @@ const (
 	KeyContractNames  = "contract_names"
 	KeyPublicKeyCount = "public_key_count"
 	KeyStorageUsed    = "storage_used"
+	KeyAccountFrozen  = "frozen"
 	uint64StorageSize = 8
 )
 
 var (
 	ErrAccountNotFound          = errors.New("account not found")
 	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
+	ErrAccountFrozen            = errors.New("account is frozen")
 )
 
 func keyPublicKey(index uint64) string {
