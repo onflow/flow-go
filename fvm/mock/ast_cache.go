@@ -4,7 +4,7 @@ package mock
 
 import (
 	ast "github.com/onflow/cadence/runtime/ast"
-	"github.com/onflow/cadence/runtime/common"
+	common "github.com/onflow/cadence/runtime/common"
 
 	mock "github.com/stretchr/testify/mock"
 )

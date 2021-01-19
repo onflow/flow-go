@@ -34,8 +34,8 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.12.3
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.3.1-0.20201122012505-4061d358b8db
-	github.com/onflow/flow-go-sdk v0.14.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.6.1-0.20210118202839-f8f9d9a04bcb
+	github.com/onflow/flow-go-sdk v0.14.1
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
@@ -57,6 +57,7 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
