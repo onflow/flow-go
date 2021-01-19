@@ -12,29 +12,29 @@ type SubscriptionManager struct {
 	mock.Mock
 }
 
-// GetChannelIDs provides a mock function with given fields:
-func (_m *SubscriptionManager) GetChannelIDs() []string {
+// Channels provides a mock function with given fields:
+func (_m *SubscriptionManager) Channels() network.ChannelList {
 	ret := _m.Called()
 
-	var r0 []string
-	if rf, ok := ret.Get(0).(func() []string); ok {
+	var r0 network.ChannelList
+	if rf, ok := ret.Get(0).(func() network.ChannelList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
+			r0 = ret.Get(0).(network.ChannelList)
 		}
 	}
 
 	return r0
 }
 
-// GetEngine provides a mock function with given fields: channelID
-func (_m *SubscriptionManager) GetEngine(channelID string) (network.Engine, error) {
-	ret := _m.Called(channelID)
+// GetEngine provides a mock function with given fields: channel
+func (_m *SubscriptionManager) GetEngine(channel network.Channel) (network.Engine, error) {
+	ret := _m.Called(channel)
 
 	var r0 network.Engine
-	if rf, ok := ret.Get(0).(func(string) network.Engine); ok {
-		r0 = rf(channelID)
+	if rf, ok := ret.Get(0).(func(network.Channel) network.Engine); ok {
+		r0 = rf(channel)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.Engine)
@@ -42,8 +42,8 @@ func (_m *SubscriptionManager) GetEngine(channelID string) (network.Engine, erro
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(channelID)
+	if rf, ok := ret.Get(1).(func(network.Channel) error); ok {
+		r1 = rf(channel)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -51,13 +51,13 @@ func (_m *SubscriptionManager) GetEngine(channelID string) (network.Engine, erro
 	return r0, r1
 }
 
-// Register provides a mock function with given fields: channelID, engine
-func (_m *SubscriptionManager) Register(channelID string, engine network.Engine) error {
-	ret := _m.Called(channelID, engine)
+// Register provides a mock function with given fields: channel, engine
+func (_m *SubscriptionManager) Register(channel network.Channel, engine network.Engine) error {
+	ret := _m.Called(channel, engine)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, network.Engine) error); ok {
-		r0 = rf(channelID, engine)
+	if rf, ok := ret.Get(0).(func(network.Channel, network.Engine) error); ok {
+		r0 = rf(channel, engine)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -65,13 +65,13 @@ func (_m *SubscriptionManager) Register(channelID string, engine network.Engine)
 	return r0
 }
 
-// Unregister provides a mock function with given fields: channelID
-func (_m *SubscriptionManager) Unregister(channelID string) error {
-	ret := _m.Called(channelID)
+// Unregister provides a mock function with given fields: channel
+func (_m *SubscriptionManager) Unregister(channel network.Channel) error {
+	ret := _m.Called(channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(channelID)
+	if rf, ok := ret.Get(0).(func(network.Channel) error); ok {
+		r0 = rf(channel)
 	} else {
 		r0 = ret.Error(0)
 	}

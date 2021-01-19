@@ -39,7 +39,7 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	channel  string
+	channel  network.Channel
 	selector flow.IdentityFilter
 	create   CreateFunc
 	handle   HandleFunc
@@ -51,7 +51,7 @@ type Engine struct {
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel string, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
+	channel network.Channel, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -103,7 +103,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(channel, e)
+	con, err := net.Register(network.Channel(channel), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -350,7 +350,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		delete(e.requests, req.Nonce)
 	}()
 
-	e.metrics.MessageSent(e.channel, metrics.MessageEntityRequest)
+	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
 
 	return true, nil
 }
@@ -358,8 +358,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(e.channel, metrics.MessageEntityResponse)
-	defer e.metrics.MessageHandled(e.channel, metrics.MessageEntityResponse)
+	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityResponse)
+	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
