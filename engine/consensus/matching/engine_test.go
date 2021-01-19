@@ -99,6 +99,7 @@ func (ms *MatchingSuite) SetupTest() {
 		requestTracker:                       NewRequestTracker(1, 3),
 		approvalRequestsThreshold:            10,
 		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+		emergencySealingActive:               false,
 	}
 }
 
@@ -489,7 +490,8 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 // When emergency sealing is active we should be able to identify and pick as candidates incorporated results
 // that are deep enough but still without verifications.
 func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates() {
-
+	// make sure that emergency sealing is enabled
+	ms.matching.emergencySealingActive = true
 	emergencySealingCandidates := make([]flow.Identifier, 10)
 
 	lastFinalizedBlock := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
@@ -526,7 +528,6 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 	results, err = ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Equal(len(emergencySealingCandidates), len(results), "expecting valid number of sealable results")
-
 }
 
 // TestRequestPendingReceipts tests matching.Engine.requestPendingReceipts():

@@ -33,7 +33,14 @@ import (
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
 // for subsequent inclusion in block.
 const DefaultRequiredApprovalsForSealConstruction = 1
+
+// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
+// sealing.
 const DefaultEmergencySealingThreshold = 400
+
+// DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
+// to make fire fighting easier while seal & verification is under development.
+const DefaultEmergencySealingActive = false
 
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
@@ -66,6 +73,7 @@ type Engine struct {
 	receiptValidator                     module.ReceiptValidator         // used to validate receipts
 	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
 	approvalRequestsThreshold            uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
+	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 }
 
 // New creates a new collection propagation engine.
@@ -89,6 +97,7 @@ func New(
 	assigner module.ChunkAssigner,
 	validator module.ReceiptValidator,
 	requiredApprovalsForSealConstruction uint,
+	emergencySealingActive bool,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -118,6 +127,7 @@ func New(
 		receiptValidator:                     validator,
 		requestTracker:                       NewRequestTracker(10, 30),
 		approvalRequestsThreshold:            10,
+		emergencySealingActive:               emergencySealingActive,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -643,6 +653,14 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 		}
 
 		if !checked {
+			if !e.emergencySealingActive {
+				continue
+			}
+
+			// ATTENTION: this is a temporary solution called emergency sealing. Emergency sealing is a special case
+			// when we seal ERs that don't have enough approvals but are deep enough in the chain resulting in halting sealing
+			// process. This will be removed when implementation of seal & verification is finished.
+
 			block, err := e.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
 			if err != nil {
 				continue
