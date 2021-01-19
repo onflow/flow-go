@@ -99,7 +99,7 @@ func (suite *TopologyTestSuite) TestModerateScaleLinearFanout() {
 // 100 verification nodes
 // and builds a stateful randomized topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *TopologyTestSuite) TestModerateScale() {
+func (suite *TopologyTestSuite) TestModerateScaleRandomized() {
 	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 20, 200, 240, 10, 200, 8)
 }
 
