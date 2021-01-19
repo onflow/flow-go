@@ -1061,10 +1061,8 @@ func (e *Engine) saveExecutionResults(
 	originalState := startState
 	blockID := executableBlock.ID()
 
-	err := e.execState.PersistStateInteractions(childCtx, blockID, stateInteractions)
-	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return nil, err
-	}
+	// no need to persist the state interactions, since they are used only by state
+	// syncing, which is currently disabled
 
 	chunks := make([]*flow.Chunk, len(stateInteractions))
 
@@ -1115,7 +1113,7 @@ func (e *Engine) saveExecutionResults(
 		startState = endState
 	}
 
-	err = e.execState.PersistStateCommitment(childCtx, blockID, endState)
+	err := e.execState.PersistStateCommitment(childCtx, blockID, endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
