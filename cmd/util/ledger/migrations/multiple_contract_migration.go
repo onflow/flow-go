@@ -235,10 +235,10 @@ func migrateContractValue(p ledger.Payload) ([]ledger.Payload, *contractValueMap
 	}
 
 	value := interpreter.NewSomeValueOwningNonCopying(storedValue).Value.(*interpreter.CompositeValue)
-	pieces := strings.Split(string(value.TypeID), ".")
+	pieces := strings.Split(string(value.TypeID()), ".")
 	if len(pieces) != 3 {
 		log.Error().
-			Str("TypeId", string(value.TypeID)).
+			Str("TypeId", string(value.TypeID())).
 			Str("address", address.Hex()).
 			Msg("contract TypeId not in correct format")
 		return nil, nil, fmt.Errorf("contract TypeId not in correct format")
