@@ -93,25 +93,19 @@ func TestIsClusterChannel(t *testing.T) {
 // We use the identifier of RoleList to determine their uniqueness.
 func TestUniqueChannels_Uniqueness(t *testing.T) {
 	for _, role := range flow.Roles() {
-		channels := ChannelsByRole(role)
-		uniques := UniqueChannels(channels)
+		uniques := UniqueChannels(ChannelsByRole(role))
 
 		visited := make(map[flow.Identifier]struct{})
 		for _, channel := range uniques {
 
-			if _, ok := IsClusterChannel(channel); ok {
-				// no deduplication check is made on cluster channels.
-				// since topologies treat these channels differently, hence
-				// we should not deduplicate them.
-				continue
+			if _, ok := IsClusterChannel(channel); !ok {
+				// non-cluster channels should be unique based on their RoleList identifier.
+				id := channelRoleMap[channel].ID()
+				_, duplicate := visited[id]
+				require.False(t, duplicate)
+
+				visited[id] = struct{}{}
 			}
-
-			// non-cluster channels should be unique based on their RoleList identifier.
-			id := channelRoleMap[channel].ID()
-			_, ok := visited[id]
-			require.False(t, ok)
-
-			visited[id] = struct{}{}
 		}
 	}
 }
