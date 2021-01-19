@@ -47,7 +47,6 @@ type ComplianceMetrics interface {
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
-	EmergencySeal()
 }
 
 type CleanerMetrics interface {
@@ -138,6 +137,9 @@ type ConsensusMetrics interface {
 
 	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
 	CheckSealingDuration(duration time.Duration)
+
+	// EmergencySeal increments the number of seals that were created in emergency mode
+	EmergencySeal()
 }
 
 type VerificationMetrics interface {

@@ -107,7 +107,7 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 	// requiredApprovalsForSealing is > 0. We don't mock the EmergencySeal
 	// method of the compliance collector, such that the test will fail if the
 	// method is called.
-	mockMetrics := &mock2.ComplianceMetrics{}
+	mockMetrics := &mock2.ConsensusMetrics{}
 	s.sealValidator.metrics = mockMetrics
 
 	_, err := s.sealValidator.Validate(&block)
@@ -139,7 +139,7 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 	})
 
 	s.sealValidator.requiredApprovalsForSealVerification = 0
-	mockMetrics := &mock2.ComplianceMetrics{}
+	mockMetrics := &mock2.ConsensusMetrics{}
 	mockMetrics.On("EmergencySeal").Once()
 	s.sealValidator.metrics = mockMetrics
 

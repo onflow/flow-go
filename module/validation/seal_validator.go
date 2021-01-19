@@ -30,11 +30,11 @@ type sealValidator struct {
 	headers                              storage.Headers
 	payloads                             storage.Payloads
 	requiredApprovalsForSealVerification uint
-	metrics                              module.ComplianceMetrics
+	metrics                              module.ConsensusMetrics
 }
 
 func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
-	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint, metrics module.ComplianceMetrics) *sealValidator {
+	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint, metrics module.ConsensusMetrics) *sealValidator {
 
 	rv := &sealValidator{
 		state:                                state,

@@ -22,11 +22,6 @@ func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.Block) {
 	_m.Called(_a0)
 }
 
-// EmergencySeal provides a mock function with given fields:
-func (_m *ComplianceMetrics) EmergencySeal() {
-	_m.Called()
-}
-
 // FinalizedHeight provides a mock function with given fields: height
 func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
 	_m.Called(height)
