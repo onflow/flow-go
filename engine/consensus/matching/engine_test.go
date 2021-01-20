@@ -494,7 +494,7 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 	ms.matching.emergencySealingActive = true
 	emergencySealingCandidates := make([]flow.Identifier, 10)
 
-	for i, _ := range emergencySealingCandidates {
+	for i := range emergencySealingCandidates {
 		block := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(ms.ExeID),
