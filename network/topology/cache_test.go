@@ -8,7 +8,10 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,9 +38,38 @@ func TestCache_GenerateFanout(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, prevFanout, newFanout)
-		newFanout = prevFanout
+		prevFanout = newFanout
 	}
 
 	// underlying topology should be called only once.
 	mock.AssertExpectationsForObjects(t, top)
+}
+
+// TestCache_TopicBased
+func TestCache_TopicBased(t *testing.T) {
+	// creates a topology cache for a verification node based on its
+	// TopicBased topology.
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	ids := unittest.IdentityListFixture(100, unittest.WithAllRoles())
+	myId := ids.Filter(filter.HasRole(flow.RoleVerification))[0]
+	mySubManager := MockSubscriptionManager(t, flow.IdentityList{myId})
+
+	top, err := NewTopicBasedTopology(myId.NodeID, log, &mockprotocol.State{}, mySubManager[0])
+	require.NoError(t, err)
+
+	cache := NewCache(log, top)
+
+	// Testing deterministic behavior
+	//
+	// over 100 invocations of cache with the same input, the same
+	// output should be returned.
+	prevFanout, err := cache.GenerateFanout(ids)
+	require.NoError(t, err)
+	for i := 0; i < 100; i++ {
+		newFanout, err := cache.GenerateFanout(ids)
+		require.NoError(t, err)
+
+		require.Equal(t, prevFanout, newFanout)
+		prevFanout = newFanout
+	}
 }
