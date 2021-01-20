@@ -31,10 +31,8 @@ func TestCache_GenerateFanout(t *testing.T) {
 
 	// Testing cache resolving
 	//
-	// over 100 invocations of cache with the same input, the same
-	// output should be returned.
-	// The output should be resolved by the cache
-	// without asking the underlying topology more than once.
+	// Over consecutive invocations of cache with the same input, the same output should be returned.
+	// The output should be resolved by the cache without asking the underlying topology more than once.
 	prevFanout := fanout
 	for i := 0; i < 100; i++ {
 		newFanout, err := cache.GenerateFanout(ids)
@@ -44,7 +42,7 @@ func TestCache_GenerateFanout(t *testing.T) {
 		prevFanout = newFanout
 	}
 
-	// underlying topology should be called only once.
+	// underlying topology should be called only once through all consecutive calls (with same input).
 	mock.AssertExpectationsForObjects(t, top)
 }
 
