@@ -107,21 +107,18 @@ func (e *Engine) startPing() {
 // pingNode pings the given peer and updates the metrics with the result and the additional node information
 func (e *Engine) pingNode(peer *flow.Identity) {
 	id := peer.ID()
-	reachable := e.pingAddress(id)
-	info := e.nodeInfo[id]
-	e.metrics.NodeReachable(peer, info, reachable)
-}
 
-// pingAddress sends a ping request to the given address, and block until either receive
-// a ping respond then return true, or hitting a timeout and return false.
-// if there is other unknown error, return false
-func (e *Engine) pingAddress(target flow.Identifier) bool {
-	// ignore the ping duration for now
-	// ping will timeout in libp2p.PingTimeoutSecs seconds
-	_, err := e.middleware.Ping(target)
+	// ping the node
+	rtt, err := e.middleware.Ping(id) // ping will timeout in libp2p.PingTimeoutSecs seconds
 	if err != nil {
-		e.log.Debug().Err(err).Str("target", target.String()).Msg("failed to ping")
-		return false
+		e.log.Debug().Err(err).Str("target", id.String()).Msg("failed to ping")
+		// report the rtt duration as negative to make it easier to distinguish between pingable and non-pingable nodes
+		rtt = -1
 	}
-	return true
+
+	// get the additional info about the node
+	info := e.nodeInfo[id]
+
+	// update metric
+	e.metrics.NodeReachable(peer, info, rtt)
 }
