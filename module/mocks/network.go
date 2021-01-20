@@ -37,7 +37,7 @@ func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 }
 
 // Register mocks base method
-func (m *MockNetwork) Register(arg0 string, arg1 network.Engine) (network.Conduit, error) {
+func (m *MockNetwork) Register(arg0 network.Channel, arg1 network.Engine) (network.Conduit, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", arg0, arg1)
 	ret0, _ := ret[0].(network.Conduit)
