@@ -154,6 +154,28 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 
 	// TODO: register each node in each cluster to vote
 	// https://github.com/onflow/flow-core-contracts/blob/josh/qc/lib/go/test/flow_qc_test.go#L195-L221
+
+	for _, cluster := range clustering {
+		for _, node := range cluster {
+			registerVoterTx := sdk.NewTransaction().
+				SetScript(templates.GenerateCreateVoterScript(s.env)).
+				SetGasLimit(100).
+				SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
+				SetPayer(s.blockchain.ServiceKey().Address).
+				AddAuthorizer(sdk.HexToAddress(node.Address))
+
+			err = registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
+			require.NoError(s.T(), err)
+
+			err = registerVoterTx.AddArgument(cadence.NewString(node.NodeID.String()))
+			require.NoError(s.T(), err)
+
+			s.SignAndSubmit(registerVoterTx,
+				[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+				[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner},
+			)
+		}
+	}
 }
 
 // DeployEpochQCContract deploys the `EpochQC` contract to the emulated chain and returns the
@@ -203,6 +225,7 @@ func (s *ClusterEpochTestSuite) CreateNode(epoch uint64, cluster flow.IdentityLi
 	// create account on emualted chain
 	address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 	require.NoError(s.T(), err)
+	me.Address = address.String()
 
 	// create a mock of QCContractClient to submit vote and check if voted on the emulated chain
 	// TODO: we need to mock the underlying flowClient instead of the QCContract client
