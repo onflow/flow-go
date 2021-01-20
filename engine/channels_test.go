@@ -114,7 +114,7 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 
 // TestUniqueChannels_ClusterChannels verifies that if cluster channels have the RoleList the same as
 // single non-cluster channel, then all cluster channels as well as the one non-cluster channel are returned
-// by the UniqueChannels. In other words, neither cluster channels nor non-cluster ones are not deduplicated in the
+// by the UniqueChannels. In other words, neither cluster channels nor non-cluster ones are de-duplicated in the
 // favor of each other.
 // We use the identifier of RoleList to determine their uniqueness.
 func TestUniqueChannels_ClusterChannels(t *testing.T) {
