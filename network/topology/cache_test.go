@@ -72,4 +72,26 @@ func TestCache_TopicBased(t *testing.T) {
 		require.Equal(t, prevFanout, newFanout)
 		prevFanout = newFanout
 	}
+
+	// Testing cache invalidation and update
+	//
+	// evicts one identity from ids list and cache should be invalidated
+	// and updated with a new fanout.
+	ids = ids[:len(ids)-1]
+	newFanout, err := cache.GenerateFanout(ids)
+	require.NoError(t, err)
+	require.NotEqual(t, newFanout, prevFanout)
+
+	// Testing deterministic behavior after an update
+	//
+	// over 100 invocations of cache with the same (new) input, the same
+	// (new) output should be returned.
+	prevFanout = newFanout
+	for i := 0; i < 100; i++ {
+		newFanout, err := cache.GenerateFanout(ids)
+		require.NoError(t, err)
+
+		require.Equal(t, prevFanout, newFanout)
+		prevFanout = newFanout
+	}
 }
