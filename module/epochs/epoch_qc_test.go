@@ -1,4 +1,4 @@
-package integration_test
+package epochs_test
 
 import (
 	"context"
