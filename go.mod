@@ -31,7 +31,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.12.3
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.5.1-0.20201217205349-3a1a5b3cc35e
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.5.1-0.20201217205349-3a1a5b3cc35e
 	github.com/onflow/flow-emulator v0.14.0
 	github.com/onflow/flow-go-sdk v0.14.1
