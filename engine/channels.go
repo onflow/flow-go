@@ -51,7 +51,7 @@ func ChannelsByRole(role flow.Role) network.ChannelList {
 
 // UniqueChannels returns list of non-cluster channels with a unique RoleList accompanied
 // with the list of all cluster channels.
-// e.g. is channel X and Y both are non-cluster channels and have role IDs [A,B,C] then only one of them will be in the returned list.
+// e.g. if channel X and Y both are non-cluster channels and have role IDs [A,B,C] then only one of them will be in the returned list.
 func UniqueChannels(channels network.ChannelList) network.ChannelList {
 	// uniques keeps the set of unique channels based on their RoleList.
 	uniques := make(network.ChannelList, 0)
