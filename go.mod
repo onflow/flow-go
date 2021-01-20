@@ -4,8 +4,11 @@ go 1.13
 
 require (
 	cloud.google.com/go/storage v1.10.0
+	github.com/HdrHistogram/hdrhistogram-go v0.9.0 // indirect
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
+	github.com/codahale/hdrhistogram v0.9.0 // indirect
+	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
@@ -31,9 +34,8 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.12.3
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.5.1-0.20201217205349-3a1a5b3cc35e
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.5.1-0.20201217205349-3a1a5b3cc35e
-	github.com/onflow/flow-emulator v0.14.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2-0.20210120222512-ca3212c272a7
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.2-0.20210120222512-ca3212c272a7
 	github.com/onflow/flow-go-sdk v0.14.1
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
@@ -45,6 +47,7 @@ require (
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
+	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
@@ -55,6 +58,7 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
+	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
