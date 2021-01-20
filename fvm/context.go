@@ -23,6 +23,7 @@ type Context struct {
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
+	LimitAccountStorage              bool
 	CadenceLoggingEnabled            bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
@@ -82,6 +83,7 @@ func defaultContext(logger zerolog.Logger) Context {
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
 			NewTransactionInvocator(logger),
+			NewTransactionStorageLimiter(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
@@ -231,6 +233,15 @@ func WithRestrictedAccountCreation(enabled bool) Option {
 func WithSetValueHandler(handler SetValueHandler) Option {
 	return func(ctx Context) Context {
 		ctx.SetValueHandler = handler
+		return ctx
+	}
+}
+
+// WithAccountStorageLimit enables or disables checking if account storage used is
+// over its storage capacity
+func WithAccountStorageLimit(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.LimitAccountStorage = enabled
 		return ctx
 	}
 }

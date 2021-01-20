@@ -171,7 +171,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(constructorFunc
 	}
 
 	for j := 0; j < system; j++ {
-		// adjacency map keeps graph component of a single channel ID
+		// adjacency map keeps graph component of a single channel
 		adjMap := make(map[flow.Identifier]flow.IdentityList)
 
 		// creates a flow system
