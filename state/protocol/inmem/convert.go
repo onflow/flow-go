@@ -184,6 +184,9 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 	return &Cluster{enc}, nil
 }
 
+// SnapshotFromBootstrapState generates a protocol.Snapshot representing a
+// root bootstrap state. This is used to bootstrap the protocol state for
+// genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
 
 	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
