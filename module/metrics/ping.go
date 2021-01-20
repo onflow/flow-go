@@ -30,5 +30,5 @@ func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt
 		LabelNodeID:   node.String(),
 		LabelNodeRole: node.Role.String(),
 		LabelNodeInfo: nodeInfo}).
-		Set(float64(rtt))
+		Set(float64(rtt.Milliseconds()))
 }
