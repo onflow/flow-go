@@ -98,7 +98,9 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 		visited := make(map[flow.Identifier]struct{})
 		for _, channel := range uniques {
 
-			if _, ok := IsClusterChannel(channel); !ok {
+			if _, ok := IsClusterChannel(channel); ok {
+			continue //only considering non-cluster channel in this test case
+			}
 				// non-cluster channels should be unique based on their RoleList identifier.
 				id := channelRoleMap[channel].ID()
 				_, duplicate := visited[id]
