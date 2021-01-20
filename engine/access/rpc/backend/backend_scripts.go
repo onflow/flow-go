@@ -81,7 +81,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	b.logger.Info().
 		Hex("block_id", logging.ID(blockID)).
 		Str("script", string(script)).
-		Msg("an script sent for execution")
+		Msg("an script is sent for execution")
 
 	execReq := execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
