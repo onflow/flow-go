@@ -62,7 +62,8 @@ func (s *ClusterEpochTestSuite) SetupTest() {
 }
 
 // TestQuroumCertificate tests one Epoch of the EpochClusterQC contract
-func (s *ClusterEpochTestSuite) TestQuroumCertificate() {
+func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
+
 
 	// initial cluster and total node count
 	clusterCount := 3
