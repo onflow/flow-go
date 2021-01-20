@@ -50,36 +50,77 @@ type testNode struct {
 	idRefresher *p2p.NodeIDRefresher
 }
 
-// testNodeList is a list of test node and has functions to retrieve the different elements of the test nodes
-type testNodeList []testNode
+// testNodeList encapsulates a list of test node and
+// has functions to retrieve the different elements of the test nodes in a concurrency safe manner
+type testNodeList struct {
+	sync.RWMutex
+	nodes []testNode
+}
 
-func (t testNodeList) ids() flow.IdentityList {
-	ids := make(flow.IdentityList, len(t))
-	for i, node := range t {
+func newTestNodeList() testNodeList {
+	return testNodeList{}
+}
+
+func (t *testNodeList) append(node testNode) {
+	t.Lock()
+	defer t.Unlock()
+	t.nodes = append(t.nodes, node)
+}
+
+func (t *testNodeList) remove() testNode {
+	t.Lock()
+	defer t.Unlock()
+	// choose a random node to remove
+	i := rand.Intn(len(t.nodes))
+	removedNode := t.nodes[i]
+	t.nodes = append(t.nodes[:i], t.nodes[i+1:]...)
+	return removedNode
+}
+
+func (t *testNodeList) ids() flow.IdentityList {
+	t.RLock()
+	defer t.RUnlock()
+	ids := make(flow.IdentityList, len(t.nodes))
+	for i, node := range t.nodes {
 		ids[i] = node.id
 	}
 	return ids
 }
 
-func (t testNodeList) engines() []*MeshEngine {
-	engs := make([]*MeshEngine, len(t))
-	for i, node := range t {
+func (t *testNodeList) lastAdded() (testNode, error) {
+	t.RLock()
+	defer t.RUnlock()
+	if len(t.nodes) > 0 {
+		return t.nodes[len(t.nodes)-1], nil
+	}
+	return testNode{}, fmt.Errorf("node list empty")
+}
+
+func (t *testNodeList) engines() []*MeshEngine {
+	t.RLock()
+	defer t.RUnlock()
+	engs := make([]*MeshEngine, len(t.nodes))
+	for i, node := range t.nodes {
 		engs[i] = node.engine
 	}
 	return engs
 }
 
-func (t testNodeList) idRefreshers() []*p2p.NodeIDRefresher {
-	idRefreshers := make([]*p2p.NodeIDRefresher, len(t))
-	for i, node := range t {
+func (t *testNodeList) idRefreshers() []*p2p.NodeIDRefresher {
+	t.RLock()
+	defer t.RUnlock()
+	idRefreshers := make([]*p2p.NodeIDRefresher, len(t.nodes))
+	for i, node := range t.nodes {
 		idRefreshers[i] = node.idRefresher
 	}
 	return idRefreshers
 }
 
-func (t testNodeList) networks() []*p2p.Network {
-	nets := make([]*p2p.Network, len(t))
-	for i, node := range t {
+func (t *testNodeList) networks() []*p2p.Network {
+	t.RLock()
+	defer t.RUnlock()
+	nets := make([]*p2p.Network, len(t.nodes))
+	for i, node := range t.nodes {
 		nets[i] = node.net
 	}
 	return nets
@@ -90,10 +131,11 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 }
 
 func (suite *MutableIdentityTableSuite) SetupTest() {
-	suite.testNodes = nil
+	suite.testNodes = newTestNodeList()
+	suite.removedTestNodes = newTestNodeList()
 	rand.Seed(time.Now().UnixNano())
 	nodeCount := 10
-	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 
 	suite.setupStateMock()
@@ -130,6 +172,7 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 
 // addNodes creates count many new nodes and appends them to the suite state variables
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
+
 	// create the ids, middlewares and networks
 	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
 
@@ -148,17 +191,14 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 			engine:      engines[i],
 			idRefresher: idRefereshers[i],
 		}
-		suite.testNodes = append(suite.testNodes, node)
+		suite.testNodes.append(node)
 	}
 }
 
 // removeNode removes a randomly chosen test node from suite.testNodes and adds it to suite.removedTestNodes
 func (suite *MutableIdentityTableSuite) removeNode() testNode {
-	// choose a random node to remove
-	i := rand.Intn(len(suite.testNodes))
-	removedNode := suite.testNodes[i]
-	suite.removedTestNodes = append(suite.removedTestNodes, removedNode)
-	suite.testNodes = append(suite.testNodes[:i], suite.testNodes[i+1:]...)
+	removedNode := suite.testNodes.remove()
+	suite.removedTestNodes.append(removedNode)
 	return removedNode
 }
 
@@ -169,12 +209,17 @@ func (suite *MutableIdentityTableSuite) TestNewNodeAdded() {
 	// add a new node the current list of nodes
 	suite.addNodes(1)
 
-	// update IDs for all the networks (simulating an epoch)
-	suite.signalIdentityChanged()
-
-	newNode := suite.testNodes[len(suite.testNodes)-1]
+	newNode, err := suite.testNodes.lastAdded()
+	require.NoError(suite.T(), err)
 	newID := newNode.id
 	newMiddleware := newNode.mw
+
+	suite.logger.Debug().
+		Str("new_node", newID.NodeID.String()).
+		Msg("added one node")
+
+	// update IDs for all the networks (simulating an epoch)
+	suite.signalIdentityChanged()
 
 	ids := suite.testNodes.ids()
 	engs := suite.testNodes.engines()
@@ -222,17 +267,18 @@ func (suite *MutableIdentityTableSuite) TestNodeRemoved() {
 // b. a node that has has been removed cannot exchange messages with the existing nodes
 func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 
-	// add a node
-	suite.addNodes(1)
-	newNode := suite.testNodes[len(suite.testNodes)-1]
-	newID := newNode.id
-	newMiddleware := newNode.mw
-
 	// remove a node
 	removedNode := suite.removeNode()
 	removedID := removedNode.id
 	removedMiddleware := removedNode.mw
 	removedEngine := removedNode.engine
+
+	// add a node
+	suite.addNodes(1)
+	newNode, err := suite.testNodes.lastAdded()
+	require.NoError(suite.T(), err)
+	newID := newNode.id
+	newMiddleware := newNode.mw
 
 	// update all current nodes
 	suite.signalIdentityChanged()
@@ -267,7 +313,7 @@ func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
 func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids flow.IdentityList) {
 	t := suite.T()
 	threshold := len(ids) / 2
-	require.Eventually(t, func() bool {
+	require.Eventuallyf(t, func() bool {
 		connections := 0
 		for _, id := range ids {
 			connected, err := mw.IsConnected(*id)
@@ -276,15 +322,19 @@ func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids 
 				connections++
 			}
 		}
+		suite.logger.Debug().
+			Int("threshold", threshold).
+			Int("connections", connections).
+			Msg("current connection count")
 		return connections >= threshold
-	}, 5*time.Second, time.Millisecond*100)
+	}, 5*time.Second, 100*time.Millisecond, "node is not connected to enough nodes")
 }
 
 // assertDisconnected checks that the middleware of a node is not connected to any of the other nodes specified in the
 // ids list
 func (suite *MutableIdentityTableSuite) assertDisconnected(mw *p2p.Middleware, ids flow.IdentityList) {
 	t := suite.T()
-	require.Eventually(t, func() bool {
+	require.Eventuallyf(t, func() bool {
 		for _, id := range ids {
 			connected, err := mw.IsConnected(*id)
 			require.NoError(t, err)
@@ -293,7 +343,7 @@ func (suite *MutableIdentityTableSuite) assertDisconnected(mw *p2p.Middleware, i
 			}
 		}
 		return true
-	}, 5*time.Second, time.Millisecond*100)
+	}, 5*time.Second, 100*time.Millisecond, "node is still connected")
 }
 
 // assertNetworkPrimitives asserts that allowed engines can exchange messages between themselves but not with the

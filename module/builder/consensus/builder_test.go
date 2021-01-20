@@ -706,3 +706,27 @@ func (bs *BuilderSuite) TestPayloadReceiptMultipleReceiptsWithDifferentResults()
 	bs.Require().NoError(err)
 	bs.Assert().Equal(receipts, bs.assembled.Receipts, "payload should contain all receipts for a given block")
 }
+
+// TestPayloadReceiptLimit tests that the builder does not include more receipts
+// than the configured maxReceiptCount.
+func (bs *BuilderSuite) TestPayloadReceiptLimit() {
+
+	// populate the mempool with 5 valid receipts
+	receipts := []*flow.ExecutionReceipt{}
+	var i uint64
+	for i = 0; i < 5; i++ {
+		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
+		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
+		receipts = append(receipts, pendingReceipt)
+	}
+	bs.pendingReceipts = receipts
+
+	// set maxReceiptCount to 3
+	var limit uint = 3
+	bs.build.cfg.maxReceiptCount = limit
+
+	// ensure that only 3 of the 5 receipts were included
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.pendingReceipts[:limit], bs.assembled.Receipts, "should have excluded receipts above maxReceiptCount")
+}

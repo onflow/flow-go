@@ -57,6 +57,7 @@ func NewBuilder(
 		maxInterval:       10 * time.Second,
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
+		maxReceiptCount:   200,
 		expiry:            flow.DefaultTransactionExpiry,
 	}
 
@@ -435,6 +436,11 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 
 	// sort receipts by block height
 	sortedReceipts := sortReceipts(receipts)
+
+	// don't collect more than maxReceiptCount receipts
+	if uint(len(sortedReceipts)) > b.cfg.maxReceiptCount {
+		sortedReceipts = sortedReceipts[:b.cfg.maxReceiptCount]
+	}
 
 	return sortedReceipts, nil
 }

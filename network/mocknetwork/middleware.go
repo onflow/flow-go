@@ -39,13 +39,13 @@ func (_m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
 	return r0, r1
 }
 
-// Publish provides a mock function with given fields: msg, channelID
-func (_m *Middleware) Publish(msg *message.Message, channelID string) error {
-	ret := _m.Called(msg, channelID)
+// Publish provides a mock function with given fields: msg, channel
+func (_m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
+	ret := _m.Called(msg, channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*message.Message, string) error); ok {
-		r0 = rf(msg, channelID)
+	if rf, ok := ret.Get(0).(func(*message.Message, network.Channel) error); ok {
+		r0 = rf(msg, channel)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -53,20 +53,20 @@ func (_m *Middleware) Publish(msg *message.Message, channelID string) error {
 	return r0
 }
 
-// Send provides a mock function with given fields: channelID, msg, targetIDs
-func (_m *Middleware) Send(channelID string, msg *message.Message, targetIDs ...flow.Identifier) error {
+// Send provides a mock function with given fields: channel, msg, targetIDs
+func (_m *Middleware) Send(channel network.Channel, msg *message.Message, targetIDs ...flow.Identifier) error {
 	_va := make([]interface{}, len(targetIDs))
 	for _i := range targetIDs {
 		_va[_i] = targetIDs[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, channelID, msg)
+	_ca = append(_ca, channel, msg)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, *message.Message, ...flow.Identifier) error); ok {
-		r0 = rf(channelID, msg, targetIDs...)
+	if rf, ok := ret.Get(0).(func(network.Channel, *message.Message, ...flow.Identifier) error); ok {
+		r0 = rf(channel, msg, targetIDs...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -107,13 +107,13 @@ func (_m *Middleware) Stop() {
 	_m.Called()
 }
 
-// Subscribe provides a mock function with given fields: channelID
-func (_m *Middleware) Subscribe(channelID string) error {
-	ret := _m.Called(channelID)
+// Subscribe provides a mock function with given fields: channel
+func (_m *Middleware) Subscribe(channel network.Channel) error {
+	ret := _m.Called(channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(channelID)
+	if rf, ok := ret.Get(0).(func(network.Channel) error); ok {
+		r0 = rf(channel)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -121,13 +121,13 @@ func (_m *Middleware) Subscribe(channelID string) error {
 	return r0
 }
 
-// Unsubscribe provides a mock function with given fields: channelID
-func (_m *Middleware) Unsubscribe(channelID string) error {
-	ret := _m.Called(channelID)
+// Unsubscribe provides a mock function with given fields: channel
+func (_m *Middleware) Unsubscribe(channel network.Channel) error {
+	ret := _m.Called(channel)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(channelID)
+	if rf, ok := ret.Get(0).(func(network.Channel) error); ok {
+		r0 = rf(channel)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,7 +56,7 @@ func TestTransactionASTCache(t *testing.T) {
 
 		// Determine location of transaction
 		txID := txBody.ID()
-		location := runtime.TransactionLocation(txID[:])
+		location := common.TransactionLocation(txID[:])
 
 		// Get cached program
 		program, err := cache.GetProgram(location)
@@ -94,7 +95,7 @@ func TestScriptASTCache(t *testing.T) {
 
 		// Determine location
 		scriptHash := hash.DefaultHasher.ComputeHash(code)
-		location := runtime.ScriptLocation(scriptHash)
+		location := common.ScriptLocation(scriptHash)
 
 		// Get cached program
 		program, err := cache.GetProgram(location)
@@ -159,7 +160,7 @@ func TestTransactionWithProgramASTCache(t *testing.T) {
 
 	// Determine location of transaction
 	txID := txBody.ID()
-	location := runtime.TransactionLocation(txID[:])
+	location := common.TransactionLocation(txID[:])
 
 	// Get cached program
 	program, err := cache.GetProgram(location)
@@ -309,11 +310,11 @@ func BenchmarkTransactionWithProgramASTCache(b *testing.B) {
 
 type nonFunctioningCache struct{}
 
-func (cache *nonFunctioningCache) GetProgram(location ast.Location) (*ast.Program, error) {
+func (cache *nonFunctioningCache) GetProgram(_ common.Location) (*ast.Program, error) {
 	return nil, nil
 }
 
-func (cache *nonFunctioningCache) SetProgram(location ast.Location, program *ast.Program) error {
+func (cache *nonFunctioningCache) SetProgram(_ common.Location, _ *ast.Program) error {
 	return nil
 }
 
@@ -417,7 +418,7 @@ func TestProgramASTCacheAvoidRaceCondition(t *testing.T) {
 	}
 	wg.Wait()
 
-	location := runtime.AddressLocation{Address: runtime.Address(fvm.FlowTokenAddress(chain)), Name: "FlowToken"}
+	location := common.AddressLocation{Address: runtime.Address(fvm.FlowTokenAddress(chain)), Name: "FlowToken"}
 
 	// Get cached program
 	var program *ast.Program
