@@ -21,7 +21,7 @@ var channelRoleMap map[network.Channel]flow.RoleList
 
 // RolesByChannel returns list of flow roles involved in the channel.
 func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
-	if clusterChannel, isCluster := IsClusterChannel(channel); isCluster {
+	if clusterChannel, isCluster := ClusterChannel(channel); isCluster {
 		// replaces channel with the stripped-off prefix
 		channel = clusterChannel
 	}
@@ -47,6 +47,37 @@ func ChannelsByRole(role flow.Role) network.ChannelList {
 	}
 
 	return channels
+}
+
+// UniqueChannels returns list of non-cluster channels with a unique RoleList accompanied
+// with the list of all cluster channels.
+// e.g. if channel X and Y both are non-cluster channels and have role IDs [A,B,C] then only one of them will be in the returned list.
+func UniqueChannels(channels network.ChannelList) network.ChannelList {
+	// uniques keeps the set of unique channels based on their RoleList.
+	uniques := make(network.ChannelList, 0)
+	// added keeps track of channels added to uniques for deduplication.
+	added := make(map[flow.Identifier]struct{})
+
+	// a channel is added to uniques if it is either a
+	// cluster channel, or no non-cluster channel with the same set of roles
+	// has already been added to uniques.
+	// We use identifier of RoleList to determine its uniqueness.
+	for _, channel := range channels {
+		id := channelRoleMap[channel].ID()
+
+		// non-cluster channel deduplicated based identifier of role list
+		if _, cluster := ClusterChannel(channel); !cluster {
+			if _, ok := added[id]; ok {
+				// a channel with same RoleList already added, hence skips
+				continue
+			}
+			added[id] = struct{}{}
+		}
+
+		uniques = append(uniques, channel)
+	}
+
+	return uniques
 }
 
 // Channels returns all channels that nodes of any role have subscribed to.
@@ -148,10 +179,10 @@ func initializeChannelRoleMap() {
 	channelRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
 }
 
-// IsClusterChannel returns true if channel is cluster-based.
+// ClusterChannel returns true if channel is cluster-based.
 // At the current implementation, only collection nodes are involved in a cluster-based channels.
 // If the channel is a cluster-based one, this method also strips off the channel prefix and returns it.
-func IsClusterChannel(channel network.Channel) (network.Channel, bool) {
+func ClusterChannel(channel network.Channel) (network.Channel, bool) {
 	if strings.HasPrefix(channel.String(), syncClusterPrefix.String()) {
 		return syncClusterPrefix, true
 	}
