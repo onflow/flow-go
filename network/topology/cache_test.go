@@ -16,8 +16,9 @@ import (
 )
 
 // TestCache_GenerateFanout evaluates some weak caching guarantees over Cache with a mock underlying topology.
-// Guarantees include calling the underlying topology once as long as the input is the same, caching the result,
-// and returning it over consecutive invocations. The evaluations are weak as they go through a mock topology.
+// The guarantees include calling the underlying topology only once as long as the input is the same, caching the result,
+// and returning the same result over consecutive invocations with the same input.
+// The evaluations are weak as they go through a mock topology.
 func TestCache_GenerateFanout(t *testing.T) {
 	top := &mocknetwork.Topology{}
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
