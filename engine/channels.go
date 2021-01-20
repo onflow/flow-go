@@ -21,7 +21,7 @@ var channelRoleMap map[network.Channel]flow.RoleList
 
 // RolesByChannel returns list of flow roles involved in the channel.
 func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
-	if clusterChannel, isCluster := IsClusterChannel(channel); isCluster {
+	if clusterChannel, isCluster := ClusterChannel(channel); isCluster {
 		// replaces channel with the stripped-off prefix
 		channel = clusterChannel
 	}
@@ -66,7 +66,7 @@ func UniqueChannels(channels network.ChannelList) network.ChannelList {
 		id := channelRoleMap[channel].ID()
 
 		// non-cluster channel deduplicated based identifier of role list
-		if _, cluster := IsClusterChannel(channel); !cluster {
+		if _, cluster := ClusterChannel(channel); !cluster {
 			if _, ok := added[id]; ok {
 				// a channel with same RoleList already added, hence skips
 				continue
@@ -179,10 +179,10 @@ func initializeChannelRoleMap() {
 	channelRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
 }
 
-// IsClusterChannel returns true if channel is cluster-based.
+// ClusterChannel returns true if channel is cluster-based.
 // At the current implementation, only collection nodes are involved in a cluster-based channels.
 // If the channel is a cluster-based one, this method also strips off the channel prefix and returns it.
-func IsClusterChannel(channel network.Channel) (network.Channel, bool) {
+func ClusterChannel(channel network.Channel) (network.Channel, bool) {
 	if strings.HasPrefix(channel.String(), syncClusterPrefix.String()) {
 		return syncClusterPrefix, true
 	}

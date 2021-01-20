@@ -67,23 +67,23 @@ func TestGetChannelByRole(t *testing.T) {
 	assert.Contains(t, topics, TestNetwork)
 }
 
-// TestIsClusterChannel verifies the correctness of IsClusterChannel method
+// TestIsClusterChannel verifies the correctness of ClusterChannel method
 // against cluster and non-cluster channel.
 func TestIsClusterChannel(t *testing.T) {
 	// creates a consensus cluster channel and verifies it
 	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
-	clusterChannel, ok := IsClusterChannel(conClusterChannel)
+	clusterChannel, ok := ClusterChannel(conClusterChannel)
 	require.True(t, ok)
 	require.Equal(t, clusterChannel, consensusClusterPrefix)
 
 	// creates a sync cluster channel and verifies it
 	syncClusterChannel := ChannelSyncCluster("some-sync-cluster-id")
-	clusterChannel, ok = IsClusterChannel(syncClusterChannel)
+	clusterChannel, ok = ClusterChannel(syncClusterChannel)
 	require.True(t, ok)
 	require.Equal(t, clusterChannel, syncClusterPrefix)
 
 	// non-cluster channel should not be verified
-	clusterChannel, ok = IsClusterChannel("non-cluster-channel-id")
+	clusterChannel, ok = ClusterChannel("non-cluster-channel-id")
 	require.False(t, ok)
 	require.Empty(t, clusterChannel)
 }
@@ -98,18 +98,19 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 		visited := make(map[flow.Identifier]struct{})
 		for _, channel := range uniques {
 
-			if _, ok := IsClusterChannel(channel); ok {
-			continue //only considering non-cluster channel in this test case
+			if _, ok := ClusterChannel(channel); ok {
+				continue //only considering non-cluster channel in this test case
 			}
-				// non-cluster channels should be unique based on their RoleList identifier.
-				id := channelRoleMap[channel].ID()
-				_, duplicate := visited[id]
-				require.False(t, duplicate)
 
-				visited[id] = struct{}{}
-			}
+			// non-cluster channels should be unique based on their RoleList identifier.
+			id := channelRoleMap[channel].ID()
+			_, duplicate := visited[id]
+			require.False(t, duplicate)
+
+			visited[id] = struct{}{}
 		}
 	}
+}
 }
 
 // TestUniqueChannels_ClusterChannels verifies that if cluster channels have the RoleList the same as

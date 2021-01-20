@@ -104,7 +104,7 @@ func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel network
 	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
 
 	// samples a random graph based on whether channel is cluster-based or not.
-	if _, ok := engine.IsClusterChannel(channel); ok {
+	if _, ok := engine.ClusterChannel(channel); ok {
 		return r.clusterChannelHandler(sampleSpace)
 	}
 	return r.nonClusterChannelHandler(sampleSpace, channel)
@@ -155,7 +155,7 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 
 // clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
 func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
-	if _, ok := engine.IsClusterChannel(channel); ok {
+	if _, ok := engine.ClusterChannel(channel); ok {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
 

@@ -152,7 +152,7 @@ func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
 func clusterChannels(t *testing.T) network.ChannelList {
 	channels := make(network.ChannelList, 0)
 	for _, channel := range engine.Channels() {
-		if _, ok := engine.IsClusterChannel(channel); !ok {
+		if _, ok := engine.ClusterChannel(channel); !ok {
 			// skips non-cluster channels
 			continue
 		}
