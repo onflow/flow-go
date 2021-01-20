@@ -20,17 +20,17 @@ import (
 // and returning the same result over consecutive invocations with the same input.
 // The evaluations are weak as they go through a mock topology.
 func TestCache_GenerateFanout(t *testing.T) {
+	// mocks underlying topology
 	top := &mocknetwork.Topology{}
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
-
-	// mock underlying topology should be called only once.
 	top.On("GenerateFanout", ids).Return(fanout, nil).Once()
 
 	cache := NewCache(log, top)
 
+	// Testing cache resolving
+	//
 	// over 100 invocations of cache with the same input, the same
 	// output should be returned.
 	// The output should be resolved by the cache
