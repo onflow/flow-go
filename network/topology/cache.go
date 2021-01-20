@@ -51,13 +51,14 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 	if !bytes.Equal(inputFingerprint[:], c.fingerprint[:]) {
 		// updates current cache with a new topology
 		c.cachedFanout, c.cachedError = c.top.GenerateFanout(ids)
-		c.fingerprint = inputFingerprint
 
 		c.log.Debug().
 			Hex("cached_fingerprint", logging.ID(c.fingerprint)).
 			Hex("new_fingerprint", logging.ID(inputFingerprint)).
 			Int("input_size", len(ids)).
 			Msg("topology cache updated")
+
+		c.fingerprint = inputFingerprint
 	}
 
 	return c.cachedFanout, c.cachedError
