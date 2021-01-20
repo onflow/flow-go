@@ -185,8 +185,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			p2p.DefaultMaxUnicastMsgSize,
-			p2p.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
 

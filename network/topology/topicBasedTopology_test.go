@@ -63,12 +63,12 @@ func (suite *TopicAwareTopologyTestSuite) TestTopologySize_Topic() {
 		top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.logger, suite.state, suite.subMngr[0])
 		require.NoError(suite.T(), err)
 
-		topics := engine.ChannelIDsByRole(suite.all[0].Role)
+		topics := engine.ChannelsByRole(suite.all[0].Role)
 		require.Greater(suite.T(), len(topics), 1)
 
 		for _, topic := range topics {
 			// extracts total number of nodes subscribed to topic
-			roles, ok := engine.RolesByChannelID(topic)
+			roles, ok := engine.RolesByChannel(topic)
 			require.True(suite.T(), ok)
 
 			ids, err := top.subsetChannel(suite.all, nil, topic)
@@ -90,7 +90,7 @@ func (suite *TopicAwareTopologyTestSuite) TestDeteministicity() {
 	top, err := NewTopicBasedTopology(suite.all[0].NodeID, suite.logger, suite.state, suite.subMngr[0])
 	require.NoError(suite.T(), err)
 
-	topics := engine.ChannelIDsByRole(suite.all[0].Role)
+	topics := engine.ChannelsByRole(suite.all[0].Role)
 	require.Greater(suite.T(), len(topics), 1)
 
 	// for each topic samples 100 topologies
@@ -139,7 +139,7 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 
 	// for each topic samples 100 topologies
 	// all topologies for a topic should be the same
-	topics := engine.ChannelIDsByRole(flow.RoleConsensus)
+	topics := engine.ChannelsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
 	for i, identity := range suite.all {
@@ -175,11 +175,11 @@ func (suite *TopicAwareTopologyTestSuite) TestUniqueness() {
 }
 
 // TestConnectedness_NonClusterTopics checks whether graph components corresponding to a
-// non-cluster channel ID are individually connected.
-func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID() {
-	channelID := engine.TestNetwork
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+// non-cluster channel are individually connected.
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannel() {
+	channel := engine.TestNetwork
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	for i, id := range suite.all {
 		// creates a topic-based topology for node
@@ -187,40 +187,40 @@ func (suite *TopicAwareTopologyTestSuite) TestConnectedness_NonClusterChannelID(
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, nil, channel)
 		require.NoError(suite.T(), err)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
-	connectednessByChannelID(suite.T(), channelIDAdjMap, suite.all, channelID)
+	connectednessByChannel(suite.T(), channelAdjMap, suite.all, channel)
 }
 
-// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
-// cluster channel ID are individually connected.
-func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannelID() {
-	// picks one cluster channel ID as sample
-	channelID := clusterChannelIDs(suite.T())[0]
+// TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
+// cluster channel are individually connected.
+func (suite *TopicAwareTopologyTestSuite) TestConnectedness_ClusterChannel() {
+	// picks one cluster channel as sample
+	channel := clusterChannels(suite.T())[0]
 
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	// iterates over collection nodes
 	for i, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
-		// creates a channelID-based topology for node
+		// creates a channel-based topology for node
 		top, err := NewTopicBasedTopology(id.NodeID, suite.logger, suite.state, suite.subMngr[i])
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, nil, channelID)
+		subset, err := top.subsetChannel(suite.all, nil, channel)
 		require.NoError(suite.T(), err)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
 	// check that each of the collection clusters forms a connected graph
 	for _, cluster := range suite.clusters {
-		connectedByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
+		connectedByCluster(suite.T(), channelAdjMap, suite.all, cluster)
 	}
 }
 

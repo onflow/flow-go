@@ -21,14 +21,14 @@ type MeshEngine struct {
 	received chan struct{}    // used as an indicator on reception of messages for testing
 }
 
-func NewMeshEngine(t *testing.T, net module.Network, cap int, engineID string) *MeshEngine {
+func NewMeshEngine(t *testing.T, net module.Network, cap int, channel network.Channel) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
 		event:    make(chan interface{}, cap),
 		received: make(chan struct{}, cap),
 	}
 
-	c2, err := net.Register(engineID, te)
+	c2, err := net.Register(channel, te)
 	require.NoError(te.t, err)
 	te.con = c2
 
