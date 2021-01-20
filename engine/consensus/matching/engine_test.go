@@ -517,7 +517,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 
 // TestRequestPendingApprovals checks that requests are sent only for chunks
 // that have not collected any approvals yet, and are sent only to the verifiers
-// assigned to those chunks. It also check that the threshold and raite limiting
+// assigned to those chunks. It also checks that the threshold and rate limiting
 // is respected.
 func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
@@ -548,25 +548,25 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock.Header)
 	ms.Blocks[unfinalizedBlock.ID()] = &unfinalizedBlock
 
-	// we will assume that all chunks are assigned to the same verifier. So each
-	// approval request should only be sent to this single verifier.
-	verifier := unittest.IdentifierFixture()
+	// we will assume that all chunks are assigned to the same two verifiers.
+	verifiers := unittest.IdentifierListFixture(2)
+
+	// the matching engine requires approvals from both verifiers for each chunk
+	ms.matching.requiredApprovalsForSealConstruction = 2
 
 	// expectedRequests collects the set of ApprovalRequests that should be sent
 	expectedRequests := []*messages.ApprovalRequest{}
 
 	// populate the incorporated-results mempool with:
-	// - 50 that have collected one signature per chunk
-	// - 50 that have collected no signatures
+	// - 50 that have collected two signatures per chunk
+	// - 50 that have collected only 1 signature
 	//
-	// each chunk is assigned to the single verifier we defined above
+	// each chunk is assigned to both verifiers we defined above
 	//
-	// we populate expectedRequests with requests for chunks that have no
-	// signatures, and for results that are for block that meet the approval
-	// request threshold.
+	// we populate expectedRequests with requests for chunks that are missing a
+	// signature, and that are below the approval request threshold.
 	//
-	//
-	//     sealed          unseale/finalized
+	//     sealed          unsealed/finalized
 	// |              ||                        |
 	// 1 <- 2 <- .. <- s <- s+1 <- .. <- n-t <- n
 	//                 |                  |
@@ -591,15 +591,18 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 		for _, chunk := range ir.Result.Chunks {
 
 			// assign the verifier to this chunk
-			assignment.Add(chunk, flow.IdentifierList{verifier})
+			assignment.Add(chunk, verifiers)
 			ms.Assigner.On("Assign", ir.Result, ir.IncorporatedBlockID).Return(assignment, nil)
 
-			// only add a signature if the result belongs to the set of results
-			// that we assume have already received approvals for every chunk
-			if i < s {
-				ir.AddSignature(chunk.Index, unittest.IdentifierFixture(), unittest.SignatureFixture())
-			} else {
+			// every chunk receives a signature from the first verifier
+			ir.AddSignature(chunk.Index, verifiers[0], unittest.SignatureFixture())
 
+			// Only add the second signature for a subset of results. For the
+			// remaining subset, we expect an ApprovalRequest to be sent to the
+			// missing verifier.
+			if i < s {
+				ir.AddSignature(chunk.Index, verifiers[1], unittest.SignatureFixture())
+			} else {
 				if i < n-int(ms.matching.approvalRequestsThreshold) {
 					expectedRequests = append(expectedRequests,
 						&messages.ApprovalRequest{
@@ -658,10 +661,11 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 			ms.Assert().True(ok)
 			requests = append(requests, ar)
 
-			// check that the target is the verifier assigned to the chunk
+			// check that the target is the verifier for which the approval is
+			// missing
 			target, ok := args[1].(flow.Identifier)
 			ms.Assert().True(ok)
-			ms.Assert().Equal(verifier, target)
+			ms.Assert().Equal(verifiers[1], target)
 		})
 	ms.matching.approvalConduit = conduit
 
