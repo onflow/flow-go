@@ -269,7 +269,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		seals,
 		assigner,
 		validator,
-		validation.DefaultRequiredApprovalsForSealValidation)
+		validation.DefaultRequiredApprovalsForSealValidation,
+		matching.DefaultEmergencySealingActive)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{
