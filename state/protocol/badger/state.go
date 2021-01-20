@@ -54,6 +54,9 @@ func Bootstrap(
 
 		// 1) insert each block in the root chain segment
 		segment, err := root.SealingSegment()
+		if err != nil {
+			return fmt.Errorf("could not get sealing segment: %w", err)
+		}
 		if len(segment) == 0 {
 			return fmt.Errorf("root sealing segment must contain at least one block")
 		}
@@ -63,13 +66,10 @@ func Bootstrap(
 		tail := segment[0]
 		head := segment[len(segment)-1]
 
-		if err != nil {
-			return fmt.Errorf("could not get sealing segment: %w", err)
-		}
 		for i, block := range segment {
-
 			blockID := block.ID()
 			height := block.Header.Height
+
 			err = state.blocks.StoreTx(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
@@ -83,13 +83,6 @@ func Bootstrap(
 				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
 			}
 
-			// for the final block in the segment, insert an empty child index
-			if i == len(segment)-1 {
-				err = operation.InsertBlockChildren(blockID, nil)(tx)
-				if err != nil {
-					return fmt.Errorf("could not initialize child index for final segment block: %w", err)
-				}
-			}
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
 				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(tx)
@@ -97,6 +90,12 @@ func Bootstrap(
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
 			}
+		}
+
+		// insert an empty child index for the final block in the segment
+		err = operation.InsertBlockChildren(head.ID(), nil)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
 
 		// 2) insert the root execution result into the database and index it
@@ -189,9 +188,6 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 
 		// insert previous epoch if it exists
 		_, err := previous.Counter()
-		if err != nil && !errors.Is(err, protocol.ErrNoPreviousEpoch) {
-			return fmt.Errorf("could not retrieve previous epoch: %w", err)
-		}
 		if err == nil {
 			// if there is a previous epoch, both setup and commit events must exist
 			setup, err := protocol.ToEpochSetup(previous)
@@ -207,6 +203,8 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			commits = append(commits, commit)
 			status.PreviousEpoch.SetupID = setup.ID()
 			status.PreviousEpoch.CommitID = commit.ID()
+		} else if !errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return fmt.Errorf("could not retrieve previous epoch: %w", err)
 		}
 
 		// insert current epoch - both setup and commit events must exist
@@ -226,10 +224,8 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 
 		// insert next epoch, if it exists
 		_, err = next.Counter()
-		if err != nil && !errors.Is(err, protocol.ErrNextEpochNotSetup) {
-			return fmt.Errorf("could not get next epoch: %w", err)
-		}
 		if err == nil {
+			// either only the setup event, or both the setup and commit events must exist
 			setup, err := protocol.ToEpochSetup(next)
 			if err != nil {
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
@@ -244,6 +240,8 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 				commits = append(commits, commit)
 				status.NextEpoch.CommitID = commit.ID()
 			}
+		} else if !errors.Is(err, protocol.ErrNextEpochNotSetup) {
+			return fmt.Errorf("could not get next epoch: %w", err)
 		}
 
 		// sanity check: ensure epoch status is valid

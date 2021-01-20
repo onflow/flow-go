@@ -95,7 +95,6 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 }
 
 func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
-
 	identities := es.setupEvent.Participants.Filter(filter.Any)
 	// apply a deterministic sort to the participants
 	identities = identities.Order(order.ByNodeIDAsc)
@@ -104,7 +103,6 @@ func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 }
 
 func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
-
 	collectorFilter := filter.And(filter.HasStake(true), filter.HasRole(flow.RoleCollection))
 	clustering, err := flow.NewClusterList(es.setupEvent.Assignments, es.setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
@@ -138,7 +136,6 @@ type committedEpoch struct {
 }
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
-
 	qcs := es.commitEvent.ClusterQCs
 	if uint(len(qcs)) <= index {
 		return nil, fmt.Errorf("no cluster with index %d", index)
