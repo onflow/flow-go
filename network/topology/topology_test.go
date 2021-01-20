@@ -48,7 +48,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 	}
 
 	suite.randomizedTop = func(t *testing.T, identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
-		top, err := topology.NewRandomizedTopology(identifier, suite.logger, 0.01, state, manager)
+		top, err := topology.NewRandomizedTopology(identifier, suite.logger, 0.05, state, manager)
 		require.NoError(t, err)
 
 		return top
@@ -76,7 +76,7 @@ func (suite *TopologyTestSuite) TestLowScaleLinearFanout() {
 // and builds a randomized topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
 func (suite *TopologyTestSuite) TestLowScaleRandomized() {
-	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 200, 10, 100, 120, 5, 100, 4)
+	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 10, 100, 120, 5, 100, 4)
 }
 
 // TestModerateScaleLinearFanout creates systems with
@@ -99,7 +99,7 @@ func (suite *TopologyTestSuite) TestModerateScaleLinearFanout() {
 // 100 verification nodes
 // and builds a stateful randomized topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *TopologyTestSuite) TestModerateScale() {
+func (suite *TopologyTestSuite) TestModerateScaleRandomized() {
 	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 20, 200, 240, 10, 200, 8)
 }
 
