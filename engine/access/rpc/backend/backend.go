@@ -7,6 +7,7 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -57,6 +58,7 @@ func New(
 	collectionGRPCPort uint,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	logger zerolog.Logger,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -68,6 +70,7 @@ func New(
 		state:        state,
 		// create the sub-backends
 		backendScripts: backendScripts{
+			logger:       logger,
 			headers:      headers,
 			executionRPC: executionRPC,
 			state:        state,

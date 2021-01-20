@@ -82,6 +82,7 @@ func (suite *Suite) TestPing() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	err := backend.Ping(context.Background())
@@ -104,6 +105,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	// query the handler for the latest finalized block
@@ -132,6 +134,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	// query the handler for the latest sealed block
@@ -164,6 +167,7 @@ func (suite *Suite) TestGetTransaction() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	actual, err := backend.GetTransaction(context.Background(), transaction.ID())
@@ -192,6 +196,7 @@ func (suite *Suite) TestGetCollection() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	actual, err := backend.GetCollectionByID(context.Background(), expected.ID())
@@ -261,6 +266,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	// Successfully return empty event list
@@ -363,6 +369,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	// first call - referenced block isn't known yet, so should return pending status
@@ -408,6 +415,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	// query the handler for the latest finalized header
@@ -492,6 +500,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	// execute request
@@ -583,6 +592,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			0,
 			nil,
 			false,
+			suite.log,
 		)
 
 		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), maxHeight, minHeight)
@@ -613,6 +623,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			0,
 			nil,
 			false,
+			suite.log,
 		)
 
 		// execute request
@@ -642,6 +653,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			0,
 			nil,
 			false,
+			suite.log,
 		)
 
 		actualResp, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
@@ -703,6 +715,7 @@ func (suite *Suite) TestGetAccount() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	suite.Run("happy path - valid request and valid response", func() {
@@ -762,6 +775,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	suite.Run("happy path - valid request and valid response", func() {
@@ -784,6 +798,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		0,
 		nil,
 		false,
+		suite.log,
 	)
 
 	params := backend.GetNetworkParameters(context.Background())

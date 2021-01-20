@@ -102,6 +102,7 @@ func New(log zerolog.Logger,
 		collectionGRPCPort,
 		&backend.ConnectionFactoryImpl{},
 		retryEnabled,
+		log,
 	)
 
 	eng := &Engine{

@@ -110,6 +110,7 @@ func (suite *Suite) RunTest(
 			uint(9000),
 			nil,
 			false,
+			suite.log,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
@@ -289,6 +290,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			collectionGrpcPort,
 			connFactory, // passing in the connection factory
 			false,
+			suite.log,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
