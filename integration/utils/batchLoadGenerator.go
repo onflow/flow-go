@@ -231,6 +231,7 @@ func (lg *BatchLoadGenerator) createAccounts() error {
 
 		createAccountTx := templates.CreateAccount(
 			[]*flowsdk.AccountKey{accountKey},
+			nil,
 			*lg.serviceAccount.address,
 		)
 
