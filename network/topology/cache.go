@@ -3,8 +3,11 @@ package topology
 import (
 	"bytes"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Cache provides caching the most recently generated topology.
@@ -17,10 +20,22 @@ import (
 // Note: as a convention with other topology implementations, Cache is not concurrency-safe, and should be invoked
 // in a concurrency safe way, i.e., the caller should lock for it.
 type Cache struct {
-	top         network.Topology
-	cachedList  flow.IdentityList
-	cachedError error
-	fingerprint flow.Identifier
+	log          zerolog.Logger
+	top          network.Topology  // instance of underlying topology.
+	cachedFanout flow.IdentityList // most recently generated fanout.
+	cachedError  error             // most recently generated error by invoking underlying topology.
+	fingerprint  flow.Identifier   // input IdentityList unique fingerprint for cached fanout.
+}
+
+//NewTopologyCache creates and returns a topology Cache given an instance of topology implementation.
+func NewTopologyCache(log zerolog.Logger, top network.Topology) *Cache {
+	return &Cache{
+		log:          log.With().Str("component", "topology_cache").Logger(),
+		top:          top,
+		cachedFanout: nil,
+		cachedError:  nil,
+		fingerprint:  flow.Identifier{},
+	}
 }
 
 // GenerateFanout receives IdentityList of entire network and constructs the fanout IdentityList
@@ -32,11 +47,18 @@ type Cache struct {
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
 func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
-	fp := ids.Fingerprint()
-	if !bytes.Equal(fp[:], c.fingerprint[:]) {
+	inputFingerprint := ids.Fingerprint()
+	if !bytes.Equal(inputFingerprint[:], c.fingerprint[:]) {
 		// updates current cache with a new topology
-		c.cachedList, c.cachedError = c.top.GenerateFanout(ids)
+		c.cachedFanout, c.cachedError = c.top.GenerateFanout(ids)
+		c.fingerprint = inputFingerprint
+
+		c.log.Debug().
+			Hex("cached_fingerprint", logging.ID(c.fingerprint)).
+			Hex("new_fingerprint", logging.ID(inputFingerprint)).
+			Int("input_size", len(ids)).
+			Msg("topology cache updated")
 	}
 
-	return c.cachedList, c.cachedError
+	return c.cachedFanout, c.cachedError
 }
