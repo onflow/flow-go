@@ -12,7 +12,7 @@ import (
 
 // Cache provides caching the most recently generated topology.
 // It implements the same GenerateFanout as a normal topology, so can easily replace any topology implementation.
-// As long as the input IdentityList to it is the same the cached topology is returned without invoking the
+// As long as the input IdentityList to it is the same, the cached topology is returned without invoking the
 // underlying GenerateFanout.
 // This is vital to provide a deterministic topology interface, as by its nature, the Topology interface does not
 // guarantee a deterministic behavior.
@@ -22,9 +22,9 @@ import (
 type Cache struct {
 	log          zerolog.Logger
 	top          network.Topology  // instance of underlying topology.
-	cachedFanout flow.IdentityList // most recently generated fanout.
-	cachedError  error             // most recently generated error by invoking underlying topology.
-	fingerprint  flow.Identifier   // input IdentityList unique fingerprint for cached fanout.
+	cachedFanout flow.IdentityList // most recently generated fanout list by invoking underlying topology.
+	cachedError  error             // most recently generated fanout error by invoking underlying topology.
+	fingerprint  flow.Identifier   // unique fingerprint of input IdentityList for cached fanout.
 }
 
 //NewCache creates and returns a topology Cache given an instance of topology implementation.
@@ -46,6 +46,9 @@ func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 // of the messages (i.e., publish and multicast).
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
+//
+// Note that this implementation of GenerateFanout preserves same output as long as input is the same. This
+// should not be assumed as a 1-1 mapping between input and output.
 func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	inputFingerprint := ids.Fingerprint()
 	if !bytes.Equal(inputFingerprint[:], c.fingerprint[:]) {
