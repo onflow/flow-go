@@ -78,7 +78,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	arguments [][]byte,
 ) ([]byte, error) {
 
-	b.logger.Info().
+	b.logger.Debug().
 		Hex("block_id", logging.ID(blockID)).
 		Str("script", string(script)).
 		Msg("an script is sent for execution")
