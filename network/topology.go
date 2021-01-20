@@ -13,23 +13,3 @@ type Topology interface {
 	// connected graph of nodes that enables them talking to each other.
 	GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 }
-
-// TopologyCache provides caching the most recently generated topology.
-// It exposes the same GenerateFanout method as a typical topology interface.
-// As long as the input IdentityList to it is the same the cached topology is returned without invoking the
-// underlying GenerateFanout.
-// This is vital to provide a deterministic topology interface, as by its nature, the Topology interface does not
-// guarantee determinesticity.
-type TopologyCache interface {
-	Topology
-
-	// Get returns the cached fanout of node.
-	Get() (flow.IdentityList, bool)
-
-	// FingerPrint returns the finger print of fanout list for which the cache
-	// maintains a topology.
-	FingerPrint() flow.Identifier
-
-	// Invalidate cleans the cache.
-	Invalidate()
-}
