@@ -4,15 +4,18 @@ import (
 	"context"
 
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type backendScripts struct {
+	logger       zerolog.Logger
 	headers      storage.Headers
 	state        protocol.State
 	executionRPC execproto.ExecutionAPIClient
@@ -74,6 +77,11 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	script []byte,
 	arguments [][]byte,
 ) ([]byte, error) {
+
+	b.logger.Info().
+		Hex("block_id", logging.ID(blockID)).
+		Str("script", string(script)).
+		Msg("an script sent for execution")
 
 	execReq := execproto.ExecuteScriptAtBlockIDRequest{
 		BlockId:   blockID[:],
