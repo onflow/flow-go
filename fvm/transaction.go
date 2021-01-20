@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 
-	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,11 +26,12 @@ type TransactionProcessor interface {
 }
 
 type TransactionProcedure struct {
-	ID          flow.Identifier
-	Transaction *flow.TransactionBody
-	TxIndex     uint32
-	Logs        []string
-	Events      []flow.Event
+	ID            flow.Identifier
+	Transaction   *flow.TransactionBody
+	TxIndex       uint32
+	Logs          []string
+	Events        []flow.Event
+	ServiceEvents []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
@@ -52,33 +52,6 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 	}
 
 	return nil
-}
-
-func (proc *TransactionProcedure) ConvertEvents(txIndex uint32, chain flow.Chain) ([]flow.Event, []flow.Event, error) {
-	flowEvents := make([]flow.Event, len(proc.Events))
-	serviceEvents := make([]flow.Event, 0)
-
-	for i, event := range proc.Events {
-		payload, err := jsoncdc.Encode(event)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to encode event: %w", err)
-		}
-
-		flowEvents[i] = flow.Event{
-			Type:             flow.EventType(event.EventType.ID()),
-			TransactionID:    proc.ID,
-			TransactionIndex: txIndex,
-			EventIndex:       uint32(i),
-			Payload:          payload,
-		}
-
-		if fvmEvent.IsServiceEvent(event, chain) {
-			serviceEvents = append(serviceEvents, flowEvents[i])
-		}
-
-	}
-
-	return flowEvents, serviceEvents, nil
 }
 
 type TransactionInvocator struct {
@@ -124,6 +97,7 @@ func (i *TransactionInvocator) Process(
 	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
 	proc.Events = env.getEvents()
+	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
 
 	return nil

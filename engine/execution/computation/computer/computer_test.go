@@ -6,6 +6,11 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -145,12 +150,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext()
-
-		vm := new(computermock.VirtualMachine)
-
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
-		require.NoError(t, err)
+		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithTransactionProcessors(
+			fvm.NewTransactionInvocator(zerolog.Nop()), //we don't need to check signatures or sequence numbers
+		))
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -162,31 +164,26 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		ordinaryEvent := cadence.Event{
 			EventType: &cadence.EventType{
-				EventTypeID: cadence.CompositeTypeID{
-					Location:   "what",
-					Identifier: "ever",
-				},
-				Identifier: "what.ever",
+				Location:            stdlib.FlowLocation{},
+				QualifiedIdentifier: "what.ever",
 			},
 		}
 
 		eventWhitelist := event.GetServiceEventWhitelist()
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
-				EventTypeID: cadence.CompositeTypeID{
-					Location:   execCtx.Chain.ServiceAddress().String(),
-					Identifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				Location: common.AddressLocation{
+					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
 				},
-				TypeID: "eventA",
+				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
 			},
 		}
 		serviceEventB := cadence.Event{
 			EventType: &cadence.EventType{
-				EventTypeID: cadence.CompositeTypeID{
-					Location:   execCtx.Chain.ServiceAddress().String(),
-					Identifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				Location: common.AddressLocation{
+					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
 				},
-				TypeID: "eventB",
+				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
 			},
 		}
 
@@ -198,35 +195,67 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		events[3] = nil
 		events[4] = []cadence.Event{serviceEventB}
 
-		txCount := 0
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-			Run(func(args mock.Arguments) {
+		emittingRuntime := &eventEmittingRuntime{events: events}
 
-				tx := args[1].(*fvm.TransactionProcedure)
+		vm := &fvm.VirtualMachine{Runtime: emittingRuntime}
 
-				tx.Err = &fvm.MissingPayerError{}
-				tx.Events = events[txCount]
-				txCount++
-			}).
-			Return(nil).
-			Times(totalTransactionCount)
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
+
+		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+		//	Run(func(args mock.Arguments) {
+		//
+		//		tx := args[1].(*fvm.TransactionProcedure)
+		//
+		//
+		//		tx.Err = &fvm.MissingPayerError{}
+		//		tx.Events = events[txCount]
+		//		txCount++
+		//	}).
+		//	Return(nil).
+		//	Times(totalTransactionCount)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// all events should have been collected
-		assert.Len(t, result.ServiceEvents, 2)
+		require.Len(t, result.ServiceEvents, 2)
 
 		//events are ordered
-		assert.Equal(t, serviceEventA.EventType.TypeID, string(result.ServiceEvents[0].Type))
-		assert.Equal(t, serviceEventB.EventType.TypeID, string(result.ServiceEvents[1].Type))
-
-		vm.AssertExpectations(t)
+		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
+		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
 	})
+}
+
+type eventEmittingRuntime struct {
+	events [][]cadence.Event
+}
+
+func (e *eventEmittingRuntime) ExecuteScript(script runtime.Script, c runtime.Context) (cadence.Value, error) {
+	panic("ExecuteScript not expected")
+}
+
+func (e *eventEmittingRuntime) ExecuteTransaction(script runtime.Script, c runtime.Context) error {
+	for _, event := range e.events[0] {
+		err := c.Interface.EmitEvent(event)
+		if err != nil {
+			return err
+		}
+	}
+	e.events = e.events[1:]
+	return nil
+}
+
+func (e *eventEmittingRuntime) ParseAndCheckProgram(source []byte, context runtime.Context) (*sema.Checker, error) {
+	panic("ExecuteScript not expected")
+}
+
+func (e *eventEmittingRuntime) SetCoverageReport(coverageReport *runtime.CoverageReport) {
+	panic("SetCoverageReport not expected")
 }
 
 func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBlock {

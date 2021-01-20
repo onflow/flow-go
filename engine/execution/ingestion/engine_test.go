@@ -620,6 +620,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		blocks,
 		collections,
 		events,
+		events,
 		txResults,
 		computationManager,
 		providerEngine,

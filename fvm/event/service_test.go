@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,10 +18,10 @@ func Test_IsServiceEvent(t *testing.T) {
 		assert.True(t,
 			IsServiceEvent(cadence.Event{
 				EventType: &cadence.EventType{
-					EventTypeID: cadence.CompositeTypeID{
-						Location:   chain.ServiceAddress().String(),
-						Identifier: "EpochManager.EpochSetup",
+					Location: common.AddressLocation{
+						Address: common.BytesToAddress(chain.ServiceAddress().Bytes()),
 					},
+					QualifiedIdentifier: "EpochManager.EpochSetup",
 				},
 			}, chain),
 		)
@@ -30,9 +31,8 @@ func Test_IsServiceEvent(t *testing.T) {
 		assert.False(t,
 			IsServiceEvent(cadence.Event{
 				EventType: &cadence.EventType{
-					EventTypeID: cadence.CompositeTypeID{
-						Location:   chain.ServiceAddress().String() + "abc",
-						Identifier: "EpochManager.EpochSetup",
+					Location: common.AddressLocation{
+						Address: common.BytesToAddress(append([]byte{1, 2, 3}, chain.ServiceAddress().Bytes()...)),
 					},
 				},
 			}, chain),
@@ -43,10 +43,10 @@ func Test_IsServiceEvent(t *testing.T) {
 		assert.False(t,
 			IsServiceEvent(cadence.Event{
 				EventType: &cadence.EventType{
-					EventTypeID: cadence.CompositeTypeID{
-						Location:   chain.ServiceAddress().String(),
-						Identifier: "SomeContract.SomeEvent",
+					Location: common.AddressLocation{
+						Address: common.BytesToAddress(chain.ServiceAddress().Bytes()),
 					},
+					QualifiedIdentifier: "SomeContract.SomeEvent",
 				},
 			}, chain),
 		)

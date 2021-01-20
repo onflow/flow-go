@@ -261,12 +261,6 @@ func (e *blockComputer) executeTransaction(
 		return nil, nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to execute transaction: %w", err)
 	}
 
-	txEvents, serviceEvents, err := tx.ConvertEvents(txIndex, e.vmCtx.Chain)
-
-	if err != nil {
-		return nil, nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to create flow events: %w", err)
-	}
-
 	txResult := flow.TransactionResult{
 		TransactionID: tx.ID,
 	}
@@ -288,5 +282,5 @@ func (e *blockComputer) executeTransaction(
 		collectionView.MergeView(txView)
 	}
 
-	return txEvents, serviceEvents, txResult, tx.GasUsed, nil
+	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil
 }

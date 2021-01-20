@@ -2,6 +2,7 @@ package event
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -24,10 +25,18 @@ func GetServiceEventWhitelist() []string {
 }
 
 func IsServiceEvent(event cadence.Event, chain flow.Chain) bool {
-	serviceAccount := chain.ServiceAddress().String()
-	if event.EventType.EventTypeID.Location != serviceAccount {
+	serviceAccount := chain.ServiceAddress()
+
+	addressLocation, casted := event.EventType.Location.(common.AddressLocation)
+	if !casted {
 		return false
 	}
-	_, has := serviceEventWhitelist[event.EventType.EventTypeID.Identifier]
+
+	flowAddress := flow.BytesToAddress(addressLocation.Address.Bytes())
+
+	if flowAddress != serviceAccount {
+		return false
+	}
+	_, has := serviceEventWhitelist[event.EventType.QualifiedIdentifier]
 	return has
 }
