@@ -28,7 +28,7 @@ type BaseChainSuite struct {
 	// BLOCKS
 	RootBlock            flow.Block
 	LatestSealedBlock    flow.Block
-	LatestFinalizedBlock flow.Block
+	LatestFinalizedBlock *flow.Block
 	UnfinalizedBlock     flow.Block
 	Blocks               map[flow.Identifier]*flow.Block
 
@@ -101,13 +101,14 @@ func (bc *BaseChainSuite) SetupChain() {
 	// RootBlock <- LatestSealedBlock <- LatestFinalizedBlock <- UnfinalizedBlock
 	bc.RootBlock = BlockFixture()
 	bc.LatestSealedBlock = BlockWithParentFixture(bc.RootBlock.Header)
-	bc.LatestFinalizedBlock = BlockWithParentFixture(bc.LatestSealedBlock.Header)
+	latestFinalizedBlock := BlockWithParentFixture(bc.LatestSealedBlock.Header)
+	bc.LatestFinalizedBlock = &latestFinalizedBlock
 	bc.UnfinalizedBlock = BlockWithParentFixture(bc.LatestFinalizedBlock.Header)
 
 	bc.Blocks = make(map[flow.Identifier]*flow.Block)
 	bc.Blocks[bc.RootBlock.ID()] = &bc.RootBlock
 	bc.Blocks[bc.LatestSealedBlock.ID()] = &bc.LatestSealedBlock
-	bc.Blocks[bc.LatestFinalizedBlock.ID()] = &bc.LatestFinalizedBlock
+	bc.Blocks[bc.LatestFinalizedBlock.ID()] = bc.LatestFinalizedBlock
 	bc.Blocks[bc.UnfinalizedBlock.ID()] = &bc.UnfinalizedBlock
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP PROTOCOL STATE ~~~~~~~~~~~~~~~~~~~~~~~~ //

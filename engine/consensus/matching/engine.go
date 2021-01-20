@@ -633,45 +633,35 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 			return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 		}
 
-		checkApprovals := func(incorporatedResult *flow.IncorporatedResult) (bool, error) {
-			// check that each chunk collects enough approvals
-			for _, chunk := range incorporatedResult.Result.Chunks {
-				matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
-				if err != nil {
-					return false, fmt.Errorf("could not match chunk: %w", err)
-				}
-				if !matched {
-					return false, nil
-				}
+		matched := false
+		// check that each chunk collects enough approvals
+		for _, chunk := range incorporatedResult.Result.Chunks {
+			matched, err = e.matchChunk(incorporatedResult, block, chunk, assignment)
+			if err != nil {
+				return nil, fmt.Errorf("could not match chunk: %w", err)
 			}
-			return true, nil
+			if !matched {
+				break
+			}
 		}
 
-		checked, err := checkApprovals(incorporatedResult)
-		if err != nil {
-			return nil, err
-		}
-
-		if !checked {
-			if !e.emergencySealingActive {
-				continue
-			}
-
-			// ATTENTION: this is a temporary solution called emergency sealing. Emergency sealing is a special case
-			// when we seal ERs that don't have enough approvals but are deep enough in the chain resulting in halting sealing
-			// process. This will be removed when implementation of seal & verification is finished.
-
+		// ATTENTION: this is a temporary solution called emergency sealing. Emergency sealing is a special case
+		// when we seal ERs that don't have enough approvals but are deep enough in the chain resulting in halting sealing
+		// process. This will be removed when implementation of seal & verification is finished.
+		if !matched && e.emergencySealingActive {
 			block, err := e.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
 			if err != nil {
-				continue
+				return nil, fmt.Errorf("could not match chunk: %w", err)
 			}
-
-			if lastFinalized.Height < block.Height+DefaultEmergencySealingThreshold {
-				continue
+			if block.Height+DefaultEmergencySealingThreshold <= lastFinalized.Height {
+				matched = true
 			}
 		}
-		// add the result to the results that should be sealed
-		results = append(results, incorporatedResult)
+
+		if matched {
+			// add the result to the results that should be sealed
+			results = append(results, incorporatedResult)
+		}
 	}
 
 	return results, nil
