@@ -6,7 +6,6 @@ require (
 	cloud.google.com/go/storage v1.10.0
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
-	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
@@ -23,19 +22,19 @@ require (
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
 	github.com/libp2p/go-addr-util v0.0.2
-	github.com/libp2p/go-libp2p v0.11.0
-	github.com/libp2p/go-libp2p-core v0.6.1
+	github.com/libp2p/go-libp2p v0.13.0
+	github.com/libp2p/go-libp2p-core v0.8.0
 	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-pubsub v0.3.5
-	github.com/libp2p/go-libp2p-swarm v0.2.8
-	github.com/libp2p/go-libp2p-transport-upgrader v0.3.0
+	github.com/libp2p/go-libp2p-pubsub v0.4.1
+	github.com/libp2p/go-libp2p-swarm v0.4.0
+	github.com/libp2p/go-libp2p-transport-upgrader v0.4.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.10.5
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.5.1-0.20201217205349-3a1a5b3cc35e
+	github.com/onflow/cadence v0.12.3
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.5.1-0.20201217205349-3a1a5b3cc35e
-	github.com/onflow/flow-emulator v0.12.5
-	github.com/onflow/flow-go-sdk v0.12.3
+	github.com/onflow/flow-emulator v0.14.0
+	github.com/onflow/flow-go-sdk v0.14.1
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
@@ -48,6 +47,7 @@ require (
 	github.com/spf13/viper v1.4.0
 	github.com/stretchr/testify v1.6.1
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
+	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.6.0

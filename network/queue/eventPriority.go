@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/network"
 )
 
 const (
@@ -17,10 +18,10 @@ const (
 
 // QMessage is the message that is enqueued for each incoming message
 type QMessage struct {
-	Payload   interface{}     // the decoded message
-	Size      int             // the size of the message in bytes
-	ChannelID string          // the channel id to use to lookup the engine
-	SenderID  flow.Identifier // senderID for logging
+	Payload  interface{}     // the decoded message
+	Size     int             // the size of the message in bytes
+	Target   network.Channel // the target channel to lookup the engine
+	SenderID flow.Identifier // senderID for logging
 }
 
 // GetEventPriority returns the priority of the flow event message.

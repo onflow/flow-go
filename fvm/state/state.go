@@ -25,6 +25,7 @@ type State struct {
 	// here to prevent accidental multi-thread use in the future
 	lock                  sync.Mutex
 	draft                 map[string]payload
+	updatedAddresses      map[flow.Address]struct{}
 	readCache             map[string]payload
 	interactionUsed       uint64
 	maxKeySizeAllowed     uint64
@@ -37,6 +38,7 @@ func defaultState(ledger Ledger) *State {
 		ledger:                ledger,
 		interactionUsed:       uint64(0),
 		draft:                 make(map[string]payload),
+		updatedAddresses:      make(map[flow.Address]struct{}),
 		readCache:             make(map[string]payload),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
@@ -44,7 +46,7 @@ func defaultState(ledger Ledger) *State {
 	}
 }
 
-// NewState constucts a new state
+// NewState constructs a new state
 func NewState(ledger Ledger, opts ...StateOption) *State {
 	ctx := defaultState(ledger)
 	for _, applyOption := range opts {
@@ -77,7 +79,7 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-func (s *State) Read(owner, controller, key string) (flow.RegisterValue, error) {
+func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -127,7 +129,7 @@ func (s *State) Read(owner, controller, key string) (flow.RegisterValue, error) 
 	return value, s.updateInteraction(owner, controller, key, value, []byte{})
 }
 
-func (s *State) Update(owner, controller, key string, value flow.RegisterValue) error {
+func (s *State) Set(owner, controller, key string, value flow.RegisterValue) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -136,7 +138,21 @@ func (s *State) Update(owner, controller, key string, value flow.RegisterValue) 
 	}
 
 	s.draft[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+	address, isAddress := addressFromOwner(owner)
+	if isAddress {
+		s.updatedAddresses[address] = struct{}{}
+	}
 	return nil
+}
+
+func (s *State) Touch(owner, controller, key string) error {
+	_, err := s.Get(owner, controller, key)
+	return err
+}
+
+func (s *State) Delete(owner, controller, key string) error {
+	err := s.Set(owner, controller, key, nil)
+	return err
 }
 
 func (s *State) Commit() error {
@@ -178,6 +194,7 @@ func (s *State) Commit() error {
 
 	// reset draft
 	s.draft = make(map[string]payload)
+	s.updatedAddresses = make(map[flow.Address]struct{})
 
 	return nil
 }
@@ -187,11 +204,20 @@ func (s *State) Rollback() error {
 	defer s.lock.Unlock()
 
 	s.draft = make(map[string]payload)
+	s.updatedAddresses = make(map[flow.Address]struct{})
 	return nil
 }
 
 func (s *State) Ledger() Ledger {
 	return s.ledger
+}
+
+func (s *State) UpdatedAddresses() []flow.Address {
+	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
+	for k := range s.updatedAddresses {
+		addresses = append(addresses, k)
+	}
+	return addresses
 }
 
 func (s *State) InteractionUsed() uint64 {
@@ -229,6 +255,16 @@ func (s *State) checkSize(owner, controller, key string, value flow.RegisterValu
 			Limit: s.maxKeySizeAllowed}
 	}
 	return nil
+}
+
+func addressFromOwner(owner string) (flow.Address, bool) {
+	ownerBytes := []byte(owner)
+	if len(ownerBytes) != flow.AddressLength {
+		// not an address
+		return flow.EmptyAddress, false
+	}
+	address := flow.BytesToAddress(ownerBytes)
+	return address, true
 }
 
 type payload struct {
