@@ -27,8 +27,8 @@ type Cache struct {
 	fingerprint  flow.Identifier   // input IdentityList unique fingerprint for cached fanout.
 }
 
-//NewTopologyCache creates and returns a topology Cache given an instance of topology implementation.
-func NewTopologyCache(log zerolog.Logger, top network.Topology) *Cache {
+//NewCache creates and returns a topology Cache given an instance of topology implementation.
+func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 	return &Cache{
 		log:          log.With().Str("component", "topology_cache").Logger(),
 		top:          top,
