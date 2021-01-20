@@ -50,22 +50,20 @@ func TestCache_GenerateFanout(t *testing.T) {
 // include a deterministic fanout as long as the input is the same, updating the cache once input gets changed, and
 // retaining on that.
 func TestCache_TopicBased(t *testing.T) {
-	// creates a topology cache for a verification node based on its
-	// TopicBased topology.
+	// Creates a topology cache for a verification node based on its TopicBased topology.
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	ids := unittest.IdentityListFixture(100, unittest.WithAllRoles())
 	myId := ids.Filter(filter.HasRole(flow.RoleVerification))[0]
-	mySubManager := MockSubscriptionManager(t, flow.IdentityList{myId})
+	subManagers := MockSubscriptionManager(t, flow.IdentityList{myId})
 
-	top, err := NewTopicBasedTopology(myId.NodeID, log, &mockprotocol.State{}, mySubManager[0])
+	top, err := NewTopicBasedTopology(myId.NodeID, log, &mockprotocol.State{}, subManagers[0])
 	require.NoError(t, err)
 
 	cache := NewCache(log, top)
 
 	// Testing deterministic behavior
 	//
-	// over 100 invocations of cache with the same input, the same
-	// output should be returned.
+	// Over consecutive invocations of cache with the same input, the same output should be returned.
 	prevFanout, err := cache.GenerateFanout(ids)
 	require.NoError(t, err)
 	for i := 0; i < 100; i++ {
@@ -78,8 +76,7 @@ func TestCache_TopicBased(t *testing.T) {
 
 	// Testing cache invalidation and update
 	//
-	// evicts one identity from ids list and cache should be invalidated
-	// and updated with a new fanout.
+	// Evicts one identity from ids list and cache should be invalidated and updated with a new fanout.
 	ids = ids[:len(ids)-1]
 	newFanout, err := cache.GenerateFanout(ids)
 	require.NoError(t, err)
@@ -87,7 +84,7 @@ func TestCache_TopicBased(t *testing.T) {
 
 	// Testing deterministic behavior after an update
 	//
-	// over 100 invocations of cache with the same (new) input, the same
+	// After a cache update, over consecutive invocations of cache with the same (new) input, the same
 	// (new) output should be returned.
 	prevFanout = newFanout
 	for i := 0; i < 100; i++ {
