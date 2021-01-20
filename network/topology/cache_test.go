@@ -16,6 +16,8 @@ import (
 )
 
 // TestCache_GenerateFanout evaluates some weak caching guarantees over Cache with a mock underlying topology.
+// Guarantees include calling the underlying topology once as long as the input is the same, caching the result,
+// and returning it over consecutive invocations. The evaluations are weak as they go through a mock topology.
 func TestCache_GenerateFanout(t *testing.T) {
 	top := &mocknetwork.Topology{}
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
@@ -45,7 +47,9 @@ func TestCache_GenerateFanout(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, top)
 }
 
-// TestCache_TopicBased
+// TestCache_TopicBased evaluates strong cache guarantees over an underlying TopicBased cache. The guarantees
+// include a deterministic fanout as long as the input is the same, updating the cache once input gets changed, and
+// retaining on that.
 func TestCache_TopicBased(t *testing.T) {
 	// creates a topology cache for a verification node based on its
 	// TopicBased topology.
