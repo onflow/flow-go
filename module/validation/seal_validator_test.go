@@ -36,7 +36,7 @@ func (s *SealValidationSuite) TestSealValid() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -61,7 +61,7 @@ func (s *SealValidationSuite) TestSealInvalidBlockID() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -88,7 +88,7 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -123,7 +123,7 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -155,7 +155,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -182,7 +182,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -209,7 +209,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -235,7 +235,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 func (s *SealValidationSuite) TestHighestSeal() {
 	// take finalized block and build a receipt for it
 	block3 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
-	block2Receipt := unittest.ReceiptForBlockFixture(&s.LatestFinalizedBlock)
+	block2Receipt := unittest.ReceiptForBlockFixture(s.LatestFinalizedBlock)
 	block3.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{block2Receipt},
 	})
