@@ -19,6 +19,10 @@ func InsertIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.Txn
 		if err != nil {
 			return fmt.Errorf("could not store seal index: %w", err)
 		}
+		err = operation.IndexPayloadReceipts(blockID, index.ReceiptIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store receipts index: %w", err)
+		}
 		return nil
 	}
 }
@@ -35,10 +39,16 @@ func RetrieveIndex(blockID flow.Identifier, index *flow.Index) func(tx *badger.T
 		if err != nil {
 			return fmt.Errorf("could not retrieve seal index: %w", err)
 		}
+		var receiptIDs []flow.Identifier
+		err = operation.LookupPayloadReceipts(blockID, &receiptIDs)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve receipts index: %w", err)
+		}
 
 		*index = flow.Index{
 			CollectionIDs: collIDs,
 			SealIDs:       sealIDs,
+			ReceiptIDs:    receiptIDs,
 		}
 		return nil
 	}

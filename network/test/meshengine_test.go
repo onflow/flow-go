@@ -45,7 +45,7 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	const count = 10
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
-	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun)
+	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -321,7 +321,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	}
 }
 
-// conduitCloseScenario tests after a Conduit is closed, an engine cannot send or receive a message for that channel ID
+// conduitCloseScenario tests after a Conduit is closed, an engine cannot send or receive a message for that channel.
 func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFunc) {
 
 	optionalSleep(send)
@@ -343,6 +343,11 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	unregisterIndex := rand.Intn(count)
 	err := engs[unregisterIndex].con.Close()
 	assert.NoError(suite.T(), err)
+
+	// waits enough for peer manager to unsubscribe the node from the topic
+	// while libp2p is unsubscribing the node, the topology gets unstable
+	// and connections to the node may be refused (although very unlikely).
+	time.Sleep(2 * time.Second)
 
 	// each node attempts to broadcast a message to all others
 	for i := range suite.nets {

@@ -105,6 +105,24 @@ func BlockFixture() flow.Block {
 	return BlockWithParentFixture(&header)
 }
 
+func FullBlockFixture() flow.Block {
+	block := BlockFixture()
+	payload := block.Payload
+	payload.Seals = Seal.Fixtures(10)
+	payload.Receipts = []*flow.ExecutionReceipt{
+		ExecutionReceiptFixture(),
+		ExecutionReceiptFixture(),
+	}
+
+	header := block.Header
+	header.PayloadHash = payload.Hash()
+
+	return flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
 func BlockFixtures(number int) []*flow.Block {
 	blocks := make([]*flow.Block, 0, number)
 	for ; number > 0; number-- {
@@ -314,6 +332,12 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 func WithCollRef(refID flow.Identifier) func(*flow.CollectionGuarantee) {
 	return func(guarantee *flow.CollectionGuarantee) {
 		guarantee.ReferenceBlockID = refID
+	}
+}
+
+func WithCollection(collection *flow.Collection) func(guarantee *flow.CollectionGuarantee) {
+	return func(guarantee *flow.CollectionGuarantee) {
+		guarantee.CollectionID = collection.ID()
 	}
 }
 
@@ -1034,7 +1058,6 @@ func EpochStatusFixture() *flow.EpochStatus {
 
 func IndexFixture() *flow.Index {
 	return &flow.Index{
-		NodeIDs:       IdentifierListFixture(5),
 		CollectionIDs: IdentifierListFixture(5),
 		SealIDs:       IdentifierListFixture(5),
 		ReceiptIDs:    IdentifierListFixture(5),

@@ -71,15 +71,15 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 // Node is a wrapper around LibP2P host.
 type Node struct {
 	sync.Mutex
-	connGater            *connGater                      // used to provide white listing
-	host                 host.Host                       // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub               *pubsub.PubSub                  // reference to the libp2p PubSub component
-	cancel               context.CancelFunc              // used to cancel context of host
-	logger               zerolog.Logger                  // used to provide logging
-	topics               map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs                 map[string]*pubsub.Subscription // map of a topic string to an actual subscription
-	id                   flow.Identifier                 // used to represent id of flow node running this instance of libP2P node
-	flowLibP2PProtocolID protocol.ID                     // the unique protocol ID
+	connGater            *connGater                             // used to provide white listing
+	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
+	cancel               context.CancelFunc                     // used to cancel context of host
+	logger               zerolog.Logger                         // used to provide logging
+	topics               map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
+	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 }
 
 func NewLibP2PNode(logger zerolog.Logger,
@@ -119,8 +119,8 @@ func NewLibP2PNode(logger zerolog.Logger,
 		pubSub:               pubSub,
 		cancel:               cancel,
 		logger:               logger,
-		topics:               make(map[string]*pubsub.Topic),
-		subs:                 make(map[string]*pubsub.Subscription),
+		topics:               make(map[flownet.Topic]*pubsub.Topic),
+		subs:                 make(map[flownet.Topic]*pubsub.Subscription),
 		id:                   id,
 		flowLibP2PProtocolID: flowLibP2PProtocolID,
 	}
@@ -274,7 +274,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 
 		// if this is a retry attempt, wait for some time before retrying
 		if retries > 0 {
-			// choose a random interval between 0 and 5 ms to retry
+			// choose a random interval between 0 to 5
 			r := rand.Intn(5)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
@@ -318,7 +318,7 @@ func (n *Node) GetIPPort() (string, string, error) {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(ctx context.Context, topic string) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -327,7 +327,7 @@ func (n *Node) Subscribe(ctx context.Context, topic string) (*pubsub.Subscriptio
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		tp, err = n.pubSub.Join(topic)
+		tp, err = n.pubSub.Join(topic.String())
 		if err != nil {
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
@@ -345,13 +345,13 @@ func (n *Node) Subscribe(ctx context.Context, topic string) (*pubsub.Subscriptio
 
 	n.logger.Debug().
 		Hex("node_id", logging.ID(n.id)).
-		Str("topic", topic).
+		Str("topic", topic.String()).
 		Msg("subscribed to topic")
 	return s, err
 }
 
 // UnSubscribe cancels the subscriber and closes the topic.
-func (n *Node) UnSubscribe(topic string) error {
+func (n *Node) UnSubscribe(topic flownet.Topic) error {
 	n.Lock()
 	defer n.Unlock()
 	// Remove the Subscriber from the cache
@@ -378,13 +378,13 @@ func (n *Node) UnSubscribe(topic string) error {
 
 	n.logger.Debug().
 		Hex("node_id", logging.ID(n.id)).
-		Str("topic", topic).
+		Str("topic", topic.String()).
 		Msg("unsubscribed from topic")
 	return err
 }
 
 // Publish publishes the given payload on the topic
-func (n *Node) Publish(ctx context.Context, topic string, data []byte) error {
+func (n *Node) Publish(ctx context.Context, topic flownet.Topic, data []byte) error {
 	ps, found := n.topics[topic]
 	if !found {
 		return fmt.Errorf("could not find topic (%s)", topic)

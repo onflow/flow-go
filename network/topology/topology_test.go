@@ -48,7 +48,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 	}
 
 	suite.randomizedTop = func(t *testing.T, identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
-		top, err := topology.NewRandomizedTopology(identifier, 0.01, state, manager)
+		top, err := topology.NewRandomizedTopology(identifier, suite.logger, 0.01, state, manager)
 		require.NoError(t, err)
 
 		return top
@@ -171,7 +171,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(constructorFunc
 	}
 
 	for j := 0; j < system; j++ {
-		// adjacency map keeps graph component of a single channel ID
+		// adjacency map keeps graph component of a single channel
 		adjMap := make(map[flow.Identifier]flow.IdentityList)
 
 		// creates a flow system
