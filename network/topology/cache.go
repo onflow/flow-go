@@ -51,23 +51,22 @@ func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 // should not be assumed as a 1-1 mapping between input and output.
 func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	inputFingerprint := ids.Fingerprint()
+	cacheHit := false
+
+	// updates current cache with a new topology if finger print of input is
+	// different than cached fingerprint
 	if !bytes.Equal(inputFingerprint[:], c.fingerprint[:]) {
-		// updates current cache with a new topology
 		c.cachedFanout, c.cachedError = c.top.GenerateFanout(ids)
-
-		c.log.Debug().
-			Hex("cached_fingerprint", logging.ID(c.fingerprint)).
-			Hex("new_fingerprint", logging.ID(inputFingerprint)).
-			Int("input_size", len(ids)).
-			Msg("topology cache updated")
-
 		c.fingerprint = inputFingerprint
-	} else {
-		c.log.Debug().
-			Hex("cached_fingerprint", logging.ID(c.fingerprint)).
-			Int("input_size", len(ids)).
-			Msg("topology resolves via cache")
+		cacheHit = true
 	}
+
+	c.log.Debug().
+		Hex("cached_fingerprint", logging.ID(c.fingerprint)).
+		Hex("input_fingerprint", logging.ID(inputFingerprint)).
+		Int("input_size", len(ids)).
+		Bool("cache_hit", cacheHit).
+		Msg("topology cache visited for fanout generation")
 
 	return c.cachedFanout, c.cachedError
 }
