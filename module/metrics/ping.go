@@ -26,9 +26,16 @@ func NewPingCollector() *PingCollector {
 }
 
 func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration) {
+	var rttValue float64
+	if rtt > 0 {
+		rttValue = float64(rtt.Milliseconds())
+	} else {
+		rttValue = -1
+	}
+
 	pc.reachable.With(prometheus.Labels{
 		LabelNodeID:   node.String(),
 		LabelNodeRole: node.Role.String(),
 		LabelNodeInfo: nodeInfo}).
-		Set(float64(rtt.Milliseconds()))
+		Set(rttValue)
 }
