@@ -47,6 +47,32 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, top)
 }
 
+// TestCache_GenerateFanout_Error evaluates that returning error by underlying topology on GenerateFanout, results in
+// cache to invalidate itself.
+func TestCache_GenerateFanout_Error(t *testing.T) {
+	// mocks underlying topology returning a fanout
+	top := &mocknetwork.Topology{}
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	ids := unittest.IdentityListFixture(100)
+	top.On("GenerateFanout", ids).Return(nil, fmt.Errorf("fanout-generation-error")).Once()
+
+	// assumes cache holding some fanout
+	cache := NewCache(log, top)
+	cache.cachedFanout = ids.Sample(10)
+	cache.fingerprint = unittest.IdentifierFixture()
+
+	// returning error on fanout generation should invalidate cache
+	// same error should be returned.
+	fanout, err := cache.GenerateFanout(ids)
+	require.Error(t, err)
+	require.Nil(t, fanout)
+	require.Equal(t, cache.fingerprint, flow.Identifier{})
+	require.Empty(t, cache.cachedFanout)
+
+	// underlying topology should be called only once.
+	mock.AssertExpectationsForObjects(t, top)
+}
+
 // TestCache_TopicBased evaluates strong cache guarantees over an underlying TopicBased cache. The guarantees
 // include a deterministic fanout as long as the input is the same, updating the cache once input gets changed, and
 // retaining on that.
@@ -95,30 +121,4 @@ func TestCache_TopicBased(t *testing.T) {
 		require.Equal(t, prevFanout, newFanout)
 		prevFanout = newFanout
 	}
-}
-
-// TestCache_GenerateFanout_Error evaluates that returning error by underlying topology on GenerateFanout, results in
-// cache to invalidate itself.
-func TestCache_GenerateFanout_Error(t *testing.T) {
-	// mocks underlying topology returning a fanout
-	top := &mocknetwork.Topology{}
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-	ids := unittest.IdentityListFixture(100)
-	top.On("GenerateFanout", ids).Return(nil, fmt.Errorf("fanout-generation-error")).Once()
-
-	// assumes cache holding some fanout
-	cache := NewCache(log, top)
-	cache.cachedFanout = ids.Sample(10)
-	cache.fingerprint = unittest.IdentifierFixture()
-
-	// returning error on fanout generation should invalidate cache
-	// same error should be returned.
-	fanout, err := cache.GenerateFanout(ids)
-	require.Error(t, err)
-	require.Nil(t, fanout)
-	require.Equal(t, cache.fingerprint, flow.Identifier{})
-	require.Empty(t, cache.cachedFanout)
-
-	// underlying topology should be called only once.
-	mock.AssertExpectationsForObjects(t, top)
 }
