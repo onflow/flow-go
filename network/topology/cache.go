@@ -2,6 +2,7 @@ package topology
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/rs/zerolog"
 
@@ -23,7 +24,6 @@ type Cache struct {
 	log          zerolog.Logger
 	top          network.Topology  // instance of underlying topology.
 	cachedFanout flow.IdentityList // most recently generated fanout list by invoking underlying topology.
-	cachedError  error             // most recently generated fanout error by invoking underlying topology.
 	fingerprint  flow.Identifier   // unique fingerprint of input IdentityList for cached fanout.
 }
 
@@ -33,7 +33,6 @@ func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 		log:          log.With().Str("component", "topology_cache").Logger(),
 		top:          top,
 		cachedFanout: nil,
-		cachedError:  nil,
 		fingerprint:  flow.Identifier{},
 	}
 }
@@ -56,17 +55,37 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 	// updates current cache with a new topology if finger print of input is
 	// different than cached fingerprint
 	if !bytes.Equal(inputFingerprint[:], c.fingerprint[:]) {
-		c.cachedFanout, c.cachedError = c.top.GenerateFanout(ids)
+		fanout, err := c.top.GenerateFanout(ids)
+		if err != nil {
+			c.invalidate()
+			return nil, fmt.Errorf("could not cache fanout: %w", err)
+		}
+
+		if len(fanout) == 0 {
+			c.invalidate()
+			c.log.Trace().
+				Int("input_size", len(ids)).
+				Msg("topology cache invalidated due to empty generated fanout")
+
+			return fanout, nil
+		}
+
 		c.fingerprint = inputFingerprint
 		cacheHit = true
 	}
 
-	c.log.Debug().
+	c.log.Trace().
 		Hex("cached_fingerprint", logging.ID(c.fingerprint)).
 		Hex("input_fingerprint", logging.ID(inputFingerprint)).
 		Int("input_size", len(ids)).
 		Bool("cache_hit", cacheHit).
 		Msg("topology cache visited for fanout generation")
 
-	return c.cachedFanout, c.cachedError
+	return c.cachedFanout, nil
+}
+
+// invalidate is cleans the cache and invalidates its content.
+func (c *Cache) invalidate() {
+	c.fingerprint = flow.Identifier{}
+	c.cachedFanout = nil
 }
