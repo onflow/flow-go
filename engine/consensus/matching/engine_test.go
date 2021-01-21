@@ -516,17 +516,17 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 }
 
 // TestRequestPendingApprovals checks that requests are sent only for chunks
-// that have not collected any approvals yet, and are sent only to the verifiers
-// assigned to those chunks. It also checks that the threshold and rate limiting
-// is respected.
+// that have not collected enough approvals yet, and are sent only to the
+// verifiers assigned to those chunks. It also checks that the threshold and
+// rate limiting is respected.
 func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
 	// n is the total number of blocks and incorporated-results we add to the
 	// chain and mempool
 	n := 100
 
-	// s is the number of incorporated results that have already collected at
-	// least one approval per chunk, so they should not require any approval
+	// s is the number of incorporated results that have already collected
+	// enough approval for every chunk, so they should not require any approval
 	// requests
 	s := 50
 
@@ -559,12 +559,13 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
 	// populate the incorporated-results mempool with:
 	// - 50 that have collected two signatures per chunk
-	// - 50 that have collected only 1 signature
+	// - 25 that have collected only one signature
+	// - 25 that have collected no signatures
 	//
 	// each chunk is assigned to both verifiers we defined above
 	//
-	// we populate expectedRequests with requests for chunks that are missing a
-	// signature, and that are below the approval request threshold.
+	// we populate expectedRequests with requests for chunks that are missing
+	// signatures, and that are below the approval request threshold.
 	//
 	//     sealed          unsealed/finalized
 	// |              ||                        |
@@ -594,15 +595,18 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 			assignment.Add(chunk, verifiers)
 			ms.Assigner.On("Assign", ir.Result, ir.IncorporatedBlockID).Return(assignment, nil)
 
-			// every chunk receives a signature from the first verifier
-			ir.AddSignature(chunk.Index, verifiers[0], unittest.SignatureFixture())
-
-			// Only add the second signature for a subset of results. For the
-			// remaining subset, we expect an ApprovalRequest to be sent to the
-			// missing verifier.
 			if i < s {
+				// the first s results receive 2 signatures per chunk
+				ir.AddSignature(chunk.Index, verifiers[0], unittest.SignatureFixture())
 				ir.AddSignature(chunk.Index, verifiers[1], unittest.SignatureFixture())
 			} else {
+				if i < s+25 {
+					// the next 25 have only 1 signature
+					ir.AddSignature(chunk.Index, verifiers[0], unittest.SignatureFixture())
+				}
+				// all these chunks are missing at least one signature so we
+				// expect requests to be sent out if the result's block is below
+				// the threshold
 				if i < n-int(ms.matching.approvalRequestsThreshold) {
 					expectedRequests = append(expectedRequests,
 						&messages.ApprovalRequest{
@@ -610,13 +614,13 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 							ChunkIndex: chunk.Index,
 						})
 				}
-
 			}
 		}
 
 		ms.PendingResults[ir.ID()] = ir
 	}
 
+	// exp is the number of requests that we expect
 	exp := n - s - int(ms.matching.approvalRequestsThreshold)
 
 	// add an incorporated-result for a block that was already sealed. We
@@ -649,10 +653,21 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	ms.PendingResults[unfinalizedBlock.ID()] = unfinalizedBlockIR
 
 	// wire-up the approval requests conduit to keep track of all sent requests
-	// and check that the target matches the unique verifier assigned to each
-	// chunk
+	// and check that the targets match with the verifiers who haven't signed
 	requests := []*messages.ApprovalRequest{}
 	conduit := &mocknetwork.Conduit{}
+	// mock the Publish method when requests are sent to 2 verifiers
+	conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			// collect the request
+			ar, ok := args[0].(*messages.ApprovalRequest)
+			ms.Assert().True(ok)
+			requests = append(requests, ar)
+		})
+	// mock the Publish method when requests are sent to only 1 verifier (which
+	// should be verifiers[1] by design, because we only included a signature
+	// from verifiers[0])
 	conduit.On("Publish", mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
@@ -692,7 +707,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	ms.Require().NoError(err)
 
 	// now we expect that requests have been sent for the chunks that haven't
-	// collected any approvals
+	// collected enough approvals
 	ms.Assert().Len(requests, len(expectedRequests))
 
 	// Check the request tracker

@@ -1019,9 +1019,9 @@ func (e *Engine) requestPendingApprovals() error {
 		// approvals
 		for _, c := range r.Result.Chunks {
 
-			// skip if we already have enough valid approvals for this chunk.
-			sigs, ok := r.GetChunkSignatures(c.Index)
-			if ok && uint(sigs.Len()) >= e.requiredApprovalsForSealConstruction {
+			// skip if we already have enough valid approvals for this chunk
+			sigs, haveChunkApprovals := r.GetChunkSignatures(c.Index)
+			if haveChunkApprovals && uint(sigs.Len()) >= e.requiredApprovalsForSealConstruction {
 				continue
 			}
 
@@ -1056,7 +1056,7 @@ func (e *Engine) requestPendingApprovals() error {
 
 			// keep only the ids of verifiers who haven't provided an approval
 			var targetIDs flow.IdentifierList
-			if sigs != nil {
+			if haveChunkApprovals && sigs.Len() > 0 {
 				targetIDs = flow.IdentifierList{}
 				for _, id := range assignedVerifiers {
 					if _, ok := sigs.BySigner(id); !ok {
