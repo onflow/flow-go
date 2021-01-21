@@ -9,16 +9,6 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-var Cmd = &cobra.Command{
-	Use:   "remove-execution-fork",
-	Short: "Remove execution fork for conflicting results. Useful for resuming the sealing.",
-	Run:   run,
-}
-
-func init() {
-	rootCmd.AddCommand(Cmd)
-}
-
 func run(*cobra.Command, []string) {
 	log.Info().
 		Str("datadir", flagDatadir).
