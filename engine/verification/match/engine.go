@@ -188,14 +188,35 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	// monitoring: increases number of received execution results
 	e.metrics.OnExecutionResultReceived()
 
+	// if result has already been sealed, then not to verify this result, nor fetching chunk
+	// data pack for this block
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not get last sealed height: %w", err)
+	}
+
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get block by height: %w", err)
+	}
+
+	isResultSealed := header.Height <= lastSealed.Height
+
+	// isResultSealed :=
 	log := e.log.With().
 		Hex("originID", logging.ID(originID)).
 		Hex("result_id", logging.ID(resultID)).
 		Hex("block_id", logging.ID(blockID)).
 		Int("total_chunks", len(result.Chunks)).
+		Uint64("height", header.Height).
+		Bool("sealed", isResultSealed).
 		Logger()
 
 	log.Info().Msg("execution result arrived")
+
+	if isResultSealed {
+		return nil
+	}
 
 	// different execution results can be chunked in parallel
 	// chunk assignment requires the randomness from the child block of the block that includes the result.
