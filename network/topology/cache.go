@@ -1,8 +1,6 @@
 package topology
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -66,7 +64,7 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 	c.invalidate()
 	fanout, err := c.top.GenerateFanout(ids)
 	if err != nil {
-		return nil, fmt.Errorf("could not cache fanout: %w", err)
+		return nil, err
 	}
 
 	if len(fanout) == 0 {
