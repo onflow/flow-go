@@ -72,6 +72,7 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 			return fanout, nil
 		}
 
+		c.cachedFanout = fanout
 		c.fingerprint = inputFingerprint
 		cacheHit = true
 	}
