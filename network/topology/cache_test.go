@@ -1,6 +1,7 @@
 package topology
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -15,11 +16,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestCache_GenerateFanout evaluates some weak caching guarantees over Cache with a mock underlying topology.
+// TestCache_GenerateFanout_HappyPath evaluates some weak caching guarantees over Cache with a mock underlying topology.
 // The guarantees include calling the underlying topology only once as long as the input is the same, caching the result,
 // and returning the same result over consecutive invocations with the same input.
 // The evaluations are weak as they go through a mock topology.
-func TestCache_GenerateFanout(t *testing.T) {
+func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	// mocks underlying topology
 	top := &mocknetwork.Topology{}
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
@@ -94,4 +95,28 @@ func TestCache_TopicBased(t *testing.T) {
 		require.Equal(t, prevFanout, newFanout)
 		prevFanout = newFanout
 	}
+}
+
+func TestCache_GenerateFanout_Error(t *testing.T) {
+	// mocks underlying topology returning a fanout
+	top := &mocknetwork.Topology{}
+	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	ids := unittest.IdentityListFixture(100)
+	top.On("GenerateFanout", ids).Return(nil, fmt.Errorf("fanout-generation-error")).Once()
+
+	// assumes cache holding some fanout
+	cache := NewCache(log, top)
+	cache.cachedFanout = ids.Sample(10)
+	cache.fingerprint = unittest.IdentifierFixture()
+
+	// returning error on fanout generation should invalidate cache
+	// same error should be returned.
+	fanout, err := cache.GenerateFanout(ids)
+	require.Error(t, err)
+	require.Nil(t, fanout)
+	require.Equal(t, cache.fingerprint, flow.Identifier{})
+	require.Empty(t, cache.cachedFanout)
+
+	// underlying topology should be called only once.
+	mock.AssertExpectationsForObjects(t, top)
 }
