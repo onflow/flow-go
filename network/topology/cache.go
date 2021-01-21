@@ -62,6 +62,8 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 		}
 
 		if len(fanout) == 0 {
+			// accounting for situations that topology decides not to generate fanout without throwing error
+			// e.g., empty channel list.
 			c.invalidate()
 			c.log.Trace().
 				Int("input_size", len(ids)).
