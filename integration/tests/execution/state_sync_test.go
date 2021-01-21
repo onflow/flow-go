@@ -24,6 +24,7 @@ type StateSyncSuite struct {
 }
 
 func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
+	s.T().Skip("disable state sync")
 
 	// wait for first finalized block, called blockA
 	blockA := s.BlockState.WaitForFirstFinalized(s.T())
