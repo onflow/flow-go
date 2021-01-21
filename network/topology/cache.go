@@ -54,7 +54,7 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 
 	// updates current cache with a new topology if finger print of input is
 	// different than cached fingerprint
-	if !bytes.Equal(inputFingerprint[:], c.fingerprint[:]) {
+	if inputFingerprint != c.fingerprint {
 		fanout, err := c.top.GenerateFanout(ids)
 		if err != nil {
 			c.invalidate()
