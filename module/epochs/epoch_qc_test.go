@@ -19,8 +19,10 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/test"
 
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -89,7 +91,8 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 
 	for _, node := range nodes {
 		cluster, _, _ := clustering.ByNodeID(node.NodeID)
-		_ = s.CreateNode(1, cluster, node)
+		rootBlock := clusterstate.CanonicalRootBlock(1, cluster)
+		_ = s.CreateNode(rootBlock, node)
 	}
 
 	// sign and publish voter transaction
@@ -218,7 +221,7 @@ func (s *ClusterEpochTestSuite) CreateClusterList(clusterCount, nodeCount int) (
 	return clusterList, nodes
 }
 
-func (s *ClusterEpochTestSuite) CreateNode(epoch uint64, cluster flow.IdentityList, me *flow.Identity) *ClusterNode {
+func (s *ClusterEpochTestSuite) CreateNode(rootBlock *cluster.Block, me *flow.Identity) *ClusterNode {
 
 	key, signer := test.AccountKeyGenerator().NewWithSigner()
 
@@ -229,7 +232,9 @@ func (s *ClusterEpochTestSuite) CreateNode(epoch uint64, cluster flow.IdentityLi
 
 	// create a mock of QCContractClient to submit vote and check if voted on the emulated chain
 	// TODO: we need to mock the underlying flowClient instead of the QCContract client
-	client := &modulemock.QCContractClient{}
+	rpcClient := client.MockRPCClient{}
+
+	client := epochs.NewQCContractClient()
 	client.On("Voted", mock.Anything).Return(func(_ context.Context) bool {
 
 		// execute a script to read if the node has voted and return true or false
@@ -277,7 +282,6 @@ func (s *ClusterEpochTestSuite) CreateNode(epoch uint64, cluster flow.IdentityLi
 	snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
 
 	// TODO: create a canonical root block
-	rootBlock := clusterstate.CanonicalRootBlock(epoch, cluster)
 	state := &protomock.State{}
 	state.On("CanonicalRootBlock").Return(rootBlock)
 	state.On("Final").Return(snapshot)

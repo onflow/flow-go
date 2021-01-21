@@ -6,7 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"google.golang.org/grpc"
 
 	"github.com/spf13/pflag"
 
@@ -404,7 +406,12 @@ func main() {
 			txSigner := sdkcrypto.NewInMemorySigner(sk, accountInfo.HashAlgorithm)
 
 			// create QC vote client
-			qcContractClient, err := epochs.NewQCContractClient(node.Me.NodeID(), accountInfo.Address, accountInfo.KeyIndex, accessAddress, qcContractAddress, txSigner)
+			flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+			if err != nil {
+				return nil, err
+			}
+
+			qcContractClient, err := epochs.NewQCContractClient(flowClient, node.Me.NodeID(), accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
 			if err != nil {
 				return nil, err
 			}
