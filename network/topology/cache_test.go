@@ -97,6 +97,8 @@ func TestCache_TopicBased(t *testing.T) {
 	}
 }
 
+// TestCache_GenerateFanout_Error evaluates that returning error by underlying topology on GenerateFanout, results in
+// cache to invalidate itself.
 func TestCache_GenerateFanout_Error(t *testing.T) {
 	// mocks underlying topology returning a fanout
 	top := &mocknetwork.Topology{}
