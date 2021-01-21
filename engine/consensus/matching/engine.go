@@ -934,36 +934,29 @@ func (e *Engine) requestPendingReceipts() error {
 //       sealed       maxHeightForRequesting      final
 func (e *Engine) requestPendingApprovals() error {
 
-	// Skip requesting approvals if they are not required for sealing.
-	// TODO: this is only here temporarily to ease the migration to new chunk
-	// based sealing.
-	if e.requiredApprovalsForSealConstruction <= 0 {
+	// skip requesting approvals if they are not required for sealing
+	if e.requiredApprovalsForSealConstruction == 0 {
 		return nil
 	}
 
-	// last sealed block
-	sealed, err := e.state.Sealed().Head()
+	sealed, err := e.state.Sealed().Head() // last sealed block
 	if err != nil {
 		return fmt.Errorf("could not get sealed height: %w", err)
 	}
-
-	// last finalized block
-	final, err := e.state.Final().Head()
+	final, err := e.state.Final().Head() // last finalized block
 	if err != nil {
 		return fmt.Errorf("could not get finalized height: %w", err)
 	}
-
-	// only request if number of unsealed finalized blocks exceeds the threshold
 	log := e.log.With().
 		Uint64("finalized_height", final.Height).
 		Uint64("sealed_height", sealed.Height).
 		Uint64("approval_requests_threshold", e.approvalRequestsThreshold).
 		Logger()
-
 	if sealed.Height+e.approvalRequestsThreshold >= final.Height {
 		log.Debug().Msg("skip requesting approvals as number of unsealed finalized blocks is below threshold")
 		return nil
 	}
+
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - approvalRequestsThreshold
 	// Hence, the following operation cannot underflow
@@ -980,13 +973,12 @@ func (e *Engine) requestPendingApprovals() error {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// Skip results incorporated in blocks that are above the approval
-		// request threshold. If this check passes, height `block.Height` must
-		// be finalized, because maxHeightForRequesting is lower than the
-		// finalized height.
 		if block.Height > maxHeightForRequesting {
 			continue
 		}
+
+		// If we got this far, height `block.Height` must be finalized, because
+		// maxHeightForRequesting is lower than the finalized height.
 
 		// Skip result if it is incorporated in a block that is _not_ part of
 		// the finalized fork.
@@ -1027,11 +1019,9 @@ func (e *Engine) requestPendingApprovals() error {
 		// approvals
 		for _, c := range r.Result.Chunks {
 
-			// skip if we already have one valid approval for this chunk.
-			// TODO: this is the happy path. In the full protocol we will
-			// require more than one approval.
-			sigs, ok := r.GetChunkSignatures(c.Index)
-			if ok && sigs.Len() > 0 {
+			// skip if we already have enough valid approvals for this chunk
+			sigs, haveChunkApprovals := r.GetChunkSignatures(c.Index)
+			if haveChunkApprovals && uint(sigs.Len()) >= e.requiredApprovalsForSealConstruction {
 				continue
 			}
 
@@ -1062,7 +1052,20 @@ func (e *Engine) requestPendingApprovals() error {
 			}
 
 			// get the list of verification nodes assigned to this chunk
-			targetIDs := assignment.Verifiers(c)
+			assignedVerifiers := assignment.Verifiers(c)
+
+			// keep only the ids of verifiers who haven't provided an approval
+			var targetIDs flow.IdentifierList
+			if haveChunkApprovals && sigs.Len() > 0 {
+				targetIDs = flow.IdentifierList{}
+				for _, id := range assignedVerifiers {
+					if _, ok := sigs.BySigner(id); !ok {
+						targetIDs = append(targetIDs, id)
+					}
+				}
+			} else {
+				targetIDs = assignedVerifiers
+			}
 
 			// publish the approval request to the network
 			requestCount++
