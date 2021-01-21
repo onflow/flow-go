@@ -275,33 +275,20 @@ func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}
-	head, err := s.state.blocks.ByID(s.blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get head block: %w", err)
-	}
 
-	// if this snapshot references the root block, the sealing segment
-	// consists only of the root block
-	segment := []*flow.Block{head}
-	if s.blockID == seal.BlockID {
-		return segment, nil
-	}
-
-	// for all other cases we walk through the chain backward until we reach
-	// the block referenced by the latest seal - the returned segment includes
-	// this block
-	nextID := head.Header.ParentID
-	for {
-		next, err := s.state.blocks.ByID(nextID)
+	// walk through the chain backward until we reach the block referenced by
+	// the latest seal - the returned segment includes this block
+	var segment []*flow.Block
+	err = state.Traverse(s.state.headers, s.blockID, seal.BlockID, func(header *flow.Header) error {
+		block, err := s.state.blocks.ByID(header.ID())
 		if err != nil {
-			return nil, fmt.Errorf("could not get next block (id=%x): %w", nextID, err)
+			return fmt.Errorf("could not get block: %w", err)
 		}
-
-		segment = append(segment, next)
-		if nextID == seal.BlockID {
-			break
-		}
-		nextID = next.Header.ParentID
+		segment = append(segment, block)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
 	}
 
 	// reverse the segment so it is in ascending order by height
