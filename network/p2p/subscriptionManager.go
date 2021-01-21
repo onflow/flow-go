@@ -7,83 +7,87 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// ChannelSubscriptionManager manages the engine to channelID subscription
+// ChannelSubscriptionManager manages subscriptions of engines running on the node to channels.
+// Each channel should be taken by at most a single engine.
 type ChannelSubscriptionManager struct {
 	mu      sync.RWMutex
-	engines map[string]network.Engine
+	engines map[network.Channel]network.Engine
 	mw      network.Middleware
 }
 
 func NewChannelSubscriptionManager(mw network.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
-		engines: make(map[string]network.Engine),
+		engines: make(map[network.Channel]network.Engine),
 		mw:      mw,
 	}
 }
 
-func (sm *ChannelSubscriptionManager) Register(channelID string, engine network.Engine) error {
+// Register registers an engine on the channel into the subscription manager.
+func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine network.Engine) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	// check if the engine engineID is already taken
-	_, ok := sm.engines[channelID]
+	// channel should be registered only once.
+	_, ok := sm.engines[channel]
 	if ok {
-		return fmt.Errorf("subscriptionManager: channel already registered: %s", channelID)
+		return fmt.Errorf("subscriptionManager: channel already registered: %s", channel)
 	}
 
-	// register the channel ID with the middleware to start receiving messages
-	err := sm.mw.Subscribe(channelID)
+	// registers the channel with the middleware to let middleware start receiving messages
+	err := sm.mw.Subscribe(channel)
 	if err != nil {
-		return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channelID, err)
+		return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channel, err)
 	}
 
-	// save the engine for the provided channelID
-	sm.engines[channelID] = engine
+	// saves the engine for the provided channel
+	sm.engines[channel] = engine
 
 	return nil
 }
 
-func (sm *ChannelSubscriptionManager) Unregister(channelID string) error {
+// Unregister removes the engine associated with a channel.
+func (sm *ChannelSubscriptionManager) Unregister(channel network.Channel) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	// check if there is a registered engine for the given channelID
-	_, ok := sm.engines[channelID]
+	// check if there is a registered engine for the given channel
+	_, ok := sm.engines[channel]
 	if !ok {
 		// if not found then there is nothing else to do
 		return nil
 	}
 
-	err := sm.mw.Unsubscribe(channelID)
+	err := sm.mw.Unsubscribe(channel)
 	if err != nil {
-		return fmt.Errorf("subscriptionManager: failed to unregister from channel %s", channelID)
+		return fmt.Errorf("subscriptionManager: failed to unregister from channel %s", channel)
 	}
 
-	delete(sm.engines, channelID)
+	delete(sm.engines, channel)
 
 	return nil
 }
 
-func (sm *ChannelSubscriptionManager) GetEngine(channelID string) (network.Engine, error) {
+// GetEngine returns engine associated with a channel.
+func (sm *ChannelSubscriptionManager) GetEngine(channel network.Channel) (network.Engine, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	eng, found := sm.engines[channelID]
+	eng, found := sm.engines[channel]
 	if !found {
-		return nil, fmt.Errorf("subscriptionManager: engine for channelID %s not found", channelID)
+		return nil, fmt.Errorf("subscriptionManager: engine for channel %s not found", channel)
 	}
 	return eng, nil
 }
 
-// GetChannelIDs returns list of topics this subscription manager has an engine registered for.
-func (sm *ChannelSubscriptionManager) GetChannelIDs() []string {
+// Channels returns all the channels registered in this subscription manager.
+func (sm *ChannelSubscriptionManager) Channels() network.ChannelList {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	topics := make([]string, 0)
-	for topic := range sm.engines {
-		topics = append(topics, topic)
+	channels := make(network.ChannelList, 0)
+	for channel := range sm.engines {
+		channels = append(channels, channel)
 	}
 
-	return topics
+	return channels
 }

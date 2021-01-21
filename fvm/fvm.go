@@ -33,7 +33,11 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger) 
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	return proc.Run(vm, ctx, st)
+	err := proc.Run(vm, ctx, st)
+	if err != nil {
+		return err
+	}
+	return st.Commit()
 }
 
 // GetAccount returns an account by address or an error if none exists.
@@ -43,7 +47,12 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	account, err := getAccount(vm, ctx, st, ctx.Chain, address)
+	account, err := getAccount(vm, ctx, st, address)
+	if err != nil {
+		// TODO: wrap error
+		return nil, err
+	}
+	err = st.Commit()
 	if err != nil {
 		// TODO: wrap error
 		return nil, err

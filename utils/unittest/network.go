@@ -15,7 +15,7 @@ func RegisterNetwork() (*module.Network, *mocknetwork.Conduit) {
 	// set up network module mock
 	net := &module.Network{}
 	net.On("Register", mock.Anything, mock.Anything).Return(
-		func(code string, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return con
 		},
 		nil,

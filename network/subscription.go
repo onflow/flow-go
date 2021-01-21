@@ -1,15 +1,15 @@
 package network
 
 type SubscriptionManager interface {
-	// Register registers an engine on the channel ID into the subscription manager.
-	Register(channelID string, engine Engine) error
+	// Register registers an engine on the channel into the subscription manager.
+	Register(channel Channel, engine Engine) error
 
-	// Unregister removes the engine associated with a channel ID
-	Unregister(channelID string) error
+	// Unregister removes the engine associated with a channel.
+	Unregister(channel Channel) error
 
-	// GetEngine returns engine associated with a channel ID.
-	GetEngine(channelID string) (Engine, error)
+	// GetEngine returns engine associated with a channel.
+	GetEngine(channel Channel) (Engine, error)
 
-	// GetChannelIDs returns all the channel IDs registered in this subscription manager.
-	GetChannelIDs() []string
+	// Channels returns all the channels registered in this subscription manager.
+	Channels() ChannelList
 }

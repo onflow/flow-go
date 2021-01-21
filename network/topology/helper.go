@@ -37,10 +37,9 @@ func MockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, c
 	return state, clusters
 }
 
-// connectednessByChannelID verifies that the subgraph of nodes subscribed to a channelID is connected.
-func connectednessByChannelID(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList,
-	channelID string) {
-	roles, ok := engine.RolesByChannelID(channelID)
+// connectednessByChannel verifies that the subgraph of nodes subscribed to a channel is connected.
+func connectednessByChannel(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, channel network.Channel) {
+	roles, ok := engine.RolesByChannel(channel)
 	require.True(t, ok)
 	Connected(t, adjMap, ids, filter.HasRole(roles...))
 }
@@ -70,7 +69,7 @@ func Connected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids f
 }
 
 // MockSubscriptionManager returns a list of mocked subscription manages for the input
-// identities. It only mocks the GetChannelIDs method of the subscription manager. Other methods
+// identities. It only mocks the Channels method of the subscription manager. Other methods
 // return an error, as they are not supposed to be invoked.
 func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.SubscriptionManager {
 	require.NotEmpty(t, ids)
@@ -82,7 +81,7 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.Subs
 		sm.On("Register", mock.Anything, mock.Anything).Return(err)
 		sm.On("Unregister", mock.Anything).Return(err)
 		sm.On("GetEngine", mock.Anything).Return(err)
-		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
+		sm.On("Channels").Return(engine.ChannelsByRole(id.Role))
 		sms[i] = sm
 	}
 
@@ -149,18 +148,19 @@ func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
 	}
 }
 
-// clusterChannelIDs is a test helper method that returns all cluster-based channel ids.
-func clusterChannelIDs(t *testing.T) []string {
-	channels := make([]string, 0)
-	for _, channelID := range engine.ChannelIDs() {
-		if _, ok := engine.IsClusterChannelID(channelID); !ok {
-			// skips if not a channel id
+// clusterChannels is a test helper method that returns all cluster-based channel.
+func clusterChannels(t *testing.T) network.ChannelList {
+	channels := make(network.ChannelList, 0)
+	for _, channel := range engine.Channels() {
+		if _, ok := engine.ClusterChannel(channel); !ok {
+			// skips non-cluster channels
 			continue
 		}
-		channels = append(channels, channelID)
+
+		channels = append(channels, channel)
 	}
 
-	require.NotEmpty(t, channels, "empty cluster-based channel ids")
+	require.NotEmpty(t, channels, "empty cluster-based channels")
 	return channels
 }
 
