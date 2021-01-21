@@ -99,6 +99,7 @@ func (ms *MatchingSuite) SetupTest() {
 		requestTracker:                       NewRequestTracker(1, 3),
 		approvalRequestsThreshold:            10,
 		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+		emergencySealingActive:               false,
 	}
 }
 
@@ -485,6 +486,59 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	ms.Assert().Empty(results, "expecting no sealable result")
 }
 
+// TestSealableResultsEmergencySealingMultipleCandidates tests matching.Engine.sealableResults():
+// When emergency sealing is active we should be able to identify and pick as candidates incorporated results
+// that are deep enough but still without verifications.
+func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates() {
+	// make sure that emergency sealing is enabled
+	ms.matching.emergencySealingActive = true
+	emergencySealingCandidates := make([]flow.Identifier, 10)
+
+	for i := range emergencySealingCandidates {
+		block := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
+		receipt := unittest.ExecutionReceiptFixture(
+			unittest.WithExecutorID(ms.ExeID),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))))
+		block.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{receipt},
+		})
+		// TODO: replace this with block.ID(), for now IncoroporatedBlockID == ExecutionResult.BlockID
+		emergencySealingCandidates[i] = receipt.ExecutionResult.BlockID
+		ms.Extend(&block)
+		delete(ms.PendingApprovals[receipt.ExecutionResult.ID()], uint64(len(receipt.ExecutionResult.Chunks)-1))
+		ms.LatestFinalizedBlock = &block
+	}
+
+	// at this point we have results without enough approvals
+	// no sealable results expected
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "expecting no sealable result")
+
+	// setup a new finalized block which is new enough that satisfies emergency sealing condition
+	for i := 0; i < DefaultEmergencySealingThreshold; i++ {
+		block := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
+		ms.Extend(&block)
+		ms.LatestFinalizedBlock = &block
+	}
+
+	// once emergency sealing is active and ERs are deep enough in chain
+	// we are expecting all stalled seals to be selected as candidates
+	results, err = ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Require().Equal(len(emergencySealingCandidates), len(results), "expecting valid number of sealable results")
+	for _, id := range emergencySealingCandidates {
+		matched := false
+		for _, ir := range results {
+			if ir.IncorporatedBlockID == id {
+				matched = true
+				break
+			}
+		}
+		ms.Assert().True(matched, "expect to find IR with valid ID")
+	}
+}
+
 // TestRequestPendingReceipts tests matching.Engine.requestPendingReceipts():
 //   * generate n=100 consecutive blocks, where the first one is sealed and the last one is final
 func (ms *MatchingSuite) TestRequestPendingReceipts() {
@@ -501,7 +555,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 
 	// progress latest sealed and latest finalized:
 	ms.LatestSealedBlock = orderedBlocks[0]
-	ms.LatestFinalizedBlock = orderedBlocks[n-1]
+	ms.LatestFinalizedBlock = &orderedBlocks[n-1]
 
 	// Expecting all blocks to be requested: from sealed height + 1 up to (incl.) latest finalized
 	for i := 1; i < n; i++ {
@@ -542,7 +596,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
 	// progress latest sealed and latest finalized:
 	ms.LatestSealedBlock = unsealedFinalizedBlocks[0]
-	ms.LatestFinalizedBlock = unsealedFinalizedBlocks[n-1]
+	ms.LatestFinalizedBlock = &unsealedFinalizedBlocks[n-1]
 
 	// add an unfinalized block; it shouldn't require an approval request
 	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock.Header)

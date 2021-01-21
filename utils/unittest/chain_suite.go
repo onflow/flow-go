@@ -28,7 +28,7 @@ type BaseChainSuite struct {
 	// BLOCKS
 	RootBlock            flow.Block
 	LatestSealedBlock    flow.Block
-	LatestFinalizedBlock flow.Block
+	LatestFinalizedBlock *flow.Block
 	UnfinalizedBlock     flow.Block
 	Blocks               map[flow.Identifier]*flow.Block
 
@@ -62,7 +62,9 @@ type BaseChainSuite struct {
 	SealsIndex map[flow.Identifier]*flow.Seal // last valid seal for block
 
 	// mock mempool.Approvals: used to test whether or not Matching Engine stores approvals
-	ApprovalsPL *mempool.Approvals
+	// mock storage backed by in-memory map PendingApprovals
+	ApprovalsPL      *mempool.Approvals
+	PendingApprovals map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval
 
 	// mock mempool.Receipts: used to test whether or not Matching Engine stores receipts
 	ReceiptsPL *mempool.Receipts
@@ -99,13 +101,14 @@ func (bc *BaseChainSuite) SetupChain() {
 	// RootBlock <- LatestSealedBlock <- LatestFinalizedBlock <- UnfinalizedBlock
 	bc.RootBlock = BlockFixture()
 	bc.LatestSealedBlock = BlockWithParentFixture(bc.RootBlock.Header)
-	bc.LatestFinalizedBlock = BlockWithParentFixture(bc.LatestSealedBlock.Header)
+	latestFinalizedBlock := BlockWithParentFixture(bc.LatestSealedBlock.Header)
+	bc.LatestFinalizedBlock = &latestFinalizedBlock
 	bc.UnfinalizedBlock = BlockWithParentFixture(bc.LatestFinalizedBlock.Header)
 
 	bc.Blocks = make(map[flow.Identifier]*flow.Block)
 	bc.Blocks[bc.RootBlock.ID()] = &bc.RootBlock
 	bc.Blocks[bc.LatestSealedBlock.ID()] = &bc.LatestSealedBlock
-	bc.Blocks[bc.LatestFinalizedBlock.ID()] = &bc.LatestFinalizedBlock
+	bc.Blocks[bc.LatestFinalizedBlock.ID()] = bc.LatestFinalizedBlock
 	bc.Blocks[bc.UnfinalizedBlock.ID()] = &bc.UnfinalizedBlock
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP PROTOCOL STATE ~~~~~~~~~~~~~~~~~~~~~~~~ //
@@ -360,6 +363,12 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~ SETUP APPROVALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.ApprovalsPL = &mempool.Approvals{}
 	bc.ApprovalsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
+	bc.PendingApprovals = make(map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval)
+	bc.ApprovalsPL.On("ByChunk", mock.Anything, mock.Anything).Return(
+		func(resultID flow.Identifier, chunkIndex uint64) map[flow.Identifier]*flow.ResultApproval {
+			return bc.PendingApprovals[resultID][chunkIndex]
+		},
+	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.ReceiptsPL = &mempool.Receipts{}
@@ -378,7 +387,7 @@ func (bc *BaseChainSuite) SetupChain() {
 			_, found := bc.PendingSeals[sealID]
 			return found
 		},
-	)
+	).Maybe()
 
 	bc.Assigner = &module.ChunkAssigner{}
 	bc.Assignments = make(map[flow.Identifier]*chunks.Assignment)
@@ -531,10 +540,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		}
 
 		bc.Assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil).Maybe()
-		for index := uint64(0); index < uint64(len(incorporatedResult.Result.Chunks)); index++ {
-			bc.ApprovalsPL.On("ByChunk", incorporatedResult.Result.ID(), index).Return(approvals[index]).Maybe()
-		}
-
+		bc.PendingApprovals[incorporatedResult.Result.ID()] = approvals
+		bc.PendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 		bc.Assignments[incorporatedResult.Result.ID()] = assignment
 	}
 }
@@ -548,7 +555,5 @@ func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture)
 	bc.PendingResults[subgraph.IncorporatedResult.ID()] = subgraph.IncorporatedResult
 
 	bc.Assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
-	for index := uint64(0); index < uint64(len(subgraph.IncorporatedResult.Result.Chunks)); index++ {
-		bc.ApprovalsPL.On("ByChunk", subgraph.IncorporatedResult.Result.ID(), index).Return(subgraph.Approvals[index]).Maybe()
-	}
+	bc.PendingApprovals[subgraph.IncorporatedResult.Result.ID()] = subgraph.Approvals
 }

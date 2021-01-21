@@ -34,6 +34,14 @@ import (
 // for subsequent inclusion in block.
 const DefaultRequiredApprovalsForSealConstruction = 1
 
+// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
+// sealing.
+const DefaultEmergencySealingThreshold = 400
+
+// DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
+// to make fire fighting easier while seal & verification is under development.
+const DefaultEmergencySealingActive = false
+
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
 // from verification nodes), and saves the seals into seals mempool for adding
@@ -65,6 +73,7 @@ type Engine struct {
 	receiptValidator                     module.ReceiptValidator         // used to validate receipts
 	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
 	approvalRequestsThreshold            uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
+	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 }
 
 // New creates a new collection propagation engine.
@@ -88,6 +97,7 @@ func New(
 	assigner module.ChunkAssigner,
 	validator module.ReceiptValidator,
 	requiredApprovalsForSealConstruction uint,
+	emergencySealingActive bool,
 ) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
@@ -117,6 +127,7 @@ func New(
 		receiptValidator:                     validator,
 		requestTracker:                       NewRequestTracker(10, 30),
 		approvalRequestsThreshold:            10,
+		emergencySealingActive:               emergencySealingActive,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
@@ -288,12 +299,31 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	err = e.storeReceipt(receipt, &log)
 	if err != nil {
+		// We do _not_ return here if receiptsDB already contained the receipt,
+		// because we still need to create a corresponding IncorporatedResult,
+		// and push it to the mempool, otherwise liveness of sealing is
+		// undermined.
+		// receiptsDB is persistent storage while Mempools are in-memory only.
+		// After a crash, the replica still needs to be able to generate a seal
+		// for an Result even if it had stored the Result (as part of a Receipt)
+		// before the crash.
+		// TODO: This exception to the rule must be removed in phase 3, because
+		// the IR mempool will be populated by another function.
 		if engine.IsDuplicatedEntryError(err) {
 			return nil
 		}
 		return fmt.Errorf("failed to store receipt: %w", err)
 	}
 
+	// ATTENTION:
+	//
+	// In phase 2, we artificially create IncorporatedResults from incoming
+	// receipts and set the IncorporatedBlockID to the result's block ID.
+	//
+	// In phase 3, the incorporated results mempool will be populated by the
+	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
+	// will be the ID of the first block on its fork that contains a receipt
+	// committing to this result.
 	err = e.storeIncorporatedResult(receipt, &log)
 	if err != nil {
 		if engine.IsDuplicatedEntryError(err) {
@@ -340,29 +370,8 @@ func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, log *zerolog.Logge
 //	* exception in case something went wrong
 // 	* nil in case of success
 func (e *Engine) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
-	// We do _not_ return here if receiptsDB already contained receipt!
-	// receiptsDB is persistent storage while Mempools are in-memory only.
-	// After a crash, the replica still needs to be able to generate a seal
-	// for an Result even if it had stored the Result (as part of a Receipt) before the crash.
-	// Otherwise, a stored result might never get sealed, and
-	// liveness of sealing is undermined.
-	// resultsDB is persistent storage while Mempools are in-memory only.
-	// After a crash, the replica still needs to be able to generate a seal
-	// for an Result even if it had stored the Result before the crash.
-	// Otherwise, a stored result might never get sealed, and
-	// liveness of sealing is undermined.
 
 	// Create an IncorporatedResult and add it to the mempool
-	//
-	// ATTENTION:
-	//
-	// In phase 2, we artificially create IncorporatedResults from incoming
-	// receipts and set the IncorporatedBlockID to the result's block ID.
-	//
-	// In phase 3, the incorporated results mempool will be populated by the
-	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
-	// will be the ID of the first block on its fork that contains a receipt
-	// committing to this result.
 	added, err := e.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
 			receipt.ExecutionResult.BlockID,
@@ -591,9 +600,13 @@ func (e *Engine) checkingSealing() {
 func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 	var results []*flow.IncorporatedResult
 
+	lastFinalized, err := e.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last finalized block: %w", err)
+	}
+
 	// go through the results mempool and check which ones we have collected
 	// enough approvals for
-RES_LOOP:
 	for _, incorporatedResult := range e.incorporatedResults.All() {
 		// not finding the block header for an incorporated result is a fatal
 		// implementation bug, as we only add results to the IncorporatedResults
@@ -620,19 +633,41 @@ RES_LOOP:
 			return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 		}
 
+		// The production system must always have a system chunk. Any result without chunks
+		// is wrong and should _not_ be sealed. While it is fundamentally the ReceiptValidator's
+		// responsibility to filter out results without chunks, there is no harm in also in enforcing
+		// the same condition here as well. It simplifies the code, because otherwise the
+		// matching engine must enforce equality of start and end state for a result with zero chunks,
+		// in the absence of anyone else doing do.
+		matched := false
 		// check that each chunk collects enough approvals
 		for _, chunk := range incorporatedResult.Result.Chunks {
-			matched, err := e.matchChunk(incorporatedResult, block, chunk, assignment)
+			matched, err = e.matchChunk(incorporatedResult, block, chunk, assignment)
 			if err != nil {
 				return nil, fmt.Errorf("could not match chunk: %w", err)
 			}
 			if !matched {
-				continue RES_LOOP
+				break
 			}
 		}
 
-		// add the result to the results that should be sealed
-		results = append(results, incorporatedResult)
+		// ATTENTION: this is a temporary solution called emergency sealing. Emergency sealing is a special case
+		// when we seal ERs that don't have enough approvals but are deep enough in the chain resulting in halting sealing
+		// process. This will be removed when implementation of seal & verification is finished.
+		if !matched && e.emergencySealingActive {
+			block, err := e.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
+			if err != nil {
+				return nil, fmt.Errorf("could not get block %v: %w", incorporatedResult.IncorporatedBlockID, err)
+			}
+			if block.Height+DefaultEmergencySealingThreshold <= lastFinalized.Height {
+				matched = true
+			}
+		}
+
+		if matched {
+			// add the result to the results that should be sealed
+			results = append(results, incorporatedResult)
+		}
 	}
 
 	return results, nil

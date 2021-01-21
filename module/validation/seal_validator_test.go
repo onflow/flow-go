@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	mock2 "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -20,7 +20,7 @@ func TestSealValidator(t *testing.T) {
 type SealValidationSuite struct {
 	unittest.BaseChainSuite
 
-	sealValidator module.SealValidator
+	sealValidator *sealValidator
 	verifier      *mock2.Verifier
 }
 
@@ -28,7 +28,7 @@ func (s *SealValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.verifier = &mock2.Verifier{}
 	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.PayloadsDB, s.SealsDB,
-		s.Assigner, s.verifier, 1)
+		s.Assigner, s.verifier, 1, metrics.NewNoopCollector())
 }
 
 // TestSealValid tests submitting of valid seal
@@ -36,7 +36,7 @@ func (s *SealValidationSuite) TestSealValid() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -61,7 +61,7 @@ func (s *SealValidationSuite) TestSealInvalidBlockID() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -88,7 +88,7 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -103,10 +103,50 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 		Seals: []*flow.Seal{seal},
 	})
 
+	// we want to make sure that the emergency-seal metric is not called because
+	// requiredApprovalsForSealing is > 0. We don't mock the EmergencySeal
+	// method of the compliance collector, such that the test will fail if the
+	// method is called.
+	mockMetrics := &mock2.ConsensusMetrics{}
+	s.sealValidator.metrics = mockMetrics
+
 	_, err := s.sealValidator.Validate(&block)
 
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
+}
+
+// TestSealEmergencySeal checks that, when requiredApprovalsForSealVerification
+// is 0, a seal which has 0 signatures for at least one chunk will be accepted,
+// and that the emergency-seal metric will be incremented.
+func (s *SealValidationSuite) TestSealEmergencySeal() {
+	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+	)
+	blockParent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receipt},
+	})
+
+	s.Extend(&blockParent)
+
+	block := unittest.BlockWithParentFixture(blockParent.Header)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	seal.AggregatedApprovalSigs = seal.AggregatedApprovalSigs[1:]
+	block.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	s.sealValidator.requiredApprovalsForSealVerification = 0
+	mockMetrics := &mock2.ConsensusMetrics{}
+	mockMetrics.On("EmergencySeal").Once()
+	s.sealValidator.metrics = mockMetrics
+
+	_, err := s.sealValidator.Validate(&block)
+	s.Require().NoError(err)
+
+	mockMetrics.AssertExpectations(s.T())
 }
 
 // TestSealInvalidChunkSignersCount tests that we reject seal with invalid approval signatures for
@@ -115,7 +155,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -142,7 +182,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -169,7 +209,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
@@ -195,7 +235,7 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 func (s *SealValidationSuite) TestHighestSeal() {
 	// take finalized block and build a receipt for it
 	block3 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
-	block2Receipt := unittest.ReceiptForBlockFixture(&s.LatestFinalizedBlock)
+	block2Receipt := unittest.ReceiptForBlockFixture(s.LatestFinalizedBlock)
 	block3.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{block2Receipt},
 	})
