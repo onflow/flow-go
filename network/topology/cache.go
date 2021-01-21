@@ -1,7 +1,6 @@
 package topology
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -50,40 +49,36 @@ func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 // should not be assumed as a 1-1 mapping between input and output.
 func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
 	inputFingerprint := ids.Fingerprint()
-	cacheHit := false
 
-	// updates current cache with a new topology if finger print of input is
-	// different than cached fingerprint
-	if inputFingerprint != c.fingerprint {
-		fanout, err := c.top.GenerateFanout(ids)
-		if err != nil {
-			c.invalidate()
-			return nil, fmt.Errorf("could not cache fanout: %w", err)
-		}
-
-		if len(fanout) == 0 {
-			// accounting for situations that topology decides not to generate fanout without throwing error
-			// e.g., empty channel list.
-			c.invalidate()
-			c.log.Trace().
-				Int("input_size", len(ids)).
-				Msg("topology cache invalidated due to empty generated fanout")
-
-			return fanout, nil
-		}
-
-		c.cachedFanout = fanout
-		c.fingerprint = inputFingerprint
-		cacheHit = true
-	}
-
-	c.log.Trace().
+	log := c.log.With().
 		Hex("cached_fingerprint", logging.ID(c.fingerprint)).
 		Hex("input_fingerprint", logging.ID(inputFingerprint)).
-		Int("input_size", len(ids)).
-		Bool("cache_hit", cacheHit).
-		Msg("topology cache visited for fanout generation")
+		Int("input_size", len(ids)).Logger()
 
+	if inputFingerprint == c.fingerprint {
+		// cache hit
+		log.Trace().Msg("topology cache hit")
+		return c.cachedFanout, nil
+	}
+
+	// cache invalidation and update
+	c.invalidate()
+	fanout, err := c.top.GenerateFanout(ids)
+	if err != nil {
+		return nil, fmt.Errorf("could not cache fanout: %w", err)
+	}
+
+	if len(fanout) == 0 {
+		// accounting for situations that topology decides not to generate fanout without throwing error
+		// e.g., empty channel list.
+		log.Trace().Msg("topology cache invalidated due to empty generated fanout")
+		return fanout, nil
+	}
+
+	c.cachedFanout = fanout
+	c.fingerprint = inputFingerprint
+
+	log.Trace().Msg("topology cache invalidated and updated")
 	return c.cachedFanout, nil
 }
 
