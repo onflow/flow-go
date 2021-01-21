@@ -633,6 +633,12 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 			return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 		}
 
+		// The production system must always have a system chunk. Any result without chunks
+		// is wrong and should _not_ be sealed. While it is fundamentally the ReceiptValidator's
+		// responsibility to filter out results without chunks, there is no harm in also in enforcing
+		// the same condition here as well. It simplifies the code, because otherwise the
+		// matching engine must enforce equality of start and end state for a result with zero chunks,
+		// in the absence of anyone else doing do.
 		matched := false
 		// check that each chunk collects enough approvals
 		for _, chunk := range incorporatedResult.Result.Chunks {
@@ -651,7 +657,7 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, error) {
 		if !matched && e.emergencySealingActive {
 			block, err := e.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
 			if err != nil {
-				return nil, fmt.Errorf("could not match chunk: %w", err)
+				return nil, fmt.Errorf("could not get block %v: %w", incorporatedResult.IncorporatedBlockID, err)
 			}
 			if block.Height+DefaultEmergencySealingThreshold <= lastFinalized.Height {
 				matched = true
