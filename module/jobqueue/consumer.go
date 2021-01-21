@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/storage"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/onflow/flow-go/storage"
 )
 
 type Consumer struct {
 	sync.Mutex
-	log     zerolog.Logger
-	storage *badger.DB
+	log zerolog.Logger
+
+	// storage
+	jobs     storage.Jobs
+	progress storage.ConsumerProgress
 
 	// config
-	jobName       []byte
 	maxProcessing int
 	maxPending    int
 	fn            func(job Job)
@@ -33,16 +33,22 @@ type Consumer struct {
 	processingsIndex map[JobID]int
 }
 
-func NewConsumer(log zerolog.Logger, storage *badger.DB, maxProcessing int, maxPending int, jobName []byte, fn func(job Job), processedIndex int) *Consumer {
+func NewConsumer(log zerolog.Logger, jobs storage.Jobs, progress storage.ConsumerProgress, maxProcessing int, maxPending int, fn func(job Job)) *Consumer {
 	return &Consumer{
-		storage:          storage,
-		log:              log,
-		jobName:          jobName,
-		maxProcessing:    maxProcessing,
-		maxPending:       maxPending,
-		fn:               fn,
+		log: log,
+
+		// store dependency
+		jobs:     jobs,
+		progress: progress,
+
+		// update config
+		maxProcessing: maxProcessing,
+		maxPending:    maxPending,
+		fn:            fn,
+
+		// init state variables
 		running:          false,
-		processedIndex:   processedIndex,
+		processedIndex:   0,
 		processings:      make(map[int]*JobStatus),
 		processingsIndex: make(map[JobID]int),
 	}
@@ -53,17 +59,27 @@ type JobStatus struct {
 	done  bool
 }
 
-func (c *Consumer) Start() {
+func (c *Consumer) Start() error {
 	c.Lock()
 	defer c.Unlock()
 
 	if c.running {
-		return
+		return nil
 	}
 
 	c.running = true
 
+	// on startup, sync with storage for the processed index
+	// to ensure the consistency
+	processedIndex, err := c.progress.ProcessedIndex()
+	if err != nil {
+		return fmt.Errorf("could not read processed index: %w", err)
+	}
+	c.processedIndex = processedIndex
+
 	c.checkProcessable()
+
+	return nil
 }
 
 func (c *Consumer) Stop() {
@@ -83,6 +99,10 @@ func (c *Consumer) FinishJob(jobID JobID) {
 }
 
 func (c *Consumer) Check() {
+	c.Lock()
+	defer c.Unlock()
+
+	c.checkProcessable()
 }
 
 // checkProcessable is a wrap of the `run` function with logging
@@ -107,7 +127,7 @@ func (c *Consumer) run() (int, error) {
 		return 0, nil
 	}
 
-	processables, err := c.processableJobs()
+	processables, processedIndex, err := c.processableJobs()
 	if err != nil {
 		return 0, fmt.Errorf("could not query processable jobs: %w", err)
 	}
@@ -116,27 +136,37 @@ func (c *Consumer) run() (int, error) {
 		go c.fn(job)
 	}
 
+	err = c.progress.SetProcessedIndex(processedIndex)
+	if err != nil {
+		return 0, fmt.Errorf("could not set processed index %v, %w", processedIndex, err)
+	}
+	c.processedIndex = processedIndex
+
 	return len(processables), nil
 }
 
-func (c *Consumer) processableJobs() ([]Job, error) {
+// processableJobs check the worker's capacity and if sufficient, read
+// jobs from the storage, return the processable jobs, and the processed
+// index
+func (c *Consumer) processableJobs() ([]Job, int, error) {
 	processables := make([]Job, 0)
 
 	// count how many jobs are still processing,
 	// in order to decide whether to process a new job
 	processing := 0
 	pending := 0
+	processedIndex := c.processedIndex
 
 	// if still have processing capacity, find the next processable
 	// job
-	for i := c.processedIndex + 1; processing <= c.maxProcessing && pending <= c.maxPending; i++ {
+	for i := processedIndex + 1; processing <= c.maxProcessing && pending <= c.maxPending; i++ {
 		status, ok := c.processings[i]
 
 		// if no one is processing the next job, try to read one
 		// job and process it.
 		if !ok {
 			// take one job
-			job, err := c.readJobAtIndex(i)
+			job, err := c.jobs.AtIndex(i)
 
 			// if there is no more job at this index, we could stop
 			if errors.Is(err, storage.ErrNotFound) {
@@ -145,7 +175,7 @@ func (c *Consumer) processableJobs() ([]Job, error) {
 
 			// exception
 			if err != nil {
-				return nil, fmt.Errorf("could not read job at index %v, %w", i, err)
+				return nil, 0, fmt.Errorf("could not read job at index %v, %w", i, err)
 			}
 
 			jobID := job.ID()
@@ -163,20 +193,17 @@ func (c *Consumer) processableJobs() ([]Job, error) {
 			continue
 		}
 
-		if i == c.processedIndex+1 {
-			err := c.setProcessedJob(i)
-			if err != nil {
-				return nil, fmt.Errorf("could not write processed index %v, %w", i, err)
-			}
-			c.processedIndex = i
+		if i == processedIndex+1 {
+			processedIndex++
 		} else {
 			pending++
 		}
 	}
 
-	return processables, nil
+	return processables, processedIndex, nil
 }
 
+// saveJob only update the interanal state to add the processing job
 func (c *Consumer) saveJob(jobID JobID, index int) {
 	c.processingsIndex[jobID] = index
 	c.processings[index] = &JobStatus{
@@ -185,6 +212,7 @@ func (c *Consumer) saveJob(jobID JobID, index int) {
 	}
 }
 
+// doneJob updates the internal state to mark the job has been processed
 func (c *Consumer) doneJob(jobID JobID) bool {
 	// lock
 	index, ok := c.processingsIndex[jobID]
@@ -206,20 +234,4 @@ func (c *Consumer) doneJob(jobID JobID) bool {
 
 	status.done = true
 	return true
-}
-
-func (c *Consumer) readJobAtIndex(index int) (Job, error) {
-	// key := c.jobName + index
-	// bytes, err := c.storage.Get(key)
-	var job Job
-	var err error
-	if err != nil {
-		return nil, fmt.Errorf("could not get job: %w", err)
-	}
-
-	return job, nil
-}
-
-func (c *Consumer) setProcessedJob(index int) error {
-	return nil
 }

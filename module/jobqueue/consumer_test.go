@@ -1,7 +1,14 @@
 package jobqueue
 
 import (
+	"sync"
 	"testing"
+
+	badgerdb "github.com/dgraph-io/badger/v2"
+
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // 0# means job at index 0 is processed.
@@ -10,31 +17,23 @@ import (
 // 1* means job 1 is finished, but there is a gap in the processed
 
 type testConsumer struct {
-	Consumer
+	*Consumer
 }
 
-func (c *testConsumer) readState() bool {
-	return c.running
+func (c *testConsumer) readState() (bool, int, map[int]*JobStatus, map[JobID]int) {
+	return c.running, c.processedIndex, c.processings, c.processingsIndex
 }
 
-type C struct {
-	pri int
-}
-
-func NewC() *C {
-	return &C{pri: 10}
-}
-
-func (c *C) Update(v int) {
-	c.pri = v
-}
-
-type TC struct {
-	*C
-}
-
-func (tc *TC) readPri() int {
-	return tc.pri
+func NewTestConsumer(db *badgerdb.DB, fn func(Job)) *testConsumer {
+	log := unittest.Logger()
+	jobs := &MockJobs{}
+	cc := badger.NewChunkConsumer(db)
+	maxProcessing := 3
+	maxPending := 8
+	c := NewConsumer(log, jobs, cc, maxProcessing, maxPending, fn)
+	return &testConsumer{
+		Consumer: c,
+	}
 }
 
 func TestConsumer(t *testing.T) {
@@ -128,4 +127,44 @@ func testTooManyPending(t *testing.T) {
 }
 
 func testStopRunning(t *testing.T) {
+}
+
+type MockJobs struct {
+	sync.Mutex
+	last  int
+	jobs  map[int]Job
+	index map[JobID]int
+}
+
+// ensure MockJobs implements the Jobs interface
+var _ storage.Jobs = &MockJobs{}
+
+func (j *MockJobs) AtIndex(index int) (Job, error) {
+	j.Lock()
+	defer j.Unlock()
+
+	job, ok := j.jobs[index]
+	if !ok {
+		return nil, storage.ErrNotFound
+	}
+
+	return job, nil
+}
+
+func (j *MockJobs) Add(job Job) error {
+	j.Lock()
+	defer j.Unlock()
+
+	id := job.ID()
+	_, ok := j.index[id]
+	if ok {
+		return storage.ErrAlreadyExists
+	}
+
+	index := j.last + 1
+	j.index[id] = index
+	j.jobs[index] = job
+	j.last++
+
+	return nil
 }

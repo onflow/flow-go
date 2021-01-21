@@ -84,6 +84,48 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
+// adjust will allow the caller to inspect the value stored under
+// the given key, and replace with a new value returned by the given
+// function. It will error if the key does not exist
+func adjust(key []byte, adjuster func(interface{}) interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		// retrieve the item from the key-value store
+		item, err := tx.Get(key)
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return storage.ErrNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("could not check key: %w", err)
+		}
+
+		var oldEntity interface{}
+		// get the value from the item
+		err = item.Value(func(val []byte) error {
+			err := msgpack.Unmarshal(val, oldEntity)
+			return err
+		})
+		if err != nil {
+			return fmt.Errorf("could not decode the stored entity: %w", err)
+		}
+
+		entity := adjuster(oldEntity)
+
+		// serialize the entity data
+		val, err := msgpack.Marshal(entity)
+		if err != nil {
+			return fmt.Errorf("could not encode entity: %w", err)
+		}
+
+		// persist the entity data into the DB
+		err = tx.Set(key, val)
+		if err != nil {
+			return fmt.Errorf("could not replace data: %w", err)
+		}
+
+		return nil
+	}
+}
+
 // remove removes the entity with the given key, if it exists. If it doesn't
 // exist, this is a no-op.
 func remove(key []byte) func(*badger.Txn) error {
