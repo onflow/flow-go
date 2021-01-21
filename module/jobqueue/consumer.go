@@ -10,6 +10,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type Worker interface {
+	Run(job storage.Job)
+}
+
 type Consumer struct {
 	sync.Mutex
 	log zerolog.Logger
@@ -17,11 +21,11 @@ type Consumer struct {
 	// storage
 	jobs     storage.Jobs
 	progress storage.ConsumerProgress
+	worker   Worker
 
 	// config
 	maxProcessing int
 	maxPending    int
-	fn            func(job Job)
 
 	// state variables
 	running        bool
@@ -33,18 +37,18 @@ type Consumer struct {
 	processingsIndex map[JobID]int
 }
 
-func NewConsumer(log zerolog.Logger, jobs storage.Jobs, progress storage.ConsumerProgress, maxProcessing int, maxPending int, fn func(job Job)) *Consumer {
+func NewConsumer(log zerolog.Logger, jobs storage.Jobs, progress storage.ConsumerProgress, worker Worker, maxProcessing int, maxPending int) *Consumer {
 	return &Consumer{
 		log: log,
 
 		// store dependency
 		jobs:     jobs,
 		progress: progress,
+		worker:   worker,
 
 		// update config
 		maxProcessing: maxProcessing,
 		maxPending:    maxPending,
-		fn:            fn,
 
 		// init state variables
 		running:          false,
@@ -133,7 +137,7 @@ func (c *Consumer) run() (int, error) {
 	}
 
 	for _, job := range processables {
-		go c.fn(job)
+		go c.worker.Run(job)
 	}
 
 	err = c.progress.SetProcessedIndex(processedIndex)

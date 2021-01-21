@@ -1,11 +1,13 @@
-package jobqueue
+package jobqueue_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
 	badgerdb "github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -14,27 +16,7 @@ import (
 // 0# means job at index 0 is processed.
 // +1 means received a job 1
 // 1! means job 1 is being processed.
-// 1* means job 1 is finished, but there is a gap in the processed
-
-type testConsumer struct {
-	*Consumer
-}
-
-func (c *testConsumer) readState() (bool, int, map[int]*JobStatus, map[JobID]int) {
-	return c.running, c.processedIndex, c.processings, c.processingsIndex
-}
-
-func NewTestConsumer(db *badgerdb.DB, fn func(Job)) *testConsumer {
-	log := unittest.Logger()
-	jobs := &MockJobs{}
-	cc := badger.NewChunkConsumer(db)
-	maxProcessing := 3
-	maxPending := 8
-	c := NewConsumer(log, jobs, cc, maxProcessing, maxPending, fn)
-	return &testConsumer{
-		Consumer: c,
-	}
-}
+// 1* means job 1 is finished
 
 func TestConsumer(t *testing.T) {
 	// [] => 										[0#]
@@ -70,7 +52,7 @@ func TestConsumer(t *testing.T) {
 	t.Run("testProcessingWithNonNextFinished", testProcessingWithNonNextFinished)
 
 	// [+1, +2, +3, +4, 3*, 2*, +5, +6] =>	[0#, 1!, 2*, 3*, 4!, 5!, 6]
-	// when job 6 is received, then no more worker can process it, it will be buffered
+	// when job 6 is received, no more worker can process it, it will be buffered
 	t.Run("testMaxWorkerWithFinishedNonNexts", testMaxWorkerWithFinishedNonNexts)
 
 	// [+1, +2, +3, +4, 3*, 2*, +5, 1*] => [0#, 1#, 2#, 3#, 4!, 5!]
@@ -91,9 +73,22 @@ func TestConsumer(t *testing.T) {
 }
 
 func testOnStartup(t *testing.T) {
+	runWith(t, func(c *testConsumer, w *mockWorker, j *mockJobs) {
+		// running, processedIndex, processings, processingsIndex := c.ReadState()
+		// require.Equal(t, running, false)
+		// require.Equal(t, processedIndex, 0)
+		// require.Equal(t, len(processings), 0)
+		// require.Equal(t, len(processingsIndex), 0)
+	})
 }
 
+// [+1] => 									[0#, 1!]
+// when received job 1, it will be processed
 func testOnReceiveOneJob(t *testing.T) {
+	runWith(t, func(c *testConsumer, w *mockWorker, j *mockJobs) {
+		c.Start()
+		j.PushOne()
+	})
 }
 
 func testOnJobFinished(t *testing.T) {
@@ -129,17 +124,64 @@ func testTooManyPending(t *testing.T) {
 func testStopRunning(t *testing.T) {
 }
 
-type MockJobs struct {
-	sync.Mutex
-	last  int
-	jobs  map[int]Job
-	index map[JobID]int
+type JobStatus = jobqueue.JobStatus
+type Worker = jobqueue.Worker
+type JobID = storage.JobID
+type Job = storage.Job
+
+func runWith(t *testing.T, runTestWith func(*testConsumer, *mockWorker, *mockJobs)) {
+	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
+		jobs := newMockJobs()
+		worker := newMockWorker()
+		consumer := newTestConsumer(db, worker)
+		runTestWith(consumer, worker, jobs)
+	})
 }
 
-// ensure MockJobs implements the Jobs interface
-var _ storage.Jobs = &MockJobs{}
+// testConsumer wraps the Consumer instance, and allows
+// us to inspect its internal state
+type testConsumer struct {
+	*jobqueue.Consumer
+}
 
-func (j *MockJobs) AtIndex(index int) (Job, error) {
+// func (c *testConsumer) ReadState() (bool, int, map[int]*JobStatus, map[JobID]int) {
+// 	return c.running, c.processedIndex, c.processings, c.processingsIndex
+// }
+
+func newTestConsumer(db *badgerdb.DB, worker Worker) *testConsumer {
+	log := unittest.Logger()
+	jobs := &mockJobs{}
+	cc := badger.NewChunkConsumer(db)
+	maxProcessing := 3
+	maxPending := 8
+	c := jobqueue.NewConsumer(log, jobs, cc, worker, maxProcessing, maxPending)
+	return &testConsumer{
+		Consumer: c,
+	}
+}
+
+// mockJobs implements the Jobs interface, and is used as the dependency for
+// the Consumer for testing purpose
+type mockJobs struct {
+	sync.Mutex
+	last     int
+	jobs     map[int]Job
+	index    map[JobID]int
+	jobMaker *jobMaker
+}
+
+func newMockJobs() *mockJobs {
+	return &mockJobs{
+		last:     0,
+		jobs:     make(map[int]Job),
+		index:    make(map[JobID]int),
+		jobMaker: &jobMaker{},
+	}
+}
+
+// var _ storage.Jobs = &mockJobs{}
+
+func (j *mockJobs) AtIndex(index int) (Job, error) {
 	j.Lock()
 	defer j.Unlock()
 
@@ -151,7 +193,7 @@ func (j *MockJobs) AtIndex(index int) (Job, error) {
 	return job, nil
 }
 
-func (j *MockJobs) Add(job Job) error {
+func (j *mockJobs) Add(job Job) error {
 	j.Lock()
 	defer j.Unlock()
 
@@ -167,4 +209,75 @@ func (j *MockJobs) Add(job Job) error {
 	j.last++
 
 	return nil
+}
+
+func (j *mockJobs) PushOne() error {
+	job := j.jobMaker.Next()
+	return j.Add(job)
+}
+
+func (j *mockJobs) PushN(n int) error {
+	for i := 0; i < n; i++ {
+		err := j.PushOne()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deterministically compute the JobID from index
+func jobIDAtIndex(index int) storage.JobID {
+	return storage.JobID(fmt.Sprintf("%v", index))
+}
+
+// a Mock worker that stores all the jobs that it was asked to work on
+type mockWorker struct {
+	sync.Mutex
+	called []Job
+}
+
+// var _ module.Worker = &mockWorker{}
+
+func newMockWorker() *mockWorker {
+	return &mockWorker{
+		called: make([]Job, 0),
+	}
+}
+
+func (w *mockWorker) Run(job Job) {
+	w.Lock()
+	defer w.Unlock()
+	w.called = append(w.called, job)
+}
+
+func (w *mockWorker) Called() []Job {
+	return w.called
+}
+
+type testJob struct {
+	index int
+}
+
+func (tj testJob) ID() storage.JobID {
+	return jobIDAtIndex(tj.index)
+}
+
+// jobMaker is a test helper.
+// it creates new job with unique job id
+type jobMaker struct {
+	sync.Mutex
+	index int
+}
+
+// return next unique job
+func (j *jobMaker) Next() Job {
+	j.Lock()
+	defer j.Unlock()
+
+	job := &testJob{
+		index: j.index,
+	}
+	j.index++
+	return job
 }
