@@ -185,7 +185,7 @@ func (w *LedgerWAL) replay(
 			break
 		}
 
-		if loadedCheckpoint != -1 && to == loadedCheckpoint {
+		if loadedCheckpoint != -1 && loadedCheckpoint == to {
 			return nil
 		}
 
