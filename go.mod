@@ -31,6 +31,7 @@ require (
 	github.com/libp2p/go-libp2p-swarm v0.4.0
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.0
 	github.com/libp2p/go-tcp-transport v0.2.1
+	github.com/m4ksio/wal v1.0.0 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.12.3
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
@@ -39,7 +40,7 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.5.1
+	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/zerolog v1.19.0
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
@@ -55,7 +56,6 @@ require (
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
-	gopkg.in/yaml.v2 v2.2.8 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
