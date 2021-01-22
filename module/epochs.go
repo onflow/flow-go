@@ -76,6 +76,9 @@ type DKGContractClient interface {
 	// SubmitResult submits the final public result of the DKG protocol. This
 	// represents the node's local computation of the public keys for each
 	// DKG participant and the group public key.
+	//
+	// SubmitResult must be called strictly after the final phase has ended.
+	//
 	// TODO type of DKGResult?
 	SubmitResult(result []byte) error
 }
