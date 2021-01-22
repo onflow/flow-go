@@ -4,6 +4,8 @@ package mocknetwork
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,7 +15,7 @@ type Topology struct {
 }
 
 // GenerateFanout provides a mock function with given fields: ids
-func (_m *Topology) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
+func (_m *Topology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
 	ret := _m.Called(ids)
 
 	var r0 flow.IdentityList

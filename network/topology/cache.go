@@ -45,7 +45,7 @@ func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 //
 // Note that this implementation of GenerateFanout preserves same output as long as input is the same. This
 // should not be assumed as a 1-1 mapping between input and output.
-func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
+func (c *Cache) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
 	inputFingerprint := ids.Fingerprint()
 
 	log := c.log.With().
@@ -62,7 +62,7 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 	// cache miss logic
 	// invalidation and update
 	c.invalidate()
-	fanout, err := c.top.GenerateFanout(ids)
+	fanout, err := c.top.GenerateFanout(ids, nil)
 	if err != nil {
 		return nil, err
 	}

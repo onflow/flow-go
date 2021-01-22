@@ -224,7 +224,7 @@ func (suite *TopologyTestSuite) topologyScenario(constructorFunc factory, me flo
 	top := topology.NewCache(suite.logger, constructorFunc(suite.T(), me, state, subMngr))
 
 	// generates topology of node.
-	myFanout, err := top.GenerateFanout(ids)
+	myFanout, err := top.GenerateFanout(ids, nil)
 	require.NoError(suite.T(), err)
 
 	return myFanout

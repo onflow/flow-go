@@ -36,7 +36,7 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	// The output should be resolved by the cache without asking the underlying topology more than once.
 	prevFanout := fanout
 	for i := 0; i < 100; i++ {
-		newFanout, err := cache.GenerateFanout(ids)
+		newFanout, err := cache.GenerateFanout(ids, nil)
 		require.NoError(t, err)
 
 		require.Equal(t, prevFanout, newFanout)
@@ -63,7 +63,7 @@ func TestCache_GenerateFanout_Error(t *testing.T) {
 
 	// returning error on fanout generation should invalidate cache
 	// same error should be returned.
-	fanout, err := cache.GenerateFanout(ids)
+	fanout, err := cache.GenerateFanout(ids, nil)
 	require.Error(t, err)
 	require.Nil(t, fanout)
 	require.Equal(t, cache.fingerprint, flow.Identifier{})
@@ -88,7 +88,7 @@ func TestCache_Update(t *testing.T) {
 	cache.fingerprint = unittest.IdentifierFixture()
 
 	// cache content should change once fingerprint to GenerateFanout changes.
-	newFanout, err := cache.GenerateFanout(ids)
+	newFanout, err := cache.GenerateFanout(ids, nil)
 	require.NoError(t, err)
 	require.Equal(t, cache.fingerprint, ids.Fingerprint())
 	require.Equal(t, cache.cachedFanout, fanout)
@@ -116,10 +116,10 @@ func TestCache_TopicBased(t *testing.T) {
 	// Testing deterministic behavior
 	//
 	// Over consecutive invocations of cache with the same input, the same output should be returned.
-	prevFanout, err := cache.GenerateFanout(ids)
+	prevFanout, err := cache.GenerateFanout(ids, nil)
 	require.NoError(t, err)
 	for i := 0; i < 100; i++ {
-		newFanout, err := cache.GenerateFanout(ids)
+		newFanout, err := cache.GenerateFanout(ids, nil)
 		require.NoError(t, err)
 
 		require.Equal(t, prevFanout, newFanout)
@@ -130,7 +130,7 @@ func TestCache_TopicBased(t *testing.T) {
 	//
 	// Evicts one identity from ids list and cache should be invalidated and updated with a new fanout.
 	ids = ids[:len(ids)-1]
-	newFanout, err := cache.GenerateFanout(ids)
+	newFanout, err := cache.GenerateFanout(ids, nil)
 	require.NoError(t, err)
 	require.NotEqual(t, newFanout, prevFanout)
 
@@ -140,7 +140,7 @@ func TestCache_TopicBased(t *testing.T) {
 	// (new) output should be returned.
 	prevFanout = newFanout
 	for i := 0; i < 100; i++ {
-		newFanout, err := cache.GenerateFanout(ids)
+		newFanout, err := cache.GenerateFanout(ids, nil)
 		require.NoError(t, err)
 
 		require.Equal(t, prevFanout, newFanout)
