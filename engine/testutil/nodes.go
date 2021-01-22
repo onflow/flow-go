@@ -152,7 +152,7 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator())
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -219,6 +219,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
+	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -240,7 +241,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
-	requesterEng, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
@@ -248,8 +249,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
 	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
-
-	requireApprovals := true
 
 	matchingEngine, err := matching.New(
 		node.Log,
@@ -260,8 +259,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Net,
 		node.State,
 		node.Me,
-		requesterEng,
-		resultsDB,
+		receiptRequester,
+		receiptsDB,
 		node.Headers,
 		node.Index,
 		results,
@@ -270,7 +269,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		seals,
 		assigner,
 		validator,
-		requireApprovals)
+		validation.DefaultRequiredApprovalsForSealValidation,
+		matching.DefaultEmergencySealingActive)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{
@@ -705,13 +705,16 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 
+		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
+
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,
 			node.Tracer,
 			node.Net,
 			node.State,
 			node.Me,
-			chunkVerifier)
+			chunkVerifier,
+			approvalStorage)
 		require.Nil(t, err)
 	}
 
