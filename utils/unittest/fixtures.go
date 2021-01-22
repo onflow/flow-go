@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -1000,12 +1001,18 @@ func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 	return key
 }
 
-func QuorumCertificateFixture() *flow.QuorumCertificate {
+func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	return &flow.QuorumCertificate{
 		View:      uint64(rand.Uint32()),
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
 		SigData:   SeedFixture(32 * 3),
+	}
+}
+
+func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
+		qc.BlockID = blockID
 	}
 }
 
@@ -1131,7 +1138,20 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		Seal.WithResult(result),
 		Seal.WithServiceEvents(setup.ServiceEvent(), commit.ServiceEvent()),
 	)
+
 	return root, result, seal
+}
+
+// RootSnapshotFixture returns a snapshot representing a root chain state, for
+// example one as returned from BootstrapFixture.
+func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
+	block, result, seal := BootstrapFixture(participants, opts...)
+	qc := QuorumCertificateFixture(QCWithBlockID(block.ID()))
+	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
+	if err != nil {
+		panic(err)
+	}
+	return root
 }
 
 // ChainFixture creates a list of blocks that forms a chain
