@@ -10,8 +10,9 @@ import (
 
 // FinalizedProtocolStateWithParticipants returns a protocol state with finalized participants
 func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
-	*flow.Block, *protocol.Snapshot, *protocol.State) {
-	block := BlockFixture()
+	*flow.Block, *protocol.Snapshot, *protocol.State, *protocol.Snapshot) {
+	sealed := BlockFixture()
+	block := BlockWithParentFixture(sealed.Header)
 	head := block.Header
 
 	// set up protocol snapshot mock
@@ -37,6 +38,14 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 		nil,
 	)
 
+	sealedSnapshot := &protocol.Snapshot{}
+	sealedSnapshot.On("Head").Return(
+		func() *flow.Header {
+			return sealed.Header
+		},
+		nil,
+	)
+
 	// set up protocol state mock
 	state := &protocol.State{}
 	state.On("Final").Return(
@@ -44,10 +53,14 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 			return snapshot
 		},
 	)
+	state.On("Sealed").Return(func() protint.Snapshot {
+		return sealedSnapshot
+	},
+	)
 	state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) protint.Snapshot {
 			return snapshot
 		},
 	)
-	return &block, snapshot, state
+	return &block, snapshot, state, sealedSnapshot
 }

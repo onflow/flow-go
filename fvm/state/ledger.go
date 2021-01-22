@@ -6,13 +6,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// Rename this to Storage
+// remove reference to flow.RegisterValue and use byte[]
 // A Ledger is the storage interface used by the virtual machine to read and write register values.
 type Ledger interface {
-	Set(owner, controller, key string, value flow.RegisterValue)
+	Set(owner, controller, key string, value flow.RegisterValue) error
 	Get(owner, controller, key string) (flow.RegisterValue, error)
-	Touch(owner, controller, key string)
-	Delete(owner, controller, key string)
-	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
+	Touch(owner, controller, key string) error
+	Delete(owner, controller, key string) error
 }
 
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
@@ -30,7 +31,7 @@ func NewMapLedger() *MapLedger {
 	}
 }
 
-func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) {
+func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) error {
 	k := fullKey(owner, controller, key)
 	m.RegisterTouches[k] = true
 	m.Registers[k] = flow.RegisterEntry{
@@ -41,6 +42,7 @@ func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) 
 		},
 		Value: value,
 	}
+	return nil
 }
 
 func (m MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error) {
@@ -49,30 +51,14 @@ func (m MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error
 	return m.Registers[k].Value, nil
 }
 
-func (m MapLedger) Touch(owner, controller, key string) {
+func (m MapLedger) Touch(owner, controller, key string) error {
 	m.RegisterTouches[fullKey(owner, controller, key)] = true
+	return nil
 }
 
-func (m MapLedger) Delete(owner, controller, key string) {
-	delete(m.Registers, fullKey(owner, controller, key))
-}
-
-func (m MapLedger) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	data := make(flow.RegisterEntries, 0, len(m.Registers))
-
-	for _, v := range m.Registers {
-		data = append(data, v)
-	}
-
-	ids := make([]flow.RegisterID, 0, len(m.Registers))
-	values := make([]flow.RegisterValue, 0, len(m.Registers))
-
-	for _, v := range data {
-		ids = append(ids, v.Key)
-		values = append(values, v.Value)
-	}
-
-	return ids, values
+func (m MapLedger) Delete(owner, controller, key string) error {
+	delete(m.RegisterTouches, fullKey(owner, controller, key))
+	return nil
 }
 
 func fullKey(owner, controller, key string) string {

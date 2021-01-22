@@ -12,21 +12,24 @@ import (
 func TestAccounts_Create(t *testing.T) {
 	t.Run("Sets registers", func(t *testing.T) {
 		ledger := state.NewMapLedger()
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 
-		accounts := state.NewAccounts(ledger)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
 		require.NoError(t, err)
 
+		err = st.Commit()
+		require.NoError(t, err)
 		// storage_used + exists + key count
 		require.Equal(t, len(ledger.RegisterTouches), 3)
 	})
 
 	t.Run("Fails if account exists", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -40,8 +43,8 @@ func TestAccounts_Create(t *testing.T) {
 
 func TestAccounts_GetWithNoKeys(t *testing.T) {
 	ledger := state.NewMapLedger()
-
-	accounts := state.NewAccounts(ledger)
+	st := state.NewState(ledger)
+	accounts := state.NewAccounts(st)
 	address := flow.HexToAddress("01")
 
 	err := accounts.Create(nil, address)
@@ -62,14 +65,16 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 
 			ledger := state.NewMapLedger()
 
-			ledger.Set(
+			err := ledger.Set(
 				string(address.Bytes()), string(address.Bytes()), "public_key_0",
 				ledgerValue,
 			)
+			require.NoError(t, err)
 
-			accounts := state.NewAccounts(ledger)
+			st := state.NewState(ledger)
+			accounts := state.NewAccounts(st)
 
-			err := accounts.Create(nil, address)
+			err = accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			_, err = accounts.GetPublicKey(address, 0)
@@ -87,14 +92,16 @@ func TestAccounts_GetPublicKeyCount(t *testing.T) {
 		for _, ledgerValue := range [][]byte{{}, nil} {
 
 			ledger := state.NewMapLedger()
-			ledger.Set(
+			err := ledger.Set(
 				string(address.Bytes()), string(address.Bytes()), "public_key_count",
 				ledgerValue,
 			)
+			require.NoError(t, err)
 
-			accounts := state.NewAccounts(ledger)
+			st := state.NewState(ledger)
+			accounts := state.NewAccounts(st)
 
-			err := accounts.Create(nil, address)
+			err = accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			count, err := accounts.GetPublicKeyCount(address)
@@ -113,14 +120,16 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 		for _, ledgerValue := range [][]byte{{}, nil} {
 
 			ledger := state.NewMapLedger()
-			ledger.Set(
+			err := ledger.Set(
 				string(address.Bytes()), string(address.Bytes()), "public_key_count",
 				ledgerValue,
 			)
+			require.NoError(t, err)
 
-			accounts := state.NewAccounts(ledger)
+			st := state.NewState(ledger)
+			accounts := state.NewAccounts(st)
 
-			err := accounts.Create(nil, address)
+			err = accounts.Create(nil, address)
 			require.NoError(t, err)
 
 			keys, err := accounts.GetPublicKeys(address)
@@ -135,16 +144,19 @@ func TestAccounts_GetPublicKeys(t *testing.T) {
 func TestAccounts_GetWithNoKeysCounter(t *testing.T) {
 	ledger := state.NewMapLedger()
 
-	accounts := state.NewAccounts(ledger)
+	st := state.NewState(ledger)
+	accounts := state.NewAccounts(st)
 	address := flow.HexToAddress("01")
 
 	err := accounts.Create(nil, address)
 	require.NoError(t, err)
 
-	ledger.Delete(
+	err = ledger.Delete(
 		string(address.Bytes()),
 		string(address.Bytes()),
 		"public_key_count")
+
+	require.NoError(t, err)
 
 	require.NotPanics(t, func() {
 		_, _ = accounts.Get(address)
@@ -157,7 +169,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 
 	t.Run("Setting a contract puts it in Contracts", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-		a := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		a := state.NewAccounts(st)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
 
@@ -172,7 +185,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting a contract again, does not add it to contracts", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-		a := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		a := state.NewAccounts(st)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
 
@@ -190,7 +204,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Setting more contracts always keeps them sorted", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-		a := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		a := state.NewAccounts(st)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
 
@@ -213,7 +228,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract does not fail if there is none", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-		a := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		a := state.NewAccounts(st)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
 
@@ -222,7 +238,8 @@ func TestAccounts_SetContracts(t *testing.T) {
 	})
 	t.Run("Removing a contract removes it", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-		a := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		a := state.NewAccounts(st)
 		err := a.Create(nil, address)
 		require.NoError(t, err)
 
@@ -243,8 +260,8 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 	t.Run("Storage used on account creation is deterministic", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -252,13 +269,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(55))
+		require.Equal(t, uint64(55), storageUsed)
 	})
 
 	t.Run("Storage used on register set increases", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -269,13 +286,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(55+34))
+		require.Equal(t, uint64(55+34), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to same value, stays the same", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -288,13 +305,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(55+34))
+		require.Equal(t, uint64(55+34), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to larger value, increases", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -307,13 +324,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(55+35))
+		require.Equal(t, uint64(55+35), storageUsed)
 	})
 
 	t.Run("Storage used, set twice on same register to smaller value, decreases", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -326,13 +343,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(55+33))
+		require.Equal(t, uint64(55+33), storageUsed)
 	})
 
 	t.Run("Storage used, after register deleted, decreases", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -345,13 +362,13 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(55+0))
+		require.Equal(t, uint64(55+0), storageUsed)
 	})
 
 	t.Run("Storage used on a complex scenario has correct value", func(t *testing.T) {
 		ledger := state.NewMapLedger()
-
-		accounts := state.NewAccounts(ledger)
+		st := state.NewState(ledger)
+		accounts := state.NewAccounts(st)
 		address := flow.HexToAddress("01")
 
 		err := accounts.Create(nil, address)
@@ -374,7 +391,7 @@ func TestAccount_StorageUsed(t *testing.T) {
 
 		storageUsed, err := accounts.GetStorageUsed(address)
 		require.NoError(t, err)
-		require.Equal(t, storageUsed, uint64(55+33+46))
+		require.Equal(t, uint64(55+33+46), storageUsed)
 	})
 }
 

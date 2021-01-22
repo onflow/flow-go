@@ -3,6 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -31,7 +32,7 @@ type ScriptProcedure struct {
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, state.Ledger) error
+	Process(*VirtualMachine, Context, *ScriptProcedure, *state.State) error
 }
 
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
@@ -42,9 +43,9 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, ledger)
+		err := p.Process(vm, ctx, proc, st)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -69,16 +70,25 @@ func (i ScriptInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *ScriptProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, ledger)
+	env, err := newEnvironment(ctx, vm, st)
 	if err != nil {
 		return err
 	}
 
-	location := runtime.ScriptLocation(proc.ID[:])
+	location := common.ScriptLocation(proc.ID[:])
 
-	value, err := vm.Runtime.ExecuteScript(proc.Script, proc.Arguments, env, location)
+	value, err := vm.Runtime.ExecuteScript(
+		runtime.Script{
+			Source:    proc.Script,
+			Arguments: proc.Arguments,
+		},
+		runtime.Context{
+			Interface: env,
+			Location:  location,
+		},
+	)
 	if err != nil {
 		return err
 	}

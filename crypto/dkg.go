@@ -6,15 +6,18 @@ package crypto
 // refers to discrete-log based protocols that generate keys for a BLS-based
 // threshold signature scheme.
 // BLS is used with the BLS12-381 curve.
-
+//
 // These protocols mainly generate a BLS key pair and share the secret key
 // among (n) participants in a way that any (t+1) key shares allow reconstructing
 // the initial key (and also reconstructing a BLS threshold signature under the initial key).
+// Up to (t) shares don't reveal any information about the initial key (or a signature generated
+//	by that key).
+//
 // We refer to the initial key pair by group private and group public key.
-// (t) is the threshold parameter. Although the API allows using arbitrary values of (t),
+// (t) is the threshold parameter.
 // Flow uses DKG with the value t = floor((n-1)/2) to optimize for unforgeability and robustness
 // of the threshold signature scheme using the output keys.
-
+//
 // Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
@@ -44,11 +47,11 @@ type DKGState interface {
 	NextTimeout() error
 	// Running returns the running state of the DKG protocol
 	Running() bool
-	// Disqualify forces a node to get disqualified
+	// ForceDisqualify forces a node to get disqualified
 	// for a reason outside of the DKG protocol.
 	// The caller should make sure all honest nodes call this function,
 	// otherwise, the protocol can be broken.
-	Disqualify(node int) error
+	ForceDisqualify(node int) error
 }
 
 // index is the node index type used as participants ID
@@ -62,11 +65,13 @@ func newDKGCommon(size int, threshold int, currentIndex int,
 	}
 
 	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
-		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d", size-1)
+		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d, got %d",
+			size-1, currentIndex)
 	}
 
-	if threshold >= size || threshold < 0 {
-		return nil, fmt.Errorf("The threshold must be between 0 and %d", size-1)
+	if threshold >= size || threshold < MinimumThreshold {
+		return nil, fmt.Errorf("The threshold must be between %d and %d, got %d",
+			MinimumThreshold, size-1, threshold)
 	}
 
 	return &dkgCommon{
@@ -142,22 +147,18 @@ type DKGProcessor interface {
 	// protocol instance. This can be achieved by prepending all
 	// messages by a unique instance ID.
 	Broadcast(data []byte)
-	// Blacklist flags that a node is misbehaving and that it got
+	// Disqualify flags that a node is misbehaving and that it got
 	// disqualified from the protocol. Such behavior deserves
 	// disqualifying as it is flagged to all honest nodes in
 	// the protocol.
-	Blacklist(node int)
+	// log describes the disqualification reason.
+	Disqualify(node int, log string)
 	// FlagMisbehavior warns that a node is misbehaving.
 	// Such behavior is not necessarily flagged to all nodes and therefore
 	// the node is not disqualified from the protocol. Other mechanisms
 	// outside DKG could be implemented to synchronize slashing the misbehaving
-	// node by all participating nodes, using the api `Disqualify`. Failing to
+	// node by all participating nodes, using the api `ForceDisqualify`. Failing to
 	// do so, the protocol can be broken.
+	// log describes the misbehavior.
 	FlagMisbehavior(node int, log string)
 }
-
-const (
-	wrongFormat   = "wrong message format"
-	duplicated    = "message type is duplicated"
-	wrongProtocol = "message is not compliant with the protocol"
-)

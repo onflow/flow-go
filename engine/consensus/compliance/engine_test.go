@@ -54,9 +54,8 @@ type ComplianceSuite struct {
 	cleaner  *storage.Cleaner
 	headers  *storage.Headers
 	payloads *storage.Payloads
-	state    *protocol.State
+	state    *protocol.MutableState
 	snapshot *protocol.Snapshot
-	mutator  *protocol.Mutator
 	con      *mocknetwork.Conduit
 	net      *module.Network
 	prov     *mocknetwork.Engine
@@ -146,7 +145,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	)
 
 	// set up protocol state mock
-	cs.state = &protocol.State{}
+	cs.state = &protocol.MutableState{}
 	cs.state.On("Final").Return(
 		func() protint.Snapshot {
 			return cs.snapshot
@@ -157,11 +156,7 @@ func (cs *ComplianceSuite) SetupTest() {
 			return cs.snapshot
 		},
 	)
-	cs.state.On("Mutate", mock.Anything).Return(
-		func() protint.Mutator {
-			return cs.mutator
-		},
-	)
+	cs.state.On("Extend", mock.Anything).Return(nil)
 
 	// set up protocol snapshot mock
 	cs.snapshot = &protocol.Snapshot{}
@@ -178,10 +173,6 @@ func (cs *ComplianceSuite) SetupTest() {
 		nil,
 	)
 
-	// set up protocol mutator mock
-	cs.mutator = &protocol.Mutator{}
-	cs.mutator.On("Extend", mock.Anything).Return(nil)
-
 	// set up network conduit mock
 	cs.con = &mocknetwork.Conduit{}
 	cs.con.On("Publish", mock.Anything, mock.Anything).Return(nil)
@@ -192,7 +183,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	// set up network module mock
 	cs.net = &module.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(code string, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return cs.con
 		},
 		nil,
@@ -358,8 +349,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidParent() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Mutate")
-	cs.mutator.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block.Header, cs.head.View)
@@ -383,8 +373,7 @@ func (cs *ComplianceSuite) TestOnBlockProposalValidAncestor() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Mutate")
-	cs.mutator.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block.Header, parent.Header.View)
@@ -404,16 +393,20 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 	cs.headerDB[ancestor.ID()] = ancestor.Header
 
 	// make sure we fail to extend the state
-	*cs.mutator = protocol.Mutator{}
-	cs.mutator.On("Extend", mock.Anything).Return(errors.New("dummy error"))
+	*cs.state = protocol.MutableState{}
+	cs.state.On("Final").Return(
+		func() protint.Snapshot {
+			return cs.snapshot
+		},
+	)
+	cs.state.On("Extend", mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error
 	err := cs.e.onBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Mutate")
-	cs.mutator.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should not submit the proposal to hotstuff
 	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)

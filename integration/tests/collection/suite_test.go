@@ -139,7 +139,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(convert.ToSDKID(suite.net.Root().ID())).
-		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
+		SetProposalKey(acct.addr, acct.key.Index, acct.key.SequenceNumber).
 		SetPayer(acct.addr).
 		AddAuthorizer(acct.addr)
 
@@ -147,7 +147,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 		apply(tx)
 	}
 
-	err := tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
 	require.Nil(suite.T(), err)
 
 	suite.acct.key.SequenceNumber++
@@ -165,7 +165,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.ID, acct.signer)
+		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.Index, acct.signer)
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)

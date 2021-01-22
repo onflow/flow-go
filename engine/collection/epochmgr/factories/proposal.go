@@ -47,7 +47,7 @@ func NewProposalEngineFactory(
 	return factory, nil
 }
 
-func (f *ProposalEngineFactory) Create(clusterState cluster.State, headers storage.Headers, payloads storage.ClusterPayloads) (*proposal.Engine, error) {
+func (f *ProposalEngineFactory) Create(clusterState cluster.MutableState, headers storage.Headers, payloads storage.ClusterPayloads) (*proposal.Engine, error) {
 
 	cache := buffer.NewPendingClusterBlocks()
 	engine, err := proposal.New(

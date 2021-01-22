@@ -13,11 +13,11 @@ import (
 // protocol state.
 type NodeIDRefresher struct {
 	logger   zerolog.Logger
-	state    protocol.ReadOnlyState
+	state    protocol.State
 	callBack func(flow.IdentityList) error // callBack to call when the id list has changed
 }
 
-func NewNodeIDRefresher(logger zerolog.Logger, state protocol.ReadOnlyState, callBack func(list flow.IdentityList) error) *NodeIDRefresher {
+func NewNodeIDRefresher(logger zerolog.Logger, state protocol.State, callBack func(list flow.IdentityList) error) *NodeIDRefresher {
 	return &NodeIDRefresher{
 		logger:   logger.With().Str("component", "network-refresher").Logger(),
 		state:    state,

@@ -79,8 +79,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			factory,
 			id.NodeID,
 			metrics,
-			p2p.DefaultMaxUnicastMsgSize,
-			p2p.DefaultMaxPubSubMsgSize,
 			rootBlockID)
 	}
 	return mws
@@ -108,7 +106,7 @@ func GenerateNetworks(t *testing.T,
 		// mocks state for collector nodes topology
 		// considers only a single cluster as higher cluster numbers are tested
 		// in collectionTopology_test
-		state, _ := topology.CreateMockStateForCollectionNodes(t,
+		state, _ := topology.MockStateForCollectionNodes(t,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
 		tops = GenerateTopologies(t, state, ids, sms, log)
@@ -143,10 +141,10 @@ func GenerateNetworks(t *testing.T,
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	logger zerolog.Logger) (flow.IdentityList,
+	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList,
 	[]*p2p.Middleware) {
 
-	ids, libP2PNodes := GenerateIDs(t, logger, n, dryRunMode)
+	ids, libP2PNodes := GenerateIDs(t, logger, n, dryRunMode, opts...)
 	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes)
 	return ids, mws
 }
@@ -156,8 +154,8 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
-	dryRun bool) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network) {
-	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log)
+	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network) {
+	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
 	return ids, mws, networks

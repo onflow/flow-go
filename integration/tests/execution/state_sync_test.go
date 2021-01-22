@@ -7,7 +7,6 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/tests/common"
@@ -16,7 +15,8 @@ import (
 )
 
 func TestExecutionStateSync(t *testing.T) {
-	suite.Run(t, new(StateSyncSuite))
+	// TODO: We've removed state sync, so tests are not currently maintained, and flakey
+	// suite.Run(t, new(StateSyncSuite))
 }
 
 type StateSyncSuite struct {

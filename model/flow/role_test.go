@@ -59,5 +59,21 @@ func TestRoleList_Union(t *testing.T) {
 	assert.Contains(t, union, flow.RoleConsensus)
 	assert.Contains(t, union, flow.RoleVerification)
 	assert.Contains(t, union, flow.RoleExecution)
+}
 
+// TestRoleList_ID evaluates that corresponding identifier of a role list is unique with its content, and
+// does not depend on the order of its element
+func TestRoleList_ID(t *testing.T) {
+	// identifier of a role list should be the same as long as its element are the same
+	// regardless of order of its elements
+	this := flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+	shuffled := flow.RoleList{flow.RoleVerification, flow.RoleConsensus}
+	thisID := this.ID()
+	shuffledID := shuffled.ID()
+	assert.Equal(t, thisID, shuffledID)
+
+	// lists with distinct elements should have distinct identifiers
+	other := flow.RoleList{flow.RoleExecution, flow.RoleVerification}
+	otherID := other.ID()
+	assert.NotEqual(t, thisID, otherID)
 }

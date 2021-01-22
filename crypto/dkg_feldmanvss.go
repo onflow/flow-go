@@ -144,7 +144,7 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	}
 
 	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, wrongFormat)
+		s.processor.FlagMisbehavior(orig, "the received message is empty")
 		return nil
 	}
 
@@ -161,16 +161,18 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	case feldmanVSSVerifVec:
 		s.receiveVerifVector(index(orig), msg[1:])
 	default:
-		s.processor.FlagMisbehavior(orig, wrongFormat)
+		s.processor.FlagMisbehavior(orig,
+			fmt.Sprintf("the message header is invalid, got %d",
+				dkgMsgTag(msg[0])))
 	}
 	return nil
 }
 
-// Disqualify forces a node to get disqualified
+// ForceDisqualify forces a node to get disqualified
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest nodes call this function,
 // otherwise, the protocol can be broken
-func (s *feldmanVSSstate) Disqualify(node int) error {
+func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
@@ -239,20 +241,26 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 	}
 
 	if s.xReceived {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin), "private share was already received")
 		return
 	}
 
 	if (len(data)) != shareSize {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("invalid share size, expects %d, got %d",
+				shareSize, len(data)))
 		return
 	}
 
 	// read the node private share
-	C.bn_read_bin((*C.bn_st)(&s.x),
+	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
-	)
+	) != valid {
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("invalid share value %x", data))
+		return
+	}
 
 	s.xReceived = true
 	if s.vAReceived {
@@ -267,18 +275,22 @@ func (s *feldmanVSSstate) receiveVerifVector(origin index, data []byte) {
 		return
 	}
 	if s.vAReceived {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin),
+			"verification vector was already received")
 		return
 	}
 	if verifVectorSize*(s.threshold+1) != len(data) {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("invalid verification vector size, expects %d, got %d",
+				verifVectorSize*(s.threshold+1), len(data)))
 		return
 	}
 	// read the verification vector
 	s.vA = make([]pointG2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("reading the verification vector failed: %s", err))
 		return
 	}
 

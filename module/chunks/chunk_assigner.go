@@ -20,39 +20,39 @@ import (
 // DISCLAIMER: alpha down there is not a production-level value
 const DefaultChunkAssignmentAlpha = 5
 
-// PublicAssignment implements an instance of the Public Chunk Assignment
+// ChunkAssigner implements an instance of the Public Chunk Assignment
 // algorithm for assigning chunks to verifier nodes in a deterministic but
 // unpredictable manner. It implements the ChunkAssigner interface.
-type PublicAssignment struct {
+type ChunkAssigner struct {
 	alpha       int // used to indicate the number of verifiers that should be assigned to each chunk
 	assignments mempool.Assignments
 
-	protocolState protocol.ReadOnlyState
+	protocolState protocol.State
 }
 
-// NewPublicAssignment generates and returns an instance of the Public Chunk
+// NewChunkAssigner generates and returns an instance of the Public Chunk
 // Assignment algorithm. Parameter alpha is the number of verifiers that should
 // be assigned to each chunk.
-func NewPublicAssignment(alpha int, protocolState protocol.ReadOnlyState) (*PublicAssignment, error) {
+func NewChunkAssigner(alpha uint, protocolState protocol.State) (*ChunkAssigner, error) {
 	// TODO to have limit of assignment mempool as a parameter (2703)
 	assignment, err := stdmap.NewAssignments(1000)
 	if err != nil {
 		return nil, fmt.Errorf("could not create an assignment mempool: %w", err)
 	}
-	return &PublicAssignment{
-		alpha:         alpha,
+	return &ChunkAssigner{
+		alpha:         int(alpha),
 		assignments:   assignment,
 		protocolState: protocolState,
 	}, nil
 }
 
 // Size returns number of assignments
-func (p *PublicAssignment) Size() uint {
+func (p *ChunkAssigner) Size() uint {
 	return p.assignments.Size()
 }
 
 // Assign generates the assignment
-func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
+func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
 	// computes a finger print for blockID||resultID||alpha
 	hash, err := fingerPrint(blockID, result.ID(), p.alpha)
 	if err != nil {
@@ -91,7 +91,7 @@ func (p *PublicAssignment) Assign(result *flow.ExecutionResult, blockID flow.Ide
 	return a, nil
 }
 
-func (p *PublicAssignment) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
+func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
 	// TODO: rng could be cached to optimize performance
 
 	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...)

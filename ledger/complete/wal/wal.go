@@ -16,6 +16,7 @@ const SegmentSize = 32 * 1024 * 1024
 
 type LedgerWAL struct {
 	wal            *prometheusWAL.WAL
+	paused         bool
 	forestCapacity int
 	pathByteSize   int
 }
@@ -28,12 +29,24 @@ func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapa
 	}
 	return &LedgerWAL{
 		wal:            w,
+		paused:         false,
 		forestCapacity: forestCapacity,
 		pathByteSize:   pathByteSize,
 	}, nil
 }
 
+func (w *LedgerWAL) PauseRecord() {
+	w.paused = true
+}
+
+func (w *LedgerWAL) UnpauseRecord() {
+	w.paused = false
+}
+
 func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+	if w.paused {
+		return nil
+	}
 
 	bytes := EncodeUpdate(update)
 
@@ -46,6 +59,10 @@ func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 }
 
 func (w *LedgerWAL) RecordDelete(rootHash ledger.RootHash) error {
+	if w.paused {
+		return nil
+	}
+
 	bytes := EncodeDelete(rootHash)
 
 	err := w.wal.Log(bytes)

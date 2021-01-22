@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -10,25 +11,84 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 type State struct {
 	db        *badger.DB
-	tracer    module.Tracer
 	clusterID flow.ChainID
-	headers   storage.Headers
-	payloads  storage.ClusterPayloads
 }
 
-func NewState(db *badger.DB, tracer module.Tracer, clusterID flow.ChainID, headers storage.Headers, payloads storage.ClusterPayloads) (*State, error) {
+// Bootstrap initializes the persistent cluster state with a genesis block.
+// The genesis block must have height 0, a parent hash of 32 zero bytes,
+// and an empty collection as payload.
+func Bootstrap(db *badger.DB, stateRoot *StateRoot) (*State, error) {
+	isBootstrapped, err := IsBootstrapped(db, stateRoot.ClusterID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
+	}
+	if isBootstrapped {
+		return nil, fmt.Errorf("expected empty cluster state for cluster ID %s", stateRoot.ClusterID())
+	}
+	state := newState(db, stateRoot.ClusterID())
+
+	genesis := stateRoot.Block()
+	// bootstrap cluster state
+	err = operation.RetryOnConflict(state.db.Update, func(tx *badger.Txn) error {
+		chainID := genesis.Header.ChainID
+		// insert the block
+		err := procedure.InsertClusterBlock(genesis)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis block: %w", err)
+		}
+		// insert block height -> ID mapping
+		err = operation.IndexClusterBlockHeight(chainID, genesis.Header.Height, genesis.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("failed to map genesis block height to block: %w", err)
+		}
+		// insert boundary
+		err = operation.InsertClusterFinalizedHeight(chainID, genesis.Header.Height)(tx)
+		// insert started view for hotstuff
+		if err != nil {
+			return fmt.Errorf("could not insert genesis boundary: %w", err)
+		}
+		err = operation.InsertStartedView(chainID, genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert started view: %w", err)
+		}
+		// insert voted view for hotstuff
+		err = operation.InsertVotedView(chainID, genesis.Header.View)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert voted view: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("bootstrapping failed: %w", err)
+	}
+
+	return state, nil
+}
+
+func OpenState(db *badger.DB, tracer module.Tracer, headers storage.Headers, payloads storage.ClusterPayloads, clusterID flow.ChainID) (*State, error) {
+	isBootstrapped, err := IsBootstrapped(db, clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
+	}
+	if !isBootstrapped {
+		return nil, fmt.Errorf("expected database to contain bootstrapped state")
+	}
+	state := newState(db, clusterID)
+	return state, nil
+}
+
+func newState(db *badger.DB, clusterID flow.ChainID) *State {
 	state := &State{
 		db:        db,
-		tracer:    tracer,
 		clusterID: clusterID,
-		headers:   headers,
-		payloads:  payloads,
 	}
-	return state, nil
+	return state
 }
 
 func (s *State) Params() cluster.Params {
@@ -39,7 +99,6 @@ func (s *State) Params() cluster.Params {
 }
 
 func (s *State) Final() cluster.Snapshot {
-
 	// get the finalized block ID
 	var blockID flow.Identifier
 	err := s.db.View(func(tx *badger.Txn) error {
@@ -77,9 +136,15 @@ func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	return snapshot
 }
 
-func (s *State) Mutate() cluster.Mutator {
-	mutator := &Mutator{
-		state: s,
+// IsBootstrapped returns whether or not the database contains a bootstrapped state
+func IsBootstrapped(db *badger.DB, clusterID flow.ChainID) (bool, error) {
+	var finalized uint64
+	err := db.View(operation.RetrieveClusterFinalizedHeight(clusterID, &finalized))
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, nil
 	}
-	return mutator
+	if err != nil {
+		return false, fmt.Errorf("retrieving finalized height failed: %w", err)
+	}
+	return true, nil
 }

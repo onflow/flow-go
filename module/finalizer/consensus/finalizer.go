@@ -18,12 +18,12 @@ import (
 type Finalizer struct {
 	db      *badger.DB
 	headers storage.Headers
-	state   protocol.State
+	state   protocol.MutableState
 	cleanup CleanupFunc
 }
 
 // NewFinalizer creates a new finalizer for the temporary state.
-func NewFinalizer(db *badger.DB, headers storage.Headers, state protocol.State, options ...func(*Finalizer)) *Finalizer {
+func NewFinalizer(db *badger.DB, headers storage.Headers, state protocol.MutableState, options ...func(*Finalizer)) *Finalizer {
 	f := &Finalizer{
 		db:      db,
 		state:   state,
@@ -102,7 +102,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 	for i := len(pendingIDs) - 1; i >= 0; i-- {
 		pendingID := pendingIDs[i]
-		err = f.state.Mutate().Finalize(pendingID)
+		err = f.state.Finalize(pendingID)
 		if err != nil {
 			return fmt.Errorf("could not finalize block (%x): %w", pendingID, err)
 		}
@@ -117,7 +117,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
 // MakeValid marks a block as having passed HotStuff validation.
 func (f *Finalizer) MakeValid(blockID flow.Identifier) error {
-	err := f.state.Mutate().MarkValid(blockID)
+	err := f.state.MarkValid(blockID)
 	if err != nil {
 		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
 	}

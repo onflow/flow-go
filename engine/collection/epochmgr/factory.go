@@ -14,6 +14,8 @@ type EpochComponentsFactory interface {
 	// be used either for an ongoing epoch (for example, after a restart) or
 	// for an epoch that will start soon. It is safe to call multiple times for
 	// a given epoch counter.
+	//
+	// Must return ErrUnstakedForEpoch if this node is not staked in the epoch.
 	Create(epoch protocol.Epoch) (
 		state cluster.State,
 		proposal module.Engine,

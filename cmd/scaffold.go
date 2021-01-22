@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+
 	"math/rand"
 	"os"
 	"os/signal"
@@ -29,11 +29,11 @@ import (
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
-	storerr "github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -73,6 +73,8 @@ type Storage struct {
 	Index        storage.Index
 	Identities   storage.Identities
 	Guarantees   storage.Guarantees
+	Receipts     storage.ExecutionReceipts
+	Results      storage.ExecutionResults
 	Seals        storage.Seals
 	Payloads     storage.Payloads
 	Blocks       storage.Blocks
@@ -117,7 +119,7 @@ type FlowNodeBuilder struct {
 	DB                *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
-	State             *protocol.State
+	State             protocol.State
 	Middleware        *p2p.Middleware
 	Network           *p2p.Network
 	MsgValidators     []network.MessageValidator
@@ -182,8 +184,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			p2p.DefaultMaxUnicastMsgSize,
-			p2p.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
 
@@ -379,8 +379,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
 	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
+	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
+	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals)
+	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
@@ -391,6 +393,8 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.Storage = Storage{
 		Headers:      headers,
 		Guarantees:   guarantees,
+		Receipts:     receipts,
+		Results:      results,
 		Seals:        seals,
 		Index:        index,
 		Payloads:     payloads,
@@ -404,28 +408,59 @@ func (fnb *FlowNodeBuilder) initStorage() {
 }
 
 func (fnb *FlowNodeBuilder) initState() {
+	fnb.ProtocolEvents = events.NewDistributor()
 
-	distributor := events.NewDistributor()
-	state, err := protocol.NewState(
-		fnb.Metrics.Compliance,
-		fnb.Tracer,
-		fnb.DB,
-		fnb.Storage.Headers,
-		fnb.Storage.Seals,
-		fnb.Storage.Index,
-		fnb.Storage.Payloads,
-		fnb.Storage.Blocks,
-		fnb.Storage.Setups,
-		fnb.Storage.Commits,
-		fnb.Storage.Statuses,
-		distributor,
-	)
+	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
+	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
+	if isBootStrapped {
+		state, stateRoot, err := badgerState.OpenState(
+			fnb.Metrics.Compliance,
+			fnb.DB,
+			fnb.Storage.Headers,
+			fnb.Storage.Seals,
+			fnb.Storage.Blocks,
+			fnb.Storage.Setups,
+			fnb.Storage.Commits,
+			fnb.Storage.Statuses,
+		)
+		fnb.MustNot(err).Msg("could not open flow state")
+		fnb.State = state
 
-	fnb.MustNot(err).Msg("could not initialize flow state")
+		// Verify root block in protocol state is consistent with bootstrap information stored on-disk.
+		// Inconsistencies can happen when the bootstrap root block is updated (because of new spork),
+		// but the protocol state is not updated, so they don't match
+		// when this happens during a spork, we could try deleting the protocol state database.
+		// TODO: revisit this check when implementing Epoch
+		rootBlock, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root block")
+		if rootBlock.ID() != stateRoot.Block().ID() {
+			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
+				rootBlock.ID(),
+				fnb.RootBlock.ID())
+		}
+		fnb.RootBlock = stateRoot.Block()
 
-	// check if database is initialized
-	_, err = state.Final().Head()
-	if errors.Is(err, storerr.ErrNotFound) {
+		// TODO: we shouldn't have to load any files again after bootstrapping; in
+		// order to make it unnecessary, we need to changes:
+		// 1) persist the root QC along the root block so it can be loaded from DB
+		// => https://github.com/dapperlabs/flow-go/issues/4166
+		// 2) bootstrap and persist DKG state in a similar fashion to protocol state
+		// => https://github.com/dapperlabs/flow-go/issues/4165
+
+		// set the chain ID based on the root header
+		// TODO: as the root header can now be loaded from protocol state, we should
+		// not use a global variable for chain ID anymore, but rely on the protocol
+		// state as final authority on what the chain ID is
+		// => https://github.com/dapperlabs/flow-go/issues/4167
+		fnb.RootChainID = stateRoot.Block().Header.ChainID
+
+		// load the root QC data from bootstrap files
+		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root QC")
+
+		fnb.RootResult = stateRoot.Result()
+		fnb.RootSeal = stateRoot.Seal()
+	} else {
 		// Bootstrap!
 
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
@@ -450,7 +485,20 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not load root seal")
 
 		// bootstrap the protocol state with the loaded data
-		err = state.Mutate().Bootstrap(fnb.RootBlock, fnb.RootResult, fnb.RootSeal)
+		stateRoot, err := badgerState.NewStateRoot(fnb.RootBlock, fnb.RootResult, fnb.RootSeal, fnb.RootBlock.Header.View)
+		fnb.MustNot(err).Msg("failed to construct state root")
+
+		fnb.State, err = badgerState.Bootstrap(
+			fnb.Metrics.Compliance,
+			fnb.DB,
+			fnb.Storage.Headers,
+			fnb.Storage.Seals,
+			fnb.Storage.Blocks,
+			fnb.Storage.Setups,
+			fnb.Storage.Commits,
+			fnb.Storage.Statuses,
+			stateRoot,
+		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
 		fnb.Logger.Info().
@@ -459,71 +507,28 @@ func (fnb *FlowNodeBuilder) initState() {
 			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
 			Uint64("root_block_height", fnb.RootBlock.Header.Height).
 			Msg("genesis state bootstrapped")
-
-	} else if err != nil {
-		fnb.Logger.Fatal().Err(err).Msg("could not check existing database")
-	} else {
-
-		// TODO: we shouldn't have to load any files again after bootstrapping; in
-		// order to make it unnecessary, we need to changes:
-		// 1) persist the root QC along the root block so it can be loaded from DB
-		// => https://github.com/dapperlabs/flow-go/issues/4166
-		// 2) bootstrap and persist DKG state in a similar fashion to protocol state
-		// => https://github.com/dapperlabs/flow-go/issues/4165
-
-		// load the root block from bootstrap files and set the chain ID based on it
-		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root block")
-
-		// set the chain ID based on the root header
-		// TODO: as the root header can now be loaded from protocol state, we should
-		// not use a global variable for chain ID anymore, but rely on the protocol
-		// state as final authority on what the chain ID is
-		// => https://github.com/dapperlabs/flow-go/issues/4167
-		fnb.RootChainID = fnb.RootBlock.Header.ChainID
-
-		// load the root QC data from bootstrap files
-		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root QC")
-
-		// load the root execution result from bootstrap files
-		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root execution result")
-
-		// load the root block seal from bootstrap files
-		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root seal")
 	}
 
-	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
-	fnb.MustNot(err).Msg("could not parse node identifier")
-
-	rootBlockHeader, err := state.Params().Root()
-	fnb.MustNot(err).Msg("could not get root block from protocol state")
-
-	// this happens when the bootstrap root block is updated (because of new spork),
-	// but the protocol state is not updated, so they don't match
-	// when this happens during a spork, we could try deleting the protocol state database.
-	// TODO: revisit this check when implementing Epoch
-	if rootBlockHeader.ID() != fnb.RootBlock.ID() {
-		fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
-			rootBlockHeader.ID(),
-			fnb.RootBlock.ID())
-	}
-
-	self, err := state.Final().Identity(myID)
-	// there are two cases that will cause the following error:
+	// Verify that my ID (as given in the configuration) is known to the network
+	// (i.e. protocol state). There are two cases that will cause the following error:
 	// 1) used the wrong node id, which is not part of the identity list of the finalized state
 	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
+	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
+	fnb.MustNot(err).Msg("could not parse node identifier")
+	self, err := fnb.State.Final().Identity(myID)
 	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
 
+	// Verify that my role (as given in the configuration) is consistent with the protocol state.
+	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
+	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.nodeRole {
+		rootBlockHeader, err := fnb.State.Params().Root()
+		fnb.MustNot(err).Msg("could not get root block from protocol state")
 		if rootBlockHeader.ChainID == flow.Mainnet {
 			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
 				self.Role.String(),
 				fnb.BaseConfig.nodeRole)
 		} else {
-			// This allows ghost node to run as any role when not on mainnet
 			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
 				self.Role.String(),
 				fnb.BaseConfig.nodeRole)
@@ -541,16 +546,12 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
 
-	lastFinalized, err := state.Final().Head()
-	fnb.MustNot(err).Msg("could not get last finalized state")
-
+	lastFinalized, err := fnb.State.Final().Head()
+	fnb.MustNot(err).Msg("could not get last finalized block header")
 	fnb.Logger.Info().
 		Hex("block_id", logging.Entity(lastFinalized)).
 		Uint64("height", lastFinalized.Height).
 		Msg("last finalized block")
-
-	fnb.State = state
-	fnb.ProtocolEvents = distributor
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
