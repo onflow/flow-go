@@ -93,23 +93,20 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		return execResp.GetValue(), nil
 	}
 
-	// find the execution nodes which have executed the block earlier and provided an execution receipt for it
-	execNodeIDs, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
+	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
 	}
 
 	var errors error
-	// choose upto 3 random execution node to try
-	execNodes := execNodeIDs.Sample(3)
-
-	// try to execute the script on one of the three execution nodes
+	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
 			return result, nil
 		}
-		multierror.Append(errors, err)
+		errors = multierror.Append(errors, err)
 	}
 	return nil, errors
 }

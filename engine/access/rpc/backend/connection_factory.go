@@ -19,8 +19,8 @@ type ConnectionFactory interface {
 }
 
 type ConnectionFactoryImpl struct {
-	collectionGRPCPort uint
-	executionGRPCPort  uint
+	CollectionGRPCPort uint
+	ExecutionGRPCPort  uint
 }
 
 // createConnection creates new gRPC connections to remote node
@@ -36,7 +36,12 @@ func (cf *ConnectionFactoryImpl) createConnection(address string) (*grpc.ClientC
 }
 
 func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
-	conn, err := cf.createConnection(address)
+
+	grpcAddress, err := getGRPCAddress(address, cf.CollectionGRPCPort)
+	if err != nil {
+		return nil, nil, err
+	}
+	conn, err := cf.createConnection(grpcAddress)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -47,7 +52,7 @@ func (cf *ConnectionFactoryImpl) GetAccessAPIClient(address string) (access.Acce
 
 func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
 
-	grpcAddress, err := getGRPCAddress(address, cf.executionGRPCPort)
+	grpcAddress, err := getGRPCAddress(address, cf.ExecutionGRPCPort)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -62,7 +67,7 @@ func (cf *ConnectionFactoryImpl) GetExecutionAPIClient(address string) (executio
 }
 
 // getExecutionNodeAddress translates flow.Identity address to the GRPC address of the node by switching the port to the
-// GRPC port
+// GRPC port from the libp2p port
 func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	// split hostname and port
 	hostnameOrIP, _, err := net.SplitHostPort(address)

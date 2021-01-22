@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -35,7 +34,6 @@ type backendTransactions struct {
 	transactionMetrics   module.TransactionMetrics
 	transactionValidator *access.TransactionValidator
 	retry                *Retry
-	collectionGRPCPort   uint
 	connFactory          ConnectionFactory
 
 	previousAccessNodes []accessproto.AccessAPIClient
@@ -122,18 +120,10 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sa
 	// select a random subset of collection nodes from the cluster to be tried in order
 	targetNodes := txCluster.Sample(sampleSize)
 
-	// convert the node addresses of the collection nodes to the GRPC address
-	// (identity list does not directly provide collection nodes gRPC address)
+	// collect the addresses of all the chosen collection nodes
 	var targetAddrs = make([]string, len(targetNodes))
 	for i, id := range targetNodes {
-		// split hostname and port
-		hostnameOrIP, _, err := net.SplitHostPort(id.Address)
-		if err != nil {
-			return nil, err
-		}
-		// use the hostname from identity list and port number as the one passed in as argument
-		grpcAddress := fmt.Sprintf("%s:%d", hostnameOrIP, b.collectionGRPCPort)
-		targetAddrs[i] = grpcAddress
+		targetAddrs[i] = id.Address
 	}
 
 	return targetAddrs, nil

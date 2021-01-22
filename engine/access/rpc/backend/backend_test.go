@@ -11,11 +11,13 @@ import (
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	access "github.com/onflow/flow-go/engine/access/mock"
+	backendmock "github.com/onflow/flow-go/engine/access/rpc/backend/mock"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -36,9 +38,11 @@ type Suite struct {
 	headers                *storagemock.Headers
 	collections            *storagemock.Collections
 	transactions           *storagemock.Transactions
+	receipts               *storagemock.ExecutionReceipts
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
+	connectionFactory      *backendmock.ConnectionFactory
 	chainID                flow.ChainID
 }
 
@@ -57,10 +61,12 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storagemock.Headers)
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
+	suite.receipts = new(storagemock.ExecutionReceipts)
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
 	suite.historicalAccessClient = new(access.AccessAPIClient)
+	suite.connectionFactory = new(backendmock.ConnectionFactory)
 }
 
 func (suite *Suite) TestPing() {
@@ -76,10 +82,9 @@ func (suite *Suite) TestPing() {
 		suite.state,
 		suite.execClient,
 		suite.colClient,
-		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -98,10 +103,9 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	backend := New(
 		suite.state,
 		suite.execClient,
-		nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -125,11 +129,10 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil,
-		suite.headers, nil, nil,
+		nil, nil, nil, nil, nil,
+		nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -159,9 +162,9 @@ func (suite *Suite) TestGetTransaction() {
 		suite.state,
 		nil, nil, nil, nil, nil, nil,
 		suite.transactions,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -187,9 +190,9 @@ func (suite *Suite) TestGetCollection() {
 		nil, nil, nil, nil, nil,
 		suite.collections,
 		suite.transactions,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -256,9 +259,9 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.headers,
 		suite.collections,
 		suite.transactions,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -358,9 +361,9 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		suite.headers,
 		suite.collections,
 		suite.transactions,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -402,10 +405,9 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.state,
 		nil, nil, nil,
 		suite.blocks,
-		nil, nil, nil,
+		nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -420,22 +422,39 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.assertAllExpectations()
 }
 
+type mockCloser struct{}
+
+func (mc *mockCloser) Close() error { return nil }
+
 func (suite *Suite) TestGetEventsForBlockIDs() {
 	events := getEvents(10)
 
 	setupStorage := func(n int) []*flow.Header {
 		headers := make([]*flow.Header, n)
+
 		for i := 0; i < n; i++ {
 			b := unittest.BlockFixture()
 			suite.blocks.
 				On("ByID", b.ID()).
-				Return(&b, nil).Once()
+				Return(&b, nil).Twice()
 
 			headers[i] = b.Header
+
+			r := unittest.ReceiptForBlockFixture(&b)
+			suite.receipts.
+				On("ByBlockIDAllExecutionID", b.ID()).
+				Return([]flow.ExecutionReceipt{*r}, nil).Once()
 		}
+
 		return headers
 	}
 	blockHeaders := setupStorage(5)
+
+	suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Once()
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 	// create the expected results from execution node and access node
 	exeResults := make([]*execproto.GetEventsForBlockIDsResponse_Result, len(blockHeaders))
@@ -474,31 +493,57 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		Type:     string(flow.EventAccountCreated),
 	}
 
-	// expect one call to the executor api client
+	// expect two calls to the executor api client (one for each of the following 2 test cases)
 	suite.execClient.
 		On("GetEventsForBlockIDs", ctx, exeReq).
 		Return(&exeResp, nil).
-		Once()
+		Twice()
 
-	// create the handler
-	backend := New(
-		suite.state,
-		suite.execClient,
-		nil, nil,
-		suite.blocks,
-		nil, nil, nil,
-		suite.chainID,
-		metrics.NewNoopCollector(),
-		0,
-		nil,
-		false,
-	)
+	suite.Run("with fixed execution node", func() {
 
-	// execute request
-	actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
-	suite.checkResponse(actual, err)
+		// create the handler
+		backend := New(
+			suite.state,
+			suite.execClient, // pass the default client
+			nil, nil,
+			suite.blocks,
+			nil, nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+		)
 
-	suite.Require().Equal(expected, actual)
+		// execute request
+		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
+		suite.checkResponse(actual, err)
+
+		suite.Require().Equal(expected, actual)
+	})
+
+	suite.Run("with an execution node chosen using block ID", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, // no default client, hence the receipts storage should be looked up
+			nil, nil,
+			suite.blocks,
+			nil, nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+		)
+
+		// execute request
+		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
+		suite.checkResponse(actual, err)
+
+		suite.Require().Equal(expected, actual)
+	})
 	suite.assertAllExpectations()
 }
 
@@ -578,9 +623,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		backend := New(
 			suite.state,
 			nil, nil, nil, nil, nil, nil, nil,
+			suite.receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			0,
 			nil,
 			false,
 		)
@@ -608,9 +653,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.blocks,
 			suite.headers,
 			nil, nil,
+			suite.receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			0,
 			nil,
 			false,
 		)
@@ -637,9 +682,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.blocks,
 			suite.headers,
 			nil, nil,
+			suite.receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
-			0,
 			nil,
 			false,
 		)
@@ -698,9 +743,9 @@ func (suite *Suite) TestGetAccount() {
 		nil, nil, nil,
 		suite.headers,
 		nil, nil,
+		suite.receipts,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -757,9 +802,9 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		nil, nil, nil,
 		suite.headers,
 		nil, nil,
+		suite.receipts,
 		flow.Testnet,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -779,9 +824,9 @@ func (suite *Suite) TestGetNetworkParameters() {
 
 	backend := New(
 		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil,
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -789,6 +834,51 @@ func (suite *Suite) TestGetNetworkParameters() {
 	params := backend.GetNetworkParameters(context.Background())
 
 	suite.Require().Equal(expectedChainID, params.ChainID)
+}
+
+// TestExecutionNodesForBlockID tests the common method backend.executionNodesForBlockID used for serving all API calls
+// that need to talk to an execution node.
+func (suite *Suite) TestExecutionNodesForBlockID() {
+
+	totalBlocks := 3
+	receiptPerBlock := 2
+	totalReceipts := receiptPerBlock * totalBlocks
+
+	blocks := unittest.BlockFixtures(totalBlocks)
+	blockIDExecNodeMap := make(map[flow.Identifier]flow.IdentityList, totalReceipts)
+	allExecutionIDs := make(flow.IdentityList, 0, totalReceipts) // assume each ER is generated by a unique exec node
+
+	// generate identitylist and receipts for each block and mark each receipt with a unique execution ID
+	for i := 0; i < totalBlocks; i++ {
+
+		block := blocks[i]
+		ids := unittest.IdentityListFixture(receiptPerBlock)
+		blockIDExecNodeMap[block.ID()] = ids
+		allExecutionIDs = append(allExecutionIDs, ids...)
+
+		receipts := make([]flow.ExecutionReceipt, receiptPerBlock)
+		for j := 0; j < receiptPerBlock; j++ {
+			r := unittest.ReceiptForBlockFixture(block)
+			r.ExecutorID = ids[j].NodeID
+			receipts[j] = *r
+		}
+		suite.receipts.
+			On("ByBlockIDAllExecutionID", block.ID()).
+			Return(receipts, nil).Once()
+	}
+
+	suite.snapshot.On("Identities", mock.Anything).Return(
+		func(filter flow.IdentityFilter) flow.IdentityList {
+			// apply the filter passed in to the list of all the execution nodes
+			return allExecutionIDs.Filter(filter)
+		},
+		func(flow.IdentityFilter) error { return nil })
+
+	testBlock := blocks[0]
+	expectedList := blockIDExecNodeMap[testBlock.ID()]
+	actualList, err := executionNodesForBlockID(testBlock.ID(), suite.receipts, suite.state)
+	require.NoError(suite.T(), err)
+	require.ElementsMatch(suite.T(), actualList, expectedList)
 }
 
 func (suite *Suite) assertAllExpectations() {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,6 +20,7 @@ import (
 type backendEvents struct {
 	staticExecutionRPC execproto.ExecutionAPIClient
 	blocks             storage.Blocks
+	executionReceipts  storage.ExecutionReceipts
 	state              protocol.State
 	connFactory        ConnectionFactory
 }
@@ -99,11 +101,27 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
-	// call the execution node gRPC
-	resp, err := b.staticExecutionRPC.GetEventsForBlockIDs(ctx, &req)
+	var resp *execproto.GetEventsForBlockIDsResponse
+	var err error
+	if b.staticExecutionRPC != nil {
+		// call the execution node gRPC
+		resp, err = b.staticExecutionRPC.GetEventsForBlockIDs(ctx, &req)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		}
+	} else {
 
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		// choose the last block ID to find the list of execution nodes
+		lastBlockID := blockIDs[len(blockIDs)-1]
+
+		execNodes, err := executionNodesForBlockID(lastBlockID, b.executionReceipts, b.state)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		}
+		resp, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+		}
 	}
 
 	// convert execution node api result to access node api result
@@ -149,4 +167,30 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 	}
 
 	return results, nil
+}
+
+func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
+	var errors error
+	// try to execute the script on one of the execution nodes
+	for _, execNode := range execNodes {
+		resp, err := b.tryGetEvents(ctx, execNode, req)
+		if err == nil {
+			return resp, nil
+		}
+		errors = multierror.Append(errors, err)
+	}
+	return nil, errors
+}
+
+func (b *backendEvents) tryGetEvents(ctx context.Context, execNode *flow.Identity, req execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	resp, err := execRPCClient.GetEventsForBlockIDs(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }

@@ -2,8 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"os"
 	"testing"
 
@@ -95,6 +93,8 @@ func (suite *Suite) RunTest(
 		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
+		results := storage.NewExecutionResults(suite.metrics, db)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
 
 		suite.backend = backend.New(
 			suite.state,
@@ -105,9 +105,9 @@ func (suite *Suite) RunTest(
 			headers,
 			collections,
 			transactions,
+			receipts,
 			suite.chainID,
 			suite.metrics,
-			uint(9000),
 			nil,
 			false,
 		)
@@ -216,8 +216,6 @@ func (mc *mockCloser) Close() error { return nil }
 func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 
-		collectionGrpcPort := uint(9000)
-
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
@@ -267,13 +265,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		grpcAddr := func(node *flow.Identity) string {
-			host, _, err := net.SplitHostPort(node.Address)
-			require.NoError(suite.T(), err)
-			return fmt.Sprintf("%s:%d", host, collectionGrpcPort)
-		}
-		connFactory.On("GetAccessAPIClient", grpcAddr(collNode1)).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", grpcAddr(collNode2)).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
 		backend := backend.New(
 			suite.state,
@@ -284,9 +277,9 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil,
 			collections,
 			transactions,
+			nil,
 			suite.chainID,
 			metrics,
-			collectionGrpcPort,
 			connFactory, // passing in the connection factory
 			false,
 		)
@@ -447,11 +440,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
-			suite.chainID, metrics, 0, false, false)
+			nil, suite.chainID, metrics, 0, 0, false, false)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+			transactions, nil, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed

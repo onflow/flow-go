@@ -18,10 +18,8 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// exectuionReceiptsThreshold is the minimum number of execution receipts that should be present to regard a transaction
-// as executed (if has not yet sealed)
-
-const exectuionReceiptsThreshold = 2
+// maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
+const maxExecutionNodesCnt = 3
 
 // Backends implements the Access API.
 //
@@ -47,7 +45,6 @@ type Backend struct {
 	state             protocol.State
 	chainID           flow.ChainID
 	collections       storage.Collections
-	blocks            storage.Blocks
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
 }
@@ -64,7 +61,6 @@ func New(
 	executionReceipts storage.ExecutionReceipts,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
-	collectionGRPCPort uint,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
 ) *Backend {
@@ -79,6 +75,7 @@ func New(
 		// create the sub-backends
 		backendScripts: backendScripts{
 			headers:            headers,
+			executionReceipts:  executionReceipts,
 			staticExecutionRPC: executionRPC,
 			connFactory:        connFactory,
 			state:              state,
@@ -94,7 +91,6 @@ func New(
 			transactionValidator: configureTransactionValidator(state, chainID),
 			transactionMetrics:   transactionMetrics,
 			retry:                retry,
-			collectionGRPCPort:   collectionGRPCPort,
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
 		},
@@ -102,6 +98,7 @@ func New(
 			staticExecutionRPC: executionRPC,
 			state:              state,
 			blocks:             blocks,
+			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
 		},
 		backendBlockHeaders: backendBlockHeaders{
@@ -195,7 +192,8 @@ func convertStorageError(err error) error {
 	return status.Errorf(codes.Internal, "failed to find: %v", err)
 }
 
-// executionNodesForBlockID finds the execution nodes which have sent execution receipts for the given block ID
+// executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
+// which have executed the given block ID. If no such execution node is found, then an error is returned.
 func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
@@ -213,11 +211,18 @@ func executionNodesForBlockID(
 		executionIDs = append(executionIDs, receipt.ExecutorID)
 	}
 
+	if len(executionIDs) == 0 {
+		return nil, fmt.Errorf("no execution node found for block ID %v: %w", blockID, err)
+	}
+
 	// find the node identities of these execution nodes
-	executionIdentifiers, err := state.Final().Identities(filter.HasNodeID(executionIDs...))
+	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executionIDs...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
-	return executionIdentifiers, nil
+	// randomly choose upto maxExecutionNodesCnt identities
+	executionIdentitiesRandom := executionIdentities.Sample(maxExecutionNodesCnt)
+
+	return executionIdentitiesRandom, nil
 }

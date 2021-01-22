@@ -46,9 +46,9 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		suite.headers,
 		suite.collections,
 		suite.transactions,
+		suite.receipts,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
@@ -99,9 +99,9 @@ func (suite *Suite) TestHistoricalTransaction() {
 		suite.headers,
 		suite.collections,
 		suite.transactions,
+		suite.receipts,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		0,
 		nil,
 		false,
 	)
