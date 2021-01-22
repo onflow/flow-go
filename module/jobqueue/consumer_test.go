@@ -16,7 +16,7 @@ func TestProcessableJobs(t *testing.T) {
 	maxPending := 8
 
 	t.Run("no job, nothing to process", func(t *testing.T) {
-		jobs := newMockJobs() // no job in the queue
+		jobs := NewMockJobs() // no job in the queue
 		processings := map[int]*JobStatus{}
 		processedIndex := 0
 
@@ -28,7 +28,7 @@ func TestProcessableJobs(t *testing.T) {
 	})
 
 	t.Run("neither max processing or max pending was reached", func(t *testing.T) {
-		jobs := newMockJobs()
+		jobs := NewMockJobs()
 		jobs.PushN(20) // enough jobs in the queue
 		processings := map[int]*JobStatus{}
 		for i := 3; i <= 11; i++ {
@@ -38,7 +38,7 @@ func TestProcessableJobs(t *testing.T) {
 			if i == 3 || i == 5 {
 				done = false
 			}
-			processings[i] = &JobStatus{jobID: jobIDAtIndex(i), done: done}
+			processings[i] = &JobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 
 		processedIndex := 2
@@ -53,7 +53,7 @@ func TestProcessableJobs(t *testing.T) {
 	})
 
 	t.Run("only reached max processing", func(t *testing.T) {
-		jobs := newMockJobs()
+		jobs := NewMockJobs()
 		jobs.PushN(20) // enough jobs in the queue
 		processings := map[int]*JobStatus{}
 		for i := 3; i <= 12; i++ {
@@ -63,7 +63,7 @@ func TestProcessableJobs(t *testing.T) {
 			if i == 3 || i == 5 || i == 6 {
 				done = false
 			}
-			processings[i] = &JobStatus{jobID: jobIDAtIndex(i), done: done}
+			processings[i] = &JobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 		processedIndex := 2
 		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxPending, processedIndex)
@@ -75,7 +75,7 @@ func TestProcessableJobs(t *testing.T) {
 	})
 
 	t.Run("only reached max pending", func(t *testing.T) {
-		jobs := newMockJobs()
+		jobs := NewMockJobs()
 		jobs.PushN(20) // enough jobs in the queue
 		processings := map[int]*JobStatus{}
 		for i := 3; i <= 12; i++ {
@@ -85,7 +85,7 @@ func TestProcessableJobs(t *testing.T) {
 			if i == 3 || i == 4 {
 				done = false
 			}
-			processings[i] = &JobStatus{jobID: jobIDAtIndex(i), done: done}
+			processings[i] = &JobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 
 		processedIndex := 2
@@ -97,7 +97,7 @@ func TestProcessableJobs(t *testing.T) {
 	})
 
 	t.Run("reached both max processing and max pending", func(t *testing.T) {
-		jobs := newMockJobs()
+		jobs := NewMockJobs()
 		jobs.PushN(20) // enough jobs in the queue
 		processings := map[int]*JobStatus{}
 		for i := 3; i <= 13; i++ {
@@ -107,7 +107,7 @@ func TestProcessableJobs(t *testing.T) {
 			if i == 3 || i == 4 || i == 13 {
 				done = false
 			}
-			processings[i] = &JobStatus{jobID: jobIDAtIndex(i), done: done}
+			processings[i] = &JobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 
 		processedIndex := 2
@@ -119,7 +119,7 @@ func TestProcessableJobs(t *testing.T) {
 	})
 
 	t.Run("no more job", func(t *testing.T) {
-		jobs := newMockJobs()
+		jobs := NewMockJobs()
 		jobs.PushN(11) // 11 jobs, no more job to process
 		processings := map[int]*JobStatus{}
 		for i := 3; i <= 11; i++ {
@@ -129,7 +129,7 @@ func TestProcessableJobs(t *testing.T) {
 			if i == 3 || i == 11 {
 				done = false
 			}
-			processings[i] = &JobStatus{jobID: jobIDAtIndex(i), done: done}
+			processings[i] = &JobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 
 		processedIndex := 2
@@ -141,7 +141,7 @@ func TestProcessableJobs(t *testing.T) {
 	})
 
 	t.Run("next jobs were done", func(t *testing.T) {
-		jobs := newMockJobs()
+		jobs := NewMockJobs()
 		jobs.PushN(20) // enough jobs
 		processings := map[int]*JobStatus{}
 		for i := 3; i <= 6; i++ {
@@ -151,7 +151,7 @@ func TestProcessableJobs(t *testing.T) {
 			if i == 4 || i == 6 {
 				done = false
 			}
-			processings[i] = &JobStatus{jobID: jobIDAtIndex(i), done: done}
+			processings[i] = &JobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 
 		processedIndex := 2
@@ -174,30 +174,30 @@ func assertJobs(t *testing.T, expectedIndex []int, jobsToRun []*jobAtIndex) {
 	require.Equal(t, expectedIndex, actualIndex)
 }
 
-// mockJobs implements the Jobs interface, and is used as the dependency for
+// MockJobs implements the Jobs interface, and is used as the dependency for
 // the Consumer for testing purpose
-type mockJobs struct {
+type MockJobs struct {
 	sync.Mutex
 	log      zerolog.Logger
 	last     int
 	jobs     map[int]Job
 	index    map[JobID]int
-	jobMaker *jobMaker
+	JobMaker *JobMaker
 }
 
-func newMockJobs() *mockJobs {
-	return &mockJobs{
+func NewMockJobs() *MockJobs {
+	return &MockJobs{
 		log:      unittest.Logger().With().Str("module", "jobs").Logger(),
 		last:     0, // must be from 1
 		jobs:     make(map[int]Job),
 		index:    make(map[JobID]int),
-		jobMaker: newJobMaker(),
+		JobMaker: NewJobMaker(),
 	}
 }
 
-// var _ storage.Jobs = &mockJobs{}
+// var _ storage.Jobs = &MockJobs{}
 
-func (j *mockJobs) AtIndex(index int) (storage.Job, error) {
+func (j *MockJobs) AtIndex(index int) (storage.Job, error) {
 	j.Lock()
 	defer j.Unlock()
 
@@ -212,7 +212,7 @@ func (j *mockJobs) AtIndex(index int) (storage.Job, error) {
 	return job, nil
 }
 
-func (j *mockJobs) Add(job storage.Job) error {
+func (j *MockJobs) Add(job storage.Job) error {
 	j.Lock()
 	defer j.Unlock()
 
@@ -237,12 +237,12 @@ func (j *mockJobs) Add(job storage.Job) error {
 	return nil
 }
 
-func (j *mockJobs) PushOne() error {
-	job := j.jobMaker.Next()
+func (j *MockJobs) PushOne() error {
+	job := j.JobMaker.Next()
 	return j.Add(job)
 }
 
-func (j *mockJobs) PushN(n int) error {
+func (j *MockJobs) PushN(n int) error {
 	for i := 0; i < n; i++ {
 		err := j.PushOne()
 		if err != nil {
@@ -253,37 +253,37 @@ func (j *mockJobs) PushN(n int) error {
 }
 
 // deterministically compute the JobID from index
-func jobIDAtIndex(index int) storage.JobID {
+func JobIDAtIndex(index int) storage.JobID {
 	return storage.JobID(fmt.Sprintf("%v", index))
 }
 
-// jobMaker is a test helper.
+// JobMaker is a test helper.
 // it creates new job with unique job id
-type jobMaker struct {
+type JobMaker struct {
 	sync.Mutex
 	index int
 }
 
-func newJobMaker() *jobMaker {
-	return &jobMaker{
+func NewJobMaker() *JobMaker {
+	return &JobMaker{
 		index: 1,
 	}
 }
 
-type testJob struct {
+type TestJob struct {
 	index int
 }
 
-func (tj testJob) ID() storage.JobID {
-	return jobIDAtIndex(tj.index)
+func (tj TestJob) ID() storage.JobID {
+	return JobIDAtIndex(tj.index)
 }
 
 // return next unique job
-func (j *jobMaker) Next() storage.Job {
+func (j *JobMaker) Next() storage.Job {
 	j.Lock()
 	defer j.Unlock()
 
-	job := &testJob{
+	job := &TestJob{
 		index: j.index,
 	}
 	j.index++
