@@ -31,7 +31,7 @@ require (
 	github.com/libp2p/go-libp2p-swarm v0.4.0
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.0
 	github.com/libp2p/go-tcp-transport v0.2.1
-	github.com/m4ksio/wal v1.0.0 // indirect
+	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.12.3
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
