@@ -50,6 +50,7 @@ const (
 	codeCollectionBlock       = 54 // index mapping collection ID to block ID
 	codeBlockExecutionReceipt = 55 // index mapping block ID to execution receipt ID
 	codeBlockEpochStatus      = 56 // index mapping block ID to epoch status
+	codePayloadReceipts       = 57 // index mapping block ID  to payload receipts
 
 	// codes related to epoch information
 	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID

@@ -51,27 +51,27 @@ func (suite *EchoEngineTestSuite) TearDownTest() {
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 }
 
-// TestUnknownChannelID evaluates that registering an engine with an unknown channel ID returns an error.
-// All channel IDs should be registered as topics in engine.topicMap.
-func (suite *EchoEngineTestSuite) TestUnknownChannelID() {
+// TestUnknownChannel evaluates that registering an engine with an unknown channel returns an error.
+// All channels should be registered as topics in engine.topicMap.
+func (suite *EchoEngineTestSuite) TestUnknownChannel() {
 	e := NewEchoEngine(suite.T(), suite.nets[0], 1, engine.TestNetwork, false, suite.Unicast)
 	_, err := suite.nets[0].Register("unknown-channel-id", e)
 	require.Error(suite.T(), err)
 }
 
-// TestClusterChannelID evaluates that registering a cluster channel ID is done without any error.
-func (suite *EchoEngineTestSuite) TestClusterChannelID() {
+// TestClusterChannel evaluates that registering a cluster channel  is done without any error.
+func (suite *EchoEngineTestSuite) TestClusterChannel() {
 	e := NewEchoEngine(suite.T(), suite.nets[0], 1, engine.TestNetwork, false, suite.Unicast)
-	// creates a cluster channel ID
-	clusterChannelID := engine.ChannelSyncCluster(flow.Testnet)
-	// registers engine with cluster channel ID
-	_, err := suite.nets[0].Register(clusterChannelID, e)
-	// registering cluster channel ID should not cause an error
+	// creates a cluster channel
+	clusterChannel := engine.ChannelSyncCluster(flow.Testnet)
+	// registers engine with cluster channel
+	_, err := suite.nets[0].Register(clusterChannel, e)
+	// registering cluster channel should not cause an error
 	require.NoError(suite.T(), err)
 }
 
-// TestDuplicateChannelID evaluates that registering an engine with duplicate channel ID returns an error.
-func (suite *EchoEngineTestSuite) TestDuplicateChannelID() {
+// TestDuplicateChannel evaluates that registering an engine with duplicate channel returns an error.
+func (suite *EchoEngineTestSuite) TestDuplicateChannel() {
 	// creates an echo engine, which registers it on test network channel
 	e := NewEchoEngine(suite.T(), suite.nets[0], 1, engine.TestNetwork, false, suite.Unicast)
 
@@ -359,7 +359,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Multicast() {
 
 // TestDuplicateMessageDifferentChan_Submit evaluates the correctness of network layer
 // on deduplicating the received messages via Submit method of Conduits against different engine ids. In specific, the
-// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// desire behavior is that the deduplication should happen based on both eventID and channel.
 // Messages are sent via the Submit method of the Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Submit() {
 	suite.duplicateMessageDifferentChan(suite.Submit)
@@ -367,7 +367,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Submit() {
 
 // TestDuplicateMessageDifferentChan_Publish evaluates the correctness of network layer
 // on deduplicating the received messages against different engine ids. In specific, the
-// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// desire behavior is that the deduplication should happen based on both eventID and channel.
 // Messages are sent via the Publish methods of the Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Publish() {
 	suite.duplicateMessageDifferentChan(suite.Publish)
@@ -375,7 +375,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Publish() {
 
 // TestDuplicateMessageDifferentChan_Unicast evaluates the correctness of network layer
 // on deduplicating the received messages against different engine ids. In specific, the
-// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// desire behavior is that the deduplication should happen based on both eventID and channel.
 // Messages are sent via the Unicast methods of the Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Unicast() {
 	suite.duplicateMessageDifferentChan(suite.Unicast)
@@ -383,7 +383,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Unicast() {
 
 // TestDuplicateMessageDifferentChan_Multicast evaluates the correctness of network layer
 // on deduplicating the received messages against different engine ids. In specific, the
-// desire behavior is that the deduplication should happen based on both eventID and channelID.
+// desire behavior is that the deduplication should happen based on both eventID and channel.
 // Messages are sent via the Multicast methods of the Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Multicast() {
 	suite.duplicateMessageDifferentChan(suite.Multicast)

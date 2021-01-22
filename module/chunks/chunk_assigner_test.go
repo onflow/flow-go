@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// PublicAssignmentTestSuite contains tests against methods of the PublicAssignment scheme
+// PublicAssignmentTestSuite contains tests against methods of the ChunkAssigner scheme
 type PublicAssignmentTestSuite struct {
 	suite.Suite
 }
@@ -28,7 +28,7 @@ func (a *PublicAssignmentTestSuite) SetupTest(n int) (*flow.Header, *protocolMoc
 	participants, _, _ := unittest.CreateNParticipantsWithMyRole(flow.RoleVerification, nodes...)
 
 	// setup protocol state
-	block, snapshot, state := unittest.FinalizedProtocolStateWithParticipants(participants)
+	block, snapshot, state, _ := unittest.FinalizedProtocolStateWithParticipants(participants)
 	head := block.Header
 
 	return head, snapshot, state
@@ -39,7 +39,7 @@ func TestAssignment(t *testing.T) {
 	suite.Run(t, new(PublicAssignmentTestSuite))
 }
 
-// TestByNodeID evaluates the correctness of ByNodeID method of PublicAssignment
+// TestByNodeID evaluates the correctness of ByNodeID method of ChunkAssigner
 func (a *PublicAssignmentTestSuite) TestByNodeID() {
 	size := 5
 	// creates ids and twice chunks of the ids
@@ -109,7 +109,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteEntirely() {
 	head, snapshot, state := a.SetupTest(10)
 
 	// create a assigner object with alpha = 10
-	assigner, err := NewPublicAssignment(10, state)
+	assigner, err := NewChunkAssigner(10, state)
 	require.NoError(a.T(), err)
 
 	// create seed
@@ -153,7 +153,7 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 	head, snapshot, state := a.SetupTest(10)
 
 	// create a assigner object with alpha = 10
-	assigner, err := NewPublicAssignment(10, state)
+	assigner, err := NewChunkAssigner(10, state)
 	require.NoError(a.T(), err)
 
 	// create seed
@@ -189,9 +189,9 @@ func (a *PublicAssignmentTestSuite) TestPermuteSublist() {
 func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 	head, snapshot, state := a.SetupTest(10)
 
-	c := 10    // keeps number of chunks
-	n := 10    // keeps number of verifier nodes
-	alpha := 1 // each chunk requires alpha verifiers
+	c := 10          // keeps number of chunks
+	n := 10          // keeps number of verifier nodes
+	alpha := uint(1) // each chunk requires alpha verifiers
 
 	// create seed
 	result := a.CreateResult(head, c, a.T())
@@ -205,14 +205,14 @@ func (a *PublicAssignmentTestSuite) TestDeterministicy() {
 
 	// chunk assignment of the first set
 	snapshot.On("Identities", mock.Anything).Return(nodes1, nil).Once()
-	a1, err := NewPublicAssignment(alpha, state)
+	a1, err := NewChunkAssigner(alpha, state)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(result, head.ID())
 	require.NoError(a.T(), err)
 
 	// chunk assignment of the second set
 	snapshot.On("Identities", mock.Anything).Return(nodes2, nil).Once()
-	a2, err := NewPublicAssignment(alpha, state)
+	a2, err := NewChunkAssigner(alpha, state)
 	require.NoError(a.T(), err)
 	p2, err := a2.Assign(result, head.ID())
 	require.NoError(a.T(), err)
@@ -271,7 +271,7 @@ func (a *PublicAssignmentTestSuite) ChunkAssignmentScenario(chunkNum, verNum, al
 	require.Equal(a.T(), copy(original, nodes), verNum)
 
 	snapshot.On("Identities", mock.Anything).Return(nodes, nil).Once()
-	a1, err := NewPublicAssignment(alpha, state)
+	a1, err := NewChunkAssigner(uint(alpha), state)
 	require.NoError(a.T(), err)
 	p1, err := a1.Assign(result, head.ID())
 	require.NoError(a.T(), err)
@@ -294,7 +294,7 @@ func (a *PublicAssignmentTestSuite) TestCacheAssignment() {
 
 	// creates nodes and keeps a copy of them
 	nodes := unittest.IdentityListFixture(5)
-	assigner, err := NewPublicAssignment(3, state)
+	assigner, err := NewChunkAssigner(3, state)
 	require.NoError(a.T(), err)
 
 	// initially cache should be empty

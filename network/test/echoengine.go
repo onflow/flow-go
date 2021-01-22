@@ -30,7 +30,7 @@ type EchoEngine struct {
 	send     ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
 }
 
-func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID string, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
+func NewEchoEngine(t *testing.T, net module.Network, cap int, channel network.Channel, echo bool, send ConduitSendWrapperFunc) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",
@@ -41,7 +41,7 @@ func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID string, e
 		send:     send,
 	}
 
-	c2, err := net.Register(engineID, te)
+	c2, err := net.Register(channel, te)
 	require.NoError(te.t, err)
 	te.con = c2
 

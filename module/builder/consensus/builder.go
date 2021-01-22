@@ -94,19 +94,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// get the collection guarantees to insert in the payload
 	insertableGuarantees, err := b.getInsertableGuarantees(parentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not insert guarantees: %w", err)
 	}
 
 	// get the seals to insert in the payload
 	insertableSeals, err := b.getInsertableSeals(parentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not insert seals: %w", err)
 	}
 
 	// get the receipts to insert in the payload
 	insertableReceipts, err := b.getInsertableReceipts(parentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not insert receipts: %w", err)
 	}
 
 	// assemble the block proposal
@@ -116,7 +116,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		insertableReceipts,
 		setter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
 	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)

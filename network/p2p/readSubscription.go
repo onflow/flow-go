@@ -30,7 +30,7 @@ func newReadSubscription(ctx context.Context,
 	metrics module.NetworkMetrics) *readSubscription {
 
 	log = log.With().
-		Str("channelid", sub.Topic()).
+		Str("channel", sub.Topic()).
 		Logger()
 
 	r := readSubscription{

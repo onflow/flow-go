@@ -3,6 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -71,14 +72,23 @@ func (i ScriptInvocator) Process(
 	proc *ScriptProcedure,
 	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, st)
+	env, err := newEnvironment(ctx, vm, st)
 	if err != nil {
 		return err
 	}
 
-	location := runtime.ScriptLocation(proc.ID[:])
+	location := common.ScriptLocation(proc.ID[:])
 
-	value, err := vm.Runtime.ExecuteScript(proc.Script, proc.Arguments, env, location)
+	value, err := vm.Runtime.ExecuteScript(
+		runtime.Script{
+			Source:    proc.Script,
+			Arguments: proc.Arguments,
+		},
+		runtime.Context{
+			Interface: env,
+			Location:  location,
+		},
+	)
 	if err != nil {
 		return err
 	}

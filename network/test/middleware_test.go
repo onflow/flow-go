@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const testChannel = "test-channel"
@@ -259,6 +260,50 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 	// sends a direct message from first node to the last node
 	err = m.mws[first].SendDirect(msg, lastNode)
 	require.Error(m.Suite.T(), err)
+}
+
+// TestLargeMessageSize_SendDirect asserts that a ChunkDataResponse is treated as a large message and can be unicasted
+// successfully even though it's size is greater than the default message size.
+func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
+	sourceIndex := 0
+	targetIndex := m.size - 1
+	sourceNode := m.ids[sourceIndex].NodeID
+	targetNode := m.ids[targetIndex].NodeID
+
+	msg := createMessage(sourceNode, targetNode, "")
+
+	// creates a network payload with a size greater than the default max size
+	payload := networkPayloadFixture(m.T(), uint(p2p.DefaultMaxUnicastMsgSize)+1000)
+	event := &libp2pmessage.TestMessage{
+		Text: string(payload),
+	}
+
+	// set the message type to a known large message type
+	msg.Type = "messages.ChunkDataResponse"
+
+	codec := json.NewCodec()
+	encodedEvent, err := codec.Encode(event)
+	require.NoError(m.T(), err)
+
+	// set the message payload as the large message
+	msg.Payload = encodedEvent
+
+	// expect one message to be received by the target
+	ch := make(chan struct{})
+	m.ov[targetIndex].On("Receive", sourceNode, msg).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			close(ch)
+		})
+
+	// sends a direct message from source node to the target node
+	err = m.mws[sourceIndex].SendDirect(msg, targetNode)
+	// SendDirect should not error since this is a known large message
+	require.NoError(m.Suite.T(), err)
+
+	// check message reception on target
+	unittest.RequireCloseBefore(m.T(), ch, 3*time.Second, "source node failed to send large message to target")
+
+	m.ov[targetIndex].AssertExpectations(m.T())
 }
 
 // TestMaxMessageSize_Publish evaluates that invoking Publish method of the middleware on a message
