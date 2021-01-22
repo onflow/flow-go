@@ -177,7 +177,7 @@ func (c *Consumer) processableJobs() ([]Job, int, error) {
 	processedIndex := c.processedIndex
 
 	// if still have processing capacity, find the next processable job
-	for i := processedIndex + 1; processing <= c.maxProcessing && pending <= c.maxPending; i++ {
+	for i := processedIndex + 1; processing < c.maxProcessing && pending < c.maxPending; i++ {
 		status, ok := c.processings[i]
 
 		// if no one is processing the next job, try to read one
