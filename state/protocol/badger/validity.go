@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 func validSetup(setup *flow.EpochSetup) error {
@@ -106,6 +107,60 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	// make sure that there is no extra data
 	if len(participants) != len(commit.DKGParticipants) {
 		return fmt.Errorf("DKG data contains extra entries")
+	}
+
+	return nil
+}
+
+// validRootSnapshot checks internal consistency of root state snapshot
+func validRootSnapshot(snap protocol.Snapshot) error {
+
+	segment, err := snap.SealingSegment()
+	if err != nil {
+		return fmt.Errorf("could not get sealing segment: %w", err)
+	}
+	seal, err := snap.LatestSeal()
+	if err != nil {
+		return fmt.Errorf("could not latest seal: %w", err)
+	}
+	result, err := snap.LatestResult()
+	if err != nil {
+		return fmt.Errorf("could not get latest result: %w", err)
+	}
+
+	if len(segment) == 0 {
+		return fmt.Errorf("invalid empty sealing segment")
+	}
+	head := segment[len(segment)-1] // reference block of the snapshot
+	tail := segment[0]              // last sealed block
+
+	if result.BlockID != tail.ID() {
+		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, tail.ID())
+	}
+
+	if seal.BlockID != tail.ID() {
+		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, tail.ID())
+	}
+
+	if seal.ResultID != result.ID() {
+		return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+	}
+
+	firstView, err := snap.Epochs().Current().FirstView()
+	if err != nil {
+		return fmt.Errorf("could not get first view: %w", err)
+	}
+	finalView, err := snap.Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("could not get final view: %w", err)
+	}
+
+	// the segment must be fully within the current epoch
+	if firstView > tail.Header.View {
+		return fmt.Errorf("root block has lower view than first view of epoch")
+	}
+	if head.Header.View >= finalView {
+		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
 	return nil

@@ -200,6 +200,13 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
+			if err := validSetup(setup); err != nil {
+				return fmt.Errorf("invalid setup: %w", err)
+			}
+			if err := validCommit(commit, setup); err != nil {
+				return fmt.Errorf("invalid commit")
+			}
+
 			setups = append(setups, setup)
 			commits = append(commits, commit)
 			status.PreviousEpoch.SetupID = setup.ID()
@@ -218,6 +225,13 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
+		if err := validSetup(setup); err != nil {
+			return fmt.Errorf("invalid setup: %w", err)
+		}
+		if err := validCommit(commit, setup); err != nil {
+			return fmt.Errorf("invalid commit")
+		}
+
 		setups = append(setups, setup)
 		commits = append(commits, commit)
 		status.CurrentEpoch.SetupID = setup.ID()
@@ -231,6 +245,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			if err != nil {
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
+			if err := validSetup(setup); err != nil {
+				return fmt.Errorf("invalid setup: %w", err)
+			}
+
 			setups = append(setups, setup)
 			status.NextEpoch.SetupID = setup.ID()
 			commit, err := protocol.ToEpochCommit(next)
@@ -238,6 +256,9 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 				return fmt.Errorf("could not get next epoch commit event: %w", err)
 			}
 			if err == nil {
+				if err := validCommit(commit, setup); err != nil {
+					return fmt.Errorf("invalid commit")
+				}
 				commits = append(commits, commit)
 				status.NextEpoch.CommitID = commit.ID()
 			}
@@ -293,62 +314,17 @@ func OpenState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-) (*State, *StateRoot, error) {
+) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
+		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}
 	if !isBootstrapped {
-		return nil, nil, fmt.Errorf("expected database to contain bootstrapped state")
+		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	// read root block from database:
-	var rootHeight uint64
-	err = db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root height: %w", err)
-	}
-	rootBlock, err := blocks.ByHeight(rootHeight)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block: %w", err)
-	}
-
-	// read root execution result
-	var resultID flow.Identifier
-	err = db.View(operation.LookupExecutionResult(rootBlock.ID(), &resultID))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's execution result ID: %w", err)
-	}
-	var result flow.ExecutionResult
-	err = db.View(operation.RetrieveExecutionResult(resultID, &result))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's execution result: %w", err)
-	}
-
-	// read root seal
-	seal, err := seals.ByBlockID(rootBlock.ID())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's seal: %w", err)
-	}
-
-	// read root seal
-	epochStatus, err := statuses.ByBlockID(rootBlock.ID())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's epoch status: %w", err)
-	}
-	epochSetup, err := setups.ByID(epochStatus.CurrentEpoch.SetupID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root epochs's setup event: %w", err)
-	}
-
-	// construct state Root
-	stateRoot, err := NewStateRoot(rootBlock, &result, seal, epochSetup.FirstView)
-	if err != nil {
-		return nil, nil, fmt.Errorf("constructing state root failed: %w", err)
-	}
-
-	return state, stateRoot, nil
+	return state, nil
 }
 
 func (s *State) Params() protocol.Params {

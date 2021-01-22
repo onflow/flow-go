@@ -541,7 +541,7 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 		block.Header.ParentID = unittest.IdentifierFixture()
 	})
 
-	stateRoot, err := bprotocol.NewStateRoot(root, result, seal, 0)
+	stateRoot, err := flow.NewStateRoot(root, result, seal, 0)
 	require.NoError(t, err)
 
 	util.RunWithBootstrapState(t, stateRoot, func(db *badger.DB, state *bprotocol.State) {

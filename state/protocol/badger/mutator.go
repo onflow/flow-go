@@ -931,6 +931,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 				}
 
 				// cache the first view to simplify epoch queries later on
+				// TODO remove
 				ev.FirstView = activeSetup.FinalView + 1
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)

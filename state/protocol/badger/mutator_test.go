@@ -4,7 +4,6 @@ package badger_test
 
 import (
 	"errors"
-
 	"math/rand"
 	"testing"
 	"time"
@@ -41,10 +40,8 @@ func init() {
 var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
 func TestBootstrapValid(t *testing.T) {
-	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.NoError(t, err)
-	util.RunWithBootstrapState(t, stateRoot, func(db *badger.DB, state *protocol.State) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *protocol.State) {
 		var finalized uint64
 		err := db.View(operation.RetrieveFinalizedHeight(&finalized))
 		require.NoError(t, err)
@@ -65,233 +62,18 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.LookupBlockSeal(genesisID, &sealID))
 		require.NoError(t, err)
 
-		seal := stateRoot.Seal()
+		seal, err := rootSnapshot.LatestSeal()
+		require.NoError(t, err)
 		err = db.View(operation.RetrieveSeal(sealID, seal))
 		require.NoError(t, err)
 
-		block := stateRoot.Block()
-		require.Equal(t, block.Header.Height, finalized)
-		require.Equal(t, block.Header.Height, sealed)
+		block, err := rootSnapshot.Head()
+		require.NoError(t, err)
+		require.Equal(t, block.Height, finalized)
+		require.Equal(t, block.Height, sealed)
 		require.Equal(t, block.ID(), genesisID)
 		require.Equal(t, block.ID(), seal.BlockID)
-		require.Equal(t, block.Header, &header)
-	})
-}
-
-func TestBootstrapDuplicateID(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-	root, result, seal := unittest.BootstrapFixture(participants)
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapZeroStake(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-	root, result, seal := unittest.BootstrapFixture(participants)
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapNoCollection(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-
-	root, result, seal := unittest.BootstrapFixture(participants)
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapNoConsensus(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-
-	root, result, seal := unittest.BootstrapFixture(participants)
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapNoExecution(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-
-	root, result, seal := unittest.BootstrapFixture(participants)
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapNoVerification(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-	}
-
-	root, result, seal := unittest.BootstrapFixture(participants)
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapExistingAddress(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-
-	root, result, seal := unittest.BootstrapFixture(participants)
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapNonZeroParent(t *testing.T) {
-	root, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
-		block.Header.Height = 13
-		block.Header.ParentID = unittest.IdentifierFixture()
-	})
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.NoError(t, err)
-}
-
-func TestBootstrapNonEmptyCollections(t *testing.T) {
-	root, result, seal := unittest.BootstrapFixture(participants, func(block *flow.Block) {
-		block.Payload.Guarantees = unittest.CollectionGuaranteesFixture(1)
-	})
-	_, err := protocol.NewStateRoot(root, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapWithSeal(t *testing.T) {
-	block := unittest.GenesisFixture(participants)
-	block.Payload.Seals = []*flow.Seal{unittest.Seal.Fixture()}
-	block.Header.PayloadHash = block.Payload.Hash()
-
-	result := unittest.ExecutionResultFixture()
-	result.BlockID = block.ID()
-
-	finalState, ok := result.FinalStateCommitment()
-	require.True(t, ok)
-
-	seal := unittest.Seal.Fixture()
-	seal.BlockID = block.ID()
-	seal.ResultID = result.ID()
-	seal.FinalState = finalState
-
-	_, err := protocol.NewStateRoot(block, result, seal, 0)
-	require.Error(t, err)
-}
-
-func TestBootstrapMissingServiceEvents(t *testing.T) {
-	t.Run("missing setup", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		seal.ServiceEvents = seal.ServiceEvents[1:]
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-
-	t.Run("missing commit", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		seal.ServiceEvents = seal.ServiceEvents[:1]
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapInvalidEpochSetup(t *testing.T) {
-	t.Run("invalid final view", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		// set an invalid final view for the first epoch
-		setup.FinalView = root.Header.View
-
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-
-	t.Run("invalid cluster assignments", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		// create an invalid cluster assignment (node appears in multiple clusters)
-		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
-		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
-
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-
-	t.Run("empty seed", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		setup.RandomSource = nil
-
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-}
-
-func TestBootstrapInvalidEpochCommit(t *testing.T) {
-	t.Run("inconsistent counter", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// use a different counter for the commit
-		commit.Counter = setup.Counter + 1
-
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-
-	t.Run("inconsistent cluster QCs", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// add an extra QC to commit
-		commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
-
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-
-	t.Run("missing dkg group key", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-		commit.DKGGroupKey = nil
-
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
-	})
-
-	t.Run("inconsistent DKG participants", func(t *testing.T) {
-		root, result, seal := unittest.BootstrapFixture(participants)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// add an invalid DKG participant
-		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
-		commit.DKGParticipants[collector.NodeID] = flow.DKGParticipant{
-			KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
-			Index:    1,
-		}
-
-		_, err := protocol.NewStateRoot(root, result, seal, 0)
-		require.Error(t, err)
+		require.Equal(t, block, &header)
 	})
 }
 
@@ -299,7 +81,7 @@ func TestExtendValid(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := storeutil.StorageLayer(t, db)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 
 		// create a event consumer to test epoch transition events
 		distributor := events.NewDistributor()
@@ -307,10 +89,11 @@ func TestExtendValid(t *testing.T) {
 		distributor.AddConsumer(consumer)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, unittest.QuorumCertificateFixture())
+		qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(block.ID()))
+		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
+		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 
 		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockReceiptValidator())
@@ -451,7 +234,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 
 func TestExtendHeightTooLarge(t *testing.T) {
 	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
+	stateRoot, err := flow.NewStateRoot(root, result, seal, 0)
 	require.NoError(t, err)
 	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
 
@@ -1889,13 +1672,13 @@ func saveBlock(t *testing.T, block *flow.Block, finalizes *flow.Block, state *pr
 	require.NoError(t, err)
 }
 
-func fixtureStateRoot(t *testing.T) *protocol.StateRoot {
+func fixtureStateRoot(t *testing.T) *flow.StateRoot {
 	return fixtureStateRootWithParticipants(t, participants)
 }
 
-func fixtureStateRootWithParticipants(t *testing.T, participants flow.IdentityList) *protocol.StateRoot {
+func fixtureStateRootWithParticipants(t *testing.T, participants flow.IdentityList) *flow.StateRoot {
 	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
+	stateRoot, err := flow.NewStateRoot(root, result, seal, 0)
 	require.NoError(t, err)
 	return stateRoot
 }
