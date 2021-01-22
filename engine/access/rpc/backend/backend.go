@@ -206,17 +206,17 @@ func executionNodesForBlockID(
 	}
 
 	// collect the execution node id in each of the receipts
-	var executionIDs flow.IdentifierList
+	var executorIDs flow.IdentifierList
 	for _, receipt := range receipts {
-		executionIDs = append(executionIDs, receipt.ExecutorID)
+		executorIDs = append(executorIDs, receipt.ExecutorID)
 	}
 
-	if len(executionIDs) == 0 {
+	if len(executorIDs) == 0 {
 		return nil, fmt.Errorf("no execution node found for block ID %v: %w", blockID, err)
 	}
 
 	// find the node identities of these execution nodes
-	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executionIDs...))
+	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executorIDs...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}

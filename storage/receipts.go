@@ -18,7 +18,7 @@ type ExecutionReceipts interface {
 	Index(blockID flow.Identifier, resultID flow.Identifier) error
 
 	// Index indexes an execution receipt by block ID and execution ID
-	IndexByBlockIDAndExecutionID(blockID, executionID, resultID flow.Identifier) error
+	IndexByBlockIDAndExecutionID(blockID, executorID, resultID flow.Identifier) error
 
 	// ByBlockID retrieves an execution receipt by block ID.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error)

@@ -99,7 +99,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
 	}
 
-	var errors error
+	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
@@ -108,7 +108,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		}
 		errors = multierror.Append(errors, err)
 	}
-	return nil, errors
+	return nil, errors.ErrorOrNil()
 }
 
 func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {

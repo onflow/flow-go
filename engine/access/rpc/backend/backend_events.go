@@ -170,7 +170,7 @@ func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDs
 }
 
 func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {
-	var errors error
+	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetEvents(ctx, execNode, req)
@@ -179,7 +179,7 @@ func (b *backendEvents) getEventsFromAnyExeNode(ctx context.Context, execNodes f
 		}
 		errors = multierror.Append(errors, err)
 	}
-	return nil, errors
+	return nil, errors.ErrorOrNil()
 }
 
 func (b *backendEvents) tryGetEvents(ctx context.Context, execNode *flow.Identity, req execproto.GetEventsForBlockIDsRequest) (*execproto.GetEventsForBlockIDsResponse, error) {

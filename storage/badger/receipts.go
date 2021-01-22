@@ -143,10 +143,10 @@ func (r *ExecutionReceipts) Index(blockID, receiptID flow.Identifier) error {
 	})
 }
 
-func (r *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID, executionID, receiptID flow.Identifier) error {
+func (r *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID, executorID, receiptID flow.Identifier) error {
 	return operation.RetryOnConflict(r.db.Update, func(tx *badger.Txn) error {
 
-		err := operation.IndexExecutionReceiptByBlockIDExecutionID(blockID, executionID, receiptID)(tx)
+		err := operation.IndexExecutionReceiptByBlockIDExecutionID(blockID, executorID, receiptID)(tx)
 		if err == nil {
 			return nil
 		}
@@ -160,7 +160,7 @@ func (r *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID, executionID, r
 		// if the result is the same, we could skip indexing the receipt
 		// if the result is different, then return error
 		var storedReceiptID flow.Identifier
-		err = operation.LookupExecutionReceiptByBlockIDExecutionID(blockID, executionID, &storedReceiptID)(tx)
+		err = operation.LookupExecutionReceiptByBlockIDExecutionID(blockID, executorID, &storedReceiptID)(tx)
 		if err != nil {
 			return fmt.Errorf("there is a receipt stored already, but cannot retrieve the ID of it: %w", err)
 		}
@@ -180,7 +180,7 @@ func (r *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID, executionID, r
 		if storedResultID != storingResultID {
 			return fmt.Errorf(
 				"storing receipt that is different from the already stored one for block: %v, execution ID: %v, storing receipt: %v, stored receipt: %v. storing result: %v, stored result: %v, %w",
-				blockID, executionID, receiptID, storedReceiptID, storingResultID, storedResultID, storage.ErrDataMismatch)
+				blockID, executorID, receiptID, storedReceiptID, storingResultID, storedResultID, storage.ErrDataMismatch)
 		}
 
 		return nil
