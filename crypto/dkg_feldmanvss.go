@@ -149,7 +149,7 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	// In case a broadcasted message is received by the origin node,
+	// In case a message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
 		return nil

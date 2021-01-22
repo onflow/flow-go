@@ -173,8 +173,8 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 }
 
 const (
-	complaintSize      = 1
-	complainAnswerSize = 1 + PrKeyLenBLSBLS12381
+	complaintSize       = 1
+	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
 )
 
 // HandleMsg processes a new message received by the current node
@@ -193,7 +193,7 @@ func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	// In case a broadcasted message is received by the origin node,
+	// In case a message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
 		return nil
@@ -455,7 +455,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		}
 		// if the complainee is the current node, prepare an answer
 		if s.currentIndex == s.leaderIndex {
-			data := make([]byte, complainAnswerSize+1)
+			data := make([]byte, complaintAnswerSize+1)
 			data[0] = byte(feldmanVSSComplaintAnswer)
 			data[1] = byte(origin)
 			zrPolynomialImage(data[2:], s.a, origin+1, nil)
@@ -465,7 +465,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		return
 	}
 	// complaint is not new in the map
-	// check if the complain has been already received
+	// check if the complaint has been already received
 	if c.received {
 		s.processor.FlagMisbehavior(int(origin),
 			"complaint was already received")
@@ -492,11 +492,11 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	}
 
 	// check the answer format
-	if len(data) != complainAnswerSize {
+	if len(data) != complaintAnswerSize {
 		s.disqualified = true
 		s.processor.Disqualify(int(s.leaderIndex),
 			fmt.Sprintf("the complaint answer has an invalid length, expects %d, got %d",
-				complainAnswerSize, len(data)))
+				complaintAnswerSize, len(data)))
 		return
 	}
 
