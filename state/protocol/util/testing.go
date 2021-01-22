@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,30 +27,23 @@ func MockReceiptValidator() module.ReceiptValidator {
 	return validator
 }
 
-// TODO update state root
-func RunWithBootstrapState(t testing.TB, stateRoot *pbadger.StateRoot, f func(*badger.DB, *pbadger.State)) {
+func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.State)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		headers, _, seals, _, _, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
-		qc := unittest.QuorumCertificateFixture() // TODO replace this
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(stateRoot.Block(), stateRoot.Result(), stateRoot.Seal(), qc)
-		require.NoError(t, err)
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
+		headers, _, seals, _, _, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		f(db, state)
 	})
 }
 
-func RunWithFullProtocolState(t testing.TB, stateRoot *pbadger.StateRoot, f func(*badger.DB, *pbadger.MutableState)) {
+func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.MutableState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		consumer := events.NewNoop()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
-		qc := unittest.QuorumCertificateFixture() // TODO replace this
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(stateRoot.Block(), stateRoot.Result(), stateRoot.Seal(), qc)
-		require.NoError(t, err)
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator)
@@ -60,16 +52,13 @@ func RunWithFullProtocolState(t testing.TB, stateRoot *pbadger.StateRoot, f func
 	})
 }
 
-func RunWithFullProtocolStateAndValidator(t testing.TB, stateRoot *pbadger.StateRoot, validator module.ReceiptValidator, f func(*badger.DB, *pbadger.MutableState)) {
+func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Snapshot, validator module.ReceiptValidator, f func(*badger.DB, *pbadger.MutableState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		consumer := events.NewNoop()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
-		qc := unittest.QuorumCertificateFixture() // TODO replace this
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(stateRoot.Block(), stateRoot.Result(), stateRoot.Seal(), qc)
-		require.NoError(t, err)
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, validator)
 		require.NoError(t, err)
@@ -77,16 +66,13 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, stateRoot *pbadger.State
 	})
 }
 
-func RunWithFollowerProtocolState(t testing.TB, stateRoot *pbadger.StateRoot, f func(*badger.DB, *pbadger.FollowerState)) {
+func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f func(*badger.DB, *pbadger.FollowerState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
 		consumer := events.NewNoop()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
-		qc := unittest.QuorumCertificateFixture() // TODO replace this
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(stateRoot.Block(), stateRoot.Result(), stateRoot.Seal(), qc)
-		require.NoError(t, err)
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer)
 		require.NoError(t, err)
@@ -94,15 +80,12 @@ func RunWithFollowerProtocolState(t testing.TB, stateRoot *pbadger.StateRoot, f 
 	})
 }
 
-func RunWithFullProtocolStateAndConsumer(t testing.TB, stateRoot *pbadger.StateRoot, consumer protocol.Consumer, f func(*badger.DB, *pbadger.MutableState)) {
+func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Snapshot, consumer protocol.Consumer, f func(*badger.DB, *pbadger.MutableState)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		tracer := trace.NewNoopTracer()
-		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
-		qc := unittest.QuorumCertificateFixture() // TODO replace this
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(stateRoot.Block(), stateRoot.Result(), stateRoot.Seal(), qc)
-		require.NoError(t, err)
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator)
