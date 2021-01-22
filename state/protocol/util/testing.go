@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	mock2 "github.com/onflow/flow-go/module/mock"
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -24,6 +26,29 @@ import (
 func MockReceiptValidator() module.ReceiptValidator {
 	validator := &mock2.ReceiptValidator{}
 	validator.On("Validate", mock.Anything).Return(nil)
+	return validator
+}
+
+// MockSealValidator returns a SealValidator that accepts
+// all seals without performing any
+// integrity checks, returns first seal in block as valid one
+func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
+	validator := &mock2.SealValidator{}
+	validator.On("Validate", mock.Anything).Return(
+		func(candidate *flow.Block) *flow.Seal {
+			if len(candidate.Payload.Seals) > 0 {
+				return candidate.Payload.Seals[0]
+			}
+			last, _ := sealsDB.ByBlockID(candidate.Header.ParentID)
+			return last
+		},
+		func(candidate *flow.Block) error {
+			if len(candidate.Payload.Seals) > 0 {
+				return nil
+			}
+			_, err := sealsDB.ByBlockID(candidate.Header.ParentID)
+			return err
+		}).Maybe()
 	return validator
 }
 
@@ -48,7 +73,8 @@ func RunWithFullProtocolState(t testing.TB, stateRoot *pbadger.StateRoot, f func
 		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
-		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator)
+		sealValidator := MockSealValidator(seals)
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -62,7 +88,8 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, stateRoot *pbadger.State
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
 		require.NoError(t, err)
-		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, validator)
+		sealValidator := MockSealValidator(seals)
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, validator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -90,7 +117,8 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, stateRoot *pbadger.StateR
 		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
-		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator)
+		sealValidator := MockSealValidator(seals)
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
