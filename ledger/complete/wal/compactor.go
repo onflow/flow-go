@@ -114,11 +114,11 @@ func (c *Compactor) createCheckpoints() error {
 }
 
 func (c *Compactor) cleanupCheckpoints() error {
-	// don't bother listening checkpoints if we keep them all
+	// don't bother listing checkpoints if we keep them all
 	if c.checkpointsToKeep == 0 {
 		return nil
 	}
-	checkpoints, err := c.checkpointer.ListCheckpoints()
+	checkpoints, err := c.checkpointer.Checkpoints()
 	if err != nil {
 		return fmt.Errorf("cannot list checkpoints: %w", err)
 	}

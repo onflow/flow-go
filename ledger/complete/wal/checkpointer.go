@@ -47,13 +47,14 @@ func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Check
 	}
 }
 
+// listCheckpoints returns all the numbers (unsorted) of the checkpoint files, and the number of the last checkpoint.
 func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 
 	list := make([]int, 0)
 
 	files, err := ioutil.ReadDir(c.dir)
 	if err != nil {
-		return nil, -1, err
+		return nil, -1, fmt.Errorf("could not read directory %s: %w", c.dir, err)
 	}
 	last := -1
 	for _, fn := range files {
@@ -77,11 +78,11 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 	return list, last, nil
 }
 
-// ListCheckpoints returns all the checkpoint numbers in asc order
-func (c *Checkpointer) ListCheckpoints() ([]int, error) {
+// Checkpoints returns all the checkpoint numbers in asc order
+func (c *Checkpointer) Checkpoints() ([]int, error) {
 	list, _, err := c.listCheckpoints()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not fetch all checkpoints: %w", err)
 	}
 
 	sort.Ints(list)
