@@ -49,7 +49,19 @@ func (ir *IncorporatedResult) Checksum() Identifier {
 	return MakeID(ir)
 }
 
-// GetSignature returns a signature by chunk index and signer ID.
+// GetChunkSignatures returns the AggregatedSignature for a specific chunk
+func (ir *IncorporatedResult) GetChunkSignatures(chunkIndex uint64) (*AggregatedSignature, bool) {
+	ir.aggregatedSignaturesLock.Lock()
+	defer ir.aggregatedSignaturesLock.Unlock()
+	ar, ok := ir.aggregatedSignatures[chunkIndex]
+	if !ok {
+		return nil, false
+	}
+	sigCopy := ar.Copy()
+	return &sigCopy, true
+}
+
+// GetSignature returns a signature by chunk index and signer ID
 func (ir *IncorporatedResult) GetSignature(chunkIndex uint64, signerID Identifier) (*crypto.Signature, bool) {
 	ir.aggregatedSignaturesLock.Lock()
 	defer ir.aggregatedSignaturesLock.Unlock()
@@ -69,11 +81,10 @@ func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifie
 	as, ok := ir.aggregatedSignatures[chunkIndex]
 	if !ok {
 		as = &AggregatedSignature{}
+		ir.aggregatedSignatures[chunkIndex] = as
 	}
 
 	as.Add(signerID, signature)
-
-	ir.aggregatedSignatures[chunkIndex] = as
 }
 
 // GetAggregatedSignatures returns all the aggregated signatures orderd by chunk
@@ -87,7 +98,9 @@ func (ir *IncorporatedResult) GetAggregatedSignatures() []AggregatedSignature {
 	for _, chunk := range ir.Result.Chunks {
 		as, ok := ir.aggregatedSignatures[chunk.Index]
 		if ok {
-			result = append(result, *as)
+			result = append(result, as.Copy())
+		} else {
+			result = append(result, AggregatedSignature{})
 		}
 	}
 

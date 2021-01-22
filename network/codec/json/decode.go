@@ -72,6 +72,11 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeChunkDataResponse:
 		v = &messages.ChunkDataResponse{}
 
+	case CodeApprovalRequest:
+		v = &messages.ApprovalRequest{}
+	case CodeApprovalResponse:
+		v = &messages.ApprovalResponse{}
+
 	// generic entity exchange engines
 	case CodeEntityRequest:
 		v = &messages.EntityRequest{}
