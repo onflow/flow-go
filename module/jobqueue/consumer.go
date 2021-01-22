@@ -80,6 +80,8 @@ func (c *Consumer) Start() error {
 		if err != nil {
 			return fmt.Errorf("could not init processed index: %w", err)
 		}
+		c.log.Info().Int("processed", processedIndex).
+			Msg("processed index not found, initialized")
 	}
 
 	if err != nil {
@@ -90,6 +92,7 @@ func (c *Consumer) Start() error {
 
 	c.checkProcessable()
 
+	c.log.Info().Int("processed", processedIndex).Msg("consumer started")
 	return nil
 }
 
@@ -98,11 +101,13 @@ func (c *Consumer) Stop() {
 	defer c.Unlock()
 
 	c.running = false
+	c.log.Info().Msg("consumer stopped")
 }
 
 func (c *Consumer) FinishJob(jobID JobID) {
 	c.Lock()
 	defer c.Unlock()
+	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
 
 	if c.doneJob(jobID) {
 		c.checkProcessable()
@@ -118,6 +123,8 @@ func (c *Consumer) Check() {
 
 // checkProcessable is a wrap of the `run` function with logging
 func (c *Consumer) checkProcessable() {
+	c.log.Debug().Msg("checking processable jobs")
+
 	processingCount, err := c.run()
 	if err != nil {
 		c.log.Error().Err(err).Msg("failed to check processables")

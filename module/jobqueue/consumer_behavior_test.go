@@ -349,29 +349,36 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 	})
 }
 
-// [+1, +2, +3, ... +12, +13, +14, 1*, 2*, 3*, 5*, 6*, ...12*] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
+// [+1, +2, +3, ... +12 , 1*, 2*, 3*, 5*, 6*, ...12*, +13, +14] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
 // when there are too many pending (8) jobs, it will stop processing more but wait for job 4 to finish
 // 5* - 12* has 8 pending in total
 func testTooManyPending(t *testing.T) {
 	runWith(t, func(c *testConsumer, cp storage.ConsumerProgress, w *mockWorker, j *mockJobs) {
 		require.NoError(t, c.Start())
-		for i := 1; i <= 14; i++ {
-			// +1, +2, ... +14
+		for i := 1; i <= 12; i++ {
+			// +1, +2, ... +12
 			require.NoError(t, j.PushOne())
 			c.Check()
 		}
 
-		c.FinishJob(jobIDAtIndex(3)) // 3*
-		c.FinishJob(jobIDAtIndex(2)) // 2*
-		c.FinishJob(jobIDAtIndex(1)) // 1*
-
-		for i := 5; i <= 12; i++ {
-			// 5*, 6*, ... 12*
+		for i := 1; i <= 12; i++ {
+			// job 1 - 12 are all finished, except 4
+			// 5, 6, 7, 8, 9, 10, 11, 12 are pending, which have reached max pending (8)
+			if i == 4 {
+				continue
+			}
 			c.FinishJob(jobIDAtIndex(i))
 		}
 
+		require.NoError(t, j.PushOne()) // +13
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // + 14
+		c.Check()
+
 		time.Sleep(1 * time.Millisecond)
 
+		// max pending reached, will not work on job 13
 		w.AssertCalled(t, []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"})
 		assertProcessed(t, cp, 3)
 	})
