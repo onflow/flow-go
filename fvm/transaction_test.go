@@ -292,6 +292,9 @@ func TestAccountFreezing(t *testing.T) {
 		err = txInvocator.Process(vm, context, proc, st)
 		require.NoError(t, err)
 
+		err = st.Commit()
+		require.NoError(t, err)
+
 		codeB := fmt.Sprintf(`
 			import Whatever from 0x%s
 
