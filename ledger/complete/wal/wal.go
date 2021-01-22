@@ -258,7 +258,7 @@ func (w *LedgerWAL) replay(
 }
 
 func getPossibleCheckpoints(allCheckpoints []int, from, to int) []int {
-	//list of checkpoints is sorted
+	// list of checkpoints is sorted
 	indexFrom := sort.SearchInts(allCheckpoints, from)
 	indexTo := sort.SearchInts(allCheckpoints, to)
 
