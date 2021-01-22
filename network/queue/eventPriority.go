@@ -91,6 +91,12 @@ func getPriorityByType(message interface{}) Priority {
 	case *messages.ChunkDataResponse:
 		return HighPriority
 
+	// request/response for result approvals
+	case *messages.ApprovalRequest:
+		return MediumPriority
+	case *messages.ApprovalResponse:
+		return MediumPriority
+
 	// generic entity exchange engines
 	case *messages.EntityRequest:
 		return LowPriority

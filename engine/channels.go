@@ -117,6 +117,7 @@ const (
 	RequestCollections       = network.Channel("request-collections")
 	RequestChunks            = network.Channel("request-chunks")
 	RequestReceiptsByBlockID = network.Channel("request-receipts-by-block-id")
+	RequestApprovalsByChunk  = network.Channel("request-approvals-by-chunk")
 
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
@@ -128,6 +129,7 @@ const (
 	ProvideCollections       = RequestCollections
 	ProvideChunks            = RequestChunks
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
+	ProvideApprovalsByChunk  = RequestApprovalsByChunk
 )
 
 // initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
@@ -162,6 +164,7 @@ func initializeChannelRoleMap() {
 	channelRoleMap[RequestCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
 	channelRoleMap[RequestChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
 	channelRoleMap[RequestReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	channelRoleMap[RequestApprovalsByChunk] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	// Channel aliases to make the code more readable / more robust to errors
 	channelRoleMap[ReceiveGuarantees] = flow.RoleList{flow.RoleCollection, flow.RoleConsensus}
@@ -174,6 +177,7 @@ func initializeChannelRoleMap() {
 	channelRoleMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
 	channelRoleMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
 	channelRoleMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
+	channelRoleMap[ProvideApprovalsByChunk] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
 	channelRoleMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
 	channelRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
