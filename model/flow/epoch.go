@@ -43,33 +43,11 @@ func (p EpochPhase) String() string {
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
 	Counter      uint64         // the number of the epoch
+	FirstView    uint64         // the first view of the epoch
 	FinalView    uint64         // the final view of the epoch
 	Participants IdentityList   // all participants of the epoch
 	Assignments  AssignmentList // cluster assignment for the epoch
 	RandomSource []byte         // source of randomness for epoch-specific setup tasks
-
-	// FirstView is the first view of the epoch. It is NOT included in the service
-	// event, but is cached here when stored to simplify epoch queries.
-	// TODO separate this more explicitly from canonical service event
-	FirstView uint64
-}
-
-// Body returns the canonical body of the EpochSetup event (notably omitting
-// the FirstView which is a computed property).
-func (setup *EpochSetup) Body() interface{} {
-	return struct {
-		Counter      uint64
-		FinalView    uint64
-		Participants IdentityList
-		Assignments  AssignmentList
-		RandomSource []byte
-	}{
-		Counter:      setup.Counter,
-		FinalView:    setup.FinalView,
-		Participants: setup.Participants,
-		Assignments:  setup.Assignments,
-		RandomSource: setup.RandomSource,
-	}
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -81,7 +59,7 @@ func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 
 // ID returns the hash of the event contents.
 func (setup *EpochSetup) ID() Identifier {
-	return MakeID(setup.Body())
+	return MakeID(setup)
 }
 
 // EpochCommit is a service event emitted when epoch setup has been completed.

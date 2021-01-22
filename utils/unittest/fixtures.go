@@ -1044,6 +1044,12 @@ func WithFinalView(view uint64) func(*flow.EpochSetup) {
 	}
 }
 
+func WithFirstView(view uint64) func(*flow.EpochSetup) {
+	return func(setup *flow.EpochSetup) {
+		setup.FirstView = view
+	}
+}
+
 func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	participants := IdentityListFixture(5, WithAllRoles())
 	assignments := ClusterAssignment(1, participants)
@@ -1131,6 +1137,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 	setup := EpochSetupFixture(
 		WithParticipants(participants),
 		SetupWithCounter(counter),
+		WithFirstView(root.Header.View),
 		WithFinalView(root.Header.View+1000),
 	)
 	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
