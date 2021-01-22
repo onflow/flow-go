@@ -213,9 +213,14 @@ func CreateAccountsWithSimpleAddresses(
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *state.MapLedger {
 	ledger := state.NewMapLedger()
 
+	bootstrap := fvm.Bootstrap(
+		unittest.ServiceAccountPublicKey,
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+	)
+
 	_ = vm.Run(
 		ctx,
-		fvm.Bootstrap(unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply),
+		bootstrap,
 		ledger,
 	)
 

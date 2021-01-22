@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/state/protocol/seed"
 	"github.com/onflow/flow-go/storage"
@@ -57,6 +58,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
 
+	// TODO: store root QC
 	if s.blockID == root.ID() {
 		// TODO store root QC and return here
 		return nil, fmt.Errorf("root qc not stored")
@@ -170,30 +172,16 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	// from the previous epoch that are now un-staking
 	case flow.EpochPhaseStaking:
 
-		first, err := s.state.AtBlockID(status.FirstBlockID).Head()
-		if err != nil {
-			return nil, fmt.Errorf("could not get first block of epoch: %w", err)
-		}
-		// check whether this is the first epoch after the root block - in this
-		// case there are no previous epoch identities to check anyway
-		root, err := s.state.Params().Root()
-		if err != nil {
-			return nil, fmt.Errorf("could not get root block: %w", err)
-		}
-		if first.ID() == root.ID() {
+		if !status.HasPrevious() {
 			break
 		}
 
-		lastStatus, err := s.state.epoch.statuses.ByBlockID(first.ParentID)
+		previousSetup, err := s.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get last epoch status: %w", err)
-		}
-		lastSetup, err := s.state.epoch.setups.ByID(lastStatus.CurrentEpoch.SetupID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get last epoch setup event: %w", err)
+			return nil, fmt.Errorf("could not get previous epoch setup event: %w", err)
 		}
 
-		for _, identity := range lastSetup.Participants {
+		for _, identity := range previousSetup.Participants {
 			_, exists := lookup[identity.NodeID]
 			// add identity from previous epoch that is not in current epoch
 			if !exists {
@@ -261,6 +249,55 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	return seal.FinalState, nil
 }
 
+func (s *Snapshot) LatestSeal() (*flow.Seal, error) {
+	seal, err := s.state.seals.ByBlockID(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not look up latest seal: %w", err)
+	}
+	return seal, nil
+}
+
+// TODO inject results storage
+func (s *Snapshot) LatestResult() (*flow.ExecutionResult, error) {
+	seal, err := s.LatestSeal()
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest seal: %w", err)
+	}
+	result, err := s.state.results.ByID(seal.ResultID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest result: %w", err)
+	}
+	return result, nil
+}
+
+func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
+	seal, err := s.LatestSeal()
+	if err != nil {
+		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
+	}
+
+	// walk through the chain backward until we reach the block referenced by
+	// the latest seal - the returned segment includes this block
+	var segment []*flow.Block
+	err = state.Traverse(s.state.headers, s.blockID, seal.BlockID, func(header *flow.Header) error {
+		block, err := s.state.blocks.ByID(header.ID())
+		if err != nil {
+			return fmt.Errorf("could not get block: %w", err)
+		}
+		segment = append(segment, block)
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
+	}
+
+	// reverse the segment so it is in ascending order by height
+	for i, j := 0, len(segment)-1; i < j; i, j = i+1, j-1 {
+		segment[i], segment[j] = segment[j], segment[i]
+	}
+	return segment, nil
+}
+
 func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 	return s.pending(s.blockID)
 }
@@ -325,7 +362,11 @@ func (q *EpochQuery) Current() protocol.Epoch {
 		return invalid.NewEpoch(err)
 	}
 
-	return NewCommittedEpoch(setup, commit)
+	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	return epoch
 }
 
 // Next returns the next epoch, if it is available.
@@ -350,7 +391,11 @@ func (q *EpochQuery) Next() protocol.Epoch {
 		return invalid.NewEpoch(fmt.Errorf("failed to retrieve setup event for next epoch: %w", err))
 	}
 	if phase == flow.EpochPhaseSetup {
-		return NewSetupEpoch(nextSetup)
+		epoch, err := inmem.NewSetupEpoch(nextSetup)
+		if err != nil {
+			return invalid.NewEpoch(err)
+		}
+		return epoch
 	}
 
 	// if we are in committed phase, return a CommittedEpoch
@@ -358,7 +403,11 @@ func (q *EpochQuery) Next() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpoch(fmt.Errorf("failed to retrieve commit event for next epoch: %w", err))
 	}
-	return NewCommittedEpoch(nextSetup, nextCommit)
+	epoch, err := inmem.NewCommittedEpoch(nextSetup, nextCommit)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	return epoch
 }
 
 // Previous returns the previous epoch. During the first epoch after the root
@@ -370,23 +419,27 @@ func (q *EpochQuery) Previous() protocol.Epoch {
 	if err != nil {
 		return invalid.NewEpoch(err)
 	}
-	first, err := q.snap.state.headers.ByBlockID(status.FirstBlockID)
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
 
-	// CASE 1: we are in the first epoch after the root block, in which case
-	// we return a sentinel error
-	root, err := q.snap.state.Params().Root()
-	if err != nil {
-		return invalid.NewEpoch(err)
-	}
-	if first.ID() == root.ID() {
+	// CASE 1: there is no previous epoch - this indicates we are in the first
+	// epoch after a spork root or genesis block
+	if !status.HasPrevious() {
 		return invalid.NewEpoch(protocol.ErrNoPreviousEpoch)
 	}
 
-	// CASE 2: we are in any other epoch, return the current epoch w.r.t. the
-	// parent block of the first block in this epoch, which must be in the
-	// previous epoch
-	return q.snap.state.AtBlockID(first.ParentID).Epochs().Current()
+	// CASE 2: we are in any other epoch - retrieve the setup and commit events
+	// for the previous epoch
+	setup, err := q.snap.state.epoch.setups.ByID(status.PreviousEpoch.SetupID)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	commit, err := q.snap.state.epoch.commits.ByID(status.PreviousEpoch.CommitID)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+
+	epoch, err := inmem.NewCommittedEpoch(setup, commit)
+	if err != nil {
+		return invalid.NewEpoch(err)
+	}
+	return epoch
 }

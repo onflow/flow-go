@@ -10,7 +10,9 @@ import (
 type EncodableSnapshot struct {
 	Head              *flow.Header
 	Identities        flow.IdentityList
-	Commit            flow.StateCommitment
+	LatestSeal        *flow.Seal
+	LatestResult      *flow.ExecutionResult
+	SealingSegment    []*flow.Block
 	QuorumCertificate *flow.QuorumCertificate
 	Phase             flow.EpochPhase
 	Epochs            EncodableEpochs

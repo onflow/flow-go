@@ -21,6 +21,7 @@ type State struct {
 	db      *badger.DB
 	headers storage.Headers
 	blocks  storage.Blocks
+	results storage.ExecutionResults
 	seals   storage.Seals
 	epoch   struct {
 		setups   storage.EpochSetups
@@ -38,7 +39,7 @@ func Bootstrap(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	stateRoot *StateRoot,
+	root protocol.Snapshot,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
@@ -50,92 +51,115 @@ func Bootstrap(
 	state := newState(metrics, db, headers, seals, blocks, setups, commits, statuses)
 
 	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
-		// 1) insert the root block with its payload into the state and index it
-		err = state.blocks.StoreTx(stateRoot.Block())(tx)
+
+		// 1) insert each block in the root chain segment
+		segment, err := root.SealingSegment()
 		if err != nil {
-			return fmt.Errorf("could not insert root block: %w", err)
+			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		err = operation.InsertBlockValidity(stateRoot.Block().ID(), true)(tx)
-		if err != nil {
-			return fmt.Errorf("could not mark root block as valid: %w", err)
+		if len(segment) == 0 {
+			return fmt.Errorf("root sealing segment must contain at least one block")
 		}
 
-		err = operation.IndexBlockHeight(stateRoot.Block().Header.Height, stateRoot.Block().ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index root block: %w", err)
+		// sealing segment is in ascending height order, so the tail is the
+		// oldest ancestor and head is the newest child in the segment
+		tail := segment[0]
+		head := segment[len(segment)-1]
+
+		for i, block := range segment {
+			blockID := block.ID()
+			height := block.Header.Height
+
+			err = state.blocks.StoreTx(block)(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert root block: %w", err)
+			}
+			err = operation.InsertBlockValidity(blockID, true)(tx)
+			if err != nil {
+				return fmt.Errorf("could not mark root block as valid: %w", err)
+			}
+			err = operation.IndexBlockHeight(height, blockID)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
+			}
+
+			// for all but the first block in the segment, index the parent->child relationship
+			if i > 0 {
+				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(tx)
+				if err != nil {
+					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
+				}
+			}
 		}
-		// root block has no parent, so only needs to add one index
-		// to indicate the root block has no child yet
-		err = operation.InsertBlockChildren(stateRoot.Block().ID(), nil)(tx)
+
+		// insert an empty child index for the final block in the segment
+		err = operation.InsertBlockChildren(head.ID(), nil)(tx)
 		if err != nil {
-			return fmt.Errorf("could not initialize root child index: %w", err)
+			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
 
 		// 2) insert the root execution result into the database and index it
-		err = operation.InsertExecutionResult(stateRoot.Result())(tx)
+		result, err := root.LatestResult()
+		if err != nil {
+			return fmt.Errorf("could not get latest result from root snapshot: %w", err)
+		}
+		err = operation.SkipDuplicates(operation.InsertExecutionResult(result))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root result: %w", err)
 		}
-		err = operation.IndexExecutionResult(stateRoot.Block().ID(), stateRoot.Result().ID())(tx)
+		err = operation.IndexExecutionResult(result.BlockID, result.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
 		}
 
 		// 3) insert the root block seal into the database and index it
-		err = operation.InsertSeal(stateRoot.Seal().ID(), stateRoot.Seal())(tx)
+		seal, err := root.LatestSeal()
+		if err != nil {
+			return fmt.Errorf("could not get latest seal from root snapshot: %w", err)
+		}
+		err = operation.SkipDuplicates(operation.InsertSeal(seal.ID(), seal))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root seal: %w", err)
 		}
-		err = operation.IndexBlockSeal(stateRoot.Block().ID(), stateRoot.Seal().ID())(tx)
+		err = operation.IndexBlockSeal(seal.BlockID, seal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index root block seal: %w", err)
 		}
 
 		// 4) initialize the current protocol state values
-		err = operation.InsertStartedView(stateRoot.Block().Header.ChainID, stateRoot.Block().Header.View)(tx)
+		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertVotedView(stateRoot.Block().Header.ChainID, stateRoot.Block().Header.View)(tx)
+		err = operation.InsertVotedView(head.Header.ChainID, head.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertRootHeight(stateRoot.Block().Header.Height)(tx)
+		err = operation.InsertRootHeight(tail.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(stateRoot.Block().Header.Height)(tx)
+		err = operation.InsertFinalizedHeight(head.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(stateRoot.Block().Header.Height)(tx)
+		err = operation.InsertSealedHeight(tail.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = state.epoch.setups.StoreTx(stateRoot.EpochSetupEvent())(tx)
+		err = state.bootstrapEpoch(root)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert EpochSetup event: %w", err)
-		}
-		err = state.epoch.commits.StoreTx(stateRoot.EpochCommitEvent())(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert EpochCommit event: %w", err)
-		}
-		status, err := flow.NewEpochStatus(stateRoot.Block().ID(), stateRoot.EpochSetupEvent().ID(), stateRoot.EpochCommitEvent().ID(), flow.ZeroID, flow.ZeroID)
-		if err != nil {
-			return fmt.Errorf("could not construct root epoch status: %w", err)
-		}
-		err = state.epoch.statuses.StoreTx(stateRoot.Block().ID(), status)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert EpochStatus: %w", err)
+			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
-		state.metrics.FinalizedHeight(stateRoot.Block().Header.Height)
-		state.metrics.BlockFinalized(stateRoot.Block())
-
-		state.metrics.SealedHeight(stateRoot.Block().Header.Height)
-		state.metrics.BlockSealed(stateRoot.Block())
+		state.metrics.BlockSealed(tail)
+		state.metrics.SealedHeight(tail.Header.Height)
+		state.metrics.FinalizedHeight(head.Header.Height)
+		for _, block := range segment {
+			state.metrics.BlockFinalized(block)
+		}
 
 		return nil
 	})
@@ -144,6 +168,118 @@ func Bootstrap(
 	}
 
 	return state, nil
+}
+
+// bootstrapEpoch bootstraps the protocol state database with information about
+// the previous, current, and next epochs as of the root snapshot.
+//
+// The root snapshot's sealing segment must not straddle any epoch transitions
+// or epoch phase transitions.
+func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		previous := root.Epochs().Previous()
+		current := root.Epochs().Current()
+		next := root.Epochs().Next()
+
+		// build the status as we go
+		status := new(flow.EpochStatus)
+		var setups []*flow.EpochSetup
+		var commits []*flow.EpochCommit
+
+		// insert previous epoch if it exists
+		_, err := previous.Counter()
+		if err == nil {
+			// if there is a previous epoch, both setup and commit events must exist
+			setup, err := protocol.ToEpochSetup(previous)
+			if err != nil {
+				return fmt.Errorf("could not get previous epoch setup event: %w", err)
+			}
+			commit, err := protocol.ToEpochCommit(previous)
+			if err != nil {
+				return fmt.Errorf("could not get previous epoch commit event: %w", err)
+			}
+
+			setups = append(setups, setup)
+			commits = append(commits, commit)
+			status.PreviousEpoch.SetupID = setup.ID()
+			status.PreviousEpoch.CommitID = commit.ID()
+		} else if !errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			return fmt.Errorf("could not retrieve previous epoch: %w", err)
+		}
+
+		// insert current epoch - both setup and commit events must exist
+		setup, err := protocol.ToEpochSetup(current)
+		if err != nil {
+			return fmt.Errorf("could not get current epoch setup event: %w", err)
+		}
+		commit, err := protocol.ToEpochCommit(current)
+		if err != nil {
+			return fmt.Errorf("could not get current epoch commit event: %w", err)
+		}
+
+		setups = append(setups, setup)
+		commits = append(commits, commit)
+		status.CurrentEpoch.SetupID = setup.ID()
+		status.CurrentEpoch.CommitID = commit.ID()
+
+		// insert next epoch, if it exists
+		_, err = next.Counter()
+		if err == nil {
+			// either only the setup event, or both the setup and commit events must exist
+			setup, err := protocol.ToEpochSetup(next)
+			if err != nil {
+				return fmt.Errorf("could not get next epoch setup event: %w", err)
+			}
+			setups = append(setups, setup)
+			status.NextEpoch.SetupID = setup.ID()
+			commit, err := protocol.ToEpochCommit(next)
+			if err != nil && !errors.Is(err, protocol.ErrEpochNotCommitted) {
+				return fmt.Errorf("could not get next epoch commit event: %w", err)
+			}
+			if err == nil {
+				commits = append(commits, commit)
+				status.NextEpoch.CommitID = commit.ID()
+			}
+		} else if !errors.Is(err, protocol.ErrNextEpochNotSetup) {
+			return fmt.Errorf("could not get next epoch: %w", err)
+		}
+
+		// sanity check: ensure epoch status is valid
+		err = status.Check()
+		if err != nil {
+			return fmt.Errorf("bootstrapping resulting in invalid epoch status: %w", err)
+		}
+
+		// insert all epoch setup/commit service events
+		for _, setup := range setups {
+			err = state.epoch.setups.StoreTx(setup)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store epoch setup event: %w", err)
+			}
+		}
+		for _, commit := range commits {
+			err = state.epoch.commits.StoreTx(commit)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store epoch commit event: %w", err)
+			}
+		}
+
+		// NOTE: as specified in the godoc, this code assumes that each block
+		// in the sealing segment in within the same phase within the same epoch.
+		segment, err := root.SealingSegment()
+		if err != nil {
+			return fmt.Errorf("could not get sealing segment: %w", err)
+		}
+		for _, block := range segment {
+			blockID := block.ID()
+			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
+			if err != nil {
+				return fmt.Errorf("could not store epoch status for block (id=%x): %w", blockID, err)
+			}
+		}
+
+		return nil
+	}
 }
 
 func OpenState(

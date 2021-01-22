@@ -50,7 +50,7 @@ func (c *GhostClient) Close() error {
 	return c.close()
 }
 
-func (c *GhostClient) Send(ctx context.Context, channelID string, event interface{}, targetIDs ...flow.Identifier) error {
+func (c *GhostClient) Send(ctx context.Context, channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 
 	message, err := c.codec.Encode(event)
 	if err != nil {
@@ -63,7 +63,7 @@ func (c *GhostClient) Send(ctx context.Context, channelID string, event interfac
 	}
 
 	req := ghost.SendEventRequest{
-		ChannelId: channelID,
+		ChannelId: channel.String(),
 		TargetID:  targets,
 		Message:   message,
 	}

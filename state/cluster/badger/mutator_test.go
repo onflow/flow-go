@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -74,12 +75,12 @@ func (suite *MutatorSuite) SetupTest() {
 	// ensure we don't enter a new epoch for tests that build many blocks
 	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
 
-	stateRoot, err := pbadger.NewStateRoot(root, result, seal, 0)
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture())
 	require.NoError(suite.T(), err)
 
-	suite.protoGenesis = stateRoot.Block().Header
+	suite.protoGenesis = root.Header
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
 	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer)

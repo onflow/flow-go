@@ -849,7 +849,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 			return nil, fmt.Errorf("missing commit event for starting next epoch")
 		}
 		status, err := flow.NewEpochStatus(
-			block.ID(),
+			parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
 			parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 			flow.ZeroID, flow.ZeroID,
 		)
@@ -859,7 +859,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 	// Block is in the same epoch as its parent, re-use the same epoch status
 	// IMPORTANT: copy the status to avoid modifying the parent status in the cache
 	status, err := flow.NewEpochStatus(
-		parentStatus.FirstBlockID,
+		parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
 		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
 		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
 	)

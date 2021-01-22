@@ -13,6 +13,7 @@ import (
 // FromSnapshot generates a memory-backed snapshot from the input snapshot.
 // Typically, this would be used to convert a database-backed snapshot to
 // one that can easily be serialized to disk or to network.
+//
 func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 
 	var (
@@ -29,9 +30,17 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
-	snap.Commit, err = from.Commit()
+	snap.LatestSeal, err = from.LatestSeal()
 	if err != nil {
-		return nil, fmt.Errorf("could not get commit: %w", err)
+		return nil, fmt.Errorf("could not get seal: %w", err)
+	}
+	snap.LatestResult, err = from.LatestResult()
+	if err != nil {
+		return nil, fmt.Errorf("could not get result: %w", err)
+	}
+	snap.SealingSegment, err = from.SealingSegment()
+	if err != nil {
+		return nil, fmt.Errorf("could not get sealing segment: %w", err)
 	}
 	snap.QuorumCertificate, err = from.QuorumCertificate()
 	if err != nil {
@@ -72,7 +81,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	return &Snapshot{snap}, nil
 }
 
-// FromEpoch converts any protocol.Protocol to a memory-backed Epoch.
+// FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
 func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 
 	var (
@@ -153,27 +162,14 @@ func FromCluster(from protocol.Cluster) (*Cluster, error) {
 //
 // The given participant list must exactly match the DKG members.
 func FromDKG(from protocol.DKG, participants flow.IdentityList) (*DKG, error) {
-
 	var dkg EncodableDKG
-
 	dkg.GroupKey = encodable.RandomBeaconPubKey{PublicKey: from.GroupKey()}
-	dkg.Participants = make(map[flow.Identifier]flow.DKGParticipant)
-	for _, identity := range participants {
 
-		index, err := from.Index(identity.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get index (node=%x): %w", identity.NodeID, err)
-		}
-		key, err := from.KeyShare(identity.NodeID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get key share (node=%x): %w", identity.NodeID, err)
-		}
-
-		dkg.Participants[identity.NodeID] = flow.DKGParticipant{
-			Index:    index,
-			KeyShare: key,
-		}
+	lookup, err := protocol.ToDKGParticipantLookup(from, participants)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate dkg participant lookup: %w", err)
 	}
+	dkg.Participants = lookup
 
 	return &DKG{dkg}, nil
 }
@@ -186,4 +182,39 @@ func DKGFromEncodable(enc EncodableDKG) (*DKG, error) {
 // ClusterFromEncodable returns a Cluster backed by the given encodable representation.
 func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 	return &Cluster{enc}, nil
+}
+
+// SnapshotFromBootstrapState generates a protocol.Snapshot representing a
+// root bootstrap state. This is used to bootstrap the protocol state for
+// genesis or post-spork states.
+func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
+
+	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	if !ok {
+		return nil, fmt.Errorf("invalid setup event type (%T)", seal.ServiceEvents[0].Event)
+	}
+	commit, ok := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+	if !ok {
+		return nil, fmt.Errorf("invalid commit event type (%T)", seal.ServiceEvents[1].Event)
+	}
+
+	current, err := NewCommittedEpoch(setup, commit)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert epoch: %w", err)
+	}
+	epochs := EncodableEpochs{
+		Current: current.enc,
+	}
+
+	snap := SnapshotFromEncodable(EncodableSnapshot{
+		Head:              root.Header,
+		Identities:        setup.Participants,
+		LatestSeal:        seal,
+		LatestResult:      result,
+		SealingSegment:    []*flow.Block{root},
+		QuorumCertificate: qc,
+		Phase:             flow.EpochPhaseStaking,
+		Epochs:            epochs,
+	})
+	return snap, nil
 }

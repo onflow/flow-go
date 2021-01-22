@@ -37,8 +37,28 @@ type Snapshot interface {
 	// selected point of the protocol state history. It will error if it doesn't exist.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
-	// Commit return the sealed execution state commitment at this block.
+	// LatestSeal returns the most recent included seal as of this block. The seal
+	// may have been included in a parent block, if this block is empty. If this
+	// block contains multiple seals, this returns the seal for the block with
+	// the greatest height.
+	LatestSeal() (*flow.Seal, error)
+
+	// LatestResult returns the execution result referenced by the most recent
+	// included seal as of this block (see LatestSeal).
+	LatestResult() (*flow.ExecutionResult, error)
+
+	// Commit returns the state commitment of the most recently included seal
+	// as of this block. It represents the sealed state.
 	Commit() (flow.StateCommitment, error)
+
+	// SealingSegment returns the chain segment such that the head (greatest
+	// height) is this snapshot's reference block and the tail (least height)
+	// is the most recently sealed block as of this snapshot (ie. the block
+	// referenced by LatestSeal).
+	//
+	// This segment is used as the initial state for non-spork and non-genesis
+	// root states.
+	SealingSegment() ([]*flow.Block, error)
 
 	// Pending returns the IDs of all descendants of the Head block. The IDs
 	// are ordered such that parents are included before their children. These

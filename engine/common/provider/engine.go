@@ -35,7 +35,7 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	channel  string
+	channel  network.Channel
 	selector flow.IdentityFilter
 	retrieve RetrieveFunc
 }
@@ -44,7 +44,7 @@ type Engine struct {
 // from a node within the set obtained by applying the provided selector filter. It uses the injected retrieve function
 // to manage the fullfilment of these requests.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel string, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
+	channel network.Channel, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
 
 	// make sure we don't respond to requests sent by self or non-staked nodes
 	selector = filter.And(
@@ -121,8 +121,8 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(e.channel, metrics.MessageEntityRequest)
-	defer e.metrics.MessageHandled(e.channel, metrics.MessageEntityRequest)
+	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest)
+	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
@@ -193,7 +193,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		return fmt.Errorf("could not send response: %w", err)
 	}
 
-	e.metrics.MessageSent(e.channel, metrics.MessageEntityResponse)
+	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
 
 	return nil
 }

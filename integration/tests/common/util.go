@@ -73,12 +73,14 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 			Address: contractAddress,
 		},
 		ReturnType: "Int",
-		Code: fmt.Sprintf(`
-			let account = getAccount(0x%s)
-			if let cap = account.getCapability(/public/counter) {
-				return cap.borrow<&Testing.Counter>()?.count ?? -3
-			}
-			return -3`, accountAddress.Hex()),
+		Code: fmt.Sprintf(
+			`
+			  let account = getAccount(0x%s)
+			  let cap = account.getCapability(/public/counter)
+              return cap.borrow<&Testing.Counter>()?.count ?? -3
+            `,
+			accountAddress.Hex(),
+		),
 	}
 }
 

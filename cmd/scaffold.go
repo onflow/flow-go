@@ -33,6 +33,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -184,8 +185,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			p2p.DefaultMaxUnicastMsgSize,
-			p2p.DefaultMaxPubSubMsgSize,
 			fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
 
@@ -487,7 +486,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not load root seal")
 
 		// bootstrap the protocol state with the loaded data
-		stateRoot, err := badgerState.NewStateRoot(fnb.RootBlock, fnb.RootResult, fnb.RootSeal, fnb.RootBlock.Header.View)
+		rootSnapshot, err := inmem.SnapshotFromBootstrapState(fnb.RootBlock, fnb.RootResult, fnb.RootSeal, fnb.RootQC)
 		fnb.MustNot(err).Msg("failed to construct state root")
 
 		fnb.State, err = badgerState.Bootstrap(
@@ -499,7 +498,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Setups,
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
-			stateRoot,
+			rootSnapshot,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 

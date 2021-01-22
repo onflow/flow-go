@@ -7,11 +7,12 @@ import (
 )
 
 // StateRoot is the root information required to bootstrap the protocol state
+// TODO remove or make container for (root, result, seal, qc)
 type StateRoot struct {
 	block          *flow.Block
 	result         *flow.ExecutionResult
 	seal           *flow.Seal
-	epochFirstView uint64
+	epochFirstView uint64 // TODO remove - this will be part of EpochSetup
 }
 
 func NewStateRoot(block *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, epochFirstView uint64) (*StateRoot, error) {

@@ -25,6 +25,7 @@ import (
 	st "github.com/onflow/flow-go/state"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/util"
 	stoerr "github.com/onflow/flow-go/storage"
@@ -306,10 +307,10 @@ func TestExtendValid(t *testing.T) {
 		distributor.AddConsumer(consumer)
 
 		block, result, seal := unittest.BootstrapFixture(participants)
-		stateRoot, err := protocol.NewStateRoot(block, result, seal, 0)
+		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, unittest.QuorumCertificateFixture())
 		require.NoError(t, err)
 
-		state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 
 		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockReceiptValidator())
