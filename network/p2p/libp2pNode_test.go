@@ -15,7 +15,6 @@ import (
 	"github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/helpers"
 	"github.com/libp2p/go-libp2p-core/network"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/multiformats/go-multiaddr"
@@ -231,7 +230,8 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			helpers.FullClose(s)
+			err := s.Close()
+			assert.NoError(suite.T(), err)
 			wg.Done()
 		}()
 		wg.Wait()
@@ -420,7 +420,8 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 				str, err := rw.ReadString('\n')
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						s.Close()
+						err := s.Close()
+						assert.NoError(suite.T(), err)
 						return
 					}
 					assert.Fail(suite.T(), fmt.Sprintf("received error %v", err))
@@ -460,7 +461,7 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 		go func(s network.Stream) {
 			defer wg.Done()
 			// close the stream
-			err := helpers.FullClose(s)
+			err := s.Close()
 			require.NoError(suite.T(), err)
 		}(s)
 		// wait for stream to be closed

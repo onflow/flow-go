@@ -30,6 +30,7 @@ func (s *ReceiptValidationSuite) SetupTest() {
 	s.receiptValidator = NewReceiptValidator(s.State, s.IndexDB, s.ResultsDB, s.verifier)
 }
 
+// TestReceiptValid try submitting valid receipt
 func (s *ReceiptValidationSuite) TestReceiptValid() {
 	executor := s.Identities[s.ExeID]
 	valSubgrph := s.ValidSubgraphFixture()
@@ -48,6 +49,7 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 	s.verifier.AssertExpectations(s.T())
 }
 
+// TestReceiptNoIdentity tests that we reject receipt with invalid `ExecutionResult.ExecutorID`
 func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(unittest.IdentityFixture().NodeID),
@@ -59,6 +61,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptInvalidStake tests that we reject receipt with invalid stake
 func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
@@ -78,6 +81,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptInvalidRole tests that we reject receipt with invalid execution node role
 func (s *ReceiptValidationSuite) TestReceiptInvalidRole() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
@@ -97,6 +101,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidRole() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptInvalidSignature tests that we reject receipt with invalid signature
 func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
 	executor := s.Identities[s.ExeID]
 
@@ -116,6 +121,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
 	s.verifier.AssertExpectations(s.T())
 }
 
+// TestReceiptTooFewChunks tests that we reject receipt with invalid chunk count
 func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	valSubgrph := s.ValidSubgraphFixture()
 	chunks := valSubgrph.Result.Chunks
@@ -134,6 +140,26 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptTooManyChunks tests that we reject receipt with more chunks than expected
+func (s *ReceiptValidationSuite) TestReceiptTooManyChunks() {
+	valSubgrph := s.ValidSubgraphFixture()
+	chunks := valSubgrph.Result.Chunks
+	valSubgrph.Result.Chunks = append(chunks, chunks[len(chunks)-1]) // duplicate the last chunk
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.verifier.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe()
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject with invalid chunks")
+	s.Assert().True(engine.IsInvalidInputError(err))
+}
+
+// TestReceiptChunkInvalidBlockID tests that we reject receipt with invalid chunk blockID
 func (s *ReceiptValidationSuite) TestReceiptChunkInvalidBlockID() {
 	valSubgrph := s.ValidSubgraphFixture()
 	valSubgrph.Result.Chunks[0].BlockID = unittest.IdentifierFixture()
@@ -151,6 +177,7 @@ func (s *ReceiptValidationSuite) TestReceiptChunkInvalidBlockID() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptInvalidCollectionIndex tests that we reject receipt with invalid chunk collection index
 func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 	valSubgrph := s.ValidSubgraphFixture()
 	valSubgrph.Result.Chunks[0].CollectionIndex = 42
@@ -168,6 +195,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
 
+// TestReceiptNoPreviousResult tests that we reject receipt with missing previous result
 func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 	valSubgrph := s.ValidSubgraphFixture()
 	// invalidate prev execution result, it will result in failing to lookup
@@ -186,11 +214,30 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 	s.Require().Error(err, "should reject invalid receipt")
 }
 
+// TestReceiptInvalidPreviousResult tests that we reject receipt with invalid previous result
 func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 	valSubgrph := s.ValidSubgraphFixture()
 	// invalidate prev execution result blockID, this should fail because
 	// prev result points to wrong block
 	valSubgrph.PreviousResult.BlockID = unittest.IdentifierFixture()
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(valSubgrph.Result))
+	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	s.verifier.On("Verify",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(true, nil).Maybe()
+
+	err := s.receiptValidator.Validate(receipt)
+	s.Require().Error(err, "should reject invalid previous result")
+}
+
+func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
+	valSubgrph := s.ValidSubgraphFixture()
+	// invalidate prev execution result blockID, this should fail because
+	// prev result points to wrong block
+	valSubgrph.PreviousResult.Chunks[len(valSubgrph.Result.Chunks)-1].EndState = unittest.StateCommitmentFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
