@@ -35,6 +35,7 @@ func Bootstrap(
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
+	results storage.ExecutionResults,
 	blocks storage.Blocks,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -48,7 +49,7 @@ func Bootstrap(
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty database")
 	}
-	state := newState(metrics, db, headers, seals, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
 	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
 
@@ -287,6 +288,7 @@ func OpenState(
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
+	results storage.ExecutionResults,
 	blocks storage.Blocks,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -299,7 +301,7 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, db, headers, seals, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
 	// read root block from database:
 	var rootHeight uint64
@@ -396,6 +398,7 @@ func newState(
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
+	results storage.ExecutionResults,
 	blocks storage.Blocks,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -405,6 +408,7 @@ func newState(
 		metrics: metrics,
 		db:      db,
 		headers: headers,
+		results: results,
 		seals:   seals,
 		blocks:  blocks,
 		epoch: struct {
