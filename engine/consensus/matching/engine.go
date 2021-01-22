@@ -67,7 +67,7 @@ type Engine struct {
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
 	assigner                             module.ChunkAssigner            // chunk assignment object
 	isCheckingSealing                    *atomic.Bool                    // used to rate limit the checksealing call
-	sealingThreshold                     uint                            // how many blocks between sealed/finalized before we request execution receipts and approvals
+	sealingThreshold                     uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxResultsToRequest                  int                             // max number of finalized blocks for which we request execution results
 	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
 	receiptValidator                     module.ReceiptValidator         // used to validate receipts
@@ -494,12 +494,7 @@ func (e *Engine) checkingSealing() {
 		e.log.Warn().
 			Int("space", int(space)).
 			Int("results", len(sealableResults)).
-			Msg("discarding sealable results due to mempool limitations")
-		// TODO: dangerous operation potentially undermining sealing liveness
-		// If we are missing an early seal, we might not add it to the mempool here due to
-		// size restrictions. (sealable results are unordered) The seal mempool has
-		// a eject-newest seal policy which we are shortcutting here!
-		sealableResults = sealableResults[:space]
+			Msg("overflowing seals mempool")
 	}
 
 	e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")

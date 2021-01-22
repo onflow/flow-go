@@ -109,7 +109,7 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
-			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", matching.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to verify a seal")
+			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", matching.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", matching.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
