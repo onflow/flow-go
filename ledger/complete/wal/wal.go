@@ -175,7 +175,7 @@ func (w *LedgerWAL) replay(
 				availableCheckpoints = availableCheckpoints[:len(availableCheckpoints)-1]
 				continue
 			}
-			w.log.Info().Int("checkpoint", latestCheckpoint).Err(err).
+			w.log.Info().Int("checkpoint", latestCheckpoint)
 				Msg("checkpoint loaded")
 			err = checkpointFn(forestSequencing)
 			if err != nil {
