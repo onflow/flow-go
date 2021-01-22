@@ -499,6 +499,31 @@ func (a *Accounts) DeleteContract(contractName string, address flow.Address) err
 	return a.setContractNames(contractNames, address)
 }
 
+func (a *Accounts) GetAccountFrozen(address flow.Address) (bool, error) {
+	frozen, err := a.getValue(address,
+		true,
+		KeyAccountFrozen)
+	if err != nil {
+		return false, newLedgerGetError(KeyAccountFrozen, address, err)
+	}
+
+	if len(frozen) == 0 {
+		return false, err
+	}
+
+	return frozen[0] != 0, nil
+}
+
+func (a *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
+
+	val := make([]byte, 1) //zero value for byte is 0
+	if frozen {
+		val[0] = 1
+	}
+
+	return a.setValue(address, true, KeyAccountFrozen, val)
+}
+
 // contractNames container for a list of contract names. Should always be sorted.
 // To ensure this, don't sort while reading it from storage, but sort it while adding/removing elements
 type contractNames []string

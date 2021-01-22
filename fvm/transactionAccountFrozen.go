@@ -29,7 +29,7 @@ func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 ) error {
 	accounts := state.NewAccounts(st)
 
-	accounts.GetAccountFrozen(tx.Authorizers)
+	//accounts.GetAccountFrozen(tx.Authorizers)
 
 	proposalKey := tx.ProposalKey
 

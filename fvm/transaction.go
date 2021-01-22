@@ -3,10 +3,13 @@ package fvm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/trampoline"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -77,14 +80,66 @@ func (i *TransactionInvocator) Process(
 
 	location := common.TransactionLocation(proc.ID[:])
 
+	var predeclaredValues []runtime.ValueDeclaration
+
+	if ctx.AccountFreezeAvailable {
+
+		setAccountFrozen := runtime.ValueDeclaration{
+			Name: "setAccountFrozen",
+			Type: &sema.FunctionType{
+				Parameters: []*sema.Parameter{
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "account",
+						TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
+					},
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "frozen",
+						TypeAnnotation: sema.NewTypeAnnotation(&sema.BoolType{}),
+					},
+				},
+				ReturnTypeAnnotation: &sema.TypeAnnotation{
+					Type: &sema.IntType{},
+				},
+			},
+			Kind:           common.DeclarationKindFunction,
+			IsConstant:     true,
+			ArgumentLabels: nil,
+			Value: interpreter.NewHostFunctionValue(
+				func(invocation interpreter.Invocation) trampoline.Trampoline {
+					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
+					if !ok {
+						panic(errors.New("first argument must be an address"))
+					}
+
+					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
+					if !ok {
+						panic(errors.New("second argument must be a boolean"))
+					}
+
+					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
+					if err != nil {
+						panic(fmt.Errorf("cannot set account frozen: %w", err))
+					}
+
+					return trampoline.Done{}
+				},
+			),
+		}
+
+		predeclaredValues = append(predeclaredValues, setAccountFrozen)
+	}
+
 	err = vm.Runtime.ExecuteTransaction(
 		runtime.Script{
 			Source:    proc.Transaction.Script,
 			Arguments: proc.Transaction.Arguments,
 		},
 		runtime.Context{
-			Interface: env,
-			Location:  location,
+			Interface:         env,
+			Location:          location,
+			PredeclaredValues: predeclaredValues,
 		},
 	)
 
