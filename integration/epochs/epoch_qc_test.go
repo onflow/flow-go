@@ -2,20 +2,17 @@ package epochs
 
 import (
 	"context"
-	"encoding/hex"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/client/convert"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+	access "github.com/onflow/flow/protobuf/go/flow/access"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -49,7 +46,7 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 	// create clustering with x clusters with x*y nodes
 	clustering, nodes := s.CreateClusterList(clusterCount, nodeCount)
 
-	// create initial cluster map
+	// create initial ClusterNodes list
 	clusterNodes := make([]*ClusterNode, clusterCount)
 
 	// mock the epoch object to return counter 0 and clustering as our clusterList
@@ -76,12 +73,14 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 	err = s.CreateVoterResource(clustering)
 	require.NoError(s.T(), err)
 
+	// cast vote to qc contract for each node
 	for _, node := range clusterNodes {
 		err = node.Voter.Vote(context.Background(), epoch)
 		require.NoError(s.T(), err)
 	}
 
-	// TODO: submit endvoting transaction from admin resource
+	err = s.StopVoting()
+	require.NoError(s.T(), err)
 
 	// TODO: check contract and see if required results are there
 }
@@ -96,45 +95,56 @@ func (s *ClusterEpochTestSuite) CreateClusterNode(rootBlock *cluster.Block, me *
 	require.NoError(s.T(), err)
 
 	// create a mock of QCContractClient to submit vote and check if voted on the emulated chain
-	// TODO: we need to mock the underlying flowClient instead of the QCContract client
-	rpcClient := MockRPCClient{}
-	rpcClient.On("GetAccount", mock.Anything, mock.Anything).Return(func(_ context.Context, address sdk.Address) {
-	})
+	rpcClient := &MockRPCClient{}
+	rpcClient.On("GetAccount", mock.Anything, mock.Anything).
+		Return(func(_ context.Context, address sdk.Address) access.GetAccountResponse {
+			account, err := s.blockchain.GetAccount(address)
+			require.NoError(s.T(), err)
+			return access.GetAccountResponse{Account: convert.AccountToMessage(*account)}
+		}, func(_ context.Context, address sdk.Address) error {
+			return nil
+		})
+	rpcClient.On("SendTransaction", mock.Anything, mock.Anything).
+		Return(func(_ context.Context, tx *sdk.Transaction) error {
+			return s.Submit(tx)
+		})
+	rpcClient.On("GetLatestBlock", mock.Anything, mock.Anything).
+		Return(func(_ context.Context, _ bool) access.BlockResponse {
+			block, err := s.blockchain.GetLatestBlock()
+			require.NoError(s.T(), err)
+			blockID := block.ID()
 
-	client := client.NewFromRPCClient(rpcClient)
-	client.On("Voted", mock.Anything).Return(func(_ context.Context) bool {
+			var id sdk.Identifier
+			copy(id[:], blockID[:])
 
-		// execute a script to read if the node has voted and return true or false
-		argument := [][]byte{jsoncdc.MustEncode(cadence.String(me.NodeID.String()))}
-		result, err := s.blockchain.ExecuteScript(templates.GenerateGetVotingCompletedScript(s.env), argument)
-		require.NoError(s.T(), err)
-		assert.True(s.T(), result.Succeeded())
+			sdkblock := sdk.Block{
+				BlockHeader: sdk.BlockHeader{ID: id},
+			}
 
-		// convert from cadence type to go and return result as bool
-		hasVoted := result.Value.ToGoValue().(bool)
-		return hasVoted
-	})
-	client.On("SubmitVote", mock.Anything).Return(func(_ context.Context, vote hotstuffmodel.Vote) error {
-		// address := sdk.HexToAddress(me.Address)
+			msg, err := convert.BlockToMessage(sdkblock)
+			require.NoError(s.T(), err)
 
-		tx := sdk.NewTransaction().
-			SetScript(templates.GenerateSubmitVoteScript(s.env)).
-			SetGasLimit(1000).
-			SetProposalKey(s.blockchain.ServiceKey().Address,
-				s.blockchain.ServiceKey().Index,
-				s.blockchain.ServiceKey().SequenceNumber).
-			SetPayer(s.blockchain.ServiceKey().Address).
-			AddAuthorizer(address)
+			return access.BlockResponse{Block: msg}
+		})
+	rpcClient.On("GetTransactionResult", mock.Anything, mock.Anything).
+		Return(func(_ context.Context, txID flow.Identifier) access.TransactionResultResponse {
 
-		err := tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
-		require.NoError(s.T(), err)
+			var id sdk.Identifier
+			copy(id[:], txID[:])
 
-		s.SignAndSubmit(tx,
-			[]sdk.Address{s.blockchain.ServiceKey().Address, address},
-			[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), signer})
+			result, err := s.blockchain.GetTransactionResult(id)
+			require.NoError(s.T(), err)
 
-		return nil
-	})
+			msg, err := convert.TransactionResultToMessage(*result)
+			require.NoError(s.T(), err)
+
+			return *msg
+		})
+
+	flowClient := client.NewFromRPCClient(rpcClient)
+
+	client, err := epochs.NewQCContractClient(flowClient, me.NodeID, address.String(), uint(key.Index), s.qcAddress.String(), signer)
+	require.NoError(s.T(), err)
 
 	local := &modulemock.Local{}
 	local.On("NodeID").Return(me.NodeID)
@@ -147,7 +157,6 @@ func (s *ClusterEpochTestSuite) CreateClusterNode(rootBlock *cluster.Block, me *
 	snapshot := &protomock.Snapshot{}
 	snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
 
-	// TODO: create a canonical root block
 	state := &protomock.State{}
 	state.On("CanonicalRootBlock").Return(rootBlock)
 	state.On("Final").Return(snapshot)

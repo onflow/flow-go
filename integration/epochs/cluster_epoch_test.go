@@ -40,15 +40,15 @@ func (s *ClusterEpochTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 	s.blockchain = blockchain
 
-	qcAddress, accountKey, signer := s.DeployEpochQCContract()
+	qcAddress, accountKey, signer := s.deployEpochQCContract()
 	s.qcAddress = qcAddress
 	s.qcAccountKey = accountKey
 	s.qcSigner = signer
 }
 
-// DeployEpochQCContract deploys the `EpochQC` contract to the emulated chain and returns the
+// deployEpochQCContract deploys the `EpochQC` contract to the emulated chain and returns the
 // Account key used along with the signer and the environment with the QC address set
-func (s *ClusterEpochTestSuite) DeployEpochQCContract() (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
+func (s *ClusterEpochTestSuite) deployEpochQCContract() (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
 
 	// create new account keys for the Quorum Certificate account
 	QCAccountKey, QCSigner := test.AccountKeyGenerator().NewWithSigner()
@@ -164,15 +164,13 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 // CreateVoterResource creates the Voter resource in cadence for a cluster node
 func (s *ClusterEpochTestSuite) CreateVoterResource(clustering flow.ClusterList) error {
 
-	// TODO: register each node in each cluster to vote
-	// https://github.com/onflow/flow-core-contracts/blob/josh/qc/lib/go/test/flow_qc_test.go#L195-L221
-
 	for _, cluster := range clustering {
 		for _, node := range cluster {
 			registerVoterTx := sdk.NewTransaction().
 				SetScript(templates.GenerateCreateVoterScript(s.env)).
 				SetGasLimit(100).
-				SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
+				SetProposalKey(s.blockchain.ServiceKey().Address,
+					s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 				SetPayer(s.blockchain.ServiceKey().Address).
 				AddAuthorizer(sdk.HexToAddress(node.Address))
 
@@ -188,8 +186,7 @@ func (s *ClusterEpochTestSuite) CreateVoterResource(clustering flow.ClusterList)
 
 			err = s.SignAndSubmit(registerVoterTx,
 				[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-				[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner},
-			)
+				[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
 			if err != nil {
 				return err
 			}
@@ -197,6 +194,20 @@ func (s *ClusterEpochTestSuite) CreateVoterResource(clustering flow.ClusterList)
 	}
 
 	return nil
+}
+
+func (s *ClusterEpochTestSuite) StopVoting() error {
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateStopVotingScript(s.env)).
+		SetGasLimit(100).
+		SetProposalKey(s.blockchain.ServiceKey().Address,
+			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
+		AddAuthorizer(s.qcAddress)
+
+	return s.SignAndSubmit(tx,
+		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
 }
 
 /**
@@ -224,10 +235,10 @@ func (s *ClusterEpochTestSuite) SignAndSubmit(tx *sdk.Transaction, signerAddress
 	}
 
 	// submit transaction
-	return s.submit(tx)
+	return s.Submit(tx)
 }
 
-func (s *ClusterEpochTestSuite) submit(tx *sdk.Transaction) error {
+func (s *ClusterEpochTestSuite) Submit(tx *sdk.Transaction) error {
 	// submit the signed transaction
 	err := s.blockchain.AddTransaction(*tx)
 	if err != nil {
