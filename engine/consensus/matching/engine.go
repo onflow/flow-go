@@ -496,7 +496,6 @@ func (e *Engine) checkingSealing() {
 			Int("results", len(sealableResults)).
 			Msg("overflowing seals mempool")
 	}
-
 	e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
 
 	// Start spans for tracing within the parent spans trace.CONProcessBlock and
@@ -530,17 +529,14 @@ func (e *Engine) checkingSealing() {
 	var sealedResultIDs []flow.Identifier
 	var sealedBlockIDs []flow.Identifier
 	for _, incorporatedResult := range sealableResults {
-
-		log := e.log.With().
-			Hex("result_id", logging.Entity(incorporatedResult)).
-			Hex("previous_id", incorporatedResult.Result.PreviousResultID[:]).
-			Hex("block_id", incorporatedResult.Result.BlockID[:]).
-			Hex("incorporated_block_id", incorporatedResult.IncorporatedBlockID[:]).
-			Logger()
-
 		err := e.sealResult(incorporatedResult)
 		if err != nil {
-			log.Error().Err(err).Msg("could not seal result")
+			e.log.Error().
+				Hex("result_id", logging.Entity(incorporatedResult)).
+				Hex("previous_id", incorporatedResult.Result.PreviousResultID[:]).
+				Hex("block_id", incorporatedResult.Result.BlockID[:]).
+				Hex("incorporated_block_id", incorporatedResult.IncorporatedBlockID[:]).
+				Err(err).Msg("could not seal result")
 			continue
 		}
 
@@ -742,6 +738,11 @@ func (e *Engine) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.He
 
 	// check if the identity has a stake
 	if identity.Stake == 0 {
+		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
+	}
+
+	// check that node was not ejected
+	if identity.Ejected {
 		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
 	}
 
