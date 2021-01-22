@@ -12,10 +12,16 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// exectuionReceiptsThreshold is the minimum number of execution receipts that should be present to regard a transaction
+// as executed (if has not yet sealed)
+
+const exectuionReceiptsThreshold = 2
 
 // Backends implements the Access API.
 //
@@ -37,10 +43,13 @@ type Backend struct {
 	backendBlockDetails
 	backendAccounts
 
-	executionRPC execproto.ExecutionAPIClient
-	state        protocol.State
-	chainID      flow.ChainID
-	collections  storage.Collections
+	executionRPC      execproto.ExecutionAPIClient
+	state             protocol.State
+	chainID           flow.ChainID
+	collections       storage.Collections
+	blocks            storage.Blocks
+	executionReceipts storage.ExecutionReceipts
+	connFactory       ConnectionFactory
 }
 
 func New(
@@ -52,6 +61,7 @@ func New(
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
 	collectionGRPCPort uint,
@@ -68,9 +78,10 @@ func New(
 		state:        state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:      headers,
-			executionRPC: executionRPC,
-			state:        state,
+			headers:            headers,
+			staticExecutionRPC: executionRPC,
+			connFactory:        connFactory,
+			state:              state,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -88,9 +99,10 @@ func New(
 			previousAccessNodes:  historicalAccessNodes,
 		},
 		backendEvents: backendEvents{
-			executionRPC: executionRPC,
-			state:        state,
-			blocks:       blocks,
+			staticExecutionRPC: executionRPC,
+			state:              state,
+			blocks:             blocks,
+			connFactory:        connFactory,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -101,12 +113,15 @@ func New(
 			state:  state,
 		},
 		backendAccounts: backendAccounts{
-			executionRPC: executionRPC,
-			state:        state,
-			headers:      headers,
+			staticExecutionRPC: executionRPC,
+			state:              state,
+			headers:            headers,
+			connFactory:        connFactory,
 		},
-		collections: collections,
-		chainID:     chainID,
+		collections:       collections,
+		executionReceipts: executionReceipts,
+		connFactory:       connFactory,
+		chainID:           chainID,
 	}
 
 	retry.SetBackend(b)
@@ -178,4 +193,31 @@ func convertStorageError(err error) error {
 	}
 
 	return status.Errorf(codes.Internal, "failed to find: %v", err)
+}
+
+// executionNodesForBlockID finds the execution nodes which have sent execution receipts for the given block ID
+func executionNodesForBlockID(
+	blockID flow.Identifier,
+	executionReceipts storage.ExecutionReceipts,
+	state protocol.State) (flow.IdentityList, error) {
+
+	// lookup the receipts storage with the block ID
+	receipts, err := executionReceipts.ByBlockIDAllExecutionID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
+	}
+
+	// collect the execution node id in each of the receipts
+	var executionIDs flow.IdentifierList
+	for _, receipt := range receipts {
+		executionIDs = append(executionIDs, receipt.ExecutorID)
+	}
+
+	// find the node identities of these execution nodes
+	executionIdentifiers, err := state.Final().Identities(filter.HasNodeID(executionIDs...))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+	}
+
+	return executionIdentifiers, nil
 }

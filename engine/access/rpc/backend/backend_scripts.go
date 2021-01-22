@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -13,9 +14,11 @@ import (
 )
 
 type backendScripts struct {
-	headers      storage.Headers
-	state        protocol.State
-	executionRPC execproto.ExecutionAPIClient
+	headers            storage.Headers
+	executionReceipts  storage.ExecutionReceipts
+	state              protocol.State
+	staticExecutionRPC execproto.ExecutionAPIClient
+	connFactory        ConnectionFactory
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -81,10 +84,45 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		Arguments: arguments,
 	}
 
-	execResp, err := b.executionRPC.ExecuteScriptAtBlockID(ctx, &execReq)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
+	// if an executionRPC is provided, send the script to that execution node
+	if b.staticExecutionRPC != nil {
+		execResp, err := b.staticExecutionRPC.ExecuteScriptAtBlockID(ctx, &execReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
+		}
+		return execResp.GetValue(), nil
 	}
 
+	// find the execution nodes which have executed the block earlier and provided an execution receipt for it
+	execNodeIDs, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+	if err != nil {
+		return nil, err
+	}
+
+	var errors error
+	// choose upto 3 random execution node to try
+	execNodes := execNodeIDs.Sample(3)
+
+	// try to execute the script on one of the three execution nodes
+	for _, execNode := range execNodes {
+		result, err := b.tryExecuteScript(ctx, execNode, execReq)
+		if err == nil {
+			return result, nil
+		}
+		multierror.Append(errors, err)
+	}
+	return nil, errors
+}
+
+func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+	}
+	defer closer.Close()
+	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+	}
 	return execResp.GetValue(), nil
 }

@@ -14,9 +14,10 @@ import (
 )
 
 type backendAccounts struct {
-	state        protocol.State
-	executionRPC execproto.ExecutionAPIClient
-	headers      storage.Headers
+	state              protocol.State
+	staticExecutionRPC execproto.ExecutionAPIClient
+	headers            storage.Headers
+	connFactory        ConnectionFactory
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -76,7 +77,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	exeRes, err := b.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
+	exeRes, err := b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
 	if err != nil {
 		errStatus, _ := status.FromError(err)
 		if errStatus.Code() == codes.NotFound {

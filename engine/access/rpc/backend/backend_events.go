@@ -17,9 +17,10 @@ import (
 )
 
 type backendEvents struct {
-	executionRPC execproto.ExecutionAPIClient
-	blocks       storage.Blocks
-	state        protocol.State
+	staticExecutionRPC execproto.ExecutionAPIClient
+	blocks             storage.Blocks
+	state              protocol.State
+	connFactory        ConnectionFactory
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -99,7 +100,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	// call the execution node gRPC
-	resp, err := b.executionRPC.GetEventsForBlockIDs(ctx, &req)
+	resp, err := b.staticExecutionRPC.GetEventsForBlockIDs(ctx, &req)
 
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
