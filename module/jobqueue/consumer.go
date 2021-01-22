@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/storage"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 type Worker interface {
@@ -76,9 +75,17 @@ func (c *Consumer) Start() error {
 	// on startup, sync with storage for the processed index
 	// to ensure the consistency
 	processedIndex, err := c.progress.ProcessedIndex()
+	if errors.Is(err, storage.ErrNotFound) {
+		processedIndex, err = c.progress.InitProcessedIndex()
+		if err != nil {
+			return fmt.Errorf("could not init processed index: %w", err)
+		}
+	}
+
 	if err != nil {
 		return fmt.Errorf("could not read processed index: %w", err)
 	}
+
 	c.processedIndex = processedIndex
 
 	c.checkProcessable()
@@ -113,13 +120,16 @@ func (c *Consumer) Check() {
 func (c *Consumer) checkProcessable() {
 	processingCount, err := c.run()
 	if err != nil {
-		log.Error().Err(err).Msg("failed to check processables")
+		c.log.Error().Err(err).Msg("failed to check processables")
 		return
 	}
 
 	if processingCount > 0 {
-		log.Debug().Int("processing", processingCount).Msg("job started")
+		c.log.Info().Int("processing", processingCount).Msg("processing jobs")
+	} else {
+		c.log.Debug().Int("processing", 0).Msg("no job found")
 	}
+
 }
 
 // run checks if there are processable jobs and process them by giving
@@ -135,6 +145,11 @@ func (c *Consumer) run() (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("could not query processable jobs: %w", err)
 	}
+
+	c.log.Debug().
+		Int("processedIndex", processedIndex).
+		Int("processables", len(processables)).
+		Msg("running")
 
 	for _, job := range processables {
 		go c.worker.Run(job)
@@ -161,8 +176,7 @@ func (c *Consumer) processableJobs() ([]Job, int, error) {
 	pending := 0
 	processedIndex := c.processedIndex
 
-	// if still have processing capacity, find the next processable
-	// job
+	// if still have processing capacity, find the next processable job
 	for i := processedIndex + 1; processing <= c.maxProcessing && pending <= c.maxPending; i++ {
 		status, ok := c.processings[i]
 
@@ -188,6 +202,7 @@ func (c *Consumer) processableJobs() ([]Job, int, error) {
 			processing++
 
 			processables = append(processables, job)
+			continue
 		}
 
 		// only increment the processing variable when

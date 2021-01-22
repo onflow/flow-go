@@ -30,6 +30,16 @@ func (cc *ChunkConsumer) ProcessedIndex() (int, error) {
 	return processed, nil
 }
 
+func (cc *ChunkConsumer) InitProcessedIndex() (int, error) {
+	initprocessed := 0
+	err := operation.RetryOnConflict(cc.db.Update, operation.InsertProcessedIndex(JobConsumerChunk, initprocessed))
+	if err != nil {
+		return 0, fmt.Errorf("could not update processed index: %w", err)
+	}
+
+	return initprocessed, nil
+}
+
 func (cc *ChunkConsumer) SetProcessedIndex(processed int) error {
 	err := operation.RetryOnConflict(cc.db.Update, operation.SetProcessedIndex(JobConsumerChunk, processed))
 	if err != nil {

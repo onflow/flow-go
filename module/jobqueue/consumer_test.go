@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	badgerdb "github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/storage"
@@ -86,8 +89,14 @@ func testOnStartup(t *testing.T) {
 // when received job 1, it will be processed
 func testOnReceiveOneJob(t *testing.T) {
 	runWith(t, func(c *testConsumer, w *mockWorker, j *mockJobs) {
-		c.Start()
-		j.PushOne()
+		require.NoError(t, c.Start())
+		require.NoError(t, j.PushOne()) // +1
+		c.Check()
+
+		time.Sleep(1 * time.Second)
+
+		called := []string{"1"}
+		require.Equal(t, called, w.Called())
 	})
 }
 
@@ -133,7 +142,7 @@ func runWith(t *testing.T, runTestWith func(*testConsumer, *mockWorker, *mockJob
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := newMockJobs()
 		worker := newMockWorker()
-		consumer := newTestConsumer(db, worker)
+		consumer := newTestConsumer(db, jobs, worker)
 		runTestWith(consumer, worker, jobs)
 	})
 }
@@ -148,9 +157,8 @@ type testConsumer struct {
 // 	return c.running, c.processedIndex, c.processings, c.processingsIndex
 // }
 
-func newTestConsumer(db *badgerdb.DB, worker Worker) *testConsumer {
-	log := unittest.Logger()
-	jobs := &mockJobs{}
+func newTestConsumer(db *badgerdb.DB, jobs storage.Jobs, worker Worker) *testConsumer {
+	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	cc := badger.NewChunkConsumer(db)
 	maxProcessing := 3
 	maxPending := 8
@@ -164,6 +172,7 @@ func newTestConsumer(db *badgerdb.DB, worker Worker) *testConsumer {
 // the Consumer for testing purpose
 type mockJobs struct {
 	sync.Mutex
+	log      zerolog.Logger
 	last     int
 	jobs     map[int]Job
 	index    map[JobID]int
@@ -172,10 +181,11 @@ type mockJobs struct {
 
 func newMockJobs() *mockJobs {
 	return &mockJobs{
-		last:     0,
+		log:      unittest.Logger().With().Str("module", "jobs").Logger(),
+		last:     0, // must be from 1
 		jobs:     make(map[int]Job),
 		index:    make(map[JobID]int),
-		jobMaker: &jobMaker{},
+		jobMaker: newJobMaker(),
 	}
 }
 
@@ -186,6 +196,9 @@ func (j *mockJobs) AtIndex(index int) (Job, error) {
 	defer j.Unlock()
 
 	job, ok := j.jobs[index]
+
+	j.log.Debug().Int("index", index).Bool("exists", ok).Msg("reading job at index")
+
 	if !ok {
 		return nil, storage.ErrNotFound
 	}
@@ -197,6 +210,8 @@ func (j *mockJobs) Add(job Job) error {
 	j.Lock()
 	defer j.Unlock()
 
+	j.log.Debug().Str("job_id", string(job.ID())).Msg("adding job")
+
 	id := job.ID()
 	_, ok := j.index[id]
 	if ok {
@@ -207,6 +222,11 @@ func (j *mockJobs) Add(job Job) error {
 	j.index[id] = index
 	j.jobs[index] = job
 	j.last++
+
+	j.log.
+		Debug().Str("job_id", string(job.ID())).
+		Int("index", index).
+		Msg("job added at index")
 
 	return nil
 }
@@ -234,6 +254,7 @@ func jobIDAtIndex(index int) storage.JobID {
 // a Mock worker that stores all the jobs that it was asked to work on
 type mockWorker struct {
 	sync.Mutex
+	log    zerolog.Logger
 	called []Job
 }
 
@@ -241,6 +262,7 @@ type mockWorker struct {
 
 func newMockWorker() *mockWorker {
 	return &mockWorker{
+		log:    unittest.Logger().With().Str("module", "worker").Logger(),
 		called: make([]Job, 0),
 	}
 }
@@ -248,11 +270,19 @@ func newMockWorker() *mockWorker {
 func (w *mockWorker) Run(job Job) {
 	w.Lock()
 	defer w.Unlock()
+
+	w.log.Debug().Str("job_id", string(job.ID())).Msg("worker called with job")
+
 	w.called = append(w.called, job)
 }
 
-func (w *mockWorker) Called() []Job {
-	return w.called
+// return the IDs of the jobs
+func (w *mockWorker) Called() []string {
+	called := make([]string, 0)
+	for _, c := range w.called {
+		called = append(called, string(c.ID()))
+	}
+	return called
 }
 
 type testJob struct {
@@ -268,6 +298,12 @@ func (tj testJob) ID() storage.JobID {
 type jobMaker struct {
 	sync.Mutex
 	index int
+}
+
+func newJobMaker() *jobMaker {
+	return &jobMaker{
+		index: 1,
+	}
 }
 
 // return next unique job

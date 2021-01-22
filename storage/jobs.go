@@ -13,5 +13,6 @@ type Jobs interface {
 
 type ConsumerProgress interface {
 	ProcessedIndex() (int, error)
+	InitProcessedIndex() (int, error)
 	SetProcessedIndex(processed int) error
 }
