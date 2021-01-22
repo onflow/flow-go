@@ -151,7 +151,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// If the leader is disqualified, all keys are ignored
 	// otherwise, the keys are valid
 	if s.disqualified {
-		return nil, nil, nil, errors.New("leader is disquified")
+		return nil, nil, nil, errors.New("leader is disqualified")
 	}
 
 	// private key of the current node
@@ -392,9 +392,9 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	}
 }
 
-// assuming a complaint and its answer were received, this function returns
-// - false if the answer is valid
-// - true if the complaint is valid
+// assuming a complaint and its answer were both received, this function returns:
+// - false if the complaint answer is correct
+// - true if the complaint answer is not correct
 func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
 	// check y[complainer] == share.G2
 	return C.verifyshare((*C.bn_st)(&c.answer),

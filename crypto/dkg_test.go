@@ -438,7 +438,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		gt.Logf("malicious send, coin is %d\n", coin%4)
 		switch coin % 4 {
 		case 0:
-			// value does't match the verification vector
+			// value doesn't match the verification vector
 			newMsg.data[8]++
 		case 1:
 			// invalid length
