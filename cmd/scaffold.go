@@ -414,11 +414,12 @@ func (fnb *FlowNodeBuilder) initState() {
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
 	if isBootStrapped {
-		state, stateRoot, err := badgerState.OpenState(
+		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
 			fnb.DB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
+			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
 			fnb.Storage.Commits,
@@ -432,14 +433,17 @@ func (fnb *FlowNodeBuilder) initState() {
 		// but the protocol state is not updated, so they don't match
 		// when this happens during a spork, we could try deleting the protocol state database.
 		// TODO: revisit this check when implementing Epoch
-		rootBlock, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root block")
-		if rootBlock.ID() != stateRoot.Block().ID() {
+		rootBlockFromBootstrap, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root block from disk")
+
+		rootBlock, err := state.Params().Root()
+		fnb.MustNot(err).Msg("could not load root block from protocol state")
+		if rootBlockFromBootstrap.ID() != rootBlock.ID() {
 			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
-				rootBlock.ID(),
+				rootBlockFromBootstrap.ID(),
 				fnb.RootBlock.ID())
 		}
-		fnb.RootBlock = stateRoot.Block()
+		fnb.RootBlock = rootBlockFromBootstrap
 
 		// TODO: we shouldn't have to load any files again after bootstrapping; in
 		// order to make it unnecessary, we need to changes:
@@ -453,14 +457,17 @@ func (fnb *FlowNodeBuilder) initState() {
 		// not use a global variable for chain ID anymore, but rely on the protocol
 		// state as final authority on what the chain ID is
 		// => https://github.com/dapperlabs/flow-go/issues/4167
-		fnb.RootChainID = stateRoot.Block().Header.ChainID
+		fnb.RootChainID = rootBlock.ChainID
 
 		// load the root QC data from bootstrap files
+		// TODO get from protocol state
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root QC")
 
-		fnb.RootResult = stateRoot.Result()
-		fnb.RootSeal = stateRoot.Seal()
+		fnb.RootResult, err = state.AtBlockID(rootBlock.ID()).LatestResult()
+		fnb.MustNot(err).Msg("could not get root result")
+		fnb.RootSeal, err = state.AtBlockID(rootBlock.ID()).LatestSeal()
+		fnb.MustNot(err).Msg("could not get root seal")
 	} else {
 		// Bootstrap!
 
@@ -494,6 +501,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.DB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
+			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
 			fnb.Storage.Commits,
