@@ -525,9 +525,6 @@ func (suite *Suite) TestExecuteScript() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		//rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
-		//	receipts, suite.chainID, metrics, 0, 0, false, false)
-
 		conduit := new(mocknetwork.Conduit)
 		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
 			Once()
