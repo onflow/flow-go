@@ -98,8 +98,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 
 		exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
 		if err != nil {
-			convertedErr := getAccountError(err)
-			return nil, convertedErr
+			return nil, err
 		}
 	}
 
@@ -120,15 +119,28 @@ func getAccountError(err error) error {
 }
 
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
-	var errors *multierror.Error
+	var errors *multierror.Error // captures all error except
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetAccount(ctx, execNode, req)
 		if err == nil {
+			// return if any execution node replied successfully
 			return resp, nil
 		}
 		errors = multierror.Append(errors, err)
 	}
-	return nil, errors.ErrorOrNil()
+	// if we made it till here means there was at least one error
+	errToReturn := errors.ErrorOrNil()
+
+	// if there were an any errors other than codes.NotFound, return those
+	for _, err := range errors.Errors {
+		errStatus, _ := status.FromError(err)
+		if errStatus.Code() != codes.NotFound {
+			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", errToReturn)
+		}
+	}
+
+	// if all errors were codes.NotFound, then return a codes.NotFound error wrapping all those error
+	return nil, status.Errorf(codes.NotFound, "failed to get account from the execution node: %v", errToReturn)
 }
 
 func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
