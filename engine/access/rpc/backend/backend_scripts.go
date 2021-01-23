@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -19,6 +20,7 @@ type backendScripts struct {
 	state              protocol.State
 	staticExecutionRPC execproto.ExecutionAPIClient
 	connFactory        ConnectionFactory
+	log                zerolog.Logger
 }
 
 func (b *backendScripts) ExecuteScriptAtLatestBlock(
@@ -104,6 +106,11 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	for _, execNode := range execNodes {
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", blockID[:]).
+				Str("script", string(script)).
+				Msg("Successfully executed script")
 			return result, nil
 		}
 		errors = multierror.Append(errors, err)

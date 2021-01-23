@@ -5,6 +5,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -20,6 +21,7 @@ type backendAccounts struct {
 	headers            storage.Headers
 	executionReceipts  storage.ExecutionReceipts
 	connFactory        ConnectionFactory
+	log                zerolog.Logger
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -124,6 +126,11 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 		resp, err := b.tryGetAccount(ctx, execNode, req)
 		if err == nil {
 			// return if any execution node replied successfully
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", req.GetBlockId()).
+				Hex("address", req.GetAddress()).
+				Msg("Successfully got account info")
 			return resp, nil
 		}
 		errors = multierror.Append(errors, err)
