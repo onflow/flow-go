@@ -238,8 +238,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		).
 		Return(nil)
 
-	ctx.executionState.On("PersistStateInteractions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
 	ctx.providerEngine.
 		On(
 			"BroadcastExecutionReceipt",
