@@ -1,6 +1,7 @@
 package wal_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"path"
@@ -37,7 +38,7 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		util.CreateFiles(t, dir, fileNames...)
 
-		wal, err := realWAL.NewWAL(nil, nil, dir, 10, pathByteSize, segmentSize)
+		wal, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, 10, pathByteSize, segmentSize)
 		require.NoError(t, err)
 
 		checkpointer, err := wal.NewCheckpointer()
@@ -79,7 +80,7 @@ func Test_WAL(t *testing.T) {
 		for i := 0; i < size; i++ {
 
 			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+			values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			require.NoError(t, err)
 			state, err = led.Set(update)
@@ -149,7 +150,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("create WAL and initial trie", func(t *testing.T) {
 
-			wal, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
+			wal, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -159,7 +160,7 @@ func Test_Checkpointing(t *testing.T) {
 			for i := 0; i < size; i++ {
 
 				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+				values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 				update, err := ledger.NewUpdate(rootHash, keys, values)
 				require.NoError(t, err)
 
@@ -197,7 +198,7 @@ func Test_Checkpointing(t *testing.T) {
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
 
-			wal2, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
+			wal2, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -232,7 +233,7 @@ func Test_Checkpointing(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
-			wal3, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
+			wal3, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			err = wal3.Replay(
@@ -290,10 +291,12 @@ func Test_Checkpointing(t *testing.T) {
 		values2 := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 		t.Run("create segment after checkpoint", func(t *testing.T) {
 
-			require.NoFileExists(t, path.Join(dir, "00000011"))
+			//require.NoFileExists(t, path.Join(dir, "00000011"))
+
+			unittest.RequireFileEmpty(t, path.Join(dir, "00000011"))
 
 			//generate one more segment
-			wal4, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
+			wal4, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			update, err := ledger.NewUpdate(rootHash, keys2, values2)
@@ -318,7 +321,7 @@ func Test_Checkpointing(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
-			wal5, err := realWAL.NewWAL(nil, nil, dir, size*10, pathByteSize, segmentSize)
+			wal5, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
 			updatesLeft := 1 // there should be only one update
@@ -364,6 +367,49 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 	})
+}
+
+func Test_StoringLoadingCheckpoints(t *testing.T) {
+
+	// some hash will be literally copied into the output file
+	// so we can find it and modify - to make sure we get a different checksum
+	// but not fail process by, for example, modifying saved data length causing EOF
+	someHash := []byte{22, 22, 22}
+	forest := &flattener.FlattenedForest{
+		Nodes: []*flattener.StorableNode{
+			{}, {},
+		},
+		Tries: []*flattener.StorableTrie{
+			{}, {
+				RootHash: someHash,
+			},
+		},
+	}
+	buffer := &bytes.Buffer{}
+
+	err := realWAL.StoreCheckpoint(forest, buffer)
+	require.NoError(t, err)
+
+	// copy buffer data
+	bytes2 := buffer.Bytes()[:]
+
+	t.Run("works without data modification", func(t *testing.T) {
+
+		// first buffer reads ok
+		_, err = realWAL.ReadCheckpoint(buffer)
+		require.NoError(t, err)
+	})
+
+	t.Run("detects modified data", func(t *testing.T) {
+
+		index := bytes.Index(bytes2, someHash)
+		bytes2[index] = 23
+
+		_, err = realWAL.ReadCheckpoint(bytes.NewBuffer(bytes2))
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "checksum")
+	})
+
 }
 
 func loadIntoForest(forest *mtrie.Forest, forestSequencing *flattener.FlattenedForest) error {

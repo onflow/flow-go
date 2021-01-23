@@ -94,8 +94,8 @@ func (r *Finalizer) IsKnownBlock(block *model.Block) bool {
 	return hasBlock
 }
 
-// isProcessingNeeded performs basic checks whether or not block needs processing
-// only considering the block's height and Hash
+// IsProcessingNeeded performs basic checks whether or not block needs processing
+// only considering the block's height and hash
 // Returns false if any of the following conditions applies
 //  * block view is _below_ the most recently finalized block
 //  * known block
