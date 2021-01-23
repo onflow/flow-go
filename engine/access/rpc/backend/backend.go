@@ -113,6 +113,7 @@ func New(
 			staticExecutionRPC: executionRPC,
 			state:              state,
 			headers:            headers,
+			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
 		},
 		collections:       collections,

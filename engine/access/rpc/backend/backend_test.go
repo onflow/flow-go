@@ -709,13 +709,14 @@ func (suite *Suite) TestGetAccount() {
 	ctx := context.Background()
 
 	// setup the latest sealed block
-	header := unittest.BlockHeaderFixture() // create a mock header
-	seal := unittest.Seal.Fixture()         // create a mock seal
-	seal.BlockID = header.ID()              // make the seal point to the header
+	block := unittest.BlockFixture()
+	header := block.Header          // create a mock header
+	seal := unittest.Seal.Fixture() // create a mock seal
+	seal.BlockID = header.ID()      // make the seal point to the header
 
 	suite.snapshot.
 		On("Head").
-		Return(&header, nil).
+		Return(header, nil).
 		Once()
 
 	// create the expected execution API request
@@ -736,17 +737,29 @@ func (suite *Suite) TestGetAccount() {
 		Return(exeResp, nil).
 		Once()
 
+	ids := unittest.IdentityListFixture(1)
+	receipt := unittest.ReceiptForBlockFixture(&block)
+	suite.receipts.
+		On("ByBlockIDAllExecutionID", blockID).
+		Return([]flow.ExecutionReceipt{*receipt}, nil).Once()
+	receipt.ExecutorID = ids[0].NodeID
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		suite.execClient,
+		nil,
 		nil, nil, nil,
 		suite.headers,
 		nil, nil,
 		suite.receipts,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		nil,
+		connFactory,
 		false,
 	)
 
