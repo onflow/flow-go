@@ -95,13 +95,13 @@ func (_m *ExecutionReceipts) Index(blockID flow.Identifier, resultID flow.Identi
 	return r0
 }
 
-// IndexByBlockIDAndExecutionID provides a mock function with given fields: blockID, executionID, resultID
-func (_m *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID flow.Identifier, executionID flow.Identifier, resultID flow.Identifier) error {
-	ret := _m.Called(blockID, executionID, resultID)
+// IndexByBlockIDAndExecutionID provides a mock function with given fields: blockID, executorID, resultID
+func (_m *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID flow.Identifier, executorID flow.Identifier, resultID flow.Identifier) error {
+	ret := _m.Called(blockID, executorID, resultID)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, flow.Identifier) error); ok {
-		r0 = rf(blockID, executionID, resultID)
+		r0 = rf(blockID, executorID, resultID)
 	} else {
 		r0 = ret.Error(0)
 	}

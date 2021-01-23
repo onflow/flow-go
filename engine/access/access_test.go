@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -482,16 +483,75 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers) {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+		transactions := storage.NewTransactions(suite.metrics, db)
+		collections := storage.NewCollections(db, transactions)
+		results := storage.NewExecutionResults(suite.metrics, db)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+
+		identities := unittest.IdentityListFixture(1)
+		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
+		executionNodeIdentity := identities[0]
+
+		// create a mock connection factory
+		connFactory := new(factorymock.ConnectionFactory)
+		connFactory.On("GetExecutionAPIClient", executionNodeIdentity.Address).Return(suite.execClient, &mockCloser{}, nil)
+
+		suite.backend = backend.New(
+			suite.state,
+			nil,
+			suite.collClient,
+			nil,
+			blocks,
+			headers,
+			collections,
+			transactions,
+			receipts,
+			suite.chainID,
+			suite.metrics,
+			connFactory,
+			false,
+		)
+
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
+
+		// initialize metrics related storage
+		metrics := metrics.NewNoopCollector()
+		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+
+		//rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
+		//	receipts, suite.chainID, metrics, 0, 0, false, false)
+
+		conduit := new(mocknetwork.Conduit)
+		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+			Once()
+		// create the ingest engine
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
+			transactions, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
+		require.NoError(suite.T(), err)
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
 		lastBlock.Header.Height = 2
-		err := blocks.Store(&lastBlock)
+		err = blocks.Store(&lastBlock)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
+
+		// create an execution receipt for the block
+		executionReceiptLast := unittest.ReceiptForBlockFixture(&lastBlock)
+		executionReceiptLast.ExecutorID = identities[0].NodeID
+
+		// notify the ingestion engine about the receipt
+		err = ingestEng.ProcessLocal(executionReceiptLast)
+		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()
@@ -501,6 +561,15 @@ func (suite *Suite) TestExecuteScript() {
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
+		// create an execution receipt for the block
+		executionReceiptPrev := unittest.ReceiptForBlockFixture(&prevBlock)
+		executionReceiptPrev.ExecutorID = identities[0].NodeID
+
+		// notify the ingestion engine about the receipt
+		err = ingestEng.ProcessLocal(executionReceiptPrev)
+		require.NoError(suite.T(), err)
+		// wait for the receipt to be persisted
+		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
 		ctx := context.Background()
 
 		script := []byte("dummy script")
