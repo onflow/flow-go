@@ -14,6 +14,8 @@ type ExecutionResultBody struct {
 // ExecutionResult ...
 type ExecutionResult struct {
 	ExecutionResultBody
+
+	// TODO: this is executor specific and should move into the ExecutionReceipt
 	Signatures []crypto.Signature
 }
 
