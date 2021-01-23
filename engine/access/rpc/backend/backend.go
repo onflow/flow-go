@@ -88,6 +88,7 @@ func New(
 			collections:          collections,
 			blocks:               blocks,
 			transactions:         transactions,
+			executionReceipts:    executionReceipts,
 			transactionValidator: configureTransactionValidator(state, chainID),
 			transactionMetrics:   transactionMetrics,
 			retry:                retry,
@@ -201,7 +202,7 @@ func executionNodesForBlockID(
 	state protocol.State) (flow.IdentityList, error) {
 
 	// lookup the receipts storage with the block ID
-	receipts, err := executionReceipts.ByBlockIDAllExecutionID(blockID)
+	receipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}

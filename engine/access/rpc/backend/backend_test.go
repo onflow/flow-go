@@ -442,7 +442,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 			r := unittest.ReceiptForBlockFixture(&b)
 			suite.receipts.
-				On("ByBlockIDAllExecutionID", b.ID()).
+				On("ByBlockIDAllExecutionReceipts", b.ID()).
 				Return([]flow.ExecutionReceipt{*r}, nil).Once()
 		}
 
@@ -740,7 +740,7 @@ func (suite *Suite) TestGetAccount() {
 	ids := unittest.IdentityListFixture(1)
 	receipt := unittest.ReceiptForBlockFixture(&block)
 	suite.receipts.
-		On("ByBlockIDAllExecutionID", blockID).
+		On("ByBlockIDAllExecutionReceipts", blockID).
 		Return([]flow.ExecutionReceipt{*receipt}, nil).Once()
 	receipt.ExecutorID = ids[0].NodeID
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
@@ -876,7 +876,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			receipts[j] = *r
 		}
 		suite.receipts.
-			On("ByBlockIDAllExecutionID", block.ID()).
+			On("ByBlockIDAllExecutionReceipts", block.ID()).
 			Return(receipts, nil).Once()
 	}
 

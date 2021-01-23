@@ -135,7 +135,7 @@ func TestReceiptLookupWithBlockIDAllExecutionID(t *testing.T) {
 		err = store.IndexByBlockIDAndExecutionID(blockID, receipt2.ExecutorID, receipt2.ID())
 		require.NoError(t, err)
 
-		receipts, err := store.ByBlockIDAllExecutionID(blockID)
+		receipts, err := store.ByBlockIDAllExecutionReceipts(blockID)
 		require.NoError(t, err)
 
 		require.Len(t, receipts, 2)

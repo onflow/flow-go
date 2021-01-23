@@ -193,7 +193,7 @@ func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.ExecutionR
 	return r.byBlockID(blockID)(tx)
 }
 
-func (r *ExecutionReceipts) ByBlockIDAllExecutionID(blockID flow.Identifier) ([]flow.ExecutionReceipt, error) {
+func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]flow.ExecutionReceipt, error) {
 	var receipts []flow.ExecutionReceipt
 	err := r.db.View(func(btx *badger.Txn) error {
 		var receiptIDs []flow.Identifier
@@ -204,7 +204,7 @@ func (r *ExecutionReceipts) ByBlockIDAllExecutionID(blockID flow.Identifier) ([]
 		}
 
 		for _, id := range receiptIDs {
-			receipt, err := r.ByID(id)
+			receipt, err := r.byID(id)(btx)
 			if err != nil {
 				return err
 			}

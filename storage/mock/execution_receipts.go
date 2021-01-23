@@ -35,8 +35,8 @@ func (_m *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.Execution
 	return r0, r1
 }
 
-// ByBlockIDAllExecutionID provides a mock function with given fields: blockID
-func (_m *ExecutionReceipts) ByBlockIDAllExecutionID(blockID flow.Identifier) ([]flow.ExecutionReceipt, error) {
+// ByBlockIDAllExecutionReceipts provides a mock function with given fields: blockID
+func (_m *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]flow.ExecutionReceipt, error) {
 	ret := _m.Called(blockID)
 
 	var r0 []flow.ExecutionReceipt
