@@ -10,6 +10,7 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -38,6 +39,7 @@ type backendTransactions struct {
 	connFactory          ConnectionFactory
 
 	previousAccessNodes []accessproto.AccessAPIClient
+	log                 zerolog.Logger
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -431,6 +433,11 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Con
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetTransactionResult(ctx, execNode, req)
 		if err == nil {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", req.GetBlockId()).
+				Hex("transaction_id", req.GetTransactionId()).
+				Msg("Successfully got account info")
 			return resp, nil
 		}
 		if status.Code(err) == codes.NotFound {
