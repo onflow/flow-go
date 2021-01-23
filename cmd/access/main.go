@@ -129,6 +129,7 @@ func main() {
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
 			// execution node address is optional (if not specified, execution nodes will be chosen at random based on blockID)
 			if strings.TrimSpace(rpcConf.ExecutionAddr) == "" {
+				node.Logger.Info().Err(err).Msgf("Using dynamic execution node addr")
 				return nil
 			}
 			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
