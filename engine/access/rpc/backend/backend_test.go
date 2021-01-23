@@ -248,10 +248,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	ids := unittest.IdentityListFixture(1)
 	receipt := unittest.ReceiptForBlockFixture(&block)
+	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
 		Return([]flow.ExecutionReceipt{*receipt}, nil)
-	receipt.ExecutorID = ids[0].NodeID
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
@@ -764,10 +764,10 @@ func (suite *Suite) TestGetAccount() {
 
 	ids := unittest.IdentityListFixture(1)
 	receipt := unittest.ReceiptForBlockFixture(&block)
+	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", blockID).
 		Return([]flow.ExecutionReceipt{*receipt}, nil).Once()
-	receipt.ExecutorID = ids[0].NodeID
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
