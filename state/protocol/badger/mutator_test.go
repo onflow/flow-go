@@ -683,6 +683,64 @@ func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
 	})
 }
 
+// Test that Extend properly handles a block that
+//
+// [state root] <-- B1 <-- B2 <-- B3{R(B1); R(B2)}
+// where R(B2).PreviousResultID points to R(B1)
+func TestExtend_MultipleSuccessiveReceipts(t *testing.T) {
+	stateRoot := fixtureStateRoot(t)
+	rootBlock := stateRoot.Block()
+	require.Equal(t, len(rootBlock.Payload.Guarantees), 0)
+	require.Equal(t, len(rootBlock.Payload.Seals), 0)
+
+	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
+		// create block B1 and B2
+		b1 := unittest.BlockWithParentFixture(rootBlock.Header)
+		require.NoError(t, state.Extend(&b1))
+		b2 := unittest.BlockWithParentFixture(b1.Header)
+		require.NoError(t, state.Extend(&b2))
+
+		// create block B3 incorporating receipts for B1 and B2
+		b3 := unittest.BlockWithParentFixture(b2.Header)
+
+
+		b1Result := unittest.ExecutionResultFixture(
+			unittest.WithPreviousResult(*stateRoot.Result()),
+			unittest.WithBlock(&b1),
+			)
+		b1Receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(b1Result))
+
+		b2Result := unittest.ExecutionResultFixture(
+			unittest.WithPreviousResult(*b1Result),
+			unittest.WithBlock(&b2),
+		)
+		b2Receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(b2Result))
+
+
+		block3Receipt := unittest.ReceiptForBlockFixture(&block3)
+
+
+		unittest.Seal.Fixture(
+			Seal.WithBlockID(sealed.ID()),
+		),
+
+		block3.SetPayload(flow.Payload{})
+		err = state.Extend(&block3)
+		require.Nil(t, err)
+
+
+		block4 := unittest.BlockWithParentFixture(block2.Header)
+		block4.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{block3Receipt},
+		})
+		err = state.Extend(&block4)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err), err)
+	})
+	//
+	//fix me
+}
+
 func TestExtendReceiptsNotSorted(t *testing.T) {
 	stateRoot := fixtureStateRoot(t)
 	block1 := stateRoot.Block()

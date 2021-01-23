@@ -469,7 +469,6 @@ func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionRes
 
 func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	chunks := 1 // tailing chunk is always system chunk
-	var previousResultID flow.Identifier
 	if block.Payload != nil {
 		chunks += len(block.Payload.Guarantees)
 	}
@@ -480,7 +479,6 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 		result.BlockID = blockID
 		result.Chunks = ChunksFixture(uint(chunks), block.ID())
 		result.Chunks[0].StartState = startState // set start state to value before update
-		result.PreviousResultID = previousResultID
 	}
 }
 
