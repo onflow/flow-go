@@ -151,7 +151,7 @@ func (w *LedgerWAL) replay(
 	}
 
 	if useCheckpoints {
-		allCheckpoints, err := checkpointer.ListCheckpoints()
+		allCheckpoints, err := checkpointer.Checkpoints()
 		if err != nil {
 			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}
@@ -164,7 +164,9 @@ func (w *LedgerWAL) replay(
 			availableCheckpoints = getPossibleCheckpoints(allCheckpoints, from-1, to)
 		}
 
-		for len(availableCheckpoints) > 0 { // as long as there are checkpoints to try
+		for len(availableCheckpoints) > 0 {
+			// as long as there are checkpoints to try, we always try with the last checkpoint file, since
+			// it allows us to load less segments.
 			latestCheckpoint := availableCheckpoints[len(availableCheckpoints)-1]
 
 			forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
@@ -175,7 +177,7 @@ func (w *LedgerWAL) replay(
 				availableCheckpoints = availableCheckpoints[:len(availableCheckpoints)-1]
 				continue
 			}
-			w.log.Info().Int("checkpoint", latestCheckpoint)
+			w.log.Info().Int("checkpoint", latestCheckpoint).
 				Msg("checkpoint loaded")
 			err = checkpointFn(forestSequencing)
 			if err != nil {

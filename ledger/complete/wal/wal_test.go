@@ -166,4 +166,7 @@ func Test_LatestPossibleCheckpoints(t *testing.T) {
 	require.Equal(t, []int{5}, getPossibleCheckpoints([]int{1, 2, 5}, 3, 5))
 	require.Equal(t, []int{5}, getPossibleCheckpoints([]int{1, 2, 5}, 3, 6))
 
+	require.Equal(t, []int{5}, getPossibleCheckpoints([]int{1, 2, 5}, 5, 5))
+	require.Equal(t, []int{}, getPossibleCheckpoints([]int{1, 2, 5}, 6, 6))
+
 }
