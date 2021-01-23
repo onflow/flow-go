@@ -78,6 +78,8 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	seals := storage.NewSeals(metrics, db)
 	headers := storage.NewHeaders(metrics, db)
 	index := storage.NewIndex(metrics, db)
+	// resultsDB := storage.NewExecutionResults(metrics, db)
+	// receipts := storage.NewExecutionReceipts(metrics, db, resultsDB)
 	payloads := storage.NewPayloads(db, index, guarantees, seals)
 	blocks := storage.NewBlocks(db, headers, payloads)
 	setups := storage.NewEpochSetups(metrics, db)
@@ -191,7 +193,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNode(t, hub, identity, identities, chainID)
 
-	sealedResultsDB := storage.NewExecutionResults(node.DB)
+	sealedResultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -263,8 +265,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	txResultStorage := storage.NewTransactionResults(node.DB)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
-	results := storage.NewExecutionResults(node.DB)
-	receipts := storage.NewExecutionReceipts(node.DB, results)
+	results := storage.NewExecutionResults(node.Metrics, node.DB)
+	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
 

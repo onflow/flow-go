@@ -31,7 +31,7 @@ func ExportResults(blockID flow.Identifier, dbPath string, outputPath string) er
 
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := badger.NewHeaders(cacheMetrics, db)
-	results := badger.NewExecutionResults(db)
+	results := badger.NewExecutionResults(cacheMetrics, db)
 	activeBlockID := blockID
 
 	outputFile := filepath.Join(outputPath, "results.jsonl")

@@ -41,7 +41,8 @@ func (suite *Suite) TestTransactionRetry() {
 	// blockID := block.ID()
 	// Setup Handler + Retry
 	backend := New(suite.state, suite.execClient, suite.colClient, nil, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
+		suite.collections, suite.transactions, suite.receipts, suite.chainID, metrics.NewNoopCollector(), nil,
+		false, suite.log)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
@@ -87,6 +88,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// block storage returns the corresponding block
 	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
 
+
 	txID := transactionBody.ID()
 	blockID := block.ID()
 	exeEventReq := execution.GetTransactionResultRequest{
@@ -97,9 +99,14 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Events: nil,
 	}
 
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{}, nil)
+
 	// Setup Handler + Retry
 	backend := New(suite.state, suite.execClient, suite.colClient, nil, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
+		suite.collections, suite.transactions, suite.receipts, suite.chainID, metrics.NewNoopCollector(), nil,
+		false, suite.log)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 

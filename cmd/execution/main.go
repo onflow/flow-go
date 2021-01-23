@@ -121,8 +121,8 @@ func main() {
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
-			results = storage.NewExecutionResults(node.DB)
-			receipts = storage.NewExecutionReceipts(node.DB, results)
+			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
+			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {

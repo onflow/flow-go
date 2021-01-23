@@ -1,11 +1,12 @@
 package cmd
 
 import (
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
 )
 
 var Cmd = &cobra.Command{
