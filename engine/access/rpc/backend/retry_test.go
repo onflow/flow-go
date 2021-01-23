@@ -88,7 +88,6 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// block storage returns the corresponding block
 	suite.blocks.On("ByCollectionID", collection.ID()).Return(&block, nil)
 
-
 	txID := transactionBody.ID()
 	blockID := block.ID()
 	exeEventReq := execution.GetTransactionResultRequest{
