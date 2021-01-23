@@ -29,6 +29,8 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		return operation.InsertHeader(blockID, header)
 	}
 
+	// CAUTION: should only be used to index FINALIZED blocks by their
+	// respective height
 	storeHeight := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
 		height := key.(uint64)
 		id := val.(flow.Identifier)

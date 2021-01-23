@@ -28,7 +28,7 @@ func (a *PublicAssignmentTestSuite) SetupTest(n int) (*flow.Header, *protocolMoc
 	participants, _, _ := unittest.CreateNParticipantsWithMyRole(flow.RoleVerification, nodes...)
 
 	// setup protocol state
-	block, snapshot, state := unittest.FinalizedProtocolStateWithParticipants(participants)
+	block, snapshot, state, _ := unittest.FinalizedProtocolStateWithParticipants(participants)
 	head := block.Header
 
 	return head, snapshot, state

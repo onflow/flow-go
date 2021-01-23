@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/network"
 )
 
 type RcvCacheTestSuite struct {
@@ -34,17 +36,17 @@ func (r *RcvCacheTestSuite) SetupTest() {
 // TestSingleElementAdd adds a single element to the cache and verifies its existence
 func (r *RcvCacheTestSuite) TestSingleElementAdd() {
 	eventID := []byte("event-1")
-	channelID := "0"
-	assert.False(r.Suite.T(), r.c.add(eventID, channelID))
+	channel := network.Channel("0")
+	assert.False(r.Suite.T(), r.c.add(eventID, channel))
 
-	assert.True(r.Suite.T(), r.c.add(eventID, channelID))
+	assert.True(r.Suite.T(), r.c.add(eventID, channel))
 }
 
 // TestNoneExistence evaluates the correctness of cache operation against non-existing element
 func (r *RcvCacheTestSuite) TestNoneExistence() {
 	eventID := []byte("non-existing event")
-	channelID := "1"
-	assert.False(r.Suite.T(), r.c.add(eventID, channelID))
+	channel := network.Channel("1")
+	assert.False(r.Suite.T(), r.c.add(eventID, channel))
 }
 
 // TestMultipleElementAdd adds several eventIDs to th cache and evaluates their xistence
@@ -58,11 +60,11 @@ func (r *RcvCacheTestSuite) TestMultipleElementAdd() {
 
 	// adds all events to the cache
 	for i := range events {
-		assert.False(r.Suite.T(), r.c.add(events[i], strconv.Itoa(i)))
+		assert.False(r.Suite.T(), r.c.add(events[i], network.Channel(strconv.Itoa(i))))
 	}
 
 	// checks for the existence of the added events
 	for i := range events {
-		assert.True(r.Suite.T(), r.c.add(events[i], strconv.Itoa(i)))
+		assert.True(r.Suite.T(), r.c.add(events[i], network.Channel(strconv.Itoa(i))))
 	}
 }

@@ -3,7 +3,7 @@ package fvm
 import (
 	"time"
 
-	"github.com/onflow/cadence/runtime/ast"
+	"github.com/onflow/cadence/runtime/common"
 )
 
 // A MetricsCollector accumulates performance metrics reported by the Cadence runtime.
@@ -29,19 +29,19 @@ type metricsCollector struct {
 	*MetricsCollector
 }
 
-func (m metricsCollector) ProgramParsed(location ast.Location, duration time.Duration) {
+func (m metricsCollector) ProgramParsed(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
 		m.parsed += duration
 	}
 }
 
-func (m metricsCollector) ProgramChecked(location ast.Location, duration time.Duration) {
+func (m metricsCollector) ProgramChecked(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
 		m.checked += duration
 	}
 }
 
-func (m metricsCollector) ProgramInterpreted(location ast.Location, duration time.Duration) {
+func (m metricsCollector) ProgramInterpreted(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
 		m.interpreted += duration
 	}
@@ -52,8 +52,8 @@ func (m metricsCollector) ValueDecoded(duration time.Duration) {}
 
 type noopMetricsCollector struct{}
 
-func (m noopMetricsCollector) ProgramParsed(location ast.Location, duration time.Duration)      {}
-func (m noopMetricsCollector) ProgramChecked(location ast.Location, duration time.Duration)     {}
-func (m noopMetricsCollector) ProgramInterpreted(location ast.Location, duration time.Duration) {}
-func (m noopMetricsCollector) ValueEncoded(duration time.Duration)                              {}
-func (m noopMetricsCollector) ValueDecoded(duration time.Duration)                              {}
+func (m noopMetricsCollector) ProgramParsed(location common.Location, duration time.Duration)      {}
+func (m noopMetricsCollector) ProgramChecked(location common.Location, duration time.Duration)     {}
+func (m noopMetricsCollector) ProgramInterpreted(location common.Location, duration time.Duration) {}
+func (m noopMetricsCollector) ValueEncoded(duration time.Duration)                                 {}
+func (m noopMetricsCollector) ValueDecoded(duration time.Duration)                                 {}

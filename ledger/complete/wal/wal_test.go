@@ -127,7 +127,7 @@ func Test_checkpointWithSameSegment(t *testing.T) {
 
 func Test_listingCheckpoints(t *testing.T) {
 	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000002", "00000003", "checkpoint.00000000", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
-		listCheckpoints, err := checkpointer.ListCheckpoints()
+		listCheckpoints, err := checkpointer.Checkpoints()
 		require.NoError(t, err)
 		require.Len(t, listCheckpoints, 3)
 		require.Equal(t, []int{0, 2, 5}, listCheckpoints)

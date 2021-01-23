@@ -26,6 +26,7 @@ const MagicBytes uint16 = 0x2137
 const VersionV1 uint16 = 0x01
 
 // Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
+// Version 3 contains a file checksum for detecting corrupted checkpoint files.
 const VersionV3 uint16 = 0x03
 
 const RootCheckpointFilename = "root.checkpoint"
@@ -46,6 +47,7 @@ func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Check
 	}
 }
 
+// listCheckpoints returns all the numbers (unsorted) of the checkpoint files, and the number of the last checkpoint.
 func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 
 	list := make([]int, 0)
@@ -67,6 +69,7 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 
 		list = append(list, k)
 
+		// the last check point is the one with the highest number
 		if k > last {
 			last = k
 		}
@@ -75,10 +78,11 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 	return list, last, nil
 }
 
-func (c *Checkpointer) ListCheckpoints() ([]int, error) {
+// Checkpoints returns all the checkpoint numbers in asc order
+func (c *Checkpointer) Checkpoints() ([]int, error) {
 	list, _, err := c.listCheckpoints()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not fetch all checkpoints: %w", err)
 	}
 
 	sort.Ints(list)
@@ -215,6 +219,7 @@ func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
 	return CreateCheckpointWriterForFile(dir, NumberToFilename(fileNo))
 }
 
+// CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
 func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error) {
 
 	fullname := path.Join(dir, filename)
@@ -236,6 +241,7 @@ func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error)
 	}, nil
 }
 
+// StoreCheckpoint writes the given checkpoint to disk, and also append with a CRC32 file checksum for integrity check.
 func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writer) error {
 	storableNodes := forestSequencing.Nodes
 	storableTries := forestSequencing.Tries
