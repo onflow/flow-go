@@ -81,29 +81,26 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
+	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
+	}
+
 	var exeRes *execproto.GetAccountAtBlockIDResponse
-	var err error
-
-	if b.staticExecutionRPC != nil {
-
-		exeRes, err = b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
-		if err != nil {
-			convertedErr := getAccountError(err)
-			return nil, convertedErr
+	if len(execNodes) == 0 {
+		if b.staticExecutionRPC != nil {
+			exeRes, err = b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
+			if err != nil {
+				convertedErr := getAccountError(err)
+				return nil, convertedErr
+			}
 		}
 	} else {
-
-		execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
-		}
-
 		exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	account, err := convert.MessageToAccount(exeRes.GetAccount())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert account message: %v", err)
