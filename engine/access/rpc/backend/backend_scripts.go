@@ -84,21 +84,27 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		Arguments: arguments,
 	}
 
-	// if an executionRPC is provided, send the script to that execution node
-	if b.staticExecutionRPC != nil {
-		execResp, err := b.staticExecutionRPC.ExecuteScriptAtBlockID(ctx, &execReq)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
-		}
-		return execResp.GetValue(), nil
-	}
-
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
 	}
 
+	// if no execution nodes were found, fall back to the static execution node if provided
+	if len(execNodes) == 0 {
+		if b.staticExecutionRPC == nil {
+			return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node")
+		}
+		// if an executionRPC is provided, send the script to that execution node
+		execResp, err := b.staticExecutionRPC.ExecuteScriptAtBlockID(ctx, &execReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
+		}
+		return execResp.GetValue(), nil
+
+	}
+
+	// try each of the execution nodes found
 	var errors *multierror.Error
 	// try to execute the script on one of the execution nodes
 	for _, execNode := range execNodes {
