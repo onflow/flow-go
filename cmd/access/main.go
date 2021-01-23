@@ -43,6 +43,7 @@ func main() {
 		collectionLimit              uint
 		receiptLimit                 uint
 		collectionGRPCPort           uint
+		executionGRPCPort            uint
 		pingEnabled                  bool
 		nodeInfoFile                 string
 		ingestEng                    *ingestion.Engine
@@ -75,6 +76,7 @@ func main() {
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
+			flags.UintVar(&executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
 			flags.StringVarP(&rpcConf.GRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
@@ -91,9 +93,13 @@ func main() {
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic collection node address")
 				return nil
 			}
-			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
+
+			node.Logger.Info().
+				Str("collection_node", rpcConf.CollectionAddr).
+				Msg("using the static collection node address")
 
 			collectionRPCConn, err := grpc.Dial(
 				rpcConf.CollectionAddr,
@@ -106,7 +112,14 @@ func main() {
 			return nil
 		}).
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
-			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
+			// execution node address is optional (if not specified, execution nodes will be chosen at random based on blockID)
+			if strings.TrimSpace(rpcConf.ExecutionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic execution node address")
+				return nil
+			}
+			node.Logger.Info().
+				Str("execution_node", rpcConf.ExecutionAddr).
+				Msg("using the static execution node address")
 
 			executionRPCConn, err := grpc.Dial(
 				rpcConf.ExecutionAddr,
@@ -185,9 +198,11 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Collections,
 				node.Storage.Transactions,
+				node.Storage.Receipts,
 				node.RootChainID,
 				transactionMetrics,
 				collectionGRPCPort,
+				executionGRPCPort,
 				retryEnabled,
 				rpcMetricsEnabled,
 			)
@@ -207,7 +222,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics,
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, transactionMetrics,
 				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err

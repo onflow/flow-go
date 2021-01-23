@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -100,5 +101,45 @@ func TestReceiptStoreTwoDifferentReceiptsShouldOKIfResultAreSame(t *testing.T) {
 
 		err = store.Index(blockID, receipt2.ID())
 		require.NoError(t, err)
+	})
+}
+
+func TestReceiptLookupWithBlockIDAllExecutionID(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		results := bstorage.NewExecutionResults(db)
+		store := bstorage.NewExecutionReceipts(db, results)
+
+		// common block ID for the two ER
+		blockID := unittest.IdentifierFixture()
+
+		// two ERs with the same result body, block ID but different execution IDs
+		receipt1 := unittest.ExecutionReceiptFixture()
+		err := store.Store(receipt1)
+		require.NoError(t, err)
+
+		err = store.IndexByBlockIDAndExecutionID(blockID, receipt1.ExecutorID, receipt1.ID())
+		require.NoError(t, err)
+
+		receipt2 := unittest.ExecutionReceiptFixture()
+		receipt2.ExecutionResult.BlockID = blockID
+		receipt2.ExecutionResult.ExecutionResultBody = receipt1.ExecutionResult.ExecutionResultBody
+		err = store.Store(receipt2)
+		require.NoError(t, err)
+
+		err = store.IndexByBlockIDAndExecutionID(blockID, receipt2.ExecutorID, receipt2.ID())
+		require.NoError(t, err)
+
+		receipts, err := store.ByBlockIDAllExecutionReceipts(blockID)
+		require.NoError(t, err)
+
+		require.Len(t, receipts, 2)
+
+		var expectedIDs = make(map[flow.Identifier]struct{}, 2)
+		expectedIDs[receipt1.ID()] = struct{}{}
+		expectedIDs[receipt2.ID()] = struct{}{}
+		for _, r := range receipts {
+			actualID := r.ID()
+			require.Contains(t, expectedIDs, actualID)
+		}
 	})
 }
