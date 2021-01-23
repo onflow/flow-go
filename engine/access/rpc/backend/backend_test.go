@@ -521,6 +521,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.Run("with fixed execution node", func() {
 
+		// create receipt mocks that always returns empty
+		receipts := new(storagemock.ExecutionReceipts)
+		receipts.
+			On("ByBlockIDAllExecutionReceipts", mock.Anything).
+			Return([]flow.ExecutionReceipt{}, nil).Once()
+
 		// create the handler
 		backend := New(
 			suite.state,
@@ -528,7 +534,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil, nil,
 			suite.blocks,
 			nil, nil, nil,
-			suite.receipts,
+			receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
@@ -597,6 +603,12 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		return headers
 	}
+
+	// use the static execution node
+	// TODO: test the dynamic execution node selection logic
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -815,6 +827,10 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		On("ByHeight", height).
 		Return(&h, nil).
 		Once()
+
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()

@@ -88,13 +88,16 @@ func (b *backendAccounts) getAccountAtBlockID(
 
 	var exeRes *execproto.GetAccountAtBlockIDResponse
 	if len(execNodes) == 0 {
-		if b.staticExecutionRPC != nil {
-			exeRes, err = b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
-			if err != nil {
-				convertedErr := getAccountError(err)
-				return nil, convertedErr
-			}
+		if b.staticExecutionRPC == nil {
+			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node")
 		}
+
+		exeRes, err = b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
+		if err != nil {
+			convertedErr := getAccountError(err)
+			return nil, convertedErr
+		}
+
 	} else {
 		exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
 		if err != nil {

@@ -113,12 +113,14 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 
 	var resp *execproto.GetEventsForBlockIDsResponse
 	if len(execNodes) == 0 {
-		if b.staticExecutionRPC != nil {
-			// call the execution node gRPC
-			resp, err = b.staticExecutionRPC.GetEventsForBlockIDs(ctx, &req)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
-			}
+		if b.staticExecutionRPC == nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node")
+		}
+
+		// call the execution node gRPC
+		resp, err = b.staticExecutionRPC.GetEventsForBlockIDs(ctx, &req)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
 		}
 	} else {
 		var successfulNode *flow.Identity

@@ -395,16 +395,19 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 
 	var resp *execproto.GetTransactionResultResponse
 	if len(execNodes) == 0 {
-		if b.executionRPC != nil {
-			// call the execution node gRPC
-			resp, err = b.executionRPC.GetTransactionResult(ctx, &req)
-			if err != nil {
-				if status.Code(err) == codes.NotFound {
-					return nil, 0, "", err
-				}
-				return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
-			}
+		if b.executionRPC == nil {
+			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node")
 		}
+
+		// call the execution node gRPC
+		resp, err = b.executionRPC.GetTransactionResult(ctx, &req)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				return nil, 0, "", err
+			}
+			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+		}
+
 	} else {
 		resp, err = b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
 		if err != nil {
