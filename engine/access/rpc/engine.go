@@ -109,6 +109,7 @@ func New(log zerolog.Logger,
 		transactionMetrics,
 		connectionFactory,
 		retryEnabled,
+		log,
 	)
 
 	eng := &Engine{

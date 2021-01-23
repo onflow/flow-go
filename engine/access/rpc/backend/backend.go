@@ -7,6 +7,7 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -63,6 +64,7 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	log zerolog.Logger,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -101,6 +103,7 @@ func New(
 			blocks:             blocks,
 			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
+			log:                log,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,

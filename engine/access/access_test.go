@@ -111,6 +111,7 @@ func (suite *Suite) RunTest(
 			suite.metrics,
 			nil,
 			false,
+			suite.log,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
@@ -283,6 +284,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			metrics,
 			connFactory, // passing in the connection factory
 			false,
+			suite.log,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -512,6 +514,7 @@ func (suite *Suite) TestExecuteScript() {
 			suite.metrics,
 			connFactory,
 			false,
+			suite.log,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
