@@ -400,10 +400,13 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	} else {
 		execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
 		if err != nil {
-			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
 		}
 		resp, err = b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
 		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				return nil, 0, "", err
+			}
 			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 		}
 	}
@@ -424,6 +427,9 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Con
 		resp, err := b.tryGetTransactionResult(ctx, execNode, req)
 		if err == nil {
 			return resp, nil
+		}
+		if status.Code(err) == codes.NotFound {
+			return nil, err
 		}
 		errors = multierror.Append(errors, err)
 	}

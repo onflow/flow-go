@@ -241,6 +241,18 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	txID := transactionBody.ID()
 	blockID := block.ID()
 
+	ids := unittest.IdentityListFixture(1)
+	receipt := unittest.ReceiptForBlockFixture(&block)
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{*receipt}, nil)
+	receipt.ExecutorID = ids[0].NodeID
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
 	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
 		TransactionId: txID[:],
@@ -252,17 +264,17 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	backend := New(
 		suite.state,
-		suite.execClient,
+		nil,
 		nil,
 		nil,
 		suite.blocks,
 		suite.headers,
 		suite.collections,
 		suite.transactions,
-		nil,
+		suite.receipts,
 		suite.chainID,
 		metrics.NewNoopCollector(),
-		nil,
+		connFactory,
 		false,
 	)
 
