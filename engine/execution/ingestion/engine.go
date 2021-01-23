@@ -1246,11 +1246,9 @@ func (e *Engine) generateExecutionResultForBlock(
 	}
 
 	er := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: previousErID,
-			BlockID:          block.ID(),
-			Chunks:           chunks,
-		},
+		PreviousResultID: previousErID,
+		BlockID:          block.ID(),
+		Chunks:           chunks,
 	}
 
 	return er, nil
@@ -1275,6 +1273,7 @@ func (e *Engine) generateExecutionReceipt(
 
 	receipt := &flow.ExecutionReceipt{
 		ExecutionResult:   *result,
+		ResultSignature:   crypto.Signature{},
 		Spocks:            spocks,
 		ExecutorSignature: crypto.Signature{},
 		ExecutorID:        e.me.NodeID(),

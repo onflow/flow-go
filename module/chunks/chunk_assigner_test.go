@@ -354,10 +354,8 @@ func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.Chu
 func (a *PublicAssignmentTestSuite) CreateResult(head *flow.Header, num int, t *testing.T) *flow.ExecutionResult {
 	list := a.CreateChunks(5, a.T())
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: head.ID(),
-			Chunks:  list,
-		},
+		BlockID: head.ID(),
+		Chunks:  list,
 	}
 
 	return result
