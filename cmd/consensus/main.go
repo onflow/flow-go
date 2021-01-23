@@ -67,8 +67,10 @@ func main() {
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
-		requireOneApproval                     bool
 		chunkAlpha                             uint
+		requiredApprovalsForSealVerification   uint
+		requiredApprovalsForSealConstruction   uint
+		emergencySealing                       bool
 
 		err              error
 		mutableState     protocol.MutableState
@@ -79,12 +81,13 @@ func main() {
 		approvals        mempool.Approvals
 		seals            mempool.IncorporatedResultSeals
 		prov             *provider.Engine
-		requesterEng     *requester.Engine
+		receiptRequester *requester.Engine
 		syncCore         *synchronization.Core
 		comp             *compliance.Engine
 		conMetrics       module.ConsensusMetrics
 		mainMetrics      module.HotstuffMetrics
 		receiptValidator module.ReceiptValidator
+		chunkAssigner    *chmodule.ChunkAssigner
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -104,8 +107,14 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
+			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", matching.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+			flags.BoolVar(&emergencySealing, "emergency-sealing-active", matching.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+		}).
+		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
+			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -115,8 +124,34 @@ func main() {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
 
-			signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-			receiptValidator = validation.NewReceiptValidator(node.State, node.Storage.Index, node.Storage.Results, signatureVerifier)
+			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
+			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
+			}
+			if requiredApprovalsForSealConstruction > chunkAlpha {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
+			}
+
+			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
+			if err != nil {
+				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
+			}
+
+			receiptValidator = validation.NewReceiptValidator(
+				node.State,
+				node.Storage.Index,
+				node.Storage.Results,
+				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+
+			sealValidator := validation.NewSealValidator(
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.Storage.Seals,
+				chunkAssigner,
+				signature.NewAggregationVerifier(encoding.ResultApprovalTag),
+				requiredApprovalsForSealVerification,
+				conMetrics)
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -125,7 +160,7 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 				receiptValidator,
-			)
+				sealValidator)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
@@ -169,10 +204,6 @@ func main() {
 			}
 			return nil
 		}).
-		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
-			return nil
-		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
 			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
@@ -183,7 +214,7 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-			requesterEng, err = requester.New(
+			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -198,11 +229,6 @@ func main() {
 				return nil, err
 			}
 
-			assigner, err := chmodule.NewChunkAssigner(chunkAlpha, node.State)
-			if err != nil {
-				return nil, fmt.Errorf("could not create public assignment: %w", err)
-			}
-
 			match, err := matching.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -212,19 +238,22 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
-				requesterEng,
-				node.Storage.Results,
+				receiptRequester,
+				node.Storage.Receipts,
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,
 				receipts,
 				approvals,
 				seals,
-				assigner,
+				chunkAssigner,
 				receiptValidator,
-				requireOneApproval,
+				requiredApprovalsForSealConstruction,
+				emergencySealing,
 			)
-			requesterEng.WithHandle(match.HandleReceipt)
+
+			receiptRequester.WithHandle(match.HandleReceipt)
+
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -405,9 +434,9 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// created with matching engine
-			return requesterEng, nil
+			return receiptRequester, nil
 		}).
 		Run()
 }
