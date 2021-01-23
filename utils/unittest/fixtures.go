@@ -439,6 +439,7 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 	receipt := &flow.ExecutionReceipt{
 		ExecutorID:        IdentifierFixture(),
 		ExecutionResult:   *ExecutionResultFixture(),
+		ResultSignature:   SignatureFixture(),
 		Spocks:            nil,
 		ExecutorSignature: SignatureFixture(),
 	}
@@ -487,12 +488,9 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: IdentifierFixture(),
-			BlockID:          IdentifierFixture(),
-			Chunks:           ChunksFixture(2, blockID),
-		},
-		Signatures: SignaturesFixture(6),
+		PreviousResultID: IdentifierFixture(),
+		BlockID:          IdentifierFixture(),
+		Chunks:           ChunksFixture(2, blockID),
 	}
 
 	for _, apply := range opts {
@@ -846,10 +844,8 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	}
 
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
-		},
+		BlockID: block.ID(),
+		Chunks:  chunks,
 	}
 
 	// computes chunk end state
@@ -971,12 +967,9 @@ func BatchListFixture(n int) []flow.Batch {
 
 func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID:          block.ID(),
-			PreviousResultID: flow.ZeroID,
-			Chunks:           chunks.ChunkListFromCommit(commit),
-		},
-		Signatures: nil,
+		BlockID:          block.ID(),
+		PreviousResultID: flow.ZeroID,
+		Chunks:           chunks.ChunkListFromCommit(commit),
 	}
 	return result
 }

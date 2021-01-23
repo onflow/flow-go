@@ -192,12 +192,8 @@ SearchLoop:
 
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: resultID,               // need genesis result
-			BlockID:          targetID,               // refer the target block
-			Chunks:           flow.ChunkList{&chunk}, // include only chunk
-		},
-		Signatures: nil,
+		PreviousResultID: resultID,               // need genesis result
+		Chunks:           flow.ChunkList{&chunk}, // include only chunk
 	}
 
 	ss.T().Logf("execution result generated (result: %x)", result.ID())
@@ -206,8 +202,9 @@ SearchLoop:
 	receipt := flow.ExecutionReceipt{
 		ExecutorID:        ss.exeID, // our fake execution node
 		ExecutionResult:   result,   // result for target block
-		Spocks:            nil,      // ignored
-		ExecutorSignature: nil,      // ignored
+		ResultSignature:   nil,
+		Spocks:            nil, // ignored
+		ExecutorSignature: nil, // ignored
 	}
 
 	// keep trying to send execution receipt to the first consensus node
