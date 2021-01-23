@@ -112,9 +112,13 @@ func main() {
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic collection node address")
 				return nil
 			}
-			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
+
+			node.Logger.Info().
+				Str("collection_node", rpcConf.CollectionAddr).
+				Msg("using the static collection node address")
 
 			collectionRPCConn, err := grpc.Dial(
 				rpcConf.CollectionAddr,
@@ -129,10 +133,12 @@ func main() {
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
 			// execution node address is optional (if not specified, execution nodes will be chosen at random based on blockID)
 			if strings.TrimSpace(rpcConf.ExecutionAddr) == "" {
-				node.Logger.Info().Err(err).Msgf("Using dynamic execution node addr")
+				node.Logger.Info().Msg("using a dynamic execution node address")
 				return nil
 			}
-			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
+			node.Logger.Info().
+				Str("execution_node", rpcConf.ExecutionAddr).
+				Msg("using the static execution node address")
 
 			executionRPCConn, err := grpc.Dial(
 				rpcConf.ExecutionAddr,
