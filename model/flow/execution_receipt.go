@@ -21,7 +21,7 @@ func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult)
 	return &ExecutionReceipt{
 		ExecutorID:        meta.ExecutorID,
 		ExecutionResult:   result,
-		ResultSignature:   meta.ExecutorSignature,
+		ResultSignature:   meta.ResultSignature,
 		Spocks:            meta.Spocks,
 		ExecutorSignature: meta.ExecutorSignature,
 	}
