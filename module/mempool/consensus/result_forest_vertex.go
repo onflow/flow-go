@@ -15,10 +15,10 @@ type ReceiptEquivalenceClass struct {
 	receipts    map[flow.Identifier]*flow.ExecutionReceiptMeta // map from ExecutionReceipt.ID -> ExecutionReceiptMeta
 	result      *flow.ExecutionResult
 	resultID    flow.Identifier // precomputed ID of result to avoid expensive hashing on each call
-	blockHeader *flow.Header    // header of the block which the result computes
+	blockHeader *flow.Header    // header of the block which the result is for
 }
 
-func NewReceiptSet(block *flow.Header, receipts ...*flow.ExecutionReceipt) (*ReceiptEquivalenceClass, error) {
+func NewReceiptEquivalenceClass(block *flow.Header, receipts ...*flow.ExecutionReceipt) (*ReceiptEquivalenceClass, error) {
 	if len(receipts) == 0 {
 		return nil, fmt.Errorf("at least one ExecutionReceipt required for creating ReceiptEquivalenceClass")
 	}

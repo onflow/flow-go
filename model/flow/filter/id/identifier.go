@@ -1,0 +1,53 @@
+// (c) 2021 Dapper Labs - ALL RIGHTS RESERVED
+package id
+
+import "github.com/onflow/flow-go/model/flow"
+
+// Any will always be true.
+func Any(*flow.Identifier) bool {
+	return true
+}
+
+// And combines two or more filters that all need to be true.
+func And(filters ...flow.IdentifierFilter) flow.IdentifierFilter {
+	return func(id flow.Identifier) bool {
+		for _, filter := range filters {
+			if !filter(id) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// Or combines two or more filters and only needs one of them to be true.
+func Or(filters ...flow.IdentifierFilter) flow.IdentifierFilter {
+	return func(id flow.Identifier) bool {
+		for _, filter := range filters {
+			if filter(id) {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// Not returns a filter equivalent to the inverse of the input filter.
+func Not(filter flow.IdentifierFilter) flow.IdentifierFilter {
+	return func(id flow.Identifier) bool {
+		return !filter(id)
+	}
+}
+
+// In constructs a filter that returns true if and only if
+// the Identifier is in the provided list.
+func In(ids ...flow.Identifier) flow.IdentifierFilter {
+	lookup := make(map[flow.Identifier]struct{})
+	for _, nodeID := range ids {
+		lookup[nodeID] = struct{}{}
+	}
+	return func(id flow.Identifier) bool {
+		_, ok := lookup[id]
+		return ok
+	}
+}
