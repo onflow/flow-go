@@ -88,11 +88,11 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
 
 	index, err := v.index.ByBlockID(result.BlockID)
-	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return err
-		}
-		// reaching this line means the block is empty, i.e. it has no payload => we expect only the system chunk
+	if errors.Is(err, storage.ErrNotFound) {
+		// the block is empty, i.e. it has no payload => we expect only the system chunk
+	} else if err != nil {
+		// exception
+		return err
 	} else {
 		requiredChunks += len(index.CollectionIDs)
 	}
@@ -110,9 +110,8 @@ func (v *receiptValidator) previousResult(result *flow.ExecutionResult) (*flow.E
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return prevResult, nil
 }
@@ -155,7 +154,12 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 		return fmt.Errorf("missing initial state commitment in execution result %v", result.ID())
 	}
 	if !bytes.Equal(initialState, finalState) {
-		return engine.NewInvalidInputError("execution results do not form chain")
+		return engine.NewInvalidInputError(
+			fmt.Sprintf("execution results do not form chain: expecting init state %x, but got %x",
+				finalState,
+				initialState,
+			),
+		)
 	}
 	return nil
 }
@@ -167,10 +171,24 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 //	* chunks are in correct format
 // 	* execution result has a valid parent
 // Returns nil if all checks passed successfully
-func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
+func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
+	for i, r := range receipts {
+		err := v.validate(r)
+		if err != nil {
+			return fmt.Errorf("could not validate receipt %v at index %v: %w", r.ID(), i, err)
+		}
+	}
+	return nil
+}
+
+func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt) error {
 	identity, err := identityForNode(v.state, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
-		return fmt.Errorf("failed to get executor identity %v, %w", receipt.ExecutorID, err)
+		return fmt.Errorf(
+			"failed to get executor identity %v at block %v, %w",
+			receipt.ExecutorID,
+			receipt.ExecutionResult.BlockID,
+			err)
 	}
 
 	err = v.ensureStakedNodeWithRole(identity, flow.RoleExecution)
@@ -185,7 +203,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 
 	err = v.verifyChunksFormat(&receipt.ExecutionResult)
 	if err != nil {
-		return fmt.Errorf("invalid chunks format: %w", err)
+		return fmt.Errorf("invalid chunks format for result %v: %w", receipt.ExecutionResult.ID(), err)
 	}
 
 	prevResult, err := v.previousResult(&receipt.ExecutionResult)

@@ -1146,3 +1146,43 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 
 	return blocks
 }
+
+func ReceiptChainFor(blocks []*flow.Block, result0 *flow.ExecutionResult) []*flow.ExecutionReceipt {
+	receipts := make([]*flow.ExecutionReceipt, len(blocks))
+	receipts[0] = ExecutionReceiptFixture(WithResult(result0))
+	receipts[0].ExecutionResult.BlockID = blocks[0].ID()
+
+	for i := 1; i < len(blocks); i++ {
+		b := blocks[i]
+		prevReceipt := receipts[i-1]
+		receipt := ReceiptForBlockFixture(b)
+		receipt.ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
+		prevLastChunk := prevReceipt.ExecutionResult.Chunks[len(prevReceipt.ExecutionResult.Chunks)-1]
+		receipt.ExecutionResult.Chunks[0].StartState = prevLastChunk.EndState
+		receipts[i] = receipt
+	}
+
+	return receipts
+}
+
+// ReconnectBlocksAndReceipts re-computes each block's PayloadHash and ParentID
+// so that all the blocks are connected.
+// blocks' height have to be in strict increasing order.
+func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.ExecutionReceipt) {
+	for i := 1; i < len(blocks); i++ {
+		b := blocks[i]
+		p := i - 1
+		prev := blocks[p]
+		if prev.Header.Height+1 != b.Header.Height {
+			panic(fmt.Sprintf("height has gap when connecting blocks: expect %v, but got %v", prev.Header.Height+1, b.Header.Height))
+		}
+		b.Header.ParentID = prev.ID()
+		b.Header.PayloadHash = b.Payload.Hash()
+		receipts[i].ExecutionResult.BlockID = prev.ID()
+		prevReceipt := receipts[p]
+		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
+		for _, c := range receipts[i].ExecutionResult.Chunks {
+			c.BlockID = prev.ID()
+		}
+	}
+}
