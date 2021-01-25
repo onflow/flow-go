@@ -27,7 +27,7 @@ type BootstrapProcedure struct {
 	addressGenerator        flow.AddressGenerator
 
 	accountCreationFee        cadence.UFix64
-	transactionFee        cadence.UFix64
+	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
 }
 
