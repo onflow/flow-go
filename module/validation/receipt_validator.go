@@ -91,14 +91,12 @@ func (v *receiptValidator) verifyChunksFormat(result *flow.ExecutionResult) erro
 	requiredChunks := 1 // system chunk: must exist for block's ExecutionResult, even if block payload itself is empty
 
 	index, err := v.index.ByBlockID(result.BlockID)
-	if errors.Is(err, storage.ErrNotFound) {
-		// the block is empty, i.e. it has no payload => we expect only the system chunk
-	} else if err != nil {
-		// exception
-		return err
-	} else {
-		requiredChunks += len(index.CollectionIDs)
+	if err != nil {
+		// the mutator will always create payload index for a valid block
+		return fmt.Errorf("could not find payload index for executed block %v: %w", result.BlockID, err)
 	}
+
+	requiredChunks += len(index.CollectionIDs)
 
 	if result.Chunks.Len() != requiredChunks {
 		return engine.NewInvalidInputErrorf("invalid number of chunks, expected %d got %d",
