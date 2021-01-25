@@ -104,34 +104,48 @@ func TestCache_Update(t *testing.T) {
 // retaining on that.
 func TestCache_TopicBased(t *testing.T) {
 	// Creates a topology cache for a verification node based on its TopicBased topology.
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	ids := unittest.IdentityListFixture(100, unittest.WithAllRoles())
 	myId := ids.Filter(filter.HasRole(flow.RoleVerification))[0]
 	subManagers := MockSubscriptionManager(t, flow.IdentityList{myId})
+	channels := subManagers[0].Channels()
 
-	top, err := NewTopicBasedTopology(myId.NodeID, log, &mockprotocol.State{})
+	top, err := NewTopicBasedTopology(myId.NodeID, zerolog.Nop(), &mockprotocol.State{})
 	require.NoError(t, err)
-	cache := NewCache(log, top)
+	cache := NewCache(zerolog.Nop(), top)
 
 	// Testing deterministic behavior
 	//
 	// Over consecutive invocations of cache with the same input, the same output should be returned.
-	prevFanout, err := cache.GenerateFanout(ids, subManagers[0].Channels())
+	prevFanout, err := cache.GenerateFanout(ids, channels)
 	require.NoError(t, err)
 	require.NotEmpty(t, prevFanout)
 	// requires same fanout as long as the input is the same.
-	requireDeterministicBehavior(t, cache, prevFanout, ids, subManagers[0].Channels())
+	requireDeterministicBehavior(t, cache, prevFanout, ids, channels)
 
-	// Testing cache invalidation and update
+	// Testing cache invalidation and update by identity list change
 	//
 	// Evicts one identity from ids list and cache should be invalidated and updated with a new fanout.
 	ids = ids[:len(ids)-1]
-	newFanout, err := cache.GenerateFanout(ids, subManagers[0].Channels())
+	newFanout, err := cache.GenerateFanout(ids, channels)
 	require.NoError(t, err)
 	require.NotEmpty(t, newFanout)
 	require.NotEqual(t, newFanout, prevFanout)
 	// requires same fanout as long as the input is the same.
-	requireDeterministicBehavior(t, cache, newFanout, ids, subManagers[0].Channels())
+	requireDeterministicBehavior(t, cache, newFanout, ids, channels)
+
+	// Testing cache invalidation and update by identity channel list change
+	//
+	// Keeps the same identity list but removes all channels except one from the input channel list.
+	// Cache should be invalidated and updated with a new fanout.
+	prevFanout = newFanout.Copy()
+	channels = channels[:1]
+	newFanout, err = cache.GenerateFanout(ids, channels)
+	require.NoError(t, err)
+	require.NotEmpty(t, newFanout)
+	require.NotEqual(t, newFanout, prevFanout)
+	// requires same fanout as long as the input is the same.
+	requireDeterministicBehavior(t, cache, newFanout, ids, channels)
+
 }
 
 // requireDeterministicBehavior evaluates that consecutive invocations of cache on fanout generation with the same input (i.e., ids and channels),
