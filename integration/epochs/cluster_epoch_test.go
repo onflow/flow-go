@@ -27,8 +27,9 @@ import (
 type ClusterEpochTestSuite struct {
 	suite.Suite
 
-	env        templates.Environment
-	blockchain *emulator.Blockchain
+	env            templates.Environment
+	blockchain     *emulator.Blockchain
+	emulatorClient *BlockChainClient
 
 	// Quorum Certificate deployed account and address
 	qcAddress    sdk.Address
@@ -36,7 +37,7 @@ type ClusterEpochTestSuite struct {
 	qcSigner     sdkcrypto.Signer
 }
 
-func TestAssignment(t *testing.T) {
+func TestClusterEpoch(t *testing.T) {
 	suite.Run(t, new(ClusterEpochTestSuite))
 }
 
@@ -47,6 +48,12 @@ func (s *ClusterEpochTestSuite) SetupTest() {
 	blockchain, err := emulator.NewBlockchain()
 	require.NoError(s.T(), err)
 	s.blockchain = blockchain
+
+	// create client instance
+	client := &BlockChainClient{
+		blockchain: blockchain,
+	}
+	s.emulatorClient = client
 
 	qcAddress, accountKey, signer := s.deployEpochQCContract()
 	s.qcAddress = qcAddress
@@ -256,29 +263,5 @@ func (s *ClusterEpochTestSuite) SignAndSubmit(tx *sdk.Transaction, signerAddress
 	}
 
 	// submit transaction
-	return s.Submit(tx)
-}
-
-func (s *ClusterEpochTestSuite) Submit(tx *sdk.Transaction) error {
-	// submit the signed transaction
-	err := s.blockchain.AddTransaction(*tx)
-	if err != nil {
-		return err
-	}
-
-	result, err := s.blockchain.ExecuteNextTransaction()
-	if err != nil {
-		return err
-	}
-
-	if !assert.True(s.T(), result.Succeeded()) {
-		// TODO: handle error in submitting tx
-	}
-
-	_, err = s.blockchain.CommitBlock()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return s.emulatorClient.Submit(tx)
 }

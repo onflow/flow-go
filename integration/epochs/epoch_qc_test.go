@@ -9,12 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
-	"github.com/onflow/flow-go-sdk/client/convert"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
-	access "github.com/onflow/flow/protobuf/go/flow/access"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -103,54 +100,7 @@ func (s *ClusterEpochTestSuite) CreateClusterNode(rootBlock *cluster.Block, me *
 	address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 	require.NoError(s.T(), err)
 
-	// create a mock of QCContractClient to submit vote and check if voted on the emulated chain
-	rpcClient := &MockRPCClient{}
-	rpcClient.On("GetAccount", mock.Anything, mock.Anything).
-		Return(func(_ context.Context, address sdk.Address) access.GetAccountResponse {
-			account, err := s.blockchain.GetAccount(address)
-			require.NoError(s.T(), err)
-			return access.GetAccountResponse{Account: convert.AccountToMessage(*account)}
-		}, nil)
-	rpcClient.On("SendTransaction", mock.Anything, mock.Anything).
-		Return(func(_ context.Context, tx *sdk.Transaction) error {
-			return s.Submit(tx)
-		})
-	rpcClient.On("GetLatestBlock", mock.Anything, mock.Anything).
-		Return(func(_ context.Context, _ bool) access.BlockResponse {
-			block, err := s.blockchain.GetLatestBlock()
-			require.NoError(s.T(), err)
-			blockID := block.ID()
-
-			var id sdk.Identifier
-			copy(id[:], blockID[:])
-
-			sdkblock := sdk.Block{
-				BlockHeader: sdk.BlockHeader{ID: id},
-			}
-
-			msg, err := convert.BlockToMessage(sdkblock)
-			require.NoError(s.T(), err)
-
-			return access.BlockResponse{Block: msg}
-		})
-	rpcClient.On("GetTransactionResult", mock.Anything, mock.Anything).
-		Return(func(_ context.Context, txID flow.Identifier) access.TransactionResultResponse {
-
-			var id sdk.Identifier
-			copy(id[:], txID[:])
-
-			result, err := s.blockchain.GetTransactionResult(id)
-			require.NoError(s.T(), err)
-
-			msg, err := convert.TransactionResultToMessage(*result)
-			require.NoError(s.T(), err)
-
-			return *msg
-		})
-
-	flowClient := client.NewFromRPCClient(rpcClient)
-
-	client, err := epochs.NewQCContractClient(flowClient, me.NodeID, address.String(), uint(key.Index), s.qcAddress.String(), signer)
+	client, err := epochs.NewQCContractClient(s.emulatorClient, me.NodeID, address.String(), 0, s.qcAddress.String(), signer)
 	require.NoError(s.T(), err)
 
 	local := &modulemock.Local{}
