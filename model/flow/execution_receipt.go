@@ -12,7 +12,6 @@ type Spock []byte
 type ExecutionReceiptMeta struct {
 	ExecutorID        Identifier
 	ResultID          Identifier
-	ResultSignature   crypto.Signature // signature only over the ExecutionResultID; for aggregation in Seal
 	Spocks            []crypto.Signature
 	ExecutorSignature crypto.Signature
 }
@@ -21,7 +20,6 @@ func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult)
 	return &ExecutionReceipt{
 		ExecutorID:        meta.ExecutorID,
 		ExecutionResult:   result,
-		ResultSignature:   meta.ResultSignature,
 		Spocks:            meta.Spocks,
 		ExecutorSignature: meta.ExecutorSignature,
 	}
@@ -30,7 +28,6 @@ func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult)
 type ExecutionReceipt struct {
 	ExecutorID        Identifier
 	ExecutionResult   ExecutionResult
-	ResultSignature   crypto.Signature // signature only over the ExecutionResultID; for aggregation in Seal
 	Spocks            []crypto.Signature
 	ExecutorSignature crypto.Signature
 }
@@ -40,30 +37,23 @@ func (er *ExecutionReceipt) Meta() *ExecutionReceiptMeta {
 	return &ExecutionReceiptMeta{
 		ExecutorID:        er.ExecutorID,
 		ResultID:          er.ExecutionResult.ID(),
-		ResultSignature:   er.ResultSignature,
 		Spocks:            er.Spocks,
 		ExecutorSignature: er.ExecutorSignature,
 	}
 }
 
-// Body returns the body of the execution receipt.
-func (er *ExecutionReceipt) Body() interface{} {
-	return struct {
+// ID returns the canonical ID of the execution receipt.
+func (er *ExecutionReceipt) ID() Identifier {
+	body := struct {
 		ExecutorID      Identifier
 		ExecutionResult ExecutionResult
-		ResultSignature crypto.Signature
 		Spocks          []crypto.Signature
 	}{
 		ExecutorID:      er.ExecutorID,
 		ExecutionResult: er.ExecutionResult,
-		ResultSignature: er.ResultSignature,
 		Spocks:          er.Spocks,
 	}
-}
-
-// ID returns the canonical ID of the execution receipt.
-func (er *ExecutionReceipt) ID() Identifier {
-	return MakeID(er.Body())
+	return MakeID(body)
 }
 
 // Checksum returns a checksum for the execution receipt including the signatures.

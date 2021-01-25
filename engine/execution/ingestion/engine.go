@@ -1273,7 +1273,6 @@ func (e *Engine) generateExecutionReceipt(
 
 	receipt := &flow.ExecutionReceipt{
 		ExecutionResult:   *result,
-		ResultSignature:   crypto.Signature{},
 		Spocks:            spocks,
 		ExecutorSignature: crypto.Signature{},
 		ExecutorID:        e.me.NodeID(),
