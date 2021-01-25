@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go-sdk/client"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"google.golang.org/grpc"
 
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go-sdk/client"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
