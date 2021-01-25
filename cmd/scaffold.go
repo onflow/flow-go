@@ -209,7 +209,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			fnb.Me,
 			fnb.Middleware,
 			10e6,
-			top,
+			topology.NewCache(fnb.Logger, top),
 			subscriptionManager,
 			fnb.Metrics.Network)
 		if err != nil {
