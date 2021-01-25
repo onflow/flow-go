@@ -1,11 +1,15 @@
 package epochs
 
 import (
+	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -30,6 +34,10 @@ type ClusterEpochTestSuite struct {
 	qcAddress    sdk.Address
 	qcAccountKey *sdk.AccountKey
 	qcSigner     sdkcrypto.Signer
+}
+
+func TestAssignment(t *testing.T) {
+	suite.Run(t, new(ClusterEpochTestSuite))
 }
 
 // SetupTest creates an instance of the emulated chain and deploys the EpochQC contract
@@ -162,34 +170,32 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 }
 
 // CreateVoterResource creates the Voter resource in cadence for a cluster node
-func (s *ClusterEpochTestSuite) CreateVoterResource(clustering flow.ClusterList) error {
+func (s *ClusterEpochTestSuite) CreateVoterResource(clusterNodes []*ClusterNode) error {
 
-	for _, cluster := range clustering {
-		for _, node := range cluster {
-			registerVoterTx := sdk.NewTransaction().
-				SetScript(templates.GenerateCreateVoterScript(s.env)).
-				SetGasLimit(100).
-				SetProposalKey(s.blockchain.ServiceKey().Address,
-					s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-				SetPayer(s.blockchain.ServiceKey().Address).
-				AddAuthorizer(sdk.HexToAddress(node.Address))
+	for _, node := range clusterNodes {
+		registerVoterTx := sdk.NewTransaction().
+			SetScript(templates.GenerateCreateVoterScript(s.env)).
+			SetGasLimit(100).
+			SetProposalKey(s.blockchain.ServiceKey().Address,
+				s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
+			SetPayer(s.blockchain.ServiceKey().Address).
+			AddAuthorizer(node.Address)
 
-			err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
-			if err != nil {
-				return err
-			}
+		err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
+		if err != nil {
+			return err
+		}
 
-			err = registerVoterTx.AddArgument(cadence.NewString(node.NodeID.String()))
-			if err != nil {
-				return err
-			}
+		err = registerVoterTx.AddArgument(cadence.NewString(node.NodeID.String()))
+		if err != nil {
+			return err
+		}
 
-			err = s.SignAndSubmit(registerVoterTx,
-				[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
-				[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
-			if err != nil {
-				return err
-			}
+		err = s.SignAndSubmit(registerVoterTx,
+			[]sdk.Address{s.blockchain.ServiceKey().Address, node.Address},
+			[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), node.Signer})
+		if err != nil {
+			return err
 		}
 	}
 
@@ -208,6 +214,21 @@ func (s *ClusterEpochTestSuite) StopVoting() error {
 	return s.SignAndSubmit(tx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
+}
+
+func (s *ClusterEpochTestSuite) NodeHasVoted(nodeID flow.Identifier) (bool, error) {
+	result, err := s.blockchain.ExecuteScript(templates.GenerateGetNodeHasVotedScript(s.env),
+		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID.String()))})
+	if err != nil {
+		return false, err
+	}
+
+	if !assert.True(s.T(), result.Succeeded()) {
+		return false, fmt.Errorf("transaction did not succeed")
+	}
+	hasVoted := result.Value.ToGoValue().(bool)
+
+	return hasVoted, nil
 }
 
 /**

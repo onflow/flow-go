@@ -4,12 +4,14 @@ import (
 	"context"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/client/convert"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 	access "github.com/onflow/flow/protobuf/go/flow/access"
@@ -31,6 +33,7 @@ type ClusterNode struct {
 	NodeID  flow.Identifier
 	Key     *sdk.AccountKey
 	Address sdk.Address
+	Signer  sdkcrypto.Signer
 	Voter   module.ClusterRootQCVoter
 }
 
@@ -70,7 +73,7 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 	err = s.StartVoting(clustering, clusterCount, nodeCount)
 	require.NoError(s.T(), err)
 
-	err = s.CreateVoterResource(clustering)
+	err = s.CreateVoterResource(clusterNodes)
 	require.NoError(s.T(), err)
 
 	// cast vote to qc contract for each node
@@ -82,7 +85,13 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 	err = s.StopVoting()
 	require.NoError(s.T(), err)
 
-	// TODO: check contract and see if required results are there
+	// check if each node has voted
+	for _, node := range clusterNodes {
+		hasVoted, err := s.NodeHasVoted(node.NodeID)
+		require.NoError(s.T(), err)
+
+		assert.True(s.T(), hasVoted)
+	}
 }
 
 // CreateClusterNode ...
@@ -101,9 +110,7 @@ func (s *ClusterEpochTestSuite) CreateClusterNode(rootBlock *cluster.Block, me *
 			account, err := s.blockchain.GetAccount(address)
 			require.NoError(s.T(), err)
 			return access.GetAccountResponse{Account: convert.AccountToMessage(*account)}
-		}, func(_ context.Context, address sdk.Address) error {
-			return nil
-		})
+		}, nil)
 	rpcClient.On("SendTransaction", mock.Anything, mock.Anything).
 		Return(func(_ context.Context, tx *sdk.Transaction) error {
 			return s.Submit(tx)
@@ -170,6 +177,7 @@ func (s *ClusterEpochTestSuite) CreateClusterNode(rootBlock *cluster.Block, me *
 		Key:     key,
 		Address: address,
 		Voter:   voter,
+		Signer:  signer,
 	}
 
 	return node
