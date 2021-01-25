@@ -28,7 +28,6 @@ func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult)
 type ExecutionReceipt struct {
 	ExecutorID        Identifier
 	ExecutionResult   ExecutionResult
-	ResultSignature   crypto.Signature // signature only over the ExecutionResultID; for aggregation in Seal
 	Spocks            []crypto.Signature
 	ExecutorSignature crypto.Signature
 }
@@ -48,12 +47,10 @@ func (er *ExecutionReceipt) Body() interface{} {
 	return struct {
 		ExecutorID      Identifier
 		ExecutionResult ExecutionResult
-		ResultSignature crypto.Signature
 		Spocks          []crypto.Signature
 	}{
 		ExecutorID:      er.ExecutorID,
 		ExecutionResult: er.ExecutionResult,
-		ResultSignature: er.ResultSignature,
 		Spocks:          er.Spocks,
 	}
 }
