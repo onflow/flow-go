@@ -178,6 +178,8 @@ func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 	// Build a functor that performs lookup first in receipts that were passed as payload and only then in
 	// local storage. This is needed to handle a case when same block payload contains receipts that
 	// reference each other.
+	// ATTENTION: Here we assume that ER is valid, this lookup can return a result which is actually invalid.
+	// Eventually invalid result will be detected and fail the whole validation.
 	previousResult := func(executionResult *flow.ExecutionResult) (*flow.ExecutionResult, error) {
 		for _, receipt := range receipts {
 			if executionResult.PreviousResultID == receipt.ExecutionResult.ID() {
@@ -191,6 +193,8 @@ func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 	for i, r := range receipts {
 		err := v.validate(r, previousResult)
 		if err != nil {
+			// It's very important that we fail the whole validation if one of the receipts is invalid.
+			// It allows us to make assumptions as stated in previous comment.
 			return fmt.Errorf("could not validate receipt %v at index %v: %w", r.ID(), i, err)
 		}
 	}
