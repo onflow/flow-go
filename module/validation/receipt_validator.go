@@ -175,29 +175,64 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // 	* execution result has a valid parent
 // Returns nil if all checks passed successfully
 func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
+	// cache that contains ExecutionResult.ID() -> *ExecutionReceipt, build directly from payload
+	// for easy indexing instead of linear search.
+	receiptsCache := make(map[flow.Identifier]*flow.ExecutionReceipt)
+	for _, receipt := range receipts {
+		receiptsCache[receipt.ExecutionResult.ID()] = receipt
+	}
+	// cache that holds already validated ERs.
+	validatedResultsCache := make(map[flow.Identifier]*flow.ExecutionResult)
+
+	var previousResult GetPreviousResult
 	// Build a functor that performs lookup first in receipts that were passed as payload and only then in
 	// local storage. This is needed to handle a case when same block payload contains receipts that
 	// reference each other.
-	previousResult := func(executionResult *flow.ExecutionResult) (*flow.ExecutionResult, error) {
-		for _, receipt := range receipts {
-			if executionResult.PreviousResultID == receipt.ExecutionResult.ID() {
-				return &receipt.ExecutionResult, nil
+	previousResult = func(executionResult *flow.ExecutionResult) (*flow.ExecutionResult, error) {
+		validPrevResult, found := validatedResultsCache[executionResult.PreviousResultID]
+		if found {
+			// if we have found receipt that was already validated, just return it
+			return validPrevResult, nil
+		}
+
+		receipt, found := receiptsCache[executionResult.PreviousResultID]
+		if found {
+			// Getting to this point means that ER that was requested points to
+			// result that is included in same payload. First we need to validate it to make
+			// sure that it's valid.
+			err := v.validate(receipt, previousResult)
+			if err != nil {
+				return nil, err
 			}
+			// save into cache since it was already validated
+			validatedResultsCache[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+			return &receipt.ExecutionResult, nil
 		}
 
 		return v.previousResult(executionResult)
 	}
 
 	for i, r := range receipts {
-		err := v.validate(r, previousResult)
-		if err != nil {
-			return fmt.Errorf("could not validate receipt %v at index %v: %w", r.ID(), i, err)
+		_, found := validatedResultsCache[r.ID()]
+		if !found {
+			// validate each receipt only once
+			err := v.validate(r, previousResult)
+			if err != nil {
+				return fmt.Errorf("could not validate receipt %v at index %v: %w", r.ID(), i, err)
+			}
+			// save into cache since it was already validated
+			validatedResultsCache[r.ExecutionResult.ID()] = &r.ExecutionResult
 		}
 	}
 	return nil
 }
 
 func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, previousResult GetPreviousResult) error {
+	prevResult, err := previousResult(&receipt.ExecutionResult)
+	if err != nil {
+		return err
+	}
+
 	identity, err := identityForNode(v.state, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf(
@@ -220,11 +255,6 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, previousResu
 	err = v.verifyChunksFormat(&receipt.ExecutionResult)
 	if err != nil {
 		return fmt.Errorf("invalid chunks format for result %v: %w", receipt.ExecutionResult.ID(), err)
-	}
-
-	prevResult, err := previousResult(&receipt.ExecutionResult)
-	if err != nil {
-		return err
 	}
 
 	err = v.subgraphCheck(&receipt.ExecutionResult, prevResult)
