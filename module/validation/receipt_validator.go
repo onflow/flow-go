@@ -175,16 +175,21 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // 	* execution result has a valid parent
 // Returns nil if all checks passed successfully
 func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
+	// lookup cache to avoid linear search when checking for previous result that is
+	// part of payload
+	payloadExecutionResults := make(map[flow.Identifier]*flow.ExecutionResult)
+	for _, receipt := range receipts {
+		payloadExecutionResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+	}
 	// Build a functor that performs lookup first in receipts that were passed as payload and only then in
 	// local storage. This is needed to handle a case when same block payload contains receipts that
 	// reference each other.
 	// ATTENTION: Here we assume that ER is valid, this lookup can return a result which is actually invalid.
 	// Eventually invalid result will be detected and fail the whole validation.
 	previousResult := func(executionResult *flow.ExecutionResult) (*flow.ExecutionResult, error) {
-		for _, receipt := range receipts {
-			if executionResult.PreviousResultID == receipt.ExecutionResult.ID() {
-				return &receipt.ExecutionResult, nil
-			}
+		prevResult, found := payloadExecutionResults[executionResult.PreviousResultID]
+		if found {
+			return prevResult, nil
 		}
 
 		return v.previousResult(executionResult)
