@@ -15,18 +15,14 @@ import (
 // TopicBasedTopology is a deterministic topology mapping that creates a connected graph component among the nodes
 // involved in each topic.
 type TopicBasedTopology struct {
-	myNodeID flow.Identifier             // used to keep identifier of the node
-	state    protocol.State              // used to keep a read only protocol state
-	subMngr  network.SubscriptionManager // used to keep track topics the node subscribed to
+	myNodeID flow.Identifier // used to keep identifier of the node
+	state    protocol.State  // used to keep a read only protocol state
 	logger   zerolog.Logger
 	seed     int64
 }
 
 // NewTopicBasedTopology returns an instance of the TopicBasedTopology.
-func NewTopicBasedTopology(nodeID flow.Identifier,
-	logger zerolog.Logger,
-	state protocol.State,
-	subMngr network.SubscriptionManager) (*TopicBasedTopology, error) {
+func NewTopicBasedTopology(nodeID flow.Identifier, logger zerolog.Logger, state protocol.State) (*TopicBasedTopology, error) {
 	seed, err := intSeedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
@@ -36,7 +32,6 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 		myNodeID: nodeID,
 		state:    state,
 		seed:     seed,
-		subMngr:  subMngr,
 		logger:   logger.With().Str("component:", "topic-based-topology").Logger(),
 	}
 
@@ -49,7 +44,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier,
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
 func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
-	myUniqueChannels := engine.UniqueChannels(t.subMngr.Channels())
+	myUniqueChannels := engine.UniqueChannels(channels)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before

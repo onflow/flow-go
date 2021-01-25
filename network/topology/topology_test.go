@@ -41,7 +41,7 @@ func (suite *TopologyTestSuite) SetupTest() {
 
 	suite.linearFanoutTop = func(t *testing.T, identifier flow.Identifier, state protocol.State,
 		manager network.SubscriptionManager) network.Topology {
-		top, err := topology.NewTopicBasedTopology(identifier, suite.logger, state, manager)
+		top, err := topology.NewTopicBasedTopology(identifier, suite.logger, state)
 		require.NoError(t, err)
 
 		return top

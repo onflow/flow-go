@@ -108,7 +108,7 @@ func TestCache_TopicBased(t *testing.T) {
 	myId := ids.Filter(filter.HasRole(flow.RoleVerification))[0]
 	subManagers := MockSubscriptionManager(t, flow.IdentityList{myId})
 
-	top, err := NewTopicBasedTopology(myId.NodeID, log, &mockprotocol.State{}, subManagers[0])
+	top, err := NewTopicBasedTopology(myId.NodeID, log, &mockprotocol.State{})
 	require.NoError(t, err)
 
 	cache := NewCache(log, top)
@@ -116,7 +116,7 @@ func TestCache_TopicBased(t *testing.T) {
 	// Testing deterministic behavior
 	//
 	// Over consecutive invocations of cache with the same input, the same output should be returned.
-	prevFanout, err := cache.GenerateFanout(ids, nil)
+	prevFanout, err := cache.GenerateFanout(ids, subManagers[0].Channels())
 	require.NoError(t, err)
 	for i := 0; i < 100; i++ {
 		newFanout, err := cache.GenerateFanout(ids, nil)
