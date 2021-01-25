@@ -305,3 +305,75 @@ func TestOnEntityResponseValid(t *testing.T) {
 	// check that the missing items timestamp was reset
 	assert.Equal(t, iunavailable.LastRequested, time.Time{})
 }
+
+func TestOnEntityInvalidChecksum(t *testing.T) {
+	identities := unittest.IdentityListFixture(16)
+	targetID := identities[0].NodeID
+
+	final := &protocol.Snapshot{}
+	final.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return identities.Filter(selector)
+		},
+		nil,
+	)
+
+	state := &protocol.State{}
+	state.On("Final").Return(final)
+
+	nonce := rand.Uint64()
+
+	wanted := unittest.CollectionFixture(1)
+
+	now := time.Now()
+
+	iwanted := &Item{
+		EntityID:      wanted.ID(),
+		LastRequested: now,
+		ExtraSelector: filter.Any,
+	}
+
+	// prepare payload from different entity
+	bwanted, _ := msgpack.Marshal(unittest.CollectionFixture(2))
+
+	res := &messages.EntityResponse{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+		Blobs:     [][]byte{bwanted},
+	}
+
+	req := &messages.EntityRequest{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+	}
+
+	called := 0
+	request := Engine{
+		unit:     engine.NewUnit(),
+		metrics:  metrics.NewNoopCollector(),
+		state:    state,
+		items:    make(map[flow.Identifier]*Item),
+		requests: make(map[uint64]*messages.EntityRequest),
+		selector: filter.HasNodeID(targetID),
+		create:   func() flow.Entity { return &flow.Collection{} },
+		handle:   func(flow.Identifier, flow.Entity) { called++ },
+	}
+
+	request.items[iwanted.EntityID] = iwanted
+
+	request.requests[req.Nonce] = req
+
+	err := request.onEntityResponse(targetID, res)
+	assert.NoError(t, err)
+
+	// check that the request was removed
+	assert.NotContains(t, request.requests, nonce)
+
+	// check that the provided items were removed
+	assert.NotContains(t, request.items, wanted.ID())
+
+	time.Sleep(100 * time.Millisecond)
+
+	// make sure we didn't process items
+	assert.Equal(t, 0, called)
+}

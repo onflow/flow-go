@@ -426,8 +426,14 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		delete(needed, entityID)
 		delete(e.items, entityID)
 
-		// process the entity
-		go e.handle(originID, entity)
+		// validate that we got correct entity, exactly what we were expecting
+		if entityID == entity.ID() {
+			// process the entity
+			go e.handle(originID, entity)
+		} else {
+			// at this point we got an entry with invalid ID, so not the one that we were expecting
+			e.log.Error().Msgf("could not validate response body for requested entity %v", entityID)
+		}
 	}
 
 	// requeue requested entities that have not been delivered in the response
