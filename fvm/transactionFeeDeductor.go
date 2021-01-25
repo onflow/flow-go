@@ -19,7 +19,10 @@ func (d *TransactionFeeDeductor) Process(
 ) error {
 	err := d.deductFees(vm, ctx, proc.Transaction, st)
 	if err == nil {
-		st.Commit()
+		er := st.Commit()
+		if er != nil {
+			panic(er)
+		}
 	}
 	return err
 }
