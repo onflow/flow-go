@@ -12,6 +12,9 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// Functor that is used to retrieve parent of ExecutionResult.
+type GetPreviousResult func(*flow.ExecutionResult) (*flow.ExecutionResult, error)
+
 // receiptValidator holds all needed context for checking
 // receipt validity against current protocol state.
 type receiptValidator struct {
@@ -172,16 +175,38 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // 	* execution result has a valid parent
 // Returns nil if all checks passed successfully
 func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
+	// lookup cache to avoid linear search when checking for previous result that is
+	// part of payload
+	payloadExecutionResults := make(map[flow.Identifier]*flow.ExecutionResult)
+	for _, receipt := range receipts {
+		payloadExecutionResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+	}
+	// Build a functor that performs lookup first in receipts that were passed as payload and only then in
+	// local storage. This is needed to handle a case when same block payload contains receipts that
+	// reference each other.
+	// ATTENTION: Here we assume that ER is valid, this lookup can return a result which is actually invalid.
+	// Eventually invalid result will be detected and fail the whole validation.
+	previousResult := func(executionResult *flow.ExecutionResult) (*flow.ExecutionResult, error) {
+		prevResult, found := payloadExecutionResults[executionResult.PreviousResultID]
+		if found {
+			return prevResult, nil
+		}
+
+		return v.previousResult(executionResult)
+	}
+
 	for i, r := range receipts {
-		err := v.validate(r)
+		err := v.validate(r, previousResult)
 		if err != nil {
+			// It's very important that we fail the whole validation if one of the receipts is invalid.
+			// It allows us to make assumptions as stated in previous comment.
 			return fmt.Errorf("could not validate receipt %v at index %v: %w", r.ID(), i, err)
 		}
 	}
 	return nil
 }
 
-func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt) error {
+func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousResult GetPreviousResult) error {
 	identity, err := identityForNode(v.state, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf(
@@ -206,7 +231,7 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt) error {
 		return fmt.Errorf("invalid chunks format for result %v: %w", receipt.ExecutionResult.ID(), err)
 	}
 
-	prevResult, err := v.previousResult(&receipt.ExecutionResult)
+	prevResult, err := previousResult(&receipt.ExecutionResult)
 	if err != nil {
 		return err
 	}
