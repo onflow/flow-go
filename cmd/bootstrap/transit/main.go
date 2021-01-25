@@ -247,7 +247,7 @@ func generateKeys(bootDir, nodeId string) error {
 	privPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
 	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
 
-	if fileExists(privPath) && fileExists(pubPath) {
+	if utilsio.FileExists(privPath) && utilsio.FileExists(pubPath) {
 		log.Print("transit-key-path priv & pub both exist, exiting")
 		return nil
 	}
@@ -494,19 +494,11 @@ func optionsSelected(options ...bool) int {
 	return n
 }
 
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
-}
-
 // moveFile moves a file from source to destination where src and dst are full paths including the filename
 func moveFile(src, dst string) error {
 
 	// check if source file exist
-	if !fileExists(src) {
+	if !utilsio.FileExists(src) {
 		return fmt.Errorf("file not found: %s", src)
 	}
 

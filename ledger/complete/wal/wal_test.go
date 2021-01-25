@@ -32,7 +32,7 @@ func Test_noCheckpoints(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 0, from)
-		require.Equal(t, 2, to)
+		require.Equal(t, 3, to) //extra one because WAL now creates empty file on start
 	})
 }
 
@@ -45,7 +45,7 @@ func Test_someCheckpoints(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 3, from)
-		require.Equal(t, 5, to)
+		require.Equal(t, 6, to) //extra one because WAL now creates empty file on start
 	})
 }
 
@@ -62,6 +62,14 @@ func Test_loneCheckpoint(t *testing.T) {
 	})
 }
 
+func Test_lastCheckpointIsFoundByNumericValue(t *testing.T) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000004", "checkpoint.00000006", "checkpoint.00000002", "checkpoint.00000001", func(t *testing.T, wal *realWAL.LedgerWAL, checkpointer *realWAL.Checkpointer) {
+		latestCheckpoint, err := checkpointer.LatestCheckpoint()
+		require.NoError(t, err)
+		require.Equal(t, 6, latestCheckpoint)
+	})
+}
+
 func Test_checkpointWithoutPrecedingSegments(t *testing.T) {
 	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "00000006", "00000007", func(t *testing.T, wal *realWAL.LedgerWAL, checkpointer *realWAL.Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
@@ -71,7 +79,7 @@ func Test_checkpointWithoutPrecedingSegments(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 6, from)
-		require.Equal(t, 7, to)
+		require.Equal(t, 8, to) //extra one because WAL now creates empty file on start
 	})
 }
 
@@ -84,7 +92,16 @@ func Test_checkpointWithSameSegment(t *testing.T) {
 		from, to, err := checkpointer.NotCheckpointedSegments()
 		require.NoError(t, err)
 		require.Equal(t, 6, from)
-		require.Equal(t, 7, to)
+		require.Equal(t, 8, to) //extra one because WAL now creates empty file on start
+	})
+}
+
+func Test_listingCheckpoints(t *testing.T) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000002", "00000003", "checkpoint.00000000", func(t *testing.T, wal *realWAL.LedgerWAL, checkpointer *realWAL.Checkpointer) {
+		listCheckpoints, err := checkpointer.Checkpoints()
+		require.NoError(t, err)
+		require.Len(t, listCheckpoints, 3)
+		require.Equal(t, []int{0, 2, 5}, listCheckpoints)
 	})
 }
 
