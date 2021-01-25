@@ -59,14 +59,14 @@ func TestCache_GenerateFanout_Error(t *testing.T) {
 	// assumes cache holding some fanout
 	cache := NewCache(log, top)
 	cache.cachedFanout = ids.Sample(10)
-	cache.fingerprint = unittest.IdentifierFixture()
+	cache.idsFP = unittest.IdentifierFixture()
 
 	// returning error on fanout generation should invalidate cache
 	// same error should be returned.
 	fanout, err := cache.GenerateFanout(ids, nil)
 	require.Error(t, err)
 	require.Nil(t, fanout)
-	require.Equal(t, cache.fingerprint, flow.Identifier{})
+	require.Equal(t, cache.idsFP, flow.Identifier{})
 	require.Empty(t, cache.cachedFanout)
 
 	// underlying topology should be called only once.
@@ -85,12 +85,12 @@ func TestCache_Update(t *testing.T) {
 	// assumes cache holding some fanout
 	cache := NewCache(log, top)
 	cache.cachedFanout = ids.Sample(10)
-	cache.fingerprint = unittest.IdentifierFixture()
+	cache.idsFP = unittest.IdentifierFixture()
 
-	// cache content should change once fingerprint to GenerateFanout changes.
+	// cache content should change once idsFP to GenerateFanout changes.
 	newFanout, err := cache.GenerateFanout(ids, nil)
 	require.NoError(t, err)
-	require.Equal(t, cache.fingerprint, ids.Fingerprint())
+	require.Equal(t, cache.idsFP, ids.Fingerprint())
 	require.Equal(t, cache.cachedFanout, fanout)
 	require.Equal(t, cache.cachedFanout, newFanout)
 
