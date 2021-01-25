@@ -74,14 +74,16 @@ func TestCache_GenerateFanout_Error(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, top)
 }
 
-// TestCache_Update evaluates that if input to GenerateFanout changes, the cache is invalidated and updated.
-func TestCache_Update(t *testing.T) {
+// TestCache_InputChange_IDs evaluates that if identity list input to GenerateFanout changes,
+// the cache is invalidated and updated.
+func TestCache_InputChange_IDs(t *testing.T) {
 	// mocks underlying topology returning a fanout
 	top := &mocknetwork.Topology{}
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
-	top.On("GenerateFanout", ids).Return(fanout, nil).Once()
+	channels := network.ChannelList{"channel1", "channel2"}
+	top.On("GenerateFanout", ids, channels).Return(fanout, nil).Once()
 
 	// assumes cache holding some fanout
 	cache := NewCache(log, top)
@@ -89,9 +91,13 @@ func TestCache_Update(t *testing.T) {
 	cache.idsFP = unittest.IdentifierFixture()
 
 	// cache content should change once idsFP to GenerateFanout changes.
-	newFanout, err := cache.GenerateFanout(ids, nil)
+	newFanout, err := cache.GenerateFanout(ids, channels)
 	require.NoError(t, err)
 	require.Equal(t, cache.idsFP, ids.Fingerprint())
+	// channels input did not change, hence channels fingerprint should not be changed.
+	require.Equal(t, cache.chansFP, channels.ID())
+	// returned (new) fanout should be equal to the mocked fanout, and
+	// also should be cached.
 	require.Equal(t, cache.cachedFanout, fanout)
 	require.Equal(t, cache.cachedFanout, newFanout)
 
