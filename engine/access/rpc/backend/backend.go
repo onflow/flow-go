@@ -7,15 +7,20 @@ import (
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
+const maxExecutionNodesCnt = 3
 
 // Backends implements the Access API.
 //
@@ -37,10 +42,12 @@ type Backend struct {
 	backendBlockDetails
 	backendAccounts
 
-	executionRPC execproto.ExecutionAPIClient
-	state        protocol.State
-	chainID      flow.ChainID
-	collections  storage.Collections
+	executionRPC      execproto.ExecutionAPIClient
+	state             protocol.State
+	chainID           flow.ChainID
+	collections       storage.Collections
+	executionReceipts storage.ExecutionReceipts
+	connFactory       ConnectionFactory
 }
 
 func New(
@@ -52,11 +59,12 @@ func New(
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
-	collectionGRPCPort uint,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	log zerolog.Logger,
 ) *Backend {
 	retry := newRetry()
 	if retryEnabled {
@@ -68,9 +76,11 @@ func New(
 		state:        state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:      headers,
-			executionRPC: executionRPC,
-			state:        state,
+			headers:            headers,
+			executionReceipts:  executionReceipts,
+			staticExecutionRPC: executionRPC,
+			connFactory:        connFactory,
+			state:              state,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -80,17 +90,20 @@ func New(
 			collections:          collections,
 			blocks:               blocks,
 			transactions:         transactions,
+			executionReceipts:    executionReceipts,
 			transactionValidator: configureTransactionValidator(state, chainID),
 			transactionMetrics:   transactionMetrics,
 			retry:                retry,
-			collectionGRPCPort:   collectionGRPCPort,
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
 		},
 		backendEvents: backendEvents{
-			executionRPC: executionRPC,
-			state:        state,
-			blocks:       blocks,
+			staticExecutionRPC: executionRPC,
+			state:              state,
+			blocks:             blocks,
+			executionReceipts:  executionReceipts,
+			connFactory:        connFactory,
+			log:                log,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -101,12 +114,16 @@ func New(
 			state:  state,
 		},
 		backendAccounts: backendAccounts{
-			executionRPC: executionRPC,
-			state:        state,
-			headers:      headers,
+			staticExecutionRPC: executionRPC,
+			state:              state,
+			headers:            headers,
+			executionReceipts:  executionReceipts,
+			connFactory:        connFactory,
 		},
-		collections: collections,
-		chainID:     chainID,
+		collections:       collections,
+		executionReceipts: executionReceipts,
+		connFactory:       connFactory,
+		chainID:           chainID,
 	}
 
 	retry.SetBackend(b)
@@ -178,4 +195,39 @@ func convertStorageError(err error) error {
 	}
 
 	return status.Errorf(codes.Internal, "failed to find: %v", err)
+}
+
+// executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
+// which have executed the given block ID. If no such execution node is found, then an error is returned.
+func executionNodesForBlockID(
+	blockID flow.Identifier,
+	executionReceipts storage.ExecutionReceipts,
+	state protocol.State) (flow.IdentityList, error) {
+
+	// lookup the receipts storage with the block ID
+	receipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
+	}
+
+	// collect the execution node id in each of the receipts
+	var executorIDs flow.IdentifierList
+	for _, receipt := range receipts {
+		executorIDs = append(executorIDs, receipt.ExecutorID)
+	}
+
+	if len(executorIDs) == 0 {
+		return nil, fmt.Errorf("no execution node found for block ID %v: %w", blockID, err)
+	}
+
+	// find the node identities of these execution nodes
+	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executorIDs...))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+	}
+
+	// randomly choose upto maxExecutionNodesCnt identities
+	executionIdentitiesRandom := executionIdentities.Sample(maxExecutionNodesCnt)
+
+	return executionIdentitiesRandom, nil
 }

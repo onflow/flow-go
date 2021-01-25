@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +24,7 @@ func Test_Compactor(t *testing.T) {
 
 	numInsPerStep := 2
 	pathByteSize := 4
-	minPayloadByteSize := 200
+	minPayloadByteSize := 2 << 15
 	maxPayloadByteSize := 2 << 16
 	size := 10
 	metricsCollector := &metrics.NoopCollector{}
@@ -41,7 +42,7 @@ func Test_Compactor(t *testing.T) {
 
 		t.Run("Compactor creates checkpoints eventually", func(t *testing.T) {
 
-			wal, err := NewWAL(nil, nil, dir, size*10, 4, 32*1024)
+			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -50,7 +51,7 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1) //keep only latest checkpoint
 
 			// Run Compactor in background.
 			<-compactor.Ready()
@@ -92,6 +93,15 @@ func Test_Compactor(t *testing.T) {
 				// this is disk-based operation after all, so give it big timeout
 			}, 15*time.Second, 100*time.Millisecond)
 
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000003"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000004"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000005"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000006"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000007"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
 			require.FileExists(t, path.Join(dir, "checkpoint.00000009"))
 
 			<-compactor.Done()
@@ -121,7 +131,7 @@ func Test_Compactor(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
-			wal2, err := NewWAL(nil, nil, dir, size*10, 4, 32*1024)
+			wal2, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -186,7 +196,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 	pathByteSize := 4
 	minPayloadByteSize := 100
 	maxPayloadByteSize := 2 << 16
-	size := 10
+	size := 20
 	metricsCollector := &metrics.NoopCollector{}
 	checkpointDistance := uint(3) // there should be 3 WAL not checkpointed
 
@@ -199,7 +209,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 		t.Run("Compactor creates checkpoints", func(t *testing.T) {
 
-			wal, err := NewWAL(nil, nil, dir, size*10, 4, 32*1024)
+			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -207,7 +217,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2)
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
@@ -231,8 +241,8 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 				require.FileExists(t, path.Join(dir, NumberToFilenamePart(i)))
 
-				// run compactor after every file
-				err = compactor.Run()
+				// run checkpoint creation after every file
+				err = compactor.createCheckpoints()
 				require.NoError(t, err)
 			}
 
@@ -247,6 +257,41 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "checkpoint.00000007"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000009"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000011"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000012"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000013"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000014"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000015"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000016"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000019"))
+
+			// expect all but last 2 checkpoints gone
+			err = compactor.cleanupCheckpoints()
+			require.NoError(t, err)
+
+			require.NoFileExists(t, path.Join(dir, RootCheckpointFilename))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000003"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000004"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000005"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000006"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000007"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000008"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000009"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000011"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000012"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000013"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000014"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000015"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000016"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
+			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
+			require.FileExists(t, path.Join(dir, "checkpoint.00000019"))
 
 			err = wal.Close()
 			require.NoError(t, err)

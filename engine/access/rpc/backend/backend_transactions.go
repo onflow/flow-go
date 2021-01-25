@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -28,6 +27,7 @@ type backendTransactions struct {
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	executionRPC         execproto.ExecutionAPIClient
 	transactions         storage.Transactions
+	executionReceipts    storage.ExecutionReceipts
 	collections          storage.Collections
 	blocks               storage.Blocks
 	state                protocol.State
@@ -35,7 +35,6 @@ type backendTransactions struct {
 	transactionMetrics   module.TransactionMetrics
 	transactionValidator *access.TransactionValidator
 	retry                *Retry
-	collectionGRPCPort   uint
 	connFactory          ConnectionFactory
 
 	previousAccessNodes []accessproto.AccessAPIClient
@@ -122,18 +121,10 @@ func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sa
 	// select a random subset of collection nodes from the cluster to be tried in order
 	targetNodes := txCluster.Sample(sampleSize)
 
-	// convert the node addresses of the collection nodes to the GRPC address
-	// (identity list does not directly provide collection nodes gRPC address)
+	// collect the addresses of all the chosen collection nodes
 	var targetAddrs = make([]string, len(targetNodes))
 	for i, id := range targetNodes {
-		// split hostname and port
-		hostnameOrIP, _, err := net.SplitHostPort(id.Address)
-		if err != nil {
-			return nil, err
-		}
-		// use the hostname from identity list and port number as the one passed in as argument
-		grpcAddress := fmt.Sprintf("%s:%d", hostnameOrIP, b.collectionGRPCPort)
-		targetAddrs[i] = grpcAddress
+		targetAddrs[i] = id.Address
 	}
 
 	return targetAddrs, nil
@@ -316,7 +307,7 @@ func (b *backendTransactions) lookupTransactionResult(
 
 	blockID := block.ID()
 
-	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID[:], txID[:])
+	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:])
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
 			// No result yet, indicate that it has not been executed
@@ -385,24 +376,39 @@ func (b *backendTransactions) registerTransactionForRetry(tx *flow.TransactionBo
 
 func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	ctx context.Context,
-	blockID []byte,
+	blockID flow.Identifier,
 	transactionID []byte,
 ) ([]flow.Event, uint32, string, error) {
 
 	// create an execution API request for events at blockID and transactionID
 	req := execproto.GetTransactionResultRequest{
-		BlockId:       blockID,
+		BlockId:       blockID[:],
 		TransactionId: transactionID,
 	}
 
-	// call the execution node gRPC
-	resp, err := b.executionRPC.GetTransactionResult(ctx, &req)
-	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			return nil, 0, "", err
+	var resp *execproto.GetTransactionResultResponse
+	var err error
+	if b.executionRPC != nil {
+		// call the execution node gRPC
+		resp, err = b.executionRPC.GetTransactionResult(ctx, &req)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				return nil, 0, "", err
+			}
+			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 		}
-
-		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+	} else {
+		execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+		if err != nil {
+			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
+		}
+		resp, err = b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				return nil, 0, "", err
+			}
+			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
+		}
 	}
 
 	events := convert.MessagesToEvents(resp.GetEvents())
@@ -412,4 +418,33 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 
 func (b *backendTransactions) NotifyFinalizedBlockHeight(height uint64) {
 	b.retry.Retry(height)
+}
+
+func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetTransactionResultRequest) (*execproto.GetTransactionResultResponse, error) {
+	var errors *multierror.Error
+	// try to execute the script on one of the execution nodes
+	for _, execNode := range execNodes {
+		resp, err := b.tryGetTransactionResult(ctx, execNode, req)
+		if err == nil {
+			return resp, nil
+		}
+		if status.Code(err) == codes.NotFound {
+			return nil, err
+		}
+		errors = multierror.Append(errors, err)
+	}
+	return nil, errors.ErrorOrNil()
+}
+
+func (b *backendTransactions) tryGetTransactionResult(ctx context.Context, execNode *flow.Identity, req execproto.GetTransactionResultRequest) (*execproto.GetTransactionResultResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	resp, err := execRPCClient.GetTransactionResult(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
