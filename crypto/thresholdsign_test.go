@@ -151,7 +151,7 @@ func testStatefulThresholdSignatureFeldmanVSS(t *testing.T) {
 	// synchronize the main thread to end DKG
 	sync.Wait()
 	for i := 1; i < n; i++ {
-		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes, "2 group public keys are mismatching")
+		assert.True(t, processors[i].pk.Equals(processors[0].pk), "2 group public keys are mismatching")
 	}
 
 	// Start TS
@@ -218,7 +218,7 @@ func testStatefulThresholdSignatureJointFeldman(t *testing.T) {
 		// synchronize the main thread to end DKG
 		sync.Wait()
 		for i := 1; i < n; i++ {
-			assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes,
+			assert.True(t, processors[i].pk.Equals(processors[0].pk),
 				"2 group public keys are mismatching")
 		}
 
@@ -278,7 +278,7 @@ func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 	// synchronize the main thread to end DKG
 	sync.Wait()
 	for i := 1; i < n; i++ {
-		assert.Equal(t, processors[i].pkBytes, processors[0].pkBytes, "2 group public keys are mismatching")
+		assert.True(t, processors[i].pk.Equals(processors[0].pk), "2 group public keys are mismatching")
 	}
 
 	// Start TS
@@ -323,11 +323,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				require.NotNil(t, groupPK)
 				require.NotNil(t, nodesPK)
 				require.Nil(t, err, "End dkg failed: %v\n", err)
-				if groupPK == nil {
-					proc.pkBytes = []byte{}
-				} else {
-					proc.pkBytes = groupPK.Encode()
-				}
+				proc.pk = groupPK
 				n := proc.dkg.Size()
 				kmac := NewBLSKMAC(thresholdSignatureTag)
 				proc.ts, err = NewThresholdSigner(n, optimalThreshold(n), proc.current, kmac)

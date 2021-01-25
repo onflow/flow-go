@@ -141,7 +141,8 @@ func (s *feldmanVSSstate) HandleBroadcastedMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return errors.New("wrong input")
+		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
+			s.Size(), orig)
 	}
 
 	if len(msg) == 0 {
@@ -149,7 +150,7 @@ func (s *feldmanVSSstate) HandleBroadcastedMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	// In case a broadcasted message is received by the origin node,
+	// In case a message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
 		return nil
@@ -208,7 +209,8 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return errors.New("wrong input")
+		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
+			s.Size(), node)
 	}
 	if index(node) == s.leaderIndex {
 		s.validKey = false
@@ -362,7 +364,7 @@ func readVerifVector(A []pointG2, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(A)),
 	) != valid {
-		return errors.New("the verifcation vector does not encode public keys correctly")
+		return errors.New("the verifcation vector does not serialize points correctly")
 	}
 	return nil
 }
