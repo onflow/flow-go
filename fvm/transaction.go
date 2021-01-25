@@ -89,6 +89,7 @@ func (i *TransactionInvocator) Process(
 	)
 
 	if err != nil {
+		st.Rollback()
 		i.safetyErrorCheck(err)
 		return err
 	}
