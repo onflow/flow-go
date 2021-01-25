@@ -27,7 +27,8 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	ids := unittest.IdentityListFixture(100)
 	fanout := ids.Sample(10)
-	top.On("GenerateFanout", ids).Return(fanout, nil).Once()
+	channels := network.ChannelList{"Channel1", "Channel2", "Channel3"}
+	top.On("GenerateFanout", ids, channels).Return(fanout, nil).Once()
 
 	cache := NewCache(log, top)
 
@@ -35,14 +36,7 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 	//
 	// Over consecutive invocations of cache with the same input, the same output should be returned.
 	// The output should be resolved by the cache without asking the underlying topology more than once.
-	prevFanout := fanout
-	for i := 0; i < 100; i++ {
-		newFanout, err := cache.GenerateFanout(ids, nil)
-		require.NoError(t, err)
-
-		require.Equal(t, prevFanout, newFanout)
-		prevFanout = newFanout
-	}
+	requireDeterministicBehavior(t, cache, fanout, ids, channels)
 
 	// underlying topology should be called only once through all consecutive calls (with same input).
 	mock.AssertExpectationsForObjects(t, top)
@@ -53,21 +47,22 @@ func TestCache_GenerateFanout_HappyPath(t *testing.T) {
 func TestCache_GenerateFanout_Error(t *testing.T) {
 	// mocks underlying topology returning a fanout
 	top := &mocknetwork.Topology{}
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	ids := unittest.IdentityListFixture(100)
-	top.On("GenerateFanout", ids).Return(nil, fmt.Errorf("fanout-generation-error")).Once()
+	top.On("GenerateFanout", mock.Anything, mock.Anything).Return(nil, fmt.Errorf("fanout-generation-error")).Once()
 
 	// assumes cache holding some fanout
-	cache := NewCache(log, top)
+	cache := NewCache(zerolog.Nop(), top)
 	cache.cachedFanout = ids.Sample(10)
 	cache.idsFP = unittest.IdentifierFixture()
+	cache.chansFP = unittest.IdentifierFixture()
 
 	// returning error on fanout generation should invalidate cache
 	// same error should be returned.
-	fanout, err := cache.GenerateFanout(ids, nil)
+	fanout, err := cache.GenerateFanout(ids, network.ChannelList{})
 	require.Error(t, err)
 	require.Nil(t, fanout)
 	require.Equal(t, cache.idsFP, flow.Identifier{})
+	require.Equal(t, cache.chansFP, flow.Identifier{})
 	require.Empty(t, cache.cachedFanout)
 
 	// underlying topology should be called only once.
@@ -107,38 +102,40 @@ func TestCache_InputChange_IDs(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, top)
 }
 
-//// TestCache_InputChange_Channels evaluates that if identity list input to GenerateFanout changes,
-//// the cache is invalidated and updated.
-//func TestCache_InputChange_Channels(t *testing.T) {
-//	// mocks underlying topology returning a fanout
-//	top := &mocknetwork.Topology{}
-//	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-//	ids := unittest.IdentityListFixture(100)
-//	fanout := ids.Sample(10)
-//	channels := network.ChannelList{"channel1", "channel2"}
-//	newChannels := append(channel, "channel3")
-//	top.On("GenerateFanout", ids, channels).Return(fanout, nil).Once()
-//
-//	// assumes cache holding some fanout
-//	cache := NewCache(log, top)
-//	cache.cachedFanout = ids.Sample(10)
-//	cache.idsFP = unittest.IdentifierFixture()
-//
-//	// cache content should change once input channels to GenerateFanout changes.
-//	newFanout, err := cache.GenerateFanout(ids, newChannels)
-//	require.NoError(t, err)
-//	// ids fingerprint in the cache should not change, since the original input did not change.
-//	require.Equal(t, cache.idsFP, ids.Fingerprint())
-//	// channels input changed, hence channels fingerprint should be changed.
-//	require.Equal(t, cache.chansFP, newChannels.ID())
-//	// returned (new) fanout should be equal to the mocked fanout, and
-//	// also should be cached.
-//	require.Equal(t, cache.cachedFanout, fanout)
-//	require.Equal(t, cache.cachedFanout, newFanout)
-//
-//	// underlying topology should be called only once.
-//	mock.AssertExpectationsForObjects(t, top)
-//}
+// TestCache_InputChange_Channels evaluates that if channel list input to GenerateFanout changes,
+// the cache is invalidated and updated.
+func TestCache_InputChange_Channels(t *testing.T) {
+	// mocks underlying topology returning a fanout
+	top := &mocknetwork.Topology{}
+	ids := unittest.IdentityListFixture(100)
+	fanout := ids.Sample(10)
+	channels := network.ChannelList{"channel1", "channel2"}
+	top.On("GenerateFanout", ids, mock.Anything).Return(fanout, nil).Once()
+
+	// assumes cache holding some fanout for the same
+	// ids and channels defined above.
+	cache := NewCache(zerolog.Nop(), top)
+	cache.cachedFanout = ids.Sample(10)
+	cache.idsFP = ids.Fingerprint()
+	cache.chansFP = channels.ID()
+
+	// cache content should change once input channels to GenerateFanout changes.
+	// adds a new channel to the list of channels imitate a change.
+	channels = append(channels, "channel3")
+	newFanout, err := cache.GenerateFanout(ids, channels)
+	require.NoError(t, err)
+	// ids fingerprint in the cache should not change, since the original input did not change.
+	require.Equal(t, cache.idsFP, ids.Fingerprint())
+	// channels input changed, hence channels fingerprint should be changed.
+	require.Equal(t, cache.chansFP, channels.ID())
+	// returned (new) fanout should be equal to the mocked fanout, and
+	// also should be cached.
+	require.Equal(t, cache.cachedFanout, fanout)
+	require.Equal(t, cache.cachedFanout, newFanout)
+
+	// underlying topology should be called only once.
+	mock.AssertExpectationsForObjects(t, top)
+}
 
 // TestCache_TopicBased evaluates strong cache guarantees over an underlying TopicBased cache. The guarantees
 // include a deterministic fanout as long as the input is the same, updating the cache once input gets changed, and
