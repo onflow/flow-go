@@ -324,6 +324,7 @@ func TestOnEntityInvalidChecksum(t *testing.T) {
 	nonce := rand.Uint64()
 
 	wanted := unittest.CollectionFixture(1)
+	wanted2 := unittest.CollectionFixture(2)
 
 	now := time.Now()
 
@@ -333,8 +334,10 @@ func TestOnEntityInvalidChecksum(t *testing.T) {
 		ExtraSelector: filter.Any,
 	}
 
+	assert.NotEqual(t, wanted, wanted2)
+
 	// prepare payload from different entity
-	bwanted, _ := msgpack.Marshal(unittest.CollectionFixture(2))
+	bwanted, _ := msgpack.Marshal(wanted2)
 
 	res := &messages.EntityResponse{
 		Nonce:     nonce,
