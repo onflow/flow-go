@@ -17,20 +17,15 @@ import (
 // By random topology we mean a node is connected to any other co-channel nodes with some
 // edge probability.
 type RandomizedTopology struct {
-	myNodeID flow.Identifier             // used to keep identifier of the node
-	state    protocol.State              // used to keep a read only protocol state
-	subMngr  network.SubscriptionManager // used to keep track topics the node subscribed to
-	chance   uint64                      // used to translate connectedness probability into a number in [0, 100]
-	rng      random.Rand                 // used as a stateful random number generator to sample edges
+	myNodeID flow.Identifier // used to keep identifier of the node
+	state    protocol.State  // used to keep a read only protocol state
+	chance   uint64          // used to translate connectedness probability into a number in [0, 100]
+	rng      random.Rand     // used as a stateful random number generator to sample edges
 	logger   zerolog.Logger
 }
 
 // NewRandomizedTopology returns an instance of the RandomizedTopology.
-func NewRandomizedTopology(nodeID flow.Identifier,
-	logger zerolog.Logger,
-	edgeProb float64,
-	state protocol.State,
-	subMngr network.SubscriptionManager) (*RandomizedTopology, error) {
+func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgeProb float64, state protocol.State) (*RandomizedTopology, error) {
 	// edge probability should be a positive value between 0 and 1. However,
 	// we like it to be strictly greater than zero. Also, at the current scale of
 	// Flow, we need it to be greater than 0.01 to support probabilistic connectedness.
@@ -51,7 +46,6 @@ func NewRandomizedTopology(nodeID flow.Identifier,
 	t := &RandomizedTopology{
 		myNodeID: nodeID,
 		state:    state,
-		subMngr:  subMngr,
 		chance:   uint64(100 * edgeProb),
 		rng:      rng,
 		logger:   logger.With().Str("component:", "randomized-topology").Logger(),
@@ -67,7 +61,7 @@ func NewRandomizedTopology(nodeID flow.Identifier,
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
 func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
-	myUniqueChannels := engine.UniqueChannels(r.subMngr.Channels())
+	myUniqueChannels := engine.UniqueChannels(channels)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
