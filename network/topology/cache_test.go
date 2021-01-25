@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -110,7 +111,6 @@ func TestCache_TopicBased(t *testing.T) {
 
 	top, err := NewTopicBasedTopology(myId.NodeID, log, &mockprotocol.State{})
 	require.NoError(t, err)
-
 	cache := NewCache(log, top)
 
 	// Testing deterministic behavior
@@ -118,32 +118,34 @@ func TestCache_TopicBased(t *testing.T) {
 	// Over consecutive invocations of cache with the same input, the same output should be returned.
 	prevFanout, err := cache.GenerateFanout(ids, subManagers[0].Channels())
 	require.NoError(t, err)
-	for i := 0; i < 100; i++ {
-		newFanout, err := cache.GenerateFanout(ids, nil)
-		require.NoError(t, err)
-
-		require.Equal(t, prevFanout, newFanout)
-		prevFanout = newFanout
-	}
+	require.NotEmpty(t, prevFanout)
+	// requires same fanout as long as the input is the same.
+	requireDeterministicBehavior(t, cache, prevFanout, ids, subManagers[0].Channels())
 
 	// Testing cache invalidation and update
 	//
 	// Evicts one identity from ids list and cache should be invalidated and updated with a new fanout.
 	ids = ids[:len(ids)-1]
-	newFanout, err := cache.GenerateFanout(ids, nil)
+	newFanout, err := cache.GenerateFanout(ids, subManagers[0].Channels())
 	require.NoError(t, err)
+	require.NotEmpty(t, newFanout)
 	require.NotEqual(t, newFanout, prevFanout)
+	// requires same fanout as long as the input is the same.
+	requireDeterministicBehavior(t, cache, newFanout, ids, subManagers[0].Channels())
+}
 
-	// Testing deterministic behavior after an update
+// requireDeterministicBehavior evaluates that consecutive invocations of cache on fanout generation with the same input (i.e., ids and channels),
+// results in the same output fanout as the one passed to the method.
+func requireDeterministicBehavior(t *testing.T, cache *Cache, fanout flow.IdentityList, ids flow.IdentityList, channels network.ChannelList) {
+	// Testing deterministic
 	//
-	// After a cache update, over consecutive invocations of cache with the same (new) input, the same
+	// Over consecutive invocations of cache with the same (new) input, the same
 	// (new) output should be returned.
-	prevFanout = newFanout
 	for i := 0; i < 100; i++ {
-		newFanout, err := cache.GenerateFanout(ids, nil)
+		newFanout, err := cache.GenerateFanout(ids, channels)
 		require.NoError(t, err)
+		require.NotEmpty(t, newFanout)
 
-		require.Equal(t, prevFanout, newFanout)
-		prevFanout = newFanout
+		require.Equal(t, fanout, newFanout)
 	}
 }
