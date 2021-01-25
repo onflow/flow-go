@@ -730,3 +730,86 @@ func (bs *BuilderSuite) TestPayloadReceiptLimit() {
 	bs.Require().NoError(err)
 	bs.Assert().Equal(bs.pendingReceipts[:limit], bs.assembled.Receipts, "should have excluded receipts above maxReceiptCount")
 }
+
+// TestPayloadReceiptNoParentResult tests that the builder does not include
+// receipts whose PreviousResult is not already incorporated in the chain.
+//
+// Here we create 4 consecutive blocks S, A, B, and C, where A contains a valid
+// receipt for block S, but blocks B and C have empty payloads.
+//
+// We populate the mempool with valid receipts for blocks A, and C, but NOT for
+// block B.
+//
+// The expected behaviour, is that the builder should not include the receipt
+// for block C, because the chain and the mempool do not contain a valid receipt
+// for the parent result (block B's result).
+//
+// ... <- S <- A[ER{S}] <- B <- C <- X (candidate)
+func (bs *BuilderSuite) TestPayloadReceiptNoParentResult() {
+	// create and save block S
+	s := bs.blocks[bs.parentID]
+	sReceipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(s),
+			),
+		),
+	)
+
+	// create and save block A with a valid receipt for S
+	a := unittest.BlockWithParentFixture(s.Header)
+	a.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{sReceipt},
+	})
+	bs.headers[a.ID()] = a.Header
+	bs.blocks[a.ID()] = &a
+	bs.index[a.ID()] = a.Payload.Index()
+
+	// create and save empty block B
+	b := unittest.BlockWithParentFixture(a.Header)
+	bs.headers[b.ID()] = b.Header
+	bs.blocks[b.ID()] = &b
+	bs.index[b.ID()] = b.Payload.Index()
+
+	// create and save empty block C
+	c := unittest.BlockWithParentFixture(b.Header)
+	bs.headers[c.ID()] = c.Header
+	bs.blocks[c.ID()] = &c
+	bs.index[c.ID()] = c.Payload.Index()
+
+	// create valid chain of receipts for A, B, and C
+	aReceipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(&a),
+				unittest.WithPreviousResult(sReceipt.ExecutionResult),
+			),
+		),
+	)
+	bReceipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(&b),
+				unittest.WithPreviousResult(aReceipt.ExecutionResult),
+			),
+		),
+	)
+	cReceipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(&c),
+				unittest.WithPreviousResult(bReceipt.ExecutionResult),
+			),
+		),
+	)
+
+	// only include receipts for A and C in the mempool; NOT B,
+	bs.pendingReceipts = append(bs.pendingReceipts, aReceipt, cReceipt)
+
+	_, err := bs.build.BuildOn(c.ID(), bs.setter)
+	bs.Require().NoError(err)
+
+	expectedReceipts := []*flow.ExecutionReceipt{aReceipt}
+	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain only receipt for block a")
+
+}
