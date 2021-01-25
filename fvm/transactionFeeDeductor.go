@@ -20,8 +20,6 @@ func (d *TransactionFeeDeductor) Process(
 	err := d.deductFees(vm, ctx, proc.Transaction, st)
 	if err != nil {
 		st.Commit()
-	} else {
-		st.Rollback()
 	}
 	return err
 }
