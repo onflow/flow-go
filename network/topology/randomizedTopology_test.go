@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +22,6 @@ type RandomizedTopologyTestSuite struct {
 	state    protocol.State    // represents a mocked protocol state
 	all      flow.IdentityList // represents the identity list of all nodes in the system
 	clusters flow.ClusterList  // represents list of cluster ids of collection nodes
-	subMngr  []network.SubscriptionManager
 	logger   zerolog.Logger
 	edgeProb float64
 }
@@ -52,8 +50,6 @@ func (suite *RandomizedTopologyTestSuite) SetupTest() {
 	// mocks state for collector nodes topology
 	suite.state, suite.clusters = MockStateForCollectionNodes(suite.T(),
 		suite.all.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
-
-	suite.subMngr = MockSubscriptionManager(suite.T(), suite.all)
 }
 
 // TestUnhappyInitialization concerns initializing randomized topology with unhappy inputs.
