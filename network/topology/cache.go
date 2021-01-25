@@ -62,7 +62,7 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList, channels network.ChannelLi
 	// cache miss logic
 	// invalidation and update
 	c.invalidate()
-	fanout, err := c.top.GenerateFanout(ids, nil)
+	fanout, err := c.top.GenerateFanout(ids, channels)
 	if err != nil {
 		return nil, err
 	}
