@@ -231,7 +231,7 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 		return fmt.Errorf("invalid chunks format for result %v: %w", receipt.ExecutionResult.ID(), err)
 	}
 
-	prevResult, err := previousResult(&receipt.ExecutionResult)
+	prevResult, err := getPreviousResult(&receipt.ExecutionResult)
 	if err != nil {
 		return err
 	}
