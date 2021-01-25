@@ -554,7 +554,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, // no default client, hence the receipts storage should be looked up
+			nil,
 			nil, nil,
 			suite.blocks,
 			nil, nil, nil,
@@ -572,6 +572,29 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		suite.Require().Equal(expected, actual)
 	})
+
+	suite.Run("with an empty block ID list", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, // no default client, hence the receipts storage should be looked up
+			nil, nil,
+			suite.blocks,
+			nil, nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			suite.log,
+		)
+
+		// execute request with an empty block id list and expect an error (not a panic)
+		_, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
+		require.Error(suite.T(), err)
+	})
+
 	suite.assertAllExpectations()
 }
 

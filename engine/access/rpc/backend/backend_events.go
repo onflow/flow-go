@@ -103,6 +103,10 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
+	if len(blockIDs) == 0 {
+		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node")
+	}
+
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
