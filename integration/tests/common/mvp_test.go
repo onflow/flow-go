@@ -27,7 +27,8 @@ func TestMVP_Network(t *testing.T) {
 	}
 
 	consensusConfigs := append(collectionConfigs,
-		testnet.WithAdditionalFlag("--require-one-approval=true"), // require one approval per chunk when sealing)
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 

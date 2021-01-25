@@ -48,6 +48,7 @@ type MatchEngineTestSuite struct {
 	headerDB         map[flow.Identifier]*flow.Header
 	state            *protocol.State
 	snapshot         *protocol.Snapshot
+	sealed           *protocol.Snapshot
 	results          *stdmap.ResultDataPacks
 	chunkIDsByResult *mempool.IdentifierMap
 	verifier         *mocknetwork.Engine
@@ -98,10 +99,11 @@ func (suite *MatchEngineTestSuite) SetupTest() {
 	suite.headers = unittest.HeadersFromMap(suite.headerDB)
 
 	// setup protocol state
-	block, snapshot, state := unittest.FinalizedProtocolStateWithParticipants(participants)
+	block, snapshot, state, sealed := unittest.FinalizedProtocolStateWithParticipants(participants)
 	suite.head = block.Header
 	suite.snapshot = snapshot
 	suite.state = state
+	suite.sealed = sealed
 
 	// setup other dependencies
 	suite.results = stdmap.NewResultDataPacks(10)
@@ -634,7 +636,10 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(count)
 
 	for i := 0; i < count; i++ {
-		header := &flow.Header{View: uint64(i)}
+		header := &flow.Header{
+			Height: suite.head.Height + 1, // ensure the height is above the sealed height
+			View:   uint64(i),
+		}
 		// create a execution result that assigns to me
 		result, assignment := createExecutionResult(
 			header.ID(),

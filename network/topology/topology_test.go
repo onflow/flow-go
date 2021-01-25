@@ -220,10 +220,10 @@ func (suite *TopologyTestSuite) topologyScenario(constructorFunc factory, me flo
 	ids flow.IdentityList,
 	state protocol.State) flow.IdentityList {
 
-	// creates topology of the node
-	top := constructorFunc(suite.T(), me, state, subMngr)
+	// creates topology of the node as a topology cache.
+	top := topology.NewCache(suite.logger, constructorFunc(suite.T(), me, state, subMngr))
 
-	// generates topology of node
+	// generates topology of node.
 	myFanout, err := top.GenerateFanout(ids)
 	require.NoError(suite.T(), err)
 
