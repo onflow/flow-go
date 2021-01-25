@@ -61,6 +61,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	accountKey.SeqNumber++
+	st.Commit()
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {

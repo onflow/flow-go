@@ -17,7 +17,13 @@ func (d *TransactionFeeDeductor) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	return d.deductFees(vm, ctx, proc.Transaction, st)
+	err := d.deductFees(vm, ctx, proc.Transaction, st)
+	if err != nil {
+		st.Commit()
+	} else {
+		st.Rollback()
+	}
+	return err
 }
 
 func (d *TransactionFeeDeductor) deductFees(
