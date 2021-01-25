@@ -96,6 +96,7 @@ func (i *TransactionInvocator) Process(
 
 	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
+	// TODO: this can cause issue for fee events
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()
 
