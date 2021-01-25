@@ -206,7 +206,7 @@ func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 	return nil
 }
 
-func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, previousResult GetPreviousResult) error {
+func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousResult GetPreviousResult) error {
 	identity, err := identityForNode(v.state, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf(
