@@ -67,7 +67,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
 func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, st *state.State) error {
 	invocator := NewTransactionInvocator(zerolog.Nop())
-	err := invocator.Process(vm, ctx, tx, st)
+	err := invocator.Process(vm, &ctx, tx, st)
 	if err != nil {
 		return err
 	}

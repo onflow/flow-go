@@ -13,7 +13,7 @@ func NewTransactionFeeDeductor() *TransactionFeeDeductor {
 
 func (d *TransactionFeeDeductor) Process(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
@@ -22,13 +22,13 @@ func (d *TransactionFeeDeductor) Process(
 
 func (d *TransactionFeeDeductor) deductFees(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	tx *flow.TransactionBody,
 	st *state.State,
 ) error {
 
 	return vm.invokeMetaTransaction(
-		ctx,
+		*ctx,
 		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),
 		st,
 	)

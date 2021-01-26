@@ -25,7 +25,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State) error
+	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.State) error
 }
 
 type TransactionProcedure struct {
@@ -40,8 +40,9 @@ type TransactionProcedure struct {
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
+
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st)
+		err := p.Process(vm, &ctx, proc, st)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -68,11 +69,11 @@ func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
 
 func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	env, err := newEnvironment(ctx, vm, st)
+	env, err := newEnvironment(*ctx, vm, st)
 	if err != nil {
 		return err
 	}

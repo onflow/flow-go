@@ -20,8 +20,8 @@ func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatu
 }
 
 func (v *TransactionSignatureVerifier) Process(
-	vm *VirtualMachine,
-	ctx Context,
+	_ *VirtualMachine,
+	_ *Context,
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {

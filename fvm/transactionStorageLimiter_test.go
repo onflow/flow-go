@@ -25,7 +25,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, st)
 
@@ -43,7 +43,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, st)
 
@@ -61,7 +61,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, st)
 
@@ -79,7 +79,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, st)
 
@@ -96,7 +96,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, st)
 

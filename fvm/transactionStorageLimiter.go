@@ -39,7 +39,7 @@ func NewTransactionStorageLimiter() *TransactionStorageLimiter {
 
 func (d *TransactionStorageLimiter) Process(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	tp *TransactionProcedure,
 	st *state.State,
 ) error {
@@ -47,7 +47,7 @@ func (d *TransactionStorageLimiter) Process(
 		return nil
 	}
 
-	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, st)
+	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, st)
 	if err != nil {
 		return err
 	}

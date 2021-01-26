@@ -71,7 +71,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err = txInvocator.Process(vm, context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, st)
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -132,7 +132,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err = txInvocator.Process(vm, context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, st)
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -163,7 +163,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err := txInvocator.Process(vm, context, proc, st)
+		err := txInvocator.Process(vm, &context, proc, st)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -194,7 +194,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		)
 
-		err := txInvocator.Process(vm, context, proc, st)
+		err := txInvocator.Process(vm, &context, proc, st)
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")

@@ -15,11 +15,10 @@ func NewTransactionAccountFrozenChecker() *TransactionAccountFrozenChecker {
 
 func (c *TransactionAccountFrozenChecker) Process(
 	_ *VirtualMachine,
-	_ Context,
+	_ *Context,
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-
 	return c.checkAccountNotFrozen(proc.Transaction, st)
 }
 
@@ -53,4 +52,29 @@ func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 	}
 
 	return errIfFrozen(tx.Payer)
+}
+
+type TransactionAccountFrozenEnabler struct{}
+
+func NewTransactionAccountFrozenEnabler() *TransactionAccountFrozenEnabler {
+	return &TransactionAccountFrozenEnabler{}
+}
+
+func (c *TransactionAccountFrozenEnabler) Process(
+	_ *VirtualMachine,
+	ctx *Context,
+	proc *TransactionProcedure,
+	_ *state.State,
+) error {
+
+	serviceAddress := ctx.Chain.ServiceAddress()
+
+	for _, signature := range proc.Transaction.EnvelopeSignatures {
+		if signature.Address == serviceAddress {
+			ctx.AccountFreezeAvailable = true
+			return nil //we can bail out and save maybe some loops
+		}
+	}
+
+	return nil
 }
