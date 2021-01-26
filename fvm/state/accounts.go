@@ -240,11 +240,11 @@ func (a *Accounts) getContract(contractName string, address flow.Address) ([]byt
 		return nil, newLedgerGetError(contractName, address, err)
 	}
 
-	log.Info().
+	log.Debug().
 		Str("address", address.String()).
 		Str("contract", contractName).
 		Int("contract_len", len(contract)).
-		Msg(fmt.Sprintf("TEMP LOGGING: a contract returned for %s.%s", address.String(), contractName))
+		Msg(fmt.Sprintf("a contract returned for %s.%s", address.String(), contractName))
 
 	return contract, nil
 }

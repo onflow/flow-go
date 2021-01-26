@@ -60,7 +60,7 @@ func hashResult(res *flow.ExecutionResult) []byte {
 	h := hash.NewSHA3_384()
 
 	// encodes result approval body to byte slice
-	b, _ := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)
+	b, _ := encoding.DefaultEncoder.Encode(res)
 
 	// takes hash of result approval body
 	hash := h.ComputeHash(b)
@@ -255,7 +255,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// create chunk data pack
-	myChunk := result.ExecutionResultBody.Chunks[0]
+	myChunk := result.Chunks[0]
 	chunkDataPack := FromChunkID(myChunk.ID())
 
 	// setup conduit to return requested chunk data packs
@@ -812,10 +812,8 @@ func (suite *MatchEngineTestSuite) NewTestMatchEngine(maxTry int) *match.Engine 
 
 func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: blockID,
-			Chunks:  flow.ChunkList{},
-		},
+		BlockID: blockID,
+		Chunks:  flow.ChunkList{},
 	}
 	assignments := chunks.NewAssignment()
 
@@ -829,7 +827,7 @@ func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment
 	return func(result *flow.ExecutionResult, assignment *chunks.Assignment) {
 		for i, setAssignee := range setAssignees {
 			chunk := setAssignee(result.BlockID, uint64(i), assignment)
-			result.ExecutionResultBody.Chunks.Insert(chunk)
+			result.Chunks.Insert(chunk)
 		}
 	}
 }
