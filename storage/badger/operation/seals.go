@@ -22,6 +22,14 @@ func LookupPayloadSeals(blockID flow.Identifier, sealIDs *[]flow.Identifier) fun
 	return retrieve(makePrefix(codePayloadSeals, blockID), sealIDs)
 }
 
+func IndexPayloadReceipts(blockID flow.Identifier, receiptIDs []flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codePayloadReceipts, blockID), receiptIDs)
+}
+
+func LookupPayloadReceipts(blockID flow.Identifier, receiptIDs *[]flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codePayloadReceipts, blockID), receiptIDs)
+}
+
 func IndexBlockSeal(blockID flow.Identifier, sealID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeBlockToSeal, blockID), sealID)
 }

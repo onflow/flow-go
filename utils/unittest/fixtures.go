@@ -105,6 +105,24 @@ func BlockFixture() flow.Block {
 	return BlockWithParentFixture(&header)
 }
 
+func FullBlockFixture() flow.Block {
+	block := BlockFixture()
+	payload := block.Payload
+	payload.Seals = Seal.Fixtures(10)
+	payload.Receipts = []*flow.ExecutionReceipt{
+		ExecutionReceiptFixture(),
+		ExecutionReceiptFixture(),
+	}
+
+	header := block.Header
+	header.PayloadHash = payload.Hash()
+
+	return flow.Block{
+		Header:  header,
+		Payload: payload,
+	}
+}
+
 func BlockFixtures(number int) []*flow.Block {
 	blocks := make([]*flow.Block, 0, number)
 	for ; number > 0; number-- {
@@ -469,12 +487,9 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: IdentifierFixture(),
-			BlockID:          IdentifierFixture(),
-			Chunks:           ChunksFixture(2, blockID),
-		},
-		Signatures: SignaturesFixture(6),
+		PreviousResultID: IdentifierFixture(),
+		BlockID:          IdentifierFixture(),
+		Chunks:           ChunksFixture(2, blockID),
 	}
 
 	for _, apply := range opts {
@@ -828,10 +843,8 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	}
 
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
-		},
+		BlockID: block.ID(),
+		Chunks:  chunks,
 	}
 
 	// computes chunk end state
@@ -953,12 +966,9 @@ func BatchListFixture(n int) []flow.Batch {
 
 func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID:          block.ID(),
-			PreviousResultID: flow.ZeroID,
-			Chunks:           chunks.ChunkListFromCommit(commit),
-		},
-		Signatures: nil,
+		BlockID:          block.ID(),
+		PreviousResultID: flow.ZeroID,
+		Chunks:           chunks.ChunkListFromCommit(commit),
 	}
 	return result
 }
@@ -1040,7 +1050,6 @@ func EpochStatusFixture() *flow.EpochStatus {
 
 func IndexFixture() *flow.Index {
 	return &flow.Index{
-		NodeIDs:       IdentifierListFixture(5),
 		CollectionIDs: IdentifierListFixture(5),
 		SealIDs:       IdentifierListFixture(5),
 		ReceiptIDs:    IdentifierListFixture(5),

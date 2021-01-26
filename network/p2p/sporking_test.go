@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,7 +23,7 @@ import (
 // Sporking can be supported by two ways:
 // 1. Updating the network key of a node after it is moved from the old chain to the new chain
 // 2. Updating the Flow Libp2p protocol ID suffix to prevent one-to-one messaging across sporks and
-//    updating the channel ID suffix to prevent one-to-K messaging (PubSub) across sporks.
+//    updating the channel suffix to prevent one-to-K messaging (PubSub) across sporks.
 // 1 and 2 both can independently ensure that nodes from the old chain cannot communicate with nodes on the new chain
 // These tests are just to reconfirm the network behaviour and provide a test bed for future tests for sporking, if needed
 type SporkingTestSuite struct {
@@ -111,7 +112,7 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 }
 
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
-// if the channel ID is updated while the network keys are kept the same.
+// if the channel is updated while the network keys are kept the same.
 func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// root id before spork
@@ -130,8 +131,8 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// spork topic is derived by suffixing the channelID with the root block ID
-	topicBeforeSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDBeforeSpork)
+	// spork topic is derived by suffixing the channel with the root block ID
+	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDBeforeSpork)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err := node1.Subscribe(ctx, topicBeforeSpork)
@@ -153,7 +154,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	rootIDAfterSpork := unittest.BlockFixture().ID().String()
 
 	// topic after the spork
-	topicAfterSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDAfterSpork)
+	topicAfterSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
@@ -188,7 +189,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic string) {
+	topic network.Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")
@@ -209,7 +210,7 @@ func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic string) {
+	topic network.Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")

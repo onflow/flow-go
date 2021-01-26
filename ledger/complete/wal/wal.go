@@ -3,9 +3,9 @@ package wal
 import (
 	"fmt"
 
-	"github.com/go-kit/kit/log"
+	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
-	prometheusWAL "github.com/prometheus/tsdb/wal"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -22,8 +22,8 @@ type LedgerWAL struct {
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize)
+func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
+	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 
 	bytes := EncodeUpdate(update)
 
-	err := w.wal.Log(bytes)
+	_, err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
@@ -65,7 +65,7 @@ func (w *LedgerWAL) RecordDelete(rootHash ledger.RootHash) error {
 
 	bytes := EncodeDelete(rootHash)
 
-	err := w.wal.Log(bytes)
+	_, err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording delete in LedgerWAL: %w", err)
@@ -97,12 +97,16 @@ func (w *LedgerWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	)
 }
 
+func (w *LedgerWAL) Segments() (first, last int, err error) {
+	return prometheusWAL.Segments(w.wal.Dir())
+}
+
 func (w *LedgerWAL) Replay(
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(ledger.RootHash) error,
 ) error {
-	from, to, err := w.wal.Segments()
+	from, to, err := w.Segments()
 	if err != nil {
 		return err
 	}
@@ -114,7 +118,7 @@ func (w *LedgerWAL) ReplayLogsOnly(
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
-	from, to, err := w.wal.Segments()
+	from, to, err := w.Segments()
 	if err != nil {
 		return err
 	}

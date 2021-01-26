@@ -3,7 +3,6 @@
 package consensus
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 	"time"
@@ -58,6 +57,7 @@ func NewBuilder(
 		maxInterval:       10 * time.Second,
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
+		maxReceiptCount:   200,
 		expiry:            flow.DefaultTransactionExpiry,
 	}
 
@@ -94,19 +94,19 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	// get the collection guarantees to insert in the payload
 	insertableGuarantees, err := b.getInsertableGuarantees(parentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not insert guarantees: %w", err)
 	}
 
 	// get the seals to insert in the payload
 	insertableSeals, err := b.getInsertableSeals(parentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not insert seals: %w", err)
 	}
 
 	// get the receipts to insert in the payload
 	insertableReceipts, err := b.getInsertableReceipts(parentID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not insert receipts: %w", err)
 	}
 
 	// assemble the block proposal
@@ -116,7 +116,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		insertableReceipts,
 		setter)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
 	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
@@ -338,11 +338,11 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 		//  enforce that execution results form chain
 		nextResultToBeSealed := nextSeal.IncorporatedResult.Result
-		initialState, isOK := nextResultToBeSealed.InitialStateCommit()
-		if !isOK {
-			return nil, fmt.Errorf("missing initial state commitment in execution result %v", nextResultToBeSealed.ID())
-		}
-		if !bytes.Equal(initialState, last.FinalState) {
+
+		// at this point we are safe just to check this condition since every
+		// ER gets validated by `module.ReceiptValidator` which checks if
+		// results form a valid chain.
+		if nextResultToBeSealed.PreviousResultID != last.ResultID {
 			return nil, fmt.Errorf("execution results do not form chain")
 		}
 
@@ -436,6 +436,11 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 
 	// sort receipts by block height
 	sortedReceipts := sortReceipts(receipts)
+
+	// don't collect more than maxReceiptCount receipts
+	if uint(len(sortedReceipts)) > b.cfg.maxReceiptCount {
+		sortedReceipts = sortedReceipts[:b.cfg.maxReceiptCount]
+	}
 
 	return sortedReceipts, nil
 }
