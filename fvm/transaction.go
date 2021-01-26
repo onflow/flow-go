@@ -101,7 +101,7 @@ func (i *TransactionInvocator) Process(
 					},
 				},
 				ReturnTypeAnnotation: &sema.TypeAnnotation{
-					Type: &sema.IntType{},
+					Type: sema.VoidType,
 				},
 			},
 			Kind:           common.DeclarationKindFunction,
