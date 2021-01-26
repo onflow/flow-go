@@ -453,7 +453,6 @@ func testConcurrency(t *testing.T) {
 	})
 }
 
-type Worker = jobqueue.Worker
 type JobID = module.JobID
 type Job = storage.Job
 
@@ -473,7 +472,7 @@ func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed 
 	require.Equal(t, expectProcessed, processed)
 }
 
-func newTestConsumer(cp storage.ConsumerProgress, jobs storage.Jobs, worker Worker) module.JobConsumer {
+func newTestConsumer(cp storage.ConsumerProgress, jobs storage.Jobs, worker jobqueue.Worker) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := int64(3)
 	maxFinished := int64(8)
