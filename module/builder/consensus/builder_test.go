@@ -78,6 +78,13 @@ type BuilderSuite struct {
 	build *Builder
 }
 
+func (bs *BuilderSuite) storeBlock(block *flow.Block) {
+	bs.headers[block.ID()] = block.Header
+	bs.heights[block.Header.Height] = block.Header
+	bs.blocks[block.ID()] = block
+	bs.index[block.ID()] = block.Payload.Index()
+}
+
 // createAndRecordBlock creates a new block chained to the previous block (if it
 // is not nil). The new block contains a receipt for a result of the previous
 // block, which is also used to create a seal for the previous block. The seal
@@ -124,10 +131,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 	}
 
 	// record block in dbs
-	bs.headers[block.ID()] = block.Header
-	bs.heights[block.Header.Height] = block.Header
-	bs.blocks[block.ID()] = &block
-	bs.index[block.ID()] = block.Payload.Index()
+	bs.storeBlock(&block)
 
 	// seal the parentBlock block with the result included in this block. Do not
 	// seal the first block because it is assumed that it is already sealed.
@@ -740,13 +744,13 @@ func (bs *BuilderSuite) TestPayloadReceiptLimit() {
 // We populate the mempool with valid receipts for blocks A, and C, but NOT for
 // block B.
 //
-// The expected behaviour, is that the builder should not include the receipt
-// for block C, because the chain and the mempool do not contain a valid receipt
-// for the parent result (block B's result).
+// The expected behaviour is that the builder should not include the receipt for
+// block C, because the chain and the mempool do not contain a valid receipt for
+// the parent result (block B's result).
 //
 // ... <- S <- A[ER{S}] <- B <- C <- X (candidate)
 func (bs *BuilderSuite) TestPayloadReceiptNoParentResult() {
-	// create and save block S
+	// use the suite's parent block as S, and create a receipt of it
 	s := bs.blocks[bs.parentID]
 	sReceipt := unittest.ExecutionReceiptFixture(
 		unittest.WithResult(
@@ -761,21 +765,15 @@ func (bs *BuilderSuite) TestPayloadReceiptNoParentResult() {
 	a.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{sReceipt},
 	})
-	bs.headers[a.ID()] = a.Header
-	bs.blocks[a.ID()] = &a
-	bs.index[a.ID()] = a.Payload.Index()
+	bs.storeBlock(&a)
 
 	// create and save empty block B
 	b := unittest.BlockWithParentFixture(a.Header)
-	bs.headers[b.ID()] = b.Header
-	bs.blocks[b.ID()] = &b
-	bs.index[b.ID()] = b.Payload.Index()
+	bs.storeBlock(&b)
 
 	// create and save empty block C
 	c := unittest.BlockWithParentFixture(b.Header)
-	bs.headers[c.ID()] = c.Header
-	bs.blocks[c.ID()] = &c
-	bs.index[c.ID()] = c.Payload.Index()
+	bs.storeBlock(&c)
 
 	// create valid chain of receipts for A, B, and C
 	aReceipt := unittest.ExecutionReceiptFixture(
@@ -811,5 +809,4 @@ func (bs *BuilderSuite) TestPayloadReceiptNoParentResult() {
 
 	expectedReceipts := []*flow.ExecutionReceipt{aReceipt}
 	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain only receipt for block a")
-
 }
