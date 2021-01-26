@@ -103,6 +103,10 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
+	if len(blockIDs) == 0 {
+		return []flow.BlockEvents{}, nil
+	}
+
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
