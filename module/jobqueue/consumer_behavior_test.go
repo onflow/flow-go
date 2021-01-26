@@ -68,8 +68,8 @@ func TestConsumer(t *testing.T) {
 	t.Run("testWorkOnNextAfterFastforward", testWorkOnNextAfterFastforward)
 
 	// [+1, +2, +3, ... +12, +13, +14, 1*, 2*, 3*, 5*, 6*, ...12*] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
-	// when there are too many pending jobs, it will stop processing more but wait for job 4 to finish
-	t.Run("testTooManyPending", testTooManyPending)
+	// when there are too many finished jobs, it will stop processing more but wait for job 4 to finish
+	t.Run("testTooManyFinished", testTooManyFinished)
 
 	// [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 	// when Stop is called, it won't work on any job any more
@@ -360,9 +360,9 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 }
 
 // [+1, +2, +3, ... +12 , 1*, 2*, 3*, 5*, 6*, ...12*, +13, +14] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
-// when there are too many pending (8) jobs, it will stop processing more but wait for job 4 to finish
-// 5* - 12* has 8 pending in total
-func testTooManyPending(t *testing.T) {
+// when there are too many finished (8) jobs, it will stop processing more but wait for job 4 to finish
+// 5* - 12* has 8 finished in total
+func testTooManyFinished(t *testing.T) {
 	runWith(t, func(c *jobqueue.Consumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
 		require.NoError(t, c.Start())
 		for i := 1; i <= 12; i++ {
@@ -373,7 +373,7 @@ func testTooManyPending(t *testing.T) {
 
 		for i := 1; i <= 12; i++ {
 			// job 1 - 12 are all finished, except 4
-			// 5, 6, 7, 8, 9, 10, 11, 12 are pending, which have reached max pending (8)
+			// 5, 6, 7, 8, 9, 10, 11, 12 are finished, which have reached max finished (8)
 			if i == 4 {
 				continue
 			}
@@ -388,7 +388,7 @@ func testTooManyPending(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		// max pending reached, will not work on job 13
+		// max finished reached, will not work on job 13
 		w.AssertCalled(t, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
 		assertProcessed(t, cp, 3)
 	})
@@ -438,7 +438,7 @@ func testConcurrency(t *testing.T) {
 		}
 		wg.Wait()
 
-		called := make([]int, 0, 0)
+		called := make([]int, 0)
 		for i := 1; i <= 100; i++ {
 			called = append(called, i)
 		}
@@ -450,7 +450,6 @@ func testConcurrency(t *testing.T) {
 	})
 }
 
-type JobStatus = jobqueue.JobStatus
 type Worker = jobqueue.Worker
 type JobID = storage.JobID
 type Job = storage.Job
@@ -474,8 +473,8 @@ func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed 
 func newTestConsumer(cp storage.ConsumerProgress, jobs storage.Jobs, worker Worker) *jobqueue.Consumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := 3
-	maxPending := 8
-	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxPending)
+	maxFinished := 8
+	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxFinished)
 	return c
 }
 
