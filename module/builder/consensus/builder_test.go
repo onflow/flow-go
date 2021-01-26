@@ -69,7 +69,7 @@ type BuilderSuite struct {
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
-	recPool  *mempool.Receipts
+	recPool  *mempool.ReceiptsForest
 
 	// tracking behaviour
 	assembled *flow.Payload // built payload
@@ -341,7 +341,7 @@ func (bs *BuilderSuite) SetupTest() {
 		},
 	)
 
-	bs.recPool = &mempool.Receipts{}
+	bs.recPool = &mempool.ReceiptsForest{}
 	bs.recPool.On("Size").Return(uint(0))
 	bs.recPool.On("All").Return(
 		func() []*flow.ExecutionReceipt {

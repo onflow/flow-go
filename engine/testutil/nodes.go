@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -227,8 +229,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results, err := stdmap.NewIncorporatedResults(1000)
 	require.NoError(t, err)
 
-	receipts, err := stdmap.NewReceipts(1000)
-	require.NoError(t, err)
+	receipts := consensusMempools.NewReceiptsForest()
 
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)

@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
-// ResultForest is a mempool holding receipts, which is aware of the tree structure
+// ReceiptsForest is a mempool holding receipts, which is aware of the tree structure
 // formed by the results. The mempool supports pruning by height: only results
 // descending from the latest sealed and finalized result are relevant. Hence, we
 // can prune all results for blocks _below_ the latest block with a finalized seal.
@@ -19,16 +19,25 @@ import (
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 // For an in-depth discussion of the core algorithm, see ./Fork-Aware_Mempools.md
-type ResultForest struct {
+type ReceiptsForest struct {
 	sync.RWMutex
 	forest forest.LevelledForest
 	size   uint
 }
 
+// NewReceiptsForest instantiates a ReceiptsForest
+func NewReceiptsForest() *ReceiptsForest {
+	return &ReceiptsForest{
+		RWMutex: sync.RWMutex{},
+		forest:  *forest.NewLevelledForest(),
+		size:    0,
+	}
+}
+
 // Add the given execution receipt to the memory pool. Requires height
 // of the block the receipt is for. We enforce data consistency on an API
 // level by using the block header as input.
-func (rf *ResultForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
+func (rf *ReceiptsForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
 	rf.Lock()
 	defer rf.Unlock()
 
@@ -90,7 +99,7 @@ func (rf *ResultForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header) 
 // the receipt committing to the derived result.
 // The algorithm only traverses to results, for which there exists a
 // sequence of interim result in the mempool without any gaps.
-func (rf *ResultForest) ReachableReceipts(resultID flow.Identifier, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter) ([]*flow.ExecutionReceipt, error) {
+func (rf *ReceiptsForest) ReachableReceipts(resultID flow.Identifier, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter) ([]*flow.ExecutionReceipt, error) {
 	rf.RLock()
 	defer rf.RUnlock()
 
@@ -109,7 +118,7 @@ func (rf *ResultForest) ReachableReceipts(resultID flow.Identifier, blockFilter 
 // Entire sub-trees are skipped from search, if their root result is for a block which do _not_ pass the blockFilter
 // For each result (vertex in the Execution Tree), which the tree search visits, the known receipts are inspected.
 // Receipts that pass the receiptFilter are appended to `receipts` (passes as slice pointer, to allow appending).
-func (rf *ResultForest) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts *[]*flow.ExecutionReceipt) {
+func (rf *ReceiptsForest) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts *[]*flow.ExecutionReceipt) {
 	receiptsForResult := vertex.(*ReceiptEquivalenceClass)
 	if !blockFilter(receiptsForResult.blockHeader) {
 		return
@@ -135,7 +144,7 @@ func (rf *ResultForest) reachableReceipts(vertex forest.Vertex, blockFilter memp
 // PruneUpToHeight prunes all results for all blocks with height up to but
 // NOT INCLUDING `newLowestHeight`. Errors if newLowestHeight is lower than
 // the previous value (as we cannot recover previously pruned results).
-func (rf *ResultForest) PruneUpToHeight(limit uint64) error {
+func (rf *ReceiptsForest) PruneUpToHeight(limit uint64) error {
 	rf.Lock()
 	defer rf.Unlock()
 
@@ -160,11 +169,11 @@ func (rf *ResultForest) PruneUpToHeight(limit uint64) error {
 }
 
 // Size returns the number of receipts stored in the mempool
-func (rf *ResultForest) Size() uint {
+func (rf *ReceiptsForest) Size() uint {
 	return rf.size
 }
 
 // LowestHeight returns the lowest height, where results are still stored in the mempool.
-func (rf *ResultForest) LowestHeight() uint64 {
+func (rf *ReceiptsForest) LowestHeight() uint64 {
 	return rf.forest.LowestLevel
 }

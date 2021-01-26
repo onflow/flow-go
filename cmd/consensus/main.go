@@ -54,7 +54,6 @@ func main() {
 	var (
 		guaranteeLimit                         uint
 		resultLimit                            uint
-		receiptLimit                           uint
 		approvalLimit                          uint
 		sealLimit                              uint
 		minInterval                            time.Duration
@@ -77,7 +76,7 @@ func main() {
 		privateDKGData   *bootstrap.DKGParticipantPriv
 		guarantees       mempool.Guarantees
 		results          mempool.IncorporatedResults
-		receipts         mempool.Receipts
+		receipts         mempool.ReceiptsForest
 		approvals        mempool.Approvals
 		seals            mempool.IncorporatedResultSeals
 		prov             *provider.Engine
@@ -94,7 +93,6 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
-			flags.UintVar(&receiptLimit, "receipt-limit", 10000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
@@ -176,18 +174,13 @@ func main() {
 			return err
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			receipts, err = stdmap.NewReceipts(receiptLimit)
-			if err != nil {
-				return err
-			}
-
+			receipts = consensusMempools.NewReceiptsForest()
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, receipts.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
-
-			return err
+			return nil
 		}).
 		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {
 			approvals, err = stdmap.NewApprovals(approvalLimit)

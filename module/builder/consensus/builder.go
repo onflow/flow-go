@@ -4,7 +4,6 @@ package consensus
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -493,25 +492,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	}
 
 	return proposal, nil
-}
-
-// sortReceipts takes a map of block-height to execution receipt, and returns
-// the receipts in a slice sorted by block-height.
-func sortReceipts(receipts map[uint64][]*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
-
-	keys := make([]uint64, 0, len(receipts))
-	for k := range receipts {
-		keys = append(keys, k)
-	}
-
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-
-	res := make([]*flow.ExecutionReceipt, 0, len(keys))
-	for _, k := range keys {
-		res = append(res, receipts[k]...)
-	}
-
-	return res
 }
 
 // isResultForBlock constructs a mempool.BlockFilter that accepts only blocks whose ID is part of the given set.

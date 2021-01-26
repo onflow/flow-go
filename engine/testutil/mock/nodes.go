@@ -99,7 +99,7 @@ type ConsensusNode struct {
 	GenericNode
 	Guarantees      mempool.Guarantees
 	Approvals       mempool.Approvals
-	Receipts        mempool.Receipts
+	Receipts        mempool.ReceiptsForest
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
 	MatchingEngine  *matching.Engine

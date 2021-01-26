@@ -90,6 +90,8 @@ func (rs *ReceiptEquivalenceClass) Has(receiptID flow.Identifier) bool {
 	return found
 }
 
+// Size returns the number of receipts in the equivalence class (i.e. the number of
+// receipts known for that particular result)
 func (rs *ReceiptEquivalenceClass) Size() uint {
 	return uint(len(rs.receipts))
 }
