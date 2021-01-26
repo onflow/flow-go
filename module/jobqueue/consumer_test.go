@@ -254,8 +254,8 @@ func (j *MockJobs) PushN(n int64) error {
 }
 
 // deterministically compute the JobID from index
-func JobIDAtIndex(index int) storage.JobID {
-	return storage.JobID(fmt.Sprintf("%v", index))
+func JobIDAtIndex(index int) JobID {
+	return JobID(fmt.Sprintf("%v", index))
 }
 
 // JobMaker is a test helper.
@@ -275,7 +275,7 @@ type TestJob struct {
 	index int
 }
 
-func (tj TestJob) ID() storage.JobID {
+func (tj TestJob) ID() JobID {
 	return JobIDAtIndex(tj.index)
 }
 

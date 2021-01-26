@@ -209,11 +209,6 @@ func (c *Consumer) run() (int64, error) {
 	return int64(len(processables)), nil
 }
 
-type jobAtIndex struct {
-	job   Job
-	index int64
-}
-
 func (c *Consumer) processableJobs() ([]*jobAtIndex, int64, error) {
 	return processableJobs(
 		c.jobs,
@@ -302,6 +297,11 @@ func (c *Consumer) doneJob(jobID JobID) bool {
 
 	status.done = true
 	return true
+}
+
+type jobAtIndex struct {
+	job   Job
+	index int64
 }
 
 type jobStatus struct {
