@@ -171,7 +171,7 @@ func TestCache_TopicBased(t *testing.T) {
 	// requires same fanout as long as the input is the same.
 	requireDeterministicBehavior(t, cache, newFanout, ids, channels)
 
-	// Testing cache invalidation and update by identity channel list change
+	// Testing cache invalidation and update by input channels list change
 	//
 	// Keeps the same identity list but removes all channels except one from the input channel list.
 	// Cache should be invalidated and updated with a new fanout.
