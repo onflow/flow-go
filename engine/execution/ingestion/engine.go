@@ -1246,11 +1246,9 @@ func (e *Engine) generateExecutionResultForBlock(
 	}
 
 	er := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: previousErID,
-			BlockID:          block.ID(),
-			Chunks:           chunks,
-		},
+		PreviousResultID: previousErID,
+		BlockID:          block.ID(),
+		Chunks:           chunks,
 	}
 
 	return er, nil
