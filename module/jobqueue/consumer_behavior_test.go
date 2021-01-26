@@ -92,8 +92,6 @@ func testOnReceiveOneJob(t *testing.T) {
 
 		c.Check()
 
-		time.Sleep(1 * time.Millisecond)
-
 		w.AssertCalled(t, []int{1})
 		assertProcessed(t, cp, 0)
 	})
@@ -394,7 +392,26 @@ func testTooManyPending(t *testing.T) {
 	})
 }
 
+// [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
+// when Stop is called, it won't work on any job any more
 func testStopRunning(t *testing.T) {
+	runWith(t, func(c *jobqueue.Consumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
+		for i := 0; i < 4; i++ {
+			require.NoError(t, j.PushOne())
+			c.Check()
+		}
+
+		c.Stop()
+
+		c.FinishJob(jobqueue.JobIDAtIndex(2))
+
+		time.Sleep(1 * time.Millisecond)
+
+		// it won't work on 4 because it stopped before 2 is finished
+		w.AssertCalled(t, []int{1, 2, 3})
+		assertProcessed(t, cp, 0)
+	})
 }
 
 type JobStatus = jobqueue.JobStatus
