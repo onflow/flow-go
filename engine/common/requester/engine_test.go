@@ -367,15 +367,14 @@ func TestOnEntityInvalidChecksum(t *testing.T) {
 	request.requests[req.Nonce] = req
 
 	err := request.onEntityResponse(targetID, res)
-	assert.NoError(t, err)
+	assert.Error(t, err)
+	assert.True(t, engine.IsInvalidInputError(err))
 
 	// check that the request was removed
 	assert.NotContains(t, request.requests, nonce)
 
 	// check that the provided items were removed
 	assert.NotContains(t, request.items, wanted.ID())
-
-	time.Sleep(100 * time.Millisecond)
 
 	// make sure we didn't process items
 	assert.Equal(t, 0, called)
