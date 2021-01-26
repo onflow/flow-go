@@ -22,7 +22,7 @@ type Cache struct {
 	top          network.Topology  // instance of underlying topology.
 	cachedFanout flow.IdentityList // most recently generated fanout list by invoking underlying topology.
 	idsFP        flow.Identifier   // unique fingerprint of input IdentityList for cached fanout.
-	chansFP      flow.Identifier   // unique fingerprint of input channels for cached fanout.
+	chansFP      flow.Identifier   // unique fingerprint of input ChannelsList for cached fanout.
 }
 
 //NewCache creates and returns a topology Cache given an instance of topology implementation.
