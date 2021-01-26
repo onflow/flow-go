@@ -22,8 +22,8 @@ func NewChunkConsumer(db *badger.DB) *ChunkConsumer {
 	}
 }
 
-func (cc *ChunkConsumer) ProcessedIndex() (int, error) {
-	var processed int
+func (cc *ChunkConsumer) ProcessedIndex() (int64, error) {
+	var processed int64
 	err := cc.db.View(operation.RetrieveProcessedIndex(JobConsumerChunk, &processed))
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve processed index: %w", err)
@@ -31,8 +31,8 @@ func (cc *ChunkConsumer) ProcessedIndex() (int, error) {
 	return processed, nil
 }
 
-func (cc *ChunkConsumer) InitProcessedIndex() (int, error) {
-	initprocessed := 0
+func (cc *ChunkConsumer) InitProcessedIndex() (int64, error) {
+	initprocessed := int64(0)
 	err := operation.RetryOnConflict(cc.db.Update, operation.InsertProcessedIndex(JobConsumerChunk, initprocessed))
 	if err != nil {
 		return 0, fmt.Errorf("could not update processed index: %w", err)
@@ -41,7 +41,7 @@ func (cc *ChunkConsumer) InitProcessedIndex() (int, error) {
 	return initprocessed, nil
 }
 
-func (cc *ChunkConsumer) SetProcessedIndex(processed int) error {
+func (cc *ChunkConsumer) SetProcessedIndex(processed int64) error {
 	err := operation.RetryOnConflict(cc.db.Update, operation.SetProcessedIndex(JobConsumerChunk, processed))
 	if err != nil {
 		return fmt.Errorf("could not update processed index: %w", err)

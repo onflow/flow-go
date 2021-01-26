@@ -8,11 +8,11 @@ type Job interface {
 }
 
 type Jobs interface {
-	AtIndex(index int) (Job, error)
+	AtIndex(index int64) (Job, error)
 }
 
 type ConsumerProgress interface {
-	ProcessedIndex() (int, error)
-	InitProcessedIndex() (int, error)
-	SetProcessedIndex(processed int) error
+	ProcessedIndex() (int64, error)
+	InitProcessedIndex() (int64, error)
+	SetProcessedIndex(processed int64) error
 }

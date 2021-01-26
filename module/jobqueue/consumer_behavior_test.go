@@ -94,7 +94,7 @@ func testOnReceiveOneJob(t *testing.T) {
 
 		c.Check()
 
-		w.AssertCalled(t, []int{1})
+		w.AssertCalled(t, []int64{1})
 		assertProcessed(t, cp, 0)
 	})
 }
@@ -111,7 +111,7 @@ func testOnJobFinished(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1})
+		w.AssertCalled(t, []int64{1})
 		assertProcessed(t, cp, 1)
 	})
 }
@@ -132,7 +132,7 @@ func testOnJobsFinished(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1, 2})
+		w.AssertCalled(t, []int64{1, 2})
 		assertProcessed(t, cp, 2)
 	})
 }
@@ -156,7 +156,7 @@ func testMaxWorker(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1, 2, 3})
+		w.AssertCalled(t, []int64{1, 2, 3})
 		assertProcessed(t, cp, 0)
 	})
 }
@@ -182,7 +182,7 @@ func testNonNextFinished(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1, 2, 3, 4})
+		w.AssertCalled(t, []int64{1, 2, 3, 4})
 	})
 }
 
@@ -208,7 +208,7 @@ func testTwoNonNextFinished(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1, 2, 3, 4})
+		w.AssertCalled(t, []int64{1, 2, 3, 4})
 		assertProcessed(t, cp, 0)
 	})
 }
@@ -238,7 +238,7 @@ func testProcessingWithNonNextFinished(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1, 2, 3, 4, 5})
+		w.AssertCalled(t, []int64{1, 2, 3, 4, 5})
 		assertProcessed(t, cp, 0)
 	})
 }
@@ -271,7 +271,7 @@ func testMaxWorkerWithFinishedNonNexts(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1, 2, 3, 4, 5})
+		w.AssertCalled(t, []int64{1, 2, 3, 4, 5})
 		assertProcessed(t, cp, 0)
 	})
 }
@@ -303,7 +303,7 @@ func testFastforward(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		w.AssertCalled(t, []int{1, 2, 3, 4, 5})
+		w.AssertCalled(t, []int64{1, 2, 3, 4, 5})
 		assertProcessed(t, cp, 3)
 	})
 }
@@ -354,7 +354,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 
 		time.Sleep(1 * time.Millisecond)
 
-		reWorker.AssertCalled(t, []int{4, 5, 6})
+		reWorker.AssertCalled(t, []int64{4, 5, 6})
 		assertProcessed(t, reProgress, 3)
 	})
 }
@@ -389,7 +389,7 @@ func testTooManyFinished(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 
 		// max finished reached, will not work on job 13
-		w.AssertCalled(t, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
+		w.AssertCalled(t, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
 		assertProcessed(t, cp, 3)
 	})
 }
@@ -411,7 +411,7 @@ func testStopRunning(t *testing.T) {
 		time.Sleep(1 * time.Millisecond)
 
 		// it won't work on 4 because it stopped before 2 is finished
-		w.AssertCalled(t, []int{1, 2, 3})
+		w.AssertCalled(t, []int64{1, 2, 3})
 		assertProcessed(t, cp, 0)
 	})
 }
@@ -438,9 +438,9 @@ func testConcurrency(t *testing.T) {
 		}
 		wg.Wait()
 
-		called := make([]int, 0)
+		called := make([]int64, 0)
 		for i := 1; i <= 100; i++ {
-			called = append(called, i)
+			called = append(called, int64(i))
 		}
 
 		time.Sleep(100 * time.Millisecond)
@@ -464,7 +464,7 @@ func runWith(t *testing.T, runTestWith func(*jobqueue.Consumer, storage.Consumer
 	})
 }
 
-func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed int) {
+func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed int64) {
 	processed, err := cp.ProcessedIndex()
 	require.NoError(t, err)
 	require.Equal(t, expectProcessed, processed)
@@ -472,8 +472,8 @@ func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed 
 
 func newTestConsumer(cp storage.ConsumerProgress, jobs storage.Jobs, worker Worker) *jobqueue.Consumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
-	maxProcessing := 3
-	maxFinished := 8
+	maxProcessing := int64(3)
+	maxFinished := int64(8)
 	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxFinished)
 	return c
 }
@@ -505,7 +505,7 @@ func (w *mockWorker) Run(job Job) {
 }
 
 // return the IDs of the jobs
-func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int) {
+func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int64) {
 	called := make([]int, 0)
 	for _, c := range w.called {
 		jobID, err := strconv.Atoi(string(c.ID()))
@@ -513,5 +513,10 @@ func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int) {
 		called = append(called, jobID)
 	}
 	sort.Ints(called)
-	require.Equal(t, expectCalled, called)
+
+	called64 := make([]int64, 0)
+	for _, c := range called {
+		called64 = append(called64, int64(c))
+	}
+	require.Equal(t, expectCalled, called64)
 }
