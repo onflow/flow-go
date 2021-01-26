@@ -61,7 +61,7 @@ type Engine struct {
 	headersDB                            storage.Headers                 // used to check sealed headers
 	indexDB                              storage.Index                   // used to check payloads for results
 	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results in memory
-	receipts                             mempool.Receipts                // holds execution receipts in memory
+	receipts                             mempool.ResultForest            // holds execution receipts in memory
 	approvals                            mempool.Approvals               // holds result approvals in memory
 	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
@@ -91,7 +91,7 @@ func New(
 	headersDB storage.Headers,
 	indexDB storage.Index,
 	incorporatedResults mempool.IncorporatedResults,
-	receipts mempool.Receipts,
+	receipts mempool.ResultForest,
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
@@ -297,7 +297,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
-	err = e.storeReceipt(receipt, &log)
+	err = e.storeReceipt(receipt, head, &log)
 	if err != nil {
 		// We do _not_ return here if receiptsDB already contained the receipt,
 		// because we still need to create a corresponding IncorporatedResult,
@@ -343,15 +343,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 // 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool and we don't need to process this again
 //	* exception in case something went wrong
 // 	* nil in case of success
-func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
+func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, log *zerolog.Logger) error {
 	// add the receipt to the mempool
-	added := e.receipts.Add(receipt)
-	if !added {
-		log.Debug().Msg("skipping receipt already in mempool")
-		return engine.NewDuplicatedEntryErrorf("")
-	}
-
-	log.Info().Msg("execution receipt added to mempool")
+	e.receipts.Add(receipt, head)
 	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
 
 	// persist receipt in database. Even if the receipt is already in persistent storage,

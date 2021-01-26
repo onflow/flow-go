@@ -51,3 +51,13 @@ func In(ids ...flow.Identifier) flow.IdentifierFilter {
 		return ok
 	}
 }
+
+// InSet constructs a filter that returns true if and only if
+// the Identifier is in the provided map.
+// CAUTION: input map is _not_ copied
+func InSet(ids map[flow.Identifier]struct{}) flow.IdentifierFilter {
+	return func(id flow.Identifier) bool {
+		_, ok := ids[id]
+		return ok
+	}
+}
