@@ -11,6 +11,7 @@ import (
 // this, the mempool utilizes knowledge about the height of the block the result
 // is for. Hence, the Mempool can only store and process Receipts whose block
 // is known.
+// Implementations are concurrency safe.
 type ResultForest interface {
 
 	// Add the given execution receipt to the memory pool. Requires height
@@ -60,6 +61,18 @@ type ResultForest interface {
 	//   Only individual receipts are dropped.
 	ReachableReceipts(resultID flow.Identifier, blockFilter BlockFilter, receiptFilter ReceiptFilter) ([]*flow.ExecutionReceipt, error)
 
+	// Size returns the number of receipts stored in the mempool
+	Size() uint
+
+	// PruneUpToHeight prunes all results for all blocks with height up to but
+	// NOT INCLUDING `newLowestHeight`. Errors if newLowestHeight is lower than
+	// the previous value (as we cannot recover previously pruned results).
+	PruneUpToHeight(newLowestHeight uint64) error
+
+	// LowestHeight returns the lowest height, where results are still
+	// stored in the mempool.
+	LowestHeight() uint64
+
 	//// Has checks if the given receipt is part of the memory pool.
 	//Has(receiptID flow.Identifier) bool
 	//
@@ -70,8 +83,6 @@ type ResultForest interface {
 	//// pool. It will return false if it was not found in the mempool.
 	//ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, bool)
 	//
-	//// Size will return the current size of the memory pool.
-	//Size() uint
 	//
 	//// All will return a list of all receipts in the memory pool.
 	//All() []*flow.ExecutionReceipt

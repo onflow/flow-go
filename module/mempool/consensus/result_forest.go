@@ -10,9 +10,14 @@ import (
 )
 
 // ResultForest is a mempool holding receipts, which is aware of the tree structure
-// formed by the results. Internally it utilizes the LevelledForrest.
-// Safe for concurrent access.
+// formed by the results. The mempool supports pruning by height: only results
+// descending from the latest sealed and finalized result are relevant. Hence, we
+// can prune all results for blocks _below_ the latest block with a finalized seal.
+// Results of sufficient height for forks that conflict with the finalized fork are
+// retained. However, such orphaned forks do not grow anymore and their results
+// will be progressively flushed out with increasing sealed-finalized height.
 //
+// Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 // For an in-depth discussion of the core algorithm, see ./Fork-Aware_Mempools.md
 type ResultForest struct {
 	sync.RWMutex
@@ -26,6 +31,11 @@ type ResultForest struct {
 func (rf *ResultForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
 	rf.Lock()
 	defer rf.Unlock()
+
+	// drop receipts for block heights lower than the lowest height.
+	if block.Height < rf.forest.LowestLevel {
+		return false, nil
+	}
 
 	// sanity check: initial result should be for block
 	if block.ID() != receipt.ExecutionResult.BlockID {
@@ -122,7 +132,9 @@ func (rf *ResultForest) reachableReceipts(vertex forest.Vertex, blockFilter memp
 	}
 }
 
-// PruneUpToLevel prunes all results for all blocks with height UP TO but NOT INCLUDING `limit`
+// PruneUpToHeight prunes all results for all blocks with height up to but
+// NOT INCLUDING `newLowestHeight`. Errors if newLowestHeight is lower than
+// the previous value (as we cannot recover previously pruned results).
 func (rf *ResultForest) PruneUpToHeight(limit uint64) error {
 	rf.Lock()
 	defer rf.Unlock()
@@ -145,4 +157,14 @@ func (rf *ResultForest) PruneUpToHeight(limit uint64) error {
 	rf.size -= numberReceiptsRemoved
 
 	return nil
+}
+
+// Size returns the number of receipts stored in the mempool
+func (rf *ResultForest) Size() uint {
+	return rf.size
+}
+
+// LowestHeight returns the lowest height, where results are still stored in the mempool.
+func (rf *ResultForest) LowestHeight() uint64 {
+	return rf.forest.LowestLevel
 }
