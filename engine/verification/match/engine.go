@@ -175,7 +175,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // once to it.
 func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.ExecutionResult) error {
 	resultID := result.ID()
-	blockID := result.ExecutionResultBody.BlockID
+	blockID := result.BlockID
 
 	// metrics
 	//
@@ -588,7 +588,7 @@ func (e *Engine) matchChunk(
 	chunkDataPack *flow.ChunkDataPack,
 	endState flow.StateCommitment) error {
 
-	blockID := result.ExecutionResultBody.BlockID
+	blockID := result.BlockID
 
 	// header must exist in storage
 	header, err := e.headers.ByBlockID(blockID)

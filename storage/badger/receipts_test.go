@@ -128,7 +128,7 @@ func TestReceiptLookupWithBlockIDAllExecutionID(t *testing.T) {
 
 		receipt2 := unittest.ExecutionReceiptFixture()
 		receipt2.ExecutionResult.BlockID = blockID
-		receipt2.ExecutionResult.ExecutionResultBody = receipt1.ExecutionResult.ExecutionResultBody
+		receipt2.ExecutionResult = receipt1.ExecutionResult
 		err = store.Store(receipt2)
 		require.NoError(t, err)
 
