@@ -74,6 +74,8 @@ func TestConsumer(t *testing.T) {
 	// [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 	// when Stop is called, it won't work on any job any more
 	t.Run("testStopRunning", testStopRunning)
+
+	t.Run("testConcurrency", testConcurrency)
 }
 
 func testOnStartup(t *testing.T) {
@@ -414,6 +416,40 @@ func testStopRunning(t *testing.T) {
 	})
 }
 
+func testConcurrency(t *testing.T) {
+	runWith(t, func(c *jobqueue.Consumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start())
+		// Finish job concurrently
+		w.fn = func(j Job) {
+			go func() {
+				c.FinishJob(j.ID())
+			}()
+		}
+
+		// Pushing job and checking job concurrently
+		var wg sync.WaitGroup
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func() {
+				require.NoError(t, j.PushOne())
+				c.Check()
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
+		called := make([]int, 0, 0)
+		for i := 1; i <= 100; i++ {
+			called = append(called, i)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+
+		w.AssertCalled(t, called)
+		assertProcessed(t, cp, 100)
+	})
+}
+
 type JobStatus = jobqueue.JobStatus
 type Worker = jobqueue.Worker
 type JobID = storage.JobID
@@ -448,12 +484,14 @@ type mockWorker struct {
 	sync.Mutex
 	log    zerolog.Logger
 	called []Job
+	fn     func(job Job)
 }
 
 func newMockWorker() *mockWorker {
 	return &mockWorker{
 		log:    unittest.Logger().With().Str("module", "worker").Logger(),
 		called: make([]Job, 0),
+		fn:     func(Job) {},
 	}
 }
 
@@ -464,6 +502,7 @@ func (w *mockWorker) Run(job Job) {
 	w.log.Debug().Str("job_id", string(job.ID())).Msg("worker called with job")
 
 	w.called = append(w.called, job)
+	w.fn(job)
 }
 
 // return the IDs of the jobs
