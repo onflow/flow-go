@@ -254,8 +254,8 @@ func TestAccountFreezing(t *testing.T) {
 		importedCheckerErrors := checkerErrors[0].(*sema.ImportedProgramError).CheckerError.Errors
 		require.Len(t, importedCheckerErrors, 1)
 
-		require.IsType(t, &fvm.AccountFrozenError{}, importedCheckerErrors[0])
-		require.Equal(t, frozenAddress, importedCheckerErrors[0].(*fvm.AccountFrozenError).Address)
+		require.IsType(t, &state.AccountFrozenError{}, importedCheckerErrors[0])
+		require.Equal(t, frozenAddress, importedCheckerErrors[0].(*state.AccountFrozenError).Address)
 	})
 
 	t.Run("default settings allow only service account to freeze accounts", func(t *testing.T) {

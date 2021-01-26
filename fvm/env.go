@@ -212,7 +212,7 @@ func (e *hostEnv) ResolveLocation(
 	if len(identifiers) == 0 {
 		address := flow.Address(addressLocation.Address)
 
-		err := e.isAccountFrozen(address)
+		err := e.accounts.CheckAccountNotFrozen(address)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +264,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 	address := flow.BytesToAddress(contractLocation.Address.Bytes())
 
-	err := e.isAccountFrozen(address)
+	err := e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
 		return nil, err
 	}
@@ -494,7 +494,7 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 		return errors.New("adding account keys is not supported")
 	}
 
-	err := e.isAccountFrozen(flow.Address(address))
+	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
 		return err
 	}
@@ -508,7 +508,7 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 		return nil, errors.New("removing account keys is not supported")
 	}
 
-	err = e.isAccountFrozen(flow.Address(address))
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
 		return nil, err
 	}
@@ -522,7 +522,7 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 		return errors.New("updating account contract code is not supported")
 	}
 
-	err = e.isAccountFrozen(flow.Address(address))
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
 		return err
 	}
@@ -543,7 +543,7 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 		return errors.New("removing account contracts is not supported")
 	}
 
-	err = e.isAccountFrozen(flow.Address(address))
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
 		return err
 	}
@@ -582,17 +582,6 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
-}
-
-func (e *hostEnv) isAccountFrozen(address flow.Address) error {
-	frozen, err := e.accounts.GetAccountFrozen(address)
-	if err != nil {
-		return err
-	}
-	if frozen {
-		return &AccountFrozenError{Address: address}
-	}
-	return nil
 }
 
 // Transaction Environment

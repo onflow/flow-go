@@ -1,8 +1,6 @@
 package fvm
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -28,30 +26,19 @@ func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 ) error {
 	accounts := state.NewAccounts(st)
 
-	errIfFrozen := func(address flow.Address) error {
-		frozen, err := accounts.GetAccountFrozen(address)
-		if err != nil {
-			return fmt.Errorf("cannot check acount free status: %w", err)
-		}
-		if frozen {
-			return &AccountFrozenError{Address: address}
-		}
-		return nil
-	}
-
 	for _, authorizer := range tx.Authorizers {
-		err := errIfFrozen(authorizer)
+		err := accounts.CheckAccountNotFrozen(authorizer)
 		if err != nil {
 			return err
 		}
 	}
 
-	err := errIfFrozen(tx.ProposalKey.Address)
+	err := accounts.CheckAccountNotFrozen(tx.ProposalKey.Address)
 	if err != nil {
 		return err
 	}
 
-	return errIfFrozen(tx.Payer)
+	return accounts.CheckAccountNotFrozen(tx.Payer)
 }
 
 type TransactionAccountFrozenEnabler struct{}

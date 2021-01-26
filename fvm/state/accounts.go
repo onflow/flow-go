@@ -28,8 +28,19 @@ const (
 var (
 	ErrAccountNotFound          = errors.New("account not found")
 	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
-	ErrAccountFrozen            = errors.New("account is frozen")
 )
+
+type AccountFrozenError struct {
+	Address flow.Address
+}
+
+func (e *AccountFrozenError) Error() string {
+	return fmt.Sprintf("account %s is frozen", e.Address)
+}
+
+func (e *AccountFrozenError) Code() uint32 {
+	return 2
+}
 
 func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
@@ -528,6 +539,18 @@ func (a *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
 	}
 
 	return a.setValue(address, true, KeyAccountFrozen, val)
+}
+
+// handy function to error out if account is frozen
+func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
+	frozen, err := a.GetAccountFrozen(address)
+	if err != nil {
+		return fmt.Errorf("cannot check acount free status: %w", err)
+	}
+	if frozen {
+		return &AccountFrozenError{Address: address}
+	}
+	return nil
 }
 
 // contractNames container for a list of contract names. Should always be sorted.

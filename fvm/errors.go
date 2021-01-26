@@ -27,8 +27,6 @@ const (
 
 	errCodeStorageCapacityExceeded = 11
 
-	errCodeAccountFrozen = 30
-
 	errCodeEventLimitExceededError = 20
 
 	errCodeExecution = 100
@@ -263,18 +261,6 @@ func (e *ExecutionError) Error() string {
 
 func (e *ExecutionError) Code() uint32 {
 	return errCodeExecution
-}
-
-type AccountFrozenError struct {
-	Address flow.Address
-}
-
-func (e *AccountFrozenError) Error() string {
-	return fmt.Sprintf("account %s is frozen", e.Address)
-}
-
-func (e *AccountFrozenError) Code() uint32 {
-	return errCodeAccountFrozen
 }
 
 func handleError(err error) (vmErr Error, fatalErr error) {
