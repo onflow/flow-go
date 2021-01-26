@@ -1,11 +1,12 @@
 package fvm
 
 import (
-	"bytes"
+	"encoding/hex"
 	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -13,44 +14,43 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestAccountFreezing(t *testing.T) {
+func makeTwoAccounts(t *testing.T) (flow.Address, flow.Address, *state.State) {
 
 	ledger := state.NewMapLedger()
 	st := state.NewState(ledger)
 
-	frozenAddress := flow.HexToAddress("1234")
-	notFrozenAddress := flow.HexToAddress("5678")
+	a := flow.HexToAddress("1234")
+	b := flow.HexToAddress("5678")
 
+	//create accounts
 	accounts := state.NewAccounts(st)
-	err := accounts.Create(nil, frozenAddress)
+	err := accounts.Create(nil, a)
 	require.NoError(t, err)
-	err = accounts.Create(nil, notFrozenAddress)
-	require.NoError(t, err)
-
-	err = accounts.SetAccountFrozen(frozenAddress, true)
-	require.NoError(t, err)
-
-	err = accounts.SetContract("Whatever", notFrozenAddress, []byte(`
-		pub contract Whatever {
-			pub fun say() {
-				log("whatever not frozen")
-			}
-		}
-	`))
+	err = accounts.Create(nil, b)
 	require.NoError(t, err)
 
 	err = st.Commit()
 	require.NoError(t, err)
 
+	return a, b, st
+}
+
+func TestAccountFreezing(t *testing.T) {
+
 	t.Run("setFrozenAccount can be enabled", func(t *testing.T) {
 
+		address, _, st := makeTwoAccounts(t)
+		accounts := state.NewAccounts(st)
+
+		// account should no be frozen
+		frozen, err := accounts.GetAccountFrozen(address)
+		require.NoError(t, err)
+		require.False(t, frozen)
+
 		rt := runtime.NewInterpreterRuntime()
-
-		buffer := &bytes.Buffer{}
-		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
-
+		log := zerolog.Nop()
 		vm := New(rt)
+		txInvocator := NewTransactionInvocator(log)
 
 		code := fmt.Sprintf(`
 			transaction {
@@ -58,7 +58,7 @@ func TestAccountFreezing(t *testing.T) {
 					setAccountFrozen(0x%s, true)
 				}
 			}
-		`, frozenAddress.String())
+		`, address.String())
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
@@ -73,11 +73,32 @@ func TestAccountFreezing(t *testing.T) {
 
 		err = txInvocator.Process(vm, context, proc, st)
 		require.NoError(t, err)
+
+		// account should be frozen now
+		frozen, err = accounts.GetAccountFrozen(address)
+		require.NoError(t, err)
+		require.True(t, frozen)
 	})
 
 	t.Run("frozen account is rejected", func(t *testing.T) {
 
 		txChecker := NewTransactionAccountFrozenChecker()
+
+		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t)
+		accounts := state.NewAccounts(st)
+
+		// freeze account
+		err := accounts.SetAccountFrozen(frozenAddress, true)
+		require.NoError(t, err)
+
+		// make sure freeze status is correct
+		frozen, err := accounts.GetAccountFrozen(frozenAddress)
+		require.NoError(t, err)
+		require.True(t, frozen)
+
+		frozen, err = accounts.GetAccountFrozen(notFrozenAddress)
+		require.NoError(t, err)
+		require.False(t, frozen)
 
 		// Authorizers
 
@@ -122,32 +143,115 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("code from frozen account cannot be loaded", func(t *testing.T) {
 
+		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t)
+		accounts := state.NewAccounts(st)
+
 		rt := runtime.NewInterpreterRuntime()
 
-		buffer := &bytes.Buffer{}
-		log := zerolog.New(buffer)
+		log := zerolog.Nop()
 		txInvocator := NewTransactionInvocator(log)
-
 		vm := New(rt)
 
-		code := fmt.Sprintf(`
-			import Whatever from 0x%s
-
-			transaction {
-				execute {
-					Whatever.say()
+		// deploy code to accounts
+		whateverContractCode := `
+			pub contract Whatever {
+				pub fun say() {
+					log("Düsseldorf")
 				}
 			}
-		`, notFrozenAddress.String())
+		`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		deployContract := []byte(fmt.Sprintf(
+			`
+			 transaction {
+			   prepare(signer: AuthAccount) {
+				   signer.contracts.add(name: "Whatever", code: "%s".decodeHex())
+			   }
+			 }
+	   `, hex.EncodeToString([]byte(whateverContractCode)),
+		))
 
-		context := NewContext(log)
+		procFrozen := Transaction(&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{frozenAddress}, Payer: frozenAddress}, 0)
+		procNotFrozen := Transaction(&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{notFrozenAddress}, Payer: notFrozenAddress}, 0)
+		deployContext := NewContext(zerolog.Nop(), WithServiceAccount(false), WithRestrictedDeployment(false), WithCadenceLogging(false))
+		deployTxInvocator := NewTransactionInvocator(zerolog.Nop())
+		deployRt := runtime.NewInterpreterRuntime()
+
+		deployVm := New(deployRt)
+
+		err := deployTxInvocator.Process(deployVm, deployContext, procFrozen, st)
+		require.NoError(t, err)
+		err = deployTxInvocator.Process(deployVm, deployContext, procNotFrozen, st)
+		require.NoError(t, err)
+
+		// both contracts should load now
+		context := NewContext(log, WithCadenceLogging(true))
+
+		code := func(a flow.Address) []byte {
+			return []byte(fmt.Sprintf(`
+				import Whatever from 0x%s
+	
+				transaction {
+					execute {
+						Whatever.say()
+					}
+				}
+			`, a.String()))
+		}
+
+		// code from not frozen loads fine
+		proc := Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
 
 		err = txInvocator.Process(vm, context, proc, st)
 		require.NoError(t, err)
-		require.Contains(t, buffer, "whatever not frozen")
+		require.Len(t, proc.Logs, 1)
+		require.Contains(t, proc.Logs[0], "Düsseldorf")
 
+		proc = Transaction(&flow.TransactionBody{Script: code(notFrozenAddress)}, 0)
+
+		err = txInvocator.Process(vm, context, proc, st)
+		require.NoError(t, err)
+		require.Len(t, proc.Logs, 1)
+		require.Contains(t, proc.Logs[0], "Düsseldorf")
+
+		// freeze account
+		err = accounts.SetAccountFrozen(frozenAddress, true)
+		require.NoError(t, err)
+
+		// make sure freeze status is correct
+		frozen, err := accounts.GetAccountFrozen(frozenAddress)
+		require.NoError(t, err)
+		require.True(t, frozen)
+
+		frozen, err = accounts.GetAccountFrozen(notFrozenAddress)
+		require.NoError(t, err)
+		require.False(t, frozen)
+
+		// loading code from frozen account triggers error
+		proc = Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
+
+		err = txInvocator.Process(vm, context, proc, st)
+		require.Error(t, err)
+
+		// find frozen account specific error
+		require.IsType(t, runtime.Error{}, err)
+		err = err.(runtime.Error).Err
+
+		require.IsType(t, &runtime.ParsingCheckingError{}, err)
+		err = err.(*runtime.ParsingCheckingError).Err
+
+		require.IsType(t, &sema.CheckerError{}, err)
+		checkerErr := err.(*sema.CheckerError)
+
+		checkerErrors := checkerErr.ChildErrors()
+
+		require.Len(t, checkerErrors, 2)
+		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
+
+		importedCheckerErrors := checkerErrors[0].(*sema.ImportedProgramError).CheckerError.Errors
+		require.Len(t, importedCheckerErrors, 1)
+
+		require.IsType(t, &AccountFrozenError{}, importedCheckerErrors[0])
+		require.Equal(t, frozenAddress, importedCheckerErrors[0].(*AccountFrozenError).Address)
 	})
-
 }

@@ -590,7 +590,7 @@ func (e *hostEnv) isAccountFrozen(address flow.Address) error {
 		return err
 	}
 	if frozen {
-		return fmt.Errorf("account %s is frozen", address)
+		return &AccountFrozenError{Address: address}
 	}
 	return nil
 }

@@ -1,7 +1,7 @@
 package fvm
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -14,8 +14,8 @@ func NewTransactionAccountFrozenChecker() *TransactionAccountFrozenChecker {
 }
 
 func (c *TransactionAccountFrozenChecker) Process(
-	vm *VirtualMachine,
-	ctx Context,
+	_ *VirtualMachine,
+	_ Context,
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
@@ -29,46 +29,28 @@ func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 ) error {
 	accounts := state.NewAccounts(st)
 
-	//accounts.GetAccountFrozen(tx.Authorizers)
-
-	proposalKey := tx.ProposalKey
-
-	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
-	if err != nil {
-		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
-			return &InvalidProposalKeyPublicKeyDoesNotExistError{
-				Address:  proposalKey.Address,
-				KeyIndex: proposalKey.KeyIndex,
-			}
+	errIfFrozen := func(address flow.Address) error {
+		frozen, err := accounts.GetAccountFrozen(address)
+		if err != nil {
+			return fmt.Errorf("cannot check acount free status: %w", err)
 		}
-
-		return err
+		if frozen {
+			return &AccountFrozenError{Address: address}
+		}
+		return nil
 	}
 
-	if accountKey.Revoked {
-		return &InvalidProposalKeyPublicKeyRevokedError{
-			Address:  proposalKey.Address,
-			KeyIndex: proposalKey.KeyIndex,
+	for _, authorizer := range tx.Authorizers {
+		err := errIfFrozen(authorizer)
+		if err != nil {
+			return err
 		}
 	}
 
-	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
-
-	if !valid {
-		return &InvalidProposalKeySequenceNumberError{
-			Address:           proposalKey.Address,
-			KeyIndex:          proposalKey.KeyIndex,
-			CurrentSeqNumber:  accountKey.SeqNumber,
-			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}
-	}
-
-	accountKey.SeqNumber++
-
-	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
+	err := errIfFrozen(tx.ProposalKey.Address)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return errIfFrozen(tx.Payer)
 }
