@@ -8,25 +8,26 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/network"
 )
 
 // Engine implements the crypto DKGProcessor interface which provides means for
 // DKG nodes to exchange private and public messages. The same instance can be
 // used across epochs, but transitions should be accompanied by a call to
-// SetEpoch, such that DKGMessages can be prepended with the appropriate epoch
+// SetEpoch, such that messages can be prepended with the appropriate epoch
 // ID.
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	me           module.Local
-	conduit      network.Conduit
-	msgCh        chan dkg.DKGMessage
-	committee    flow.IdentifierList
-	myIndex      int
-	epochCounter uint64
+	unit              *engine.Unit
+	log               zerolog.Logger
+	me                module.Local
+	conduit           network.Conduit
+	dkgContractClient module.DKGContractClient
+	msgCh             chan msg.DKGMessage
+	committee         flow.IdentifierList
+	myIndex           int
+	epochCounter      uint64
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -38,8 +39,9 @@ func New(
 	logger zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	msgCh chan dkg.DKGMessage,
+	msgCh chan msg.DKGMessage,
 	committee flow.IdentifierList,
+	dkgContractClient module.DKGContractClient,
 	epochCounter uint64) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
@@ -56,13 +58,14 @@ func New(
 	}
 
 	eng := Engine{
-		unit:         engine.NewUnit(),
-		log:          log,
-		me:           me,
-		msgCh:        msgCh,
-		committee:    committee,
-		myIndex:      index,
-		epochCounter: epochCounter,
+		unit:              engine.NewUnit(),
+		log:               log,
+		me:                me,
+		msgCh:             msgCh,
+		committee:         committee,
+		myIndex:           index,
+		epochCounter:      epochCounter,
+		dkgContractClient: dkgContractClient,
 	}
 
 	var err error
@@ -123,14 +126,14 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
-	case dkg.DKGMessage:
-		return e.onDKGMessage(originID, v)
+	case msg.DKGMessage:
+		return e.onMessage(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-func (e *Engine) onDKGMessage(originID flow.Identifier, msg dkg.DKGMessage) error {
+func (e *Engine) onMessage(originID flow.Identifier, msg msg.DKGMessage) error {
 
 	// check that the message corresponds to the current epoch
 	e.unit.Lock()
@@ -150,7 +153,7 @@ func (e *Engine) onDKGMessage(originID flow.Identifier, msg dkg.DKGMessage) erro
 		return fmt.Errorf("OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 	}
 
-	e.log.Debug().Msgf("forwarding DKGMessage to controller")
+	e.log.Debug().Msgf("forwarding Message to controller")
 	e.msgCh <- msg
 
 	return nil
@@ -171,7 +174,7 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 
 	destID := e.committee[dest]
 
-	dkgMessage := dkg.NewDKGMessage(
+	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
 		e.epochCounter,
@@ -179,13 +182,25 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 
 	err := e.conduit.Unicast(dkgMessage, destID)
 	if err != nil {
-		e.log.Error().Msgf("Could not send DKGMessage to %v: %v", destID, err)
+		e.log.Error().Msgf("Could not send Message to %v: %v", destID, err)
 		return
 	}
 }
 
 // Broadcast broadcasts a message to all participants.
-func (e *Engine) Broadcast(data []byte) {}
+func (e *Engine) Broadcast(data []byte) {
+
+	dkgMessage := msg.NewDKGMessage(
+		e.myIndex,
+		data,
+		e.epochCounter,
+	)
+
+	err := e.dkgContractClient.Broadcast(dkgMessage)
+	if err != nil {
+		e.log.Error().Msgf("Could not broadcast message: %v", err)
+	}
+}
 
 // Disqualify flags that a node is misbehaving and got disqualified
 func (e *Engine) Disqualify(node int, log string) {}

@@ -155,7 +155,7 @@ func initializeChannelRoleMap() {
 	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for DKG communication
-	channelIdMap[DKGCommittee] = flow.RoleList{flow.RoleConsensus}
+	channelRoleMap[DKGCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for actively pushing entities to subscribers
 	channelRoleMap[PushTransactions] = flow.RoleList{flow.RoleCollection}

@@ -1,4 +1,4 @@
-package dkg
+package messages
 
 type DKGMessage struct {
 	Orig         int

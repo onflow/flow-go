@@ -1,4 +1,4 @@
-package dkg
+package controller
 
 import (
 	"sync"

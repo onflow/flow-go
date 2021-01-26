@@ -1,4 +1,4 @@
-package dkg
+package controller
 
 import (
 	"crypto/rand"
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	msg "github.com/onflow/flow-go/model/messages"
 )
 
 // node is a test object that simulates a running instance of the DKG protocol
@@ -89,13 +90,13 @@ func (n *node) run() error {
 // private and public messages.
 type processor struct {
 	id       int
-	channels []chan DKGMessage
+	channels []chan msg.DKGMessage
 	logger   zerolog.Logger
 	epoch    uint64
 }
 
 func (proc *processor) PrivateSend(dest int, data []byte) {
-	proc.channels[dest] <- NewDKGMessage(proc.id, data, proc.epoch)
+	proc.channels[dest] <- msg.NewDKGMessage(proc.id, data, proc.epoch)
 }
 
 // ATTENTION: Normally the processor requires Broadcast to provide guaranteed
@@ -108,7 +109,7 @@ func (proc *processor) Broadcast(data []byte) {
 		if i == proc.id {
 			continue
 		}
-		proc.channels[i] <- NewDKGMessage(proc.id, data, proc.epoch)
+		proc.channels[i] <- msg.NewDKGMessage(proc.id, data, proc.epoch)
 	}
 }
 
@@ -193,9 +194,9 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phase0Duration, phase1
 // Initialise nodes and communication channels.
 func initNodes(t *testing.T, n int, phase0Duration, phase1Duration, phase2Duration time.Duration) []*node {
 	// Create the channels through which the nodes will communicate
-	channels := make([]chan DKGMessage, 0, n)
+	channels := make([]chan msg.DKGMessage, 0, n)
 	for i := 0; i < n; i++ {
-		channels = append(channels, make(chan DKGMessage, 5*n*n))
+		channels = append(channels, make(chan msg.DKGMessage, 5*n*n))
 	}
 
 	nodes := make([]*node, 0, n)

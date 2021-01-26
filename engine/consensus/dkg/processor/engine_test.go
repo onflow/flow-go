@@ -8,15 +8,55 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/dkg"
+	msg "github.com/onflow/flow-go/model/messages"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+// variables that are used throughout the tests
+var (
+	committee = unittest.IdentifierListFixture(2) // dkg nodes
+	orig      = 0                                 // message sender
+	dest      = 1                                 // message destination
+	msgb      = []byte("hello world")             // message content
+)
+
+// Helper function to initialise an engine with the default committee, a mock
+// conduit for private messages, and a mock dkg contract client for broadcast
+// messages.
+func createTestEngine(t *testing.T, nodeID flow.Identifier) *Engine {
+
+	// define epoch ID
+	epochCounter := rand.Uint64()
+
+	// setup mock conduit
+	conduit := &mocknetwork.Conduit{}
+	network := new(module.Network)
+	network.On("Register", mock.Anything, mock.Anything).
+		Return(conduit, nil).
+		Once()
+
+		// setup local with nodeID
+	me := new(module.Local)
+	me.On("NodeID").Return(nodeID)
+
+	engine, err := New(
+		zerolog.Logger{},
+		network,
+		me,
+		make(chan msg.DKGMessage),
+		committee,
+		&module.DKGContractClient{},
+		epochCounter,
+	)
+	require.NoError(t, err)
+
+	return engine
+}
 
 // TestImplementsDKGProcessor ensures that Engine implements the DKGProcessor
 // interface of the crypto package.
@@ -30,55 +70,25 @@ func TestImplementsDKGProcessor(t *testing.T) {
 // recipient through the network conduit.
 func TestPrivateSend_Valid(t *testing.T) {
 
-	// initialize the list of dkg participants
-	committee := unittest.IdentifierListFixture(2)
+	// sender engine
+	engine := createTestEngine(t, committee[orig])
 
-	// define epoch ID
-	epochCounter := rand.Uint64()
-
-	// send a msg from the first node to the second node
-	orig := 0
-	dest := 1
-	msgb := []byte("hello world")
-
-	msg := dkg.NewDKGMessage(
+	// expected DKGMessage
+	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		epochCounter,
+		engine.epochCounter,
 	)
 
+	// override the conduit to check that the Unicast call matches the expected
+	// message and destination ID
 	conduit := &mocknetwork.Conduit{}
-	conduit.On("Unicast", mock.Anything, mock.Anything).
-		Run(
-			func(args mock.Arguments) {
-				request := args.Get(0).(dkg.DKGMessage)
-				destID := args.Get(1).(flow.Identifier)
-				assert.Equal(t, committee[dest], destID)
-				assert.DeepEqual(t, msg, request)
-			},
-		).
+	conduit.On("Unicast", expectedMsg, committee[dest]).
 		Return(nil).
 		Once()
+	engine.conduit = conduit
 
-	network := new(module.Network)
-	network.On("Register", mock.Anything, mock.Anything).
-		Return(conduit, nil).
-		Once()
-
-	me := new(module.Local)
-	me.On("NodeID").Return(committee[orig])
-
-	origEngine, err := New(
-		zerolog.Logger{},
-		network,
-		me,
-		make(chan dkg.DKGMessage),
-		committee,
-		epochCounter,
-	)
-	require.NoError(t, err)
-
-	origEngine.PrivateSend(dest, msgb)
+	engine.PrivateSend(dest, msgb)
 
 	conduit.AssertExpectations(t)
 }
@@ -88,93 +98,46 @@ func TestPrivateSend_Valid(t *testing.T) {
 // committee list.
 func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 
-	// initialize the list of dkg participants
-	committee := unittest.IdentifierListFixture(2)
+	// sender engine
+	engine := createTestEngine(t, committee[orig])
 
-	// define epoch ID
-	epochCounter := rand.Uint64()
-
-	// send a msg from the first node on the list to second node on the list
-	orig := 0
-	msgb := []byte("hello world")
-
+	// override the conduit to check that Unicast is never called
 	conduit := &mocknetwork.Conduit{}
-	network := new(module.Network)
-	network.On("Register", mock.Anything, mock.Anything).
-		Return(conduit, nil).
-		Once()
+	conduit.On("Unicast", mock.Anything, mock.Anything).
+		Return(nil)
+	engine.conduit = conduit
 
-	me := new(module.Local)
-	me.On("NodeID").Return(committee[orig])
-
-	origEngine, err := New(
-		zerolog.Logger{},
-		network,
-		me,
-		make(chan dkg.DKGMessage),
-		committee,
-		epochCounter,
-	)
-	require.NoError(t, err)
-
-	origEngine.PrivateSend(2, msgb)
-	origEngine.PrivateSend(-1, msgb)
+	// try providing destination indexes that are out of range
+	engine.PrivateSend(2, msgb)
+	engine.PrivateSend(-1, msgb)
 
 	// make sure the unicast method is never called
 	conduit.AssertNotCalled(t, "Unicast", mock.Anything, mock.Anything)
 }
 
-// TestProcessDKGMessage_Valid checks that a valid incoming DKG message is
+// TestProcessMessage_Valid checks that a valid incoming DKG message is
 // correctly matched with origin's Identifier, and that the message is forwarded
 // to the message channel.
-func TestProcessDKGMessage_Valid(t *testing.T) {
+func TestProcessMessage_Valid(t *testing.T) {
 
-	// initialize the list of dkg participants
-	committee := unittest.IdentifierListFixture(2)
+	// destination engine
+	engine := createTestEngine(t, committee[dest])
 
-	// define epoch ID
-	epochCounter := rand.Uint64()
-
-	// send a msg from the first node to the second node
-	orig := 0
-	dest := 1
-	msgb := []byte("hello world")
-
-	msg := dkg.NewDKGMessage(
+	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		epochCounter,
+		engine.epochCounter,
 	)
-
-	network := new(module.Network)
-	network.On("Register", mock.Anything, mock.Anything).
-		Return(nil, nil).
-		Once()
-
-	me := new(module.Local)
-	me.On("NodeID").Return(committee[dest])
-
-	msgCh := make(chan dkg.DKGMessage)
-
-	engine, err := New(
-		zerolog.Logger{},
-		network,
-		me,
-		msgCh,
-		committee,
-		epochCounter,
-	)
-	require.NoError(t, err)
 
 	// launch a background routine to capture messages forwarded to the msgCh
-	var receivedMsg dkg.DKGMessage
+	var receivedMsg msg.DKGMessage
 	doneCh := make(chan struct{})
 	go func() {
-		receivedMsg = <-msgCh
+		receivedMsg = <-engine.msgCh
 		close(doneCh)
 	}()
 
-	err = engine.Process(committee[orig], msg)
+	err := engine.Process(committee[orig], expectedMsg)
 	require.NoError(t, err)
 
 	//check that the message has been received and forwarded to the msgCh
@@ -184,68 +147,64 @@ func TestProcessDKGMessage_Valid(t *testing.T) {
 			<-doneCh
 		},
 		time.Second)
-	require.Equal(t, msg, receivedMsg)
+	require.Equal(t, expectedMsg, receivedMsg)
 }
 
-// TestProcessDKGMessage checks that incoming DKG messages are discarded with an
+// TestProcessMessage checks that incoming DKG messages are discarded with an
 // error if their origin is invalid, or if there is a discrepancy between the
 // origin defined in the message, and the network identifier of the origin (as
 // provided by the network utilities).
-func TestProcessDKGMessage_InvalidOrigin(t *testing.T) {
+func TestProcessMessage_InvalidOrigin(t *testing.T) {
 
-	// initialize the list of dkg participants
-	committee := unittest.IdentifierListFixture(2)
+	// destination engine
+	engine := createTestEngine(t, committee[dest])
 
-	// define epoch ID
-	epochCounter := rand.Uint64()
+	// check that the Message's Orig field is not out of index
+	badIndexes := []int{-1, 2}
+	for _, badIndex := range badIndexes {
+		dkgMsg := msg.NewDKGMessage(
+			badIndex,
+			msgb,
+			engine.epochCounter,
+		)
+		err := engine.Process(unittest.IdentifierFixture(), dkgMsg)
+		require.Error(t, err)
+	}
 
-	network := new(module.Network)
-	network.On("Register", mock.Anything, mock.Anything).
-		Return(nil, nil).
-		Once()
-
-	me := new(module.Local)
-	me.On("NodeID").Return(committee[1])
-
-	msgCh := make(chan dkg.DKGMessage)
-
-	engine, err := New(
-		zerolog.Logger{},
-		network,
-		me,
-		msgCh,
-		committee,
-		epochCounter,
-	)
-	require.NoError(t, err)
-
-	// check that the DKGMessage's Orig field is not out of index
-	msg := dkg.NewDKGMessage(
-		2,
-		[]byte{},
-		epochCounter,
-	)
-
-	err = engine.Process(unittest.IdentifierFixture(), msg)
-	require.Error(t, err)
-
-	msg = dkg.NewDKGMessage(
-		-1,
-		[]byte{},
-		epochCounter,
-	)
-
-	err = engine.Process(unittest.IdentifierFixture(), msg)
-	require.Error(t, err)
-
-	// check that the DKGMessage's Orig field matches the sender's network
+	// check that the Message's Orig field matches the sender's network
 	// identifier
-	msg = dkg.NewDKGMessage(
-		0,
-		[]byte{},
-		epochCounter,
+	dkgMsg := msg.NewDKGMessage(
+		orig,
+		msgb,
+		engine.epochCounter,
 	)
 
-	err = engine.Process(unittest.IdentifierFixture(), msg)
+	err := engine.Process(unittest.IdentifierFixture(), dkgMsg)
 	require.Error(t, err)
+}
+
+// TestBroadcastMessage checks that the processor correctly wraps the message
+// data in a DKGMessage (with origin and epochCounter), and that it calls the
+// dkg contract client.
+func TestBroadcastMessage(t *testing.T) {
+
+	// sender engine
+	engine := createTestEngine(t, committee[orig])
+
+	expectedMsg := msg.NewDKGMessage(
+		orig,
+		msgb,
+		engine.epochCounter,
+	)
+
+	// check that the dkg contract client is called with the expected message
+	contractClient := &module.DKGContractClient{}
+	contractClient.On("Broadcast", expectedMsg).
+		Return(nil).
+		Once()
+	engine.dkgContractClient = contractClient
+
+	engine.Broadcast(msgb)
+
+	contractClient.AssertExpectations(t)
 }
