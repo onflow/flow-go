@@ -102,6 +102,7 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 		return errors.New("dkg is already running")
 	}
 
+	// TODO: update to one loop
 	for i := index(0); int(i) < s.size; i++ {
 		if i != s.currentIndex {
 			s.fvss[i].running = false
@@ -218,7 +219,7 @@ func (s *JointFeldmanState) HandleBroadcastedMsg(orig int, msg []byte) error {
 
 // HandlePrivateMsg processes a new private message received by the current node
 // orig is the message origin index
-func (s *JointFeldmanState) (orig int, msg []byte) error {
+func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
 		return errors.New("dkg protocol is not running")
 	}

@@ -170,7 +170,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		processors = append(processors, testDKGProcessor{
 			current:      current,
 			chans:        chans,
-			msgType:      dkgType,
+			protocol:     dkgType,
 			malicious:    honest,
 			disqualified: list,
 		})
@@ -320,8 +320,13 @@ func dkgRunChan(proc *testDKGProcessor,
 		// if a message received, handle it
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving from %d:", proc.current, newMsg.orig)
-			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
-			require.Nil(t, err)
+			if newMsg.channel == private {
+				err := proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
+				require.Nil(t, err)
+			} else {
+				err := proc.dkg.HandleBroadcastedMsg(newMsg.orig, newMsg.data)
+				require.Nil(t, err)
+			}
 		// if timeout without a message, stop and finalize
 		case <-time.After(200 * time.Millisecond):
 			switch phase {
@@ -360,8 +365,8 @@ type testDKGProcessor struct {
 	// type of malicious behavior
 	malicious behavior
 
-	chans   []chan *message
-	msgType int
+	chans    []chan *message
+	protocol int
 
 	// only used when testing the threshold signature stateful api
 	ts   *thresholdSigner
@@ -373,10 +378,16 @@ const (
 	tsType
 )
 
+const (
+	broadcast int = iota
+	private
+)
+
 type message struct {
-	orig    int
-	msgType int
-	data    []byte
+	orig     int
+	protocol int
+	channel  int
+	data     []byte
 }
 
 func (proc *testDKGProcessor) Disqualify(node int, logInfo string) {
@@ -406,7 +417,7 @@ func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
 func (proc *testDKGProcessor) honestSend(dest int, data []byte) {
 	gt.Logf("honest send\n")
 	gt.Logf("%x\n", data)
-	newMsg := &message{proc.current, proc.msgType, data}
+	newMsg := &message{proc.current, proc.protocol, private, data}
 	proc.chans[dest] <- newMsg
 }
 
@@ -429,7 +440,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		panic("invalid share send not supported")
 	}
 
-	newMsg := &message{proc.current, proc.msgType, data}
+	newMsg := &message{proc.current, proc.protocol, private, data}
 	// check destination
 	if (dest < recipients) || (proc.current < recipients && dest < recipients+1) ||
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
@@ -479,7 +490,7 @@ func (proc *testDKGProcessor) Broadcast(data []byte) {
 func (proc *testDKGProcessor) honestBroadcast(data []byte) {
 	gt.Log("honest broadcast:")
 	gt.Logf("%x\n", data)
-	newMsg := &message{proc.current, proc.msgType, data}
+	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 	for i := 0; i < len(proc.chans); i++ {
 		if i != proc.current {
 			proc.chans[i] <- newMsg
@@ -489,7 +500,7 @@ func (proc *testDKGProcessor) honestBroadcast(data []byte) {
 
 func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 	gt.Log("malicious broadcast:")
-	newMsg := &message{proc.current, proc.msgType, data}
+	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 
 	// choose a random reason of an invalid vector
 	coin := mrand.Intn(100)
@@ -518,7 +529,7 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 
 func (proc *testDKGProcessor) invalidComplaintBroadcast(data []byte) {
 	gt.Log("malicious broadcast:")
-	newMsg := &message{proc.current, proc.msgType, data}
+	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 
 	// choose a random reason for an invalid complaint
 	coin := mrand.Intn(100)
@@ -542,7 +553,7 @@ func (proc *testDKGProcessor) invalidComplaintBroadcast(data []byte) {
 
 func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
 	gt.Log("malicious broadcast:")
-	newMsg := &message{proc.current, proc.msgType, data}
+	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 
 	// choose a random reason for an invalid complaint
 	coin := mrand.Intn(100)

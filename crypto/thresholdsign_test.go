@@ -121,9 +121,9 @@ func testStatefulThresholdSignatureFeldmanVSS(t *testing.T) {
 	// create n processors for all nodes
 	for current := 0; current < n; current++ {
 		processors = append(processors, testDKGProcessor{
-			current: current,
-			chans:   chans,
-			msgType: dkgType,
+			current:  current,
+			chans:    chans,
+			protocol: dkgType,
 		})
 		// create DKG in all nodes
 		var err error
@@ -179,9 +179,9 @@ func testStatefulThresholdSignatureJointFeldman(t *testing.T) {
 		// create n processors for all nodes
 		for current := 0; current < n; current++ {
 			processors = append(processors, testDKGProcessor{
-				current: current,
-				chans:   chans,
-				msgType: dkgType,
+				current:  current,
+				chans:    chans,
+				protocol: dkgType,
 			})
 			// create DKG in all nodes
 			var err error
@@ -248,9 +248,9 @@ func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 	// create n processors for all nodes
 	for current := 0; current < n; current++ {
 		processors = append(processors, testDKGProcessor{
-			current: current,
-			chans:   chans,
-			msgType: dkgType,
+			current:  current,
+			chans:    chans,
+			protocol: dkgType,
 		})
 		// create DKG in all nodes
 		var err error
@@ -302,8 +302,13 @@ func tsDkgRunChan(proc *testDKGProcessor,
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving DKG from %d:", proc.current, newMsg.orig)
-			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
-			require.NoError(t, err)
+			if newMsg.channel == private {
+				err := proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
+				require.Nil(t, err)
+			} else {
+				err := proc.dkg.HandleBroadcastedMsg(newMsg.orig, newMsg.data)
+				require.Nil(t, err)
+			}
 
 		// if timeout, finalize DKG and sign the share
 		case <-time.After(200 * time.Millisecond):
@@ -345,7 +350,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 	// Sign a share and broadcast it
 	sighShare, _ := proc.ts.SignShare()
-	proc.msgType = tsType
+	proc.protocol = tsType
 	proc.Broadcast(sighShare)
 	for {
 		select {
@@ -400,7 +405,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 	// add the node own share
 	signShares = append(signShares, ownSignShare)
 	signers = append(signers, proc.current)
-	proc.msgType = tsType
+	proc.protocol = tsType
 	proc.Broadcast(ownSignShare)
 	for {
 		select {

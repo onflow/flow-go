@@ -117,20 +117,26 @@ type localDKGProcessor struct {
 	pubkeys     []crypto.PublicKey
 }
 
+const (
+	broadcast int = iota
+	private
+)
+
 type message struct {
-	orig int
-	data []byte
+	orig    int
+	channel int
+	data    []byte
 }
 
 // PrivateSend sends a message from one node to another
 func (proc *localDKGProcessor) PrivateSend(dest int, data []byte) {
-	newMsg := &message{proc.current, data}
+	newMsg := &message{proc.current, private, data}
 	proc.chans[dest] <- newMsg
 }
 
 // Broadcast a message from one node to all nodes
 func (proc *localDKGProcessor) Broadcast(data []byte) {
-	newMsg := &message{proc.current, data}
+	newMsg := &message{proc.current, broadcast, data}
 	for i := 0; i < len(proc.chans); i++ {
 		if i != proc.current {
 			proc.chans[i] <- newMsg
@@ -152,7 +158,12 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 	for {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
-			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
+			var err error
+			if newMsg.channel == private {
+				err = proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
+			} else {
+				err = proc.dkg.HandleBroadcastedMsg(newMsg.orig, newMsg.data)
+			}
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to receive DKG mst")
 			}
