@@ -6,13 +6,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ResultForest represents a concurrency-safe memory pool for execution receipts.
-// Its is aware of the tree structure formed by execution results. To enable
-// this, the mempool utilizes knowledge about the height of the block the result
-// is for. Hence, the Mempool can only store and process Receipts whose block
-// is known.
+// ReceiptsForest represents a concurrency-safe memory pool for execution
+// Receipts. Its is aware of the tree structure formed by execution results.
+// All execution receipts for the _same result_ form an equivalence class and
+// are represented by _one_ vertex in the execution tree. The mempool utilizes
+// knowledge about the height of the block the result is for. Hence, the
+// Mempool can only store and process Receipts whose block is known.
+//
 // Implementations are concurrency safe.
-type ResultForest interface {
+type ReceiptsForest interface {
 
 	// Add the given execution receipt to the memory pool. Requires height
 	// of the block the receipt is for. We enforce data consistency on an API
@@ -65,7 +67,7 @@ type ResultForest interface {
 	Size() uint
 
 	// PruneUpToHeight prunes all results for all blocks with height up to but
-	// NOT INCLUDING `newLowestHeight`. Errors if newLowestHeight is lower than
+	// NOT INCLUDING `newLowestHeight`. Errors if newLowestHeight is smaller than
 	// the previous value (as we cannot recover previously pruned results).
 	PruneUpToHeight(newLowestHeight uint64) error
 
@@ -88,12 +90,12 @@ type ResultForest interface {
 	//All() []*flow.ExecutionReceipt
 }
 
-// BlockFilter is used for controlling the ResultForest's Execution Tree search.
+// BlockFilter is used for controlling the ReceiptsForest's Execution Tree search.
 // The search only traverses to results for blocks which pass the filter.
 // If an the block for an execution result does not pass the filter, the entire
 // sub-tree of derived results is not traversed.
 type BlockFilter func(header *flow.Header) bool
 
 // ReceiptFilter is used to drop specific receipts from. It does NOT
-// affect the ResultForest's Execution Tree search.
+// affect the ReceiptsForest's Execution Tree search.
 type ReceiptFilter func(receipt *flow.ExecutionReceipt) bool
