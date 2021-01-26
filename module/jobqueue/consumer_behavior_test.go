@@ -94,6 +94,8 @@ func testOnReceiveOneJob(t *testing.T) {
 
 		c.Check()
 
+		time.Sleep(100 * time.Millisecond)
+
 		w.AssertCalled(t, []int64{1})
 		assertProcessed(t, cp, 0)
 	})

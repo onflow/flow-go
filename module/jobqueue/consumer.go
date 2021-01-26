@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/rs/zerolog"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/storage"
 )
@@ -33,15 +34,23 @@ type Consumer struct {
 	// on any new jobs.
 
 	// State Variables
-	running bool // a signal to control whether to process more jobs. Useful for waiting until the workers
+	running    bool         // a signal to control whether to process more jobs. Useful for waiting until the workers
+	isChecking *atomic.Bool // allow only one process checking job processable
 	// are ready, and stop when shutting down.
+
 	processedIndex   int64
-	processings      map[int64]*JobStatus // keep track of the status of each on going job
+	processings      map[int64]*jobStatus // keep track of the status of each on going job
 	processingsIndex map[JobID]int64      // lookup the index of the job, useful when fast forwarding the
 	// `processed` variable
 }
 
-func NewConsumer(log zerolog.Logger, jobs storage.Jobs, progress storage.ConsumerProgress, worker Worker, maxProcessing int64, maxFinished int64) *Consumer {
+func NewConsumer(
+	log zerolog.Logger,
+	jobs storage.Jobs,
+	progress storage.ConsumerProgress,
+	worker Worker,
+	maxProcessing int64,
+	maxFinished int64) *Consumer {
 	return &Consumer{
 		log: log,
 
@@ -56,17 +65,14 @@ func NewConsumer(log zerolog.Logger, jobs storage.Jobs, progress storage.Consume
 
 		// init state variables
 		running:          false,
+		isChecking:       atomic.NewBool(false),
 		processedIndex:   0,
-		processings:      make(map[int64]*JobStatus),
+		processings:      make(map[int64]*jobStatus),
 		processingsIndex: make(map[JobID]int64),
 	}
 }
 
-type JobStatus struct {
-	jobID JobID
-	done  bool
-}
-
+// Start starts consuming the jobs from the job queue.
 func (c *Consumer) Start() error {
 	c.Lock()
 	defer c.Unlock()
@@ -101,6 +107,8 @@ func (c *Consumer) Start() error {
 	return nil
 }
 
+// Stop stops consuming jobs from the job queue.
+// Note, it won't stop the existing worker from finishing their job
 func (c *Consumer) Stop() {
 	c.Lock()
 	defer c.Unlock()
@@ -109,6 +117,8 @@ func (c *Consumer) Stop() {
 	c.log.Info().Msg("consumer stopped")
 }
 
+// FinishJob let the consumer know a job has been finished, so that consumer will take
+// the next job from the job queue if there are workers available
 func (c *Consumer) FinishJob(jobID JobID) {
 	c.Lock()
 	defer c.Unlock()
@@ -119,11 +129,24 @@ func (c *Consumer) FinishJob(jobID JobID) {
 	}
 }
 
+// Check allows the job publisher to notify the consumer that a new job has been added, so that
+// the consumer can check if the job is processable
+// since multiple checks at the same time are unnecessary, we could only keep one check by checking.
+// an atomic isChecking value.
 func (c *Consumer) Check() {
+	if !c.isChecking.CAS(false, true) {
+		// other process is checking, we could exit and rely on that process to check
+		// processable jobs
+		return
+	}
+
+	// still need to lock here, since checkProcessable might update the state vars.
 	c.Lock()
 	defer c.Unlock()
 
 	c.checkProcessable()
+
+	c.isChecking.Store(false)
 }
 
 // checkProcessable is a wrap of the `run` function with logging
@@ -169,7 +192,7 @@ func (c *Consumer) run() (int64, error) {
 		jobID := jobAtIndex.job.ID()
 
 		c.processingsIndex[jobID] = jobAtIndex.index
-		c.processings[jobAtIndex.index] = &JobStatus{
+		c.processings[jobAtIndex.index] = &jobStatus{
 			jobID: jobID,
 			done:  false,
 		}
@@ -204,7 +227,7 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, int64, error) {
 // processableJobs check the worker's capacity and if sufficient, read
 // jobs from the storage, return the processable jobs, and the processed
 // index
-func processableJobs(jobs storage.Jobs, processings map[int64]*JobStatus, maxProcessing int64, maxFinished int64, processedIndex int64) ([]*jobAtIndex, int64, error) {
+func processableJobs(jobs storage.Jobs, processings map[int64]*jobStatus, maxProcessing int64, maxFinished int64, processedIndex int64) ([]*jobAtIndex, int64, error) {
 	processables := make([]*jobAtIndex, 0)
 
 	// count how many jobs are still processing,
@@ -279,4 +302,9 @@ func (c *Consumer) doneJob(jobID JobID) bool {
 
 	status.done = true
 	return true
+}
+
+type jobStatus struct {
+	jobID JobID
+	done  bool
 }
