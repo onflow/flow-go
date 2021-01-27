@@ -155,11 +155,9 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 		return fmt.Errorf("missing initial state commitment in execution result %v", result.ID())
 	}
 	if !bytes.Equal(initialState, finalState) {
-		return engine.NewInvalidInputError(
-			fmt.Sprintf("execution results do not form chain: expecting init state %x, but got %x",
+		return engine.NewInvalidInputErrorf("execution results do not form chain: expecting init state %x, but got %x",
 				finalState,
 				initialState,
-			),
 		)
 	}
 	return nil
@@ -198,7 +196,7 @@ func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 		if err != nil {
 			// It's very important that we fail the whole validation if one of the receipts is invalid.
 			// It allows us to make assumptions as stated in previous comment.
-			return fmt.Errorf("could not validate receipt %v at index %v: %w", r.ID(), i, err)
+			return fmt.Errorf("could not validate receipt %v at index %d: %w", r.ID(), i, err)
 		}
 	}
 	return nil
@@ -208,7 +206,7 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 	identity, err := identityForNode(v.state, receipt.ExecutionResult.BlockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf(
-			"failed to get executor identity %v at block %v, %w",
+			"failed to get executor identity %v at block %v: %w",
 			receipt.ExecutorID,
 			receipt.ExecutionResult.BlockID,
 			err)
