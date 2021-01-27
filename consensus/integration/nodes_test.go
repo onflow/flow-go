@@ -200,7 +200,7 @@ func createNode(
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB,
+	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB,
 		guarantees, seals, receipts, tracer)
 
 	signer := &Signer{identity.ID()}

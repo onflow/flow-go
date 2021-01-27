@@ -34,10 +34,60 @@ func NewReceiptsForest() *ReceiptsForest {
 	}
 }
 
+// AddResult adds an Execution Result to the Execution Tree (without any receipts), in
+// case the result is not already stored in the tree.
+// This is useful for crash recovery:
+// After recovering from a crash, the mempools are wiped and the sealed results will not
+// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
+// a vertex in the tree without attaching any Execution Receipts to it.
+func (rf *ReceiptsForest) AddResult(result *flow.ExecutionResult, block *flow.Header) error {
+	rf.Lock()
+	defer rf.Unlock()
+
+	// drop receipts for block heights lower than the lowest height.
+	if block.Height < rf.forest.LowestLevel {
+		return nil
+	}
+
+	// sanity check: initial result should be for block
+	if block.ID() != result.BlockID {
+		return fmt.Errorf("receipt is for different block")
+	}
+
+	_, err := rf.getEquivalenceClass(result, block)
+	if err != nil {
+		return fmt.Errorf("failed to get equivalence class for result (%x): %w", result.ID(), err)
+	}
+	return nil
+}
+
+// getEquivalenceClass retrieves the Equivalence class for the given result
+// or creates a new one and stores it into the levelled forest
+func (rf *ReceiptsForest) getEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptEquivalenceClass, error) {
+	vertex, found := rf.forest.GetVertex(result.ID())
+	var receiptsForResult *ReceiptEquivalenceClass
+	if !found {
+		var err error
+		receiptsForResult, err = NewReceiptEquivalenceClass(result, block)
+		if err != nil {
+			return nil, fmt.Errorf("constructing equivalence class for receipt failed: %w", err)
+		}
+		err = rf.forest.VerifyVertex(receiptsForResult)
+		if err != nil {
+			return nil, fmt.Errorf("receipt's equivalence class is not a valid vertex for LevelledForest: %w", err)
+		}
+		rf.forest.AddVertex(receiptsForResult)
+		// this Receipt Equivalence class is empty (no receipts); hence we don't need to adjust the mempool size
+		return receiptsForResult, nil
+	}
+
+	return vertex.(*ReceiptEquivalenceClass), nil
+}
+
 // Add the given execution receipt to the memory pool. Requires height
 // of the block the receipt is for. We enforce data consistency on an API
 // level by using the block header as input.
-func (rf *ReceiptsForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
+func (rf *ReceiptsForest) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
 	rf.Lock()
 	defer rf.Unlock()
 
@@ -51,24 +101,11 @@ func (rf *ReceiptsForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header
 		return false, fmt.Errorf("receipt is for different block")
 	}
 
-	vertex, found := rf.forest.GetVertex(receipt.ExecutionResult.ID())
-	var receiptsForResult *ReceiptEquivalenceClass
-	if !found {
-		var err error
-		receiptsForResult, err = NewReceiptEquivalenceClass(block, receipt)
-		if err != nil {
-			return false, fmt.Errorf("constructing equivalence class for receipt failed: %w", err)
-		}
-		err = rf.forest.VerifyVertex(receiptsForResult)
-		if err != nil {
-			return false, fmt.Errorf("receipt's equivalence class is not a valid vertex for LevelledForest: %w", err)
-		}
-		rf.forest.AddVertex(receiptsForResult)
-		rf.size += 1
-		return true, nil
+	receiptsForResult, err := rf.getEquivalenceClass(&receipt.ExecutionResult, block)
+	if err != nil {
+		return false, fmt.Errorf("failed to get equivalence class for result (%x): %w", receipt.ExecutionResult.ID(), err)
 	}
 
-	receiptsForResult = vertex.(*ReceiptEquivalenceClass)
 	added, err := receiptsForResult.AddReceipt(receipt)
 	if err != nil {
 		return false, fmt.Errorf("failed to add receipt to its equivalence class: %w", err)

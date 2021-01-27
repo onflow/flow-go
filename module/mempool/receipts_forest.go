@@ -74,20 +74,6 @@ type ReceiptsForest interface {
 	// LowestHeight returns the lowest height, where results are still
 	// stored in the mempool.
 	LowestHeight() uint64
-
-	//// Has checks if the given receipt is part of the memory pool.
-	//Has(receiptID flow.Identifier) bool
-	//
-	//// Rem will remove a receipt by ID.
-	//Rem(receiptID flow.Identifier) bool
-	//
-	//// ByID retrieve the execution receipt with the given ID from the memory
-	//// pool. It will return false if it was not found in the mempool.
-	//ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, bool)
-	//
-	//
-	//// All will return a list of all receipts in the memory pool.
-	//All() []*flow.ExecutionReceipt
 }
 
 // BlockFilter is used for controlling the ReceiptsForest's Execution Tree search.

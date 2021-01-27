@@ -18,36 +18,21 @@ type ReceiptEquivalenceClass struct {
 	blockHeader *flow.Header    // header of the block which the result is for
 }
 
-func NewReceiptEquivalenceClass(block *flow.Header, receipts ...*flow.ExecutionReceipt) (*ReceiptEquivalenceClass, error) {
-	if len(receipts) == 0 {
-		return nil, fmt.Errorf("at least one ExecutionReceipt required for creating ReceiptEquivalenceClass")
-	}
-	initialReceipt := receipts[0]
-	initialResult := &initialReceipt.ExecutionResult
-
+// NewReceiptEquivalenceClass instantiates an empty Equivalence Class (without any receipts)
+func NewReceiptEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptEquivalenceClass, error) {
 	//sanity check: initial result should be for block
-	if block.ID() != initialResult.BlockID {
+	if block.ID() != result.BlockID {
 		return nil, fmt.Errorf("initial result is for different block")
 	}
 
 	// construct ReceiptEquivalenceClass only containing initialReceipt
 	rcpts := make(map[flow.Identifier]*flow.ExecutionReceiptMeta)
-	rcpts[initialReceipt.ID()] = initialReceipt.Meta()
 	rs := &ReceiptEquivalenceClass{
 		receipts:    rcpts,
-		result:      initialResult,
-		resultID:    initialResult.ID(),
+		result:      result,
+		resultID:    result.ID(),
 		blockHeader: block,
 	}
-
-	// add remaining receipt
-	for i := 1; i < len(receipts); i++ {
-		_, err := rs.AddReceipt(receipts[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return rs, nil
 }
 

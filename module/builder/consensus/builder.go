@@ -22,18 +22,19 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics  module.MempoolMetrics
-	tracer   module.Tracer
-	db       *badger.DB
-	state    protocol.MutableState
-	seals    storage.Seals
-	headers  storage.Headers
-	index    storage.Index
-	blocks   storage.Blocks
-	guarPool mempool.Guarantees
-	sealPool mempool.IncorporatedResultSeals
-	recPool  mempool.ReceiptsForest
-	cfg      Config
+	metrics   module.MempoolMetrics
+	tracer    module.Tracer
+	db        *badger.DB
+	state     protocol.MutableState
+	seals     storage.Seals
+	headers   storage.Headers
+	index     storage.Index
+	blocks    storage.Blocks
+	resultsDB storage.ExecutionResults
+	guarPool  mempool.Guarantees
+	sealPool  mempool.IncorporatedResultSeals
+	recPool   mempool.ReceiptsForest
+	cfg       Config
 }
 
 // NewBuilder creates a new block builder.
@@ -45,6 +46,7 @@ func NewBuilder(
 	seals storage.Seals,
 	index storage.Index,
 	blocks storage.Blocks,
+	resultsDB storage.ExecutionResults,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
 	recPool mempool.ReceiptsForest,
@@ -68,18 +70,19 @@ func NewBuilder(
 	}
 
 	b := &Builder{
-		metrics:  metrics,
-		db:       db,
-		tracer:   tracer,
-		state:    state,
-		headers:  headers,
-		seals:    seals,
-		index:    index,
-		blocks:   blocks,
-		guarPool: guarPool,
-		sealPool: sealPool,
-		recPool:  recPool,
-		cfg:      cfg,
+		metrics:   metrics,
+		db:        db,
+		tracer:    tracer,
+		state:     state,
+		headers:   headers,
+		seals:     seals,
+		index:     index,
+		blocks:    blocks,
+		resultsDB: resultsDB,
+		guarPool:  guarPool,
+		sealPool:  sealPool,
+		recPool:   recPool,
+		cfg:       cfg,
 	}
 	return b
 }
@@ -378,6 +381,10 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
+	sealedResult, err := b.resultsDB.ByID(latestSeal.ResultID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
+	}
 	sealed, err := b.headers.ByBlockID(latestSeal.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", latestSeal.BlockID, err)
@@ -415,6 +422,15 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		ancestorID = ancestor.ParentID
 	}
 
+	// After recovering from a crash, the mempools are wiped and the sealed results will not
+	// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
+	// a vertex in the tree without attaching any Execution Receipts to it. Thereby, we can
+	// traverse to receipts committing to derived results without having to find the receipts
+	// for the sealed result.
+	err = b.recPool.AddResult(sealedResult, sealed) // no-op, if result is already in Execution Tree
+	if err != nil {
+		return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
+	}
 	receipts, err := b.recPool.ReachableReceipts(latestSeal.ResultID, isResultForBlock(ancestors), isNoDupAndNotSealed(includedReceipts, sealedBlockID))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
