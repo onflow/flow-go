@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ReceiptsForest represents a concurrency-safe memory pool for execution
+// ExecutionTree represents a concurrency-safe memory pool for execution
 // Receipts. Its is aware of the tree structure formed by execution results.
 // All execution receipts for the _same result_ form an equivalence class and
 // are represented by _one_ vertex in the execution tree. The mempool utilizes
@@ -14,7 +14,7 @@ import (
 // Mempool can only store and process Receipts whose block is known.
 //
 // Implementations are concurrency safe.
-type ReceiptsForest interface {
+type ExecutionTree interface {
 
 	// AddResult adds an Execution Result to the Execution Tree (without any receipts), in
 	// case the result is not already stored in the tree.
@@ -84,12 +84,12 @@ type ReceiptsForest interface {
 	LowestHeight() uint64
 }
 
-// BlockFilter is used for controlling the ReceiptsForest's Execution Tree search.
+// BlockFilter is used for controlling the ExecutionTree's Execution Tree search.
 // The search only traverses to results for blocks which pass the filter.
 // If an the block for an execution result does not pass the filter, the entire
 // sub-tree of derived results is not traversed.
 type BlockFilter func(header *flow.Header) bool
 
 // ReceiptFilter is used to drop specific receipts from. It does NOT
-// affect the ReceiptsForest's Execution Tree search.
+// affect the ExecutionTree's Execution Tree search.
 type ReceiptFilter func(receipt *flow.ExecutionReceipt) bool

@@ -576,7 +576,7 @@ func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 }
 
 // TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult tests the receipt selection:
-// Expectation: Builder should trigger ReceiptsForest to search Execution Tree from
+// Expectation: Builder should trigger ExecutionTree to search Execution Tree from
 //              last sealed result on respective fork.
 // We test with the following main chain tree
 //                                                ┌-[X0] <- [X1{seals ..F4}]
@@ -639,7 +639,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 // Expectation: BlockFilter should pass blocks marked with star: B1, ... ,B5
 //              All other blocks should be filtered out.
 // Context:
-// While the receipt selection itself is performed by the ReceiptsForest, the Builder
+// While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
 func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() {
 	b1 := bs.createAndRecordBlock(bs.blocks[bs.finalID])
@@ -687,7 +687,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 // Expectation: we check that the Builder provides a ReceiptFilter which
 //              filters out duplicated receipts.
 // Comment:
-// While the receipt selection itself is performed by the ReceiptsForest, the Builder
+// While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
 func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 	// setup mock to test the ReceiptFilter provided by Builder
@@ -722,7 +722,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 // Expectation: we check that the Builder provides a ReceiptFilter which
 //              filters out _any_ receipt for the sealed block.
 // Comment:
-// While the receipt selection itself is performed by the ReceiptsForest, the Builder
+// While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
 func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 	// setup mock to test the ReceiptFilter provided by Builder
@@ -773,7 +773,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 }
 
 // TestPayloadReceipts_AsProvidedByReceiptForest tests the receipt selection.
-// Expectation: Builder should embed the Receipts as provided by the ReceiptsForest
+// Expectation: Builder should embed the Receipts as provided by the ExecutionTree
 func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 	var expectedReceipts []*flow.ExecutionReceipt
 	for i := 0; i < 10; i++ {
@@ -787,6 +787,6 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
-	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "should include receipts as returned by ReceiptsForest")
+	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "should include receipts as returned by ExecutionTree")
 	bs.recPool.AssertExpectations(bs.T())
 }

@@ -76,7 +76,7 @@ func main() {
 		privateDKGData   *bootstrap.DKGParticipantPriv
 		guarantees       mempool.Guarantees
 		results          mempool.IncorporatedResults
-		receipts         mempool.ReceiptsForest
+		receipts         mempool.ExecutionTree
 		approvals        mempool.Approvals
 		seals            mempool.IncorporatedResultSeals
 		prov             *provider.Engine

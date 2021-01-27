@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
-// ReceiptsForest is a mempool holding receipts, which is aware of the tree structure
+// ExecutionTree is a mempool holding receipts, which is aware of the tree structure
 // formed by the results. The mempool supports pruning by height: only results
 // descending from the latest sealed and finalized result are relevant. Hence, we
 // can prune all results for blocks _below_ the latest block with a finalized seal.
@@ -19,15 +19,15 @@ import (
 //
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 // For an in-depth discussion of the core algorithm, see ./Fork-Aware_Mempools.md
-type ReceiptsForest struct {
+type ExecutionTree struct {
 	sync.RWMutex
 	forest forest.LevelledForest
 	size   uint
 }
 
-// NewReceiptsForest instantiates a ReceiptsForest
-func NewReceiptsForest() *ReceiptsForest {
-	return &ReceiptsForest{
+// NewReceiptsForest instantiates a ExecutionTree
+func NewReceiptsForest() *ExecutionTree {
+	return &ExecutionTree{
 		RWMutex: sync.RWMutex{},
 		forest:  *forest.NewLevelledForest(),
 		size:    0,
@@ -40,12 +40,12 @@ func NewReceiptsForest() *ReceiptsForest {
 // After recovering from a crash, the mempools are wiped and the sealed results will not
 // be stored in the Execution Tree anymore. Adding the result to the tree allows to create
 // a vertex in the tree without attaching any Execution Receipts to it.
-func (rf *ReceiptsForest) AddResult(result *flow.ExecutionResult, block *flow.Header) error {
-	rf.Lock()
-	defer rf.Unlock()
+func (et *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Header) error {
+	et.Lock()
+	defer et.Unlock()
 
 	// drop receipts for block heights lower than the lowest height.
-	if block.Height < rf.forest.LowestLevel {
+	if block.Height < et.forest.LowestLevel {
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (rf *ReceiptsForest) AddResult(result *flow.ExecutionResult, block *flow.He
 		return fmt.Errorf("receipt is for different block")
 	}
 
-	_, err := rf.getEquivalenceClass(result, block)
+	_, err := et.getEquivalenceClass(result, block)
 	if err != nil {
 		return fmt.Errorf("failed to get equivalence class for result (%x): %w", result.ID(), err)
 	}
@@ -63,8 +63,8 @@ func (rf *ReceiptsForest) AddResult(result *flow.ExecutionResult, block *flow.He
 
 // getEquivalenceClass retrieves the Equivalence class for the given result
 // or creates a new one and stores it into the levelled forest
-func (rf *ReceiptsForest) getEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptEquivalenceClass, error) {
-	vertex, found := rf.forest.GetVertex(result.ID())
+func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptEquivalenceClass, error) {
+	vertex, found := et.forest.GetVertex(result.ID())
 	var receiptsForResult *ReceiptEquivalenceClass
 	if !found {
 		var err error
@@ -72,11 +72,11 @@ func (rf *ReceiptsForest) getEquivalenceClass(result *flow.ExecutionResult, bloc
 		if err != nil {
 			return nil, fmt.Errorf("constructing equivalence class for receipt failed: %w", err)
 		}
-		err = rf.forest.VerifyVertex(receiptsForResult)
+		err = et.forest.VerifyVertex(receiptsForResult)
 		if err != nil {
 			return nil, fmt.Errorf("receipt's equivalence class is not a valid vertex for LevelledForest: %w", err)
 		}
-		rf.forest.AddVertex(receiptsForResult)
+		et.forest.AddVertex(receiptsForResult)
 		// this Receipt Equivalence class is empty (no receipts); hence we don't need to adjust the mempool size
 		return receiptsForResult, nil
 	}
@@ -87,12 +87,12 @@ func (rf *ReceiptsForest) getEquivalenceClass(result *flow.ExecutionResult, bloc
 // Add the given execution receipt to the memory pool. Requires height
 // of the block the receipt is for. We enforce data consistency on an API
 // level by using the block header as input.
-func (rf *ReceiptsForest) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
-	rf.Lock()
-	defer rf.Unlock()
+func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
+	et.Lock()
+	defer et.Unlock()
 
 	// drop receipts for block heights lower than the lowest height.
-	if block.Height < rf.forest.LowestLevel {
+	if block.Height < et.forest.LowestLevel {
 		return false, nil
 	}
 
@@ -101,7 +101,7 @@ func (rf *ReceiptsForest) AddReceipt(receipt *flow.ExecutionReceipt, block *flow
 		return false, fmt.Errorf("receipt is for different block")
 	}
 
-	receiptsForResult, err := rf.getEquivalenceClass(&receipt.ExecutionResult, block)
+	receiptsForResult, err := et.getEquivalenceClass(&receipt.ExecutionResult, block)
 	if err != nil {
 		return false, fmt.Errorf("failed to get equivalence class for result (%x): %w", receipt.ExecutionResult.ID(), err)
 	}
@@ -110,7 +110,7 @@ func (rf *ReceiptsForest) AddReceipt(receipt *flow.ExecutionReceipt, block *flow
 	if err != nil {
 		return false, fmt.Errorf("failed to add receipt to its equivalence class: %w", err)
 	}
-	rf.size += added
+	et.size += added
 	return added > 0, nil
 }
 
@@ -136,17 +136,17 @@ func (rf *ReceiptsForest) AddReceipt(receipt *flow.ExecutionReceipt, block *flow
 // the receipt committing to the derived result.
 // The algorithm only traverses to results, for which there exists a
 // sequence of interim result in the mempool without any gaps.
-func (rf *ReceiptsForest) ReachableReceipts(resultID flow.Identifier, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter) ([]*flow.ExecutionReceipt, error) {
-	rf.RLock()
-	defer rf.RUnlock()
+func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter) ([]*flow.ExecutionReceipt, error) {
+	et.RLock()
+	defer et.RUnlock()
 
-	vertex, found := rf.forest.GetVertex(resultID)
+	vertex, found := et.forest.GetVertex(resultID)
 	if !found {
 		return nil, fmt.Errorf("unknown result id %x", resultID)
 	}
 
 	receipts := make([]*flow.ExecutionReceipt, 0, 10) // we expect just below 10 execution Receipts per call
-	rf.reachableReceipts(vertex, blockFilter, receiptFilter, &receipts)
+	et.reachableReceipts(vertex, blockFilter, receiptFilter, &receipts)
 
 	return receipts, nil
 }
@@ -155,7 +155,7 @@ func (rf *ReceiptsForest) ReachableReceipts(resultID flow.Identifier, blockFilte
 // Entire sub-trees are skipped from search, if their root result is for a block which do _not_ pass the blockFilter
 // For each result (vertex in the Execution Tree), which the tree search visits, the known receipts are inspected.
 // Receipts that pass the receiptFilter are appended to `receipts` (passes as slice pointer, to allow appending).
-func (rf *ReceiptsForest) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts *[]*flow.ExecutionReceipt) {
+func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts *[]*flow.ExecutionReceipt) {
 	receiptsForResult := vertex.(*ReceiptEquivalenceClass)
 	if !blockFilter(receiptsForResult.blockHeader) {
 		return
@@ -171,24 +171,24 @@ func (rf *ReceiptsForest) reachableReceipts(vertex forest.Vertex, blockFilter me
 	}
 
 	// travers down the tree in a deep-first-search manner
-	children := rf.forest.GetChildren(vertex.VertexID())
+	children := et.forest.GetChildren(vertex.VertexID())
 	for children.HasNext() {
 		child := children.NextVertex()
-		rf.reachableReceipts(child, blockFilter, receiptFilter, receipts)
+		et.reachableReceipts(child, blockFilter, receiptFilter, receipts)
 	}
 }
 
 // PruneUpToHeight prunes all results for all blocks with height up to but
 // NOT INCLUDING `newLowestHeight`. Errors if newLowestHeight is lower than
 // the previous value (as we cannot recover previously pruned results).
-func (rf *ReceiptsForest) PruneUpToHeight(limit uint64) error {
-	rf.Lock()
-	defer rf.Unlock()
+func (et *ExecutionTree) PruneUpToHeight(limit uint64) error {
+	et.Lock()
+	defer et.Unlock()
 
 	// count how many receipts are stored in the Execution Tree that will be removed
 	numberReceiptsRemoved := uint(0)
-	for l := rf.forest.LowestLevel; l < limit; l++ {
-		iterator := rf.forest.GetVerticesAtLevel(l)
+	for l := et.forest.LowestLevel; l < limit; l++ {
+		iterator := et.forest.GetVerticesAtLevel(l)
 		for iterator.HasNext() {
 			vertex := iterator.NextVertex()
 			numberReceiptsRemoved += vertex.(*ReceiptEquivalenceClass).Size()
@@ -196,21 +196,21 @@ func (rf *ReceiptsForest) PruneUpToHeight(limit uint64) error {
 	}
 
 	// remove vertices and adjust size
-	err := rf.forest.PruneUpToLevel(limit)
+	err := et.forest.PruneUpToLevel(limit)
 	if err != nil {
 		return fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
-	rf.size -= numberReceiptsRemoved
+	et.size -= numberReceiptsRemoved
 
 	return nil
 }
 
 // Size returns the number of receipts stored in the mempool
-func (rf *ReceiptsForest) Size() uint {
-	return rf.size
+func (et *ExecutionTree) Size() uint {
+	return et.size
 }
 
 // LowestHeight returns the lowest height, where results are still stored in the mempool.
-func (rf *ReceiptsForest) LowestHeight() uint64 {
-	return rf.forest.LowestLevel
+func (et *ExecutionTree) LowestHeight() uint64 {
+	return et.forest.LowestLevel
 }

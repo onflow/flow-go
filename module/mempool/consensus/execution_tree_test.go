@@ -20,7 +20,7 @@ func TestReceiptsForest(t *testing.T) {
 
 type ReceiptsForestSuite struct {
 	suite.Suite
-	Forest *ReceiptsForest
+	Forest *ExecutionTree
 }
 
 func (bs *ReceiptsForestSuite) SetupTest() {
@@ -114,9 +114,9 @@ func (bs *ReceiptsForestSuite) createExecutionTree() (map[string]*flow.Block, ma
 	return blocks, executionReceipts
 }
 
-func (bs *ReceiptsForestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, bocks map[string]*flow.Block) {
+func (bs *ReceiptsForestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.Block) {
 	blockById := make(map[flow.Identifier]*flow.Block)
-	for _, block := range bocks {
+	for _, block := range blocks {
 		blockById[block.ID()] = block
 	}
 	for name, rcpt := range receipts {
@@ -199,7 +199,7 @@ func (bs *ReceiptsForestSuite) Test_FullTreeSearch() {
 	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[C13]]"), bs.receiptSet(collectedReceipts, receipts)))
 }
 
-// Test_RootBlockExcluded checks that ReceiptsForest does not traverses results for excluded forks.
+// Test_RootBlockExcluded checks that ExecutionTree does not traverses results for excluded forks.
 // Specifically, if the root block is excluded, no result should be returned
 func (bs *ReceiptsForestSuite) Test_RootBlockExcluded() {
 	blocks, receipts := bs.createExecutionTree()
@@ -215,7 +215,7 @@ func (bs *ReceiptsForestSuite) Test_RootBlockExcluded() {
 	assert.Empty(bs.T(), collectedReceipts)
 }
 
-// Test_FilterChainForks checks that ReceiptsForest does not traverses results for excluded forks
+// Test_FilterChainForks checks that ExecutionTree does not traverses results for excluded forks
 func (bs *ReceiptsForestSuite) Test_FilterChainForks() {
 	blocks, receipts := bs.createExecutionTree()
 	bs.addReceipts2ReceiptsForest(receipts, blocks)
@@ -248,7 +248,7 @@ func (bs *ReceiptsForestSuite) Test_ExcludeReceiptsForSealedBlock() {
 	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[B12]_1]"), bs.receiptSet(collectedReceipts, receipts)))
 }
 
-// Test_UnknownResult checks the behaviour of ReceiptsForest when the search is started on an unknown result
+// Test_UnknownResult checks the behaviour of ExecutionTree when the search is started on an unknown result
 func (bs *ReceiptsForestSuite) Test_UnknownResult() {
 	blocks, receipts := bs.createExecutionTree()
 	bs.addReceipts2ReceiptsForest(receipts, blocks)

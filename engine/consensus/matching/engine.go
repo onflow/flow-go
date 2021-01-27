@@ -61,7 +61,7 @@ type Engine struct {
 	headersDB                            storage.Headers                 // used to check sealed headers
 	indexDB                              storage.Index                   // used to check payloads for results
 	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results in memory
-	receipts                             mempool.ReceiptsForest          // holds execution receipts in memory
+	receipts                             mempool.ExecutionTree           // holds execution receipts in memory
 	approvals                            mempool.Approvals               // holds result approvals in memory
 	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
@@ -91,7 +91,7 @@ func New(
 	headersDB storage.Headers,
 	indexDB storage.Index,
 	incorporatedResults mempool.IncorporatedResults,
-	receipts mempool.ReceiptsForest,
+	receipts mempool.ExecutionTree,
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,

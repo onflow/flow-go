@@ -33,7 +33,7 @@ type Builder struct {
 	resultsDB storage.ExecutionResults
 	guarPool  mempool.Guarantees
 	sealPool  mempool.IncorporatedResultSeals
-	recPool   mempool.ReceiptsForest
+	recPool   mempool.ExecutionTree
 	cfg       Config
 }
 
@@ -49,7 +49,7 @@ func NewBuilder(
 	resultsDB storage.ExecutionResults,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
-	recPool mempool.ReceiptsForest,
+	recPool mempool.ExecutionTree,
 	tracer module.Tracer,
 	options ...func(*Config),
 ) *Builder {
