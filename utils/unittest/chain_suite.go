@@ -543,6 +543,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.PendingApprovals[incorporatedResult.Result.ID()] = approvals
 		bc.PendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 		bc.Assignments[incorporatedResult.Result.ID()] = assignment
+		bc.PersistedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+		// TODO: adding receipt
 	}
 }
 
