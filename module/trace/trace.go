@@ -85,6 +85,7 @@ func (t *OpenTracer) Done() <-chan struct{} {
 
 // StartSpan starts a span using the flow identifier as a key into the span map
 func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts ...opentracing.StartSpanOption) opentracing.Span {
+	fmt.Println("Start of SPAN ...... RAMTIN")
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	key := spanKey(entityID, spanName)
