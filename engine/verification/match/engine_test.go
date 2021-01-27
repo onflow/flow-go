@@ -48,6 +48,7 @@ type MatchEngineTestSuite struct {
 	headerDB         map[flow.Identifier]*flow.Header
 	state            *protocol.State
 	snapshot         *protocol.Snapshot
+	sealed           *protocol.Snapshot
 	results          *stdmap.ResultDataPacks
 	chunkIDsByResult *mempool.IdentifierMap
 	verifier         *mocknetwork.Engine
@@ -59,7 +60,7 @@ func hashResult(res *flow.ExecutionResult) []byte {
 	h := hash.NewSHA3_384()
 
 	// encodes result approval body to byte slice
-	b, _ := encoding.DefaultEncoder.Encode(res.ExecutionResultBody)
+	b, _ := encoding.DefaultEncoder.Encode(res)
 
 	// takes hash of result approval body
 	hash := h.ComputeHash(b)
@@ -98,10 +99,11 @@ func (suite *MatchEngineTestSuite) SetupTest() {
 	suite.headers = unittest.HeadersFromMap(suite.headerDB)
 
 	// setup protocol state
-	block, snapshot, state := unittest.FinalizedProtocolStateWithParticipants(participants)
+	block, snapshot, state, sealed := unittest.FinalizedProtocolStateWithParticipants(participants)
 	suite.head = block.Header
 	suite.snapshot = snapshot
 	suite.state = state
+	suite.sealed = sealed
 
 	// setup other dependencies
 	suite.results = stdmap.NewResultDataPacks(10)
@@ -253,7 +255,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// create chunk data pack
-	myChunk := result.ExecutionResultBody.Chunks[0]
+	myChunk := result.Chunks[0]
 	chunkDataPack := FromChunkID(myChunk.ID())
 
 	// setup conduit to return requested chunk data packs
@@ -634,7 +636,10 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(count)
 
 	for i := 0; i < count; i++ {
-		header := &flow.Header{View: uint64(i)}
+		header := &flow.Header{
+			Height: suite.head.Height + 1, // ensure the height is above the sealed height
+			View:   uint64(i),
+		}
 		// create a execution result that assigns to me
 		result, assignment := createExecutionResult(
 			header.ID(),
@@ -807,10 +812,8 @@ func (suite *MatchEngineTestSuite) NewTestMatchEngine(maxTry int) *match.Engine 
 
 func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: blockID,
-			Chunks:  flow.ChunkList{},
-		},
+		BlockID: blockID,
+		Chunks:  flow.ChunkList{},
 	}
 	assignments := chunks.NewAssignment()
 
@@ -824,7 +827,7 @@ func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment
 	return func(result *flow.ExecutionResult, assignment *chunks.Assignment) {
 		for i, setAssignee := range setAssignees {
 			chunk := setAssignee(result.BlockID, uint64(i), assignment)
-			result.ExecutionResultBody.Chunks.Insert(chunk)
+			result.Chunks.Insert(chunk)
 		}
 	}
 }

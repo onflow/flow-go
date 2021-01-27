@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -231,12 +232,19 @@ func contractKey(contractName string) string {
 }
 
 func (a *Accounts) getContract(contractName string, address flow.Address) ([]byte, error) {
+
 	contract, err := a.getValue(address,
 		true,
 		contractKey(contractName))
 	if err != nil {
 		return nil, newLedgerGetError(contractName, address, err)
 	}
+
+	log.Debug().
+		Str("address", address.String()).
+		Str("contract", contractName).
+		Int("contract_len", len(contract)).
+		Msg(fmt.Sprintf("a contract returned for %s.%s", address.String(), contractName))
 
 	return contract, nil
 }
