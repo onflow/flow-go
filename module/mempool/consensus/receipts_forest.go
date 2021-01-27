@@ -159,7 +159,7 @@ func (rf *ReceiptsForest) PruneUpToHeight(limit uint64) error {
 	}
 
 	// remove vertices and adjust size
-	err := rf.PruneUpToHeight(limit)
+	err := rf.forest.PruneUpToLevel(limit)
 	if err != nil {
 		return fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}

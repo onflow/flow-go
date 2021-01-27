@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/module/mempool"
+
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/utils/unittest"
@@ -160,19 +162,16 @@ func (bs *ReceiptsForestSuite) Test_Add() {
 // Test_FullTreeSearch verifies that Receipt Forest enumerates all receipts that are
 // reachable from the given result
 func (bs *ReceiptsForestSuite) Test_FullTreeSearch() {
-	blockFilter := func(*flow.Header) bool { return true }
-	receiptFilter := func(*flow.ExecutionReceipt) bool { return true }
-
 	blocks, receipts := bs.createExecutionTree()
 	bs.addReceipts2ReceiptsForest(receipts, blocks)
 
 	// search Execution Tree starting from result `r[A10]`
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[A10]]"].ExecutionResult.ID(), blockFilter, receiptFilter)
+	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[A10]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
 	assert.NoError(bs.T(), err)
 	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[A10]]", "ER[r[A11]]"), bs.receiptSet(collectedReceipts, receipts)))
 
 	// search Execution Tree starting from result `r[B10]`
-	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, receiptFilter)
+	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
 	assert.NoError(bs.T(), err)
 	expected := bs.toSet(
 		"ER[r[B10]]", "ER[r[B11]_1]_1", "ER[r[B11]_1]_2", "ER[r[B12]_1]",
@@ -182,12 +181,12 @@ func (bs *ReceiptsForestSuite) Test_FullTreeSearch() {
 	bs.Assert().True(reflect.DeepEqual(expected, bs.receiptSet(collectedReceipts, receipts)))
 
 	// search Execution Tree starting from result `r[B11]_2`
-	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[B11]_2]"].ExecutionResult.ID(), blockFilter, receiptFilter)
+	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[B11]_2]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
 	assert.NoError(bs.T(), err)
 	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[B11]_2]", "ER[r[B12]_2]"), bs.receiptSet(collectedReceipts, receipts)))
 
 	// search Execution Tree starting from result `r[C13]`
-	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[C13]]"].ExecutionResult.ID(), blockFilter, receiptFilter)
+	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[C13]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
 	assert.NoError(bs.T(), err)
 	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[C13]]"), bs.receiptSet(collectedReceipts, receipts)))
 }
@@ -201,10 +200,9 @@ func (bs *ReceiptsForestSuite) Test_RootBlockExcluded() {
 	blockFilter := func(h *flow.Header) bool {
 		return blocks["B10"].ID() != h.ID()
 	}
-	receiptFilter := func(*flow.ExecutionReceipt) bool { return true }
 
 	// search Execution Tree starting from result `r[B10]`
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, receiptFilter)
+	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, anyReceipt())
 	assert.NoError(bs.T(), err)
 	assert.Empty(bs.T(), collectedReceipts)
 }
@@ -217,10 +215,9 @@ func (bs *ReceiptsForestSuite) Test_FilterChainForks() {
 	blockFilter := func(h *flow.Header) bool {
 		return blocks["B11"].ID() != h.ID()
 	}
-	receiptFilter := func(*flow.ExecutionReceipt) bool { return true }
 
 	// search Execution Tree starting from result `r[B10]`: fork starting from B11 should be excluded
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, receiptFilter)
+	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, anyReceipt())
 	assert.NoError(bs.T(), err)
 	expected := bs.toSet("ER[r[B10]]", "ER[r[C11]]_1", "ER[r[C11]]_2")
 	bs.Assert().True(reflect.DeepEqual(expected, bs.receiptSet(collectedReceipts, receipts)))
@@ -232,14 +229,13 @@ func (bs *ReceiptsForestSuite) Test_ExcludeReceiptsForSealedBlock() {
 	blocks, receipts := bs.createExecutionTree()
 	bs.addReceipts2ReceiptsForest(receipts, blocks)
 
-	blockFilter := func(*flow.Header) bool { return true }
 	receiptFilter := func(rcpt *flow.ExecutionReceipt) bool {
 		// exclude all receipts for block B11
 		return rcpt.ExecutionResult.BlockID != blocks["B11"].ID()
 	}
 
 	// search Execution Tree starting from result `r[B11]_1`
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B11]_1]_1"].ExecutionResult.ID(), blockFilter, receiptFilter)
+	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B11]_1]_1"].ExecutionResult.ID(), anyBlock(), receiptFilter)
 	assert.NoError(bs.T(), err)
 	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[B12]_1]"), bs.receiptSet(collectedReceipts, receipts)))
 }
@@ -249,16 +245,13 @@ func (bs *ReceiptsForestSuite) Test_UnknownResult() {
 	blocks, receipts := bs.createExecutionTree()
 	bs.addReceipts2ReceiptsForest(receipts, blocks)
 
-	blockFilter := func(*flow.Header) bool { return true }
-	receiptFilter := func(rcpt *flow.ExecutionReceipt) bool { return true }
-
 	// search Execution Tree starting from result random result
-	_, err := bs.Forest.ReachableReceipts(unittest.IdentifierFixture(), blockFilter, receiptFilter)
+	_, err := bs.Forest.ReachableReceipts(unittest.IdentifierFixture(), anyBlock(), anyReceipt())
 	assert.Error(bs.T(), err)
 
 	// search Execution Tree starting from parent result of "ER[r[D13]]"; While the result is referenced,
 	// a receipt committing to this result was never added. Hence the search should error
-	_, err = bs.Forest.ReachableReceipts(receipts["ER[r[D13]]"].ExecutionResult.PreviousResultID, blockFilter, receiptFilter)
+	_, err = bs.Forest.ReachableReceipts(receipts["ER[r[D13]]"].ExecutionResult.PreviousResultID, anyBlock(), anyReceipt())
 	assert.Error(bs.T(), err)
 }
 
@@ -267,6 +260,38 @@ func (bs *ReceiptsForestSuite) Test_UnknownResult() {
 func (bs *ReceiptsForestSuite) Test_ReceiptOrdered() {
 	// TODO: implement me
 	bs.T().Skip()
+}
+
+// Receipts that are already included in the fork should be skipped.
+func (bs *ReceiptsForestSuite) Test_Prune() {
+	blocks, receipts := bs.createExecutionTree()
+	bs.addReceipts2ReceiptsForest(receipts, blocks)
+
+	assert.Equal(bs.T(), uint(12), bs.Forest.Size())
+	assert.Equal(bs.T(), uint64(0), bs.Forest.LowestHeight())
+
+	// prunes all receipts for blocks with height _smaller_ than 12
+	err := bs.Forest.PruneUpToHeight(12)
+	assert.NoError(bs.T(), err)
+	assert.Equal(bs.T(), uint(4), bs.Forest.Size())
+
+	// now, searching results from r[B11] should fail as the receipts were pruned
+	_, err = bs.Forest.ReachableReceipts(receipts["ER[r[B11]_1]_2"].ExecutionResult.PreviousResultID, anyBlock(), anyReceipt())
+	assert.Error(bs.T(), err)
+
+	// now, searching results from r[B12] should fail as the receipts were pruned
+	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B12]_1]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(bs.T(), err)
+	expected := bs.toSet("ER[r[B12]_1]")
+	bs.Assert().True(reflect.DeepEqual(expected, bs.receiptSet(collectedReceipts, receipts)))
+}
+
+func anyBlock() mempool.BlockFilter {
+	return func(*flow.Header) bool { return true }
+}
+
+func anyReceipt() mempool.ReceiptFilter {
+	return func(*flow.ExecutionReceipt) bool { return true }
 }
 
 func makeBlockWithHeight(height uint64) *flow.Block {
