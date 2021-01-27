@@ -292,7 +292,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
 	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
 	// eventually request the parent receipt with the `requestPending` function
-	err = e.receiptValidator.Validate(receipt)
+	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 	if err != nil {
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
