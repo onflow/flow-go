@@ -1,6 +1,6 @@
 /*
 
-Package dkg implements a controller that manages the lifecycle of a Joint
+Package controller implements a controller that manages the lifecycle of a Joint
 Feldman DKG node.
 
 The state-machine can be represented as follows:
@@ -39,7 +39,7 @@ from Phase 2 and after successfully computing the DKG artifacts. Whereas the
 Shutdown state can be reached from any other state.
 
 */
-package dkg
+package controller
 
 import (
 	"fmt"
@@ -48,6 +48,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
+	msg "github.com/onflow/flow-go/model/messages"
 )
 
 // Controller controls the execution of a Joint Feldman DKG instance.
@@ -68,7 +69,7 @@ type Controller struct {
 	// msgCh is the channel through which the controller receives private and
 	// broadcast messages. It is assumed that the messages are valid. All
 	// validity checks should be performed upstream.
-	msgCh chan DKGMessage
+	msgCh chan msg.DKGMessage
 
 	// Channels used internally to trigger state transitions
 	h0Ch       chan struct{}
@@ -92,7 +93,7 @@ type Controller struct {
 func NewController(
 	dkg crypto.DKGState,
 	seed []byte,
-	msgCh chan DKGMessage,
+	msgCh chan msg.DKGMessage,
 	log zerolog.Logger) *Controller {
 
 	return &Controller{
