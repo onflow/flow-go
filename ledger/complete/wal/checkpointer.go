@@ -54,7 +54,7 @@ func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 
 	files, err := ioutil.ReadDir(c.dir)
 	if err != nil {
-		return nil, -1, fmt.Errorf("could not read directory %s: %w", c.dir, err)
+		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", c.dir, err)
 	}
 	last := -1
 	for _, fn := range files {
