@@ -38,10 +38,6 @@ func (e *AccountFrozenError) Error() string {
 	return fmt.Sprintf("account %s is frozen", e.Address)
 }
 
-func (e *AccountFrozenError) Code() uint32 {
-	return 2
-}
-
 func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
 }
