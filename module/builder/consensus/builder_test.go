@@ -72,7 +72,7 @@ type BuilderSuite struct {
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
-	recPool  *mempool.ReceiptsForest
+	recPool  *mempool.ExecutionTree
 
 	// tracking behaviour
 	assembled *flow.Payload // built payload
@@ -361,7 +361,7 @@ func (bs *BuilderSuite) SetupTest() {
 		},
 	)
 
-	bs.recPool = &mempool.ReceiptsForest{}
+	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe() // used for metrics only
 	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil)
 	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(
@@ -598,7 +598,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 	bs.build.seals = bs.sealDB
 
 	// reset receipts mempool to verify calls made by Builder
-	bs.recPool = &mempool.ReceiptsForest{}
+	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
 	bs.build.recPool = bs.recPool
 
@@ -663,7 +663,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	bs.build.seals = bs.sealDB
 
 	// setup mock to test the BlockFilter provided by Builder
-	bs.recPool = &mempool.ReceiptsForest{}
+	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
 	bs.recPool.On("AddResult", bs.resultByID[b1Seal.ResultID], b1.Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", b1Seal.ResultID, mock.Anything, mock.Anything).Run(
@@ -691,7 +691,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
 func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 	// setup mock to test the ReceiptFilter provided by Builder
-	bs.recPool = &mempool.ReceiptsForest{}
+	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
 	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
@@ -726,7 +726,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
 func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 	// setup mock to test the ReceiptFilter provided by Builder
-	bs.recPool = &mempool.ReceiptsForest{}
+	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
 	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
@@ -779,7 +779,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 	for i := 0; i < 10; i++ {
 		expectedReceipts = append(expectedReceipts, unittest.ExecutionReceiptFixture())
 	}
-	bs.recPool = &mempool.ReceiptsForest{}
+	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
 	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil).Maybe()
 	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(expectedReceipts, nil).Once()

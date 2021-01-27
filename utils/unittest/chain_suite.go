@@ -67,7 +67,7 @@ type BaseChainSuite struct {
 	PendingApprovals map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval
 
 	// mock mempool.ReceiptsForest: used to test whether or not Matching Engine stores receipts
-	ReceiptsPL *mempool.ReceiptsForest
+	ReceiptsPL *mempool.ExecutionTree
 
 	Assigner    *module.ChunkAssigner
 	Assignments map[flow.Identifier]*chunks.Assignment // index for assignments for given execution result
@@ -371,7 +371,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
-	bc.ReceiptsPL = &mempool.ReceiptsForest{}
+	bc.ReceiptsPL = &mempool.ExecutionTree{}
 	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SEALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~~~ //
