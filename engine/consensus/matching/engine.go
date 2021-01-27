@@ -791,7 +791,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) error {
 	missingIDs := make(map[flow.Identifier]bool) // count each missing block only once
 	shouldClear := func(blockID flow.Identifier) (bool, error) {
 		if e.missing[blockID] >= 1000 {
-			return true, nil // clear if block is missing for 100 seals already
+			return true, nil // clear if block is missing for 1000 seals already
 		}
 		header, err := e.headersDB.ByBlockID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
@@ -825,7 +825,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) error {
 		if err != nil {
 			return fmt.Errorf("failed to evaluate cleaning condition for incorporated results mempool: %w", err)
 		}
-		if clear[result.ID()] || remove {
+		if remove || clear[result.ID()] {
 			_ = e.incorporatedResults.Rem(result)
 		}
 	}
@@ -836,7 +836,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) error {
 		if err != nil {
 			return fmt.Errorf("failed to evaluate cleaning condition for approvals mempool: %w", err)
 		}
-		if clear[approval.Body.ExecutionResultID] || remove {
+		if remove || clear[approval.Body.ExecutionResultID] {
 			// delete all the approvals for the corresponding chunk
 			_, err = e.approvals.RemChunk(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 			if err != nil {
