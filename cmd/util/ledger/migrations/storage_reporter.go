@@ -162,7 +162,7 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterID {
 	// Copied logic from interpreter.storageKey(path)
 	key := fmt.Sprintf("%s\x1F%s", path.Domain.Identifier(), path.Identifier)
-	
+
 	return flow.RegisterID{
 		Owner:      string(address.Bytes()),
 		Controller: "",
