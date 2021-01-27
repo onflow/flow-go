@@ -102,20 +102,12 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 		return errors.New("dkg is already running")
 	}
 
-	// TODO: update to one loop
 	for i := index(0); int(i) < s.size; i++ {
-		if i != s.currentIndex {
-			s.fvss[i].running = false
-			err := s.fvss[i].Start(seed)
-			if err != nil {
-				return fmt.Errorf("error when starting dkg: %w", err)
-			}
+		s.fvss[i].running = false
+		err := s.fvss[i].Start(seed)
+		if err != nil {
+			return fmt.Errorf("error when starting dkg: %w", err)
 		}
-	}
-	s.fvss[s.currentIndex].running = false
-	err := s.fvss[s.currentIndex].Start(seed)
-	if err != nil {
-		return fmt.Errorf("error when starting dkg: %w", err)
 	}
 	s.jointRunning = true
 	return nil

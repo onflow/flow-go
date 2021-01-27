@@ -446,8 +446,8 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
 		// choose a random reason for an invalid share
 		coin := mrand.Intn(100)
-		gt.Logf("malicious send, coin is %d\n", coin%4)
-		switch coin % 4 {
+		gt.Logf("malicious send, coin is %d\n", coin%5)
+		switch coin % 5 {
 		case 0:
 			// value doesn't match the verification vector
 			newMsg.data[8]++
@@ -462,6 +462,9 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		case 3:
 			// do not send the share at all
 			return
+		case 4:
+			// wrong header: equivalent to not sending the share at all
+			newMsg.data[0] = byte(feldmanVSSVerifVec)
 		}
 	} else {
 		gt.Logf("turns out to be a honest send\n")
@@ -517,7 +520,7 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 		return
 	case 3:
 		// wrong header, equivalent to not sending at all
-		newMsg.data[0] = 0xFF
+		newMsg.data[0] = byte(feldmanVSSShare)
 	}
 	gt.Logf("%x\n", newMsg.data)
 	for i := 0; i < len(proc.chans); i++ {

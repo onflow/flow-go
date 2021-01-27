@@ -308,15 +308,16 @@ func (s *feldmanVSSQualState) setComplaintsTimeout() {
 }
 
 func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
+
+	// only accept private shares from the leader.
+	if origin != s.leaderIndex {
+		return
+	}
+
 	// check the share timeout
 	if s.sharesTimeout {
 		s.processor.FlagMisbehavior(int(origin),
 			"private share is received after the shares timeout")
-		return
-	}
-
-	// only accept private shares from the leader.
-	if origin != s.leaderIndex {
 		return
 	}
 
@@ -358,15 +359,16 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 }
 
 func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
+
+	// only accept the verification vector from the leader.
+	if origin != s.leaderIndex {
+		return
+	}
+
 	// check the share timeout
 	if s.sharesTimeout {
 		s.processor.FlagMisbehavior(int(origin),
 			"verification vector received after the shares timeout")
-		return
-	}
-
-	// only accept the verification vector from the leader.
-	if origin != s.leaderIndex {
 		return
 	}
 
