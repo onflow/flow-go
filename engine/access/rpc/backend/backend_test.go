@@ -628,7 +628,6 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	}
 
 	// use the static execution node
-	// TODO: test the dynamic execution node selection logic
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
 		Return([]flow.ExecutionReceipt{}, nil)
