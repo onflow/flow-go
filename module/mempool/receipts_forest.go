@@ -16,10 +16,18 @@ import (
 // Implementations are concurrency safe.
 type ReceiptsForest interface {
 
+	// AddResult adds an Execution Result to the Execution Tree (without any receipts), in
+	// case the result is not already stored in the tree.
+	// This is useful for crash recovery:
+	// After recovering from a crash, the mempools are wiped and the sealed results will not
+	// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
+	// a vertex in the tree without attaching any Execution Receipts to it.
+	AddResult(result *flow.ExecutionResult, block *flow.Header) error
+
 	// Add the given execution receipt to the memory pool. Requires height
 	// of the block the receipt is for. We enforce data consistency on an API
 	// level by using the block header as input.
-	Add(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error)
+	AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error)
 
 	// ReachableReceipts returns a slice of ExecutionReceipt, whose result
 	// is computationally reachable from resultID. Context:
