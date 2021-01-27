@@ -347,7 +347,11 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		// ER gets validated by `module.ReceiptValidator` which checks if
 		// results form a valid chain.
 		if nextResultToBeSealed.PreviousResultID != last.ResultID {
-			return nil, fmt.Errorf("execution results do not form chain")
+			return nil, fmt.Errorf(
+				"sealed execution results do not form chain, expect result ID %v, but got %v",
+				last.ResultID,
+				nextResultToBeSealed.PreviousResultID,
+			)
 		}
 
 		last = nextSeal.Seal

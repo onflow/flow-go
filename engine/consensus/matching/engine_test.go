@@ -141,7 +141,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", receipt).Return(nil)
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
 
 	// setup the receipts mempool to check if we attempted to add the receipt to
 	// the mempool, and return false as we are testing the case where it was already in the mempool
@@ -164,7 +164,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", receipt).Return(nil)
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
 
 	// setup the results mempool to check if we attempted to insert the
 	// incorporated result, and return false as if it was already in the mempool
@@ -192,7 +192,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", receipt).Return(nil)
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
 
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
@@ -220,7 +220,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
 
 	// we expect that receipt is added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
@@ -248,7 +248,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputError("")).Once()
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
