@@ -507,7 +507,7 @@ func setupStorageForServiceAccountsTransaction(
 const (
 	fungibleTokenAccountIndex = 2
 	flowTokenAccountIndex     = 3
-	flowFeesAccountIndex     = 4
+	flowFeesAccountIndex      = 4
 )
 
 func FungibleTokenAddress(chain flow.Chain) flow.Address {
@@ -524,4 +524,3 @@ func FlowFeesAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
 	return address
 }
-
