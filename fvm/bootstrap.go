@@ -56,6 +56,8 @@ var DefaultMinimumStorageReservation = func() cadence.UFix64 {
 	return value
 }()
 
+// DefaultTransactionFees are the default transaction fees if transaction fees are on.
+// If they are off (which is the default behaviour) that means the transaction fees are 0.0.
 var DefaultTransactionFees = func() cadence.UFix64 {
 	value, err := cadence.NewUFix64("0.0001")
 	if err != nil {
@@ -93,6 +95,7 @@ func Bootstrap(
 ) *BootstrapProcedure {
 	bootstrapProcedure := &BootstrapProcedure{
 		serviceAccountPublicKey: serviceAccountPublicKey,
+		transactionFee:          0,
 	}
 
 	for _, applyOption := range opts {
