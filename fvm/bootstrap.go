@@ -56,6 +56,14 @@ var DefaultMinimumStorageReservation = func() cadence.UFix64 {
 	return value
 }()
 
+var DefaultTransactionFees = func() cadence.UFix64 {
+	value, err := cadence.NewUFix64("0.0001")
+	if err != nil {
+		panic(fmt.Errorf("invalid default transaction fees: %w", err))
+	}
+	return value
+}()
+
 func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.accountCreationFee = fee
@@ -499,6 +507,7 @@ func setupStorageForServiceAccountsTransaction(
 const (
 	fungibleTokenAccountIndex = 2
 	flowTokenAccountIndex     = 3
+	flowFeesAccountIndex     = 4
 )
 
 func FungibleTokenAddress(chain flow.Chain) flow.Address {
@@ -510,3 +519,9 @@ func FlowTokenAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(flowTokenAccountIndex)
 	return address
 }
+
+func FlowFeesAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
+	return address
+}
+
