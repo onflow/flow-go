@@ -336,7 +336,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 //	* exception in case something went wrong
 // 	* nil in case of success
 func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, log *zerolog.Logger) error {
-	added, err := e.receipts.Add(receipt, head)
+	added, err := e.receipts.AddReceipt(receipt, head)
 	if err != nil {
 		return fmt.Errorf("adding receipt (%x) to mempool failed: %w", receipt.ID(), err)
 	}
@@ -686,7 +686,7 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 			continue
 		}
 
-		// Add signature to incorporated result so that we don't have to check it again.
+		// AddReceipt signature to incorporated result so that we don't have to check it again.
 		incorporatedResult.AddSignature(chunk.Index, approverID, approval.Body.AttestationSignature)
 		validApprovals++
 	}
