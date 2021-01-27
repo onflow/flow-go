@@ -66,7 +66,7 @@ type BaseChainSuite struct {
 	ApprovalsPL      *mempool.Approvals
 	PendingApprovals map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval
 
-	// mock mempool.Receipts: used to test whether or not Matching Engine stores receipts
+	// mock mempool.ReceiptsForest: used to test whether or not Matching Engine stores receipts
 	ReceiptsPL *mempool.ReceiptsForest
 
 	Assigner    *module.ChunkAssigner

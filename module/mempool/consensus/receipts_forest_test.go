@@ -121,7 +121,7 @@ func (bs *ReceiptsForestSuite) addReceipts2ReceiptsForest(receipts map[string]*f
 	}
 	for name, rcpt := range receipts {
 		block := blockById[rcpt.ExecutionResult.BlockID]
-		_, err := bs.Forest.Add(rcpt, block.Header)
+		_, err := bs.Forest.AddReceipt(rcpt, block.Header)
 		if err != nil {
 			bs.FailNow("failed to add receipt '%s'", name)
 		}
@@ -134,29 +134,37 @@ func (bs *ReceiptsForestSuite) Test_Initialization() {
 	assert.Equal(bs.T(), uint64(0), bs.Forest.LowestHeight())
 }
 
+// Test_AddReceipt checks the Forest's AddReceipt method.
 // Receipts that are already included in the fork should be skipped.
-func (bs *ReceiptsForestSuite) Test_Add() {
+func (bs *ReceiptsForestSuite) Test_AddReceipt() {
 	block := unittest.BlockFixture()
 	receipt := unittest.ReceiptForBlockFixture(&block)
 
 	// add should succeed and increase size
-	added, err := bs.Forest.Add(receipt, block.Header)
+	added, err := bs.Forest.AddReceipt(receipt, block.Header)
 	assert.NoError(bs.T(), err)
 	assert.True(bs.T(), added)
 	assert.Equal(bs.T(), uint(1), bs.Forest.Size())
 
 	// adding different receipt for same result
 	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&receipt.ExecutionResult))
-	added, err = bs.Forest.Add(receipt2, block.Header)
+	added, err = bs.Forest.AddReceipt(receipt2, block.Header)
 	assert.NoError(bs.T(), err)
 	assert.True(bs.T(), added)
 	assert.Equal(bs.T(), uint(2), bs.Forest.Size())
 
 	// repeated addition should be idempotent
-	added, err = bs.Forest.Add(receipt, block.Header)
+	added, err = bs.Forest.AddReceipt(receipt, block.Header)
 	assert.NoError(bs.T(), err)
 	assert.False(bs.T(), added)
 	assert.Equal(bs.T(), uint(2), bs.Forest.Size())
+}
+
+// Test_AddResult verifies that vertices can be added to the Execution Tree
+// without requiring an Execution Rereipt
+func (bs *ReceiptsForestSuite) Test_AddResult() {
+	// TODO: implement me
+	bs.T().Skip()
 }
 
 // Test_FullTreeSearch verifies that Receipt Forest enumerates all receipts that are

@@ -14,8 +14,8 @@ type ReceiptsForest struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: receipt, block
-func (_m *ReceiptsForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
+// AddReceipt provides a mock function with given fields: receipt, block
+func (_m *ReceiptsForest) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
 	ret := _m.Called(receipt, block)
 
 	var r0 bool
@@ -33,6 +33,20 @@ func (_m *ReceiptsForest) Add(receipt *flow.ExecutionReceipt, block *flow.Header
 	}
 
 	return r0, r1
+}
+
+// AddResult provides a mock function with given fields: result, block
+func (_m *ReceiptsForest) AddResult(result *flow.ExecutionResult, block *flow.Header) error {
+	ret := _m.Called(result, block)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionResult, *flow.Header) error); ok {
+		r0 = rf(result, block)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // LowestHeight provides a mock function with given fields:

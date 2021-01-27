@@ -36,6 +36,7 @@ type BuilderSuite struct {
 	finalizedBlockIDs []flow.Identifier                         // blocks between first and final
 	pendingBlockIDs   []flow.Identifier                         // blocks between final and parent
 	resultForBlock    map[flow.Identifier]*flow.ExecutionResult // map: BlockID -> Execution Result
+	resultByID        map[flow.Identifier]*flow.ExecutionResult // map: result ID -> Execution Result
 
 	// used to populate and test the seal mempool
 	chain   []*flow.Seal                                     // chain of seals starting first
@@ -67,6 +68,7 @@ type BuilderSuite struct {
 	sealDB   *storage.Seals
 	indexDB  *storage.Index
 	blockDB  *storage.Blocks
+	resultDB *storage.ExecutionResults
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
@@ -122,6 +124,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 		)
 
 		bs.resultForBlock[result.BlockID] = result
+		bs.resultByID[result.ID()] = result
 	}
 
 	// record block in dbs
@@ -166,6 +169,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.pendingBlockIDs = nil
 	bs.finalizedBlockIDs = nil
 	bs.resultForBlock = make(map[flow.Identifier]*flow.ExecutionResult)
+	bs.resultByID = make(map[flow.Identifier]*flow.ExecutionResult)
 
 	bs.chain = nil
 	bs.irsMap = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
@@ -194,6 +198,7 @@ func (bs *BuilderSuite) SetupTest() {
 		unittest.Seal.WithResult(firstResult),
 	)
 	bs.resultForBlock[firstResult.BlockID] = firstResult
+	bs.resultByID[firstResult.ID()] = firstResult
 
 	// insert the finalized blocks between first and final
 	previous := first
@@ -312,6 +317,20 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.assembled = block.Payload
 	}).Return(nil)
 
+	bs.resultDB = &storage.ExecutionResults{}
+	bs.resultDB.On("ByID", mock.Anything).Return(
+		func(resultID flow.Identifier) *flow.ExecutionResult {
+			return bs.resultByID[resultID]
+		},
+		func(resultID flow.Identifier) error {
+			_, exists := bs.resultByID[resultID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
 	// set up memory pool mocks for tests
 	bs.guarPool = &mempool.Guarantees{}
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
@@ -343,7 +362,8 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	bs.recPool = &mempool.ReceiptsForest{}
-	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("Size").Return(uint(0)).Maybe() // used for metrics only
+	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil)
 	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(
 		func(resultID flow.Identifier, blockFilter mempoolAPIs.BlockFilter, receiptFilter mempoolAPIs.ReceiptFilter) []*flow.ExecutionReceipt {
 			return bs.pendingReceipts
@@ -360,6 +380,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.sealDB,
 		bs.indexDB,
 		bs.blockDB,
+		bs.resultDB,
 		bs.guarPool,
 		bs.sealPool,
 		bs.recPool,
@@ -583,6 +604,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 
 	// building on top of X0: latest finalized block in fork is [lastSeal]; expect search to start with sealed result
 	bs.sealDB.On("ByBlockID", x0.ID()).Return(bs.lastSeal, nil)
+	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err := bs.build.BuildOn(x0.ID(), bs.setter)
 	bs.Require().NoError(err)
@@ -590,6 +612,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 
 	// building on top of X1: latest finalized block in fork is [F4]; expect search to start with sealed result
 	bs.sealDB.On("ByBlockID", x1.ID()).Return(f4Seal, nil)
+	bs.recPool.On("AddResult", bs.resultByID[f4Seal.ResultID], bs.blocks[bs.finalID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", f4Seal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(x1.ID(), bs.setter)
 	bs.Require().NoError(err)
@@ -597,6 +620,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 
 	// building on top of A3 (with ID bs.parentID): latest finalized block in fork is [F4]; expect search to start with sealed result
 	bs.sealDB.On("ByBlockID", bs.parentID).Return(f2eal, nil)
+	bs.recPool.On("AddResult", bs.resultByID[f2eal.ResultID], f2.Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", f2eal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
@@ -641,6 +665,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	// setup mock to test the BlockFilter provided by Builder
 	bs.recPool = &mempool.ReceiptsForest{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", bs.resultByID[b1Seal.ResultID], b1.Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", b1Seal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			blockFilter := args[1].(mempoolAPIs.BlockFilter)
@@ -668,6 +693,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 	// setup mock to test the ReceiptFilter provided by Builder
 	bs.recPool = &mempool.ReceiptsForest{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
@@ -702,6 +728,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 	// setup mock to test the ReceiptFilter provided by Builder
 	bs.recPool = &mempool.ReceiptsForest{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
@@ -754,6 +781,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 	}
 	bs.recPool = &mempool.ReceiptsForest{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil).Maybe()
 	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(expectedReceipts, nil).Once()
 	bs.build.recPool = bs.recPool
 

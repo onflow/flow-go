@@ -145,7 +145,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 
 	// setup the receipts mempool to check if we attempted to add the receipt to
 	// the mempool, and return false as we are testing the case where it was already in the mempool
-	ms.ReceiptsPL.On("Add", receipt, ms.UnfinalizedBlock.Header).Return(false, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(false, nil).Once()
 
 	// onReceipt should return immediately after realizing the receipt is already in the mempool
 	// but without throwing any errors
@@ -174,7 +174,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 		Return(false, nil).Once()
 
 	// Expect the receipt to be added to mempool
-	ms.ReceiptsPL.On("Add", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should not error for different receipt for already pending result")
@@ -198,7 +198,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
 
 	// The receipt should be added to the receipts mempool
-	ms.ReceiptsPL.On("Add", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 	// The result should be added to the IncorporatedReceipts mempool (shortcut sealing Phase 2b):
 	// TODO: remove for later sealing phases
 	ms.ResultsPL.
@@ -223,7 +223,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 
 	// we expect that receipt is added to mempool
-	ms.ReceiptsPL.On("Add", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	// setup the results mempool to check if we attempted to add the incorporated result
 	ms.ResultsPL.
