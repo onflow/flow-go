@@ -541,10 +541,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
-			&flow.ExecutionResult{
-				ExecutionResultBody: flow.ExecutionResultBody{},
-				Signatures:          nil,
-			},
+			&flow.ExecutionResult{},
 			snapshots,
 		)
 		require.NoError(t, err)
