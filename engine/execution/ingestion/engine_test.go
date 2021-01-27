@@ -238,8 +238,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 		).
 		Return(nil)
 
-	ctx.executionState.On("PersistStateInteractions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
 	ctx.providerEngine.
 		On(
 			"BroadcastExecutionReceipt",
@@ -543,10 +541,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
-			&flow.ExecutionResult{
-				ExecutionResultBody: flow.ExecutionResultBody{},
-				Signatures:          nil,
-			},
+			&flow.ExecutionResult{},
 			snapshots,
 		)
 		require.NoError(t, err)
