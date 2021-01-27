@@ -156,9 +156,7 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 	}
 	if !bytes.Equal(initialState, finalState) {
 		return engine.NewInvalidInputErrorf("execution results do not form chain: expecting init state %x, but got %x",
-				finalState,
-				initialState,
-		)
+			finalState, initialState)
 	}
 	return nil
 }
