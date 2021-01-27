@@ -52,6 +52,14 @@ func In(ids ...flow.Identifier) flow.IdentifierFilter {
 	}
 }
 
+// Is constructs a filter that returns true if and only if
+// the Identifier is identical to the expectedID.
+func Is(expectedID flow.Identifier) flow.IdentifierFilter {
+	return func(id flow.Identifier) bool {
+		return id == expectedID
+	}
+}
+
 // InSet constructs a filter that returns true if and only if
 // the Identifier is in the provided map.
 // CAUTION: input map is _not_ copied

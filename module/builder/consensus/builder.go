@@ -8,6 +8,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/model/flow/filter/id"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
@@ -496,9 +498,9 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 
 // isResultForBlock constructs a mempool.BlockFilter that accepts only blocks whose ID is part of the given set.
 func isResultForBlock(blockIDs map[flow.Identifier]struct{}) mempool.BlockFilter {
+	blockIdFilter := id.InSet(blockIDs)
 	return func(h *flow.Header) bool {
-		_, ok := blockIDs[h.ID()]
-		return ok
+		return blockIdFilter(h.ID())
 	}
 }
 
