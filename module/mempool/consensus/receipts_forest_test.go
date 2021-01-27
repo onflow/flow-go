@@ -280,21 +280,6 @@ func makeChildBlock(parent *flow.Block) *flow.Block {
 	return &block
 }
 
-func makeResult(block *flow.Block, parent *flow.ExecutionResult) *flow.ExecutionResult {
-	return unittest.ExecutionResultFixture(
-		unittest.WithBlock(block),
-		unittest.WithPreviousResult(*parent),
-	)
-}
-
-func makeReceipt(block *flow.Block, parent *flow.ExecutionReceipt) *flow.ExecutionReceipt {
-	result := unittest.ExecutionResultFixture(
-		unittest.WithBlock(block),
-		unittest.WithPreviousResult(parent.ExecutionResult),
-	)
-	return unittest.ExecutionReceiptFixture(unittest.WithResult(result))
-}
-
 func (bs *ReceiptsForestSuite) receiptSet(selected []*flow.ExecutionReceipt, receipts map[string]*flow.ExecutionReceipt) map[string]struct{} {
 	id2Name := make(map[flow.Identifier]string)
 	for name, rcpt := range receipts {
@@ -311,18 +296,6 @@ func (bs *ReceiptsForestSuite) receiptSet(selected []*flow.ExecutionReceipt, rec
 	}
 	return names
 }
-
-//func (bs *ReceiptsForestSuite) expectedReceipts2(receipts map[string]*flow.ExecutionReceipt, receiptNames ...string) []*flow.ExecutionReceipt {
-//	var selected []*flow.ExecutionReceipt
-//	for _, name := range receiptNames {
-//		rcpt, found := receipts[name]
-//		if !found {
-//			bs.FailNow("missing execution receipt '%s'", name)
-//		}
-//		selected = append(selected, rcpt)
-//	}
-//	return selected
-//}
 
 func (bs *ReceiptsForestSuite) toSet(receiptNames ...string) map[string]struct{} {
 	set := make(map[string]struct{})
