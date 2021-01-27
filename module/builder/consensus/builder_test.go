@@ -542,7 +542,6 @@ func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 }
 
 func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
-
 	// remove a seal in the middle
 	seal := bs.irsList[3]
 	delete(bs.irsMap, seal.ID())
@@ -744,4 +743,22 @@ func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Equal(bs.pendingReceipts[:limit], bs.assembled.Receipts, "should have excluded receipts above maxReceiptCount")
+}
+
+// TestPayloadReceipts_AsProvidedByReceiptForest tests the receipt selection.
+// Expectation: Builder should embed the Receipts as provided by the ReceiptsForest
+func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
+	var expectedReceipts []*flow.ExecutionReceipt
+	for i := 0; i < 10; i++ {
+		expectedReceipts = append(expectedReceipts, unittest.ExecutionReceiptFixture())
+	}
+	bs.recPool = &mempool.ReceiptsForest{}
+	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(expectedReceipts, nil).Once()
+	bs.build.recPool = bs.recPool
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "should include receipts as returned by ReceiptsForest")
+	bs.recPool.AssertExpectations(bs.T())
 }
