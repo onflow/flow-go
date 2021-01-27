@@ -93,35 +93,35 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 }
 
 func (r StorageReporter) isDapper(address flow.Address, st *state.State) (bool, error) {
-	id := flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        fmt.Sprintf("%s\x1F%s", "public", "dapperUtilityCoinReceiver"),
-	}
+	id := resourceId(address,
+		interpreter.PathValue{
+			Domain:     common.PathDomainPublic,
+			Identifier: "dapperUtilityCoinReceiver",
+		})
 
-	resource, err := st.Get(id.Owner, id.Controller, id.Key)
+	receiver, err := st.Get(id.Owner, id.Controller, id.Key)
 	if err != nil {
-		return false, fmt.Errorf("could not load resource at %s: %w", address, err)
+		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)
 	}
-	return len(resource) != 0, nil
+	return len(receiver) != 0, nil
 }
 
 func (r StorageReporter) balance(address flow.Address, st *state.State) (balance uint64, hasBalance bool, err error) {
-	vaultId := flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        fmt.Sprintf("%s\x1F%s", "storage", "flowTokenVault"),
-	}
+	vaultId := resourceId(address,
+		interpreter.PathValue{
+			Domain:     common.PathDomainStorage,
+			Identifier: "flowTokenVault",
+		})
 
-	balanceId := flow.RegisterID{
-		Owner:      string(address.Bytes()),
-		Controller: "",
-		Key:        fmt.Sprintf("%s\x1F%s", "public", "flowTokenBalance"),
-	}
+	balanceId := resourceId(address,
+		interpreter.PathValue{
+			Domain:     common.PathDomainPublic,
+			Identifier: "flowTokenBalance",
+		})
 
-	balanceResource, err := st.Get(balanceId.Owner, balanceId.Controller, balanceId.Key)
+	balanceCapability, err := st.Get(balanceId.Owner, balanceId.Controller, balanceId.Key)
 	if err != nil {
-		return 0, false, fmt.Errorf("could not load resource at %s: %w", address, err)
+		return 0, false, fmt.Errorf("could not load capability at %s: %w", address, err)
 	}
 
 	vaultResource, err := st.Get(vaultId.Owner, vaultId.Controller, vaultId.Key)
@@ -133,7 +133,7 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 		return 0, false, nil
 	}
 
-	if len(balanceResource) == 0 {
+	if len(balanceCapability) == 0 {
 		r.Log.Warn().Str("Account", address.HexWithPrefix()).Msgf("Address has a vault, but not a balance capability")
 	}
 
@@ -157,4 +157,15 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 	}
 
 	return uint64(balanceValue), true, nil
+}
+
+func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterID {
+	// Copied logic from interpreter.storageKey(path)
+	key := fmt.Sprintf("%s\x1F%s", path.Domain.Identifier(), path.Identifier)
+	
+	return flow.RegisterID{
+		Owner:      string(address.Bytes()),
+		Controller: "",
+		Key:        key,
+	}
 }
