@@ -20,7 +20,7 @@ import (
 )
 
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
-const maxExecutionNodesCnt = 2
+const maxExecutionNodesCnt = 3
 
 // Backends implements the Access API.
 //
