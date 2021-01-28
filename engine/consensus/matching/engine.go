@@ -950,11 +950,13 @@ func (e *Engine) requestPendingReceipts() error {
 	}
 
 	// request missing execution results, if sealed height is low enough
-	log.Info().
-		Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
-		Msg("requesting receipts")
-	for _, blockID := range missingBlocksOrderedByHeight {
-		e.receiptRequester.EntityByID(blockID, filter.Any)
+	if len(missingBlocksOrderedByHeight) > 0 {
+		log.Info().
+			Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
+			Msg("requesting receipts")
+		for _, blockID := range missingBlocksOrderedByHeight {
+			e.receiptRequester.EntityByID(blockID, filter.Any)
+		}
 	}
 
 	return nil
