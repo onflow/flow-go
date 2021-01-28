@@ -414,7 +414,7 @@ func (m *MutableState) receiptExtend(candidate *flow.Block) error {
 			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
 		}
 
-		err = m.receiptValidator.Validate(receipt)
+		err = m.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 		if err != nil {
 			// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
 			if errors.Is(err, storage.ErrNotFound) {
