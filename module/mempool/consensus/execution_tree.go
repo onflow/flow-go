@@ -25,8 +25,8 @@ type ExecutionTree struct {
 	size   uint
 }
 
-// NewReceiptsForest instantiates a ExecutionTree
-func NewReceiptsForest() *ExecutionTree {
+// NewExecutionTree instantiates a ExecutionTree
+func NewExecutionTree() *ExecutionTree {
 	return &ExecutionTree{
 		RWMutex: sync.RWMutex{},
 		forest:  *forest.NewLevelledForest(),

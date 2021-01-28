@@ -195,7 +195,7 @@ func createNode(
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
 
-	receipts := consensusMempools.NewReceiptsForest()
+	receipts := consensusMempools.NewExecutionTree()
 
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 

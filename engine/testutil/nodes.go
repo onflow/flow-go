@@ -228,7 +228,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results, err := stdmap.NewIncorporatedResults(1000)
 	require.NoError(t, err)
 
-	receipts := consensusMempools.NewReceiptsForest()
+	receipts := consensusMempools.NewExecutionTree()
 
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)

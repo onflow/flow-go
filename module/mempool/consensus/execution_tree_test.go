@@ -15,16 +15,16 @@ import (
 )
 
 func TestReceiptsForest(t *testing.T) {
-	suite.Run(t, new(ReceiptsForestSuite))
+	suite.Run(t, new(ExecutionTreeTestSuite))
 }
 
-type ReceiptsForestSuite struct {
+type ExecutionTreeTestSuite struct {
 	suite.Suite
 	Forest *ExecutionTree
 }
 
-func (bs *ReceiptsForestSuite) SetupTest() {
-	bs.Forest = NewReceiptsForest()
+func (et *ExecutionTreeTestSuite) SetupTest() {
+	et.Forest = NewExecutionTree()
 }
 
 // addReceiptForest creates an Execution Tree for testing purposes and stores it in the ResultForest.
@@ -58,7 +58,7 @@ func (bs *ReceiptsForestSuite) SetupTest() {
 //   :
 //   :                                                       ? ? ? ? <- r[C13] {ER}
 //   pruned height
-func (bs *ReceiptsForestSuite) createExecutionTree() (map[string]*flow.Block, map[string]*flow.ExecutionReceipt) {
+func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block, map[string]*flow.ExecutionReceipt) {
 	// Make blocks
 	blocks := make(map[string]*flow.Block)
 
@@ -114,128 +114,128 @@ func (bs *ReceiptsForestSuite) createExecutionTree() (map[string]*flow.Block, ma
 	return blocks, executionReceipts
 }
 
-func (bs *ReceiptsForestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.Block) {
+func (et *ExecutionTreeTestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.Block) {
 	blockById := make(map[flow.Identifier]*flow.Block)
 	for _, block := range blocks {
 		blockById[block.ID()] = block
 	}
 	for name, rcpt := range receipts {
 		block := blockById[rcpt.ExecutionResult.BlockID]
-		_, err := bs.Forest.AddReceipt(rcpt, block.Header)
+		_, err := et.Forest.AddReceipt(rcpt, block.Header)
 		if err != nil {
-			bs.FailNow("failed to add receipt '%s'", name)
+			et.FailNow("failed to add receipt '%s'", name)
 		}
 	}
 }
 
 // Receipts that are already included in the fork should be skipped.
-func (bs *ReceiptsForestSuite) Test_Initialization() {
-	assert.Equal(bs.T(), uint(0), bs.Forest.Size())
-	assert.Equal(bs.T(), uint64(0), bs.Forest.LowestHeight())
+func (et *ExecutionTreeTestSuite) Test_Initialization() {
+	assert.Equal(et.T(), uint(0), et.Forest.Size())
+	assert.Equal(et.T(), uint64(0), et.Forest.LowestHeight())
 }
 
 // Test_AddReceipt checks the Forest's AddReceipt method.
 // Receipts that are already included in the fork should be skipped.
-func (bs *ReceiptsForestSuite) Test_AddReceipt() {
+func (et *ExecutionTreeTestSuite) Test_AddReceipt() {
 	block := unittest.BlockFixture()
 	receipt := unittest.ReceiptForBlockFixture(&block)
 
 	// add should succeed and increase size
-	added, err := bs.Forest.AddReceipt(receipt, block.Header)
-	assert.NoError(bs.T(), err)
-	assert.True(bs.T(), added)
-	assert.Equal(bs.T(), uint(1), bs.Forest.Size())
+	added, err := et.Forest.AddReceipt(receipt, block.Header)
+	assert.NoError(et.T(), err)
+	assert.True(et.T(), added)
+	assert.Equal(et.T(), uint(1), et.Forest.Size())
 
 	// adding different receipt for same result
 	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&receipt.ExecutionResult))
-	added, err = bs.Forest.AddReceipt(receipt2, block.Header)
-	assert.NoError(bs.T(), err)
-	assert.True(bs.T(), added)
-	assert.Equal(bs.T(), uint(2), bs.Forest.Size())
+	added, err = et.Forest.AddReceipt(receipt2, block.Header)
+	assert.NoError(et.T(), err)
+	assert.True(et.T(), added)
+	assert.Equal(et.T(), uint(2), et.Forest.Size())
 
 	// repeated addition should be idempotent
-	added, err = bs.Forest.AddReceipt(receipt, block.Header)
-	assert.NoError(bs.T(), err)
-	assert.False(bs.T(), added)
-	assert.Equal(bs.T(), uint(2), bs.Forest.Size())
+	added, err = et.Forest.AddReceipt(receipt, block.Header)
+	assert.NoError(et.T(), err)
+	assert.False(et.T(), added)
+	assert.Equal(et.T(), uint(2), et.Forest.Size())
 }
 
 // Test_AddResult verifies that vertices can be added to the Execution Tree
 // without requiring an Execution Rereipt
-func (bs *ReceiptsForestSuite) Test_AddResult() {
+func (et *ExecutionTreeTestSuite) Test_AddResult() {
 	// TODO: implement me
-	bs.T().Skip()
+	et.T().Skip()
 }
 
 // Test_FullTreeSearch verifies that Receipt Forest enumerates all receipts that are
 // reachable from the given result
-func (bs *ReceiptsForestSuite) Test_FullTreeSearch() {
-	blocks, receipts := bs.createExecutionTree()
-	bs.addReceipts2ReceiptsForest(receipts, blocks)
+func (et *ExecutionTreeTestSuite) Test_FullTreeSearch() {
+	blocks, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	// search Execution Tree starting from result `r[A10]`
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[A10]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
-	assert.NoError(bs.T(), err)
-	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[A10]]", "ER[r[A11]]"), bs.receiptSet(collectedReceipts, receipts)))
+	collectedReceipts, err := et.Forest.ReachableReceipts(receipts["ER[r[A10]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(et.T(), err)
+	et.Assert().True(reflect.DeepEqual(et.toSet("ER[r[A10]]", "ER[r[A11]]"), et.receiptSet(collectedReceipts, receipts)))
 
 	// search Execution Tree starting from result `r[B10]`
-	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
-	assert.NoError(bs.T(), err)
-	expected := bs.toSet(
+	collectedReceipts, err = et.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(et.T(), err)
+	expected := et.toSet(
 		"ER[r[B10]]", "ER[r[B11]_1]_1", "ER[r[B11]_1]_2", "ER[r[B12]_1]",
 		"ER[r[B11]_2]", "ER[r[B12]_2]",
 		"ER[r[C11]]_1", "ER[r[C11]]_2",
 	)
-	bs.Assert().True(reflect.DeepEqual(expected, bs.receiptSet(collectedReceipts, receipts)))
+	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
 
 	// search Execution Tree starting from result `r[B11]_2`
-	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[B11]_2]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
-	assert.NoError(bs.T(), err)
-	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[B11]_2]", "ER[r[B12]_2]"), bs.receiptSet(collectedReceipts, receipts)))
+	collectedReceipts, err = et.Forest.ReachableReceipts(receipts["ER[r[B11]_2]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(et.T(), err)
+	et.Assert().True(reflect.DeepEqual(et.toSet("ER[r[B11]_2]", "ER[r[B12]_2]"), et.receiptSet(collectedReceipts, receipts)))
 
 	// search Execution Tree starting from result `r[C13]`
-	collectedReceipts, err = bs.Forest.ReachableReceipts(receipts["ER[r[C13]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
-	assert.NoError(bs.T(), err)
-	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[C13]]"), bs.receiptSet(collectedReceipts, receipts)))
+	collectedReceipts, err = et.Forest.ReachableReceipts(receipts["ER[r[C13]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(et.T(), err)
+	et.Assert().True(reflect.DeepEqual(et.toSet("ER[r[C13]]"), et.receiptSet(collectedReceipts, receipts)))
 }
 
 // Test_RootBlockExcluded checks that ExecutionTree does not traverses results for excluded forks.
 // Specifically, if the root block is excluded, no result should be returned
-func (bs *ReceiptsForestSuite) Test_RootBlockExcluded() {
-	blocks, receipts := bs.createExecutionTree()
-	bs.addReceipts2ReceiptsForest(receipts, blocks)
+func (et *ExecutionTreeTestSuite) Test_RootBlockExcluded() {
+	blocks, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	blockFilter := func(h *flow.Header) bool {
 		return blocks["B10"].ID() != h.ID()
 	}
 
 	// search Execution Tree starting from result `r[B10]`
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, anyReceipt())
-	assert.NoError(bs.T(), err)
-	assert.Empty(bs.T(), collectedReceipts)
+	collectedReceipts, err := et.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, anyReceipt())
+	assert.NoError(et.T(), err)
+	assert.Empty(et.T(), collectedReceipts)
 }
 
 // Test_FilterChainForks checks that ExecutionTree does not traverses results for excluded forks
-func (bs *ReceiptsForestSuite) Test_FilterChainForks() {
-	blocks, receipts := bs.createExecutionTree()
-	bs.addReceipts2ReceiptsForest(receipts, blocks)
+func (et *ExecutionTreeTestSuite) Test_FilterChainForks() {
+	blocks, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	blockFilter := func(h *flow.Header) bool {
 		return blocks["B11"].ID() != h.ID()
 	}
 
 	// search Execution Tree starting from result `r[B10]`: fork starting from B11 should be excluded
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, anyReceipt())
-	assert.NoError(bs.T(), err)
-	expected := bs.toSet("ER[r[B10]]", "ER[r[C11]]_1", "ER[r[C11]]_2")
-	bs.Assert().True(reflect.DeepEqual(expected, bs.receiptSet(collectedReceipts, receipts)))
+	collectedReceipts, err := et.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), blockFilter, anyReceipt())
+	assert.NoError(et.T(), err)
+	expected := et.toSet("ER[r[B10]]", "ER[r[C11]]_1", "ER[r[C11]]_2")
+	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
 }
 
 // Test_ExcludeReceiptsForSealedBlock verifies that, even though we are filtering out the
 // receipts for the root result, the tree search still traverses to the derived results
-func (bs *ReceiptsForestSuite) Test_ExcludeReceiptsForSealedBlock() {
-	blocks, receipts := bs.createExecutionTree()
-	bs.addReceipts2ReceiptsForest(receipts, blocks)
+func (et *ExecutionTreeTestSuite) Test_ExcludeReceiptsForSealedBlock() {
+	blocks, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	receiptFilter := func(rcpt *flow.ExecutionReceipt) bool {
 		// exclude all receipts for block B11
@@ -243,55 +243,55 @@ func (bs *ReceiptsForestSuite) Test_ExcludeReceiptsForSealedBlock() {
 	}
 
 	// search Execution Tree starting from result `r[B11]_1`
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B11]_1]_1"].ExecutionResult.ID(), anyBlock(), receiptFilter)
-	assert.NoError(bs.T(), err)
-	bs.Assert().True(reflect.DeepEqual(bs.toSet("ER[r[B12]_1]"), bs.receiptSet(collectedReceipts, receipts)))
+	collectedReceipts, err := et.Forest.ReachableReceipts(receipts["ER[r[B11]_1]_1"].ExecutionResult.ID(), anyBlock(), receiptFilter)
+	assert.NoError(et.T(), err)
+	et.Assert().True(reflect.DeepEqual(et.toSet("ER[r[B12]_1]"), et.receiptSet(collectedReceipts, receipts)))
 }
 
 // Test_UnknownResult checks the behaviour of ExecutionTree when the search is started on an unknown result
-func (bs *ReceiptsForestSuite) Test_UnknownResult() {
-	blocks, receipts := bs.createExecutionTree()
-	bs.addReceipts2ReceiptsForest(receipts, blocks)
+func (et *ExecutionTreeTestSuite) Test_UnknownResult() {
+	blocks, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	// search Execution Tree starting from result random result
-	_, err := bs.Forest.ReachableReceipts(unittest.IdentifierFixture(), anyBlock(), anyReceipt())
-	assert.Error(bs.T(), err)
+	_, err := et.Forest.ReachableReceipts(unittest.IdentifierFixture(), anyBlock(), anyReceipt())
+	assert.Error(et.T(), err)
 
 	// search Execution Tree starting from parent result of "ER[r[D13]]"; While the result is referenced,
 	// a receipt committing to this result was never added. Hence the search should error
-	_, err = bs.Forest.ReachableReceipts(receipts["ER[r[D13]]"].ExecutionResult.PreviousResultID, anyBlock(), anyReceipt())
-	assert.Error(bs.T(), err)
+	_, err = et.Forest.ReachableReceipts(receipts["ER[r[D13]]"].ExecutionResult.PreviousResultID, anyBlock(), anyReceipt())
+	assert.Error(et.T(), err)
 }
 
 // Test_ReceiptSorted verifies that receipts are ordered in a
 // "parent first" manner
-func (bs *ReceiptsForestSuite) Test_ReceiptOrdered() {
+func (et *ExecutionTreeTestSuite) Test_ReceiptOrdered() {
 	// TODO: implement me
-	bs.T().Skip()
+	et.T().Skip()
 }
 
 // Receipts that are already included in the fork should be skipped.
-func (bs *ReceiptsForestSuite) Test_Prune() {
-	blocks, receipts := bs.createExecutionTree()
-	bs.addReceipts2ReceiptsForest(receipts, blocks)
+func (et *ExecutionTreeTestSuite) Test_Prune() {
+	blocks, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
 
-	assert.Equal(bs.T(), uint(12), bs.Forest.Size())
-	assert.Equal(bs.T(), uint64(0), bs.Forest.LowestHeight())
+	assert.Equal(et.T(), uint(12), et.Forest.Size())
+	assert.Equal(et.T(), uint64(0), et.Forest.LowestHeight())
 
 	// prunes all receipts for blocks with height _smaller_ than 12
-	err := bs.Forest.PruneUpToHeight(12)
-	assert.NoError(bs.T(), err)
-	assert.Equal(bs.T(), uint(4), bs.Forest.Size())
+	err := et.Forest.PruneUpToHeight(12)
+	assert.NoError(et.T(), err)
+	assert.Equal(et.T(), uint(4), et.Forest.Size())
 
 	// now, searching results from r[B11] should fail as the receipts were pruned
-	_, err = bs.Forest.ReachableReceipts(receipts["ER[r[B11]_1]_2"].ExecutionResult.PreviousResultID, anyBlock(), anyReceipt())
-	assert.Error(bs.T(), err)
+	_, err = et.Forest.ReachableReceipts(receipts["ER[r[B11]_1]_2"].ExecutionResult.PreviousResultID, anyBlock(), anyReceipt())
+	assert.Error(et.T(), err)
 
 	// now, searching results from r[B12] should fail as the receipts were pruned
-	collectedReceipts, err := bs.Forest.ReachableReceipts(receipts["ER[r[B12]_1]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
-	assert.NoError(bs.T(), err)
-	expected := bs.toSet("ER[r[B12]_1]")
-	bs.Assert().True(reflect.DeepEqual(expected, bs.receiptSet(collectedReceipts, receipts)))
+	collectedReceipts, err := et.Forest.ReachableReceipts(receipts["ER[r[B12]_1]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(et.T(), err)
+	expected := et.toSet("ER[r[B12]_1]")
+	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
 }
 
 func anyBlock() mempool.BlockFilter {
@@ -313,7 +313,7 @@ func makeChildBlock(parent *flow.Block) *flow.Block {
 	return &block
 }
 
-func (bs *ReceiptsForestSuite) receiptSet(selected []*flow.ExecutionReceipt, receipts map[string]*flow.ExecutionReceipt) map[string]struct{} {
+func (et *ExecutionTreeTestSuite) receiptSet(selected []*flow.ExecutionReceipt, receipts map[string]*flow.ExecutionReceipt) map[string]struct{} {
 	id2Name := make(map[flow.Identifier]string)
 	for name, rcpt := range receipts {
 		id2Name[rcpt.ID()] = name
@@ -323,20 +323,20 @@ func (bs *ReceiptsForestSuite) receiptSet(selected []*flow.ExecutionReceipt, rec
 	for _, r := range selected {
 		name, found := id2Name[r.ID()]
 		if !found {
-			bs.FailNow("unknown execution receipt %x", r.ID())
+			et.FailNow("unknown execution receipt %x", r.ID())
 		}
 		names[name] = struct{}{}
 	}
 	return names
 }
 
-func (bs *ReceiptsForestSuite) toSet(receiptNames ...string) map[string]struct{} {
+func (et *ExecutionTreeTestSuite) toSet(receiptNames ...string) map[string]struct{} {
 	set := make(map[string]struct{})
 	for _, name := range receiptNames {
 		set[name] = struct{}{}
 	}
 	if len(set) != len(receiptNames) {
-		bs.FailNow("repeated receipts")
+		et.FailNow("repeated receipts")
 	}
 	return set
 }

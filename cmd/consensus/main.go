@@ -174,7 +174,7 @@ func main() {
 			return err
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			receipts = consensusMempools.NewReceiptsForest()
+			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, receipts.Size)
 			if err != nil {
