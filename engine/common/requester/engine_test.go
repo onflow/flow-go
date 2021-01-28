@@ -306,7 +306,7 @@ func TestOnEntityResponseValid(t *testing.T) {
 	assert.Equal(t, iunavailable.LastRequested, time.Time{})
 }
 
-func TestOnEntityInvalidChecksum(t *testing.T) {
+func TestOnEntityIntegrityCheck(t *testing.T) {
 	identities := unittest.IdentityListFixture(16)
 	targetID := identities[0].NodeID
 
@@ -329,9 +329,10 @@ func TestOnEntityInvalidChecksum(t *testing.T) {
 	now := time.Now()
 
 	iwanted := &Item{
-		EntityID:      wanted.ID(),
-		LastRequested: now,
-		ExtraSelector: filter.Any,
+		EntityID:       wanted.ID(),
+		LastRequested:  now,
+		ExtraSelector:  filter.Any,
+		checkIntegrity: true,
 	}
 
 	assert.NotEqual(t, wanted, wanted2)
@@ -378,4 +379,16 @@ func TestOnEntityInvalidChecksum(t *testing.T) {
 
 	// make sure we didn't process items
 	assert.Equal(t, 0, called)
+
+	iwanted.checkIntegrity = false
+	request.items[iwanted.EntityID] = iwanted
+	request.requests[req.Nonce] = req
+
+	err = request.onEntityResponse(targetID, res)
+	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// make sure we process item without checking integrity
+	assert.Equal(t, 1, called)
 }

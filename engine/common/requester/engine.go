@@ -177,9 +177,21 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // of the global selector injected upon construction. It allows for finer-grained
 // control over which subset of providers to request a given entity from, such as
 // selection of a collection cluster. Use `filter.Any` if no additional selection
-// is required.
+// is required. Checks integrity of response to make sure that we got entity that we were requesting.
 func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
+	e.addEntityRequest(entityID, selector, true)
+}
 
+// Query will request data through the request engine backing the interface.
+//The additional selector will be applied to the subset
+// of valid providers for the data and allows finer-grained control
+// over which providers to request data from. Doesn't perform integrity check
+// can be used to get entities without knowing their ID.
+func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter) {
+	e.addEntityRequest(key, selector, false)
+}
+
+func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter, checkIntegrity bool) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
@@ -191,11 +203,12 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 
 	// otherwise, add a new item to the list
 	item := &Item{
-		EntityID:      entityID,
-		NumAttempts:   0,
-		LastRequested: time.Time{},
-		RetryAfter:    e.cfg.RetryInitial,
-		ExtraSelector: selector,
+		EntityID:       entityID,
+		NumAttempts:    0,
+		LastRequested:  time.Time{},
+		RetryAfter:     e.cfg.RetryInitial,
+		ExtraSelector:  selector,
+		checkIntegrity: checkIntegrity,
 	}
 	e.items[entityID] = item
 }
@@ -410,7 +423,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		entityID := res.EntityIDs[i]
 
 		// the entity might already have been returned in another response
-		_, exists := e.items[entityID]
+		item, exists := e.items[entityID]
 		if !exists {
 			continue
 		}
@@ -426,12 +439,13 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		delete(needed, entityID)
 		delete(e.items, entityID)
 
-		actualEntityID := entity.ID()
-
-		// validate that we got correct entity, exactly what we were expecting
-		if entityID != actualEntityID {
-			return engine.NewInvalidInputErrorf("could not validate response body for requested entity, expected: %v, actual: %v",
-				entityID, actualEntityID)
+		if item.checkIntegrity {
+			actualEntityID := entity.ID()
+			// validate that we got correct entity, exactly what we were expecting
+			if entityID != actualEntityID {
+				return engine.NewInvalidInputErrorf("could not validate response body for requested entity, expected: %v, actual: %v",
+					entityID, actualEntityID)
+			}
 		}
 
 		// process the entity
