@@ -80,6 +80,7 @@ func (e *blockComputer) ExecuteBlock(
 	if e.tracer != nil {
 		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
 		defer func() {
+			span.SetTag("block.collectioncount", len(block.CompleteCollections))
 			span.LogFields(
 				log.String("block.hash", block.ID().String()),
 			)
@@ -189,6 +190,7 @@ func (e *blockComputer) executeCollection(
 	if e.tracer != nil {
 		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
 		defer func() {
+			colSpan.SetTag("collection.txcount", len(collection.Transactions))
 			colSpan.LogFields(
 				log.String("collection.hash", collection.Guarantee.CollectionID.String()),
 			)
@@ -241,6 +243,8 @@ func (e *blockComputer) executeTransaction(
 			//
 			// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
 			// as well as any imported programs.
+			txSpan.SetTag("transaction.proposer", txBody.Payer.String())
+			txSpan.SetTag("transaction.payer", txBody.Payer.String())
 			txSpan.LogFields(
 				log.String("transaction.hash", txBody.ID().String()),
 				log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
