@@ -63,25 +63,25 @@ func (et *ExecutionTree) AddResult(result *flow.ExecutionResult, block *flow.Hea
 
 // getEquivalenceClass retrieves the Equivalence class for the given result
 // or creates a new one and stores it into the levelled forest
-func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptEquivalenceClass, error) {
+func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block *flow.Header) (*ReceiptsOfSameResult, error) {
 	vertex, found := et.forest.GetVertex(result.ID())
-	var receiptsForResult *ReceiptEquivalenceClass
+	var receiptsForResult *ReceiptsOfSameResult
 	if !found {
 		var err error
-		receiptsForResult, err = NewReceiptEquivalenceClass(result, block)
+		receiptsForResult, err = NewReceiptsOfSameResult(result, block)
 		if err != nil {
 			return nil, fmt.Errorf("constructing equivalence class for receipt failed: %w", err)
 		}
 		err = et.forest.VerifyVertex(receiptsForResult)
 		if err != nil {
-			return nil, fmt.Errorf("receipt's equivalence class is not a valid vertex for LevelledForest: %w", err)
+			return nil, fmt.Errorf("failed to store receipt's equivalence class: %w", err)
 		}
 		et.forest.AddVertex(receiptsForResult)
 		// this Receipt Equivalence class is empty (no receipts); hence we don't need to adjust the mempool size
 		return receiptsForResult, nil
 	}
 
-	return vertex.(*ReceiptEquivalenceClass), nil
+	return vertex.(*ReceiptsOfSameResult), nil
 }
 
 // Add the given execution receipt to the memory pool. Requires height
@@ -146,7 +146,7 @@ func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter
 	}
 
 	receipts := make([]*flow.ExecutionReceipt, 0, 10) // we expect just below 10 execution Receipts per call
-	et.reachableReceipts(vertex, blockFilter, receiptFilter, &receipts)
+	receipts = et.reachableReceipts(vertex, blockFilter, receiptFilter, receipts)
 
 	return receipts, nil
 }
@@ -154,11 +154,12 @@ func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter
 // reachableReceipts implements a depth-first search over the Execution Tree.
 // Entire sub-trees are skipped from search, if their root result is for a block which do _not_ pass the blockFilter
 // For each result (vertex in the Execution Tree), which the tree search visits, the known receipts are inspected.
-// Receipts that pass the receiptFilter are appended to `receipts` (passes as slice pointer, to allow appending).
-func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts *[]*flow.ExecutionReceipt) {
-	receiptsForResult := vertex.(*ReceiptEquivalenceClass)
+// Receipts that pass the receiptFilter are appended to `receipts` in the order they are encountered during the
+// tree search. the resulting slice is returned.
+func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter, receipts []*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
+	receiptsForResult := vertex.(*ReceiptsOfSameResult)
 	if !blockFilter(receiptsForResult.blockHeader) {
-		return
+		return receipts
 	}
 
 	// add all Execution Receipts for result to `receipts` provided they pass the receiptFilter
@@ -167,15 +168,16 @@ func (et *ExecutionTree) reachableReceipts(vertex forest.Vertex, blockFilter mem
 		if !receiptFilter(receipt) {
 			continue
 		}
-		*receipts = append(*receipts, receipt)
+		receipts = append(receipts, receipt)
 	}
 
 	// travers down the tree in a deep-first-search manner
 	children := et.forest.GetChildren(vertex.VertexID())
 	for children.HasNext() {
 		child := children.NextVertex()
-		et.reachableReceipts(child, blockFilter, receiptFilter, receipts)
+		receipts = et.reachableReceipts(child, blockFilter, receiptFilter, receipts)
 	}
+	return receipts
 }
 
 // PruneUpToHeight prunes all results for all blocks with height up to but
@@ -191,7 +193,7 @@ func (et *ExecutionTree) PruneUpToHeight(limit uint64) error {
 		iterator := et.forest.GetVerticesAtLevel(l)
 		for iterator.HasNext() {
 			vertex := iterator.NextVertex()
-			numberReceiptsRemoved += vertex.(*ReceiptEquivalenceClass).Size()
+			numberReceiptsRemoved += vertex.(*ReceiptsOfSameResult).Size()
 		}
 	}
 
