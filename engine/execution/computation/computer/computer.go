@@ -243,13 +243,15 @@ func (e *blockComputer) executeTransaction(
 			//
 			// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
 			// as well as any imported programs.
-			txSpan.SetTag("transaction.proposer", txBody.Payer.String())
+			txSpan.SetTag("transaction.proposer", txBody.ProposalKey.Address.String())
 			txSpan.SetTag("transaction.payer", txBody.Payer.String())
 			txSpan.LogFields(
 				log.String("transaction.hash", txBody.ID().String()),
 				log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
 				log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
 				log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
+				log.Int64(trace.EXEValueEncodingDurationTag, int64(txMetrics.ValueEncoded())),
+				log.Int64(trace.EXEValueDecodingDurationTag, int64(txMetrics.ValueDecoded())),
 			)
 			txSpan.Finish()
 		}()
