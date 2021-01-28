@@ -394,7 +394,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", latestSeal.BlockID, err)
 	}
 
-	// blocksOnFork is used to keep the IDs of the ancestor blocks we iterate through.
+	// ancestors is used to keep the IDs of the ancestor blocks we iterate through.
 	// We use it to skip receipts that are not for unsealed blocks in the fork.
 	ancestors := make(map[flow.Identifier]struct{})
 
