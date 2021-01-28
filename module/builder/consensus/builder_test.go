@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	mempoolAPIs "github.com/onflow/flow-go/module/mempool"
+	mempoolImpl "github.com/onflow/flow-go/module/mempool/consensus/"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -81,6 +82,13 @@ type BuilderSuite struct {
 	build *Builder
 }
 
+func (bs *BuilderSuite) storeBlock(block *flow.Block) {
+	bs.headers[block.ID()] = block.Header
+	bs.heights[block.Header.Height] = block.Header
+	bs.blocks[block.ID()] = block
+	bs.index[block.ID()] = block.Payload.Index()
+}
+
 // createAndRecordBlock creates a new block chained to the previous block (if it
 // is not nil). The new block contains a receipt for a result of the previous
 // block, which is also used to create a seal for the previous block. The seal
@@ -128,10 +136,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 	}
 
 	// record block in dbs
-	bs.headers[block.ID()] = block.Header
-	bs.heights[block.Header.Height] = block.Header
-	bs.blocks[block.ID()] = &block
-	bs.index[block.ID()] = block.Payload.Index()
+	bs.storeBlock(&block)
 
 	// seal the parentBlock block with the result included in this block. Do not
 	// seal the first block because it is assumed that it is already sealed.
@@ -790,3 +795,100 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "should include receipts as returned by ExecutionTree")
 	bs.recPool.AssertExpectations(bs.T())
 }
+
+// TestIntegration_PayloadReceiptNoParentResult is a mini-integration test combining the
+// Builder with a full ExecutionTree mempool. We check that the builder does not include
+// receipts whose PreviousResult is not already incorporated in the chain.
+//
+// Here we create 4 consecutive blocks S, A, B, and C, where A contains a valid
+// receipt for block S, but blocks B and C have empty payloads.
+//
+// We populate the mempool with valid receipts for blocks A, and C, but NOT for
+// block B.
+//
+// The expected behaviour is that the builder should not include the receipt for
+// block C, because the chain and the mempool do not contain a valid receipt for
+// the parent result (block B's result).
+//
+// ... <- S <- A[ER{S}] <- B <- C <- X (candidate)
+func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
+	// make blocks S, A, B, C
+	blockSABC := unittest.ChainFixtureFrom(4, bs.blocks[bs.parentID].Header)
+	resultS := unittest.ExecutionResultFixture(unittest.WithBlock(bs.blocks[bs.parentID]), unittest.WithPreviousResult(*bs.resultByID[bs.parentID]))
+	receiptSABC := unittest.ReceiptChainFor(blockSABC, resultS)
+	blockSABC[0].Payload.Receipts = []*flow.ExecutionReceipt{}
+	blockSABC[1].Payload.Receipts = []*flow.ExecutionReceipt{receiptSABC[0]}
+	blockSABC[2].Payload.Receipts = []*flow.ExecutionReceipt{}
+	blockSABC[3].Payload.Receipts = []*flow.ExecutionReceipt{}
+	unittest.ReconnectBlocksAndReceipts(blockSABC, receiptSABC) // update block header so that blocks are chained together
+	bs.storeBlock(blockSABC[0])
+	bs.storeBlock(blockSABC[1])
+	bs.storeBlock(blockSABC[2])
+	bs.storeBlock(blockSABC[3])
+
+	// Instantiate real Execution Tree mempool; only include receipts for A and C but NOT B
+	bs.build.recPool = mempoolImpl.NewExecutionTree()
+	bs.build.recPool.AddReceipt(receiptA, blockA.Header)
+	bs.build.recPool.AddReceipt(receiptC, blockC.Header)
+
+	// assuming all receipts are executed by the correct executor
+	for _, r := range receipts {
+		r.ExecutorID = s.ExeID
+	}
+
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+	s.PersistedResults[result0.ID()] = result0
+	return receipts
+
+	// only include receipts for A and C in the mempool; NOT B,
+	bs.pendingReceipts = append(bs.pendingReceipts, aReceipt, cReceipt)
+
+	_, err := bs.build.BuildOn(c.ID(), bs.setter)
+	bs.Require().NoError(err)
+
+	expectedReceipts := []*flow.ExecutionReceipt{aReceipt}
+	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain only receipt for block a")
+}
+
+//func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
+//	// make blocks S, A, B, C
+//	blockSABC := unittest.ChainFixtureFrom(4, bs.blocks[bs.parentID].Header)
+//	resultS := unittest.ExecutionResultFixture(unittest.WithBlock(bs.blocks[bs.parentID]), unittest.WithPreviousResult(*bs.resultByID[bs.parentID]))
+//	receiptSABC := unittest.ReceiptChainFor(blockSABC, resultS)
+//	blockSABC[0].Payload.Receipts = []*flow.ExecutionReceipt{}
+//	blockSABC[1].Payload.Receipts = []*flow.ExecutionReceipt{receiptSABC[0]}
+//	blockSABC[2].Payload.Receipts = []*flow.ExecutionReceipt{}
+//	blockSABC[3].Payload.Receipts = []*flow.ExecutionReceipt{}
+//	unittest.ReconnectBlocksAndReceipts(blockSABC, receiptSABC) // update block header so that blocks are chained together
+//	bs.storeBlock(blockSABC[0])
+//	bs.storeBlock(blockSABC[1])
+//	bs.storeBlock(blockSABC[2])
+//	bs.storeBlock(blockSABC[3])
+//
+//	// Instantiate real Execution Tree mempool; only include receipts for A and C but NOT B
+//	bs.build.recPool = mempoolImpl.NewExecutionTree()
+//	bs.build.recPool.AddReceipt(receiptA, blockA.Header)
+//	bs.build.recPool.AddReceipt(receiptC, blockC.Header)
+//
+//	// assuming all receipts are executed by the correct executor
+//	for _, r := range receipts {
+//		r.ExecutorID = s.ExeID
+//	}
+//
+//	for _, b := range blocks {
+//		s.Extend(b)
+//	}
+//	s.PersistedResults[result0.ID()] = result0
+//	return receipts
+//
+//	// only include receipts for A and C in the mempool; NOT B,
+//	bs.pendingReceipts = append(bs.pendingReceipts, aReceipt, cReceipt)
+//
+//	_, err := bs.build.BuildOn(c.ID(), bs.setter)
+//	bs.Require().NoError(err)
+//
+//	expectedReceipts := []*flow.ExecutionReceipt{aReceipt}
+//	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain only receipt for block a")
+//}
