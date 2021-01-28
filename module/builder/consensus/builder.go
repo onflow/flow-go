@@ -435,7 +435,12 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	if err != nil {
 		return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
 	}
-	receipts, err := b.recPool.ReachableReceipts(latestSeal.ResultID, isResultForBlock(ancestors), isNoDupAndNotSealed(includedReceipts, sealedBlockID))
+	isResultForUnsealedBlock := isResultForBlock(ancestors)
+	isReceiptUniqueAndUnsealed := isNoDupAndNotSealed(includedReceipts, sealedBlockID)
+	// find all receipts:
+	// 1) whose result connects all the way to the last sealed result
+	// 2) is unique (never seen in unsealed blocks)
+	receipts, err := b.recPool.ReachableReceipts(latestSeal.ResultID, isResultForUnsealedBlock, isReceiptUniqueAndUnsealed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
