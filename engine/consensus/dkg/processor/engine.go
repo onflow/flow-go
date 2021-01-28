@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
@@ -23,15 +25,18 @@ type Engine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
 	me                module.Local
-	conduit           network.Conduit
-	dkgContractClient module.DKGContractClient
-	msgCh             chan msg.DKGMessage
-	committee         flow.IdentifierList
-	myIndex           int
-	epochCounter      uint64
-	epochCounterLock  sync.Mutex
-	dkgPhase          msg.DKGPhase
-	dkgPhaseLock      sync.Mutex
+	conduit           network.Conduit          // network conduit for sending and receiving private messages
+	dkgContractClient module.DKGContractClient // client to communicate with the DKG smart contract
+	msgCh             chan msg.DKGMessage      // channel to forward DKG messages to the consumer
+	committee         flow.IdentifierList      // IDs of DKG members
+	myIndex           int                      // index of this instance in the committee
+	epochCounter      uint64                   // identifier of the current epoch
+	epochCounterLock  sync.Mutex               // lock to safely manipulate epochCounter
+	dkgPhase          msg.DKGPhase             // current DKG phase
+	dkgPhaseLock      sync.Mutex               // lock to safely manipulate dkgPhase
+	messageOffset     int                      // index of next broadcast message to query
+	messageOffsetLock sync.Mutex               // lock to safely manipulate messageOffset
+	pollInterval      time.Duration            // interval between reading broadcast messages from DKG contract
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -46,7 +51,8 @@ func New(
 	msgCh chan msg.DKGMessage,
 	committee flow.IdentifierList,
 	dkgContractClient module.DKGContractClient,
-	epochCounter uint64) (*Engine, error) {
+	epochCounter uint64,
+	pollInterval time.Duration) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
 
@@ -70,6 +76,7 @@ func New(
 		myIndex:           index,
 		epochCounter:      epochCounter,
 		dkgContractClient: dkgContractClient,
+		pollInterval:      pollInterval,
 	}
 
 	var err error
@@ -97,24 +104,45 @@ func (e *Engine) GetEpoch() uint64 {
 	return e.epochCounter
 }
 
-// SetPhase changes the dkg phase of the engine.
+// SetPhase reads broadcast messages one last time, changes the dkg phase of the
+// engine, and resets message offset.
 func (e *Engine) SetPhase(phase msg.DKGPhase) {
+	e.fetchBroadcastMessages()
 	e.dkgPhaseLock.Lock()
-	defer e.dkgPhaseLock.Unlock()
 	e.dkgPhase = phase
+	defer e.dkgPhaseLock.Unlock()
+	e.SetOffset(0)
 }
 
 // GetPhase returns the current dkg phase.
 func (e *Engine) GetPhase() msg.DKGPhase {
 	e.dkgPhaseLock.Lock()
-	e.dkgPhaseLock.Unlock()
+	defer e.dkgPhaseLock.Unlock()
 	return e.dkgPhase
+}
+
+// SetOffset updates the value of messageOffset.
+func (e *Engine) SetOffset(value int) {
+	e.messageOffsetLock.Lock()
+	defer e.messageOffsetLock.Unlock()
+	e.messageOffset = value
+}
+
+// GetOffset returns the current messageOffset.
+func (e *Engine) GetOffset() int {
+	e.messageOffsetLock.Lock()
+	defer e.messageOffsetLock.Unlock()
+	return e.messageOffset
 }
 
 // Ready implements the module ReadyDoneAware interface. It returns a channel
 // that will close when the engine has successfully
 // started.
+//
+// It instructs the engine to periodically read broadcast messages from the DKG
+// smart contract.
 func (e *Engine) Ready() <-chan struct{} {
+	e.unit.LaunchPeriodically(e.fetchBroadcastMessages, e.pollInterval, 0)
 	return e.unit.Ready()
 }
 
@@ -154,26 +182,62 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
 	case msg.DKGMessage:
-		return e.onMessage(originID, v)
+		return e.onPrivateMessage(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// TODO: should check Phase?
-func (e *Engine) onMessage(originID flow.Identifier, msg msg.DKGMessage) error {
-	if currentEpoch := e.GetEpoch(); currentEpoch != msg.EpochCounter {
-		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, currentEpoch)
+func (e *Engine) onPrivateMessage(originID flow.Identifier, msg msg.DKGMessage) error {
+	err := e.checkMessageEpochAndOrigin(msg)
+	if err != nil {
+		return err
 	}
-	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
-		return fmt.Errorf("origin id out of range: %d", msg.Orig)
-	}
+	// check that the message's origin matches the sender's flow identifier
 	nodeID := e.committee[msg.Orig]
 	if !bytes.Equal(nodeID[:], originID[:]) {
 		return fmt.Errorf("OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 	}
-	e.log.Debug().Msgf("forwarding Message to controller")
+	e.log.Debug().Msgf("forwarding private message to controller")
 	e.msgCh <- msg
+	return nil
+}
+
+// fetchBroadcastMessages calls the DKG smart contract to get missing DKG
+// messages for the current epoch, and forwards them to the msgCh.
+func (e *Engine) fetchBroadcastMessages() {
+	epoch := e.GetEpoch()
+	phase := e.GetPhase()
+	offset := e.GetOffset()
+	msgs, err := e.dkgContractClient.ReadBroadcast(epoch, phase, offset)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not read broadcast messages")
+		return
+	}
+	for _, msg := range msgs {
+		err := e.checkMessageEpochAndOrigin(msg)
+		if err != nil {
+			e.log.Error().Err(err).Msg("bad broadcast message")
+			continue
+		}
+		e.log.Debug().Msgf("forwarding broadcast message to controller")
+		e.msgCh <- msg
+	}
+	e.SetOffset(offset + len(msgs))
+}
+
+// checkMessageEpochAndOrigin returns an error if the message's epochCounter
+// does not correspond to the current epoch, or if the message's origin index is
+// out of range with respect to the committee list.
+func (e *Engine) checkMessageEpochAndOrigin(msg messages.DKGMessage) error {
+	// check that the message corresponds to the current epoch
+	if currentEpoch := e.GetEpoch(); currentEpoch != msg.EpochCounter {
+		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, currentEpoch)
+	}
+	// check that the message's origin is not out of range
+	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
+		return fmt.Errorf("origin id out of range: %d", msg.Orig)
+	}
 	return nil
 }
 

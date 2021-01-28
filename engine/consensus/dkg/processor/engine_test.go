@@ -52,6 +52,7 @@ func createTestEngine(t *testing.T, nodeID flow.Identifier) *Engine {
 		committee,
 		&module.DKGContractClient{},
 		epochCounter,
+		time.Second,
 	)
 	require.NoError(t, err)
 
