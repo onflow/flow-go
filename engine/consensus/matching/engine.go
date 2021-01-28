@@ -450,6 +450,8 @@ func (e *Engine) checkSealing() {
 		return
 	}
 
+	defer e.isCheckingSealing.Store(false)
+
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
@@ -457,8 +459,6 @@ func (e *Engine) checkSealing() {
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("error in sealing protocol")
 	}
-
-	e.isCheckingSealing.Store(false)
 }
 
 func (e *Engine) checkingSealing() error {
