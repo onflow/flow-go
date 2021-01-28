@@ -18,5 +18,6 @@ type Topology interface {
 	// One may utilize topology Cache to have a more deterministic endpoint on generating fanout.
 	//
 	// GenerateFanout is not concurrency safe. It is responsibility of caller to lock for it.
+	// with the channels argument, it allows the returned topology to be cached, which is necessary for randomized topology.
 	GenerateFanout(ids flow.IdentityList, channels ChannelList) (flow.IdentityList, error)
 }
