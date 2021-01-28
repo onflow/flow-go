@@ -58,7 +58,7 @@ func (et *ExecutionTreeTestSuite) SetupTest() {
 //   :
 //   :                                                       ? ? ? ? <- r[C13] {ER}
 //   pruned height
-func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block, map[string]*flow.ExecutionReceipt) {
+func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block, map[string]*flow.ExecutionResult, map[string]*flow.ExecutionReceipt) {
 	// Make blocks
 	blocks := make(map[string]*flow.Block)
 
@@ -76,42 +76,43 @@ func (et *ExecutionTreeTestSuite) createExecutionTree() (map[string]*flow.Block,
 	blocks["D13"] = makeBlockWithHeight(13)
 
 	// Make Results
-	rA10 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["A10"]))
-	rA11 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["A11"]), unittest.WithPreviousResult(*rA10))
+	results := make(map[string]*flow.ExecutionResult)
+	results["r[A10]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["A10"]))
+	results["r[A11]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["A11"]), unittest.WithPreviousResult(*results["r[A10]"]))
 
-	rB10 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B10"]))
-	rB11_1 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B11"]), unittest.WithPreviousResult(*rB10))
-	rB12_1 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B12"]), unittest.WithPreviousResult(*rB11_1))
-	rB11_2 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B11"]), unittest.WithPreviousResult(*rB10))
-	rB12_2 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B12"]), unittest.WithPreviousResult(*rB11_2))
+	results["r[B10]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B10"]))
+	results["r[B11_1]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B11"]), unittest.WithPreviousResult(*results["r[B10]"]))
+	results["r[B12_1]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B12"]), unittest.WithPreviousResult(*results["r[B11_1]"]))
+	results["r[B11_2]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B11"]), unittest.WithPreviousResult(*results["r[B10]"]))
+	results["r[B12_2]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["B12"]), unittest.WithPreviousResult(*results["r[B11_2]"]))
 
-	rC11 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["C11"]), unittest.WithPreviousResult(*rB10))
-	rC12 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["C12"]), unittest.WithPreviousResult(*rC11))
-	rC13 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["C13"]), unittest.WithPreviousResult(*rC12))
+	results["r[C11]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["C11"]), unittest.WithPreviousResult(*results["r[B10]"]))
+	results["r[C12]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["C12"]), unittest.WithPreviousResult(*results["r[C11]"]))
+	results["r[C13]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["C13"]), unittest.WithPreviousResult(*results["r[C12]"]))
 
-	rD13 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks["D13"]))
+	results["r[D13]"] = unittest.ExecutionResultFixture(unittest.WithBlock(blocks["D13"]))
 
 	// Make Receipts
-	executionReceipts := make(map[string]*flow.ExecutionReceipt)
+	receipts := make(map[string]*flow.ExecutionReceipt)
 
-	executionReceipts["ER[r[A10]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rA10))
-	executionReceipts["ER[r[A11]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rA11))
+	receipts["ER[r[A10]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[A10]"]))
+	receipts["ER[r[A11]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[A11]"]))
 
-	executionReceipts["ER[r[B10]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rB10))
-	executionReceipts["ER[r[B11]_1]_1"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rB11_1))
-	executionReceipts["ER[r[B11]_1]_2"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rB11_1))
-	executionReceipts["ER[r[B12]_1]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rB12_1))
+	receipts["ER[r[B10]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[B10]"]))
+	receipts["ER[r[B11]_1]_1"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[B11_1]"]))
+	receipts["ER[r[B11]_1]_2"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[B11_1]"]))
+	receipts["ER[r[B12]_1]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[B12_1]"]))
 
-	executionReceipts["ER[r[B11]_2]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rB11_2))
-	executionReceipts["ER[r[B12]_2]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rB12_2))
+	receipts["ER[r[B11]_2]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[B11_2]"]))
+	receipts["ER[r[B12]_2]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[B12_2]"]))
 
-	executionReceipts["ER[r[C11]]_1"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rC11))
-	executionReceipts["ER[r[C11]]_2"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rC11))
+	receipts["ER[r[C11]]_1"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[C11]"]))
+	receipts["ER[r[C11]]_2"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[C11]"]))
 
-	executionReceipts["ER[r[C13]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rC13))
-	executionReceipts["ER[r[D13]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(rD13))
+	receipts["ER[r[C13]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[C13]"]))
+	receipts["ER[r[D13]]"] = unittest.ExecutionReceiptFixture(unittest.WithResult(results["r[D13]"]))
 
-	return blocks, executionReceipts
+	return blocks, results, receipts
 }
 
 func (et *ExecutionTreeTestSuite) addReceipts2ReceiptsForest(receipts map[string]*flow.ExecutionReceipt, blocks map[string]*flow.Block) {
@@ -160,17 +161,48 @@ func (et *ExecutionTreeTestSuite) Test_AddReceipt() {
 	assert.Equal(et.T(), uint(2), et.Forest.Size())
 }
 
-// Test_AddResult verifies that vertices can be added to the Execution Tree
-// without requiring an Execution Rereipt
-func (et *ExecutionTreeTestSuite) Test_AddResult() {
-	// TODO: implement me
-	et.T().Skip()
+// Test_AddResult_Detached verifies that vertices can be added to the Execution Tree without requiring
+// an Execution Receipt. Here, we add a result for a completely detached block. Starting a tree search
+// from this result should not yield any receipts.
+func (et *ExecutionTreeTestSuite) Test_AddResult_Detached() {
+	miscBlock := makeBlockWithHeight(101)
+	miscResult := unittest.ExecutionResultFixture(unittest.WithBlock(miscBlock))
+
+	err := et.Forest.AddResult(miscResult, miscBlock.Header)
+	assert.NoError(et.T(), err)
+	collectedReceipts, err := et.Forest.ReachableReceipts(miscResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(et.T(), err)
+	et.Assert().Empty(collectedReceipts)
+}
+
+// Test_AddResult_Bridge verifies that vertices can be added to the Execution Tree without requiring
+// an Execution Receipt. Here, we add the result r[C12], which closes the gap between r[C11] and r[C13].
+// Hence, the tree search should reach r[C13].
+func (et *ExecutionTreeTestSuite) Test_AddResult_Bridge() {
+	blocks, results, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
+
+	// restrict traversal to B10 <- C11 <- C12 <- C13
+	blockFilter := func(h *flow.Header) bool {
+		for _, blockName := range []string{"B10", "C11", "C12", "C13"} {
+			if blocks[blockName].ID() == h.ID() {
+				return true
+			}
+		}
+		return false
+	}
+
+	err := et.Forest.AddResult(results["r[C12]"], blocks["C12"].Header)
+	assert.NoError(et.T(), err)
+	collectedReceipts, err := et.Forest.ReachableReceipts(results["r[B10]"].ID(), blockFilter, anyReceipt())
+	expected := et.toSet("ER[r[B10]]", "ER[r[C11]]_1", "ER[r[C11]]_2", "ER[r[C13]]")
+	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
 }
 
 // Test_FullTreeSearch verifies that Receipt Forest enumerates all receipts that are
 // reachable from the given result
 func (et *ExecutionTreeTestSuite) Test_FullTreeSearch() {
-	blocks, receipts := et.createExecutionTree()
+	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	// search Execution Tree starting from result `r[A10]`
@@ -199,10 +231,54 @@ func (et *ExecutionTreeTestSuite) Test_FullTreeSearch() {
 	et.Assert().True(reflect.DeepEqual(et.toSet("ER[r[C13]]"), et.receiptSet(collectedReceipts, receipts)))
 }
 
+// Test_ReceiptSorted verifies that receipts are ordered in a "parent first" manner
+func (et *ExecutionTreeTestSuite) Test_ReceiptOrdered() {
+	blocks, results, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
+
+	// search Execution Tree starting from result `r[B10]`
+	collectedReceipts, err := et.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), anyBlock(), anyReceipt())
+	assert.NoError(et.T(), err)
+
+	// first receipt must be for `r[B10]`
+	id := collectedReceipts[0].ExecutionResult.ID()
+	et.Assert().Equal(results["r[B10]"].ID(), id)
+	// for all subsequent receipts, a receipt committing to the parent result must have been listed before
+	knownResults := make(map[flow.Identifier]struct{})
+	knownResults[id] = struct{}{}
+	for _, rcpt := range collectedReceipts[1:] {
+		_, found := knownResults[rcpt.ExecutionResult.PreviousResultID]
+		et.Assert().True(found)
+		knownResults[rcpt.ExecutionResult.ID()] = struct{}{}
+	}
+}
+
+// Test_FilterReceipts checks that ExecutionTree does filter Receipts as directed by the ReceiptFilter.
+func (et *ExecutionTreeTestSuite) Test_FilterReceipts() {
+	blocks, _, receipts := et.createExecutionTree()
+	et.addReceipts2ReceiptsForest(receipts, blocks)
+
+	receiptFilter := func(rcpt *flow.ExecutionReceipt) bool {
+		for _, receiptName := range []string{"ER[r[B10]]", "ER[r[B11]_1]_2", "ER[r[B12]_2]", "ER[r[C11]]_1"} {
+			if receipts[receiptName].ID() == rcpt.ID() {
+				return false
+			}
+		}
+		return true
+	}
+
+	// search Execution Tree starting from result `r[B10]`
+	collectedReceipts, err := et.Forest.ReachableReceipts(receipts["ER[r[B10]]"].ExecutionResult.ID(), anyBlock(), receiptFilter)
+	assert.NoError(et.T(), err)
+	expected := et.toSet("ER[r[B11]_1]_1", "ER[r[B12]_1]", "ER[r[B11]_2]", "ER[r[C11]]_2")
+	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
+}
+
 // Test_RootBlockExcluded checks that ExecutionTree does not traverses results for excluded forks.
-// Specifically, if the root block is excluded, no result should be returned
+// In this specific test, we set the root results' block to be excluded. Therefore, the
+// tree search should stop immediately and no result should be returned.
 func (et *ExecutionTreeTestSuite) Test_RootBlockExcluded() {
-	blocks, receipts := et.createExecutionTree()
+	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	blockFilter := func(h *flow.Header) bool {
@@ -217,7 +293,7 @@ func (et *ExecutionTreeTestSuite) Test_RootBlockExcluded() {
 
 // Test_FilterChainForks checks that ExecutionTree does not traverses results for excluded forks
 func (et *ExecutionTreeTestSuite) Test_FilterChainForks() {
-	blocks, receipts := et.createExecutionTree()
+	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	blockFilter := func(h *flow.Header) bool {
@@ -234,7 +310,7 @@ func (et *ExecutionTreeTestSuite) Test_FilterChainForks() {
 // Test_ExcludeReceiptsForSealedBlock verifies that, even though we are filtering out the
 // receipts for the root result, the tree search still traverses to the derived results
 func (et *ExecutionTreeTestSuite) Test_ExcludeReceiptsForSealedBlock() {
-	blocks, receipts := et.createExecutionTree()
+	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	receiptFilter := func(rcpt *flow.ExecutionReceipt) bool {
@@ -250,7 +326,7 @@ func (et *ExecutionTreeTestSuite) Test_ExcludeReceiptsForSealedBlock() {
 
 // Test_UnknownResult checks the behaviour of ExecutionTree when the search is started on an unknown result
 func (et *ExecutionTreeTestSuite) Test_UnknownResult() {
-	blocks, receipts := et.createExecutionTree()
+	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	// search Execution Tree starting from result random result
@@ -263,16 +339,9 @@ func (et *ExecutionTreeTestSuite) Test_UnknownResult() {
 	assert.Error(et.T(), err)
 }
 
-// Test_ReceiptSorted verifies that receipts are ordered in a
-// "parent first" manner
-func (et *ExecutionTreeTestSuite) Test_ReceiptOrdered() {
-	// TODO: implement me
-	et.T().Skip()
-}
-
 // Receipts that are already included in the fork should be skipped.
 func (et *ExecutionTreeTestSuite) Test_Prune() {
-	blocks, receipts := et.createExecutionTree()
+	blocks, _, receipts := et.createExecutionTree()
 	et.addReceipts2ReceiptsForest(receipts, blocks)
 
 	assert.Equal(et.T(), uint(12), et.Forest.Size())
