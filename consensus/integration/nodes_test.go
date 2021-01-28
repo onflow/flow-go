@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -189,17 +191,16 @@ func createNode(
 	// add a network for this node to the hub
 	net := hub.AddNetwork(localID, node)
 
-	guaranteeLimit, sealLimit, receiptLimit := uint(1000), uint(1000), uint(1000)
+	guaranteeLimit, sealLimit := uint(1000), uint(1000)
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
 
-	receipts, err := stdmap.NewReceipts(receiptLimit)
-	require.NoError(t, err)
+	receipts := consensusMempools.NewExecutionTree()
 
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB,
+	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB,
 		guarantees, seals, receipts, tracer)
 
 	signer := &Signer{identity.ID()}
