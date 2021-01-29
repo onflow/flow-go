@@ -2,6 +2,7 @@ package fvm_test
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -254,8 +255,10 @@ func TestAccountFreezing(t *testing.T) {
 		importedCheckerErrors := checkerErrors[0].(*sema.ImportedProgramError).CheckerError.Errors
 		require.Len(t, importedCheckerErrors, 1)
 
-		require.IsType(t, &state.AccountFrozenError{}, importedCheckerErrors[0])
-		require.Equal(t, frozenAddress, importedCheckerErrors[0].(*state.AccountFrozenError).Address)
+		accountFrozenError := &state.AccountFrozenError{}
+
+		require.True(t, errors.As(importedCheckerErrors[0], &accountFrozenError))
+		require.Equal(t, frozenAddress, accountFrozenError.Address)
 	})
 
 	t.Run("default settings allow only service account to freeze accounts", func(t *testing.T) {
