@@ -289,7 +289,9 @@ func (e *blockComputer) executeTransaction(
 			Msg("transaction executed successfully")
 	}
 
-	collectionView.MergeView(txView)
+	if tx.Err == nil {
+		collectionView.MergeView(txView)
+	}
 
 	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil
 }
