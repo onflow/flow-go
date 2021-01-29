@@ -25,7 +25,7 @@ type IncorporatedResult struct {
 	// This field is not exported (name doesn't start with a capital letter), so
 	// it is not used in calculating the ID and Checksum of the Incorporated
 	// Result (RLP encoding ignores private fields).
-	chunkApprovals     map[uint64]*approverSignatures
+	chunkApprovals     map[uint64]*SignatureCollector
 	chunkApprovalsLock sync.Mutex
 }
 
@@ -33,7 +33,7 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 	return &IncorporatedResult{
 		IncorporatedBlockID: incorporatedBlockID,
 		Result:              result,
-		chunkApprovals:      make(map[uint64]*approverSignatures),
+		chunkApprovals:      make(map[uint64]*SignatureCollector),
 	}
 }
 
@@ -79,7 +79,7 @@ func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifie
 
 	as, ok := ir.chunkApprovals[chunkIndex]
 	if !ok {
-		as = NewApproverSignatures()
+		as = NewSignatureCollector()
 		ir.chunkApprovals[chunkIndex] = as
 	}
 
@@ -108,32 +108,37 @@ func (ir *IncorporatedResult) GetAggregatedSignatures() []AggregatedSignature {
 
 /* ************************************************************************ */
 
-// approverSignatures contains a set of of signatures from verifiers attesting
+// SignatureCollector contains a set of of signatures from verifiers attesting
 // to the validity of an execution result chunk.
-// TODO: this will be replaced with BLS aggregation
-type approverSignatures struct {
+// NOT concurrency safe.
+// TODO: this will be replaced with stateful BLS aggregation
+type SignatureCollector struct {
 	// List of signatures
 	verifierSignatures []crypto.Signature
 	// List of signer identifiers
 	signerIDs []Identifier
 
+	// set of all signerIDs for de-duplicating signatures
 	signerIDSet map[Identifier]struct{}
 }
 
-func NewApproverSignatures() *approverSignatures {
-	return &approverSignatures{
+// NewSignatureCollector instantiates a new SignatureCollector
+func NewSignatureCollector() *SignatureCollector {
+	return &SignatureCollector{
 		verifierSignatures: nil,
 		signerIDs:          nil,
 		signerIDSet:        make(map[Identifier]struct{}),
 	}
 }
 
-func (as *approverSignatures) ToAggregatedSignature() *AggregatedSignature {
-	signatures := make([]crypto.Signature, len(as.verifierSignatures))
-	copy(signatures, as.verifierSignatures)
+// ToAggregatedSignature generates an aggregated signature from all signatures
+// in the SignatureCollector
+func (c *SignatureCollector) ToAggregatedSignature() *AggregatedSignature {
+	signatures := make([]crypto.Signature, len(c.verifierSignatures))
+	copy(signatures, c.verifierSignatures)
 
-	signers := make([]Identifier, len(as.signerIDs))
-	copy(signers, as.signerIDs)
+	signers := make([]Identifier, len(c.signerIDs))
+	copy(signers, c.signerIDs)
 
 	return &AggregatedSignature{
 		VerifierSignatures: signatures,
@@ -142,22 +147,21 @@ func (as *approverSignatures) ToAggregatedSignature() *AggregatedSignature {
 }
 
 // BySigner returns a signer's signature if it exists
-func (as *approverSignatures) BySigner(signerID Identifier) (*crypto.Signature, bool) {
-	for index, id := range as.signerIDs {
+func (c *SignatureCollector) BySigner(signerID Identifier) (*crypto.Signature, bool) {
+	for index, id := range c.signerIDs {
 		if id == signerID {
-			return &as.verifierSignatures[index], true
+			return &c.verifierSignatures[index], true
 		}
 	}
 	return nil, false
 }
 
-// Add appends a signature.
-// ATTENTION: it does not check for duplicates
-func (as *approverSignatures) Add(signerID Identifier, signature crypto.Signature) {
-	if _, found := as.signerIDSet[signerID]; found {
+// Add appends a signature. Only the _first_ signature is retained for each signerID.
+func (c *SignatureCollector) Add(signerID Identifier, signature crypto.Signature) {
+	if _, found := c.signerIDSet[signerID]; found {
 		return
 	}
-	as.signerIDSet[signerID] = struct{}{}
-	as.signerIDs = append(as.signerIDs, signerID)
-	as.verifierSignatures = append(as.verifierSignatures, signature)
+	c.signerIDSet[signerID] = struct{}{}
+	c.signerIDs = append(c.signerIDs, signerID)
+	c.verifierSignatures = append(c.verifierSignatures, signature)
 }
