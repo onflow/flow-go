@@ -291,7 +291,7 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 }
 
 func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
-	e.ctx.Programs.Set(location.ID(), program)
+	e.ctx.Programs.Set(location, program)
 
 	return nil
 }
