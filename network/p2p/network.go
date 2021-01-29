@@ -167,7 +167,9 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()
 	defer n.Unlock()
-	top, err := n.top.GenerateFanout(n.ids)
+
+	subscribedChannels := n.subMngr.Channels()
+	top, err := n.top.GenerateFanout(n.ids, subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}

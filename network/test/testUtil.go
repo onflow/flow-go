@@ -109,7 +109,7 @@ func GenerateNetworks(t *testing.T,
 		state, _ := topology.MockStateForCollectionNodes(t,
 			ids.Filter(filter.HasRole(flow.RoleCollection)), 1)
 		// creates topology instances for the nodes based on their roles
-		tops = GenerateTopologies(t, state, ids, sms, log)
+		tops = GenerateTopologies(t, state, ids, log)
 	}
 
 	for i := 0; i < count; i++ {
@@ -221,14 +221,13 @@ func generateNetworkingKey(s flow.Identifier) (crypto.PrivateKey, error) {
 
 // CreateTopologies is a test helper on receiving an identity list, creates a topology per identity
 // and returns the slice of topologies.
-func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList,
-	subMngrs []network.SubscriptionManager, logger zerolog.Logger) []network.Topology {
+func GenerateTopologies(t *testing.T, state protocol.State, identities flow.IdentityList, logger zerolog.Logger) []network.Topology {
 	tops := make([]network.Topology, 0)
-	for i, id := range identities {
+	for _, id := range identities {
 		var top network.Topology
 		var err error
 
-		top, err = topology.NewTopicBasedTopology(id.NodeID, logger, state, subMngrs[i])
+		top, err = topology.NewTopicBasedTopology(id.NodeID, logger, state)
 		require.NoError(t, err)
 
 		tops = append(tops, top)
