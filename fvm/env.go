@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -266,31 +267,27 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	return code, nil
 }
 
-func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, error) {
-	if e.ctx.ASTCache == nil {
-		return nil, nil
-	}
+func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 
-	program, err := e.ctx.ASTCache.GetProgram(location)
+	program := e.ctx.Programs.Get(location.ID())
 	if program != nil {
-		// Program was found within cache, do an explicit ledger register touch
+		// Program was found, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
 		if addressLocation, ok := location.(common.AddressLocation); ok {
-			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
+			e.accounts.TouchContract(
+				addressLocation.Name,
+				flow.BytesToAddress(addressLocation.Address.Bytes()),
+			)
 		}
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return program, err
+	return program, nil
 }
 
-func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) error {
-	if e.ctx.ASTCache == nil {
-		return nil
-	}
+func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
+	e.ctx.Programs.Set(location.ID(), program)
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.ctx.ASTCache.SetProgram(location, program)
+	return nil
 }
 
 func (e *hostEnv) Log(message string) error {
