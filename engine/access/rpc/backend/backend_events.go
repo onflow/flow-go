@@ -100,7 +100,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	if len(blockIDs) == 0 {
-		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: block ID list empty")
+		return []flow.BlockEvents{}, nil
 	}
 
 	req := execproto.GetEventsForBlockIDsRequest{

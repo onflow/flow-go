@@ -591,8 +591,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		)
 
 		// execute request with an empty block id list and expect an error (not a panic)
-		_, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
-		require.Error(suite.T(), err)
+		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
+		require.NoError(suite.T(), err)
+		require.Empty(suite.T(), resp)
 	})
 
 	suite.assertAllExpectations()
