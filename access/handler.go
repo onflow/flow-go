@@ -405,6 +405,11 @@ func (h *Handler) GetEventsForBlockIDs(
 	}, nil
 }
 
+// GetLatestSerializableSnapshot returns the latest serializable Snapshot
+func (h *Handler) GetLatestSerializableSnapshot(ctx context.Context, req interface{}) {
+
+}
+
 func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
 	msg, err := convert.BlockToMessage(block)
 	if err != nil {

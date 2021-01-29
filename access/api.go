@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // API provides all public-facing functionality of the Flow Access API.
@@ -39,6 +40,8 @@ type API interface {
 
 	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64) ([]flow.BlockEvents, error)
 	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier) ([]flow.BlockEvents, error)
+
+	GetLatestSerializableSnapshot(ctx context.Context) (protocol.Snapshot, error)
 }
 
 // TODO: Combine this with flow.TransactionResult?
