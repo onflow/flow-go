@@ -77,12 +77,21 @@ func (d *TransactionStorageLimiter) Process(
 		}
 
 		if usage > capacity {
+			er := st.Rollback()
+			if er != nil {
+				panic(er)
+			}
 			return &StorageCapacityExceededError{
 				Address:         address,
 				StorageUsed:     usage,
 				StorageCapacity: capacity,
 			}
 		}
+	}
+
+	er := st.Commit()
+	if er != nil {
+		panic(er)
 	}
 	return nil
 }

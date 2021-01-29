@@ -89,12 +89,17 @@ func (i *TransactionInvocator) Process(
 	)
 
 	if err != nil {
+		er := st.Rollback()
+		if er != nil {
+			panic(er)
+		}
 		i.safetyErrorCheck(err)
 		return err
 	}
 
 	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
+	// TODO: this can cause issue for fee events
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()
 
