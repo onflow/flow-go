@@ -14,14 +14,14 @@ type ProgramEntry struct {
 
 type Programs struct {
 	lock     sync.RWMutex
+	parent   *Programs
 	programs map[common.LocationID]ProgramEntry
-	draft    map[common.LocationID]ProgramEntry
 }
 
-func NewPrograms() *Programs {
+func NewPrograms(parent *Programs) *Programs {
 	return &Programs{
+		parent: parent,
 		programs: map[common.LocationID]ProgramEntry{},
-		draft: map[common.LocationID]ProgramEntry{},
 	}
 }
 
@@ -29,32 +29,45 @@ func (p *Programs) Get(locationID common.LocationID) *interpreter.Program {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	// Check is the program is in the drafts
-	programEntry, ok := p.draft[locationID]
-	if ok {
+	// First check if the program is available here
+	if programEntry, ok := p.programs[locationID]; ok {
 		return programEntry.Program
 	}
 
-	return p.programs[locationID].Program
+	// Second, check if the program is available in the parent (if any)
+
+	if p.parent != nil {
+		return p.parent.Get(locationID)
+	}
+
+	// The program is neither available here nor in the parent
+
+	return nil
 }
 
 func (p *Programs) Set(location common.Location, program *interpreter.Program) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.draft[location.ID()] = ProgramEntry{
+	p.programs[location.ID()] = ProgramEntry{
 		Location: location,
 		Program: program,
 	}
 }
 
-func (p *Programs) Commit() error {
+// Commit sets all programs into the parent (if any)
+//
+func (p *Programs) Commit() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// Commit all drafts
+	parent := p.parent
 
-	for locationID, programEntry := range p.draft {
+	if parent == nil {
+		return
+	}
+
+	for _, programEntry := range p.programs {
 
 		// Only commit programs with address locations,
 		// i.e. programs for contracts,
@@ -64,27 +77,34 @@ func (p *Programs) Commit() error {
 			continue
 		}
 
-		p.programs[locationID] = programEntry
+		parent.Set(
+			programEntry.Location,
+			programEntry.Program,
+		)
 	}
-
-	// Clear drafts
-
-	for locationID := range p.draft {
-		delete(p.draft, locationID)
-	}
-
-	return nil
 }
 
 func (p *Programs) Rollback() error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	// Clear drafts
+	// Clear all program entries
 
-	for locationID := range p.draft {
-		delete(p.draft, locationID)
+	for locationID := range p.programs {
+		delete(p.programs, locationID)
 	}
 
 	return nil
+}
+
+func (p *Programs) ForEach(fn func(location common.Location, program *interpreter.Program)) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	for _, programEntry := range p.programs {
+		fn(
+			programEntry.Location,
+			programEntry.Program,
+		)
+	}
 }

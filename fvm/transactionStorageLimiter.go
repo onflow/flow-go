@@ -95,15 +95,14 @@ func (d *TransactionStorageLimiter) Process(
 		}
 	}
 
-	// All good
+	// Commit storage changes and programs
+
 	er := st.Commit()
 	if er != nil {
 		panic(er)
 	}
-	er = ctx.Programs.Commit()
-	if er != nil {
-		panic(er)
-	}
+
+	ctx.Programs.Commit()
 
 	return nil
 }

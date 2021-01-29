@@ -42,7 +42,9 @@ func NewContext(logger zerolog.Logger, opts ...Option) Context {
 
 // NewContextFromParent spawns a child execution context with the provided options.
 func NewContextFromParent(parent Context, opts ...Option) Context {
-	return newContext(parent, opts...)
+	child := newContext(parent, opts...)
+	child.Programs = NewPrograms(parent.Programs)
+	return child
 }
 
 func newContext(ctx Context, opts ...Option) Context {
@@ -63,7 +65,7 @@ const (
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
-		Programs:                         NewPrograms(),
+		Programs:                         NewPrograms(nil),
 		Blocks:                           nil,
 		Metrics:                          nil,
 		GasLimit:                         DefaultGasLimit,
