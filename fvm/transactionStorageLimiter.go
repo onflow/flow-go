@@ -82,6 +82,10 @@ func (d *TransactionStorageLimiter) Process(
 				if er != nil {
 					panic(er)
 				}
+				// discard events
+				tp.Events = nil
+				tp.Logs = nil
+				tp.Failed = true
 				return &StorageCapacityExceededError{
 					Address:         address,
 					StorageUsed:     usage,
@@ -91,6 +95,7 @@ func (d *TransactionStorageLimiter) Process(
 		}
 	}
 
+	// All good
 	er := st.Commit()
 	if er != nil {
 		panic(er)
