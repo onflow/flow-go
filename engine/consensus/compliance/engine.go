@@ -38,7 +38,7 @@ type Engine struct {
 	cleaner  storage.Cleaner
 	headers  storage.Headers
 	payloads storage.Payloads
-	state    protocol.State
+	state    protocol.MutableState
 	con      network.Conduit
 	prov     network.Engine
 	pending  module.PendingBlockBuffer // pending block cache
@@ -58,7 +58,7 @@ func New(
 	cleaner storage.Cleaner,
 	headers storage.Headers,
 	payloads storage.Payloads,
-	state protocol.State,
+	state protocol.MutableState,
 	prov network.Engine,
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
@@ -489,7 +489,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Payload: proposal.Payload,
 	}
 
-	err := e.state.Mutate().Extend(block)
+	err := e.state.Extend(block)
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

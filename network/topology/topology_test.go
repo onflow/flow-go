@@ -19,9 +19,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// factory is an internal topology factory test helper.
+type factory func(*testing.T, flow.Identifier, protocol.State, network.SubscriptionManager) network.Topology
+
 // TopologyTestSuite tests the end-to-end connectedness of topology
 type TopologyTestSuite struct {
 	suite.Suite
+	logger          zerolog.Logger
+	linearFanoutTop factory
+	randomizedTop   factory
 }
 
 // TestTopologyTestSuite runs all tests in this test suite
@@ -29,31 +35,75 @@ func TestTopologyTestSuite(t *testing.T) {
 	suite.Run(t, new(TopologyTestSuite))
 }
 
-// TestLowScale creates systems with
+// SetupTest is executed prior to every test in this test suite.
+func (suite *TopologyTestSuite) SetupTest() {
+	suite.logger = zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+
+	suite.linearFanoutTop = func(t *testing.T, identifier flow.Identifier, state protocol.State,
+		manager network.SubscriptionManager) network.Topology {
+		top, err := topology.NewTopicBasedTopology(identifier, suite.logger, state)
+		require.NoError(t, err)
+
+		return top
+	}
+
+	suite.randomizedTop = func(t *testing.T, identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
+		top, err := topology.NewRandomizedTopology(identifier, suite.logger, 0.05, state)
+		require.NoError(t, err)
+
+		return top
+	}
+}
+
+// TestLowScaleLinearFanout creates systems with
 // 10 access nodes
 // 100 collection nodes in 4 clusters
 // 120 consensus nodes
 // 5 execution nodes
 // 100 verification nodes
-// and builds a stateful topology for the systems.
+// and builds a stateful linear fanout topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *TopologyTestSuite) TestLowScale() {
-	suite.multiSystemEndToEndConnectedness(1, 10, 100, 120, 5, 100, 4)
+func (suite *TopologyTestSuite) TestLowScaleLinearFanout() {
+	suite.multiSystemEndToEndConnectedness(suite.linearFanoutTop, 1, 10, 100, 120, 5, 100, 4)
 }
 
-// TestModerateScale creates systems with
+// TestLowScaleRandomized creates systems with
+// 10 access nodes
+// 100 collection nodes in 4 clusters
+// 120 consensus nodes
+// 5 execution nodes
+// 100 verification nodes
+// and builds a randomized topology for the systems.
+// For each system, it then checks the end-to-end connectedness of the topology graph.
+func (suite *TopologyTestSuite) TestLowScaleRandomized() {
+	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 10, 100, 120, 5, 100, 4)
+}
+
+// TestModerateScaleLinearFanout creates systems with
 // 20 access nodes
 // 200 collection nodes in 8 clusters
 // 240 consensus nodes
 // 10 execution nodes
 // 100 verification nodes
-// and builds a stateful topology for the systems.
+// and builds a stateful linear fanout topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *TopologyTestSuite) TestModerateScale() {
-	suite.multiSystemEndToEndConnectedness(1, 20, 200, 240, 10, 200, 8)
+func (suite *TopologyTestSuite) TestModerateScaleLinearFanout() {
+	suite.multiSystemEndToEndConnectedness(suite.linearFanoutTop, 1, 20, 200, 240, 10, 200, 8)
 }
 
-// TestHighScale creates systems with
+// TestModerateScaleRandomized creates systems with
+// 20 access nodes
+// 200 collection nodes in 8 clusters
+// 240 consensus nodes
+// 10 execution nodes
+// 100 verification nodes
+// and builds a stateful randomized topology for the systems.
+// For each system, it then checks the end-to-end connectedness of the topology graph.
+func (suite *TopologyTestSuite) TestModerateScaleRandomized() {
+	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 20, 200, 240, 10, 200, 8)
+}
+
+// TestHighScaleLinearFanout creates systems with
 // 40 access nodes
 // 400 collection nodes in 16 clusters
 // 480 consensus nodes
@@ -61,8 +111,20 @@ func (suite *TopologyTestSuite) TestModerateScale() {
 // 400 verification nodes
 // and builds a stateful topology for the systems.
 // For each system, it then checks the end-to-end connectedness of the topology graph.
-func (suite *TopologyTestSuite) TestHighScale() {
-	suite.multiSystemEndToEndConnectedness(1, 40, 400, 480, 20, 400, 16)
+func (suite *TopologyTestSuite) TestHighScaleLinearFanout() {
+	suite.multiSystemEndToEndConnectedness(suite.linearFanoutTop, 1, 40, 400, 480, 20, 400, 16)
+}
+
+// TestHighScaleRandomized creates systems with
+// 40 access nodes
+// 400 collection nodes in 16 clusters
+// 480 consensus nodes
+// 20 execution nodes
+// 400 verification nodes
+// and builds a stateful randomized topology for the systems.
+// For each system, it then checks the end-to-end connectedness of the topology graph.
+func (suite *TopologyTestSuite) TestHighScaleRandomized() {
+	suite.multiSystemEndToEndConnectedness(suite.randomizedTop, 1, 40, 400, 480, 20, 400, 16)
 }
 
 // generateSystem is a test helper that given number of nodes per role as well as desire number of clusters
@@ -76,13 +138,11 @@ func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster 
 	flow.IdentityList,
 	[]network.SubscriptionManager) {
 
-	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-
-	collector, _ := test.GenerateIDs(suite.T(), logger, col, test.DryRun, unittest.WithRole(flow.RoleCollection))
-	access, _ := test.GenerateIDs(suite.T(), logger, acc, test.DryRun, unittest.WithRole(flow.RoleAccess))
-	consensus, _ := test.GenerateIDs(suite.T(), logger, con, test.DryRun, unittest.WithRole(flow.RoleConsensus))
-	verification, _ := test.GenerateIDs(suite.T(), logger, ver, test.DryRun, unittest.WithRole(flow.RoleVerification))
-	execution, _ := test.GenerateIDs(suite.T(), logger, exe, test.DryRun, unittest.WithRole(flow.RoleExecution))
+	collector, _ := test.GenerateIDs(suite.T(), suite.logger, col, test.DryRun, unittest.WithRole(flow.RoleCollection))
+	access, _ := test.GenerateIDs(suite.T(), suite.logger, acc, test.DryRun, unittest.WithRole(flow.RoleAccess))
+	consensus, _ := test.GenerateIDs(suite.T(), suite.logger, con, test.DryRun, unittest.WithRole(flow.RoleConsensus))
+	verification, _ := test.GenerateIDs(suite.T(), suite.logger, ver, test.DryRun, unittest.WithRole(flow.RoleVerification))
+	execution, _ := test.GenerateIDs(suite.T(), suite.logger, exe, test.DryRun, unittest.WithRole(flow.RoleExecution))
 
 	ids := flow.IdentityList{}
 	ids = ids.Union(collector)
@@ -92,7 +152,7 @@ func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster 
 	ids = ids.Union(execution)
 
 	// mocks state for collector nodes topology
-	state, _ := topology.CreateMockStateForCollectionNodes(suite.T(),
+	state, _ := topology.MockStateForCollectionNodes(suite.T(),
 		ids.Filter(filter.HasRole(flow.RoleCollection)), uint(cluster))
 
 	subMngrs := topology.MockSubscriptionManager(suite.T(), ids)
@@ -102,7 +162,8 @@ func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster 
 
 // multiSystemEndToEndConnectedness is a test helper evaluates end-to-end connectedness of the system graph
 // over several number of systems each with specified number of nodes on each role.
-func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, col, con, exe, ver, cluster int) {
+func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(constructorFunc factory, system, acc, col, con, exe, ver,
+	cluster int) {
 	// creates a histogram to keep average fanout of nodes in systems
 	var aveHist *thist.Hist
 	if suite.trace() {
@@ -110,7 +171,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 	}
 
 	for j := 0; j < system; j++ {
-		// adjacency map keeps graph component of a single channel ID
+		// adjacency map keeps graph component of a single channel
 		adjMap := make(map[flow.Identifier]flow.IdentityList)
 
 		// creates a flow system
@@ -126,7 +187,8 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 
 		// creates topology of the nodes
 		for i, id := range ids {
-			fanout := suite.topologyScenario(id.NodeID, subMngrs[i], ids, state)
+			fanout := suite.topologyScenario(constructorFunc, id.NodeID, subMngrs[i], ids, state)
+
 			adjMap[id.NodeID] = fanout
 
 			if suite.trace() {
@@ -143,7 +205,7 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 		}
 
 		// checks end-to-end connectedness of the topology
-		topology.CheckConnectedness(suite.T(), adjMap, ids)
+		topology.Connected(suite.T(), adjMap, ids, filter.Any)
 	}
 
 	if suite.trace() {
@@ -153,26 +215,23 @@ func (suite *TopologyTestSuite) multiSystemEndToEndConnectedness(system, acc, co
 
 // topologyScenario is a test helper that creates a StatefulTopologyManager with the LinearFanoutFunc,
 // it creates a TopicBasedTopology for the node and returns its fanout.
-func (suite *TopologyTestSuite) topologyScenario(me flow.Identifier,
+func (suite *TopologyTestSuite) topologyScenario(constructorFunc factory, me flow.Identifier,
 	subMngr network.SubscriptionManager,
 	ids flow.IdentityList,
-	state protocol.ReadOnlyState) flow.IdentityList {
+	state protocol.State) flow.IdentityList {
 
-	logger := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	// creates topology of the node as a topology cache.
+	top := topology.NewCache(suite.logger, constructorFunc(suite.T(), me, state, subMngr))
 
-	// creates topology of the node
-	top, err := topology.NewTopicBasedTopology(me, logger, state, subMngr)
-	require.NoError(suite.T(), err)
-
-	// generates topology of node
-	myFanout, err := top.GenerateFanout(ids)
+	// generates topology of node.
+	myFanout, err := top.GenerateFanout(ids, subMngr.Channels())
 	require.NoError(suite.T(), err)
 
 	return myFanout
 }
 
-// trace returns true if local environment variable Trace is found.
+// trace returns true if local environment variable trace is found.
 func (suite *TopologyTestSuite) trace() bool {
-	_, found := os.LookupEnv("Trace")
+	_, found := os.LookupEnv("trace")
 	return found
 }

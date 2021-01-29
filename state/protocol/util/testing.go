@@ -4,10 +4,13 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	mock2 "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
@@ -17,67 +20,106 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func ProtocolState(t testing.TB, db *badger.DB) *pbadger.State {
-	return WithProtocolState(t, db, pbadger.NewState)
+// MockReceiptValidator returns a ReceiptValidator that accepts
+// all receipts without performing any
+// integrity checks.
+func MockReceiptValidator() module.ReceiptValidator {
+	validator := &mock2.ReceiptValidator{}
+	validator.On("Validate", mock.Anything).Return(nil)
+	return validator
 }
 
-type createState func(
-	metrics module.ComplianceMetrics,
-	tracer module.Tracer,
-	db *badger.DB,
-	headers storage.Headers,
-	seals storage.Seals,
-	index storage.Index,
-	payloads storage.Payloads,
-	blocks storage.Blocks,
-	setups storage.EpochSetups,
-	commits storage.EpochCommits,
-	statuses storage.EpochStatuses,
-	consumer protocol.Consumer,
-) (*pbadger.State, error)
-
-func WithProtocolState(t testing.TB, db *badger.DB, create createState) *pbadger.State {
-	metrics := metrics.NewNoopCollector()
-	tracer := trace.NewNoopTracer()
-	consumer := events.NewNoop()
-	headers, _, seals, index, payloads, blocks, setups, commits, statuses := util.StorageLayer(t, db)
-	proto, err := create(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
-	require.NoError(t, err)
-	return proto
+// MockSealValidator returns a SealValidator that accepts
+// all seals without performing any
+// integrity checks, returns first seal in block as valid one
+func MockSealValidator(sealsDB storage.Seals) module.SealValidator {
+	validator := &mock2.SealValidator{}
+	validator.On("Validate", mock.Anything).Return(
+		func(candidate *flow.Block) *flow.Seal {
+			if len(candidate.Payload.Seals) > 0 {
+				return candidate.Payload.Seals[0]
+			}
+			last, _ := sealsDB.ByBlockID(candidate.Header.ParentID)
+			return last
+		},
+		func(candidate *flow.Block) error {
+			if len(candidate.Payload.Seals) > 0 {
+				return nil
+			}
+			_, err := sealsDB.ByBlockID(candidate.Header.ParentID)
+			return err
+		}).Maybe()
+	return validator
 }
 
-func RunWithProtocolState(t testing.TB, f func(*badger.DB, *pbadger.State)) {
+func RunWithBootstrapState(t testing.TB, stateRoot *pbadger.StateRoot, f func(*badger.DB, *pbadger.State)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		proto := ProtocolState(t, db)
-		f(db, proto)
-	})
-}
-
-// use this function if you'd like to create your own protocol state with customized dependencies
-func RunWithProtocolStateDeps(t testing.TB, create createState, f func(*badger.DB, *pbadger.State)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		proto := WithProtocolState(t, db, create)
-		f(db, proto)
-	})
-}
-
-func RunWithProtocolStateAndConsumer(t testing.TB, consumer protocol.Consumer, f func(*badger.DB, *pbadger.State)) {
-	RunWithProtocolStateDeps(t, func(
-		metrics module.ComplianceMetrics,
-		tracer module.Tracer,
-		db *badger.DB,
-		headers storage.Headers,
-		seals storage.Seals,
-		index storage.Index,
-		payloads storage.Payloads,
-		blocks storage.Blocks,
-		setups storage.EpochSetups,
-		commits storage.EpochCommits,
-		statuses storage.EpochStatuses,
-		c protocol.Consumer,
-	) (*pbadger.State, error) {
-		proto, err := pbadger.NewState(metrics, tracer, db, headers, seals, index, payloads, blocks, setups, commits, statuses, consumer)
+		metrics := metrics.NewNoopCollector()
+		headers, _, seals, _, _, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
+		stateRoot, err := pbadger.NewStateRoot(stateRoot.Block(), stateRoot.Result(), stateRoot.Seal(), stateRoot.EpochSetupEvent().FirstView)
 		require.NoError(t, err)
-		return proto, nil
-	}, f)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+		f(db, state)
+	})
+}
+
+func RunWithFullProtocolState(t testing.TB, stateRoot *pbadger.StateRoot, f func(*badger.DB, *pbadger.MutableState)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		consumer := events.NewNoop()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+		receiptValidator := MockReceiptValidator()
+		sealValidator := MockSealValidator(seals)
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		require.NoError(t, err)
+		f(db, fullState)
+	})
+}
+
+func RunWithFullProtocolStateAndValidator(t testing.TB, stateRoot *pbadger.StateRoot, validator module.ReceiptValidator, f func(*badger.DB, *pbadger.MutableState)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		consumer := events.NewNoop()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+		sealValidator := MockSealValidator(seals)
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, validator, sealValidator)
+		require.NoError(t, err)
+		f(db, fullState)
+	})
+}
+
+func RunWithFollowerProtocolState(t testing.TB, stateRoot *pbadger.StateRoot, f func(*badger.DB, *pbadger.FollowerState)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		consumer := events.NewNoop()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer)
+		require.NoError(t, err)
+		f(db, followerState)
+	})
+}
+
+func RunWithFullProtocolStateAndConsumer(t testing.TB, stateRoot *pbadger.StateRoot, consumer protocol.Consumer, f func(*badger.DB, *pbadger.MutableState)) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := util.StorageLayer(t, db)
+		state, err := pbadger.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+		receiptValidator := MockReceiptValidator()
+		sealValidator := MockSealValidator(seals)
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		require.NoError(t, err)
+		f(db, fullState)
+	})
 }

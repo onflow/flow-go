@@ -31,7 +31,7 @@ int check_membership_Zr(const bn_t a){
 }
 
 // checks if input point s is on the curve E1
-// and is in the subgroup G1
+// and is in the subgroup G1. 
 int check_membership_G1(const ep_t p){
 #if MEMBERSHIP_CHECK
     // check p is on curve
@@ -51,15 +51,14 @@ int check_membership_G1(const ep_t p){
 }
 
 // checks if input point s is on the curve E2 
-// and is in the subgroup G2
-// membership check in G2 is using a scalar multiplication by the group order
+// and is in the subgroup G2.
+// 
+// membership check in G2 is using a scalar multiplication by the group order.
 // TODO: switch to the faster Bowe check 
 int check_membership_G2(const ep2_t p){
 #if MEMBERSHIP_CHECK
-    // check p is on curve and is non-identity
-    if (!ep2_on_curve((ep2_st*)p) || ep2_is_infty((ep2_st*)p))
-        return INVALID;
-    if (ep2_is_infty((ep2_st*)p))
+    // check p is on curve
+    if (!ep2_on_curve((ep2_st*)p))
         return INVALID;
     // check p is in G2
     #if MEMBERSHIP_CHECK_G2 == EXP_ORDER

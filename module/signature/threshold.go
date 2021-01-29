@@ -22,6 +22,10 @@ type ThresholdVerifier struct {
 //   m<=t for unforgeability
 //   n-m>=t+1 for robustness
 func RandomBeaconThreshold(size int) int {
+	// avoid initializing the thershold to 0 when n=2
+	if size == 2 {
+		return 1
+	}
 	return (size - 1) / 2
 }
 
@@ -74,13 +78,30 @@ func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
 	return tp.priv.Sign(msg, tp.hasher)
 }
 
+// check if there are enough shares for the threshold signature reconstruction
+func EnoughThresholdShares(size int, shares int) (bool, error) {
+	// isolate the case with one node
+	if size == 1 {
+		return shares > 0, nil
+	}
+	enoughShares, err := crypto.EnoughShares(RandomBeaconThreshold(size), shares)
+	if err != nil {
+		return false, fmt.Errorf("could not check the threshold: %w", err)
+	}
+	return enoughShares, nil
+}
+
 // Combine will combine the provided public signature shares to attempt and reconstruct a threshold
 // signature for the group of the given size. The indices represent the index for ech signature share
 // within the DKG algorithm.
 func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
 
 	// check that we have sufficient shares to reconstruct the threshold signature
-	if !crypto.EnoughShares(RandomBeaconThreshold(int(size)), len(shares)) {
+	enoughShares, err := EnoughThresholdShares(int(size), len(shares))
+	if err != nil {
+		return nil, fmt.Errorf("error in combine: %w", err)
+	}
+	if !enoughShares {
 		return nil, fmt.Errorf("not enough signature shares (size: %d, shares: %d)", size, len(shares))
 	}
 
@@ -91,6 +112,9 @@ func (tp *ThresholdProvider) Combine(size uint, shares []crypto.Signature, indic
 	}
 
 	// try to reconstruct the threshold signature using the given shares & indices
+	if size == 1 { // isolate the one-node case, not supported by the crypto API
+		return shares[0], nil
+	}
 	thresSig, err := crypto.ReconstructThresholdSignature(int(size), RandomBeaconThreshold(int(size)), shares, converted)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct threshold signature: %w", err)

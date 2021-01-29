@@ -21,18 +21,18 @@ func NewSHA3_256() Hasher {
 		Hash: sha3.New256()}
 }
 
-// ComputeHash calculates and returns the SHA3-256 output of input byte array
+// ComputeHash calculates and returns the SHA3-256 output of input byte array.
+// It does not reset the state to allow further writing.
 func (s *sha3_256Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
 	_, _ = s.Write(data)
 	return s.Sum(nil)
 }
 
-// SumHash returns the SHA3-256 output and resets the hash state
+// SumHash returns the SHA3-256 output.
+// It does not reset the state to allow further writing.
 func (s *sha3_256Algo) SumHash() Hash {
-	digest := s.Sum(nil)
-	s.Reset()
-	return digest
+	return s.Sum(nil)
 }
 
 // sha3_384Algo, embeds commonHasher
@@ -50,16 +50,16 @@ func NewSHA3_384() Hasher {
 		Hash: sha3.New384()}
 }
 
-// ComputeHash calculates and returns the SHA3-256 output of input byte array
+// ComputeHash calculates and returns the SHA3-384 output of input byte array.
+// It does not reset the state to allow further writing.
 func (s *sha3_384Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
 	_, _ = s.Write(data)
 	return s.Sum(nil)
 }
 
-// SumHash returns the SHA3-256 output and resets the hash state
+// SumHash returns the SHA3-384 output.
+// It does not reset the state to allow further writing.
 func (s *sha3_384Algo) SumHash() Hash {
-	digest := s.Sum(nil)
-	s.Reset()
-	return digest
+	return s.Sum(nil)
 }

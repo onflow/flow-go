@@ -93,7 +93,7 @@ generate-proto:
 
 .PHONY: generate-mocks
 generate-mocks:
-	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Payloads,Collections,Commits,Events,TransactionResults
+	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Network,Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
 	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
@@ -115,7 +115,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'Connector' -dir=network/p2p/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'SubscriptionManager' -dir=network/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
-	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'Vertex' -dir="./module/forest" -case=underscore -output="./module/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ConnectionFactory' -dir="./engine/access/rpc/backend" -case=underscore -output="./engine/access/rpc/backend/mock" -outpkg="mock"
@@ -375,7 +375,7 @@ docker-run-ghost:
 # Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep 1.13 || go version | grep 1.14
+	go version | grep 1.13 || go version | grep 1.14 || go version | grep 1.15
 
 #----------------------------------------------------------------------
 # CD COMMANDS

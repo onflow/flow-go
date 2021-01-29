@@ -60,7 +60,7 @@ func TestDistinctChunkIDs_FullChunks(t *testing.T) {
 	require.NotEqual(t, blockIdA, blockIdB)
 
 	// generates a chunk associated with blockA
-	chunkA := unittest.ChunkFixture(blockIdA)
+	chunkA := unittest.ChunkFixture(blockIdA, 42)
 
 	// generates a deep copy of chunkA in chunkB
 	chunkB := *chunkA

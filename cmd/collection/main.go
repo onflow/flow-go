@@ -36,6 +36,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
 )
@@ -57,8 +59,9 @@ func main() {
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
 
-		ingestConf  ingest.Config
-		ingressConf ingress.Config
+		followerState protocol.MutableState
+		ingestConf    ingest.Config
+		ingressConf   ingress.Config
 
 		pools          *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer *buffer.PendingBlocks       // pending block cache for follower
@@ -81,25 +84,23 @@ func main() {
 				"maximum per-transaction gas limit")
 			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
 				"whether we check that inbound transactions are parse-able")
-			flags.BoolVar(&ingestConf.AllowUnknownReference, "ingest-allow-unknown-reference", true,
-				"whether we ingest transactions referencing an unknown block")
 			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
 				"expiry buffer for inbound transactions")
 			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 				"how many additional cluster members we propagate transactions to")
 			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 1_000_000,
 				"the maximum address index allowed in transactions")
-			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", 25,
+			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 				"expiry buffer for transactions in proposed collections")
-			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", 0, // no rate limiting
+			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
 				"rate limit for each payer (transactions/collection)")
 			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 				"set of payer addresses which are omitted from rate limiting")
-			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", 200,
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", builder.DefaultMaxCollectionSize,
 				"maximum number of transactions in proposed collections")
-			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", 1750000,
+			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", builder.DefaultMaxCollectionByteSize,
 				"maximum byte size of the proposed collection")
-			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", 10000000,
+			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", builder.DefaultMaxCollectionTotalGas,
 				"maximum total amount of maxgas of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")
@@ -116,6 +117,22 @@ func main() {
 				"additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badgerState.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
 			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
@@ -142,7 +159,7 @@ func main() {
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -194,7 +211,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				followerBuffer,
 				followerCore,
 				mainChainSyncCore,

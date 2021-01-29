@@ -9,13 +9,14 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+// Transactions ...
 type Transactions struct {
 	db    *badger.DB
 	cache *Cache
 }
 
+// NewTransactions ...
 func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transactions {
-
 	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
 		txID := key.(flow.Identifier)
 		flowTx := val.(*flow.TransactionBody)
@@ -43,6 +44,18 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 	return t
 }
 
+// Store ...
+func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
+	return operation.RetryOnConflict(t.db.Update, t.storeTx(flowTx))
+}
+
+// ByID ...
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
+	tx := t.db.NewTransaction(false)
+	defer tx.Discard()
+	return t.retrieveTx(txID)(tx)
+}
+
 func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*badger.Txn) error {
 	return t.cache.Put(flowTx.ID(), flowTx)
 }
@@ -55,14 +68,4 @@ func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow
 		}
 		return val.(*flow.TransactionBody), err
 	}
-}
-
-func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
-	return operation.RetryOnConflict(t.db.Update, t.storeTx(flowTx))
-}
-
-func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	tx := t.db.NewTransaction(false)
-	defer tx.Discard()
-	return t.retrieveTx(txID)(tx)
 }

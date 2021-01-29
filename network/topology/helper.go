@@ -5,7 +5,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -19,10 +18,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// CreateMockStateForCollectionNodes is a test helper function that generate a mock state
+// MockStateForCollectionNodes is a test helper function that generate a mock state
 // clustering collection nodes into `clusterNum` clusters.
-func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList,
-	clusterNum uint) (protocol.State, flow.ClusterList) {
+func MockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityList, clusterNum uint) (protocol.State, flow.ClusterList) {
 	state := new(mockprotocol.State)
 	snapshot := new(mockprotocol.Snapshot)
 	epochQuery := new(mockprotocol.EpochQuery)
@@ -39,24 +37,17 @@ func CreateMockStateForCollectionNodes(t *testing.T, collectorIds flow.IdentityL
 	return state, clusters
 }
 
-// CheckConnectedness verifies graph as a whole is connected.
-func CheckConnectedness(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList) {
-	CheckGraphConnected(t, adjMap, ids, filter.Any)
-}
-
-// CheckConnectednessByChannelID verifies that the subgraph of nodes subscribed to a channelID is connected.
-func CheckConnectednessByChannelID(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList,
-	channelID string) {
-	roles, ok := engine.RolesByChannelID(channelID)
+// connectednessByChannel verifies that the subgraph of nodes subscribed to a channel is connected.
+func connectednessByChannel(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, channel network.Channel) {
+	roles, ok := engine.RolesByChannel(channel)
 	require.True(t, ok)
-	CheckGraphConnected(t, adjMap, ids, filter.HasRole(roles...))
+	Connected(t, adjMap, ids, filter.HasRole(roles...))
 }
 
-// CheckGraphConnected checks if the graph represented by the adjacency matrix is connected.
+// Connected checks if the graph represented by the adjacency matrix is connected.
 // It traverses the adjacency map starting from an arbitrary node and checks if all nodes that satisfy the filter
 // were visited.
-func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, f flow.IdentityFilter) {
-
+func Connected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, ids flow.IdentityList, f flow.IdentityFilter) {
 	// filter the ids and find the expected node count
 	expectedIDs := ids.Filter(f)
 	expectedCount := len(expectedIDs)
@@ -67,12 +58,18 @@ func CheckGraphConnected(t *testing.T, adjMap map[flow.Identifier]flow.IdentityL
 	visited := make(map[flow.Identifier]bool)
 	dfs(startID, adjMap, visited, f)
 
-	// assert that expected number of nodes were visited by DFS
-	assert.Equal(t, expectedCount, len(visited))
+	// requires that expected number of nodes were visited by DFS,
+	// and each expected identifier been visited, these conditions together
+	// evaluate a 1-1 correspondences between visited and expected identifiers
+	require.Equal(t, expectedCount, len(visited))
+	for _, id := range expectedIDs {
+		_, ok := visited[id.NodeID]
+		require.True(t, ok)
+	}
 }
 
 // MockSubscriptionManager returns a list of mocked subscription manages for the input
-// identities. It only mocks the GetChannelIDs method of the subscription manager. Other methods
+// identities. It only mocks the Channels method of the subscription manager. Other methods
 // return an error, as they are not supposed to be invoked.
 func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.SubscriptionManager {
 	require.NotEmpty(t, ids)
@@ -84,7 +81,7 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.Subs
 		sm.On("Register", mock.Anything, mock.Anything).Return(err)
 		sm.On("Unregister", mock.Anything).Return(err)
 		sm.On("GetEngine", mock.Anything).Return(err)
-		sm.On("GetChannelIDs").Return(engine.ChannelIDsByRole(id.Role))
+		sm.On("Channels").Return(engine.ChannelsByRole(id.Role))
 		sms[i] = sm
 	}
 
@@ -136,4 +133,38 @@ func dfs(currentID flow.Identifier,
 	for _, id := range adjMap[currentID].Filter(filter) {
 		dfs(id.NodeID, adjMap, visited, filter)
 	}
+}
+
+// uniquenessCheck is a test helper method that fails the test if `ids` identity list include any duplicate identity.
+func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
+	seen := make(map[flow.Identity]struct{})
+	for _, id := range ids {
+		// checks if id is duplicate in ids list
+		_, ok := seen[*id]
+		require.False(t, ok)
+
+		// marks id as seen
+		seen[*id] = struct{}{}
+	}
+}
+
+// clusterChannels is a test helper method that returns all cluster-based channel.
+func clusterChannels(t *testing.T) network.ChannelList {
+	channels := make(network.ChannelList, 0)
+	for _, channel := range engine.Channels() {
+		if _, ok := engine.ClusterChannel(channel); !ok {
+			// skips non-cluster channels
+			continue
+		}
+
+		channels = append(channels, channel)
+	}
+
+	require.NotEmpty(t, channels, "empty cluster-based channels")
+	return channels
+}
+
+// connectedByCluster is a test helper that checks `all` nodes belong to a cluster are connected.
+func connectedByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, all flow.IdentityList, cluster flow.IdentityList) {
+	Connected(t, adjMap, all, filter.In(cluster))
 }

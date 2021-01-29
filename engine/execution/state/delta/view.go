@@ -131,7 +131,7 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 }
 
 // Set sets a register value in this view.
-func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
+func (v *View) Set(owner, controller, key string, value flow.RegisterValue) error {
 	// every time we write something to delta (order preserving) we update spock
 	// TODO return the error and handle it properly on other places
 	err := v.updateSpock(value)
@@ -145,10 +145,7 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) {
 	v.regTouchSet[registerID.String()] = registerID
 	// add key value to delta
 	v.delta.Set(owner, controller, key, value)
-}
-
-func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	return v.delta.RegisterUpdates()
+	return nil
 }
 
 func (v *View) updateSpock(value []byte) error {
@@ -160,7 +157,7 @@ func (v *View) updateSpock(value []byte) error {
 }
 
 // Touch explicitly adds a register to the touched registers set.
-func (v *View) Touch(owner, controller, key string) {
+func (v *View) Touch(owner, controller, key string) error {
 
 	k := toRegisterID(owner, controller, key)
 
@@ -168,11 +165,13 @@ func (v *View) Touch(owner, controller, key string) {
 	v.regTouchSet[k.String()] = k
 	// increase reads
 	v.readsCount++
+
+	return nil
 }
 
 // Delete removes a register in this view.
-func (v *View) Delete(owner, controller, key string) {
-	v.Set(owner, controller, key, nil)
+func (v *View) Delete(owner, controller, key string) error {
+	return v.Set(owner, controller, key, nil)
 }
 
 // Delta returns a record of the registers that were mutated in this view.

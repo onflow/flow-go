@@ -91,6 +91,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
+	serviceEvents := storage.NewMockServiceEvents(ctrl)
 	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
@@ -149,6 +150,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		blocks,
 		collections,
 		events,
+		serviceEvents,
 		txResults,
 		computationManager,
 		providerEngine,
@@ -237,8 +239,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			}),
 		).
 		Return(nil)
-
-	ctx.executionState.On("PersistStateInteractions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	ctx.providerEngine.
 		On(
@@ -339,26 +339,28 @@ func TestChunkIndexIsSet(t *testing.T) {
 
 func TestExecuteOneBlock(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
+
 		// A <- B
-		blockA := unittest.ExecutableBlockFixture(nil)
-		blockA.StartState = unittest.StateCommitmentFixture()
+		blockA := unittest.BlockHeaderFixture()
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB.StartState = unittest.StateCommitmentFixture()
 
 		// blockA's start state is its parent's state commitment,
 		// and blockA's parent has been executed.
 		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockA.Block.Header.ParentID] = blockA.StartState
+		commits[blockB.Block.Header.ParentID] = blockB.StartState
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
 		})
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blockA.Block.Header, nil)
+		ctx.snapshot.On("Head").Return(&blockA, nil)
 
-		ctx.assertSuccessfulBlockComputation(blockA, unittest.IdentifierFixture())
+		ctx.assertSuccessfulBlockComputation(blockB, unittest.IdentifierFixture())
 
-		wg.Add(1) // wait for block A to be executed
-		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
+		wg.Add(1) // wait for block B to be executed
+		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
 		require.NoError(t, err)
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
@@ -366,7 +368,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		require.False(t, more)
 
-		_, ok := commits[blockA.ID()]
+		_, ok := commits[blockB.ID()]
 		require.True(t, ok)
 	})
 }
@@ -384,8 +386,10 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		// create blocks with the following relations
 		// A <- B
 		// A <- C <- D
+		blockSealed := unittest.BlockHeaderFixture()
+
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixture(nil)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
 		blocks["A"].StartState = unittest.StateCommitmentFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -411,7 +415,8 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		// make sure the seal height won't trigger state syncing, so that all blocks
 		// will be executed.
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blocks["A"].Block.Header, nil)
+		// a receipt for sealed block won't be broadcasted
+		ctx.snapshot.On("Head").Return(&blockSealed, nil)
 
 		// once block A is computed, it should trigger B and C being sent to compute,
 		// which in turn should trigger D
@@ -471,7 +476,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
 		Return(previousExecutionResultID, nil)
 
-	er, err := e.generateExecutionResultForBlock(context.Background(), executableBlock.Block, nil, endState)
+	er, err := e.generateExecutionResultForBlock(context.Background(), executableBlock.Block, nil, endState, nil)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)
@@ -538,10 +543,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
-			&flow.ExecutionResult{
-				ExecutionResultBody: flow.ExecutionResultBody{},
-				Signatures:          nil,
-			},
+			&flow.ExecutionResult{},
 			snapshots,
 		)
 		require.NoError(t, err)
@@ -618,6 +620,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		blocks,
 		collections,
 		events,
+		events,
 		txResults,
 		computationManager,
 		providerEngine,
@@ -651,7 +654,7 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -672,11 +675,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -697,11 +700,11 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -725,13 +728,13 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -756,13 +759,13 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -787,12 +790,12 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 
 		logChain(chain)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockD))
-		require.NoError(t, ps.Mutate().Finalize(blockA.ID()))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockD))
+		require.NoError(t, ps.Finalize(blockA.ID()))
 
 		es := mocks.NewExecutionState(seal)
 		engine := newIngestionEngine(t, ps, es)
@@ -834,20 +837,20 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 		logChain(fork2)
 		logChain(fork3)
 
-		require.NoError(t, ps.Mutate().Bootstrap(genesis, result, seal))
-		require.NoError(t, ps.Mutate().Extend(blockA))
-		require.NoError(t, ps.Mutate().Extend(blockB))
-		require.NoError(t, ps.Mutate().Extend(blockC))
-		require.NoError(t, ps.Mutate().Extend(blockI))
-		require.NoError(t, ps.Mutate().Extend(blockJ))
-		require.NoError(t, ps.Mutate().Extend(blockK))
-		require.NoError(t, ps.Mutate().Extend(blockD))
-		require.NoError(t, ps.Mutate().Extend(blockE))
-		require.NoError(t, ps.Mutate().Extend(blockF))
-		require.NoError(t, ps.Mutate().Extend(blockG))
-		require.NoError(t, ps.Mutate().Extend(blockH))
+		require.NoError(t, ps.Bootstrap(genesis, result, seal))
+		require.NoError(t, ps.Extend(blockA))
+		require.NoError(t, ps.Extend(blockB))
+		require.NoError(t, ps.Extend(blockC))
+		require.NoError(t, ps.Extend(blockI))
+		require.NoError(t, ps.Extend(blockJ))
+		require.NoError(t, ps.Extend(blockK))
+		require.NoError(t, ps.Extend(blockD))
+		require.NoError(t, ps.Extend(blockE))
+		require.NoError(t, ps.Extend(blockF))
+		require.NoError(t, ps.Extend(blockG))
+		require.NoError(t, ps.Extend(blockH))
 
-		require.NoError(t, ps.Mutate().Finalize(blockC.ID()))
+		require.NoError(t, ps.Finalize(blockC.ID()))
 
 		es := mocks.NewExecutionState(seal)
 

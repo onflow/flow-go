@@ -246,10 +246,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 		// ExecutionResult setup
 		result := flow.ExecutionResult{
-			ExecutionResultBody: flow.ExecutionResultBody{
-				BlockID: blockID,
-				Chunks:  flow.ChunkList{&chunk},
-			},
+			BlockID: blockID,
+			Chunks:  flow.ChunkList{&chunk},
 		}
 
 		verifiableChunkData = verification.VerifiableChunkData{
@@ -277,16 +275,16 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Ledger) err
 	switch string(tx.Transaction.Script) {
 	case "wrongEndState":
 		// add updates to the ledger
-		led.Set("00", "", "", []byte{'F'})
+		_ = led.Set("00", "", "", []byte{'F'})
 		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
 		// add updates to the ledger
-		led.Set("00", "", "", []byte{'F'})
+		_ = led.Set("00", "", "", []byte{'F'})
 		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		_, _ = led.Get("00", "", "")
 		_, _ = led.Get("05", "", "")
-		led.Set("05", "", "", []byte{'B'})
+		_ = led.Set("05", "", "", []byte{'B'})
 		tx.Logs = []string{"log1", "log2"}
 	}
 

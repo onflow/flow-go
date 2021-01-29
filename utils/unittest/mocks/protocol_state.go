@@ -20,7 +20,7 @@ import (
 // value, then just use this module
 type ProtocolState struct {
 	sync.Mutex
-	protocol.State
+	protocol.MutableState
 	blocks    map[flow.Identifier]*flow.Block
 	children  map[flow.Identifier][]flow.Identifier
 	heights   map[uint64]*flow.Block
@@ -36,11 +36,6 @@ func NewProtocolState() *ProtocolState {
 		children: make(map[flow.Identifier][]flow.Identifier),
 		heights:  make(map[uint64]*flow.Block),
 	}
-}
-
-type ProtocolStateMutator struct {
-	protocolmock.Mutator
-	ps *ProtocolState
 }
 
 type Params struct {
@@ -130,82 +125,75 @@ func pending(ps *ProtocolState, blockID flow.Identifier) []flow.Identifier {
 	return pendingIDs
 }
 
-func (ps *ProtocolState) Mutate() protocol.Mutator {
-	return &ProtocolStateMutator{
-		protocolmock.Mutator{},
-		ps,
-	}
-}
+func (m *ProtocolState) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
+	m.Lock()
+	defer m.Unlock()
 
-func (m *ProtocolStateMutator) Bootstrap(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal) error {
-	m.ps.Lock()
-	defer m.ps.Unlock()
-
-	if _, ok := m.ps.blocks[root.ID()]; ok {
+	if _, ok := m.blocks[root.ID()]; ok {
 		return storage.ErrAlreadyExists
 	}
 
-	m.ps.blocks[root.ID()] = root
-	m.ps.root = root
-	m.ps.result = result
-	m.ps.seal = seal
-	m.ps.heights[root.Header.Height] = root
-	m.ps.finalized = root.Header.Height
+	m.blocks[root.ID()] = root
+	m.root = root
+	m.result = result
+	m.seal = seal
+	m.heights[root.Header.Height] = root
+	m.finalized = root.Header.Height
 	return nil
 }
 
-func (m *ProtocolStateMutator) Extend(block *flow.Block) error {
-	m.ps.Lock()
-	defer m.ps.Unlock()
+func (m *ProtocolState) Extend(block *flow.Block) error {
+	m.Lock()
+	defer m.Unlock()
 
 	id := block.ID()
-	if _, ok := m.ps.blocks[id]; ok {
+	if _, ok := m.blocks[id]; ok {
 		return storage.ErrAlreadyExists
 	}
 
-	if _, ok := m.ps.blocks[block.Header.ParentID]; !ok {
+	if _, ok := m.blocks[block.Header.ParentID]; !ok {
 		return fmt.Errorf("could not retrieve parent")
 	}
 
-	m.ps.blocks[id] = block
+	m.blocks[id] = block
 
 	// index children
-	children, ok := m.ps.children[block.Header.ParentID]
+	children, ok := m.children[block.Header.ParentID]
 	if !ok {
 		children = make([]flow.Identifier, 0)
 	}
 
 	children = append(children, id)
-	m.ps.children[block.Header.ParentID] = children
+	m.children[block.Header.ParentID] = children
 
 	return nil
 }
 
-func (m *ProtocolStateMutator) Finalize(blockID flow.Identifier) error {
-	m.ps.Lock()
-	defer m.ps.Unlock()
+func (m *ProtocolState) Finalize(blockID flow.Identifier) error {
+	m.Lock()
+	defer m.Unlock()
 
-	block, ok := m.ps.blocks[blockID]
+	block, ok := m.blocks[blockID]
 	if !ok {
 		return fmt.Errorf("could not retrieve final header")
 	}
 
-	if block.Header.Height <= m.ps.finalized {
+	if block.Header.Height <= m.finalized {
 		return fmt.Errorf("could not finalize old blocks")
 	}
 
 	// update heights
 	cur := block
-	for height := cur.Header.Height; height > m.ps.finalized; height-- {
-		parent, ok := m.ps.blocks[cur.Header.ParentID]
+	for height := cur.Header.Height; height > m.finalized; height-- {
+		parent, ok := m.blocks[cur.Header.ParentID]
 		if !ok {
 			return fmt.Errorf("parent does not exist for block at height: %v, parentID: %v", cur.Header.Height, cur.Header.ParentID)
 		}
-		m.ps.heights[height] = cur
+		m.heights[height] = cur
 		cur = parent
 	}
 
-	m.ps.finalized = block.Header.Height
+	m.finalized = block.Header.Height
 
 	return nil
 }

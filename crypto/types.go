@@ -70,17 +70,19 @@ const (
 
 	// DKG and Threshold Signatures
 
+	// MinimumThreshold is the minimum value of the threshold parameter in all threshold-based protocols.
+	MinimumThreshold = 1
 	// DKGMinSize is the minimum size of a group participating in a DKG protocol
-	DKGMinSize int = 1
-	// DKGMaxSize is the minimum size of a group participating in a DKG protocol
+	DKGMinSize int = MinimumThreshold + 1
+	// DKGMaxSize is the maximum size of a group participating in a DKG protocol
 	DKGMaxSize int = 254
 	// SeedMinLenDKG is the minumum seed length required to participate in a DKG protocol
 	SeedMinLenDKG = securityBits / 8
 	SeedMaxLenDKG = maxRelicPrgSeed
-	// ThresholdMinSize is the minimum size of a group participating in a threshold signature protocol
-	ThresholdMinSize = DKGMinSize
-	// ThresholdMaxSize is the minimum size of a group participating in a threshold signature protocol
-	ThresholdMaxSize = DKGMaxSize
+	// ThresholdSignMinSize is the minimum size of a group participating in a threshold signature protocol
+	ThresholdSignMinSize = MinimumThreshold + 1
+	// ThresholdSignMaxSize is the maximum size of a group participating in a threshold signature protocol
+	ThresholdSignMaxSize = DKGMaxSize
 
 	// Relic internal constant (related to exported constants above)
 	// max byte length of bn_st set to 2048 bits

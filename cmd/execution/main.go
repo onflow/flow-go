@@ -40,12 +40,15 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 func main() {
 
 	var (
+		followerState         protocol.MutableState
 		ledgerStorage         *ledger.Ledger
 		events                *storage.Events
 		txResults             *storage.TransactionResults
@@ -67,6 +70,7 @@ func main() {
 		collector             module.ExecutionMetrics
 		mTrieCacheSize        uint32
 		checkpointDistance    uint
+		checkpointsToKeep     uint
 		stateDeltasLimit      uint
 		requestInterval       time.Duration
 		preferredExeNodeIDStr string
@@ -85,6 +89,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 10, "number of WAL segments between checkpoints")
+			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
@@ -92,6 +97,22 @@ func main() {
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+		}).
+		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			followerState, err = badgerState.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+			)
+			return err
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
 			rt := runtime.NewInterpreterRuntime()
@@ -121,8 +142,8 @@ func main() {
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
-			results = storage.NewExecutionResults(node.DB)
-			receipts = storage.NewExecutionReceipts(node.DB, results)
+			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
+			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -177,7 +198,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
 
 			return compactor, nil
 		}).
@@ -229,6 +250,7 @@ func main() {
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
+			serviceEvents := storage.NewServiceEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
@@ -239,6 +261,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				events,
+				serviceEvents,
 				txResults,
 				computationManager,
 				providerEngine,
@@ -267,7 +290,7 @@ func main() {
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, node.State)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -306,7 +329,7 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				node.State,
+				followerState,
 				pendingBlocks,
 				followerCore,
 				syncCore,

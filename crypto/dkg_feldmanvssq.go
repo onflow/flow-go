@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 )
 
 // Implements Feldman Verifiable Secret Sharing using
@@ -136,10 +137,12 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// check if a complaint has remained without an answer
 	// a leader is disqualified if a complaint was never answered
 	if !s.disqualified {
-		for _, c := range s.complaints {
+		for complainer, c := range s.complaints {
 			if c.received && !c.answerReceived {
 				s.disqualified = true
-				s.processor.Blacklist(int(s.leaderIndex))
+				s.processor.Disqualify(int(s.leaderIndex),
+					fmt.Sprintf("complaint from %d was not answered",
+						complainer))
 				break
 			}
 		}
@@ -148,7 +151,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// If the leader is disqualified, all keys are ignored
 	// otherwise, the keys are valid
 	if s.disqualified {
-		return nil, nil, nil, nil
+		return nil, nil, nil, errors.New("leader is disqualified")
 	}
 
 	// private key of the current node
@@ -170,8 +173,8 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 }
 
 const (
-	complaintSize      = 1
-	complainAnswerSize = 1 + PrKeyLenBLSBLS12381
+	complaintSize       = 1
+	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
 )
 
 // HandleMsg processes a new message received by the current node
@@ -181,15 +184,16 @@ func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return errors.New("wrong input")
+		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
+			s.Size(), orig)
 	}
 
 	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, wrongFormat)
+		s.processor.FlagMisbehavior(orig, "received message is empty")
 		return nil
 	}
 
-	// In case a broadcasted message is received by the origin node,
+	// In case a message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
 		return nil
@@ -210,21 +214,24 @@ func (s *feldmanVSSQualState) HandleMsg(orig int, msg []byte) error {
 	case feldmanVSSComplaintAnswer:
 		s.receiveComplaintAnswer(index(orig), msg[1:])
 	default:
-		s.processor.FlagMisbehavior(orig, wrongFormat)
+		s.processor.FlagMisbehavior(orig,
+			fmt.Sprintf("invalid message header, got %d",
+				dkgMsgTag(msg[0])))
 	}
 	return nil
 }
 
-// Disqualify forces a node to get disqualified
+// ForceDisqualify forces a node to get disqualified
 // for a reason outside of the DKG protocol
 // The caller should make sure all honest nodes call this function,
 // otherwise, the protocol can be broken
-func (s *feldmanVSSQualState) Disqualify(node int) error {
+func (s *feldmanVSSQualState) ForceDisqualify(node int) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return errors.New("wrong input")
+		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
+			s.Size(), node)
 	}
 	if index(node) == s.leaderIndex {
 		s.disqualified = true
@@ -237,7 +244,8 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 	// if verif vector is not received, disqualify the leader
 	if !s.vAReceived {
 		s.disqualified = true
-		s.processor.Blacklist(int(s.leaderIndex))
+		s.processor.Disqualify(int(s.leaderIndex),
+			"verification vector was not received")
 		return
 	}
 	// if share is not received, make a complaint
@@ -259,34 +267,45 @@ func (s *feldmanVSSQualState) setComplaintsTimeout() {
 	// (i.e there is no complaint with (!c.received && c.answerReceived)
 	if len(s.complaints) > s.threshold {
 		s.disqualified = true
-		s.processor.Blacklist(int(s.leaderIndex))
+		s.processor.Disqualify(int(s.leaderIndex),
+			fmt.Sprintf("there are %d complaints, they exceeded the threshold %d",
+				len(s.complaints), s.threshold))
 	}
 }
 
 func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 	// check the share timeout
 	if s.sharesTimeout {
-		s.processor.FlagMisbehavior(int(origin), wrongProtocol)
+		s.processor.FlagMisbehavior(int(origin),
+			"private share is received after the shares timeout")
 		return
 	}
+
 	// only accept private shares from the leader.
 	if origin != s.leaderIndex {
 		return
 	}
 
 	if s.xReceived {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin),
+			"private share was already received")
 		return
 	}
 	if (len(data)) != shareSize {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("invalid share size, expects %d, got %d",
+				shareSize, len(data)))
 		return
 	}
 	// read the node private share
-	C.bn_read_bin((*C.bn_st)(&s.x),
+	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
-	)
+	) != valid {
+		s.processor.FlagMisbehavior(int(origin),
+			fmt.Sprintf("invalid share value %x", data))
+		return
+	}
 	s.xReceived = true
 	if s.vAReceived {
 		result := s.verifyShare()
@@ -307,7 +326,8 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	// check the share timeout
 	if s.sharesTimeout {
-		s.processor.FlagMisbehavior(int(origin), wrongProtocol)
+		s.processor.FlagMisbehavior(int(origin),
+			"verification vector received after the shares timeout")
 		return
 	}
 
@@ -317,31 +337,40 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	}
 
 	if s.vAReceived {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin),
+			"verification received was already received")
 		return
 	}
+	s.vAReceived = true
+
 	if len(data) != verifVectorSize*(s.threshold+1) {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.disqualified = true
+		s.processor.Disqualify(int(origin),
+			fmt.Sprintf("invalid verification vector size, expects %d, got %d",
+				verifVectorSize*(s.threshold+1), len(data)))
 		return
 	}
 	// read the verification vector
 	s.vA = make([]pointG2, s.threshold+1)
 	err := readVerifVector(s.vA, data)
 	if err != nil {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.disqualified = true
+		s.processor.Disqualify(int(origin),
+			fmt.Sprintf("reading the verification vector failed:%s", err))
 		return
 	}
 
 	s.y = make([]pointG2, s.size)
 	s.computePublicKeys()
 
-	s.vAReceived = true
 	// check the (already) registered complaints
-	for complainee, c := range s.complaints {
+	for complainer, c := range s.complaints {
 		if c.received && c.answerReceived {
-			if s.checkComplaint(complainee, c) {
+			if s.checkComplaint(complainer, c) {
 				s.disqualified = true
-				s.processor.Blacklist(int(s.leaderIndex))
+				s.processor.Disqualify(int(s.leaderIndex),
+					fmt.Sprintf("verification vector received: a complaint answer to %d is invalid",
+						complainer))
 				return
 			}
 		}
@@ -363,42 +392,57 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 	}
 }
 
-// assuming a complaint and its answer were received, this function returns
-// - false if the answer is valid
-// - true if the complaint is valid
-func (s *feldmanVSSQualState) checkComplaint(complainee index, c *complaint) bool {
-	// check y[complainee] == share.G2
+// assuming a complaint and its answer were both received, this function returns:
+// - false if the complaint answer is correct
+// - true if the complaint answer is not correct
+func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) bool {
+	// check y[complainer] == share.G2
 	return C.verifyshare((*C.bn_st)(&c.answer),
-		(*C.ep2_st)(&s.y[complainee])) == 0
+		(*C.ep2_st)(&s.y[complainer])) == 0
 }
 
 // data = |complainee|
 func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 	// check the complaints timeout
 	if s.complaintsTimeout {
-		s.processor.FlagMisbehavior(int(origin), wrongProtocol)
-		return
-	}
-
-	if origin == s.leaderIndex {
-		return
-	}
-
-	if len(data) == 0 {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
-		return
-	}
-
-	// first byte encodes the complainee
-	complainee := index(data[0])
-
-	// if the complainee is not the leader, ignore the complaint
-	if complainee != s.leaderIndex {
+		s.processor.FlagMisbehavior(int(origin),
+			"complaint received after the complaint timeout")
 		return
 	}
 
 	if len(data) != complaintSize {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		// only the leader of the instance gets disqualified
+		if origin == s.leaderIndex {
+			s.disqualified = true
+			s.processor.Disqualify(int(origin),
+				fmt.Sprintf("invalid complaint size, expects %d, got %d",
+					complaintSize, len(data)))
+		}
+		return
+	}
+
+	// the byte encodes the complainee
+	complainee := index(data[0])
+
+	// validate the complainee value
+	if int(complainee) >= s.size {
+		// only the leader of the instance gets disqualified
+		if origin == s.leaderIndex {
+			s.disqualified = true
+			s.processor.Disqualify(int(origin),
+				fmt.Sprintf("invalid complainee, should be less than %d, got %d",
+					s.size, complainee))
+		}
+		return
+	}
+
+	// if the complaint is coming from the leader, ignore it
+	if origin == s.leaderIndex {
+		return
+	}
+
+	// if the complainee is not the leader, ignore the complaint
+	if complainee != s.leaderIndex {
 		return
 	}
 
@@ -411,7 +455,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		}
 		// if the complainee is the current node, prepare an answer
 		if s.currentIndex == s.leaderIndex {
-			data := make([]byte, complainAnswerSize+1)
+			data := make([]byte, complaintAnswerSize+1)
 			data[0] = byte(feldmanVSSComplaintAnswer)
 			data[1] = byte(origin)
 			zrPolynomialImage(data[2:], s.a, origin+1, nil)
@@ -421,9 +465,10 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 		return
 	}
 	// complaint is not new in the map
-	// check if the complain has been already received
+	// check if the complaint has been already received
 	if c.received {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin),
+			"complaint was already received")
 		return
 	}
 	c.received = true
@@ -431,7 +476,9 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 	if c.answerReceived && s.currentIndex != s.leaderIndex {
 		s.disqualified = s.checkComplaint(origin, c)
 		if s.disqualified {
-			s.processor.Blacklist(int(s.leaderIndex))
+			s.processor.Disqualify(int(s.leaderIndex),
+				fmt.Sprintf("complaint received: complaint answer to %d is invalid",
+					origin))
 		}
 		return
 	}
@@ -444,15 +491,22 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		return
 	}
 
-	if len(data) == 0 {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+	// check the answer format
+	if len(data) != complaintAnswerSize {
+		s.disqualified = true
+		s.processor.Disqualify(int(s.leaderIndex),
+			fmt.Sprintf("the complaint answer has an invalid length, expects %d, got %d",
+				complaintAnswerSize, len(data)))
 		return
 	}
 
 	// first byte encodes the complainee
 	complainer := index(data[0])
 	if int(complainer) >= s.size {
-		s.processor.FlagMisbehavior(int(origin), wrongFormat)
+		s.disqualified = true
+		s.processor.Disqualify(int(origin),
+			fmt.Sprintf("complainer value is invalid, should be less that %d, got %d",
+				s.size, int(complainer)))
 		return
 	}
 
@@ -463,42 +517,45 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			received:       false,
 			answerReceived: true,
 		}
-		// check the answer format
-		if len(data) != complainAnswerSize {
-			s.disqualified = true
-			s.processor.Blacklist(int(s.leaderIndex))
-			return
-		}
+
 		// read the complainer private share
-		C.bn_read_bin((*C.bn_st)(&s.complaints[complainer].answer),
+		if C.bn_read_Zr_bin((*C.bn_st)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,
-		)
+		) != valid {
+			s.disqualified = true
+			s.processor.Disqualify(int(s.leaderIndex),
+				fmt.Sprintf("invalid complaint answer value %x", data))
+			return
+		}
 		return
 	}
 	// complaint is not new in the map
 	// check if the answer has been already received
 	if c.answerReceived {
-		s.processor.FlagMisbehavior(int(origin), duplicated)
+		s.processor.FlagMisbehavior(int(origin),
+			"complaint answer was already received")
 		return
 	}
-
 	c.answerReceived = true
-	if len(data) != complainAnswerSize {
-		s.disqualified = true
-		return
-	}
 
 	// first flag check is a sanity check
 	if c.received {
 		// read the complainer private share
-		C.bn_read_bin((*C.bn_st)(&c.answer),
+		if C.bn_read_Zr_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,
-		)
+		) != valid {
+			s.disqualified = true
+			s.processor.Disqualify(int(s.leaderIndex),
+				fmt.Sprintf("invalid complaint answer value %x", data))
+			return
+		}
 		s.disqualified = s.checkComplaint(complainer, c)
 		if s.disqualified {
-			s.processor.Blacklist(int(s.leaderIndex))
+			s.processor.Disqualify(int(s.leaderIndex),
+				fmt.Sprintf("complaint answer received: complaint answer to %d is invalid",
+					complainer))
 		}
 
 		// fix the share of the current node if the complaint in invalid

@@ -54,7 +54,7 @@ func NewLedger(dbDir string,
 	reg prometheus.Registerer,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
+	w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
@@ -77,10 +77,16 @@ func NewLedger(dbDir string,
 		pathFinderVersion: pathFinderVer,
 	}
 
+	// pause records to prevent double logging trie removals
+	w.PauseRecord()
+	defer w.UnpauseRecord()
+
 	err = w.ReplayOnForest(forest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
+
+	w.UnpauseRecord()
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
@@ -256,7 +262,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
-	outputFilePath string) (ledger.State, error) {
+	outputDir, outputFile string) (ledger.State, error) {
 
 	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
 
@@ -320,7 +326,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
-	writer, err := wal.CreateCheckpointWriterForFile(outputFilePath)
+	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}

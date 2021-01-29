@@ -4,6 +4,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const (
+	DefaultMaxCollectionSize       uint    = 100      // max 100 transactions per collection
+	DefaultExpiryBuffer            uint    = 15       // 15 blocks for collections to be included
+	DefaultMaxPayerTransactionRate float64 = 0        // no rate limiting
+	DefaultMaxCollectionByteSize   uint64  = 1750000  // ~1.75MB. This is slightly higher than the limit on single tx size, which is 1.5MB
+	DefaultMaxCollectionTotalGas   uint64  = 10000000 // 10M
+)
+
 // Config is the configurable options for the collection builder.
 type Config struct {
 
@@ -38,12 +46,12 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		MaxCollectionSize:       100,                             // max 100 transactions per collection
-		ExpiryBuffer:            15,                              // 15 blocks for collections to be included
-		MaxPayerTransactionRate: 0,                               // no rate limiting
+		MaxCollectionSize:       DefaultMaxCollectionSize,
+		ExpiryBuffer:            DefaultExpiryBuffer,
+		MaxPayerTransactionRate: DefaultMaxPayerTransactionRate,
 		UnlimitedPayers:         make(map[flow.Address]struct{}), // no unlimited payers
-		MaxCollectionByteSize:   uint64(1750000),                 // ~1.75MB. This is slightly higher than the limit on single tx size, which is 1.5MB
-		MaxCollectionTotalGas:   uint64(10000000),                // 10M
+		MaxCollectionByteSize:   DefaultMaxCollectionByteSize,
+		MaxCollectionTotalGas:   DefaultMaxCollectionTotalGas,
 	}
 }
 

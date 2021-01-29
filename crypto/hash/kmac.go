@@ -32,14 +32,9 @@ const cSHAKE128BlockSize = 168
 //   is required.
 func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
 	var k kmac128
-	// check the lengths as per NIST.SP.800-185
-	if len(key) >= KmacMaxParamsLen || len(customizer) >= KmacMaxParamsLen {
+	if outputSize < 0 {
 		return nil,
-			fmt.Errorf("kmac key and customizer lengths must be less than %d", KmacMaxParamsLen)
-	}
-	if outputSize >= KmacMaxParamsLen || outputSize < 0 {
-		return nil,
-			fmt.Errorf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)
+			fmt.Errorf("kmac output size must be positive, got %d", outputSize)
 	}
 
 	// check the key size (required if the key is used as a security key)
@@ -116,6 +111,7 @@ func leftEncode(value uint64) []byte {
 
 // bytepad function as defined in NIST SP 800-185
 // copied from golang.org/x/crypto/sha3
+// The caller must make sure parameter (w) is strictly positive.
 //
 // Copyright (c) 2009 The Go Authors. All rights reserved.
 func bytepad(input []byte, w int) []byte {
@@ -147,11 +143,12 @@ func (k *kmac128) Reset() {
 	_, _ = k.Write(k.initBlock)
 }
 
-// ComputeHash adds the input data to the a mac state copy
-// and returns the mac output
-// It does not change the underlying hash state.
+// ComputeHash computes the mac of the input data.
+// It does not update the underlying hash state.
 func (k *kmac128) ComputeHash(data []byte) Hash {
 	cshake := k.ShakeHash.Clone()
+	cshake.Reset()
+	cshake.Write(k.initBlock)
 	cshake.Write(data)
 	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
 	// read the cshake output
@@ -160,9 +157,8 @@ func (k *kmac128) ComputeHash(data []byte) Hash {
 	return h
 }
 
-// SumHash finalizes the mac computations using a state copy,
-// and returns the hash output
-// It does not change the underlying hash state.
+// SumHash finalizes the mac computations and returns the output.
+// It does not reset the state to allow further writing.
 func (k *kmac128) SumHash() Hash {
 	cshake := k.ShakeHash.Clone()
 	cshake.Write(rightEncode(uint64(k.outputSize * 8)))

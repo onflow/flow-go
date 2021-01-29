@@ -33,10 +33,9 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.State
+		state    *protocol.MutableState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
-		mutator  *protocol.Mutator
 	}
 
 	me           *module.Local
@@ -46,6 +45,7 @@ type Suite struct {
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
+	receipts     *storage.ExecutionReceipts
 
 	eng *Engine
 }
@@ -60,7 +60,7 @@ func (suite *Suite) SetupTest() {
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.State)
+	suite.proto.state = new(protocol.MutableState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.params = new(protocol.Params)
 	suite.proto.state.On("Identity").Return(obsIdentity, nil)
@@ -90,10 +90,10 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0, false, false)
+		suite.transactions, suite.receipts, flow.Testnet, metrics.NewNoopCollector(), 0, 0, false, false)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
+		suite.transactions, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 

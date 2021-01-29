@@ -17,17 +17,17 @@ func (c *TransactionSequenceNumberChecker) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	accounts := state.NewAccounts(ledger)
 
-	return c.checkAndIncrementSequenceNumber(proc.Transaction, accounts)
+	return c.checkAndIncrementSequenceNumber(proc.Transaction, st)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	tx *flow.TransactionBody,
-	accounts *state.Accounts,
+	st *state.State,
 ) error {
+	accounts := state.NewAccounts(st)
 	proposalKey := tx.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)

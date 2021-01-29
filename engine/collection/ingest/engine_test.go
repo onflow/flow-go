@@ -83,7 +83,7 @@ func (suite *Suite) SetupTest() {
 
 	assignments := unittest.ClusterAssignment(suite.N_CLUSTERS, collectors)
 	suite.clusters, err = flow.NewClusterList(assignments, collectors)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	suite.root = unittest.GenesisFixture(suite.identities)
 	suite.final = suite.root
@@ -119,7 +119,7 @@ func (suite *Suite) SetupTest() {
 	suite.conf = DefaultConfig()
 	chain := flow.Testnet.Chain()
 	suite.engine, err = New(log, net, suite.state, metrics, metrics, suite.me, chain, suite.pools, suite.conf)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 }
 
 func (suite *Suite) TestInvalidTransaction() {
@@ -136,8 +136,8 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("gas limit exceeds the maximum allowed", func() {
 		tx := unittest.TransactionBodyFixture()
-		tx.ReferenceBlockID = suite.root.ID()
 		tx.Payer = unittest.RandomAddressFixture()
+		tx.ReferenceBlockID = suite.root.ID()
 		tx.GasLimit = flow.DefaultMaxGasLimit + 1
 
 		err := suite.engine.ProcessLocal(&tx)
@@ -207,7 +207,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 		suite.Run("subjective check with max index", func() {
 			invalid, err := flow.Testnet.Chain().AddressAtIndex(suite.conf.MaxAddressIndex + 1)
-			suite.Require().Nil(err)
+			suite.Require().NoError(err)
 			tx := unittest.TransactionBodyFixture()
 			tx.ReferenceBlockID = suite.root.ID()
 			tx.Authorizers[0] = invalid
@@ -250,11 +250,11 @@ func (suite *Suite) TestRoutingLocalCluster() {
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should be added to local mempool for the current epoch
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -280,11 +280,11 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should not be added to local mempool
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -308,11 +308,11 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
 	err := suite.engine.Process(sender.NodeID, &tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().True(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -340,7 +340,7 @@ func (suite *Suite) TestRoutingInvalidTransaction() {
 
 	// should not be added to local mempool
 	counter, err := suite.epochQuery.Current().Counter()
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
 	suite.conduit.AssertExpectations(suite.T())
 }
@@ -375,7 +375,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch2Local.NodeIDs()[0], epoch2Local.NodeIDs()[1]).Return(nil).Once()
 
 	err := suite.engine.ProcessLocal(&tx)
-	suite.Assert().Nil(err)
+	suite.Assert().NoError(err)
 
 	// should add to local mempool for epoch 2 only
 	suite.Assert().True(suite.pools.ForEpoch(2).Has(tx.ID()))
@@ -392,7 +392,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 		Filter(filter.HasRole(flow.RoleCollection))
 	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
 	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	epoch2 := new(protocol.Epoch)
 	epoch2.On("Counter").Return(uint64(2), nil)
@@ -411,4 +411,74 @@ func (suite *Suite) TestRouting_ClusterAssignmentRemoved() {
 	// should not add to mempool
 	suite.Assert().False(suite.pools.ForEpoch(2).Has(tx.ID()))
 	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.ID()))
+	// should not propagate
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
+}
+
+// The node is not a participant in epoch 2 and joins in epoch 3. We start the
+// test in epoch 2.
+//
+// Test that the node discards transactions in epoch 2 and handles them
+// in epoch 3.
+func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
+
+	// EPOCH 2:
+
+	// remove ourselves from the cluster assignment for epoch 2
+	withoutMe := suite.identities.
+		Filter(filter.Not(filter.HasNodeID(suite.me.NodeID()))).
+		Filter(filter.HasRole(flow.RoleCollection))
+	epoch2Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withoutMe)
+	epoch2Clusters, err := flow.NewClusterList(epoch2Assignment, withoutMe)
+	suite.Require().NoError(err)
+
+	epoch2 := new(protocol.Epoch)
+	epoch2.On("Counter").Return(uint64(2), nil)
+	epoch2.On("Clustering").Return(epoch2Clusters, nil)
+	// update the mocks to behave as though we have transitioned to epoch 2
+	suite.epochQuery.Add(epoch2)
+	suite.epochQuery.Transition()
+
+	// any transaction is OK here, since we're not in any cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+
+	err = suite.engine.ProcessLocal(&tx)
+	suite.Assert().Error(err)
+
+	// should not add to mempool
+	suite.Assert().False(suite.pools.ForEpoch(2).Has(tx.ID()))
+	suite.Assert().False(suite.pools.ForEpoch(1).Has(tx.ID()))
+	// should not propagate
+	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
+
+	// EPOCH 3:
+
+	// include ourselves in cluster assignment
+	withMe := suite.identities.Filter(filter.HasRole(flow.RoleCollection))
+	epoch3Assignment := unittest.ClusterAssignment(suite.N_CLUSTERS, withMe)
+	epoch3Clusters, err := flow.NewClusterList(epoch3Assignment, withMe)
+	suite.Require().NoError(err)
+
+	epoch3 := new(protocol.Epoch)
+	epoch3.On("Counter").Return(uint64(3), nil)
+	epoch3.On("Clustering").Return(epoch3Clusters, nil)
+	// transition to epoch 3
+	suite.epochQuery.Add(epoch3)
+	suite.epochQuery.Transition()
+
+	// get the local cluster in epoch 2
+	epoch3Local, _, ok := epoch3Clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
+
+	// get a transaction that will be routed to local cluster
+	tx = unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+	tx = unittest.AlterTransactionForCluster(tx, epoch3Clusters, epoch3Local, func(transaction *flow.TransactionBody) {})
+
+	// should route to local cluster
+	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch3Local.NodeIDs()[0], epoch3Local.NodeIDs()[1]).Return(nil).Once()
+
+	err = suite.engine.ProcessLocal(&tx)
+	suite.Assert().NoError(err)
 }

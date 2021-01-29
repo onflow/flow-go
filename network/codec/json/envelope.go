@@ -41,6 +41,10 @@ const (
 	CodeChunkDataRequest
 	CodeChunkDataResponse
 
+	// result approvals
+	CodeApprovalRequest
+	CodeApprovalResponse
+
 	// generic entity exchange engines
 	CodeEntityRequest
 	CodeEntityResponse
