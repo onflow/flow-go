@@ -230,6 +230,7 @@ type NodeConfig struct {
 	LogLevel        zerolog.Level
 	Ghost           bool
 	AdditionalFlags []string
+	Debug           bool
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -290,6 +291,12 @@ func WithIDInt(id uint) func(config *NodeConfig) {
 func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.LogLevel = level
+	}
+}
+
+func WithDebugImage(debug bool) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.Debug = debug
 	}
 }
 
@@ -502,6 +509,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 	}
 
+	if nodeConf.Debug {
+		hostPort := "2345"
+		containerPort := "2345/tcp"
+		nodeContainer.bindPort(hostPort, containerPort)
+	}
+
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
@@ -699,6 +712,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			LogLevel:        conf.LogLevel,
 			Ghost:           conf.Ghost,
 			AdditionalFlags: conf.AdditionalFlags,
+			Debug:           conf.Debug,
 		}
 
 		confs = append(confs, containerConf)
