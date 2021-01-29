@@ -220,7 +220,7 @@ func (e *hostEnv) ResolveLocation(
 
 		err := e.accounts.CheckAccountNotFrozen(address)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("resolve location: %w", err)
 		}
 
 		contractNames, err := e.accounts.GetContractNames(address)
@@ -272,7 +272,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 	err := e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get code: %w", err)
 	}
 
 	code, err := e.accounts.GetContract(contractLocation.Name, address)
@@ -506,7 +506,7 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return err
+		return fmt.Errorf("add count key: %w", err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -520,7 +520,7 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("remove account key: %w", err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -534,7 +534,7 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return err
+		return fmt.Errorf("update account contract code: %w", err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -555,7 +555,7 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return err
+		return fmt.Errorf("remove account contract code: %w", err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
