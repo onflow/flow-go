@@ -401,6 +401,10 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	// includedReceipts is a set of all receipts that are contained in unsealed blocks along the fork.
 	includedReceipts := make(map[flow.Identifier]struct{})
 
+	// for sanity check
+	knownResults := make(map[flow.Identifier]struct{})
+	knownResults[]
+
 	// loop through the fork backwards, from parent to last sealed (including),
 	// and keep track of blocks and receipts visited on the way.
 	sealedBlockID := sealed.ID()
@@ -444,6 +448,11 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
+
+	// sanity check:
+
+
+
 
 	// don't collect more than maxReceiptCount receipts
 	if uint(len(receipts)) > b.cfg.maxReceiptCount {
