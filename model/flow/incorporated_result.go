@@ -57,7 +57,8 @@ func (ir *IncorporatedResult) GetChunkSignatures(chunkIndex uint64) (*Aggregated
 	if !ok {
 		return nil, false
 	}
-	return s.ToAggregatedSignature(), true
+	as := s.ToAggregatedSignature()
+	return &as, true
 }
 
 // GetSignature returns a signature by chunk index and signer ID
@@ -95,9 +96,9 @@ func (ir *IncorporatedResult) GetAggregatedSignatures() []AggregatedSignature {
 	result := make([]AggregatedSignature, 0, len(ir.Result.Chunks))
 
 	for _, chunk := range ir.Result.Chunks {
-		as, ok := ir.chunkApprovals[chunk.Index]
+		ca, ok := ir.chunkApprovals[chunk.Index]
 		if ok {
-			result = append(result, *as.ToAggregatedSignature())
+			result = append(result, ca.ToAggregatedSignature())
 		} else {
 			result = append(result, AggregatedSignature{})
 		}
@@ -133,14 +134,14 @@ func NewSignatureCollector() *SignatureCollector {
 
 // ToAggregatedSignature generates an aggregated signature from all signatures
 // in the SignatureCollector
-func (c *SignatureCollector) ToAggregatedSignature() *AggregatedSignature {
+func (c *SignatureCollector) ToAggregatedSignature() AggregatedSignature {
 	signatures := make([]crypto.Signature, len(c.verifierSignatures))
 	copy(signatures, c.verifierSignatures)
 
 	signers := make([]Identifier, len(c.signerIDs))
 	copy(signers, c.signerIDs)
 
-	return &AggregatedSignature{
+	return AggregatedSignature{
 		VerifierSignatures: signatures,
 		SignerIDs:          signers,
 	}
