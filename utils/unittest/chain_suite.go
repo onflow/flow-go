@@ -66,8 +66,8 @@ type BaseChainSuite struct {
 	ApprovalsPL      *mempool.Approvals
 	PendingApprovals map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval
 
-	// mock mempool.Receipts: used to test whether or not Matching Engine stores receipts
-	ReceiptsPL *mempool.Receipts
+	// mock mempool.ReceiptsForest: used to test whether or not Matching Engine stores receipts
+	ReceiptsPL *mempool.ExecutionTree
 
 	Assigner    *module.ChunkAssigner
 	Assignments map[flow.Identifier]*chunks.Assignment // index for assignments for given execution result
@@ -371,7 +371,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
-	bc.ReceiptsPL = &mempool.Receipts{}
+	bc.ReceiptsPL = &mempool.ExecutionTree{}
 	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SEALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~~~ //
@@ -543,6 +543,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.PendingApprovals[incorporatedResult.Result.ID()] = approvals
 		bc.PendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 		bc.Assignments[incorporatedResult.Result.ID()] = assignment
+		bc.PersistedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+		// TODO: adding receipt
 	}
 }
 

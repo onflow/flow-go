@@ -4,10 +4,11 @@ package consensus
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+
+	"github.com/onflow/flow-go/model/flow/filter/id"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -21,18 +22,19 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics  module.MempoolMetrics
-	tracer   module.Tracer
-	db       *badger.DB
-	state    protocol.MutableState
-	seals    storage.Seals
-	headers  storage.Headers
-	index    storage.Index
-	blocks   storage.Blocks
-	guarPool mempool.Guarantees
-	sealPool mempool.IncorporatedResultSeals
-	recPool  mempool.Receipts
-	cfg      Config
+	metrics   module.MempoolMetrics
+	tracer    module.Tracer
+	db        *badger.DB
+	state     protocol.MutableState
+	seals     storage.Seals
+	headers   storage.Headers
+	index     storage.Index
+	blocks    storage.Blocks
+	resultsDB storage.ExecutionResults
+	guarPool  mempool.Guarantees
+	sealPool  mempool.IncorporatedResultSeals
+	recPool   mempool.ExecutionTree
+	cfg       Config
 }
 
 // NewBuilder creates a new block builder.
@@ -44,9 +46,10 @@ func NewBuilder(
 	seals storage.Seals,
 	index storage.Index,
 	blocks storage.Blocks,
+	resultsDB storage.ExecutionResults,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
-	recPool mempool.Receipts,
+	recPool mempool.ExecutionTree,
 	tracer module.Tracer,
 	options ...func(*Config),
 ) *Builder {
@@ -67,18 +70,19 @@ func NewBuilder(
 	}
 
 	b := &Builder{
-		metrics:  metrics,
-		db:       db,
-		tracer:   tracer,
-		state:    state,
-		headers:  headers,
-		seals:    seals,
-		index:    index,
-		blocks:   blocks,
-		guarPool: guarPool,
-		sealPool: sealPool,
-		recPool:  recPool,
-		cfg:      cfg,
+		metrics:   metrics,
+		db:        db,
+		tracer:    tracer,
+		state:     state,
+		headers:   headers,
+		seals:     seals,
+		index:     index,
+		blocks:    blocks,
+		resultsDB: resultsDB,
+		guarPool:  guarPool,
+		sealPool:  sealPool,
+		recPool:   recPool,
+		cfg:       cfg,
 	}
 	return b
 }
@@ -343,7 +347,11 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		// ER gets validated by `module.ReceiptValidator` which checks if
 		// results form a valid chain.
 		if nextResultToBeSealed.PreviousResultID != last.ResultID {
-			return nil, fmt.Errorf("execution results do not form chain")
+			return nil, fmt.Errorf(
+				"sealed execution results do not form chain, expect result ID %v, but got %v",
+				last.ResultID,
+				nextResultToBeSealed.PreviousResultID,
+			)
 		}
 
 		last = nextSeal.Seal
@@ -373,76 +381,76 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.
-	last, err := b.seals.ByBlockID(parentID)
+	latestSeal, err := b.seals.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
-	sealed, err := b.headers.ByBlockID(last.BlockID)
+	sealedResult, err := b.resultsDB.ByID(latestSeal.ResultID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+		return nil, fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
+	}
+	sealed, err := b.headers.ByBlockID(latestSeal.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", latestSeal.BlockID, err)
 	}
 
-	// unsealedBlocks is used to keep the IDs of the blocks we iterate through.
+	// ancestors is used to keep the IDs of the ancestor blocks we iterate through.
 	// We use it to skip receipts that are not for unsealed blocks in the fork.
-	unsealedBlocks := make(map[flow.Identifier]*flow.Header)
+	ancestors := make(map[flow.Identifier]struct{})
 
 	// includedReceipts is a set of all receipts that are contained in unsealed blocks along the fork.
 	includedReceipts := make(map[flow.Identifier]struct{})
 
-	// loop through the fork backwards, from parent to last sealed, and keep
-	// track of blocks and receipts visited on the way (excluding last sealed block).
+	// loop through the fork backwards, from parent to last sealed (including),
+	// and keep track of blocks and receipts visited on the way.
+	sealedBlockID := sealed.ID()
 	ancestorID := parentID
-	sealedID := sealed.ID()
-	for ancestorID != sealedID {
-
+	for {
 		ancestor, err := b.headers.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
-		unsealedBlocks[ancestorID] = ancestor
+		ancestors[ancestorID] = struct{}{}
 
 		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-
 		for _, recID := range index.ReceiptIDs {
 			includedReceipts[recID] = struct{}{}
 		}
 
+		if ancestorID == sealedBlockID {
+			break
+		}
 		ancestorID = ancestor.ParentID
 	}
 
-	// Go through mempool and collect valid receipts. We store them by block
-	// height so as to sort them later. There can be multiple receipts per block
-	// even if they correspond to the same result.
-	receipts := make(map[uint64][]*flow.ExecutionReceipt) // [height] -> []receipt
-	for _, receipt := range b.recPool.All() {
-
-		// skip receipts that are already included in a block on this fork
-		_, ok := includedReceipts[receipt.ID()]
-		if ok {
-			continue
-		}
-
-		// skip the receipt if it is not for a block on this fork
-		h, ok := unsealedBlocks[receipt.ExecutionResult.BlockID]
-		if !ok {
-			continue
-		}
-
-		receipts[h.Height] = append(receipts[h.Height], receipt)
+	// After recovering from a crash, the mempools are wiped and the sealed results will not
+	// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
+	// a vertex in the tree without attaching any Execution Receipts to it. Thereby, we can
+	// traverse to receipts committing to derived results without having to find the receipts
+	// for the sealed result.
+	err = b.recPool.AddResult(sealedResult, sealed) // no-op, if result is already in Execution Tree
+	if err != nil {
+		return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
 	}
-
-	// sort receipts by block height
-	sortedReceipts := sortReceipts(receipts)
+	isResultForUnsealedBlock := isResultForBlock(ancestors)
+	isReceiptUniqueAndUnsealed := isNoDupAndNotSealed(includedReceipts, sealedBlockID)
+	// find all receipts:
+	// 1) whose result connects all the way to the last sealed result
+	// 2) is unique (never seen in unsealed blocks)
+	receipts, err := b.recPool.ReachableReceipts(latestSeal.ResultID, isResultForUnsealedBlock, isReceiptUniqueAndUnsealed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
+	}
 
 	// don't collect more than maxReceiptCount receipts
-	if uint(len(sortedReceipts)) > b.cfg.maxReceiptCount {
-		sortedReceipts = sortedReceipts[:b.cfg.maxReceiptCount]
+	if uint(len(receipts)) > b.cfg.maxReceiptCount {
+		receipts = receipts[:b.cfg.maxReceiptCount]
 	}
 
-	return sortedReceipts, nil
+	return receipts, nil
 }
 
 // createProposal assembles a block with the provided header and payload
@@ -513,21 +521,25 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	return proposal, nil
 }
 
-// sortReceipts takes a map of block-height to execution receipt, and returns
-// the receipts in a slice sorted by block-height.
-func sortReceipts(receipts map[uint64][]*flow.ExecutionReceipt) []*flow.ExecutionReceipt {
-
-	keys := make([]uint64, 0, len(receipts))
-	for k := range receipts {
-		keys = append(keys, k)
+// isResultForBlock constructs a mempool.BlockFilter that accepts only blocks whose ID is part of the given set.
+func isResultForBlock(blockIDs map[flow.Identifier]struct{}) mempool.BlockFilter {
+	blockIdFilter := id.InSet(blockIDs)
+	return func(h *flow.Header) bool {
+		return blockIdFilter(h.ID())
 	}
+}
 
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-
-	res := make([]*flow.ExecutionReceipt, 0, len(keys))
-	for _, k := range keys {
-		res = append(res, receipts[k]...)
+// isNoDupAndNotSealed constructs a mempool.ReceiptFilter for discarding receipts that
+// * are duplicates
+// * or are for the sealed block
+func isNoDupAndNotSealed(includedReceipts map[flow.Identifier]struct{}, sealedBlockID flow.Identifier) mempool.ReceiptFilter {
+	return func(receipt *flow.ExecutionReceipt) bool {
+		if _, duplicate := includedReceipts[receipt.ID()]; duplicate {
+			return false
+		}
+		if receipt.ExecutionResult.BlockID == sealedBlockID {
+			return false
+		}
+		return true
 	}
-
-	return res
 }
