@@ -90,6 +90,7 @@ func (i *TransactionInvocator) Process(
 
 	if err != nil {
 		er := st.Rollback()
+		ctx.Programs.Rollback()
 		if er != nil {
 			panic(er)
 		}
@@ -103,6 +104,7 @@ func (i *TransactionInvocator) Process(
 	proc.Events = env.getEvents()
 	proc.Logs = env.getLogs()
 
+	// right now we do commits and approval in the storage fee deductor
 	return nil
 }
 

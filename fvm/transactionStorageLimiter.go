@@ -43,48 +43,50 @@ func (d *TransactionStorageLimiter) Process(
 	tp *TransactionProcedure,
 	st *state.State,
 ) error {
-	if !ctx.LimitAccountStorage {
-		return nil
-	}
-
-	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, st)
-	if err != nil {
-		return err
-	}
-	accounts := state.NewAccounts(st)
-
-	addresses := st.UpdatedAddresses()
-
-	for _, address := range addresses {
-
-		// does it exist?
-		exists, err := accounts.Exists(address)
+	if ctx.LimitAccountStorage {
+		getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, st)
 		if err != nil {
 			return err
 		}
-		if !exists {
-			continue
-		}
+		accounts := state.NewAccounts(st)
 
-		capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
-		if err != nil {
-			return err
-		}
+		addresses := st.UpdatedAddresses()
 
-		usage, err := accounts.GetStorageUsed(address)
-		if err != nil {
-			return err
-		}
+		for _, address := range addresses {
 
-		if usage > capacity {
-			er := st.Rollback()
-			if er != nil {
-				panic(er)
+			// does it exist?
+			exists, err := accounts.Exists(address)
+			if err != nil {
+				return err
 			}
-			return &StorageCapacityExceededError{
-				Address:         address,
-				StorageUsed:     usage,
-				StorageCapacity: capacity,
+			if !exists {
+				continue
+			}
+
+			capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
+			if err != nil {
+				return err
+			}
+
+			usage, err := accounts.GetStorageUsed(address)
+			if err != nil {
+				return err
+			}
+
+			if usage > capacity {
+				er := st.Rollback()
+				if er != nil {
+					panic(er)
+				}
+				er = ctx.Programs.Rollback()
+				if er != nil {
+					panic(er)
+				}
+				return &StorageCapacityExceededError{
+					Address:         address,
+					StorageUsed:     usage,
+					StorageCapacity: capacity,
+				}
 			}
 		}
 	}
@@ -93,5 +95,10 @@ func (d *TransactionStorageLimiter) Process(
 	if er != nil {
 		panic(er)
 	}
+	er = ctx.Programs.Commit()
+	if er != nil {
+		panic(er)
+	}
+
 	return nil
 }
