@@ -13,18 +13,3 @@ type AggregatedSignature struct {
 	// List of signer identifiers
 	SignerIDs []Identifier
 }
-
-// Len returns the number of signatures in the AggregatedSignature
-func (a *AggregatedSignature) Len() int {
-	return len(a.VerifierSignatures)
-}
-
-// BySigner returns a signer's signature if it exists
-func (a *AggregatedSignature) BySigner(signerID Identifier) (*crypto.Signature, bool) {
-	for index, id := range a.SignerIDs {
-		if id == signerID {
-			return &a.VerifierSignatures[index], true
-		}
-	}
-	return nil, false
-}
