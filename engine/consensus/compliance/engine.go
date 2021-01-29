@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -288,14 +289,36 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *events.SyncedBlock:
+		id := ev.Block.Header.ID()
+		_, knownBlock := e.tracer.GetSpan(id, trace.CONCompProcessProposal)
+		var childSpan opentracing.Span
+		if !knownBlock {
+			span := e.tracer.StartSpan(id, trace.CONCompProcessProposal)
+			defer span.Finish()
+			childSpan = e.tracer.StartSpanFromParent(span, trace.CONCompWaitToProcessProposal)
+		}
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 		e.unit.Lock()
+		if !knownBlock {
+			childSpan.Finish()
+		}
 		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, ev)
 	case *messages.BlockProposal:
+		id := ev.Header.ID()
+		_, knownBlock := e.tracer.GetSpan(id, trace.CONCompProcessProposal)
+		var childSpan opentracing.Span
+		if !knownBlock {
+			span := e.tracer.StartSpan(id, trace.CONCompProcessProposal)
+			defer span.Finish()
+			childSpan = e.tracer.StartSpanFromParent(span, trace.CONCompWaitToProcessProposal)
+		}
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 		e.unit.Lock()
+		if !knownBlock {
+			childSpan.Finish()
+		}
 		defer e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
 		defer e.unit.Unlock()
 		return e.onBlockProposal(originID, ev)

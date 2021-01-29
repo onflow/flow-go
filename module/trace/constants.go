@@ -35,6 +35,12 @@ const (
 	CONProvOnBlockProposal            SpanName = "con.provider.onBlockProposal"
 	CONMatchCheckSealing              SpanName = "con.matching.checkSealing"
 
+	CONCompProcessProposal       SpanName = "con.compliance.processBlock"
+	CONCompWaitToProcessProposal SpanName = "con.compliance.processBlock.waitingForLock"
+
+	CONCompProcessVote       SpanName = "con.compliance.processVote"
+	CONCompWaitToProcessVote SpanName = "con.compliance.processVote.waitingForLock"
+
 	CONProcessBlock SpanName = "con.processBlock"
 	// children of CONProcessBlock
 	CONHotFinalizeBlock SpanName = "con.hotstuff.finalizeBlock"
