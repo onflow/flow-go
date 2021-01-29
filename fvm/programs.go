@@ -43,6 +43,10 @@ func (p *Programs) Commit() error {
 	defer p.lock.Unlock()
 
 	for loc, prog := range p.draft {
+		if _, ok := loc.(common.AddressLocation); !ok {
+			// ignore cases that are not addresslocation
+			continue
+		}
 		// TODO make me smarter
 		// if loc already exist this is an update - purge the cache
 		if _, ok := p.programs[loc]; ok {
