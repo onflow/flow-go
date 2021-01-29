@@ -90,8 +90,6 @@ func (i *TransactionInvocator) Process(
 	)
 
 	if err != nil {
-		ctx.Programs.Rollback()
-
 		i.safetyErrorCheck(err)
 		return err
 	}

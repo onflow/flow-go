@@ -83,26 +83,3 @@ func (p *Programs) Commit() {
 		)
 	}
 }
-
-func (p *Programs) Rollback() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	// Clear all program entries
-
-	for locationID := range p.programs {
-		delete(p.programs, locationID)
-	}
-}
-
-func (p *Programs) ForEach(fn func(location common.Location, program *interpreter.Program)) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	for _, programEntry := range p.programs {
-		fn(
-			programEntry.Location,
-			programEntry.Program,
-		)
-	}
-}
