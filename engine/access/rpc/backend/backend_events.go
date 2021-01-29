@@ -50,11 +50,6 @@ func (b *backendEvents) GetEventsForHeightRange(
 		endHeight = head.Height
 	}
 
-	// limit min height to last sealed block in the chain
-	if head.Height < startHeight {
-		startHeight = head.Height
-	}
-
 	// find the block headers for all the blocks between min and max height (inclusive)
 	blockHeaders := make([]*flow.Header, 0)
 
