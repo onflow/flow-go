@@ -6,7 +6,6 @@ import "github.com/onflow/flow-go/model/messages"
 // contract is deployed to the service account as part of a collection of
 // smart contracts that facilitate and manage epoch transitions.
 //
-// TODO type for DKGPhase?
 // TODO type for DKGResult? - should be all participant public keys plus group public key
 type DKGContractClient interface {
 
@@ -21,8 +20,6 @@ type DKGContractClient interface {
 	// successfully broadcast will be returned, regardless of whether those
 	// messages have already been read by a previous call to ReadBroadcast.
 	//
-	// Phase parameters may be one of [1,2,3].
-	//
 	// Messages are returned in the order in which they were broadcast (received
 	// and stored in the smart contract).
 	//
@@ -32,7 +29,7 @@ type DKGContractClient interface {
 	//
 	// OPTIONAL: add a messageIndex parameter to only receive messages we have
 	// not already received in previous calls
-	ReadBroadcast(epochCounter uint64, phase int) ([]messages.DKGMessage, error)
+	ReadBroadcast(epochCounter uint64, phase messages.DKGPhase) ([]messages.DKGMessage, error)
 
 	// SubmitResult submits the final public result of the DKG protocol. This
 	// represents the node's local computation of the public keys for each
