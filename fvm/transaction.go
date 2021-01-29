@@ -27,11 +27,12 @@ type TransactionProcessor interface {
 }
 
 type TransactionProcedure struct {
-	ID          flow.Identifier
-	Transaction *flow.TransactionBody
-	TxIndex     uint32
-	Logs        []string
-	Events      []flow.Event
+	ID            flow.Identifier
+	Transaction   *flow.TransactionBody
+	TxIndex       uint32
+	Logs          []string
+	Events        []flow.Event
+	ServiceEvents []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
@@ -108,6 +109,7 @@ func (i *TransactionInvocator) Process(
 
 	// TODO: this can cause issue for fee events
 	proc.Events = env.getEvents()
+	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
 
 	// right now we do commits and approval in the storage limiter

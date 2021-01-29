@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -32,6 +33,7 @@ type hostEnv struct {
 	uuidGenerator    *UUIDGenerator
 	runtime.Metrics
 	events             []flow.Event
+	serviceEvents      []flow.Event
 	totalEventByteSize uint64
 	logs               []string
 	totalGasUsed       uint64
@@ -102,6 +104,10 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 
 func (e *hostEnv) getEvents() []flow.Event {
 	return e.events
+}
+
+func (e *hostEnv) getServiceEvents() []flow.Event {
+	return e.serviceEvents
 }
 
 func (e *hostEnv) getLogs() []string {
@@ -326,6 +332,10 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 		TransactionIndex: e.transactionEnv.TxIndex(),
 		EventIndex:       uint32(len(e.events)),
 		Payload:          payload,
+	}
+
+	if fvmEvent.IsServiceEvent(event, e.ctx.Chain) {
+		e.serviceEvents = append(e.serviceEvents, flowEvent)
 	}
 
 	e.events = append(e.events, flowEvent)
