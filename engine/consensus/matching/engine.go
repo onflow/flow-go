@@ -444,14 +444,6 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 // checkSealing checks if there is anything worth sealing at the moment.
 func (e *Engine) checkSealing() {
-	// rate limit the check sealing
-	if e.isCheckingSealing.Load() {
-		return
-	}
-
-	e.unit.Lock()
-	defer e.unit.Unlock()
-
 	// only check sealing when no one else is checking
 	canCheck := e.isCheckingSealing.CAS(false, true)
 	if !canCheck {
@@ -459,6 +451,9 @@ func (e *Engine) checkSealing() {
 	}
 
 	defer e.isCheckingSealing.Store(false)
+
+	e.unit.Lock()
+	defer e.unit.Unlock()
 
 	err := e.checkingSealing()
 	if err != nil {
@@ -950,11 +945,13 @@ func (e *Engine) requestPendingReceipts() error {
 	}
 
 	// request missing execution results, if sealed height is low enough
-	log.Info().
-		Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
-		Msg("requesting receipts")
-	for _, blockID := range missingBlocksOrderedByHeight {
-		e.receiptRequester.EntityByID(blockID, filter.Any)
+	if len(missingBlocksOrderedByHeight) > 0 {
+		log.Info().
+			Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
+			Msg("requesting receipts")
+		for _, blockID := range missingBlocksOrderedByHeight {
+			e.receiptRequester.EntityByID(blockID, filter.Any)
+		}
 	}
 
 	return nil

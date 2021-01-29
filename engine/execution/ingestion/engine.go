@@ -49,6 +49,7 @@ type Engine struct {
 	blocks             storage.Blocks
 	collections        storage.Collections
 	events             storage.Events
+	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	computationManager computation.ComputationManager
 	providerEngine     provider.ProviderEngine
@@ -74,6 +75,7 @@ func New(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	events storage.Events,
+	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
@@ -101,6 +103,7 @@ func New(
 		blocks:             blocks,
 		collections:        collections,
 		events:             events,
+		serviceEvents:      serviceEvents,
 		transactionResults: transactionResults,
 		computationManager: executionEngine,
 		providerEngine:     providerEngine,
@@ -1011,6 +1014,7 @@ func (e *Engine) handleComputationResult(
 		result.ExecutableBlock,
 		snapshots,
 		result.Events,
+		result.ServiceEvents,
 		result.TransactionResult,
 		startState,
 	)
@@ -1051,6 +1055,7 @@ func (e *Engine) saveExecutionResults(
 	executableBlock *entity.ExecutableBlock,
 	stateInteractions []*delta.Snapshot,
 	events []flow.Event,
+	serviceEvents []flow.Event,
 	txResults []flow.TransactionResult,
 	startState flow.StateCommitment,
 ) (*flow.ExecutionResult, error) {
@@ -1118,7 +1123,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState)
+	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState, serviceEvents)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -1148,6 +1153,16 @@ func (e *Engine) saveExecutionResults(
 				return fmt.Errorf("failed to store events: %w", err)
 			}
 		}
+		// store service events events in 1K batches
+		chunkSize = uint(1000)
+		serviceEventChunks := ChunkifyEvents(serviceEvents, chunkSize)
+		for _, ch := range serviceEventChunks {
+			err = e.events.Store(blockID, ch)
+			if err != nil {
+				return fmt.Errorf("failed to store service events: %w", err)
+			}
+		}
+
 		return nil
 	}()
 	if err != nil {
@@ -1237,6 +1252,7 @@ func (e *Engine) generateExecutionResultForBlock(
 	block *flow.Block,
 	chunks []*flow.Chunk,
 	endState flow.StateCommitment,
+	serviceEvents []flow.Event,
 ) (*flow.ExecutionResult, error) {
 
 	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
@@ -1249,6 +1265,7 @@ func (e *Engine) generateExecutionResultForBlock(
 		PreviousResultID: previousErID,
 		BlockID:          block.ID(),
 		Chunks:           chunks,
+		ServiceEvents:    serviceEvents,
 	}
 
 	return er, nil
