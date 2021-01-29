@@ -17,21 +17,7 @@ func (d *TransactionFeeDeductor) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	err := d.deductFees(vm, ctx, proc.Transaction, st)
-	if err != nil {
-		return err
-	}
-
-	// Commit storage changes and programs
-
-	er := st.Commit()
-	if er != nil {
-		return err
-	}
-
-	ctx.Programs.Commit()
-
-	return nil
+	return d.deductFees(vm, ctx, proc.Transaction, st)
 }
 
 func (d *TransactionFeeDeductor) deductFees(

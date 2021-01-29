@@ -43,66 +43,46 @@ func (d *TransactionStorageLimiter) Process(
 	tp *TransactionProcedure,
 	st *state.State,
 ) error {
-	if ctx.LimitAccountStorage {
-		getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, st)
+	if !ctx.LimitAccountStorage {
+		return nil
+	}
+
+	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, st)
+	if err != nil {
+		return err
+	}
+	accounts := state.NewAccounts(st)
+
+	addresses := st.UpdatedAddresses()
+
+	for _, address := range addresses {
+
+		// does it exist?
+		exists, err := accounts.Exists(address)
 		if err != nil {
 			return err
 		}
-		accounts := state.NewAccounts(st)
+		if !exists {
+			continue
+		}
 
-		addresses := st.UpdatedAddresses()
+		capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
+		if err != nil {
+			return err
+		}
 
-		for _, address := range addresses {
+		usage, err := accounts.GetStorageUsed(address)
+		if err != nil {
+			return err
+		}
 
-			// does it exist?
-			exists, err := accounts.Exists(address)
-			if err != nil {
-				return err
-			}
-			if !exists {
-				continue
-			}
-
-			capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
-			if err != nil {
-				return err
-			}
-
-			usage, err := accounts.GetStorageUsed(address)
-			if err != nil {
-				return err
-			}
-
-			if usage > capacity {
-				er := st.Rollback()
-				if er != nil {
-					panic(er)
-				}
-				er = ctx.Programs.Rollback()
-				if er != nil {
-					panic(er)
-				}
-				// discard events
-				tp.Events = nil
-				tp.Logs = nil
-				tp.Failed = true
-				return &StorageCapacityExceededError{
-					Address:         address,
-					StorageUsed:     usage,
-					StorageCapacity: capacity,
-				}
+		if usage > capacity {
+			return &StorageCapacityExceededError{
+				Address:         address,
+				StorageUsed:     usage,
+				StorageCapacity: capacity,
 			}
 		}
 	}
-
-	// Commit storage changes and programs
-
-	er := st.Commit()
-	if er != nil {
-		panic(er)
-	}
-
-	ctx.Programs.Commit()
-
 	return nil
 }

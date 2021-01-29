@@ -18,7 +18,6 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 		ID:          tx.ID(),
 		Transaction: tx,
 		TxIndex:     txIndex,
-		Failed:      false,
 	}
 }
 
@@ -36,7 +35,6 @@ type TransactionProcedure struct {
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
-	Failed  bool
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
@@ -92,27 +90,18 @@ func (i *TransactionInvocator) Process(
 	)
 
 	if err != nil {
-		er := st.Rollback()
-		if er != nil {
-			panic(er)
-		}
-		er = ctx.Programs.Rollback()
-		if er != nil {
-			panic(er)
-		}
-		proc.Failed = true
+		ctx.Programs.Rollback()
+
 		i.safetyErrorCheck(err)
 		return err
 	}
 
 	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
-	// TODO: this can cause issue for fee events
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
 
-	// right now we do commits and approval in the storage limiter
 	return nil
 }
 
