@@ -84,7 +84,7 @@ func (p *Programs) Commit() {
 	}
 }
 
-func (p *Programs) Rollback() error {
+func (p *Programs) Rollback() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -93,8 +93,6 @@ func (p *Programs) Rollback() error {
 	for locationID := range p.programs {
 		delete(p.programs, locationID)
 	}
-
-	return nil
 }
 
 func (p *Programs) ForEach(fn func(location common.Location, program *interpreter.Program)) {
