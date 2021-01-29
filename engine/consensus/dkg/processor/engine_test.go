@@ -77,7 +77,8 @@ func TestPrivateSend_Valid(t *testing.T) {
 	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.epochCounter,
+		engine.GetEpoch(),
+		engine.GetPhase(),
 	)
 
 	// override the conduit to check that the Unicast call matches the expected
@@ -89,7 +90,6 @@ func TestPrivateSend_Valid(t *testing.T) {
 	engine.conduit = conduit
 
 	engine.PrivateSend(dest, msgb)
-
 	conduit.AssertExpectations(t)
 }
 
@@ -126,7 +126,8 @@ func TestProcessMessage_Valid(t *testing.T) {
 	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.epochCounter,
+		engine.GetEpoch(),
+		engine.GetPhase(),
 	)
 
 	// launch a background routine to capture messages forwarded to the msgCh
@@ -165,7 +166,8 @@ func TestProcessMessage_InvalidOrigin(t *testing.T) {
 		dkgMsg := msg.NewDKGMessage(
 			badIndex,
 			msgb,
-			engine.epochCounter,
+			engine.GetEpoch(),
+			engine.GetPhase(),
 		)
 		err := engine.Process(unittest.IdentifierFixture(), dkgMsg)
 		require.Error(t, err)
@@ -176,9 +178,9 @@ func TestProcessMessage_InvalidOrigin(t *testing.T) {
 	dkgMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.epochCounter,
+		engine.GetEpoch(),
+		engine.GetPhase(),
 	)
-
 	err := engine.Process(unittest.IdentifierFixture(), dkgMsg)
 	require.Error(t, err)
 }
@@ -194,7 +196,8 @@ func TestBroadcastMessage(t *testing.T) {
 	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.epochCounter,
+		engine.GetEpoch(),
+		engine.GetPhase(),
 	)
 
 	// check that the dkg contract client is called with the expected message
@@ -205,6 +208,5 @@ func TestBroadcastMessage(t *testing.T) {
 	engine.dkgContractClient = contractClient
 
 	engine.Broadcast(msgb)
-
 	contractClient.AssertExpectations(t)
 }

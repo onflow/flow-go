@@ -3,6 +3,7 @@ package processor
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -28,6 +29,9 @@ type Engine struct {
 	committee         flow.IdentifierList
 	myIndex           int
 	epochCounter      uint64
+	epochCounterLock  sync.Mutex
+	dkgPhase          msg.DKGPhase
+	dkgPhaseLock      sync.Mutex
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -77,11 +81,34 @@ func New(
 	return &eng, nil
 }
 
-// SetEpoch changes the epoch counter of the engine.
+// SetEpoch changes the epoch counter of the engine and resets the phase to
+// Phase1.
 func (e *Engine) SetEpoch(epochCounter uint64) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
+	e.epochCounterLock.Lock()
 	e.epochCounter = epochCounter
+	e.epochCounterLock.Unlock()
+	e.SetPhase(msg.DKGPhase1)
+}
+
+// GetEpoch returns the current epoch counter.
+func (e *Engine) GetEpoch() uint64 {
+	e.epochCounterLock.Lock()
+	defer e.epochCounterLock.Unlock()
+	return e.epochCounter
+}
+
+// SetPhase changes the dkg phase of the engine.
+func (e *Engine) SetPhase(phase msg.DKGPhase) {
+	e.dkgPhaseLock.Lock()
+	defer e.dkgPhaseLock.Unlock()
+	e.dkgPhase = phase
+}
+
+// GetPhase returns the current dkg phase.
+func (e *Engine) GetPhase() msg.DKGPhase {
+	e.dkgPhaseLock.Lock()
+	e.dkgPhaseLock.Unlock()
+	return e.dkgPhase
 }
 
 // Ready implements the module ReadyDoneAware interface. It returns a channel
@@ -133,29 +160,20 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// TODO: should check Phase?
 func (e *Engine) onMessage(originID flow.Identifier, msg msg.DKGMessage) error {
-
-	// check that the message corresponds to the current epoch
-	e.unit.Lock()
-	defer e.unit.Unlock()
-	if e.epochCounter != msg.EpochCounter {
-		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, e.epochCounter)
+	if currentEpoch := e.GetEpoch(); currentEpoch != msg.EpochCounter {
+		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, currentEpoch)
 	}
-
-	// check that the message's origin is not out of range
 	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
 		return fmt.Errorf("origin id out of range: %d", msg.Orig)
 	}
-
-	// check that the message's origin matches the sender's flow identifier
 	nodeID := e.committee[msg.Orig]
 	if !bytes.Equal(nodeID[:], originID[:]) {
 		return fmt.Errorf("OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 	}
-
 	e.log.Debug().Msgf("forwarding Message to controller")
 	e.msgCh <- msg
-
 	return nil
 }
 
@@ -166,20 +184,17 @@ Implement DKGProcessor
 // PrivateSend sends a DKGMessage to a destination over a private channel. It
 // appends the current Epoch ID to the message.
 func (e *Engine) PrivateSend(dest int, data []byte) {
-
 	if dest >= len(e.committee) || dest < 0 {
 		e.log.Error().Msgf("destination id out of range: %d", dest)
 		return
 	}
-
 	destID := e.committee[dest]
-
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.epochCounter,
+		e.GetEpoch(),
+		e.GetPhase(),
 	)
-
 	err := e.conduit.Unicast(dkgMessage, destID)
 	if err != nil {
 		e.log.Error().Msgf("Could not send Message to %v: %v", destID, err)
@@ -189,13 +204,12 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 
 // Broadcast broadcasts a message to all participants.
 func (e *Engine) Broadcast(data []byte) {
-
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.epochCounter,
+		e.GetEpoch(),
+		e.GetPhase(),
 	)
-
 	err := e.dkgContractClient.Broadcast(dkgMessage)
 	if err != nil {
 		e.log.Error().Msgf("Could not broadcast message: %v", err)

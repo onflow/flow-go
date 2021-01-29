@@ -96,7 +96,10 @@ type processor struct {
 }
 
 func (proc *processor) PrivateSend(dest int, data []byte) {
-	proc.channels[dest] <- msg.NewDKGMessage(proc.id, data, proc.epoch)
+	proc.channels[dest] <- msg.NewDKGMessage(
+		proc.id,
+		data,
+		0, 0) // epoch and phase are not relevant at the controller level
 }
 
 // ATTENTION: Normally the processor requires Broadcast to provide guaranteed
@@ -109,7 +112,8 @@ func (proc *processor) Broadcast(data []byte) {
 		if i == proc.id {
 			continue
 		}
-		proc.channels[i] <- msg.NewDKGMessage(proc.id, data, proc.epoch)
+		// epoch and phase are not relevant at the controller level
+		proc.channels[i] <- msg.NewDKGMessage(proc.id, data, 0, 0)
 	}
 }
 
