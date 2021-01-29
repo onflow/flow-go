@@ -218,7 +218,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
-		fvm.WithChain(chain), fvm.WithCadenceLogging(true))
+		fvm.WithChain(chain), 
+		fvm.WithCadenceLogging(true),
+	)
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
