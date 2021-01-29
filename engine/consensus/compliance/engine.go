@@ -306,6 +306,12 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		defer e.unit.Unlock()
 		return e.onSyncedBlock(originID, ev)
 	case *messages.BlockProposal:
+
+		header := ev.Header
+		e.log.Info().
+			Hex("block_id", logging.Entity(header)).
+			Msg("inbound proposal received from network layer")
+
 		id := ev.Header.ID()
 		_, knownBlock := e.tracer.GetSpan(id, trace.CONCompProcessProposal)
 		var childSpan opentracing.Span
