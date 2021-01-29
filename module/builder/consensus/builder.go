@@ -403,7 +403,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 
 	// for sanity check
 	knownResults := make(map[flow.Identifier]struct{})
-	knownResults[]
+	knownResults[latestSeal.ResultID] = struct{}{}
 
 	// loop through the fork backwards, from parent to last sealed (including),
 	// and keep track of blocks and receipts visited on the way.
@@ -416,17 +416,29 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		}
 		ancestors[ancestorID] = struct{}{}
 
-		index, err := b.index.ByBlockID(ancestorID)
+		block, err := b.blocks.ByID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
-		for _, recID := range index.ReceiptIDs {
+		for _, rec := range block.Payload.Receipts {
+			recID := rec.ID()
 			includedReceipts[recID] = struct{}{}
+			knownResults[rec.ExecutionResult.ID()] = struct{}{}
 		}
+
+		// TODO: put this optimized version back
+		//index, err := b.index.ByBlockID(ancestorID)
+		//if err != nil {
+		//	return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+		//}
+		//for _, recID := range index.ReceiptIDs {
+		//	includedReceipts[recID] = struct{}{}
+		//}
 
 		if ancestorID == sealedBlockID {
 			break
 		}
+
 		ancestorID = ancestor.ParentID
 	}
 
@@ -449,14 +461,18 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
 
-	// sanity check:
-
-
-
-
 	// don't collect more than maxReceiptCount receipts
 	if uint(len(receipts)) > b.cfg.maxReceiptCount {
 		receipts = receipts[:b.cfg.maxReceiptCount]
+	}
+
+	// sanity check: parent result should be on the fork
+	for _, receiptCandidate := range receipts {
+		// check that parent result is in fork:
+		if _, found := knownResults[receiptCandidate.ExecutionResult.PreviousResultID]; !found {
+			return nil, fmt.Errorf("receipt collection produced invalid result")
+		}
+		knownResults[receiptCandidate.ExecutionResult.ID()] = struct{}{}
 	}
 
 	return receipts, nil
