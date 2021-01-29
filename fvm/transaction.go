@@ -26,11 +26,12 @@ type TransactionProcessor interface {
 }
 
 type TransactionProcedure struct {
-	ID          flow.Identifier
-	Transaction *flow.TransactionBody
-	TxIndex     uint32
-	Logs        []string
-	Events      []flow.Event
+	ID            flow.Identifier
+	Transaction   *flow.TransactionBody
+	TxIndex       uint32
+	Logs          []string
+	Events        []flow.Event
+	ServiceEvents []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
@@ -96,6 +97,7 @@ func (i *TransactionInvocator) Process(
 	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
 	proc.Events = env.getEvents()
+	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
 
 	return nil
