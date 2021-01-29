@@ -323,8 +323,8 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 			Msg("Cannot parse program at address after removing declarations")
 		return nil, err
 	}
-	declarations = program.Declarations()
 
+	declarations = program.Declarations()
 	switch len(declarations) {
 	case 0:
 		// If there is no declarations. Only comments? was this legal before?

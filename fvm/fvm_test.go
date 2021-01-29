@@ -57,12 +57,8 @@ func (vmt vmTest) run(
 
 		vm := fvm.New(rt)
 
-		cache, err := fvm.NewLRUASTCache(CacheSize)
-		require.NoError(t, err)
-
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
-			fvm.WithASTCache(cache),
 		}
 
 		opts := append(baseOpts, vmt.contextOptions...)
@@ -78,7 +74,7 @@ func (vmt vmTest) run(
 
 		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
-		err = vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
+		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view)
 		require.NoError(t, err)
 
 		f(t, vm, chain, ctx, view)
@@ -86,16 +82,20 @@ func (vmt vmTest) run(
 }
 
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Testnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
 
 	t.Run("Success", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -207,16 +207,18 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 }
 
 func TestBlockContext_DeployContract(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain), fvm.WithCadenceLogging(true))
 
 	t.Run("account update with set code succeeds as service account", func(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
@@ -304,16 +306,20 @@ func TestBlockContext_DeployContract(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(cadence.NewString("foo"))
@@ -410,16 +416,20 @@ func gasLimitScript(depth int) string {
 }
 
 func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
 
 	var tests = []struct {
 		label    string
@@ -477,6 +487,9 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
+
+	t.Parallel()
+
 	b := make([]byte, 100000) // 100k bytes
 	_, err := rand.Read(b)
 	require.NoError(t, err)
@@ -596,16 +609,20 @@ var createAccountScript = []byte(`
 `)
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
 
 	t.Run("script success", func(t *testing.T) {
 		code := []byte(`
@@ -666,16 +683,20 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 }
 
 func TestBlockContext_GetBlockInfo(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
 
 	blocks := new(fvmmock.Blocks)
 
@@ -719,10 +740,28 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, tx.Err)
 
 		require.Len(t, tx.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
-			float64(block1.Header.Timestamp.Unix())), tx.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
-			float64(block2.Header.Timestamp.Unix())), tx.Logs[1])
+		assert.Equal(
+			t,
+			fmt.Sprintf(
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				block1.Header.Height,
+				block1.Header.View,
+				block1.ID(),
+				float64(block1.Header.Timestamp.Unix()),
+			),
+			tx.Logs[0],
+		)
+		assert.Equal(
+			t,
+			fmt.Sprintf(
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				block2.Header.Height,
+				block2.Header.View,
+				block2.ID(),
+				float64(block2.Header.Timestamp.Unix()),
+			),
+			tx.Logs[1],
+		)
 	})
 
 	t.Run("works as script", func(t *testing.T) {
@@ -746,10 +785,27 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.NoError(t, script.Err)
 
 		require.Len(t, script.Logs, 2)
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block1.Header.Height, block1.Header.View, block1.ID(),
-			float64(block1.Header.Timestamp.Unix())), script.Logs[0])
-		assert.Equal(t, fmt.Sprintf("Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)", block2.Header.Height, block2.Header.View, block2.ID(),
-			float64(block2.Header.Timestamp.Unix())), script.Logs[1])
+		assert.Equal(t,
+			fmt.Sprintf(
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				block1.Header.Height,
+				block1.Header.View,
+				block1.ID(),
+				float64(block1.Header.Timestamp.Unix()),
+			),
+			script.Logs[0],
+		)
+		assert.Equal(
+			t,
+			fmt.Sprintf(
+				"Block(height: %v, view: %v, id: 0x%x, timestamp: %.8f)",
+				block2.Header.Height,
+				block2.Header.View,
+				block2.ID(),
+				float64(block2.Header.Timestamp.Unix()),
+			),
+			script.Logs[1],
+		)
 	})
 
 	t.Run("panics if external function panics in transaction", func(t *testing.T) {
@@ -795,6 +851,9 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 }
 
 func TestBlockContext_GetAccount(t *testing.T) {
+
+	t.Parallel()
+
 	const count = 100
 
 	rt := runtime.NewInterpreterRuntime()
@@ -803,10 +862,11 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
 
 	sequenceNumber := uint64(0)
 
@@ -893,18 +953,23 @@ func TestBlockContext_GetAccount(t *testing.T) {
 }
 
 func TestBlockContext_UnsafeRandom(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
 	header := flow.Header{Height: 42}
 
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache), fvm.WithBlockHeader(&header), fvm.WithCadenceLogging(true))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithBlockHeader(&header),
+		fvm.WithCadenceLogging(true),
+	)
 
 	t.Run("works as transaction", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -939,16 +1004,19 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.MonotonicEmulator.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
-	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain), fvm.WithASTCache(cache))
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+	)
 
 	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
@@ -956,7 +1024,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 		SetScript(createAccountScript).
 		AddAuthorizer(chain.ServiceAddress())
 
-	err = testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+	err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 	require.NoError(t, err)
 
 	tx := fvm.Transaction(txBody, 0)
@@ -977,6 +1045,9 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 }
 
 func TestSignatureVerification(t *testing.T) {
+
+	t.Parallel()
+
 	code := []byte(`
       import Crypto
 
@@ -1231,19 +1302,18 @@ func TestSignatureVerification(t *testing.T) {
 }
 
 func TestWithServiceAccount(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
 	vm := fvm.New(rt)
 
-	cache, err := fvm.NewLRUASTCache(CacheSize)
-	require.NoError(t, err)
-
 	ctxA := fvm.NewContext(
 		zerolog.Nop(),
 		fvm.WithChain(chain),
-		fvm.WithASTCache(cache),
 		fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvocator(zerolog.Nop()),
 		),
@@ -1258,7 +1328,7 @@ func TestWithServiceAccount(t *testing.T) {
 	t.Run("With service account enabled", func(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctxA, tx, ledger)
+		err := vm.Run(ctxA, tx, ledger)
 		require.NoError(t, err)
 
 		// transaction should fail on non-bootstrapped ledger
@@ -1270,7 +1340,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctxB, tx, ledger)
+		err := vm.Run(ctxB, tx, ledger)
 		require.NoError(t, err)
 
 		// transaction should succeed on non-bootstrapped ledger
@@ -1279,6 +1349,9 @@ func TestWithServiceAccount(t *testing.T) {
 }
 
 func TestEventLimits(t *testing.T) {
+
+	t.Parallel()
+
 	rt := runtime.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
 	vm := fvm.New(rt)
