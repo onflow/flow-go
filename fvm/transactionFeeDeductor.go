@@ -23,6 +23,10 @@ func (d *TransactionFeeDeductor) Process(
 		if er != nil {
 			panic(er)
 		}
+		er = ctx.Programs.Commit()
+		if er != nil {
+			panic(er)
+		}
 	}
 	return err
 }
