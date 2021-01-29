@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow/filter/id"
 
@@ -22,6 +23,7 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
+	log       zerolog.Logger
 	metrics   module.MempoolMetrics
 	tracer    module.Tracer
 	db        *badger.DB
@@ -39,6 +41,7 @@ type Builder struct {
 
 // NewBuilder creates a new block builder.
 func NewBuilder(
+	log zerolog.Logger,
 	metrics module.MempoolMetrics,
 	db *badger.DB,
 	state protocol.MutableState,
@@ -70,6 +73,7 @@ func NewBuilder(
 	}
 
 	b := &Builder{
+		log:       log.With().Str("consensus", "builder").Logger(),
 		metrics:   metrics,
 		db:        db,
 		tracer:    tracer,
@@ -470,7 +474,8 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	for _, receiptCandidate := range receipts {
 		// check that parent result is in fork:
 		if _, found := knownResults[receiptCandidate.ExecutionResult.PreviousResultID]; !found {
-			return nil, fmt.Errorf("receipt collection produced invalid result")
+			b.log.Error().Msg("receipt collection produced invalid result")
+			return nil, nil
 		}
 		knownResults[receiptCandidate.ExecutionResult.ID()] = struct{}{}
 	}

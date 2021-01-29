@@ -309,6 +309,7 @@ func main() {
 			// initialize the block builder
 			var build module.Builder
 			build = builder.NewBuilder(
+				node.Logger,
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,

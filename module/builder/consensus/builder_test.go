@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -373,6 +374,7 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// initialize the builder
 	bs.build = NewBuilder(
+		zerolog.New(os.Stderr),
 		noopMetrics,
 		bs.db,
 		bs.state,
