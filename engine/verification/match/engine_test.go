@@ -102,6 +102,7 @@ func (suite *MatchEngineTestSuite) SetupTest() {
 	suite.head = block.Header
 	suite.snapshot = snapshot
 	suite.state = state
+	suite.state.On("Sealed").Return(suite.snapshot)
 
 	// setup other dependencies
 	suite.results = stdmap.NewResultDataPacks(10)
@@ -212,10 +213,13 @@ func (suite *MatchEngineTestSuite) OnVerifiableChunkSentMetricCalledNTimes(n int
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	e := suite.NewTestMatchEngine(1)
-
+	header := &flow.Header{
+		View:   suite.head.View + 1,
+		Height: suite.head.Height + 1,
+	}
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		suite.head.ID(),
+		header.ID(),
 		WithChunks(
 			WithAssignee(suite.myID),
 		),
@@ -247,7 +251,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	suite.chunkIDsByResult.On("Has", resultID).Return(true)
 
 	// block header has been received
-	suite.headerDB[result.BlockID] = suite.head
+	suite.headerDB[result.BlockID] = header
 
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
@@ -277,7 +281,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	require.Equal(suite.T(), myChunk.ID(), reqs[0].ChunkID)
 
 	require.Equal(suite.T(), 1, len(vchunks))
-	require.Equal(suite.T(), suite.head, vchunks[0].Header)
+	require.Equal(suite.T(), header, vchunks[0].Header)
 	require.Equal(suite.T(), result, vchunks[0].Result)
 	require.Equal(suite.T(), &chunkDataPack, vchunks[0].ChunkDataPack)
 
@@ -337,10 +341,13 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 // it will produce 2 verifiable chunks.
 func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	e := suite.NewTestMatchEngine(1)
-
+	header := &flow.Header{
+		View:   suite.head.View + 1,
+		Height: suite.head.Height + 1,
+	}
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		suite.head.ID(),
+		header.ID(),
 		WithChunks(
 			WithAssignee(suite.myID),
 			WithAssignee(flow.Identifier{}), // some other node
@@ -374,7 +381,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	suite.chunkIDsByResult.On("Has", resultID).Return(true)
 
 	// block header has been received
-	suite.headerDB[result.BlockID] = suite.head
+	suite.headerDB[result.BlockID] = header
 
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
@@ -411,10 +418,13 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 // which only has 1 chunk, only 1 verifiable chunk will be produced.
 func (suite *MatchEngineTestSuite) TestDuplication() {
 	e := suite.NewTestMatchEngine(3)
-
+	header := &flow.Header{
+		View:   suite.head.View + 1,
+		Height: suite.head.Height + 1,
+	}
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		suite.head.ID(),
+		header.ID(),
 		WithChunks(
 			WithAssignee(suite.myID),
 		),
@@ -446,7 +456,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	suite.chunkIDsByResult.On("Has", resultID).Return(true)
 
 	// block header has been received
-	suite.headerDB[result.BlockID] = suite.head
+	suite.headerDB[result.BlockID] = header
 
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
@@ -491,10 +501,14 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 // and successful to return in the 3rd try, a verifiable chunk will be produced
 func (suite *MatchEngineTestSuite) TestRetry() {
 	e := suite.NewTestMatchEngine(3)
+	header := &flow.Header{
+		View:   suite.head.View + 1,
+		Height: suite.head.Height + 1,
+	}
 
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		suite.head.ID(),
+		header.ID(),
 		WithChunks(
 			WithAssignee(suite.myID),
 		),
@@ -526,7 +540,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	suite.chunkIDsByResult.On("Has", resultID).Return(true)
 
 	// block header has been received
-	suite.headerDB[result.BlockID] = suite.head
+	suite.headerDB[result.BlockID] = header
 
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
@@ -565,9 +579,13 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	e := suite.NewTestMatchEngine(3)
+	header := &flow.Header{
+		View:   suite.head.View + 1,
+		Height: suite.head.Height + 1,
+	}
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		suite.head.ID(),
+		header.ID(),
 		WithChunks(
 			WithAssignee(suite.myID),
 		),
@@ -592,7 +610,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	}
 
 	// block header has been received
-	suite.headerDB[result.BlockID] = suite.head
+	suite.headerDB[result.BlockID] = header
 
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
@@ -633,8 +651,11 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	// receiving `count`-many chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(count)
 
-	for i := 0; i < count; i++ {
-		header := &flow.Header{View: uint64(i)}
+	for i := suite.head.Height + 1; i <= suite.head.Height+uint64(count); i++ {
+		header := &flow.Header{
+			View:   i,
+			Height: i,
+		}
 		// create a execution result that assigns to me
 		result, assignment := createExecutionResult(
 			header.ID(),
@@ -699,10 +720,13 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 // all of them, and process concurrently.
 func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	e := suite.NewTestMatchEngine(1)
-
+	header := &flow.Header{
+		View:   suite.head.View + 1,
+		Height: suite.head.Height + 1,
+	}
 	// create a execution result that assigns to me
 	result, assignment := createExecutionResult(
-		suite.head.ID(),
+		header.ID(),
 		WithChunks(
 			WithAssignee(suite.myID),
 			WithAssignee(suite.myID),
@@ -739,7 +763,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	suite.chunkIDsByResult.On("Has", resultID).Return(true)
 
 	// block header has been received
-	suite.headerDB[result.BlockID] = suite.head
+	suite.headerDB[result.BlockID] = header
 
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]

@@ -69,24 +69,25 @@ func TestTopShotSafety(t *testing.T) {
 		require.Equal(t, 0, buffer.Len())
 	})
 
-	t.Run("logs for failing tx but not related to TopShot", func(t *testing.T) {
+	// We are now logging for all failed Tx
+	// t.Run("logs for failing tx but not related to TopShot", func(t *testing.T) {
 
-		runtimeError := runtime.Error{
-			Err: sema.CheckerError{
-				Errors: []error{&sema.ImportedProgramError{
-					CheckerError: &sema.CheckerError{},
-					ImportLocation: ast.AddressLocation{
-						Name:    "NotTopshot",
-						Address: common.BytesToAddress([]byte{0, 1, 2}),
-					},
-				}},
-			},
-		}
+	// 	runtimeError := runtime.Error{
+	// 		Err: sema.CheckerError{
+	// 			Errors: []error{&sema.ImportedProgramError{
+	// 				CheckerError: &sema.CheckerError{},
+	// 				ImportLocation: ast.AddressLocation{
+	// 					Name:    "NotTopshot",
+	// 					Address: common.BytesToAddress([]byte{0, 1, 2}),
+	// 				},
+	// 			}},
+	// 		},
+	// 	}
 
-		err, buffer := prepare(runtimeError)
-		require.Error(t, err)
-		require.Equal(t, 0, buffer.Len())
-	})
+	// 	err, buffer := prepare(runtimeError)
+	// 	require.Error(t, err)
+	// 	require.Equal(t, 0, buffer.Len())
+	// })
 
 	t.Run("logs for failing TopShot tx but no extra info is provided", func(t *testing.T) {
 

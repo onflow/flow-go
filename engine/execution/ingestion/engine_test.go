@@ -340,7 +340,8 @@ func TestChunkIndexIsSet(t *testing.T) {
 func TestExecuteOneBlock(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 		// A <- B
-		blockA := unittest.ExecutableBlockFixture(nil)
+		sealed := unittest.ExecutableBlockFixture(nil)
+		blockA := unittest.ExecutableBlockFixtureWithParent(nil, sealed.Block.Header)
 		blockA.StartState = unittest.StateCommitmentFixture()
 
 		// blockA's start state is its parent's state commitment,
@@ -353,7 +354,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		})
 
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blockA.Block.Header, nil)
+		ctx.snapshot.On("Head").Return(sealed.Block.Header, nil)
 
 		ctx.assertSuccessfulBlockComputation(blockA, unittest.IdentifierFixture())
 
@@ -384,8 +385,9 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		// create blocks with the following relations
 		// A <- B
 		// A <- C <- D
+		sealed := unittest.ExecutableBlockFixture(nil)
 		blocks := make(map[string]*entity.ExecutableBlock)
-		blocks["A"] = unittest.ExecutableBlockFixture(nil)
+		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, sealed.Block.Header)
 		blocks["A"].StartState = unittest.StateCommitmentFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -411,7 +413,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		// make sure the seal height won't trigger state syncing, so that all blocks
 		// will be executed.
 		ctx.state.On("Sealed").Return(ctx.snapshot)
-		ctx.snapshot.On("Head").Return(blocks["A"].Block.Header, nil)
+		ctx.snapshot.On("Head").Return(sealed.Block.Header, nil)
 
 		// once block A is computed, it should trigger B and C being sent to compute,
 		// which in turn should trigger D
