@@ -134,6 +134,7 @@ func (e *blockComputer) executeBlock(
 		interactions[i] = collectionView.Interactions()
 
 		stateView.MergeView(collectionView)
+
 	}
 
 	// system chunk
@@ -162,7 +163,9 @@ func (e *blockComputer) executeBlock(
 	blockTxResults = append(blockTxResults, txResult)
 	gasUsed += txGas
 	interactions[len(interactions)-1] = systemChunkView.Interactions()
+
 	stateView.MergeView(systemChunkView)
+	blockCtx.Programs.Commit()
 
 	return &execution.ComputationResult{
 		ExecutableBlock:   block,
