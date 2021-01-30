@@ -139,7 +139,10 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		Guarantees: guarantees,
 	}
 	header := unittest.BlockHeaderFixture()
-	header.Height = 0
+	// This is 43 due to the fact that the default mocked sealed height is 42,
+	// and we only process blocks that are after sealed, therefore 43 is needed
+	// for us to process this chunk in the default case
+	header.Height = 43
 	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
