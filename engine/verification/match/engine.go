@@ -45,6 +45,7 @@ type Engine struct {
 	headers          storage.Headers         // used to fetch the block header when chunk data is ready to be verified
 	retryInterval    time.Duration           // determines time in milliseconds for retrying chunk data requests
 	maxAttempt       int                     // max time of retries to fetch the chunk data pack for a chunk
+	finishProcessing finishProcessing        // to report a chunk has been processed
 }
 
 func New(
@@ -90,8 +91,16 @@ func New(
 	return e, nil
 }
 
+func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
+	e.finishProcessing = finishProcessing
+}
+
 // Ready initializes the engine and returns a channel that is closed when the initialization is done
 func (e *Engine) Ready() <-chan struct{} {
+	if e.finishProcessing == nil {
+		panic("missing finishProcessing callback in verification match engine")
+	}
+
 	delay := time.Duration(0)
 	// run a periodic check to retry requesting chunk data packs for chunks that assigned to me.
 	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous

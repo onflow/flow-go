@@ -43,9 +43,10 @@ type Engine struct {
 	match   network.Engine
 	state   protocol.State
 
-	assigner    module.ChunkAssigner // used to determine chunks this node needs to verify
-	chunksQueue storage.ChunksQueue  // to store chunks to be verified
-	chunkWorker jobqueue.Worker      // to notify about a new chunk
+	assigner         module.ChunkAssigner // used to determine chunks this node needs to verify
+	chunksQueue      storage.ChunksQueue  // to store chunks to be verified
+	chunkWorker      jobqueue.Worker      // to notify about a new chunk
+	finishProcessing finishProcessing     // to report a block has been processed
 
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
@@ -111,6 +112,10 @@ func New(
 		return nil, fmt.Errorf("could not register engine on execution receipt provider channel: %w", err)
 	}
 	return e, nil
+}
+
+func (e *Engine) withFinishProcessing(finishProcessing FinishProcessing) {
+	e.finishProcessing = finishProcessing
 }
 
 // Ready returns a channel that is closed when the finder engine is ready.
