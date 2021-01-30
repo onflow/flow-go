@@ -41,7 +41,10 @@ func Bootstrap(
 
 func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
 	b.vm = vm
-	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
+	b.ctx = NewContextFromParent(ctx,
+		WithRestrictedContractDeployment(false),
+		WithRestrictedContractUpdate(false),
+	)
 	b.ledger = ledger
 
 	// initialize the account addressing state

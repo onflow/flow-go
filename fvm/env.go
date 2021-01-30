@@ -459,7 +459,7 @@ func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name
 	accountAddress := flow.Address(address)
 
 	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+	if e.ctx.RestrictedContractUpdateEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}
@@ -471,7 +471,7 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 	accountAddress := flow.Address(address)
 
 	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
+	if e.ctx.RestrictedContractUpdateEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("code deployment requires authorization from the service account")
 	}

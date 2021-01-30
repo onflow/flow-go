@@ -9,22 +9,23 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                            flow.Chain
-	ASTCache                         ASTCache
-	Blocks                           Blocks
-	Metrics                          *MetricsCollector
-	GasLimit                         uint64
-	EventCollectionByteSizeLimit     uint64
-	BlockHeader                      *flow.Header
-	ServiceAccountEnabled            bool
-	RestrictedAccountCreationEnabled bool
-	RestrictedDeploymentEnabled      bool
-	CadenceLoggingEnabled            bool
-	SetValueHandler                  SetValueHandler
-	SignatureVerifier                SignatureVerifier
-	TransactionProcessors            []TransactionProcessor
-	ScriptProcessors                 []ScriptProcessor
-	Logger                           zerolog.Logger
+	Chain                               flow.Chain
+	ASTCache                            ASTCache
+	Blocks                              Blocks
+	Metrics                             *MetricsCollector
+	GasLimit                            uint64
+	EventCollectionByteSizeLimit        uint64
+	BlockHeader                         *flow.Header
+	ServiceAccountEnabled               bool
+	RestrictedAccountCreationEnabled    bool
+	RestrictedContractDeploymentEnabled bool
+	RestrictedContractUpdateEnabled     bool
+	CadenceLoggingEnabled               bool
+	SetValueHandler                     SetValueHandler
+	SignatureVerifier                   SignatureVerifier
+	TransactionProcessors               []TransactionProcessor
+	ScriptProcessors                    []ScriptProcessor
+	Logger                              zerolog.Logger
 }
 
 // SetValueHandler receives a value written by the Cadence runtime.
@@ -56,19 +57,20 @@ const defaultEventCollectionByteSizeLimit = 128_000 // 128KB
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
-		Chain:                            flow.Mainnet.Chain(),
-		ASTCache:                         nil,
-		Blocks:                           nil,
-		Metrics:                          nil,
-		GasLimit:                         defaultGasLimit,
-		EventCollectionByteSizeLimit:     defaultEventCollectionByteSizeLimit,
-		BlockHeader:                      nil,
-		ServiceAccountEnabled:            true,
-		RestrictedAccountCreationEnabled: true,
-		RestrictedDeploymentEnabled:      true,
-		CadenceLoggingEnabled:            false,
-		SetValueHandler:                  nil,
-		SignatureVerifier:                NewDefaultSignatureVerifier(),
+		Chain:                               flow.Mainnet.Chain(),
+		ASTCache:                            nil,
+		Blocks:                              nil,
+		Metrics:                             nil,
+		GasLimit:                            defaultGasLimit,
+		EventCollectionByteSizeLimit:        defaultEventCollectionByteSizeLimit,
+		BlockHeader:                         nil,
+		ServiceAccountEnabled:               true,
+		RestrictedAccountCreationEnabled:    true,
+		RestrictedContractDeploymentEnabled: true,
+		RestrictedContractUpdateEnabled:     true,
+		CadenceLoggingEnabled:               false,
+		SetValueHandler:                     nil,
+		SignatureVerifier:                   NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
@@ -166,11 +168,20 @@ func WithServiceAccount(enabled bool) Option {
 	}
 }
 
-// WithRestrictedDeployment enables or disables restricted contract deployment for a
+// WithRestrictedContractDeployment enables or disables restricted contract deployment for a
 // virtual machine context.
-func WithRestrictedDeployment(enabled bool) Option {
+func WithRestrictedContractDeployment(enabled bool) Option {
 	return func(ctx Context) Context {
-		ctx.RestrictedDeploymentEnabled = enabled
+		ctx.RestrictedContractDeploymentEnabled = enabled
+		return ctx
+	}
+}
+
+// WithRestrictedContractUpdate enables or disables restricted contract deployment for a
+// virtual machine context.
+func WithRestrictedContractUpdate(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.RestrictedContractUpdateEnabled = enabled
 		return ctx
 	}
 }
