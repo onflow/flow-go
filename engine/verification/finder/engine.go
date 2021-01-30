@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -36,12 +37,16 @@ import (
 // This engine ensures that each (ready) result is passed to match engine only once.
 // Hence, among concurrent ready receipts with shared result, only one instance of result is passed to match engine.
 type Engine struct {
-	unit                     *engine.Unit
-	log                      zerolog.Logger
-	metrics                  module.VerificationMetrics
-	me                       module.Local
-	match                    network.Engine
-	state                    protocol.State
+	unit    *engine.Unit
+	log     zerolog.Logger
+	metrics module.VerificationMetrics
+	me      module.Local
+	match   network.Engine
+	state   protocol.State
+
+	chunksQueue storage.ChunksQueue // to store chunks to be verified
+	chunkWorker jobqueue.Worker     // to notify about a new chunk
+
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
 	readyReceipts            mempool.ReceiptDataPacks // used to keep the receipts ready for process
@@ -73,6 +78,9 @@ func New(
 	receiptsIDsByResult mempool.IdentifierMap,
 	blockIDsCache mempool.Identifiers,
 	processInterval time.Duration,
+
+	chunksQueue storage.ChunksQueue,
+	chunkWorker jobqueue.Worker,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:                     engine.NewUnit(),
@@ -92,6 +100,8 @@ func New(
 		blockIDsCache:            blockIDsCache,
 		processInterval:          processInterval,
 		tracer:                   tracer,
+		chunksQueue:              chunksQueue,
+		chunkWorker:              chunkWorker,
 	}
 
 	_, err := net.Register(engine.ReceiveReceipts, e)
@@ -219,20 +229,9 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 
 }
 
-// OnFinalizedBlock is part of implementing FinalizationConsumer interface
-// On receiving a block, it caches the block ID to be checked in the next onTimer loop.
-//
-// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
-// a block has been finalized. They are emitted in the order the blocks are finalized.
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	ok := e.blockIDsCache.Add(block.BlockID)
-	e.log.Debug().
-		Bool("added_new_blocks", ok).
-		Hex("block_id", logging.ID(block.BlockID)).
-		Msg("new finalized block received")
+func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
+	// the block consumer will pull as many finalized blocks as
+	// it can consume to process
 }
 
 // To implement FinalizationConsumer

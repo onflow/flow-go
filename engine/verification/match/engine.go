@@ -168,6 +168,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
+func (e *Engine) ProcessMyChunk(c *flow.Chunk) {
+	panic("To be implemented")
+}
+
 // handleExecutionResult takes a execution result and finds chunks that are assigned to this
 // verification node and adds them to the pending chunk list to be processed.
 // It stores the result in memory, in order to check if a chunk still needs to be processed.

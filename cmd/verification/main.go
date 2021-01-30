@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -77,6 +78,7 @@ func main() {
 		matchEng            *match.Engine              // the match engine
 		followerEng         *followereng.Engine        // the follower engine
 		collector           module.VerificationMetrics // used to collect metrics of all engines
+		chunkWorker         jobqueue.Worker            // for finder engine to notify match engine about a new chunk
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -186,6 +188,10 @@ func main() {
 
 			return nil
 		}).
+		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
+			chunksQueue = storage.NewChunksQueue(node.DB)
+			return nil
+		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
 			if err != nil {
@@ -278,13 +284,12 @@ func main() {
 				node.Me,
 				chunkVerifier,
 				approvalStorage)
+
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
-			if err != nil {
-				return nil, err
-			}
+			maxProcessing := int64(10)
+			maxFinished := int64(400)
 			matchEng, err = match.New(node.Logger,
 				collector,
 				node.Tracer,
@@ -293,15 +298,34 @@ func main() {
 				pendingResults,
 				chunkIDsByResult,
 				verifierEng,
-				assigner,
 				node.State,
 				pendingChunks,
 				headerStorage,
 				requestInterval,
-				failureThreshold)
+				failureThreshold,
+			)
 			return matchEng, err
 		}).
+		Component("match engine consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			maxProcessing := int64(10)
+			maxFinished := int64(400)
+			processedIndex := storage.NewProcessedChunk(node.DB)
+			// the chunk worker needs to be passed to the finder engine, so that
+			// finder can notify the match engine that new chunk has been added
+			// to the queue, and triggers the chunk queue to process them.
+			consumer, chunkWorker := NewChunkConsumer(
+				node.Logger,
+				processedIndex,
+				matchEng,
+				maxProcessing,
+				maxFinished,
+			)
+		}).
 		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
+			if err != nil {
+				return nil, err
+			}
 			finderEng, err = finder.New(node.Logger,
 				collector,
 				node.Tracer,
@@ -318,8 +342,25 @@ func main() {
 				receiptIDsByBlock,
 				receiptIDsByResult,
 				blockIDsCache,
-				processInterval)
+				processInterval,
+				chunksQueue,
+				chunkWorker,
+			)
+
 			return finderEng, err
+		}).
+		Component("finder engine consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			maxProcessing := int64(10)
+			maxFinished := int64(400)
+			processedHeight := storage.NewProcessedHeight(node.DB)
+			return finder.NewBlockConsumer(
+				node.Logger,
+				processedHeight,
+				node.State,
+				finderEng,
+				maxProcessing,
+				maxFinished,
+			), nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 

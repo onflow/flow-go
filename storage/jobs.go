@@ -19,3 +19,7 @@ type ConsumerProgress interface {
 	InitProcessedIndex() (int64, error)
 	SetProcessedIndex(processed int64) error
 }
+
+type JobQueue interface {
+	Add(job Job) error
+}
