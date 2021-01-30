@@ -320,7 +320,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
 
-				if executionCalls > collectionCount * transactionCount {
+				if executionCalls > collectionCount*transactionCount {
 					return nil
 				}
 
@@ -356,7 +356,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 }
 
 type testRuntime struct {
-	executeScript func (runtime.Script, runtime.Context) (cadence.Value, error)
+	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
 }
 

@@ -105,7 +105,6 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
 }
 
-
 func TestExecuteScript(t *testing.T) {
 
 	t.Run("scripts do not store programs", func(t *testing.T) {

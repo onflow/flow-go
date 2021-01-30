@@ -9,7 +9,7 @@ import (
 
 type ProgramEntry struct {
 	Location common.Location
-	Program *interpreter.Program
+	Program  *interpreter.Program
 }
 
 type Programs struct {
@@ -20,7 +20,7 @@ type Programs struct {
 
 func NewPrograms(parent *Programs) *Programs {
 	return &Programs{
-		parent: parent,
+		parent:   parent,
 		programs: map[common.LocationID]ProgramEntry{},
 	}
 }
@@ -51,7 +51,7 @@ func (p *Programs) Set(location common.Location, program *interpreter.Program) {
 
 	p.programs[location.ID()] = ProgramEntry{
 		Location: location,
-		Program: program,
+		Program:  program,
 	}
 }
 

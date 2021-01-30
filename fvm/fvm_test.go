@@ -296,7 +296,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
-		fvm.WithChain(chain), 
+		fvm.WithChain(chain),
 		fvm.WithCadenceLogging(true),
 	)
 
