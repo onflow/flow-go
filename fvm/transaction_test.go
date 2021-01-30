@@ -145,6 +145,7 @@ func TestSafetyCheck(t *testing.T) {
 			"contract_names",
 			encodedName,
 		)
+
 		ledger.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
