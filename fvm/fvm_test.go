@@ -129,7 +129,7 @@ func TestPrograms(t *testing.T) {
 					require.NoError(t, tx.Err)
 				}
 
-				require.Greater(t, ctx.Programs.Length(), 0)
+				require.Greater(t, txCtx.Programs.Length(), 0)
 			},
 		),
 	)
