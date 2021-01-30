@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -235,13 +235,13 @@ type eventEmittingRuntime struct {
 	events [][]cadence.Event
 }
 
-func (e *eventEmittingRuntime) ExecuteScript(script runtime.Script, c runtime.Context) (cadence.Value, error) {
+func (e *eventEmittingRuntime) ExecuteScript(_ runtime.Script, _ runtime.Context) (cadence.Value, error) {
 	panic("ExecuteScript not expected")
 }
 
-func (e *eventEmittingRuntime) ExecuteTransaction(script runtime.Script, c runtime.Context) error {
+func (e *eventEmittingRuntime) ExecuteTransaction(_ runtime.Script, context runtime.Context) error {
 	for _, event := range e.events[0] {
-		err := c.Interface.EmitEvent(event)
+		err := context.Interface.EmitEvent(event)
 		if err != nil {
 			return err
 		}
@@ -250,11 +250,11 @@ func (e *eventEmittingRuntime) ExecuteTransaction(script runtime.Script, c runti
 	return nil
 }
 
-func (e *eventEmittingRuntime) ParseAndCheckProgram(source []byte, context runtime.Context) (*sema.Checker, error) {
-	panic("ExecuteScript not expected")
+func (e *eventEmittingRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
+	panic("ParseAndCheckProgram not expected")
 }
 
-func (e *eventEmittingRuntime) SetCoverageReport(coverageReport *runtime.CoverageReport) {
+func (e *eventEmittingRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 	panic("SetCoverageReport not expected")
 }
 
