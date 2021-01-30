@@ -1,9 +1,9 @@
-package match
+package finder
 
 import "testing"
 
-// chunk can convert to job and converted back
-func TestChunkToJob(t *testing.T) {
+// block can convert to job and converted back
+func TestBlockToJob(t *testing.T) {
 }
 
 // 1. if pushing 10 jobs to chunks queue, then engine will
