@@ -56,7 +56,8 @@ func NewBlockComputer(
 		vmCtx,
 		fvm.WithASTCache(systemChunkASTCache),
 		fvm.WithRestrictedAccountCreation(false),
-		fvm.WithRestrictedDeployment(false),
+		fvm.WithRestrictedContractDeployment(false),
+		fvm.WithRestrictedContractUpdate(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
 	)
 
