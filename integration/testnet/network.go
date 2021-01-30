@@ -500,6 +500,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
+		nodeContainer.Ports[AccessNodeAPIPort] = hostPort
+		net.AccessPorts[AccessNodeAPIPort] = hostPort
 	}
 
 	suiteContainer := net.suite.Container(*opts)

@@ -190,3 +190,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 
 	return result, err
 }
+
+func (c *Client) GRPCClient() *client.Client {
+	return c.client
+}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 
+	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -20,6 +21,7 @@ import (
 // Config defines the configurable options for the gRPC server.
 type Config struct {
 	ListenAddr string
+	AccessListenAddr string
 	MaxMsgSize int // In bytes
 }
 
@@ -75,6 +77,9 @@ func New(net module.Network, log zerolog.Logger, me module.Local, state protocol
 	eng.handler = handler
 
 	ghost.RegisterGhostNodeAPIServer(eng.server, eng.handler)
+
+	accessBackend := AccessAPIHandler{}
+	accessproto.RegisterAccessAPIServer(eng.server, accessBackend)
 
 	return eng, nil
 }
