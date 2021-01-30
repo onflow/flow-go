@@ -83,3 +83,10 @@ func (p *Programs) Commit() {
 		)
 	}
 }
+
+func (p *Programs) Length() int {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return len(p.programs)
+}

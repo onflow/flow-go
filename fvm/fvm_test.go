@@ -81,6 +81,84 @@ func (vmt vmTest) run(
 	}
 }
 
+func TestPrograms(t *testing.T) {
+
+	t.Run(
+		"transaction execution programs are committed",
+		newVMTest().run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+
+				txCtx := fvm.NewContextFromParent(ctx)
+
+				for i := 0; i < 10; i++ {
+
+					script := []byte(fmt.Sprintf(`
+							import FungibleToken from %s
+
+							transaction {}
+						`,
+						fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+					))
+
+					serviceAddress := chain.ServiceAddress()
+
+					txBody := flow.NewTransactionBody().
+						SetScript(script).
+						SetProposalKey(serviceAddress, 0, uint64(i)).
+						SetPayer(serviceAddress)
+
+					err := testutil.SignPayload(
+						txBody,
+						serviceAddress,
+						unittest.ServiceAccountPrivateKey,
+					)
+					require.NoError(t, err)
+
+					err = testutil.SignEnvelope(
+						txBody,
+						serviceAddress,
+						unittest.ServiceAccountPrivateKey,
+					)
+					require.NoError(t, err)
+
+					tx := fvm.Transaction(txBody, uint32(i))
+
+					err = vm.Run(txCtx, tx, ledger)
+					require.NoError(t, err)
+
+					require.NoError(t, tx.Err)
+				}
+
+				require.Greater(t, ctx.Programs.Length(), 0)
+			},
+		),
+	)
+
+	t.Run("script execution programs are not committed",
+		newVMTest().run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger) {
+
+				scriptCtx := fvm.NewContextFromParent(ctx)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+
+						import FungibleToken from %s
+
+						pub fun main() {}
+					`,
+					fvm.FungibleTokenAddress(chain).HexWithPrefix(),
+				)))
+
+				err := vm.Run(scriptCtx, script, ledger)
+				require.NoError(t, err)
+				require.NoError(t, script.Err)
+
+				require.Equal(t, 0, ctx.Programs.Length())
+			},
+		),
+	)
+}
+
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	t.Parallel()
