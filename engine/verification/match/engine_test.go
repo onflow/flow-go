@@ -799,7 +799,6 @@ func (suite *MatchEngineTestSuite) NewTestMatchEngine(maxTry int) *match.Engine 
 		suite.results,
 		suite.chunkIDsByResult,
 		suite.verifier,
-		suite.assigner,
 		suite.state,
 		suite.chunks,
 		suite.headers,

@@ -74,10 +74,12 @@ func main() {
 		syncCore            *synchronization.Core      // used in follower engine
 		pendingBlocks       *buffer.PendingBlocks      // used in follower engine
 		finderEng           *finder.Engine             // the finder engine
+		blockConsumer       *finder.BlockConsumer      // to handle OnFinalizedBlock from follower engine
 		verifierEng         *verifier.Engine           // the verifier engine
 		matchEng            *match.Engine              // the match engine
 		followerEng         *followereng.Engine        // the follower engine
 		collector           module.VerificationMetrics // used to collect metrics of all engines
+		chunksQueue         *storage.ChunksQueue       // store chunks to be verified
 		chunkWorker         jobqueue.Worker            // for finder engine to notify match engine about a new chunk
 	)
 
@@ -288,8 +290,6 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			maxProcessing := int64(10)
-			maxFinished := int64(400)
 			matchEng, err = match.New(node.Logger,
 				collector,
 				node.Tracer,
@@ -313,13 +313,16 @@ func main() {
 			// the chunk worker needs to be passed to the finder engine, so that
 			// finder can notify the match engine that new chunk has been added
 			// to the queue, and triggers the chunk queue to process them.
-			consumer, chunkWorker := NewChunkConsumer(
+			var consumer *match.ChunkConsumer
+			consumer, chunkWorker = match.NewChunkConsumer(
 				node.Logger,
 				processedIndex,
+				chunksQueue,
 				matchEng,
 				maxProcessing,
 				maxFinished,
 			)
+			return consumer, nil
 		}).
 		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
@@ -343,6 +346,7 @@ func main() {
 				receiptIDsByResult,
 				blockIDsCache,
 				processInterval,
+				assigner,
 				chunksQueue,
 				chunkWorker,
 			)
@@ -353,14 +357,15 @@ func main() {
 			maxProcessing := int64(10)
 			maxFinished := int64(400)
 			processedHeight := storage.NewProcessedHeight(node.DB)
-			return finder.NewBlockConsumer(
+			blockConsumer := finder.NewBlockConsumer(
 				node.Logger,
 				processedHeight,
 				node.State,
 				finderEng,
 				maxProcessing,
 				maxFinished,
-			), nil
+			)
+			return blockConsumer, nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -394,7 +399,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, blockConsumer, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}

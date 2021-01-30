@@ -3,11 +3,12 @@ package match
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 type ChunkJob struct {
@@ -15,7 +16,7 @@ type ChunkJob struct {
 }
 
 func (j *ChunkJob) ID() module.JobID {
-	return module.JobID(fmt.Sprintf("%v", j.ID()))
+	return module.JobID(fmt.Sprintf("%v", j.Chunk.ID()))
 }
 
 type ChunksJob struct {
@@ -35,7 +36,7 @@ type Worker struct {
 }
 
 func (w *Worker) Run(job storage.Job) {
-	chunkjob, ok := job.(*ChunkJob)
+	chunkjob, _ := job.(*ChunkJob)
 	w.engine.ProcessMyChunk(chunkjob.Chunk)
 }
 
@@ -55,7 +56,10 @@ func NewChunkConsumer(log zerolog.Logger, processedIndex storage.ConsumerProgres
 }
 
 func (c *ChunkConsumer) Ready() <-chan struct{} {
-	c.consumer.Start()
+	err := c.consumer.Start()
+	if err != nil {
+		panic(fmt.Errorf("could not start the chunk consumer for match engine: %w", err))
+	}
 
 	ready := make(chan struct{})
 	close(ready)

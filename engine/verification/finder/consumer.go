@@ -3,13 +3,14 @@ package finder
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/rs/zerolog"
 )
 
 type BlockJob struct {
@@ -65,8 +66,17 @@ func (c *BlockConsumer) OnFinalizedBlock(block *model.Block) {
 	c.consumer.Check()
 }
 
+// To implement FinalizationConsumer
+func (c *BlockConsumer) OnBlockIncorporated(*model.Block) {}
+
+// To implement FinalizationConsumer
+func (c *BlockConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+
 func (c *BlockConsumer) Ready() <-chan struct{} {
-	c.consumer.Start()
+	err := c.consumer.Start()
+	if err != nil {
+		panic(fmt.Errorf("could not start block consumer for finder engine: %w", err))
+	}
 
 	ready := make(chan struct{})
 	close(ready)

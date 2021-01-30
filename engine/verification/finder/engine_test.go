@@ -154,7 +154,11 @@ func (suite *FinderEngineTestSuite) TestNewFinderEngine(opts ...func(testSuite *
 		suite.receiptIDsByBlock,
 		suite.receiptIDsByResult,
 		suite.blockIDsCache,
-		suite.processInterval)
+		suite.processInterval,
+		nil, // TODO to implement
+		nil,
+		nil,
+	)
 	require.Nil(suite.T(), err, "could not create finder engine")
 
 	// mocks identity of the verification node

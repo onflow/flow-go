@@ -26,18 +26,18 @@ func NewChunksQueue(db *badger.DB) *ChunksQueue {
 // StoreChunk stores a new chunk that assigned to me to the job queue
 // true will be returned, if the chunk was a new chunk
 // false will be returned, if the chunk was a duplicate
-func StoreChunk(chunk *flow.Chunk) (bool, error) {
+func (q *ChunksQueue) StoreChunk(chunk *flow.Chunk) (bool, error) {
 	return false, fmt.Errorf("to be implemented")
 }
 
 // LatestIndex returns the index of the latest chunk stored
 // in the queue
-func LatestIndex() (int64, error) {
+func (q *ChunksQueue) LatestIndex() (int64, error) {
 	return 0, fmt.Errorf("to be implemented")
 }
 
 // AtIndex returns the chunk stored at the given index in the
 // queue
-func AtIndex(index int64) (*flow.Chunk, error) {
+func (q *ChunksQueue) AtIndex(index int64) (*flow.Chunk, error) {
 	return nil, fmt.Errorf("TBI")
 }

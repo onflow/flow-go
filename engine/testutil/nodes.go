@@ -727,7 +727,6 @@ func VerificationNode(t testing.TB,
 			node.PendingResults,
 			node.ChunkIDsByResult,
 			node.VerifierEngine,
-			assigner,
 			node.State,
 			node.PendingChunks,
 			node.HeaderStorage,
@@ -737,6 +736,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.FinderEngine == nil {
+		// TODO: replace with real modules
 		node.FinderEngine, err = finder.New(node.Log,
 			collector,
 			node.Tracer,
@@ -753,7 +753,11 @@ func VerificationNode(t testing.TB,
 			node.PendingReceiptIDsByBlock,
 			node.ReceiptIDsByResult,
 			node.BlockIDsCache,
-			processInterval)
+			processInterval,
+			assigner,
+			nil,
+			nil,
+		)
 		require.Nil(t, err)
 	}
 

@@ -9,7 +9,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
@@ -44,8 +43,9 @@ type Engine struct {
 	match   network.Engine
 	state   protocol.State
 
-	chunksQueue storage.ChunksQueue // to store chunks to be verified
-	chunkWorker jobqueue.Worker     // to notify about a new chunk
+	assigner    module.ChunkAssigner // used to determine chunks this node needs to verify
+	chunksQueue storage.ChunksQueue  // to store chunks to be verified
+	chunkWorker jobqueue.Worker      // to notify about a new chunk
 
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
@@ -79,6 +79,7 @@ func New(
 	blockIDsCache mempool.Identifiers,
 	processInterval time.Duration,
 
+	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	chunkWorker jobqueue.Worker,
 ) (*Engine, error) {
@@ -100,6 +101,7 @@ func New(
 		blockIDsCache:            blockIDsCache,
 		processInterval:          processInterval,
 		tracer:                   tracer,
+		assigner:                 assigner,
 		chunksQueue:              chunksQueue,
 		chunkWorker:              chunkWorker,
 	}
@@ -224,18 +226,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	return nil
 }
 
-// To implement FinalizationConsumer
-func (e *Engine) OnBlockIncorporated(*model.Block) {
-
-}
-
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	// the block consumer will pull as many finalized blocks as
 	// it can consume to process
 }
-
-// To implement FinalizationConsumer
-func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 // isProcessable returns true if the block for execution result is available in the storage
 // otherwise it returns false. In the current version, it checks solely against the block that
