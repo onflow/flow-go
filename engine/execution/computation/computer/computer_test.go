@@ -195,9 +195,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		events[3] = nil
 		events[4] = []cadence.Event{serviceEventB}
 
-		emittingRuntime := &eventEmittingRuntime{events: events}
+		emittingRuntime := &testRuntime{
+			executeTransaction: func(script runtime.Script, context runtime.Context) error {
+				for _, e := range events[0] {
+					err := context.Interface.EmitEvent(e)
+					if err != nil {
+						return err
+					}
+				}
+				events = events[1:]
+				return nil
+			},
+		}
 
-		vm := &fvm.VirtualMachine{Runtime: emittingRuntime}
+		vm := fvm.New(emittingRuntime)
 
 		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 		require.NoError(t, err)
@@ -229,32 +240,139 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
 	})
-}
 
-type eventEmittingRuntime struct {
-	events [][]cadence.Event
-}
+	t.Run("succeeding transactions store programs", func(t *testing.T) {
 
-func (e *eventEmittingRuntime) ExecuteScript(_ runtime.Script, _ runtime.Context) (cadence.Value, error) {
-	panic("ExecuteScript not expected")
-}
+		execCtx := fvm.NewContext(zerolog.Nop())
 
-func (e *eventEmittingRuntime) ExecuteTransaction(_ runtime.Script, context runtime.Context) error {
-	for _, event := range e.events[0] {
-		err := context.Interface.EmitEvent(event)
-		if err != nil {
-			return err
+		contractLocation := common.AddressLocation{
+			Address: common.Address{0x1},
+			Name:    "Test",
 		}
-	}
-	e.events = e.events[1:]
-	return nil
+
+		contractProgram := &interpreter.Program{}
+
+		rt := &testRuntime{
+			executeTransaction: func(script runtime.Script, r runtime.Context) error {
+
+				err := r.Interface.SetProgram(
+					contractLocation,
+					contractProgram,
+				)
+				require.NoError(t, err)
+
+				return nil
+			},
+		}
+
+		vm := fvm.New(rt)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
+
+		const collectionCount = 2
+		const transactionCount = 2
+		block := generateBlock(collectionCount, transactionCount)
+
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
+
+		require.Equal(t, 1, execCtx.Programs.Length())
+
+		require.Same(t,
+			contractProgram,
+			execCtx.Programs.Get(contractLocation.ID()),
+		)
+	})
+
+	t.Run("failing transactions do not store programs", func(t *testing.T) {
+
+		logger := zerolog.Nop()
+
+		execCtx := fvm.NewContext(
+			logger,
+			fvm.WithTransactionProcessors(
+				fvm.NewTransactionInvocator(logger),
+			),
+		)
+
+		contractLocation := common.AddressLocation{
+			Address: common.Address{0x1},
+			Name:    "Test",
+		}
+
+		contractProgram := &interpreter.Program{}
+
+		const collectionCount = 2
+		const transactionCount = 2
+
+		var executionCalls int
+
+		rt := &testRuntime{
+			executeTransaction: func(script runtime.Script, r runtime.Context) error {
+
+				executionCalls++
+
+				// NOTE: set a program and revert all transactions but the system chunk transaction
+
+				if executionCalls > collectionCount * transactionCount {
+					return nil
+				}
+
+				err := r.Interface.SetProgram(
+					contractLocation,
+					contractProgram,
+				)
+				require.NoError(t, err)
+
+				return runtime.Error{
+					Err: fmt.Errorf("TX reverted"),
+				}
+			},
+		}
+
+		vm := fvm.New(rt)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		require.NoError(t, err)
+
+		block := generateBlock(collectionCount, transactionCount)
+
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		require.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
+
+		require.Equal(t, 0, execCtx.Programs.Length())
+	})
 }
 
-func (e *eventEmittingRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
+type testRuntime struct {
+	executeScript func (runtime.Script, runtime.Context) (cadence.Value, error)
+	executeTransaction func(runtime.Script, runtime.Context) error
+}
+
+func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
+	return e.executeScript(script, context)
+}
+
+func (e *testRuntime) ExecuteTransaction(script runtime.Script, context runtime.Context) error {
+	return e.executeTransaction(script, context)
+}
+
+func (e *testRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
 	panic("ParseAndCheckProgram not expected")
 }
 
-func (e *eventEmittingRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
+func (e *testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 	panic("SetCoverageReport not expected")
 }
 
