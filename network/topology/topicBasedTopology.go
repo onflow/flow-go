@@ -53,42 +53,10 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 		return flow.IdentityList{}, nil
 	}
 
-	// finds all interacting roles with this node
-	myInteractingRoles := flow.RoleList{}
-	for _, myChannel := range myUniqueChannels {
-		roles, ok := engine.RolesByChannel(myChannel)
-		if !ok {
-			return nil, fmt.Errorf("could not extract roles for channel: %s", myChannel)
-		}
-		myInteractingRoles = myInteractingRoles.Union(roles)
+	myFanout, err := t.subsetRole(ids, nil, flow.Roles())
+	if err != nil {
+		return nil, fmt.Errorf("topology size reached zero")
 	}
-
-	// builds a connected component per role this node interact with,
-	var myFanout flow.IdentityList
-	for _, role := range myInteractingRoles {
-		if role == flow.RoleCollection {
-			// we do not build connected component for collection nodes based on their role
-			// rather we build it based on their cluster identity in the next step.
-			continue
-		}
-		roleFanout, err := t.subsetRole(ids, nil, flow.RoleList{role})
-		if err != nil {
-			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for role %s: %w", role, err)
-		}
-		myFanout = myFanout.Union(roleFanout)
-	}
-
-	// stitches the role-based components that subscribed to the same channel together.
-	for _, myChannel := range myUniqueChannels {
-		shouldHave := myFanout.Copy()
-
-		topicFanout, err := t.subsetChannel(ids, shouldHave, myChannel)
-		if err != nil {
-			return nil, fmt.Errorf("could not generate fanout for topic %s: %w", myChannel, err)
-		}
-		myFanout = myFanout.Union(topicFanout)
-	}
-
 	if len(myFanout) == 0 {
 		return nil, fmt.Errorf("topology size reached zero")
 	}
