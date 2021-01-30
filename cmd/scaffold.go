@@ -302,6 +302,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 func (fnb *FlowNodeBuilder) initMetrics() {
 	tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
 	fnb.MustNot(err).Msg("could not initialize tracer")
+	fnb.Logger.Info().Msg("Tracer Started")
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 	fnb.Tracer = tracer
 
