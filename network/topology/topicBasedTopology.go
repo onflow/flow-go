@@ -49,7 +49,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 		return nil, fmt.Errorf("topology size reached zero: %w", err)
 	}
 	if len(myFanout) == 0 {
-		return nil, fmt.Errorf("topology size reached zero")
+		return nil, fmt.Errorf("topology size reached zero: %d", len(ids))
 	}
 	t.logger.Debug().
 		Int("fanout", len(myFanout)).
