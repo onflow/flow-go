@@ -1,9 +1,18 @@
 package match
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/require"
+)
 
 // chunk can convert to job and converted back
 func TestChunkToJob(t *testing.T) {
+	block := unittest.BlockFixture()
+	chunk := unittest.ChunkFixture(block.ID(), 0)
+	actual := jobToChunk(chunkToJob(chunk))
+	require.Equal(t, chunk, actual)
 }
 
 // 1. if pushing 10 jobs to chunks queue, then engine will
