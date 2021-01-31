@@ -209,6 +209,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		Hex("block_id", logging.ID(blockID)).
 		Int("total_chunks", len(result.Chunks)).
 		Uint64("height", header.Height).
+		Uint64("lastSealed", lastSealed.Height).
 		Bool("sealed", isResultSealed).
 		Logger()
 
