@@ -401,6 +401,7 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 	var endStateCommitment flow.StateCommitment
 	var stateInteractions []*delta.Snapshot
 	var events []flow.Event
+	var serviceEvents []flow.Event
 	var txResults []flow.TransactionResult
 
 	err = s.db.View(func(txn *badger.Txn) error {
@@ -416,6 +417,11 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 		}
 
 		err = operation.LookupEventsByBlockID(blockID, &events)(txn)
+		if err != nil {
+			return fmt.Errorf("cannot lookup events: %w", err)
+		}
+
+		err = operation.LookupServiceEventsByBlockID(blockID, &serviceEvents)(txn)
 		if err != nil {
 			return fmt.Errorf("cannot lookup events: %w", err)
 		}
@@ -445,6 +451,7 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 		StateInteractions:  stateInteractions,
 		EndState:           endStateCommitment,
 		Events:             events,
+		ServiceEvents:      serviceEvents,
 		TransactionResults: txResults,
 	}, nil
 }

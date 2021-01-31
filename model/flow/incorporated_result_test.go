@@ -10,7 +10,7 @@ import (
 )
 
 // TestIncorporatedResultID checks that the ID and Checksum of the Incorporated
-// Result do not depend on the aggregatedSignatures placeholder.
+// Result do not depend on the chunkApprovals placeholder.
 func TestIncorporatedResultID(t *testing.T) {
 
 	ir := flow.NewIncorporatedResult(
