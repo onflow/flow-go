@@ -19,7 +19,8 @@ var epochStatusesCmd = &cobra.Command{
 	Use:   "epoch-statuses",
 	Short: "get epoch statuses by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)

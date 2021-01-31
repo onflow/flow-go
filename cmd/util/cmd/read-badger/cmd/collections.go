@@ -22,7 +22,8 @@ var collectionsCmd = &cobra.Command{
 	Use:   "collections",
 	Short: "get collection by collection or transaction ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		if flagCollectionID != "" {
 			log.Info().Msgf("got flag collection id: %s", flagCollectionID)

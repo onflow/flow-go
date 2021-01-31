@@ -21,7 +21,8 @@ var epochCommitCmd = &cobra.Command{
 	Use:   "epoch-commit",
 	Short: "get epoch commit by ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag commit id: %s", flagEpochCommitID)
 		commitID, err := flow.HexStringToIdentifier(flagEpochCommitID)

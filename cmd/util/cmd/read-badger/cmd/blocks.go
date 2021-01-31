@@ -21,7 +21,8 @@ var blocksCmd = &cobra.Command{
 	Use:   "blocks",
 	Short: "get a block by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
