@@ -44,15 +44,6 @@ func NewTopicBasedTopology(nodeID flow.Identifier, logger zerolog.Logger, state 
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
 func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
-	myUniqueChannels := engine.UniqueChannels(channels)
-	if len(myUniqueChannels) == 0 {
-		// no subscribed channel, hence skip topology creation
-		// we do not return an error at this state as invocation of MakeTopology may happen before
-		// node subscribing to all its channels.
-		t.logger.Warn().Msg("skips generating fanout with no subscribed channels")
-		return flow.IdentityList{}, nil
-	}
-
 	myFanout, err := t.subsetRole(ids, nil, flow.Roles())
 	if err != nil {
 		return nil, fmt.Errorf("topology size reached zero")

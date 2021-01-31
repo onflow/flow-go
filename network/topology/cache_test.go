@@ -141,6 +141,7 @@ func TestCache_InputChange_Channels(t *testing.T) {
 // include a deterministic fanout as long as the input is the same, updating the cache once input gets changed, and
 // retaining on that.
 func TestCache_TopicBased(t *testing.T) {
+	t.Skip("skips test due to rolling back topology version")
 	// Creates a topology cache for a verification node based on its TopicBased topology.
 	ids := unittest.IdentityListFixture(100, unittest.WithAllRoles())
 	myId := ids.Filter(filter.HasRole(flow.RoleVerification))[0]
