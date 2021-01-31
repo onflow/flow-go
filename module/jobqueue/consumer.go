@@ -73,7 +73,7 @@ func NewConsumer(
 }
 
 // Start starts consuming the jobs from the job queue.
-func (c *Consumer) Start() error {
+func (c *Consumer) Start(defaultIndex int64) error {
 	c.Lock()
 	defer c.Unlock()
 
@@ -87,12 +87,20 @@ func (c *Consumer) Start() error {
 	// to ensure the consistency
 	processedIndex, err := c.progress.ProcessedIndex()
 	if errors.Is(err, storage.ErrNotFound) {
-		processedIndex, err = c.progress.InitProcessedIndex()
+		ok, err := c.progress.InitProcessedIndex(defaultIndex)
 		if err != nil {
 			return fmt.Errorf("could not init processed index: %w", err)
 		}
-		c.log.Info().Int64("processed", processedIndex).
-			Msg("processed index not found, initialized")
+
+		if !ok {
+			return fmt.Errorf("init processed index had no effect, default index: %v",
+				defaultIndex)
+		}
+
+		processedIndex = defaultIndex
+
+		c.log.Warn().Int64("processed index", processedIndex).
+			Msg("processed index not found, initialized.")
 	}
 
 	if err != nil {
@@ -162,7 +170,7 @@ func (c *Consumer) checkProcessable() {
 	if processingCount > 0 {
 		c.log.Info().Int64("processing", processingCount).Msg("processing jobs")
 	} else {
-		c.log.Debug().Int("processing", 0).Msg("no job found")
+		c.log.Debug().Msg("no job found")
 	}
 
 }

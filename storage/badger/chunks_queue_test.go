@@ -10,5 +10,6 @@ import "testing"
 // 6. storing 100 chunks concurrent should return last index as 100
 // 7. should not be able to read with wrong index
 // 8. should return init index after init
+// 9. storing chunk and updating the latest index should be atomic
 func TestStoreAndRead(t *testing.T) {
 }

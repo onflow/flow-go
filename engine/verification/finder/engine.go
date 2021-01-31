@@ -114,7 +114,7 @@ func New(
 	return e, nil
 }
 
-func (e *Engine) withFinishProcessing(finishProcessing FinishProcessing) {
+func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
 	e.finishProcessing = finishProcessing
 }
 

@@ -16,8 +16,8 @@ type ChunksQueue struct {
 }
 
 // NewChunksQueue will initialize the index of the latest chunk stored with
-// init index
-func NewChunksQueue(db *badger.DB) *ChunksQueue {
+// the given default index if it was never initialized
+func NewChunksQueue(db *badger.DB, defaultIndex int64) *ChunksQueue {
 	return &ChunksQueue{
 		db: db,
 	}

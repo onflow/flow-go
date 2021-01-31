@@ -11,6 +11,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+const (
+	DefaultJobIndex = int64(0)
+)
+
 // ChunkJob converts a Chunk into a Job to be used by job queue
 type ChunkJob struct {
 	Chunk *flow.Chunk
@@ -80,7 +84,7 @@ type finishProcessing interface {
 // It wraps the generic job consumer in order to be used as a ReadyDoneAware
 // on startup
 type ChunkConsumer struct {
-	module.JobConsumer
+	consumer module.JobConsumer
 }
 
 func NewChunkConsumer(
@@ -96,18 +100,24 @@ func NewChunkConsumer(
 	engine.withFinishProcessing(worker)
 
 	jobs := &ChunksJob{chunks: chunksQueue}
+
 	consumer := jobqueue.NewConsumer(
 		log, jobs, processedIndex, worker, maxProcessing, maxFinished,
 	)
 
 	chunkConsumer := &ChunkConsumer{consumer}
+
 	worker.consumer = chunkConsumer
 
 	return chunkConsumer, worker
 }
 
+func (c *ChunkConsumer) FinishJob(jobID module.JobID) {
+	c.consumer.FinishJob(jobID)
+}
+
 func (c *ChunkConsumer) Ready() <-chan struct{} {
-	err := c.Start()
+	err := c.consumer.Start(DefaultJobIndex)
 	if err != nil {
 		panic(fmt.Errorf("could not start the chunk consumer for match engine: %w", err))
 	}
@@ -118,7 +128,7 @@ func (c *ChunkConsumer) Ready() <-chan struct{} {
 }
 
 func (c *ChunkConsumer) Done() <-chan struct{} {
-	c.Stop()
+	c.consumer.Stop()
 
 	ready := make(chan struct{})
 	close(ready)

@@ -191,7 +191,7 @@ func main() {
 			return nil
 		}).
 		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
-			chunksQueue = storage.NewChunksQueue(node.DB)
+			chunksQueue = storage.NewChunksQueue(node.DB, match.DefaultJobIndex)
 			return nil
 		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -309,7 +309,7 @@ func main() {
 		Component("match engine consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			maxProcessing := int64(10)
 			maxFinished := int64(400)
-			processedIndex := storage.NewProcessedChunk(node.DB)
+			processedIndex := storage.NewConsumeProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
 			// the chunk worker needs to be passed to the finder engine, so that
 			// finder can notify the match engine that new chunk has been added
 			// to the queue, and triggers the chunk queue to process them.
@@ -356,8 +356,8 @@ func main() {
 		Component("finder engine consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			maxProcessing := int64(10)
 			maxFinished := int64(400)
-			processedHeight := storage.NewProcessedHeight(node.DB)
-			blockConsumer := finder.NewBlockConsumer(
+			processedHeight := storage.NewConsumeProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+			blockConsumer, err := finder.NewBlockConsumer(
 				node.Logger,
 				processedHeight,
 				node.State,
@@ -365,6 +365,9 @@ func main() {
 				maxProcessing,
 				maxFinished,
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not init block consumer: %w", err)
+			}
 			return blockConsumer, nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

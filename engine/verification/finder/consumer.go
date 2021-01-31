@@ -27,7 +27,7 @@ func blockIDToJobID(blockID flow.Identifier) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", blockID))
 }
 
-func blockToJobID(block *flow.Block) *BlockJob {
+func blockToJob(block *flow.Block) *BlockJob {
 	return &BlockJob{Block: block}
 }
 
@@ -42,8 +42,10 @@ type FinalizedBlockReader struct {
 	state protocol.State
 }
 
+// the job index would just be the finalized block height
 func (r *FinalizedBlockReader) AtIndex(index int64) (storage.Job, error) {
-	return nil, fmt.Errorf("to implement")
+	var finalBlock *flow.Block
+	return blockToJob(finalBlock), fmt.Errorf("to be implement")
 }
 
 // Worker receives job from job consumer and converts it back to Block
@@ -59,8 +61,8 @@ type Worker struct {
 // then, it reads all the receipts from the block payload. For each receipt, it checks if
 // there is any chunk assigned to me, and store all these chunks in another chunk job queue
 func (w *Worker) Run(job storage.Job) {
-	blockjob, _ := job.(*BlockJob)
-	w.engine.ProcessFinalizedBlock(blockjob.Block)
+	block := jobToBlock(job)
+	w.engine.ProcessFinalizedBlock(block)
 }
 
 func (w *Worker) FinishProcessing(blockID flow.Identifier) {
@@ -79,22 +81,59 @@ type finishProcessing interface {
 // BlockConsumer listens to the OnFinalizedBlock event
 // and notify the consumer to Check in the job queue
 type BlockConsumer struct {
-	module.JobConsumer
+	consumer     module.JobConsumer
+	defaultIndex int64
 }
 
-func NewBlockConsumer(log zerolog.Logger, processedHeight storage.ConsumerProgress, state protocol.State, engine *Engine, maxProcessing int64, maxFinished int64) *BlockConsumer {
+// the consumer is consuming the jobs from jobs queue for the first time,
+// we initialize the default processed index as the last sealed block's height,
+// so that we will process from the first unsealed block
+func defaultProcessedIndex(state protocol.State) (int64, error) {
+	final, err := state.Sealed().Head()
+	if err != nil {
+		return 0, fmt.Errorf("could not get finalized height: %w", err)
+	}
+	return int64(final.Height), nil
+}
+
+func NewBlockConsumer(
+	log zerolog.Logger,
+	processedHeight storage.ConsumerProgress,
+	state protocol.State,
+	engine *Engine,
+	maxProcessing int64,
+	maxFinished int64,
+) (*BlockConsumer, error) {
 	worker := &Worker{engine: engine}
+	engine.withFinishProcessing(worker)
+
 	jobs := &FinalizedBlockReader{state: state}
 
 	consumer := jobqueue.NewConsumer(
 		log, jobs, processedHeight, worker, maxProcessing, maxFinished,
 	)
 
-	return &BlockConsumer{consumer}
+	defaultIndex, err := defaultProcessedIndex(state)
+	if err != nil {
+		return nil, fmt.Errorf("could not read default processed index: %w", err)
+	}
+
+	blockConsumer := &BlockConsumer{
+		consumer:     consumer,
+		defaultIndex: defaultIndex,
+	}
+
+	worker.consumer = blockConsumer
+
+	return blockConsumer, nil
+}
+
+func (c *BlockConsumer) FinishJob(jobID module.JobID) {
+	c.consumer.FinishJob(jobID)
 }
 
 func (c *BlockConsumer) OnFinalizedBlock(block *model.Block) {
-	c.Check()
+	c.consumer.Check()
 }
 
 // To implement FinalizationConsumer
@@ -104,7 +143,7 @@ func (c *BlockConsumer) OnBlockIncorporated(*model.Block) {}
 func (c *BlockConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 func (c *BlockConsumer) Ready() <-chan struct{} {
-	err := c.Start()
+	err := c.consumer.Start(c.defaultIndex)
 	if err != nil {
 		panic(fmt.Errorf("could not start block consumer for finder engine: %w", err))
 	}
@@ -115,7 +154,7 @@ func (c *BlockConsumer) Ready() <-chan struct{} {
 }
 
 func (c *BlockConsumer) Done() <-chan struct{} {
-	c.Stop()
+	c.consumer.Stop()
 
 	ready := make(chan struct{})
 	close(ready)
