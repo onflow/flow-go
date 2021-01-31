@@ -39,6 +39,12 @@ var collectionsCmd = &cobra.Command{
 			}
 
 			common.PrettyPrintEntity(collection)
+			// print each transaction id
+
+			for i, tx := range collection.Transactions {
+				log.Info().Msgf("transaction at index %v's ID: %v", i, tx.ID())
+			}
+
 			return
 		}
 
