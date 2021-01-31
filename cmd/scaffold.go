@@ -201,7 +201,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
-		topologyCache := topology.NewCache(fnb.Logger, top)
 
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
@@ -210,7 +209,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			fnb.Me,
 			fnb.Middleware,
 			10e6,
-			topologyCache,
+			top,
 			subscriptionManager,
 			fnb.Metrics.Network)
 		if err != nil {
