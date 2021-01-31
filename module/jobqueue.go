@@ -1,5 +1,10 @@
 package module
 
+const (
+	ConsumeProgressVerificationBlockHeight = "ConsumeProgressVerificationBlockHeight"
+	ConsumeProgressVerificationChunkIndex  = "ConsumeProgressVerificationChunkIndex"
+)
+
 // JobID is a unique ID of the job.
 type JobID string
 
@@ -8,7 +13,7 @@ type JobID string
 type JobConsumer interface {
 	// Start starts processing jobs from a job queue. If this is the first time, a processed index
 	// will be initialized in the storage. If it fails to initialize, an error will be returned
-	Start() error
+	Start(defaultIndex int64) error
 
 	// Stop stops the consumer from reading new jobs from the job queue. But won't stop
 	// the existing worker finishing their jobs
@@ -19,6 +24,6 @@ type JobConsumer interface {
 	FinishJob(JobID)
 
 	// Check let the job queue notify the consumer that a new job has been added, so that the consumer
-	// can job if there is worker available to process that job.
+	// can check if there is worker available to process that job.
 	Check()
 }
