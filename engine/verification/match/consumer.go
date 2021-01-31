@@ -29,11 +29,11 @@ func chunkIDToJobID(chunkID flow.Identifier) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", chunkID))
 }
 
-func chunkToJob(chunk *flow.Chunk) *ChunkJob {
+func ChunkToJob(chunk *flow.Chunk) *ChunkJob {
 	return &ChunkJob{Chunk: chunk}
 }
 
-func jobToChunk(job storage.Job) *flow.Chunk {
+func JobToChunk(job storage.Job) *flow.Chunk {
 	chunkjob, _ := job.(*ChunkJob)
 	return chunkjob.Chunk
 }
@@ -49,20 +49,31 @@ func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
 	}
-	return chunkToJob(chunk), nil
+	return ChunkToJob(chunk), nil
+}
+
+type EngineWorker interface {
+	ProcessMyChunk(chunk *flow.Chunk)
+	WithFinishProcessing(finishProcessing FinishProcessing)
 }
 
 // Worker receives job from job consumer and converts it back to Chunk
 // for engine to process
 type Worker struct {
-	engine   *Engine
+	engine   EngineWorker
 	consumer *ChunkConsumer
+}
+
+func NewWorker(engine EngineWorker) *Worker {
+	return &Worker{
+		engine: engine,
+	}
 }
 
 // Run converts the job to Chunk, it's guaranteed to work, because
 // ChunksJob converted chunk into job symmetrically
 func (w *Worker) Run(job storage.Job) {
-	chunk := jobToChunk(job)
+	chunk := JobToChunk(job)
 	w.engine.ProcessMyChunk(chunk)
 }
 
@@ -71,11 +82,11 @@ func (w *Worker) FinishProcessing(chunkID flow.Identifier) {
 	w.consumer.FinishJob(jobID)
 }
 
-// finishProcessing is for the worker's underneath engine to report a chunk
+// FinishProcessing is for the worker's underneath engine to report a chunk
 // has been processed without knowing the job queue
 // it's a callback so that the worker can convert the chunk id into a job
 // id, and notify the consumer about a finished job with the
-type finishProcessing interface {
+type FinishProcessing interface {
 	FinishProcessing(chunkID flow.Identifier)
 }
 
@@ -91,16 +102,17 @@ func NewChunkConsumer(
 	log zerolog.Logger,
 	processedIndex storage.ConsumerProgress, // to persist the processed index
 	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
-	engine *Engine, // to process jobs (chunks)
+	engine EngineWorker, // to process jobs (chunks)
 	maxProcessing int64, // max number of jobs to be processed in parallel
 	maxFinished int64, // when the next unprocessed job is not finished,
 	// the max number of finished subsequent jobs before stopping processing more jobs
 ) (*ChunkConsumer, jobqueue.Worker) {
-	worker := &Worker{engine: engine}
-	engine.withFinishProcessing(worker)
+	worker := NewWorker(engine)
+	engine.WithFinishProcessing(worker)
 
 	jobs := &ChunksJob{chunks: chunksQueue}
 
+	// TODO: adding meta to logger
 	consumer := jobqueue.NewConsumer(
 		log, jobs, processedIndex, worker, maxProcessing, maxFinished,
 	)
@@ -114,6 +126,10 @@ func NewChunkConsumer(
 
 func (c *ChunkConsumer) FinishJob(jobID module.JobID) {
 	c.consumer.FinishJob(jobID)
+}
+
+func (c ChunkConsumer) Check() {
+	c.consumer.Check()
 }
 
 func (c *ChunkConsumer) Ready() <-chan struct{} {

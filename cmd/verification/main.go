@@ -347,7 +347,6 @@ func main() {
 				blockIDsCache,
 				processInterval,
 				assigner,
-				chunksQueue,
 				chunkWorker,
 			)
 

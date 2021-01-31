@@ -45,7 +45,7 @@ type Engine struct {
 	headers          storage.Headers         // used to fetch the block header when chunk data is ready to be verified
 	retryInterval    time.Duration           // determines time in milliseconds for retrying chunk data requests
 	maxAttempt       int                     // max time of retries to fetch the chunk data pack for a chunk
-	finishProcessing finishProcessing        // to report a chunk has been processed
+	finishProcessing FinishProcessing        // to report a chunk has been processed
 }
 
 func New(
@@ -91,7 +91,7 @@ func New(
 	return e, nil
 }
 
-func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
+func (e *Engine) WithFinishProcessing(finishProcessing FinishProcessing) {
 	e.finishProcessing = finishProcessing
 }
 

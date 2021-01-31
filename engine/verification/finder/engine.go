@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -43,10 +42,10 @@ type Engine struct {
 	match   network.Engine
 	state   protocol.State
 
-	assigner         module.ChunkAssigner // used to determine chunks this node needs to verify
-	chunksQueue      storage.ChunksQueue  // to store chunks to be verified
-	chunkWorker      jobqueue.Worker      // to notify about a new chunk
-	finishProcessing finishProcessing     // to report a block has been processed
+	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify
+	chunksQueue      storage.ChunksQueue   // to store chunks to be verified
+	newChunkListener module.NewJobListener // to notify about a new chunk
+	finishProcessing finishProcessing      // to report a block has been processed
 
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
@@ -82,7 +81,7 @@ func New(
 
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
-	chunkWorker jobqueue.Worker,
+	newChunkListener module.NewJobListener,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:                     engine.NewUnit(),
@@ -104,7 +103,7 @@ func New(
 		tracer:                   tracer,
 		assigner:                 assigner,
 		chunksQueue:              chunksQueue,
-		chunkWorker:              chunkWorker,
+		newChunkListener:         newChunkListener,
 	}
 
 	_, err := net.Register(engine.ReceiveReceipts, e)
@@ -114,7 +113,7 @@ func New(
 	return e, nil
 }
 
-func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
+func (e *Engine) withFinishProcessing(finishProcessing FinishProcessing) {
 	e.finishProcessing = finishProcessing
 }
 
