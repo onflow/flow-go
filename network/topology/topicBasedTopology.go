@@ -46,7 +46,7 @@ func NewTopicBasedTopology(nodeID flow.Identifier, logger zerolog.Logger, state 
 func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
 	myFanout, err := t.subsetRole(ids, nil, flow.Roles())
 	if err != nil {
-		return nil, fmt.Errorf("topology size reached zero")
+		return nil, fmt.Errorf("topology size reached zero: %w", err)
 	}
 	if len(myFanout) == 0 {
 		return nil, fmt.Errorf("topology size reached zero")
