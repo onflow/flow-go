@@ -34,7 +34,8 @@ type Consumer struct {
 	// on any new jobs.
 
 	// State Variables
-	running    bool         // a signal to control whether to process more jobs. Useful for waiting until the workers
+	running bool // a signal to control whether to start processing more jobs. Useful for waiting
+	// until the workers are ready
 	isChecking *atomic.Bool // allow only one process checking job processable
 	// are ready, and stop when shutting down.
 
@@ -101,9 +102,7 @@ func (c *Consumer) Start(defaultIndex int64) error {
 
 		c.log.Warn().Int64("processed index", processedIndex).
 			Msg("processed index not found, initialized.")
-	}
-
-	if err != nil {
+	} else if err != nil {
 		return fmt.Errorf("could not read processed index: %w", err)
 	}
 
@@ -170,7 +169,7 @@ func (c *Consumer) checkProcessable() {
 	if processingCount > 0 {
 		c.log.Info().Int64("processing", processingCount).Msg("processing jobs")
 	} else {
-		c.log.Debug().Msg("no job found")
+		c.log.Debug().Bool("running", c.running).Msg("no job found")
 	}
 
 }
@@ -284,6 +283,8 @@ func processableJobs(jobs storage.Jobs, processings map[int64]*jobStatus, maxPro
 }
 
 // doneJob updates the internal state to mark the job has been processed
+// return true if the job is changed from processing to finished
+// return false if the job is already finished, or removed
 func (c *Consumer) doneJob(jobID JobID) bool {
 	// lock
 	index, ok := c.processingsIndex[jobID]
@@ -295,6 +296,7 @@ func (c *Consumer) doneJob(jobID JobID) bool {
 	status, ok := c.processings[index]
 	if !ok {
 		// must be a bug, if went here
+		c.log.Fatal().Msgf("bug, job (%v) can not be found by index (%v)", jobID, index)
 		return false
 	}
 

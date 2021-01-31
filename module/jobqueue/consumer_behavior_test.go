@@ -20,6 +20,7 @@ import (
 
 const (
 	DefaultIndex = int64(0)
+	ConsumerTag  = "consumer"
 )
 
 // 0# means job at index 0 is processed.
@@ -353,7 +354,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		// rebuild a consumer with the dependencies to simulate a restart
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
-		reProgress := badger.NewChunkConsumer(db)
+		reProgress := badger.NewConsumeProgress(db, ConsumerTag)
 		reConsumer := newTestConsumer(reProgress, j, reWorker)
 
 		err := reConsumer.Start(DefaultIndex)
@@ -464,7 +465,7 @@ func runWith(t *testing.T, runTestWith func(module.JobConsumer, storage.Consumer
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
-		progress := badger.NewChunkConsumer(db)
+		progress := badger.NewConsumeProgress(db, ConsumerTag)
 		consumer := newTestConsumer(progress, jobs, worker)
 		runTestWith(consumer, progress, worker, jobs, db)
 	})
