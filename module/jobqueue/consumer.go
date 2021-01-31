@@ -114,7 +114,7 @@ func (c *Consumer) Start(defaultIndex int64) error {
 }
 
 // Stop stops consuming jobs from the job queue.
-// Note, it won't stop the existing worker from finishing their job
+// Note, it won't stop the existing worker from finishing their job.
 func (c *Consumer) Stop() {
 	c.Lock()
 	defer c.Unlock()
