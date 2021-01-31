@@ -19,7 +19,8 @@ var guaranteesCmd = &cobra.Command{
 	Use:   "guarantees",
 	Short: "get guarantees by collection ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 		collectionID, err := flow.HexStringToIdentifier(flagCollectionID)

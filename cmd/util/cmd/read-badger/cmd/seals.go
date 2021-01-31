@@ -21,7 +21,8 @@ var sealsCmd = &cobra.Command{
 	Use:   "seals",
 	Short: "get seals by block or seal ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		if flagSealID != "" && flagBlockID != "" {
 			log.Fatal().Msg("provide one of the flags --id or --block-id")

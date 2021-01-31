@@ -19,7 +19,8 @@ var transactionsCmd = &cobra.Command{
 	Use:   "transactions",
 	Short: "get transaction by ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 		transactionID, err := flow.HexStringToIdentifier(flagTransactionID)

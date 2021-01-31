@@ -21,7 +21,8 @@ var receiptsCmd = &cobra.Command{
 	Use:   "receipts",
 	Short: "get receipt by block or receipt ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		if flagBlockID != "" {
 			log.Info().Msgf("got flag block id: %s", flagBlockID)

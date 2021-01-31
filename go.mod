@@ -9,6 +9,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
+	github.com/dgraph-io/badger v1.6.1
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803

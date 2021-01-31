@@ -21,7 +21,8 @@ var chunkDataPackCmd = &cobra.Command{
 	Use:   "chunk-data",
 	Short: "get chunk data pack by chunk ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag chunk id: %s", flagChunkID)
 		chunkID, err := flow.HexStringToIdentifier(flagChunkID)

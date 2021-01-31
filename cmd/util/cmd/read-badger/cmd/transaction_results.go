@@ -19,7 +19,8 @@ var transactionResultsCmd = &cobra.Command{
 	Use:   "transaction-results",
 	Short: "get transaction-result by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)

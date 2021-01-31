@@ -18,7 +18,8 @@ var commitsCmd = &cobra.Command{
 	Use:   "commits",
 	Short: "get commit by block ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)

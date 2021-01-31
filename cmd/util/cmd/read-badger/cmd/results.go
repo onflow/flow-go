@@ -21,7 +21,8 @@ var resultsCmd = &cobra.Command{
 	Use:   "results",
 	Short: "get result by block or result ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		if flagBlockID != "" {
 			log.Info().Msgf("got flag block id: %s", flagBlockID)

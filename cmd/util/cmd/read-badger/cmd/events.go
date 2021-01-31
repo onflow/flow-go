@@ -25,7 +25,8 @@ var eventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "Read events from badger",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		if flagEventType != "" && flagTransactionID != "" {
 			log.Fatal().Msg("provide only one of --transaction-id or --event-type")
