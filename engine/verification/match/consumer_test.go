@@ -41,17 +41,22 @@ func TestProduceConsume(t *testing.T) {
 			called = append(called, chunk)
 		}
 		WithConsumer(t, neverFinish, func(consumer *match.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+			<-consumer.Ready()
+
 			block := unittest.BlockFixture()
 			chunks := make([]*flow.Chunk, 0)
 			for i := 0; i < 10; i++ {
 				chunk := unittest.ChunkFixture(block.ID(), uint(i))
-				chunksQueue.StoreChunk(chunk)
+				ok, err := chunksQueue.StoreChunk(chunk)
+				require.NoError(t, err)
+				require.True(t, ok)
 				chunks = append(chunks, chunk)
 				consumer.Check()
 			}
 
 			// expect the mock engine receives 3 calls
 			require.Equal(t, chunks[:3], called)
+			<-consumer.Done()
 		})
 	})
 }
@@ -72,7 +77,7 @@ func WithConsumer(
 			process: process,
 		}
 
-		consumer, _ := match.NewChunkConsumer(
+		consumer := match.NewChunkConsumer(
 			unittest.Logger(),
 			processedIndex,
 			chunksQueue,

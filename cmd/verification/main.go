@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -80,7 +79,7 @@ func main() {
 		followerEng         *followereng.Engine        // the follower engine
 		collector           module.VerificationMetrics // used to collect metrics of all engines
 		chunksQueue         *storage.ChunksQueue       // store chunks to be verified
-		chunkWorker         jobqueue.Worker            // for finder engine to notify match engine about a new chunk
+		chunkConsumer       *match.ChunkConsumer       // for finder engine to notify match engine about a new chunk
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -313,8 +312,7 @@ func main() {
 			// the chunk worker needs to be passed to the finder engine, so that
 			// finder can notify the match engine that new chunk has been added
 			// to the queue, and triggers the chunk queue to process them.
-			var consumer *match.ChunkConsumer
-			consumer, chunkWorker = match.NewChunkConsumer(
+			chunkConsumer = match.NewChunkConsumer(
 				node.Logger,
 				processedIndex,
 				chunksQueue,
@@ -322,7 +320,7 @@ func main() {
 				maxProcessing,
 				maxFinished,
 			)
-			return consumer, nil
+			return chunkConsumer, nil
 		}).
 		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
@@ -347,7 +345,8 @@ func main() {
 				blockIDsCache,
 				processInterval,
 				assigner,
-				chunkWorker,
+				chunksQueue,
+				chunkConsumer,
 			)
 
 			return finderEng, err
