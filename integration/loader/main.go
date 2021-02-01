@@ -39,8 +39,8 @@ func main() {
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 
-	numberOfWorkers := flag.Int("worker-count", 100, "number of workers (txTracker)")
-	maxTxInFlight := flag.Int("max-tx-in-flight", 5000, "maximum number of transactions in flight (txTracker)")
+	numberOfWorkers := flag.Int("worker-count", 150, "number of workers (txTracker)")
+	maxTxInFlight := flag.Int("max-tx-in-flight", 8000, "maximum number of transactions in flight (txTracker)")
 	workerDelayAfterEachFetch := flag.Duration("worker-fetch-delay", time.Second, "duration of worker sleep after each tx status fetch (prevents too much requests)")
 
 	flag.Parse()
