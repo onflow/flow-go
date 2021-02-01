@@ -155,6 +155,10 @@ func (b *backendTransactions) grpcTxSend(ctx context.Context, client accessproto
 	colReq := &accessproto.SendTransactionRequest{
 		Transaction: convert.TransactionToMessage(*tx),
 	}
+
+	clientDeadline := time.Now().Add(time.Duration(2) * time.Second)
+	ctx, cancel := context.WithDeadline(ctx, clientDeadline)
+	defer cancel()
 	_, err := client.SendTransaction(ctx, colReq)
 	return err
 }
