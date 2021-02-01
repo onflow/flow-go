@@ -160,11 +160,8 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 }
 
 func (b *Backend) GetLatestSerializableSnapshot(_ context.Context) (protocol.Snapshot, error) {
-	// retrieve the collection from the collection storage
 	latestSealed := b.state.Sealed()
-	latestSealed.
-
-	return snapshot, nil
+	return latestSealed, nil
 }
 
 func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParameters {

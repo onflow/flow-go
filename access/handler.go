@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -406,8 +407,18 @@ func (h *Handler) GetEventsForBlockIDs(
 }
 
 // GetLatestSerializableSnapshot returns the latest serializable Snapshot
-func (h *Handler) GetLatestSerializableSnapshot(ctx context.Context, req interface{}) {
+func (h *Handler) GetLatestSerializableSnapshot(ctx context.Context, req interface{}) ([]byte, error) {
+	snapshot, err := h.api.GetLatestSerializableSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
 
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
