@@ -515,7 +515,7 @@ func (a *Accounts) DeleteContract(contractName string, address flow.Address) err
 }
 
 func (a *Accounts) GetAccountFrozen(address flow.Address) (bool, error) {
-	frozen, err := a.getValue(address, true, KeyAccountFrozen)
+	frozen, err := a.getValue(address, false, KeyAccountFrozen)
 	if err != nil {
 		return false, newLedgerGetError(KeyAccountFrozen, address, err)
 	}
@@ -534,7 +534,7 @@ func (a *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
 		val[0] = 1
 	}
 
-	return a.setValue(address, true, KeyAccountFrozen, val)
+	return a.setValue(address, false, KeyAccountFrozen, val)
 }
 
 // handy function to error out if account is frozen
