@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,7 +35,7 @@ func TestChunkToJob(t *testing.T) {
 func TestProduceConsume(t *testing.T) {
 	t.Parallel()
 
-	t.Run("pushing 10 jobs to chunks queue, engine will only receive 3", func(t *testing.T) {
+	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
 		called := make([]*flow.Chunk, 0)
 		lock := &sync.Mutex{}
 		neverFinish := func(finishProcessing match.FinishProcessing, chunk *flow.Chunk) {
@@ -55,9 +57,74 @@ func TestProduceConsume(t *testing.T) {
 				consumer.Check() // notify the consumer
 			}
 
+			<-consumer.Done()
+
 			// expect the mock engine receives 3 calls
 			require.Equal(t, chunks[:3], called)
+		})
+	})
+
+	t.Run("pushing 10 receive 10", func(t *testing.T) {
+		called := make([]*flow.Chunk, 0)
+		lock := &sync.Mutex{}
+		alwaysFinish := func(finishProcessing match.FinishProcessing, chunk *flow.Chunk) {
+			lock.Lock()
+			defer lock.Unlock()
+			called = append(called, chunk)
+			go finishProcessing.FinishProcessing(chunk.ID())
+		}
+		WithConsumer(t, alwaysFinish, func(consumer *match.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+			<-consumer.Ready()
+
+			block := unittest.BlockFixture()
+			chunks := make([]*flow.Chunk, 0)
+			for i := 0; i < 10; i++ {
+				chunk := unittest.ChunkFixture(block.ID(), uint(i))
+				ok, err := chunksQueue.StoreChunk(chunk)
+				require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
+				require.True(t, ok)
+				chunks = append(chunks, chunk)
+				consumer.Check() // notify the consumer
+			}
+
 			<-consumer.Done()
+			// expect the mock engine receives all 10 calls
+			require.Equal(t, chunks, called)
+		})
+	})
+
+	t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
+		called := make([]*flow.Chunk, 0)
+		lock := &sync.Mutex{}
+		alwaysFinish := func(finishProcessing match.FinishProcessing, chunk *flow.Chunk) {
+			lock.Lock()
+			defer lock.Unlock()
+			called = append(called, chunk)
+			go finishProcessing.FinishProcessing(chunk.ID())
+		}
+		WithConsumer(t, alwaysFinish, func(consumer *match.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+			<-consumer.Ready()
+
+			block := unittest.BlockFixture()
+
+			total := atomic.NewUint32(0)
+			blockID := block.ID()
+			for i := 0; i < 100; i++ {
+				go func(i int) {
+					chunk := unittest.ChunkFixture(blockID, uint(i))
+					ok, err := chunksQueue.StoreChunk(chunk)
+					require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
+					require.True(t, ok)
+					total.Inc()
+					consumer.Check() // notify the consumer
+				}(i)
+			}
+
+			time.Sleep(100 * time.Millisecond)
+
+			<-consumer.Done()
+			// expect the mock engine receives all 100 calls
+			require.Equal(t, 100, int(total.Load()))
 		})
 	})
 }
