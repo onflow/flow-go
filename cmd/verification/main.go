@@ -191,8 +191,14 @@ func main() {
 		}).
 		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
 			chunksQueue = storage.NewChunksQueue(node.DB)
-			err := chunksQueue.Init(match.DefaultJobIndex)
-			return err
+			ok, err := chunksQueue.Init(match.DefaultJobIndex)
+			if err != nil {
+				return fmt.Errorf("failed to init chunks queue: %w", err)
+			}
+			if ok {
+				node.Logger.Warn().Msg("chunks queue latest index not found, initalized")
+			}
+			return nil
 		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)

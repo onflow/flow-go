@@ -1,6 +1,7 @@
 package match_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -48,7 +49,7 @@ func TestProduceConsume(t *testing.T) {
 			for i := 0; i < 10; i++ {
 				chunk := unittest.ChunkFixture(block.ID(), uint(i))
 				ok, err := chunksQueue.StoreChunk(chunk)
-				require.NoError(t, err)
+				require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
 				require.True(t, ok)
 				chunks = append(chunks, chunk)
 				consumer.Check() // notify the consumer
@@ -72,8 +73,9 @@ func WithConsumer(
 
 		processedIndex := storage.NewConsumeProgress(db, module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := storage.NewChunksQueue(db)
-		err := chunksQueue.Init(match.DefaultJobIndex)
+		ok, err := chunksQueue.Init(match.DefaultJobIndex)
 		require.NoError(t, err)
+		require.True(t, ok)
 
 		engine := &MockEngine{
 			process: process,

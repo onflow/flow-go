@@ -20,10 +20,10 @@ func SetJobLatestIndex(queue string, index int64) func(*badger.Txn) error {
 
 // RetrieveJobAtIndex returns the entity at the given index
 func RetrieveJobAtIndex(queue string, index int64, entity *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeJobQueue, queue, index), entity)
+	return retrieve(makePrefix(codeJobQueue, queue, uint64(index)), entity)
 }
 
 // InsertJobAtIndex insert an entity ID at the given index
 func InsertJobAtIndex(queue string, index int64, entity flow.Identifier) func(*badger.Txn) error {
-	return update(makePrefix(codeJobQueue, queue, index), entity)
+	return insert(makePrefix(codeJobQueue, queue, uint64(index)), entity)
 }

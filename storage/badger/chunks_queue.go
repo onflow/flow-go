@@ -29,20 +29,20 @@ func NewChunksQueue(db *badger.DB) *ChunksQueue {
 }
 
 // Init initial chunks queue's latest index witht the given default index
-func (q *ChunksQueue) Init(defaultIndex int64) error {
+func (q *ChunksQueue) Init(defaultIndex int64) (bool, error) {
 	_, err := q.LatestIndex()
 	if errors.Is(err, storage.ErrNotFound) {
 		err = q.db.Update(operation.InitJobLatestIndex(JobQueueChunksQueue, defaultIndex))
 		if err != nil {
-			return fmt.Errorf("could not init chunks queue with default index %v: %w", defaultIndex, err)
+			return false, fmt.Errorf("could not init chunks queue with default index %v: %w", defaultIndex, err)
 		}
-		return nil
+		return true, nil
 	}
 	if err != nil {
-		return fmt.Errorf("could not get latest index: %w", err)
+		return false, fmt.Errorf("could not get latest index: %w", err)
 	}
 
-	return nil
+	return false, nil
 }
 
 // StoreChunk stores a new chunk that assigned to me to the job queue
@@ -55,17 +55,27 @@ func (q *ChunksQueue) StoreChunk(chunk *flow.Chunk) (bool, error) {
 		if err != nil {
 			return fmt.Errorf("failed to insert chunk: %w", err)
 		}
+
+		// read the latest index
 		var latest int64
 		err = operation.RetrieveJobLatestIndex(JobQueueChunksQueue, &latest)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve job index for chunks queue: %w", err)
 		}
 
+		// insert to the next index
 		next := latest + 1
 		err = operation.InsertJobAtIndex(JobQueueChunksQueue, next, chunk.ID())(tx)
 		if err != nil {
-			return fmt.Errorf("failed to set job index for chunks queue: %w", err)
+			return fmt.Errorf("failed to set job index for chunks queue at index %v: %w", next, err)
 		}
+
+		// update the next index as the latest index
+		err = operation.SetJobLatestIndex(JobQueueChunksQueue, next)(tx)
+		if err != nil {
+			return fmt.Errorf("failed to update latest index %v: %w", next, err)
+		}
+
 		return nil
 	})
 
