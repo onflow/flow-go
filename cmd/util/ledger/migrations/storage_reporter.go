@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -19,15 +20,16 @@ import (
 // iterates through registers keeping a map of register sizes
 // reports on storage metrics
 type StorageReporter struct {
-	Log zerolog.Logger
+	Log       zerolog.Logger
+	OutputDir string
 }
 
-func filename() string {
-	return fmt.Sprintf("./storage_report_%d.csv", int32(time.Now().Unix()))
+func (r StorageReporter) filename() string {
+	return path.Join(r.OutputDir, fmt.Sprintf("storage_report_%d.csv", int32(time.Now().Unix())))
 }
 
 func (r StorageReporter) Report(payload []ledger.Payload) error {
-	fn := filename()
+	fn := r.filename()
 	r.Log.Info().Msgf("Running Storage Reporter. Saving output to %s.", fn)
 
 	f, err := os.Create(fn)
