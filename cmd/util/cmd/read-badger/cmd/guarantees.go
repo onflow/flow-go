@@ -25,13 +25,15 @@ var guaranteesCmd = &cobra.Command{
 		log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 		collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed collection idenitifer")
+			log.Error().Err(err).Msg("malformed collection idenitifer")
+			return
 		}
 
 		log.Info().Msgf("getting guarantee by collection id: %v", collectionID)
 		guarantee, err := storages.Guarantees.ByCollectionID(collectionID)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get guarantee for collection id: %v", collectionID)
+			log.Error().Err(err).Msgf("could not get guarantee for collection id: %v", collectionID)
+			return
 		}
 
 		common.PrettyPrintEntity(guarantee)

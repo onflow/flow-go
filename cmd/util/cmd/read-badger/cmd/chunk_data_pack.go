@@ -27,13 +27,15 @@ var chunkDataPackCmd = &cobra.Command{
 		log.Info().Msgf("got flag chunk id: %s", flagChunkID)
 		chunkID, err := flow.HexStringToIdentifier(flagChunkID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed chunk id")
+			log.Error().Err(err).Msg("malformed chunk id")
+			return
 		}
 
 		log.Info().Msgf("getting chunk data pack by chunk id: %v", chunkID)
 		chunkDataPack, err := storages.ChunkDataPacks.ByChunkID(chunkID)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get chunk data pack with chunk id: %v", chunkID)
+			log.Error().Err(err).Msgf("could not get chunk data pack with chunk id: %v", chunkID)
+			return
 		}
 
 		common.PrettyPrintEntity(chunkDataPack)

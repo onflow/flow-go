@@ -29,13 +29,15 @@ var collectionsCmd = &cobra.Command{
 			log.Info().Msgf("got flag collection id: %s", flagCollectionID)
 			collectionID, err := flow.HexStringToIdentifier(flagCollectionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed collection id")
+				log.Error().Err(err).Msg("malformed collection id")
+				return
 			}
 
 			log.Info().Msgf("getting collection by id: %v", collectionID)
 			collection, err := storages.Collections.ByID(collectionID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get collection with id: %v", collectionID)
+				log.Error().Err(err).Msgf("could not get collection with id: %v", collectionID)
+				return
 			}
 
 			common.PrettyPrintEntity(collection)
@@ -52,19 +54,21 @@ var collectionsCmd = &cobra.Command{
 			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed transaction id")
+				log.Error().Err(err).Msg("malformed transaction id")
+				return
 			}
 
 			log.Info().Msgf("getting collections by transaction id: %v", transactionID)
 			collections, err := storages.Collections.LightByTransactionID(transactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get collections for transaction id: %v", transactionID)
+				log.Error().Err(err).Msgf("could not get collections for transaction id: %v", transactionID)
+				return
 			}
 
 			common.PrettyPrintEntity(collections)
 			return
 		}
 
-		log.Fatal().Msg("missing flags --collection-id or --transaction-id")
+		log.Error().Msg("missing flags --collection-id or --transaction-id")
 	},
 }

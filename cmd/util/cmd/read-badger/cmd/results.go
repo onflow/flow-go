@@ -28,13 +28,15 @@ var resultsCmd = &cobra.Command{
 			log.Info().Msgf("got flag block id: %s", flagBlockID)
 			blockID, err := flow.HexStringToIdentifier(flagBlockID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed block id")
+				log.Error().Err(err).Msg("malformed block id")
+				return
 			}
 
 			log.Info().Msgf("getting result by block id: %v", blockID)
 			result, err := storages.Results.ByBlockID(blockID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get result for block id: %v", blockID)
+				log.Error().Err(err).Msgf("could not get result for block id: %v", blockID)
+				return
 			}
 
 			common.PrettyPrintEntity(result)
@@ -45,19 +47,21 @@ var resultsCmd = &cobra.Command{
 			log.Info().Msgf("got flag result id: %s", flagResultID)
 			resultID, err := flow.HexStringToIdentifier(flagResultID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed result id")
+				log.Error().Err(err).Msg("malformed result id")
+				return
 			}
 
 			log.Info().Msgf("getting result by id: %v", resultID)
 			result, err := storages.Results.ByID(resultID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get result with id: %v", resultID)
+				log.Error().Err(err).Msgf("could not get result with id: %v", resultID)
+				return
 			}
 
 			common.PrettyPrintEntity(result)
 			return
 		}
 
-		log.Fatal().Msg("missing flags: --block-id or --result-id")
+		log.Error().Msg("missing flags: --block-id or --result-id")
 	},
 }

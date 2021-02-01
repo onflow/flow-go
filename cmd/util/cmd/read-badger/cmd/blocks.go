@@ -27,13 +27,15 @@ var blocksCmd = &cobra.Command{
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed block id")
+			log.Error().Err(err).Msg("malformed block id")
+			return
 		}
 
 		log.Info().Msgf("getting block by id: %v", blockID)
 		block, err := storages.Blocks.ByID(blockID)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get block with id: %v", blockID)
+			log.Error().Err(err).Msgf("could not get block with id: %v", blockID)
+			return
 		}
 
 		common.PrettyPrintEntity(block)
