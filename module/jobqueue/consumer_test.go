@@ -13,6 +13,8 @@ import (
 )
 
 func TestProcessableJobs(t *testing.T) {
+	t.Parallel()
+
 	maxProcessing := int64(3)
 	maxFinished := int64(8)
 

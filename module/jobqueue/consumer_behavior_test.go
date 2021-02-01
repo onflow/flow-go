@@ -29,6 +29,8 @@ const (
 // 1* means job 1 is finished
 
 func TestConsumer(t *testing.T) {
+	t.Parallel()
+
 	// [] => 										[0#]
 	// on startup, if there is no more job, nothing is processed
 	t.Run("testOnStartup", testOnStartup)

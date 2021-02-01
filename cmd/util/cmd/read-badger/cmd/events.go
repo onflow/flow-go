@@ -25,30 +25,34 @@ var eventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "Read events from badger",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		if flagEventType != "" && flagTransactionID != "" {
-			log.Fatal().Msg("provide only one of --transaction-id or --event-type")
+			log.Error().Msg("provide only one of --transaction-id or --event-type")
 			return
 		}
 
 		log.Info().Msgf("got flag block id: %s", flagBlockID)
 		blockID, err := flow.HexStringToIdentifier(flagBlockID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed block id")
+			log.Error().Err(err).Msg("malformed block id")
+			return
 		}
 
 		if flagTransactionID != "" {
 			log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 			transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed transaction id")
+				log.Error().Err(err).Msg("malformed transaction id")
+				return
 			}
 
 			log.Info().Msgf("getting events for block id: %v, transaction id: %v", blockID, transactionID)
 			events, err := storages.Events.ByBlockIDTransactionID(blockID, transactionID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get events for block id: %v, transaction id: %v", blockID, transactionID)
+				log.Error().Err(err).Msgf("could not get events for block id: %v, transaction id: %v", blockID, transactionID)
+				return
 			}
 
 			for _, event := range events {
@@ -68,7 +72,8 @@ var eventsCmd = &cobra.Command{
 				log.Info().Msgf("getting events for block id: %v, event type: %s", blockID, flagEventType)
 				events, err := storages.Events.ByBlockIDEventType(blockID, flow.EventType(flagEventType))
 				if err != nil {
-					log.Fatal().Err(err).Msgf("could not get events for block id: %v, event type: %s", blockID, flagEventType)
+					log.Error().Err(err).Msgf("could not get events for block id: %v, event type: %s", blockID, flagEventType)
+					return
 				}
 
 				for _, event := range events {
@@ -85,7 +90,8 @@ var eventsCmd = &cobra.Command{
 		log.Info().Msgf("getting events for block id: %v", blockID)
 		events, err := storages.Events.ByBlockID(blockID)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get events for block id: %v", blockID)
+			log.Error().Err(err).Msgf("could not get events for block id: %v", blockID)
+			return
 		}
 
 		for _, event := range events {
