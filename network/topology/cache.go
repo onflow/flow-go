@@ -21,7 +21,8 @@ type Cache struct {
 	log          zerolog.Logger
 	top          network.Topology  // instance of underlying topology.
 	cachedFanout flow.IdentityList // most recently generated fanout list by invoking underlying topology.
-	fingerprint  flow.Identifier   // unique fingerprint of input IdentityList for cached fanout.
+	idsFP        flow.Identifier   // unique fingerprint of input IdentityList for cached fanout.
+	chansFP      flow.Identifier   // unique fingerprint of input ChannelsList for cached fanout.
 }
 
 //NewCache creates and returns a topology Cache given an instance of topology implementation.
@@ -30,7 +31,8 @@ func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 		log:          log.With().Str("component", "topology_cache").Logger(),
 		top:          top,
 		cachedFanout: nil,
-		fingerprint:  flow.Identifier{},
+		idsFP:        flow.Identifier{},
+		chansFP:      flow.Identifier{},
 	}
 }
 
@@ -45,24 +47,27 @@ func NewCache(log zerolog.Logger, top network.Topology) *Cache {
 //
 // Note that this implementation of GenerateFanout preserves same output as long as input is the same. This
 // should not be assumed as a 1-1 mapping between input and output.
-func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error) {
-	inputFingerprint := ids.Fingerprint()
+func (c *Cache) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+	inputIdsFP := ids.Fingerprint()
+	inputChansFP := channels.ID()
 
 	log := c.log.With().
-		Hex("cached_fingerprint", logging.ID(c.fingerprint)).
-		Hex("input_fingerprint", logging.ID(inputFingerprint)).
-		Int("input_size", len(ids)).Logger()
+		Hex("cached_ids_fingerprint", logging.ID(c.idsFP)).
+		Hex("input_ids_fingerprint", logging.ID(inputIdsFP)).
+		Hex("cached_channels_fingerprint", logging.ID(c.chansFP)).
+		Hex("input_channels_fingerprint", logging.ID(inputChansFP)).
+		Int("input_ids_size", len(ids)).
+		Int("input_channels_size", len(channels)).Logger()
 
-	if inputFingerprint == c.fingerprint {
+	if inputIdsFP == c.idsFP && inputChansFP == c.chansFP {
 		// cache hit
 		log.Trace().Msg("topology cache hit")
 		return c.cachedFanout, nil
 	}
 
-	// cache miss logic
-	// invalidation and update
+	// cache miss logic, invalidates and updates
 	c.invalidate()
-	fanout, err := c.top.GenerateFanout(ids)
+	fanout, err := c.top.GenerateFanout(ids, channels)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +80,8 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 	}
 
 	c.cachedFanout = fanout
-	c.fingerprint = inputFingerprint
+	c.idsFP = inputIdsFP
+	c.chansFP = inputChansFP
 
 	log.Trace().Msg("topology cache invalidated and updated")
 	return c.cachedFanout, nil
@@ -83,6 +89,7 @@ func (c *Cache) GenerateFanout(ids flow.IdentityList) (flow.IdentityList, error)
 
 // invalidate is cleans the cache and invalidates its content.
 func (c *Cache) invalidate() {
-	c.fingerprint = flow.Identifier{}
+	c.idsFP = flow.Identifier{}
+	c.chansFP = flow.Identifier{}
 	c.cachedFanout = nil
 }
