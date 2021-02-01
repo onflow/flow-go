@@ -33,15 +33,15 @@ const (
 	CONCompBroadcastProposalWithDelay SpanName = "con.compliance.BroadcastProposalWithDelay"
 	CONCompOnBlockProposal            SpanName = "con.compliance.onBlockProposal"
 	CONProvOnBlockProposal            SpanName = "con.provider.onBlockProposal"
-	ConMatchOnReceipt                 SpanName = "con.matching.onReceipt"
-	CONMatchCheckSealing              SpanName = "con.matching.checkSealing"
+
+	// Consensus matching engine
+	CONMatchCheckSealing SpanName = "con.matching.checkSealing"
+	CONMatchOnReceipt    SpanName = "con.matching.onReceipt"
+	ConMatchOnReceiptVal SpanName = "con.matching.onReceipt.validation"
 
 	CONProcessBlock SpanName = "con.processBlock"
 	// children of CONProcessBlock
 	CONHotFinalizeBlock SpanName = "con.hotstuff.finalizeBlock"
-
-	// Entity Validation
-	ConValReceipt SpanName = "con.validation.receipt"
 
 	// Builder
 	CONBuildOn                        = "con.builder"

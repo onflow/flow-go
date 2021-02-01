@@ -243,10 +243,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-
 	startTime := time.Now()
-	span := e.tracer.StartSpan(receipt.ID(), trace.ConMatchOnReceipt, opentracing.StartTime(startTime))
-	defer span.Finish()
+	receiptID := receipt.ID()
+	receiptSpan := e.tracer.StartSpan(receiptID, trace.CONMatchOnReceipt)
+	defer func() {
+		e.metrics.IncreaseOnReceiptDuration(time.Since(startTime))
+		receiptSpan.Finish()
+	}()
 
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
@@ -297,13 +300,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
 	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
 	// eventually request the parent receipt with the `requestPending` function
-	childSpan := e.tracer.StartSpanFromParent(span, trace.ConValReceipt)
-	defer childSpan.Finish()
+	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.ConMatchOnReceiptVal)
 	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
+	childSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
-	childSpan.Finish()
 
 	err = e.storeReceipt(receipt, head, &log)
 	if err != nil {
@@ -330,8 +332,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to store incorporated result: %w", err)
 	}
 	log.Info().Msg("execution result processed and stored")
-
-	span.Finish()
 
 	// kick off a check for potential seal formation
 	e.unit.Launch(e.checkSealing)

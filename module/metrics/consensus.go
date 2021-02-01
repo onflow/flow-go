@@ -26,6 +26,9 @@ const (
 type ConsensusCollector struct {
 	tracer *trace.OpenTracer
 
+	// The duration of onReceipt excluding checkSealing
+	onReceiptDuration prometheus.Counter
+
 	// The duration of the full sealing check
 	checkSealingDuration prometheus.Histogram
 
@@ -35,6 +38,12 @@ type ConsensusCollector struct {
 
 // NewConsensusCollector created a new consensus collector
 func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ConsensusCollector {
+	onReceiptDuration := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "push_receipts_on_receipt_duration_seconds_total",
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
+		Help:      "time spent in consensus matching engine's onReceipt method in seconds",
+	})
 	checkSealingDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceConsensus,
 		Subsystem: subsystemMatchEngine,
@@ -47,9 +56,10 @@ func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Subsystem: subsystemCompliance,
 		Help:      "the number of blocks sealed in emergency mode",
 	})
-	registerer.MustRegister(checkSealingDuration, emergencySealedBlocks)
+	registerer.MustRegister(onReceiptDuration, checkSealingDuration, emergencySealedBlocks)
 	cc := &ConsensusCollector{
 		tracer:                tracer,
+		onReceiptDuration:     onReceiptDuration,
 		checkSealingDuration:  checkSealingDuration,
 		emergencySealedBlocks: emergencySealedBlocks,
 	}
@@ -85,4 +95,9 @@ func (cc *ConsensusCollector) CheckSealingDuration(duration time.Duration) {
 // EmergencySeal increments the counter of emergency seals.
 func (cc *ConsensusCollector) EmergencySeal() {
 	cc.emergencySealedBlocks.Inc()
+}
+
+// IncreaseOnReceiptDuration increases the number of seconds spent processing receipts
+func (cc *ConsensusCollector) IncreaseOnReceiptDuration(duration time.Duration) {
+	cc.onReceiptDuration.Add(duration.Seconds())
 }

@@ -143,6 +143,9 @@ type ConsensusMetrics interface {
 
 	// EmergencySeal increments the number of seals that were created in emergency mode
 	EmergencySeal()
+
+	// IncreaseOnReceiptDuration increases the number of seconds spent processing receipts
+	IncreaseOnReceiptDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {
