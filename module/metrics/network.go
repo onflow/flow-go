@@ -71,7 +71,7 @@ func NewNetworkCollector() *NetworkCollector {
 		inboundProcessTime: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "inbound_message_process_time",
+			Name:      "engine_message_processing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a queue worker blocked for an engine processing message",
 		}, []string{LabelChannel}),
 
