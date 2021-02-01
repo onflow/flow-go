@@ -159,6 +159,9 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	return col, nil
 }
 
+// GetLatestSerializableSnapshot returns the latest sealed snapshot
+// TODO/Danu: `inmem.FromSnapshot`?
+// TODO/Danu: Is it desired to create a return type like `access.SerializableSnapshot`?
 func (b *Backend) GetLatestSerializableSnapshot(_ context.Context) (protocol.Snapshot, error) {
 	latestSealed := b.state.Sealed()
 	return latestSealed, nil

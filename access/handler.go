@@ -407,6 +407,7 @@ func (h *Handler) GetEventsForBlockIDs(
 }
 
 // GetLatestSerializableSnapshot returns the latest serializable Snapshot
+// TODO/Danu: Does this need a custom return type? To keep consistent with other methods?
 func (h *Handler) GetLatestSerializableSnapshot(ctx context.Context, req interface{}) ([]byte, error) {
 	snapshot, err := h.api.GetLatestSerializableSnapshot(ctx)
 	if err != nil {
