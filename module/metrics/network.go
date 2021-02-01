@@ -68,10 +68,10 @@ func NewNetworkCollector() *NetworkCollector {
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
 		}, []string{LabelPriority}),
 
-		inboundProcessTime: prometheus.NewCounterVec(prometheus.CounterOpts{
+		inboundProcessTime: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "inbound_process_time",
+			Name:      "inbound_message_process_time",
 			Help:      "duration [seconds; measured with float64 precision] of how long a queue worker blocked for an engine processing message",
 		}, []string{LabelChannel}),
 
