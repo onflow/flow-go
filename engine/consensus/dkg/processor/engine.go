@@ -199,14 +199,13 @@ func (e *Engine) onPrivateMessage(originID flow.Identifier, msg msg.DKGMessage) 
 // fetchBroadcastMessages calls the DKG smart contract to get missing DKG
 // messages for the current epoch, and forwards them to the msgCh.
 // It should be called with the ID of block whose seal is finalized.
-func (e *Engine) fetchBroadcastMessages(blockID flow.Identifier) {
+func (e *Engine) fetchBroadcastMessages(blockID flow.Identifier) error {
 	epoch := e.GetEpoch()
 	phase := e.GetPhase()
 	offset := e.GetOffset()
 	msgs, err := e.dkgContractClient.ReadBroadcast(blockID, epoch, phase, offset)
 	if err != nil {
-		e.log.Error().Err(err).Msg("could not read broadcast messages")
-		return
+		return fmt.Errorf("could not read broadcast messages: %w", err)
 	}
 	for _, msg := range msgs {
 		err := e.checkMessageEpochAndOrigin(msg)
@@ -218,6 +217,7 @@ func (e *Engine) fetchBroadcastMessages(blockID flow.Identifier) {
 		e.msgCh <- msg
 	}
 	e.SetOffset(offset + len(msgs))
+	return nil
 }
 
 // checkMessageEpochAndOrigin returns an error if the message's epochCounter

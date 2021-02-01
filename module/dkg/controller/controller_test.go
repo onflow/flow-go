@@ -92,7 +92,6 @@ type processor struct {
 	id       int
 	channels []chan msg.DKGMessage
 	logger   zerolog.Logger
-	epoch    uint64
 }
 
 func (proc *processor) PrivateSend(dest int, data []byte) {

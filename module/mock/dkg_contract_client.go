@@ -3,7 +3,9 @@
 package mock
 
 import (
+	flow "github.com/onflow/flow-go/model/flow"
 	messages "github.com/onflow/flow-go/model/messages"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -26,13 +28,13 @@ func (_m *DKGContractClient) Broadcast(msg messages.DKGMessage) error {
 	return r0
 }
 
-// ReadBroadcast provides a mock function with given fields: epochCounter, phase, offset
-func (_m *DKGContractClient) ReadBroadcast(epochCounter uint64, phase messages.DKGPhase, offset int) ([]messages.DKGMessage, error) {
-	ret := _m.Called(epochCounter, phase, offset)
+// ReadBroadcast provides a mock function with given fields: blockID, epochCounter, phase, offset
+func (_m *DKGContractClient) ReadBroadcast(blockID flow.Identifier, epochCounter uint64, phase messages.DKGPhase, offset int) ([]messages.DKGMessage, error) {
+	ret := _m.Called(blockID, epochCounter, phase, offset)
 
 	var r0 []messages.DKGMessage
-	if rf, ok := ret.Get(0).(func(uint64, messages.DKGPhase, int) []messages.DKGMessage); ok {
-		r0 = rf(epochCounter, phase, offset)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, messages.DKGPhase, int) []messages.DKGMessage); ok {
+		r0 = rf(blockID, epochCounter, phase, offset)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]messages.DKGMessage)
@@ -40,8 +42,8 @@ func (_m *DKGContractClient) ReadBroadcast(epochCounter uint64, phase messages.D
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64, messages.DKGPhase, int) error); ok {
-		r1 = rf(epochCounter, phase, offset)
+	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64, messages.DKGPhase, int) error); ok {
+		r1 = rf(blockID, epochCounter, phase, offset)
 	} else {
 		r1 = ret.Error(1)
 	}

@@ -52,7 +52,6 @@ func createTestEngine(t *testing.T, nodeID flow.Identifier) *Engine {
 		committee,
 		&module.DKGContractClient{},
 		epochCounter,
-		time.Second,
 	)
 	require.NoError(t, err)
 
@@ -142,7 +141,7 @@ func TestProcessMessage_Valid(t *testing.T) {
 	err := engine.Process(committee[orig], expectedMsg)
 	require.NoError(t, err)
 
-	//check that the message has been received and forwarded to the msgCh
+	// check that the message has been received and forwarded to the msgCh
 	unittest.AssertReturnsBefore(
 		t,
 		func() {
@@ -210,4 +209,67 @@ func TestBroadcastMessage(t *testing.T) {
 
 	engine.Broadcast(msgb)
 	contractClient.AssertExpectations(t)
+}
+
+// TestReadMessages checks that the engine correctly calls the smart contract
+// to fetch broadcast messages, and forwards the messages to the msgCh.
+func TestReadMessages(t *testing.T) {
+
+	engine := createTestEngine(t, committee[orig])
+	blockID := unittest.IdentifierFixture()
+	expectedMsgs := []msg.DKGMessage{
+		msg.NewDKGMessage(
+			orig,
+			msgb,
+			engine.GetEpoch(),
+			engine.GetPhase(),
+		),
+		msg.NewDKGMessage(
+			orig,
+			msgb,
+			engine.GetEpoch(),
+			engine.GetPhase(),
+		),
+		msg.NewDKGMessage(
+			orig,
+			msgb,
+			engine.GetEpoch(),
+			engine.GetPhase(),
+		),
+	}
+
+	// check that the dkg contract client is called correctly
+	contractClient := &module.DKGContractClient{}
+	contractClient.On("ReadBroadcast", blockID, engine.GetEpoch(), engine.GetPhase(), engine.GetOffset()).
+		Return(expectedMsgs, nil).
+		Once()
+	engine.dkgContractClient = contractClient
+
+	// launch a background routine to capture messages forwarded to the msgCh
+	receivedMsgs := []msg.DKGMessage{}
+	doneCh := make(chan struct{})
+	go func() {
+		for {
+			msg := <-engine.msgCh
+			receivedMsgs = append(receivedMsgs, msg)
+			if len(receivedMsgs) == len(expectedMsgs) {
+				close(doneCh)
+			}
+		}
+	}()
+
+	err := engine.fetchBroadcastMessages(blockID)
+	require.NoError(t, err)
+
+	// check that the contract has been correctly called
+	contractClient.AssertExpectations(t)
+
+	// check that the messages have been received and forwarded to the msgCh
+	unittest.AssertReturnsBefore(
+		t,
+		func() {
+			<-doneCh
+		},
+		time.Second)
+	require.Equal(t, expectedMsgs, receivedMsgs)
 }
