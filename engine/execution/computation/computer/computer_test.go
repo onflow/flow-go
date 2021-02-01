@@ -18,14 +18,22 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
+	state2 "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/event"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
+
+	rag := &RandomAddressGenerator{}
 
 	t.Run("single collection", func(t *testing.T) {
 
@@ -37,7 +45,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
-		block := generateBlock(1, 2)
+		block := generateBlock(1, 2, rag)
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
@@ -64,7 +72,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		// create an empty block
-		block := generateBlock(0, 0)
+		block := generateBlock(0, 0, rag)
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
@@ -97,7 +105,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
-		block := generateBlock(collectionCount, transactionsPerCollection)
+		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -160,7 +168,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
 
 		// create a block with 2 collections with 2 transactions each
-		block := generateBlock(collectionCount, transactionsPerCollection)
+		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
 		ordinaryEvent := cadence.Event{
 			EventType: &cadence.EventType{
@@ -258,13 +266,105 @@ func (e *eventEmittingRuntime) SetCoverageReport(coverageReport *runtime.Coverag
 	panic("SetCoverageReport not expected")
 }
 
-func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBlock {
+type RandomAddressGenerator struct{}
+
+func (r *RandomAddressGenerator) NextAddress() (flow.Address, error) {
+	return flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000))), nil
+}
+
+func (r *RandomAddressGenerator) CurrentAddress() flow.Address {
+	return flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000)))
+}
+
+func (r *RandomAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+type FixedAddressGenerator struct {
+	Address flow.Address
+}
+
+func (f *FixedAddressGenerator) NextAddress() (flow.Address, error) {
+	return f.Address, nil
+}
+
+func (f *FixedAddressGenerator) CurrentAddress() flow.Address {
+	return f.Address
+}
+
+func (f *FixedAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
+
+	address := flow.HexToAddress("1234")
+	fag := &FixedAddressGenerator{Address: address}
+
+	execCtx := fvm.NewContext(zerolog.Nop())
+
+	rt := runtime.NewInterpreterRuntime()
+
+	vm := fvm.New(rt)
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	require.NoError(t, err)
+
+	collectionCount := 2
+	transactionsPerCollection := 2
+	eventsPerTransaction := 2
+	totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
+	totalEventCount := eventsPerTransaction * totalTransactionCount
+
+	// empty block still contains system chunk
+	block := generateBlock(1, 1, fag)
+
+	forest, nil := mtrie.NewForest(pathfinder.PathByteSize, nil, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
+
+	state2.LedgerGetRegister()
+
+	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+
+	result, err := exe.ExecuteBlock(context.Background(), block, view)
+	assert.NoError(t, err)
+
+	registerTouches := view.Interactions().RegisterTouches()
+
+	// make sure check for frozen account has been registered
+	require.Contains(t, registerTouches, flow.RegisterID{
+		Owner:      string(address.Bytes()),
+		Controller: "",
+		Key:        state.KeyAccountFrozen,
+	})
+
+	// chunk count should match collection count
+	assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
+
+	// all events should have been collected
+	assert.Len(t, result.Events, totalEventCount)
+
+	expectedResults := make([]flow.TransactionResult, 0)
+	for _, c := range block.CompleteCollections {
+		for _, t := range c.Transactions {
+			txResult := flow.TransactionResult{
+				TransactionID: t.ID(),
+				ErrorMessage:  "no payer address provided",
+			}
+			expectedResults = append(expectedResults, txResult)
+		}
+	}
+	assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
+}
+
+func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
 	collections := make([]*entity.CompleteCollection, collectionCount)
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
 
 	for i := 0; i < collectionCount; i++ {
-		collection := generateCollection(transactionCount)
+		collection := generateCollection(transactionCount, addressGenerator)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
 		completeCollections[collection.Guarantee.ID()] = collection
@@ -285,12 +385,16 @@ func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBloc
 	}
 }
 
-func generateCollection(transactionCount int) *entity.CompleteCollection {
+func generateCollection(transactionCount int, addressGenerator flow.AddressGenerator) *entity.CompleteCollection {
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
 	for i := 0; i < transactionCount; i++ {
+		nextAddress, err := addressGenerator.NextAddress()
+		if err != nil {
+			panic(fmt.Errorf("cannot generate next address in test: %w", err))
+		}
 		transactions[i] = &flow.TransactionBody{
-			Payer:  flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000))), // a unique payer for each tx to generate a unique id
+			Payer:  nextAddress, // a unique payer for each tx to generate a unique id
 			Script: []byte("transaction { execute {} }"),
 		}
 	}
