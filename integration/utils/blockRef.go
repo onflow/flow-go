@@ -20,8 +20,8 @@ type BlockRef struct {
 	mux            sync.Mutex
 }
 
-func NewBlockRef(c *client.Client) BlockRef {
-	return BlockRef{
+func NewBlockRef(c *client.Client) *BlockRef {
+	return &BlockRef{
 		c: c,
 	}
 }

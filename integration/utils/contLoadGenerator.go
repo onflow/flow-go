@@ -50,7 +50,7 @@ type ContLoadGenerator struct {
 	txStatsTracker       *TxStatsTracker
 	workerStatsTracker   *WorkerStatsTracker
 	workers              []*Worker
-	blockRef             BlockRef
+	blockRef             *BlockRef
 	stopped              bool
 	loadType             LoadType
 }
@@ -80,7 +80,7 @@ func NewContLoadGenerator(
 		return nil, fmt.Errorf("error loading service account %w", err)
 	}
 
-	// TODO get these params hooked to the top level
+	// TODO get statsTracker params hooked to the top level
 	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
 	txTracker, err := NewTxTracker(log, maxTxInFlight, numberOfWorkers, loadedAccessAddr, workerSleepAfterEachPing, txStatsTracker)
 	if err != nil {
