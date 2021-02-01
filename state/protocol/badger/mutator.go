@@ -379,23 +379,17 @@ func (m *MutableState) receiptExtend(candidate *flow.Block) error {
 		// keep track of blocks we iterate over
 		forkBlocks[ancestorID] = ancestor
 
+		// keep track of all receipts in ancestors
 		index, err := m.index.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
 		}
-
-		// keep track of all receipts we iterate over
 		for _, recID := range index.ReceiptIDs {
 			forkLookup[recID] = struct{}{}
 		}
 
 		ancestorID = ancestor.ParentID
 	}
-
-	// prevReceiptHeight is used to check that receipts within a payload are
-	// sorted by block height. For each receipt in the payload, we check that
-	// its block height is greater or equal than the previous receipt.
-	var prevReceiptHeight uint64 = 0
 
 	// check each receipt included in the payload for duplication
 	for _, receipt := range payload.Receipts {
@@ -409,31 +403,21 @@ func (m *MutableState) receiptExtend(candidate *flow.Block) error {
 		forkLookup[receipt.ID()] = struct{}{}
 
 		// if the receipt is not for a block on this fork, error
-		header, ok := forkBlocks[receipt.ExecutionResult.BlockID]
-		if !ok {
+		if _, forBlockOnFork := forkBlocks[receipt.ExecutionResult.BlockID]; !forBlockOnFork {
 			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
 		}
+	}
 
-		err = m.receiptValidator.Validate(receipt)
-		if err != nil {
-			// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
-			if errors.Is(err, storage.ErrNotFound) {
-				return state.NewInvalidExtensionErrorf("some entities referenced by receipt %v are missing: %w", receipt.ID(), err)
-			}
-
-			if engine.IsInvalidInputError(err) {
-				return state.NewInvalidExtensionErrorf("payload includes invalid receipt %v: %w", receipt.ID(), err)
-			}
-
-			return fmt.Errorf("unexpected payload validation error %w", err)
+	err = m.receiptValidator.Validate(payload.Receipts)
+	if err != nil {
+		// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
+		if errors.Is(err, storage.ErrNotFound) {
+			return state.NewInvalidExtensionErrorf("some entities referenced by receipts are missing: %w", err)
 		}
-
-		// check receipts are sorted by block height
-		if header.Height < prevReceiptHeight {
-			return state.NewInvalidExtensionError("payload receipts should be sorted by block height")
+		if engine.IsInvalidInputError(err) {
+			return state.NewInvalidExtensionErrorf("payload includes invalid receipts: %w", err)
 		}
-
-		prevReceiptHeight = header.Height
+		return fmt.Errorf("unexpected payload validation error %w", err)
 	}
 
 	return nil

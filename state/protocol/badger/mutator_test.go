@@ -684,6 +684,12 @@ func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
 }
 
 func TestExtendReceiptsNotSorted(t *testing.T) {
+	// Todo: this test needs to be updated:
+	// We don't require the receipts to be sorted by height anymore
+	// We could require an "parent first" ordering, which is less strict than
+	// a full ordering by height
+	t.Skip()
+
 	stateRoot := fixtureStateRoot(t)
 	block1 := stateRoot.Block()
 	block1.Payload.Guarantees = nil
@@ -767,16 +773,12 @@ func TestExtendReceiptsValid(t *testing.T) {
 
 		receipt3a := unittest.ReceiptForBlockFixture(&block3)
 		receipt3b := unittest.ReceiptForBlockFixture(&block3)
-		var altResult flow.ExecutionResult = receipt3b.ExecutionResult // copy
-		altResult.Signatures = unittest.SignaturesFixture(1)
-		receipt3c := unittest.ExecutionReceiptFixture(unittest.WithResult(&altResult))
 
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceipt{
 				receipt3a,
 				receipt3b,
-				receipt3c,
 				unittest.ReceiptForBlockFixture(&block4),
 			},
 		})
