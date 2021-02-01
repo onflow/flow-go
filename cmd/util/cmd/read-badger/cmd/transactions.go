@@ -19,18 +19,21 @@ var transactionsCmd = &cobra.Command{
 	Use:   "transactions",
 	Short: "get transaction by ID",
 	Run: func(cmd *cobra.Command, args []string) {
-		storages := InitStorages()
+		storages, db := InitStorages()
+		defer db.Close()
 
 		log.Info().Msgf("got flag transaction id: %s", flagTransactionID)
 		transactionID, err := flow.HexStringToIdentifier(flagTransactionID)
 		if err != nil {
-			log.Fatal().Err(err).Msg("malformed transaction id")
+			log.Error().Err(err).Msg("malformed transaction id")
+			return
 		}
 
 		log.Info().Msgf("getting transaction by id: %v", transactionID)
 		tx, err := storages.Transactions.ByID(transactionID)
 		if err != nil {
-			log.Fatal().Err(err).Msgf("could not get transaction with id: %v", transactionID)
+			log.Error().Err(err).Msgf("could not get transaction with id: %v", transactionID)
+			return
 		}
 
 		common.PrettyPrintEntity(tx)
