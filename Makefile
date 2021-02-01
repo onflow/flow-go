@@ -261,7 +261,7 @@ docker-build-verification-debug:
 .PHONY: docker-build-access
 docker-build-access:
 	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=access --target production \
-		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
+		-t "$(CONTAINER_REGISTRY)/access:v0.13.1-patch.4.grpcmetrics" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
@@ -326,7 +326,7 @@ docker-push-verification:
 
 .PHONY: docker-push-access
 docker-push-access:
-	docker push "$(CONTAINER_REGISTRY)/access:latest"
+	docker push "$(CONTAINER_REGISTRY)/access:v0.13.1-patch.4.grpcmetrics"
 	docker push "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)"
 	docker push "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)"
 
