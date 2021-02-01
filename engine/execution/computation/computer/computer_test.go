@@ -18,17 +18,12 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
-	state2 "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/metrics"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -310,24 +305,13 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 	require.NoError(t, err)
 
-	collectionCount := 2
-	transactionsPerCollection := 2
-	eventsPerTransaction := 2
-	totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
-	totalEventCount := eventsPerTransaction * totalTransactionCount
-
-	// empty block still contains system chunk
 	block := generateBlock(1, 1, fag)
-
-	forest, nil := mtrie.NewForest(pathfinder.PathByteSize, nil, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
-
-	state2.LedgerGetRegister()
 
 	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
 
-	result, err := exe.ExecuteBlock(context.Background(), block, view)
+	_, err = exe.ExecuteBlock(context.Background(), block, view)
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()
@@ -339,23 +323,6 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 		Key:        state.KeyAccountFrozen,
 	})
 
-	// chunk count should match collection count
-	assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
-
-	// all events should have been collected
-	assert.Len(t, result.Events, totalEventCount)
-
-	expectedResults := make([]flow.TransactionResult, 0)
-	for _, c := range block.CompleteCollections {
-		for _, t := range c.Transactions {
-			txResult := flow.TransactionResult{
-				TransactionID: t.ID(),
-				ErrorMessage:  "no payer address provided",
-			}
-			expectedResults = append(expectedResults, txResult)
-		}
-	}
-	assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
 }
 
 func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
