@@ -16,6 +16,13 @@ type approvalValidator struct {
 	verifier module.Verifier
 }
 
+func NewApprovalValidator(state protocol.State, verifier module.Verifier) *approvalValidator {
+	return &approvalValidator{
+		state:    state,
+		verifier: verifier,
+	}
+}
+
 func (v *approvalValidator) Validate(approval *flow.ResultApproval) error {
 	// check if we already have the block the approval pertains to
 	head, err := v.state.AtBlockID(approval.Body.BlockID).Head()
