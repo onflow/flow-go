@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -36,7 +35,6 @@ type Engine struct {
 	dkgPhaseLock      sync.Mutex               // lock to safely manipulate dkgPhase
 	messageOffset     int                      // index of next broadcast message to query
 	messageOffsetLock sync.Mutex               // lock to safely manipulate messageOffset
-	pollInterval      time.Duration            // interval between reading broadcast messages from DKG contract
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -51,8 +49,7 @@ func New(
 	msgCh chan msg.DKGMessage,
 	committee flow.IdentifierList,
 	dkgContractClient module.DKGContractClient,
-	epochCounter uint64,
-	pollInterval time.Duration) (*Engine, error) {
+	epochCounter uint64) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
 
@@ -76,7 +73,6 @@ func New(
 		myIndex:           index,
 		epochCounter:      epochCounter,
 		dkgContractClient: dkgContractClient,
-		pollInterval:      pollInterval,
 	}
 
 	var err error
@@ -104,17 +100,15 @@ func (e *Engine) GetEpoch() uint64 {
 	return e.epochCounter
 }
 
-// SetPhase reads broadcast messages one last time, changes the dkg phase of the
-// engine, and resets message offset.
+// SetPhase changes the DKG phase of the engine, and resets message offset.
 func (e *Engine) SetPhase(phase msg.DKGPhase) {
-	e.fetchBroadcastMessages()
 	e.dkgPhaseLock.Lock()
 	e.dkgPhase = phase
 	defer e.dkgPhaseLock.Unlock()
 	e.SetOffset(0)
 }
 
-// GetPhase returns the current dkg phase.
+// GetPhase returns the current DKG phase.
 func (e *Engine) GetPhase() msg.DKGPhase {
 	e.dkgPhaseLock.Lock()
 	defer e.dkgPhaseLock.Unlock()
@@ -142,7 +136,6 @@ func (e *Engine) GetOffset() int {
 // It instructs the engine to periodically read broadcast messages from the DKG
 // smart contract.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.LaunchPeriodically(e.fetchBroadcastMessages, e.pollInterval, 0)
 	return e.unit.Ready()
 }
 
@@ -205,11 +198,12 @@ func (e *Engine) onPrivateMessage(originID flow.Identifier, msg msg.DKGMessage) 
 
 // fetchBroadcastMessages calls the DKG smart contract to get missing DKG
 // messages for the current epoch, and forwards them to the msgCh.
-func (e *Engine) fetchBroadcastMessages() {
+// It should be called with the ID of block whose seal is finalized.
+func (e *Engine) fetchBroadcastMessages(blockID flow.Identifier) {
 	epoch := e.GetEpoch()
 	phase := e.GetPhase()
 	offset := e.GetOffset()
-	msgs, err := e.dkgContractClient.ReadBroadcast(epoch, phase, offset)
+	msgs, err := e.dkgContractClient.ReadBroadcast(blockID, epoch, phase, offset)
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not read broadcast messages")
 		return

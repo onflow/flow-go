@@ -1,6 +1,7 @@
 package module
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 )
 
@@ -17,12 +18,15 @@ type DKGContractClient interface {
 	// should be re-submitted.
 	Broadcast(msg messages.DKGMessage) error
 
-	// ReadBroadcast reads the broadcast messages from the smart contract for
-	// a particular phase. All messages for the given phase, with index greater
-	// or equal to the offset, will be returned.
+	// ReadBroadcast reads the broadcast messages from the smart contract. The
+	// parameters are:
 	//
-	// ATTENTION: it is assumed that message indexes are kept on a per-phase
-	// basis, ie. the first transaction of each phase has index 0.
+	// * blockID: A marker for the state snapshot to use in the query. To ensure
+	//            consistency across DKG nodes, it is important to use a block
+	//            whose seal is finalized.
+	// * epochCounter: Retrieve messages pertaining to this epoch.
+	// * phase: Retrieve messages pertaining to this phase.
+	// * offset: Retrieve messages with index >= offset.
 	//
 	// Messages are returned in the order in which they were broadcast (received
 	// and stored in the smart contract).
@@ -30,7 +34,7 @@ type DKGContractClient interface {
 	// DKG nodes should call ReadBroadcast one final time once they have
 	// observed the phase deadline trigger to guarantee they receive all
 	// messages for that phase.
-	ReadBroadcast(epochCounter uint64, phase messages.DKGPhase, offset int) ([]messages.DKGMessage, error)
+	ReadBroadcast(blockID flow.Identifier, epochCounter uint64, phase messages.DKGPhase, offset int) ([]messages.DKGMessage, error)
 
 	// SubmitResult submits the final public result of the DKG protocol. This
 	// represents the node's local computation of the public keys for each
