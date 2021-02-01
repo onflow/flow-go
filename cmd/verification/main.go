@@ -70,6 +70,7 @@ func main() {
 		pendingResults      *stdmap.ResultDataPacks    // used in match engine
 		pendingChunks       *match.Chunks              // used in match engine
 		headerStorage       *storage.Headers           // used in match and finder engines
+		resultsDB           *storage.ExecutionResults  // used in match engine
 		syncCore            *synchronization.Core      // used in follower engine
 		pendingBlocks       *buffer.PendingBlocks      // used in follower engine
 		finderEng           *finder.Engine             // the finder engine

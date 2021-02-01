@@ -24,5 +24,5 @@ type ExecutionReceipts interface {
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
 
 	// ByBlockIDAllExecutionReceipts retrieves all execution receipts for a block ID
-	ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]flow.ExecutionReceipt, error)
+	ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error)
 }
