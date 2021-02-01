@@ -43,7 +43,11 @@ const DefaultEmergencySealingThreshold = 400
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
 
+// defaultEventsProcessingInterval interval which is used to control how often pending events will be processed by worker.
 const defaultEventsProcessingInterval = 100 * time.Millisecond
+
+// defaultEventProcessingBatch is a maximum number of pending events which will be processed in one batch.
+const defaultEventsProcessingBatch = 10
 
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
@@ -211,8 +215,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		switch event.(type) {
 		case *flow.ExecutionReceipt:
 			e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-			e.unit.Lock()
-			defer e.unit.Unlock()
 			e.receiptsQueue.Push(pendingProcessingEvent{
 				originID: originID,
 				msg:      event,
@@ -220,8 +222,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			return nil
 		case *flow.ResultApproval:
 			e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-			e.unit.Lock()
-			defer e.unit.Unlock()
 			e.resultApprovalsQueue.Push(pendingProcessingEvent{
 				originID: originID,
 				msg:      event,
@@ -229,8 +229,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			return nil
 		case *messages.ApprovalResponse:
 			e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-			e.unit.Lock()
-			defer e.unit.Unlock()
 			e.approvalResponsesQueue.Push(pendingProcessingEvent{
 				originID: originID,
 				msg:      event,
@@ -254,10 +252,10 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	}
 }
 
-// onProcessPendingEvents processes events for the propagation engine on the consensus node.
+// onProcessPendingEvents processes pending events that are stored in respective queues.
 func (e *Engine) onProcessPendingEvents() {
 	processItems := func(q *concurrent_queue.ConcurrentQueue) {
-		for i := 0; i < 10; i++ {
+		for i := 0; i < defaultEventsProcessingBatch; i++ {
 			p, found := q.Pop()
 			if !found {
 				break
@@ -283,14 +281,10 @@ func (e *Engine) processPendingEvent(originID flow.Identifier, event interface{}
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		e.unit.Lock()
-		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	case *messages.ApprovalResponse:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		e.unit.Lock()
-		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, &ev.Approval)
 	default:
