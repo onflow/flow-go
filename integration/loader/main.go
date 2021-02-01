@@ -38,6 +38,11 @@ func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
+
+	numberOfWorkers := flag.Int("worker-count", 100, "number of workers (txTracker)")
+	maxTxInFlight := flag.Int("max-tx-in-flight", 5000, "maximum number of transactions in flight (txTracker)")
+	workerDelayAfterEachFetch := flag.Duration("worker-fetch-delay", time.Second, "duration of worker sleep after each tx status fetch (prevents too much requests)")
+
 	flag.Parse()
 
 	// parse log level and apply to logger
@@ -121,6 +126,9 @@ func main() {
 					&flowTokenAddress,
 					c.tps,
 					utils.LoadType(*loadTypeFlag),
+					*numberOfWorkers,           // number of workers
+					*maxTxInFlight,             // max tx in flight
+					*workerDelayAfterEachFetch, // worker delay between each ping
 				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")

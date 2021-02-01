@@ -68,6 +68,9 @@ func NewContLoadGenerator(
 	flowTokenAddress *flowsdk.Address,
 	tps int,
 	loadType LoadType,
+	numberOfWorkers int,
+	maxTxInFlight int,
+	workerSleepAfterEachPing time.Duration,
 ) (*ContLoadGenerator, error) {
 
 	numberOfAccounts := tps * 10 // 1 second per block, factor 10 for delays to prevent sequence number collisions
@@ -79,7 +82,7 @@ func NewContLoadGenerator(
 
 	// TODO get these params hooked to the top level
 	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, numberOfAccounts})
-	txTracker, err := NewTxTracker(log, 5000, 100, loadedAccessAddr, time.Second, txStatsTracker)
+	txTracker, err := NewTxTracker(log, maxTxInFlight, numberOfWorkers, loadedAccessAddr, workerSleepAfterEachPing, txStatsTracker)
 	if err != nil {
 		return nil, err
 	}
