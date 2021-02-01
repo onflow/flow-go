@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/concurrent_queue"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -42,38 +43,48 @@ const DefaultEmergencySealingThreshold = 400
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
 
+const defaultEventsProcessingInterval = 100 * time.Millisecond
+
 // Engine is the Matching engine, which builds seals by matching receipts (aka
 // ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
 // from verification nodes), and saves the seals into seals mempool for adding
 // into a new block.
 type Engine struct {
-	unit                                 *engine.Unit                    // used to control startup/shutdown
-	log                                  zerolog.Logger                  // used to log relevant actions with context
-	engineMetrics                        module.EngineMetrics            // used to track sent and received messages
-	tracer                               module.Tracer                   // used to trace execution
-	mempool                              module.MempoolMetrics           // used to track mempool size
-	metrics                              module.ConsensusMetrics         // used to track consensus metrics
-	state                                protocol.State                  // used to access the  protocol state
-	me                                   module.Local                    // used to access local node information
-	receiptRequester                     module.Requester                // used to request missing execution receipts by block ID
-	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
-	receiptsDB                           storage.ExecutionReceipts       // to persist received execution receipts
-	headersDB                            storage.Headers                 // used to check sealed headers
-	indexDB                              storage.Index                   // used to check payloads for results
-	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results in memory
-	receipts                             mempool.ExecutionTree           // holds execution receipts in memory
-	approvals                            mempool.Approvals               // holds result approvals in memory
-	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
-	missing                              map[flow.Identifier]uint        // track how often a block was missing
-	assigner                             module.ChunkAssigner            // chunk assignment object
-	isCheckingSealing                    *atomic.Bool                    // used to rate limit the checksealing call
-	sealingThreshold                     uint                            // how many blocks between sealed/finalized before we request execution receipts
-	maxResultsToRequest                  int                             // max number of finalized blocks for which we request execution results
-	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
-	receiptValidator                     module.ReceiptValidator         // used to validate receipts
-	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
-	approvalRequestsThreshold            uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
-	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+	unit                                 *engine.Unit                     // used to control startup/shutdown
+	log                                  zerolog.Logger                   // used to log relevant actions with context
+	engineMetrics                        module.EngineMetrics             // used to track sent and received messages
+	tracer                               module.Tracer                    // used to trace execution
+	mempool                              module.MempoolMetrics            // used to track mempool size
+	metrics                              module.ConsensusMetrics          // used to track consensus metrics
+	state                                protocol.State                   // used to access the  protocol state
+	me                                   module.Local                     // used to access local node information
+	receiptRequester                     module.Requester                 // used to request missing execution receipts by block ID
+	approvalConduit                      network.Conduit                  // used to request missing approvals from verification nodes
+	receiptsDB                           storage.ExecutionReceipts        // to persist received execution receipts
+	headersDB                            storage.Headers                  // used to check sealed headers
+	indexDB                              storage.Index                    // used to check payloads for results
+	incorporatedResults                  mempool.IncorporatedResults      // holds incorporated results in memory
+	receipts                             mempool.ExecutionTree            // holds execution receipts in memory
+	approvals                            mempool.Approvals                // holds result approvals in memory
+	seals                                mempool.IncorporatedResultSeals  // holds the seals that were produced by the matching engine
+	resultApprovalsQueue                 concurrent_queue.ConcurrentQueue // queue that holds incomming `ResultApproval` messages
+	receiptsQueue                        concurrent_queue.ConcurrentQueue // queue that holds incomming `ExecutionReceipt` messages
+	approvalResponsesQueue               concurrent_queue.ConcurrentQueue // queue that holds incomming `ApprovalResponse` messages
+	missing                              map[flow.Identifier]uint         // track how often a block was missing
+	assigner                             module.ChunkAssigner             // chunk assignment object
+	isCheckingSealing                    *atomic.Bool                     // used to rate limit the checksealing call
+	sealingThreshold                     uint                             // how many blocks between sealed/finalized before we request execution receipts
+	maxResultsToRequest                  int                              // max number of finalized blocks for which we request execution results
+	requiredApprovalsForSealConstruction uint                             // min number of approvals required for constructing a candidate seal
+	receiptValidator                     module.ReceiptValidator          // used to validate receipts
+	requestTracker                       *RequestTracker                  // used to keep track of number of approval requests, and blackout periods, by chunk
+	approvalRequestsThreshold            uint64                           // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
+	emergencySealingActive               bool                             // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+}
+
+type pendingProcessingEvent struct {
+	originID flow.Identifier
+	msg      interface{}
 }
 
 // New creates a new collection propagation engine.
@@ -160,6 +171,7 @@ func New(
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
+	e.unit.LaunchPeriodically(e.onProcessPendingEvents, defaultEventsProcessingInterval, time.Duration(0))
 	return e.unit.Ready()
 }
 
@@ -196,7 +208,37 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(originID, event)
+		switch event.(type) {
+		case *flow.ExecutionReceipt:
+			e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+			e.unit.Lock()
+			defer e.unit.Unlock()
+			e.receiptsQueue.Push(pendingProcessingEvent{
+				originID: originID,
+				msg:      event,
+			})
+			return nil
+		case *flow.ResultApproval:
+			e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+			e.unit.Lock()
+			defer e.unit.Unlock()
+			e.resultApprovalsQueue.Push(pendingProcessingEvent{
+				originID: originID,
+				msg:      event,
+			})
+			return nil
+		case *messages.ApprovalResponse:
+			e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+			e.unit.Lock()
+			defer e.unit.Unlock()
+			e.approvalResponsesQueue.Push(pendingProcessingEvent{
+				originID: originID,
+				msg:      event,
+			})
+			return nil
+		default:
+			return fmt.Errorf("invalid event type (%T)", event)
+		}
 	})
 }
 
@@ -206,22 +248,37 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
 
-	e.unit.Launch(func() {
-		err := e.process(originID, receipt)
-		if err != nil {
-			e.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
-		}
-	})
+	err := e.Process(originID, receipt)
+	if err != nil {
+		e.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
+	}
 }
 
-// process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+// onProcessPendingEvents processes events for the propagation engine on the consensus node.
+func (e *Engine) onProcessPendingEvents() {
+	processItems := func(q *concurrent_queue.ConcurrentQueue) {
+		for i := 0; i < 10; i++ {
+			p, found := q.Pop()
+			if !found {
+				break
+			}
+			pendingEvent := p.(pendingProcessingEvent)
+			originID, event := pendingEvent.originID, pendingEvent.msg
+			err := e.processPendingEvent(originID, event)
+			if err != nil {
+				e.log.Error().Err(err).Hex("origin", originID[:]).Msgf("could not process event")
+			}
+		}
+	}
+	processItems(&e.receiptsQueue)
+	processItems(&e.resultApprovalsQueue)
+	processItems(&e.approvalResponsesQueue)
+}
 
+// processPendingEvent processes single event for the propagation engine on the consensus node.
+func (e *Engine) processPendingEvent(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.ExecutionReceipt:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		e.unit.Lock()
-		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
