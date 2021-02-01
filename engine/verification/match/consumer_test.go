@@ -51,7 +51,7 @@ func TestProduceConsume(t *testing.T) {
 				require.NoError(t, err)
 				require.True(t, ok)
 				chunks = append(chunks, chunk)
-				consumer.Check()
+				consumer.Check() // notify the consumer
 			}
 
 			// expect the mock engine receives 3 calls
@@ -71,7 +71,9 @@ func WithConsumer(
 		maxFinished := int64(8)
 
 		processedIndex := storage.NewConsumeProgress(db, module.ConsumeProgressVerificationChunkIndex)
-		chunksQueue := storage.NewChunksQueue(db, match.DefaultJobIndex)
+		chunksQueue := storage.NewChunksQueue(db)
+		err := chunksQueue.Init(match.DefaultJobIndex)
+		require.NoError(t, err)
 
 		engine := &MockEngine{
 			process: process,

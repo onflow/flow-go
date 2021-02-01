@@ -190,8 +190,9 @@ func main() {
 			return nil
 		}).
 		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
-			chunksQueue = storage.NewChunksQueue(node.DB, match.DefaultJobIndex)
-			return nil
+			chunksQueue = storage.NewChunksQueue(node.DB)
+			err := chunksQueue.Init(match.DefaultJobIndex)
+			return err
 		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
