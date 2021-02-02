@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -437,7 +438,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 		return
 	}
 
-	// submit the message to the engine synchronously
+	// submits the message to the engine synchronously and
+	// tracks its processing time.
+	startTimestamp := time.Now()
+
 	err = eng.Process(qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
@@ -446,4 +450,6 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to process message")
 	}
+
+	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
 }
