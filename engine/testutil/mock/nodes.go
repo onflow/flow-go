@@ -102,7 +102,7 @@ type ConsensusNode struct {
 	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
-	MatchingEngine  *matching.Engine
+	MatchingEngine  *matching.EngineContext
 }
 
 func (cn ConsensusNode) Ready() {

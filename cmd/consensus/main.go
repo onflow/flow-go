@@ -222,7 +222,7 @@ func main() {
 				return nil, err
 			}
 
-			match, err := matching.New(
+			match, err := matching.NewEngineContext(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
