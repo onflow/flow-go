@@ -541,7 +541,7 @@ func (a *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
 func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
 	frozen, err := a.GetAccountFrozen(address)
 	if err != nil {
-		return fmt.Errorf("cannot check acount free status: %w", err)
+		return fmt.Errorf("cannot check acount freeze status: %w", err)
 	}
 	if frozen {
 		return &AccountFrozenError{Address: address}

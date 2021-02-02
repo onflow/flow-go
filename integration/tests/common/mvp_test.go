@@ -39,7 +39,7 @@ func TestMVP_Network(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(true)),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
