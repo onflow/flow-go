@@ -3,7 +3,7 @@ package messages
 type DKGPhase int
 
 const (
-	DKGPhase1 DKGPhase = iota
+	DKGPhase1 DKGPhase = iota + 1
 	DKGPhase2
 	DKGPhase3
 )
