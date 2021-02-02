@@ -29,6 +29,9 @@ type ConsensusCollector struct {
 	// The duration of onReceipt excluding checkSealing
 	onReceiptDuration prometheus.Counter
 
+	// The duration of onApproval excluding checkSealig
+	onApprovalDuration prometheus.Counter
+
 	// The duration of the full sealing check
 	checkSealingDuration prometheus.Histogram
 
@@ -44,6 +47,12 @@ func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Subsystem: subsystemMatchEngine,
 		Help:      "time spent in consensus matching engine's onReceipt method in seconds",
 	})
+	onApprovalDuration := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "on_approval_duration_seconds_total",
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
+		Help:      "time spent in consensus matching engine's onApproval method in seconds",
+	})
 	checkSealingDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceConsensus,
 		Subsystem: subsystemMatchEngine,
@@ -56,14 +65,19 @@ func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Subsystem: subsystemCompliance,
 		Help:      "the number of blocks sealed in emergency mode",
 	})
-	registerer.MustRegister(onReceiptDuration, checkSealingDuration, emergencySealedBlocks)
+	registerer.MustRegister(
+		onReceiptDuration,
+		onApprovalDuration,
+		checkSealingDuration,
+		emergencySealedBlocks,
+	)
 	cc := &ConsensusCollector{
 		tracer:                tracer,
 		onReceiptDuration:     onReceiptDuration,
+		onApprovalDuration:    onApprovalDuration,
 		checkSealingDuration:  checkSealingDuration,
 		emergencySealedBlocks: emergencySealedBlocks,
 	}
-
 	return cc
 }
 
@@ -100,4 +114,9 @@ func (cc *ConsensusCollector) EmergencySeal() {
 // IncreaseOnReceiptDuration increases the number of seconds spent processing receipts
 func (cc *ConsensusCollector) IncreaseOnReceiptDuration(duration time.Duration) {
 	cc.onReceiptDuration.Add(duration.Seconds())
+}
+
+// IncreaseOnApprovalDuration increases the number of seconds spent processing approvals
+func (cc *ConsensusCollector) IncreaseOnApprovalDuration(duration time.Duration) {
+	cc.onApprovalDuration.Add(duration.Seconds())
 }

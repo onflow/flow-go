@@ -37,7 +37,8 @@ const (
 	// Consensus matching engine
 	CONMatchCheckSealing SpanName = "con.matching.checkSealing"
 	CONMatchOnReceipt    SpanName = "con.matching.onReceipt"
-	ConMatchOnReceiptVal SpanName = "con.matching.onReceipt.validation"
+	CONMatchOnReceiptVal SpanName = "con.matching.onReceipt.validation"
+	CONMatchOnApproval   SpanName = "con.matching.onApproval"
 
 	CONProcessBlock SpanName = "con.processBlock"
 	// children of CONProcessBlock

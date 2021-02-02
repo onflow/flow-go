@@ -244,8 +244,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	startTime := time.Now()
-	receiptID := receipt.ID()
-	receiptSpan := e.tracer.StartSpan(receiptID, trace.CONMatchOnReceipt)
+	receiptSpan := e.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
 	defer func() {
 		e.metrics.IncreaseOnReceiptDuration(time.Since(startTime))
 		receiptSpan.Finish()
@@ -300,7 +299,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
 	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
 	// eventually request the parent receipt with the `requestPending` function
-	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.ConMatchOnReceiptVal)
+	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
 	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 	childSpan.Finish()
 	if err != nil {
@@ -391,6 +390,13 @@ func (e *Engine) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *ze
 
 // onApproval processes a new result approval.
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+	startTime := time.Now()
+	approvalSpan := e.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
+	defer func() {
+		e.metrics.IncreaseOnApprovalDuration(time.Since(startTime))
+		approvalSpan.Finish()
+	}()
+
 	log := e.log.With().
 		Hex("approval_id", logging.Entity(approval)).
 		Hex("block_id", approval.Body.BlockID[:]).

@@ -146,6 +146,9 @@ type ConsensusMetrics interface {
 
 	// IncreaseOnReceiptDuration increases the number of seconds spent processing receipts
 	IncreaseOnReceiptDuration(duration time.Duration)
+
+	// IncreaseOnApprovalDuration increases the number of seconds spent processing approval
+	IncreaseOnApprovalDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {
