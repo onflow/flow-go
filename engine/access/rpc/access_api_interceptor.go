@@ -12,7 +12,6 @@ type accessAPIInterceptor struct {
 	log zerolog.Logger
 }
 
-// Authorization unary interceptor function to handle authorize per RPC call
 func (interceptor *accessAPIInterceptor) serverInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 	start := time.Now()
 
