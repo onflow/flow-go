@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/concurrent_queue"
+	"github.com/onflow/flow-go/utils/concurrentqueue"
 )
 
 type Event struct {
@@ -20,12 +20,14 @@ type Event struct {
 	Msg      interface{}
 }
 
+// EventProvider is an interface which provides polling mechanism for
+// events that are ready to be processed
 type EventProvider interface {
 	Poll(maxBatchSize int) []*Event
 }
 
 type concurrentQueueProvider struct {
-	q concurrent_queue.ConcurrentQueue
+	q concurrentqueue.ConcurrentQueue
 }
 
 func (c *concurrentQueueProvider) Push(event *Event) {
@@ -44,6 +46,8 @@ func (c *concurrentQueueProvider) Poll(maxBatchSize int) []*Event {
 	return transformed
 }
 
+// EngineContext is a wrapper for matching engine which implements logic for
+// queuing network messages which later will be processed by matching engine.
 type EngineContext struct {
 	log                      zerolog.Logger
 	me                       module.Local

@@ -1,4 +1,4 @@
-package concurrent_queue
+package concurrentqueue
 
 import (
 	"sync"
@@ -12,6 +12,7 @@ type testEntry struct {
 	value       int
 }
 
+// TestSafeQueue checks if `Push` and `Pop` operations work in concurrent environment
 func TestSafeQueue(t *testing.T) {
 	var q ConcurrentQueue
 	workers := 1000
@@ -48,4 +49,29 @@ func TestSafeQueue(t *testing.T) {
 	for _, acc := range r {
 		require.Equal(t, expected, acc)
 	}
+}
+
+// TestPopBatch checks correctness of `PopBatch`.
+func TestPopBatch(t *testing.T) {
+	var q ConcurrentQueue
+	samples := 100
+	for i := 1; i <= samples; i++ {
+		q.Push(i)
+	}
+
+	// (a1 + aN) * N / 2
+	expected := (samples + 1) * samples / 2
+	actual := 0
+	for {
+		v, found := q.PopBatch(11)
+		if !found {
+			break
+		}
+		for _, item := range v {
+			actual += item.(int)
+		}
+	}
+
+	require.Equal(t, 0, q.Len())
+	require.Equal(t, expected, actual)
 }
