@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -123,16 +124,22 @@ func getAccountError(err error) error {
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	var errors *multierror.Error // captures all error except
 	for _, execNode := range execNodes {
+		// TODO: use the GRPC Client interceptor
+		start := time.Now()
+
 		resp, err := b.tryGetAccount(ctx, execNode, req)
+		duration := time.Since(start)
 		if err == nil {
 			// return if any execution node replied successfully
 			b.log.Debug().
 				Str("execution_node", execNode.String()).
 				Hex("block_id", req.GetBlockId()).
 				Hex("address", req.GetAddress()).
+				Dur("rtt", duration).
 				Msg("Successfully got account info")
 			return resp, nil
 		}
+		b.log.Err(err).Dur("rtt", duration).Str("execution_node", execNode.String()).Msg("failed to execute GetAccount")
 		errors = multierror.Append(errors, err)
 	}
 	// if we made it till here means there was at least one error
