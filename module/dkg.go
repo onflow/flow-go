@@ -38,5 +38,5 @@ type DKGContractClient interface {
 	// SubmitResult must be called strictly after the final phase has ended.
 	//
 	// TODO type of DKGResult?
-	SubmitResult(epochCounter uint64, result []byte) error
+	SubmitResult([]crypto.PublicKey) error
 }
