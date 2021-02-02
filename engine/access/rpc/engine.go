@@ -78,27 +78,14 @@ func New(log zerolog.Logger,
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
-	accessAPIIntercepter := accessAPIInterceptor{
-		log: log,
-	}
-
 	if rpcMetricsEnabled {
-		unaryInterceptors := grpc.ChainUnaryInterceptor(grpc_prometheus.UnaryServerInterceptor,
-			accessAPIIntercepter.serverInterceptor)
-
 		grpcOpts = append(
 			grpcOpts,
 			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-			unaryInterceptors,
-		)
-	} else {
-		grpcOpts = append(
-			grpcOpts,
-			grpc.UnaryInterceptor(accessAPIIntercepter.serverInterceptor),
+			grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 		)
 	}
 
-	grpc.ChainStreamInterceptor()
 	grpcServer := grpc.NewServer(grpcOpts...)
 
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
