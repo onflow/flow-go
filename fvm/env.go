@@ -293,7 +293,15 @@ func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, erro
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
 		if addressLocation, ok := location.(common.AddressLocation); ok {
-			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
+			address := flow.BytesToAddress(addressLocation.Address.Bytes())
+
+			freezeError := e.accounts.CheckAccountNotFrozen(address)
+
+			if freezeError != nil {
+				return nil, freezeError
+			}
+
+			e.accounts.TouchContract(addressLocation.Name, address)
 		}
 	}
 

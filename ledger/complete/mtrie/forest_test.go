@@ -899,7 +899,7 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 }
 
 // TestRandomUpdateReadProof repeats a sequence of actions update, read and proof random paths
-// this simulates the common patern of actions on flow
+// this simulates the common pattern of actions on flow
 func TestRandomUpdateReadProof(t *testing.T) {
 	pathByteSize := 2 // path size of 16 bits
 	minPayloadByteSize := 2
