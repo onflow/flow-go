@@ -3,7 +3,11 @@
 package mock
 
 import (
+	crypto "github.com/onflow/flow-go/crypto"
+	flow "github.com/onflow/flow-go/model/flow"
+
 	messages "github.com/onflow/flow-go/model/messages"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -26,13 +30,13 @@ func (_m *DKGContractClient) Broadcast(msg messages.DKGMessage) error {
 	return r0
 }
 
-// ReadBroadcast provides a mock function with given fields: epochCounter, phase
-func (_m *DKGContractClient) ReadBroadcast(epochCounter uint64, phase int) ([]messages.DKGMessage, error) {
-	ret := _m.Called(epochCounter, phase)
+// ReadBroadcast provides a mock function with given fields: fromIndex, referenceBlock
+func (_m *DKGContractClient) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.DKGMessage, error) {
+	ret := _m.Called(fromIndex, referenceBlock)
 
 	var r0 []messages.DKGMessage
-	if rf, ok := ret.Get(0).(func(uint64, int) []messages.DKGMessage); ok {
-		r0 = rf(epochCounter, phase)
+	if rf, ok := ret.Get(0).(func(uint, flow.Identifier) []messages.DKGMessage); ok {
+		r0 = rf(fromIndex, referenceBlock)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]messages.DKGMessage)
@@ -40,8 +44,8 @@ func (_m *DKGContractClient) ReadBroadcast(epochCounter uint64, phase int) ([]me
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64, int) error); ok {
-		r1 = rf(epochCounter, phase)
+	if rf, ok := ret.Get(1).(func(uint, flow.Identifier) error); ok {
+		r1 = rf(fromIndex, referenceBlock)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -49,13 +53,13 @@ func (_m *DKGContractClient) ReadBroadcast(epochCounter uint64, phase int) ([]me
 	return r0, r1
 }
 
-// SubmitResult provides a mock function with given fields: epochCounter, result
-func (_m *DKGContractClient) SubmitResult(epochCounter uint64, result []byte) error {
-	ret := _m.Called(epochCounter, result)
+// SubmitResult provides a mock function with given fields: _a0
+func (_m *DKGContractClient) SubmitResult(_a0 []crypto.PublicKey) error {
+	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64, []byte) error); ok {
-		r0 = rf(epochCounter, result)
+	if rf, ok := ret.Get(0).(func([]crypto.PublicKey) error); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
 	}

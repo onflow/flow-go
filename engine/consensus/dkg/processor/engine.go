@@ -28,10 +28,8 @@ type Engine struct {
 	msgCh             chan msg.DKGMessage
 	committee         flow.IdentifierList
 	myIndex           int
-	epochCounter      uint64
-	epochCounterLock  sync.Mutex
-	dkgPhase          msg.DKGPhase
-	dkgPhaseLock      sync.Mutex
+	dkgInstanceID     string
+	dkgInstanceIDLock sync.Mutex
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -46,7 +44,7 @@ func New(
 	msgCh chan msg.DKGMessage,
 	committee flow.IdentifierList,
 	dkgContractClient module.DKGContractClient,
-	epochCounter uint64) (*Engine, error) {
+	dkgInstanceID string) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
 
@@ -68,7 +66,7 @@ func New(
 		msgCh:             msgCh,
 		committee:         committee,
 		myIndex:           index,
-		epochCounter:      epochCounter,
+		dkgInstanceID:     dkgInstanceID,
 		dkgContractClient: dkgContractClient,
 	}
 
@@ -81,34 +79,18 @@ func New(
 	return &eng, nil
 }
 
-// SetEpoch changes the epoch counter of the engine and resets the phase to
-// Phase1.
-func (e *Engine) SetEpoch(epochCounter uint64) {
-	e.epochCounterLock.Lock()
-	e.epochCounter = epochCounter
-	e.epochCounterLock.Unlock()
-	e.SetPhase(msg.DKGPhase1)
+// SetDKGInstanceID changes the DKG instance identifier of the engine.
+func (e *Engine) SetDKGInstanceID(value string) {
+	e.dkgInstanceIDLock.Lock()
+	defer e.dkgInstanceIDLock.Unlock()
+	e.dkgInstanceID = value
 }
 
-// GetEpoch returns the current epoch counter.
-func (e *Engine) GetEpoch() uint64 {
-	e.epochCounterLock.Lock()
-	defer e.epochCounterLock.Unlock()
-	return e.epochCounter
-}
-
-// SetPhase changes the dkg phase of the engine.
-func (e *Engine) SetPhase(phase msg.DKGPhase) {
-	e.dkgPhaseLock.Lock()
-	defer e.dkgPhaseLock.Unlock()
-	e.dkgPhase = phase
-}
-
-// GetPhase returns the current dkg phase.
-func (e *Engine) GetPhase() msg.DKGPhase {
-	e.dkgPhaseLock.Lock()
-	e.dkgPhaseLock.Unlock()
-	return e.dkgPhase
+// GetDKGInstanceID returns the currenty DKG instance identifier.
+func (e *Engine) GetDKGInstanceID() string {
+	e.dkgInstanceIDLock.Lock()
+	defer e.dkgInstanceIDLock.Unlock()
+	return e.dkgInstanceID
 }
 
 // Ready implements the module ReadyDoneAware interface. It returns a channel
@@ -160,10 +142,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// TODO: should check Phase?
 func (e *Engine) onMessage(originID flow.Identifier, msg msg.DKGMessage) error {
-	if currentEpoch := e.GetEpoch(); currentEpoch != msg.EpochCounter {
-		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, currentEpoch)
+	if currentDKG := e.GetDKGInstanceID(); currentDKG != msg.DKGInstanceID {
+		return fmt.Errorf("wrong DKG instance ID. Got %v, want %v", msg.DKGInstanceID, currentDKG)
 	}
 	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
 		return fmt.Errorf("origin id out of range: %d", msg.Orig)
@@ -182,7 +163,7 @@ Implement DKGProcessor
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 // PrivateSend sends a DKGMessage to a destination over a private channel. It
-// appends the current Epoch ID to the message.
+// appends the current DKG instance ID to the message.
 func (e *Engine) PrivateSend(dest int, data []byte) {
 	if dest >= len(e.committee) || dest < 0 {
 		e.log.Error().Msgf("destination id out of range: %d", dest)
@@ -192,8 +173,7 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.GetEpoch(),
-		e.GetPhase(),
+		e.GetDKGInstanceID(),
 	)
 	err := e.conduit.Unicast(dkgMessage, destID)
 	if err != nil {
@@ -207,8 +187,7 @@ func (e *Engine) Broadcast(data []byte) {
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.GetEpoch(),
-		e.GetPhase(),
+		e.GetDKGInstanceID(),
 	)
 	err := e.dkgContractClient.Broadcast(dkgMessage)
 	if err != nil {
