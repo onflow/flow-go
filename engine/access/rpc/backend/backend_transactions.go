@@ -90,18 +90,25 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
 
-	var sendErrors error
+	var sendErrors *multierror.Error
+	logAnyError := func() {
+		err = sendErrors.ErrorOrNil()
+		if err != nil {
+			b.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
+		}
+	}
+	defer logAnyError()
 
 	// try sending the transaction to one of the chosen collection nodes
 	for _, addr := range collAddrs {
 		err = b.sendTransactionToCollector(ctx, tx, addr)
-		if err != nil {
-			sendErrors = multierror.Append(sendErrors, err)
-		} else {
+		if err == nil {
 			return nil
 		}
+		sendErrors = multierror.Append(sendErrors, err)
 	}
-	return sendErrors
+
+	return sendErrors.ErrorOrNil()
 }
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
