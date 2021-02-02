@@ -41,14 +41,14 @@ func (suite *TopologyTestSuite) SetupTest() {
 
 	suite.linearFanoutTop = func(t *testing.T, identifier flow.Identifier, state protocol.State,
 		manager network.SubscriptionManager) network.Topology {
-		top, err := topology.NewTopicBasedTopology(identifier, suite.logger, state, manager)
+		top, err := topology.NewTopicBasedTopology(identifier, suite.logger, state)
 		require.NoError(t, err)
 
 		return top
 	}
 
 	suite.randomizedTop = func(t *testing.T, identifier flow.Identifier, state protocol.State, manager network.SubscriptionManager) network.Topology {
-		top, err := topology.NewRandomizedTopology(identifier, suite.logger, 0.05, state, manager)
+		top, err := topology.NewRandomizedTopology(identifier, suite.logger, 0.05, state)
 		require.NoError(t, err)
 
 		return top
@@ -220,11 +220,11 @@ func (suite *TopologyTestSuite) topologyScenario(constructorFunc factory, me flo
 	ids flow.IdentityList,
 	state protocol.State) flow.IdentityList {
 
-	// creates topology of the node
-	top := constructorFunc(suite.T(), me, state, subMngr)
+	// creates topology of the node as a topology cache.
+	top := topology.NewCache(suite.logger, constructorFunc(suite.T(), me, state, subMngr))
 
-	// generates topology of node
-	myFanout, err := top.GenerateFanout(ids)
+	// generates topology of node.
+	myFanout, err := top.GenerateFanout(ids, subMngr.Channels())
 	require.NoError(suite.T(), err)
 
 	return myFanout

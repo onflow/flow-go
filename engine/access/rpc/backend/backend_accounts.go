@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 
+	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,9 +15,11 @@ import (
 )
 
 type backendAccounts struct {
-	state        protocol.State
-	executionRPC execproto.ExecutionAPIClient
-	headers      storage.Headers
+	state              protocol.State
+	staticExecutionRPC execproto.ExecutionAPIClient
+	headers            storage.Headers
+	executionReceipts  storage.ExecutionReceipts
+	connFactory        ConnectionFactory
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -76,14 +79,27 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	exeRes, err := b.executionRPC.GetAccountAtBlockID(ctx, &exeReq)
-	if err != nil {
-		errStatus, _ := status.FromError(err)
-		if errStatus.Code() == codes.NotFound {
-			return nil, err
+	var exeRes *execproto.GetAccountAtBlockIDResponse
+	var err error
+
+	if b.staticExecutionRPC != nil {
+
+		exeRes, err = b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
+		if err != nil {
+			convertedErr := getAccountError(err)
+			return nil, convertedErr
+		}
+	} else {
+
+		execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
 		}
 
-		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
+		exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	account, err := convert.MessageToAccount(exeRes.GetAccount())
@@ -92,4 +108,50 @@ func (b *backendAccounts) getAccountAtBlockID(
 	}
 
 	return account, nil
+}
+
+func getAccountError(err error) error {
+	errStatus, _ := status.FromError(err)
+	if errStatus.Code() == codes.NotFound {
+		return err
+	}
+	return status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
+}
+
+func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+	var errors *multierror.Error // captures all error except
+	for _, execNode := range execNodes {
+		resp, err := b.tryGetAccount(ctx, execNode, req)
+		if err == nil {
+			// return if any execution node replied successfully
+			return resp, nil
+		}
+		errors = multierror.Append(errors, err)
+	}
+	// if we made it till here means there was at least one error
+	errToReturn := errors.ErrorOrNil()
+
+	// if there were an any errors other than codes.NotFound, return those
+	for _, err := range errors.Errors {
+		errStatus, _ := status.FromError(err)
+		if errStatus.Code() != codes.NotFound {
+			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", errToReturn)
+		}
+	}
+
+	// if all errors were codes.NotFound, then return a codes.NotFound error wrapping all those error
+	return nil, status.Errorf(codes.NotFound, "failed to get account from the execution node: %v", errToReturn)
+}
+
+func (b *backendAccounts) tryGetAccount(ctx context.Context, execNode *flow.Identity, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, err
+	}
+	defer closer.Close()
+	resp, err := execRPCClient.GetAccountAtBlockID(ctx, &req)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }

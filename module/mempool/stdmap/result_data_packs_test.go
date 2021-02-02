@@ -19,9 +19,7 @@ var _ mempool.ResultDataPacks = (*stdmap.ResultDataPacks)(nil)
 func TestAddByID(t *testing.T) {
 	results := stdmap.NewResultDataPacks(10)
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: flow.Identifier{0xbb},
-		},
+		BlockID: flow.Identifier{0xbb},
 	}
 	pending := &verification.ResultDataPack{
 		ExecutorID:      flow.Identifier{0xaa},
@@ -47,9 +45,7 @@ func TestConcurrency(t *testing.T) {
 		go func(i int) {
 			header := &flow.Header{View: uint64(i)}
 			result := &flow.ExecutionResult{
-				ExecutionResultBody: flow.ExecutionResultBody{
-					BlockID: header.ID(),
-				},
+				BlockID: header.ID(),
 			}
 			pending := &verification.ResultDataPack{
 				ExecutorID:      flow.Identifier{0xaa},
@@ -73,9 +69,7 @@ func TestEjection(t *testing.T) {
 	for i := 0; i < int(size)+1; i++ {
 		header := &flow.Header{View: uint64(i)}
 		result := &flow.ExecutionResult{
-			ExecutionResultBody: flow.ExecutionResultBody{
-				BlockID: header.ID(),
-			},
+			BlockID: header.ID(),
 		}
 		rdp := &verification.ResultDataPack{
 			ExecutorID:      flow.Identifier{0xaa},

@@ -246,10 +246,8 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 		// ExecutionResult setup
 		result := flow.ExecutionResult{
-			ExecutionResultBody: flow.ExecutionResultBody{
-				BlockID: blockID,
-				Chunks:  flow.ChunkList{&chunk},
-			},
+			BlockID: blockID,
+			Chunks:  flow.ChunkList{&chunk},
 		}
 
 		verifiableChunkData = verification.VerifiableChunkData{

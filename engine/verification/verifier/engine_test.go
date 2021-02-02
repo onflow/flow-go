@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -26,21 +27,24 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net     *mockmodule.Network
-	tracer  realModule.Tracer
-	state   *protocol.State
-	ss      *protocol.Snapshot
-	me      *mocklocal.MockLocal
-	sk      crypto.PrivateKey
-	hasher  hash.Hasher
-	chain   flow.Chain
-	con     *mocknetwork.Conduit            // mocks con for submitting result approvals
-	metrics *mockmodule.VerificationMetrics // mocks performance monitoring metrics
+	net       *mockmodule.Network
+	tracer    realModule.Tracer
+	state     *protocol.State
+	ss        *protocol.Snapshot
+	me        *mocklocal.MockLocal
+	sk        crypto.PrivateKey
+	hasher    hash.Hasher
+	chain     flow.Chain
+	pushCon   *mocknetwork.Conduit // mocks con for submitting result approvals
+	pullCon   *mocknetwork.Conduit
+	metrics   *mockmodule.VerificationMetrics // mocks performance monitoring metrics
+	approvals *mockstorage.ResultApprovals
 }
 
 func TestVerifierEngine(t *testing.T) {
@@ -53,12 +57,21 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 	suite.net = &mockmodule.Network{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
-	suite.con = &mocknetwork.Conduit{}
+	suite.pushCon = &mocknetwork.Conduit{}
+	suite.pullCon = &mocknetwork.Conduit{}
 	suite.metrics = &mockmodule.VerificationMetrics{}
 	suite.chain = flow.Testnet.Chain()
+	suite.approvals = &mockstorage.ResultApprovals{}
+
+	suite.approvals.On("Store", mock.Anything).Return(nil)
+	suite.approvals.On("Index", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	suite.net.On("Register", engine.PushApprovals, testifymock.Anything).
-		Return(suite.con, nil).
+		Return(suite.pushCon, nil).
+		Once()
+
+	suite.net.On("Register", engine.ProvideApprovalsByChunk, testifymock.Anything).
+		Return(suite.pullCon, nil).
 		Once()
 
 	suite.state.On("Final").Return(suite.ss)
@@ -86,7 +99,15 @@ func (suite *VerifierEngineTestSuite) SetupTest() {
 }
 
 func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
-	e, err := verifier.New(zerolog.Logger{}, suite.metrics, suite.tracer, suite.net, suite.state, suite.me, ChunkVerifierMock{})
+	e, err := verifier.New(
+		zerolog.Logger{},
+		suite.metrics,
+		suite.tracer,
+		suite.net,
+		suite.state,
+		suite.me,
+		ChunkVerifierMock{},
+		suite.approvals)
 	require.Nil(suite.T(), err)
 
 	suite.net.AssertExpectations(suite.T())
@@ -135,7 +156,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	// emission of result approval
 	suite.metrics.On("OnResultApproval").Return()
 
-	suite.con.
+	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
@@ -158,7 +179,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	err := eng.Process(myID, vChunk)
 	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
-	suite.con.AssertExpectations(suite.T())
+	suite.pushCon.AssertExpectations(suite.T())
 
 }
 
@@ -176,7 +197,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 	suite.metrics.On("OnVerifiableChunkReceived").Return()
 
 	// we shouldn't receive any result approval
-	suite.con.
+	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
