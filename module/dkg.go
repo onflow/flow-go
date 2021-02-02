@@ -29,7 +29,7 @@ type DKGContractClient interface {
 	//
 	// OPTIONAL: add a messageIndex parameter to only receive messages we have
 	// not already received in previous calls
-	ReadBroadcast(epochCounter uint64, phase messages.DKGPhase) ([]messages.DKGMessage, error)
+	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.DKGMessage, error)
 
 	// SubmitResult submits the final public result of the DKG protocol. This
 	// represents the node's local computation of the public keys for each
