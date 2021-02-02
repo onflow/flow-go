@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -477,7 +478,14 @@ func (e *Engine) checkSealing() {
 }
 
 func (e *Engine) checkingSealing() error {
-	start := time.Now()
+	startTime := time.Now()
+	sealingSpan, _ := e.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealing)
+	defer func() {
+		e.metrics.IncreaseCheckSealingDuration(time.Since(startTime))
+		sealingSpan.Finish()
+	}()
+
+	sealableResultsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingSealableResults)
 
 	// get all results that have collected enough approvals on a per-chunk basis
 	sealableResults, err := e.sealableResults()
@@ -488,8 +496,7 @@ func (e *Engine) checkingSealing() error {
 	// skip if no results can be sealed yet
 	if len(sealableResults) == 0 {
 		return nil
-	}
-	if len(sealableResults) > 0 {
+	} else {
 		e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
 	}
 	// log warning if we are going to overflow the seals mempool
@@ -505,7 +512,7 @@ func (e *Engine) checkingSealing() error {
 		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
 		// start a child span that will run until this function returns.
 		if span, ok := e.tracer.GetSpan(incorporatedResult.Result.BlockID, trace.CONProcessBlock); ok {
-			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(start))
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
 			defer childSpan.Finish()
 		}
 
@@ -518,7 +525,7 @@ func (e *Engine) checkingSealing() error {
 			// For each collection, we load the trace.CONProcessCollection span. If we find it, we start a child span
 			// that will run until this function returns.
 			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
-				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(start))
+				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
 				defer childSpan.Finish()
 			}
 		}
@@ -546,13 +553,8 @@ func (e *Engine) checkingSealing() error {
 
 	e.log.Debug().Int("sealed", len(sealedResultIDs)).Msg("sealed execution results")
 
-	// clear the memory pools
-	err = e.clearPools(sealedResultIDs)
-	if err != nil {
-		return fmt.Errorf("failed to clean mempools: %w", err)
-	}
-
 	// finish tracing spans
+	sealableResultsSpan.Finish()
 	for _, blockID := range sealedBlockIDs {
 		index, err := e.indexDB.ByBlockID(blockID)
 		if err != nil {
@@ -564,20 +566,30 @@ func (e *Engine) checkingSealing() error {
 		e.tracer.FinishSpan(blockID, trace.CONProcessBlock)
 	}
 
+	// clear the memory pools
+	clearPoolsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingClearPools)
+	err = e.clearPools(sealedResultIDs)
+	clearPoolsSpan.Finish()
+	if err != nil {
+		return fmt.Errorf("failed to clean mempools: %w", err)
+	}
+
 	// request execution receipts for unsealed finalized blocks
+	requestReceiptsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
 	err = e.requestPendingReceipts()
+	requestReceiptsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
 
 	// request result approvals for pending incorporated results
+	requestApprovalsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingApprovals)
 	err = e.requestPendingApprovals()
+	requestApprovalsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
 	}
 
-	// record duration of check sealing
-	e.metrics.CheckSealingDuration(time.Since(start))
 	return nil
 }
 

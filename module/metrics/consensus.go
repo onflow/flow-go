@@ -26,14 +26,14 @@ const (
 type ConsensusCollector struct {
 	tracer *trace.OpenTracer
 
-	// The duration of onReceipt excluding checkSealing
+	// Total time spent in onReceipt excluding checkSealing
 	onReceiptDuration prometheus.Counter
 
-	// The duration of onApproval excluding checkSealig
+	// Total time spent in onApproval excluding checkSealing
 	onApprovalDuration prometheus.Counter
 
-	// The duration of the full sealing check
-	checkSealingDuration prometheus.Histogram
+	// Total time spent in checkSealing
+	checkSealingDuration prometheus.Counter
 
 	// The number of emergency seals
 	emergencySealedBlocks prometheus.Counter
@@ -53,11 +53,11 @@ func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Regis
 		Subsystem: subsystemMatchEngine,
 		Help:      "time spent in consensus matching engine's onApproval method in seconds",
 	})
-	checkSealingDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+	checkSealingDuration := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "check_sealing_duration_seconds_total",
 		Namespace: namespaceConsensus,
 		Subsystem: subsystemMatchEngine,
-		Name:      "check_sealing_duration_s",
-		Help:      "duration of consensus match engine sealing check in seconds",
+		Help:      "time spent in consensus matching engine's checkSealing method in seconds",
 	})
 	emergencySealedBlocks := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "emergency_sealed_blocks_total",
@@ -101,11 +101,6 @@ func (cc *ConsensusCollector) FinishBlockToSeal(blockID flow.Identifier) {
 	cc.tracer.FinishSpan(blockID, consensusBlockToSeal)
 }
 
-// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
-func (cc *ConsensusCollector) CheckSealingDuration(duration time.Duration) {
-	cc.checkSealingDuration.Observe(duration.Seconds())
-}
-
 // EmergencySeal increments the counter of emergency seals.
 func (cc *ConsensusCollector) EmergencySeal() {
 	cc.emergencySealedBlocks.Inc()
@@ -119,4 +114,9 @@ func (cc *ConsensusCollector) IncreaseOnReceiptDuration(duration time.Duration) 
 // IncreaseOnApprovalDuration increases the number of seconds spent processing approvals
 func (cc *ConsensusCollector) IncreaseOnApprovalDuration(duration time.Duration) {
 	cc.onApprovalDuration.Add(duration.Seconds())
+}
+
+// IncreaseCheckSealingDuration increases the number of seconds spent in checkSealing
+func (cc *ConsensusCollector) IncreaseCheckSealingDuration(duration time.Duration) {
+	cc.checkSealingDuration.Add(duration.Seconds())
 }

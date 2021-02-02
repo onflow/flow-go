@@ -34,11 +34,15 @@ const (
 	CONCompOnBlockProposal            SpanName = "con.compliance.onBlockProposal"
 	CONProvOnBlockProposal            SpanName = "con.provider.onBlockProposal"
 
-	// Consensus matching engine
-	CONMatchCheckSealing SpanName = "con.matching.checkSealing"
-	CONMatchOnReceipt    SpanName = "con.matching.onReceipt"
-	CONMatchOnReceiptVal SpanName = "con.matching.onReceipt.validation"
-	CONMatchOnApproval   SpanName = "con.matching.onApproval"
+	// Matching engine
+	CONMatchCheckSealing                        SpanName = "con.matching.checkSealing"
+	CONMatchCheckSealingSealableResults         SpanName = "con.matching.checkSealing.sealableResults"
+	CONMatchCheckSealingClearPools              SpanName = "con.matching.checkSealing.clearPools"
+	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.matching.checkSealing.requestPendingReceipts"
+	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.matching.checkSealing.requestPendingApprovals"
+	CONMatchOnReceipt                           SpanName = "con.matching.onReceipt"
+	CONMatchOnReceiptVal                        SpanName = "con.matching.onReceipt.validation"
+	CONMatchOnApproval                          SpanName = "con.matching.onApproval"
 
 	CONProcessBlock SpanName = "con.processBlock"
 	// children of CONProcessBlock
