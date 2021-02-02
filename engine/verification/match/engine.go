@@ -1,6 +1,7 @@
 package match
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -222,7 +223,21 @@ func (e *Engine) processChunk(c *flow.Chunk, resultID flow.Identifier) error {
 	// chunk data pack request will only be sent to executors who produced the same result,
 	// never to who produced different results.
 	status := NewChunkStatus(c, resultID, agrees, disagrees)
-	e.pendingChunks.Add(status)
+	added := e.pendingChunks.Add(status)
+	if !added {
+		return nil
+	}
+
+	err = e.requestChunkDataPack(status)
+	if err != nil {
+		// TODO: log.Warn().Msg("could not request chunk data pack")
+		return nil
+	}
+
+	exists := e.pendingChunks.IncrementAttempt(c.ID())
+	if !exists {
+		return nil
+	}
 
 	// requesting a chunk data pack is async, when we receive it
 	// we will resume processing, and eventually call FinishProcessing
@@ -230,9 +245,7 @@ func (e *Engine) processChunk(c *flow.Chunk, resultID flow.Identifier) error {
 	// in case we never receive the chunk data pack response, we need
 	// to make sure FinishProcessing is still called, because the
 	// consumer is still waiting for it to report finish processing,
-}
-
-func (e *Engine) processChunk(c *flow.Chunk) error {
+	return nil
 }
 
 func blockIsSealed(state protocol.State, headers storage.Headers, blockID flow.Identifier) (bool, error) {
@@ -414,7 +427,7 @@ func (e *Engine) onTimer() {
 
 		err := e.requestChunkDataPack(chunk)
 		if err != nil {
-			log.Warn().Msg("could not request chunk data pack")
+			log.Warn().Err(err).Msg("could not request chunk data pack")
 			continue
 		}
 
@@ -441,68 +454,223 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
-	// find other execution nodes
-	others, err := e.state.Final().
-		Identities(filter.And(
-			filter.HasRole(flow.RoleExecution),
-			filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))))
+	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
-		return fmt.Errorf("could not find other execution nodes identities: %w", err)
+		return fmt.Errorf("could not find executors: %w", err)
 	}
 
-	targetIDs := []flow.Identifier{c.ExecutorID}
+	targetIDs := chooseChunkDataPackTarget(allExecutors, c.Agrees, c.Disagrees)
 
-	// request chunk data pack from another execution node if exists as backup
-	if len(others) > 0 {
-		other := others.Sample(1).NodeIDs()[0]
-		targetIDs = append(targetIDs, other)
-	}
+	// err :=
+	//
+	// // find other execution nodes
+	// others, err := e.state.Final().
+	// 	Identities(filter.And(
+	// 		filter.HasRole(flow.RoleExecution),
+	// 		filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))))
+	// if err != nil {
+	// 	return fmt.Errorf("could not find other execution nodes identities: %w", err)
+	// }
+	//
+	// targetIDs := []flow.Identifier{c.ExecutorID}
+	//
+	// // request chunk data pack from another execution node if exists as backup
+	// if len(others) > 0 {
+	// 	other := others.Sample(1).NodeIDs()[0]
+	// 	targetIDs = append(targetIDs, other)
+	// }
 
 	// publishes the chunk data request to the network
 	err = e.con.Publish(req, targetIDs...)
 	if err != nil {
-		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
+		return fmt.Errorf(
+			"could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
 
 	return nil
 }
 
-// handleChunk handles a chunk by creating a
-// chunk status for the chunk and adds it to the pending chunks mempool to be processed by onTimer
-func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, executorID flow.Identifier) {
-	chunkID := chunk.ID()
-	status := NewChunkStatus(chunk, resultID, executorID)
-	added := e.pendingChunks.Add(status)
-	if !added {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
-			Msg("could not add chunk status to pendingChunks mempool")
-		return
+func chooseChunkDataPackTarget(
+	allExecutors flow.IdentityList,
+	agrees []flow.Identifier,
+	disagrees []flow.Identifier,
+) []flow.Identifier {
+	// if there are enough execution produced the same result (agrees), we will
+	// randomly pick 2 from them
+	if len(agrees) >= 2 {
+		return allExecutors.Filter(filter.HasNodeID(agrees...)).Sample(2).NodeIDs()
 	}
 
-	// attachs the chunk ID to its result ID for sake of memory cleanup tracking
-	err := e.chunkIdsByResult.Append(resultID, chunkID)
+	// since there is at least one agree, then usually, we just need one extra node
+	// as a backup.
+	// we pick the one extra node randomly from the rest nodes who we haven't received
+	// its receipt.
+	// In the case where all other ENs has produced different results, then we will only
+	// fetch from the one produced the same result (the only agree)
+	need := uint(2 - len(agrees))
+
+	nonResponders := allExecutors.Filter(
+		filter.Not(filter.HasNodeID(disagrees...))).Sample(need).NodeIDs()
+
+	return append(agrees, nonResponders...)
+}
+
+func (e *Engine) onChunkDataPack(
+	originID flow.Identifier,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+) error {
+	chunkID := chunkDataPack.ChunkID
+
+	// make sure we still need it
+	status, exists := e.pendingChunks.ByID(chunkID)
+	if !exists {
+		return engine.NewInvalidInputErrorf(
+			"chunk's data pack is no longer needed, chunk id: %v", chunkID)
+	}
+
+	chunk := status.Chunk
+
+	// make sure the chunk data pack is valid
+	err := e.validateChunkDataPack(
+		chunk, originID, chunkDataPack, collection)
 	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
-			Msg("could not append chunk id to its result id")
-		return
+		return engine.NewInvalidInputErrorf(
+			"invalid chunk data pack for chunk: %v block: %v", chunkID, chunk.BlockID)
 	}
 
-	e.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Hex("result_id", logging.ID(status.ExecutionResultID)).
-		Msg("chunk marked assigned to this verification node")
+	// make sure we won't process duplicated chunk data pack
+	removed := e.pendingChunks.Rem(chunkID)
+	if !removed {
+		return engine.NewInvalidInputErrorf(
+			"chunk not found in mempool, likely a race condition, chunk id: %v", chunkID)
+	}
+
+	// whenever we removed a chunk from pending chunks, we need to
+	// report that the job has been finished
+	defer e.finishProcessing.FinishProcessing(chunkID)
+
+	header, err := e.headers.ByBlockID(chunk.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get block header: %w", err)
+	}
+
+	resultID := status.ExecutionResultID
+	result, err := e.getResultByID(chunk.BlockID, resultID)
+	if err != nil {
+		return fmt.Errorf("could not get result by id %v: %w", resultID, err)
+	}
+
+	vchunk, err := e.makeVerifiableChunkData(
+		chunk, header, result, chunkDataPack, collection)
+
+	if err != nil {
+		return fmt.Errorf("could not make verifiable chunk data: %w", err)
+	}
+
+	err = e.verifier.ProcessLocal(vchunk)
+	if err != nil {
+		return fmt.Errorf("verifier could not verify chunk: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) validateChunkDataPack(
+	chunk *flow.Chunk,
+	senderID flow.Identifier,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+) error {
+	// 1. sender must be an execution node at that block
+	blockID := chunk.BlockID
+	sender, err := e.state.AtBlockID(blockID).Identity(senderID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return engine.NewInvalidInputErrorf("sender is usntaked: %v", senderID)
+	}
+
+	if err != nil {
+		return fmt.Errorf("could not find identity for chunk: %w", err)
+	}
+
+	if sender.Role != flow.RoleExecution {
+		return engine.NewInvalidInputErrorf("sender is not execution node: %v", sender.Role)
+	}
+
+	// 2. start state must match
+	if !bytes.Equal(chunkDataPack.StartState, chunk.ChunkBody.StartState) {
+		return engine.NewInvalidInputErrorf(
+			"expecting chunk data pakc's start state: %v, but got: %v",
+			chunk.ChunkBody.StartState, chunkDataPack.StartState)
+	}
+
+	// 3. collection id must match
+	collID := collection.ID()
+	if chunkDataPack.CollectionID != collID {
+		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v",
+			chunkDataPack.CollectionID, collID)
+	}
+
+	return nil
+}
+
+func (e *Engine) getResultByID(blockID flow.Identifier, resultID flow.Identifier) (*flow.ExecutionResult, error) {
+	receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get receipts by block ID: %w", err)
+	}
+
+	for _, receipt := range receipts {
+		if receipt.ExecutionResult.ID() == resultID {
+			return &receipt.ExecutionResult, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no receipt found for the result %v", blockID)
+}
+
+func (e *Engine) makeVerifiableChunkData(
+	chunk *flow.Chunk,
+	header *flow.Header,
+	result *flow.ExecutionResult,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+) (*verification.VerifiableChunkData, error) {
+
+	// system chunk is the last chunk
+	isSystemChunk := IsSystemChunk(chunk.Index, result)
+	// computes the end state of the chunk
+	var endState flow.StateCommitment
+	if isSystemChunk {
+		// last chunk in a result is the system chunk and takes final state commitment
+		var ok bool
+		endState, ok = result.FinalStateCommitment()
+		if !ok {
+			return nil, fmt.Errorf("fatal: can not read final state commitment, likely a bug")
+		}
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.Chunks[chunk.Index+1].StartState
+	}
+
+	return &verification.VerifiableChunkData{
+		IsSystemChunk: isSystemChunk,
+		Chunk:         chunk,
+		Header:        header,
+		Result:        result,
+		Collection:    collection,
+		ChunkDataPack: chunkDataPack,
+		EndState:      endState,
+	}, nil
 }
 
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
 // VerifiableChunk, and pass it to the verifier engine to verify
-func (e *Engine) handleChunkDataPack(originID flow.Identifier,
+func (e *Engine) handleChunkDataPack(
+	originID flow.Identifier,
 	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection) error {
+	collection *flow.Collection,
+) error {
 	start := time.Now()
 
 	chunkID := chunkDataPack.ChunkID
@@ -686,9 +854,5 @@ func CanTry(maxAttempt int, chunk *ChunkStatus) bool {
 // In the current version, a chunk is a system chunk if it is the last chunk of the
 // execution result.
 func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
-	if chunkIndex == uint64(len(result.Chunks)-1) {
-		return true
-	} else {
-		return false
-	}
+	return chunkIndex == uint64(len(result.Chunks)-1)
 }
