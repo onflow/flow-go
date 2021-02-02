@@ -135,7 +135,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 				Str("execution_node", execNode.String()).
 				Hex("block_id", req.GetBlockId()).
 				Hex("address", req.GetAddress()).
-				Dur("rtt", duration).
+				Int64("rtt_ms", duration.Milliseconds()).
 				Msg("Successfully got account info")
 			return resp, nil
 		}
@@ -143,7 +143,7 @@ func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNode
 			Str("execution_node", execNode.String()).
 			Hex("block_id", req.GetBlockId()).
 			Hex("address", req.GetAddress()).
-			Dur("rtt", duration).
+			Int64("rtt_ms", duration.Milliseconds()).
 			Err(err).
 			Msg("failed to execute GetAccount")
 		errors = multierror.Append(errors, err)
