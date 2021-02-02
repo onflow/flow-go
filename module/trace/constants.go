@@ -120,7 +120,9 @@ const (
 
 // Tag names
 const (
-	EXEParseDurationTag     = "runtime.parseTransactionDuration"
-	EXECheckDurationTag     = "runtime.checkTransactionDuration"
-	EXEInterpretDurationTag = "runtime.interpretTransactionDuration"
+	EXEParseDurationTag         = "runtime.parseTransactionDuration"
+	EXECheckDurationTag         = "runtime.checkTransactionDuration"
+	EXEInterpretDurationTag     = "runtime.interpretTransactionDuration"
+	EXEValueEncodingDurationTag = "runtime.encodingValueDuration"
+	EXEValueDecodingDurationTag = "runtime.decodingValueDuration"
 )

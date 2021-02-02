@@ -96,7 +96,8 @@ func TestExtendValid(t *testing.T) {
 		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockReceiptValidator())
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer,
+			util.MockReceiptValidator(), util.MockSealValidator(seals))
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(block.Header)
@@ -315,276 +316,6 @@ func TestExtendInvalidChainID(t *testing.T) {
 	})
 }
 
-// Test that seals are rejected if they correspond to ExecutionResults that are
-// not incorporated in blocks on this fork
-func TestExtendSealNoIncorporatedResult(t *testing.T) {
-	stateRoot := fixtureStateRoot(t)
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
-		block := stateRoot.Block()
-		block1 := unittest.BlockWithParentFixture(block.Header)
-		block1.SetPayload(flow.Payload{})
-		err := state.Extend(&block1)
-		require.NoError(t, err)
-
-		// B-->B1-->B2{Seal(ER1)}
-		//
-		// Should fail because the fork does not contain an IncorporatedResult for the
-		// result (ER1) referenced by the proposed seal.
-		t.Run("no IncorporatedResult", func(t *testing.T) {
-			// create block 2 with a seal for block 1
-			block1Result := unittest.ExecutionResultFixture(unittest.WithBlock(&block1))
-			block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(block1Result))
-
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{block1Seal},
-			})
-			err = state.Extend(&block2)
-
-			// we expect an error because there is no block on the fork that
-			// contains a receipt committing to block1
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
-
-		// B-->B1-->B2{ER1a}-->B3{Seal(ER1b)}
-		//
-		// Should fail because ER1a is different than ER1b, although they
-		// reference the same block. Technically the fork does not contain an
-		// IncorporatedResult for the result referenced by the proposed seal.
-		t.Run("different IncorporatedResult", func(t *testing.T) {
-			// create block2 with an execution receipt for block1
-			block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{block1Receipt},
-			})
-			err = state.Extend(&block2)
-			require.NoError(t, err)
-
-			// create block 3 with a seal for block 1, but DIFFERENT execution
-			// result than that which was included in block1
-			block1Result2 := unittest.ExecutionResultFixture(unittest.WithBlock(&block1))
-			block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(block1Result2))
-
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{block1Seal},
-			})
-			err = state.Extend(&block3)
-
-			// we expect an error because there is no block on the fork that
-			// contains a receipt committing to the seal's result
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
-
-		// B-->B1-->B2-->B4{Seal(ER1)}
-		//      |
-		//      +-->B3{ER1}
-		//
-		// Should fail because the IncorporatedResult referenced by the seal is
-		// on a different fork
-		t.Run("IncorporatedResult in other fork", func(t *testing.T) {
-			// create block2 and block3 as children of block1 (introducing a fork)
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(flow.Payload{})
-			err = state.Extend(&block2)
-			require.NoError(t, err)
-
-			// only block 3 contains the result
-			block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-			block3 := unittest.BlockWithParentFixture(block1.Header)
-			block3.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{block1Receipt},
-			})
-			err = state.Extend(&block3)
-			require.NoError(t, err)
-
-			// create block4 on top of block2 containing a seal for the result
-			// contained on the other fork
-			block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
-			block4 := unittest.BlockWithParentFixture(block2.Header)
-			block4.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{block1Seal},
-			})
-			err = state.Extend(&block4)
-
-			// we expect an error because there is no block on the fork that
-			// contains a receipt committing to the seal's result
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
-	})
-}
-
-// Test that proposed seals are rejected if they do not form a valid chain on
-// top of the last known seal on the branch.
-func TestExtendSealNotConnected(t *testing.T) {
-	// B <- B1 <- B2 <- B3{R(B1), R(B2)} <- B4{S(R(B2))}
-	stateRoot := fixtureStateRoot(t)
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
-		block := stateRoot.Block()
-
-		// insert 2 valid blocks
-		block1 := unittest.BlockWithParentFixture(block.Header)
-		block1.SetPayload(flow.Payload{})
-		err := state.Extend(&block1)
-		require.NoError(t, err)
-
-		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{})
-		err = state.Extend(&block2)
-		require.NoError(t, err)
-
-		// insert block3 with receipts for block1 and block2
-		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-		block2Receipt := unittest.ReceiptForBlockFixture(&block2)
-
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt, block2Receipt},
-		})
-		err = state.Extend(&block3)
-		require.NoError(t, err)
-
-		// Insert block4 with a seal for block 2. Note that there is no seal
-		// for block1. The block should be rejected because it contains a seal
-		// that breaks the chain.
-		block2Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
-
-		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block2Seal},
-		})
-		err = state.Extend(&block4)
-		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
-
-		// verify seal not indexed
-		var sealID flow.Identifier
-		err = db.View(operation.LookupBlockSeal(block2Seal.ID(), &sealID))
-		require.Error(t, err)
-		require.True(t, errors.Is(err, stoerr.ErrNotFound), err)
-	})
-}
-
-// Test that payloads containing duplicate seals are rejected.
-func TestExtendSealDuplicate(t *testing.T) {
-	stateRoot := fixtureStateRoot(t)
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
-		block := stateRoot.Block()
-
-		block1 := unittest.BlockWithParentFixture(block.Header)
-		block1.SetPayload(flow.Payload{})
-		err := state.Extend(&block1)
-		require.NoError(t, err)
-
-		// create block2 with an execution receipt for block1
-		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt},
-		})
-		err = state.Extend(&block2)
-		require.NoError(t, err)
-
-		// create seal for block1
-		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
-
-		// B <- B1 <- B2{R(B1)} <- B3{S(R(B1))} <- B4{S(R(B1))}
-		t.Run("Duplicate seal in separate block", func(t *testing.T) {
-			// insert block3 with a seal for block1
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{block1Seal},
-			})
-			err = state.Extend(&block3)
-			require.NoError(t, err)
-
-			// insert block4 with a duplicate seal
-			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{block1Seal},
-			})
-			err = state.Extend(&block4)
-
-			// we expect an error because block 4 contains a seal that is
-			// already contained in another block on the fork
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
-
-		// B <- B1 <- B2{R(B1)} <- B3{S(R(B1)), S(R(B1))}
-		t.Run("Duplicate seal in same payload", func(t *testing.T) {
-			// insert block3 with 2 identical seals for block1
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{block1Seal, block1Seal},
-			})
-			err = state.Extend(&block3)
-
-			// we expect an error because block 3 contains duplicate seals
-			// within its payload
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
-	})
-}
-
-// Test that Extend will pick the seal corresponding to the highest block when
-// the payload contains multiple seals that are not ordered.
-func TestExtendHighestSeal(t *testing.T) {
-	stateRoot := fixtureStateRoot(t)
-	block1 := stateRoot.Block()
-	block1.Payload.Guarantees = nil
-	block1.Header.PayloadHash = block1.Payload.Hash()
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
-		// create and insert block2
-		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.Payload.Guarantees = nil
-		block2.Header.PayloadHash = block2.Payload.Hash()
-		err := state.Extend(&block2)
-		require.Nil(t, err)
-
-		// create and insert block3 containing a receipt for block2
-		block2Receipt := unittest.ReceiptForBlockFixture(&block2)
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block2Receipt},
-		})
-		err = state.Extend(&block3)
-		require.Nil(t, err)
-
-		// create and insert block4 containing a receipt for block3
-		block3Receipt := unittest.ReceiptForBlockFixture(&block3)
-		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block3Receipt},
-		})
-		err = state.Extend(&block4)
-		require.Nil(t, err)
-
-		// create seals for block2 and block3
-		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
-		seal3 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block3Receipt.ExecutionResult))
-
-		// include the seals in block5
-		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.SetPayload(flow.Payload{
-			// placing seals in the reversed order to test
-			// Extend will pick the highest sealed block
-			Seals: []*flow.Seal{seal3, seal2},
-		})
-		err = state.Extend(&block5)
-		require.Nil(t, err)
-
-		finalCommit, err := state.AtBlockID(block5.ID()).Commit()
-		require.NoError(t, err)
-		require.Equal(t, seal3.FinalState, finalCommit)
-	})
-}
-
 // Test that Extend will refuse payloads that contain duplicate receipts, where
 // duplicates can be in another block on the fork, or within the payload.
 func TestExtendReceiptsDuplicate(t *testing.T) {
@@ -737,6 +468,12 @@ func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
 }
 
 func TestExtendReceiptsNotSorted(t *testing.T) {
+	// Todo: this test needs to be updated:
+	// We don't require the receipts to be sorted by height anymore
+	// We could require an "parent first" ordering, which is less strict than
+	// a full ordering by height
+	t.Skip()
+
 	stateRoot := fixtureStateRoot(t)
 	block1 := stateRoot.Block()
 	block1.Payload.Guarantees = nil
@@ -820,16 +557,12 @@ func TestExtendReceiptsValid(t *testing.T) {
 
 		receipt3a := unittest.ReceiptForBlockFixture(&block3)
 		receipt3b := unittest.ReceiptForBlockFixture(&block3)
-		var altResult flow.ExecutionResult = receipt3b.ExecutionResult // copy
-		altResult.Signatures = unittest.SignaturesFixture(1)
-		receipt3c := unittest.ExecutionReceiptFixture(unittest.WithResult(&altResult))
 
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceipt{
 				receipt3a,
 				receipt3b,
-				receipt3c,
 				unittest.ReceiptForBlockFixture(&block4),
 			},
 		})
@@ -1408,6 +1141,73 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		err = state.Extend(&block4)
 		require.Error(t, err)
+	})
+}
+
+func TestExtendInvalidSealsInBlock(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, _ := storeutil.StorageLayer(t, db)
+
+		// create a event consumer to test epoch transition events
+		distributor := events.NewDistributor()
+		consumer := new(mockprotocol.Consumer)
+		distributor.AddConsumer(consumer)
+
+		block, result, seal := unittest.BootstrapFixture(participants)
+		stateRoot, err := protocol.NewStateRoot(block, result, seal, 0)
+		require.NoError(t, err)
+
+		state, err := protocol.Bootstrap(metrics, db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+		require.NoError(t, err)
+
+		block1 := unittest.BlockWithParentFixture(block.Header)
+		block1.Payload.Guarantees = nil
+		block1.Header.PayloadHash = block1.Payload.Hash()
+
+		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{block1Receipt},
+		})
+
+		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{block1Seal},
+		})
+
+		sealValidator := &mock2.SealValidator{}
+		sealValidator.On("Validate", mock.Anything).
+			Return(func(candidate *flow.Block) *flow.Seal {
+				if candidate.ID() == block3.ID() {
+					return nil
+				}
+				seal, _ := seals.ByBlockID(candidate.Header.ParentID)
+				return seal
+			}, func(candidate *flow.Block) error {
+				if candidate.ID() == block3.ID() {
+					return engine.NewInvalidInputError("")
+				}
+				_, err := seals.ByBlockID(candidate.Header.ParentID)
+				return err
+			}).
+			Times(3)
+
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer,
+			util.MockReceiptValidator(), sealValidator)
+		require.NoError(t, err)
+
+		err = fullState.Extend(&block1)
+		require.NoError(t, err)
+		err = fullState.Extend(&block2)
+		require.NoError(t, err)
+		err = fullState.Extend(&block3)
+
+		sealValidator.AssertExpectations(t)
+		require.Error(t, err)
+		require.True(t, st.IsInvalidExtensionError(err))
 	})
 }
 

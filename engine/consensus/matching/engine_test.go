@@ -5,17 +5,22 @@ package matching
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/storage"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
+	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -54,8 +59,8 @@ func TestMatchingEngine(t *testing.T) {
 type MatchingSuite struct {
 	unittest.BaseChainSuite
 	// misc SERVICE COMPONENTS which are injected into Matching Engine
-	requester        *module.Requester
-	receiptValidator *module.ReceiptValidator
+	requester        *mockmodule.Requester
+	receiptValidator *mockmodule.ReceiptValidator
 
 	// MATCHING ENGINE
 	matching *Engine
@@ -70,30 +75,33 @@ func (ms *MatchingSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
-	ms.requester = new(module.Requester)
-	ms.receiptValidator = &module.ReceiptValidator{}
+	ms.requester = new(mockmodule.Requester)
+	ms.receiptValidator = &mockmodule.ReceiptValidator{}
 
 	ms.matching = &Engine{
-		unit:                    unit,
-		log:                     log,
-		engineMetrics:           metrics,
-		mempool:                 metrics,
-		metrics:                 metrics,
-		state:                   ms.State,
-		requester:               ms.requester,
-		resultsDB:               ms.ResultsDB,
-		headersDB:               ms.HeadersDB,
-		indexDB:                 ms.IndexDB,
-		incorporatedResults:     ms.ResultsPL,
-		receipts:                ms.ReceiptsPL,
-		approvals:               ms.ApprovalsPL,
-		seals:                   ms.SealsPL,
-		isCheckingSealing:       atomic.NewBool(false),
-		requestReceiptThreshold: 10,
-		maxResultsToRequest:     200,
-		assigner:                ms.Assigner,
-		requireApprovals:        true,
-		receiptValidator:        ms.receiptValidator,
+		unit:                                 unit,
+		log:                                  log,
+		engineMetrics:                        metrics,
+		mempool:                              metrics,
+		metrics:                              metrics,
+		state:                                ms.State,
+		receiptRequester:                     ms.requester,
+		receiptsDB:                           ms.ReceiptsDB,
+		headersDB:                            ms.HeadersDB,
+		indexDB:                              ms.IndexDB,
+		incorporatedResults:                  ms.ResultsPL,
+		receipts:                             ms.ReceiptsPL,
+		approvals:                            ms.ApprovalsPL,
+		seals:                                ms.SealsPL,
+		isCheckingSealing:                    atomic.NewBool(false),
+		sealingThreshold:                     10,
+		maxResultsToRequest:                  200,
+		assigner:                             ms.Assigner,
+		receiptValidator:                     ms.receiptValidator,
+		requestTracker:                       NewRequestTracker(1, 3),
+		approvalRequestsThreshold:            10,
+		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+		emergencySealingActive:               false,
 	}
 }
 
@@ -122,64 +130,86 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 	err := ms.matching.onReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for sealed result")
 
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-// Test that we reject receipts that are already pooled
+// Test that we drop receipts that are already pooled
 func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(ms.ExeID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", receipt).Return(nil)
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
 
 	// setup the receipts mempool to check if we attempted to add the receipt to
 	// the mempool, and return false as we are testing the case where it was already in the mempool
-	ms.ReceiptsPL.On("Add", receipt).Return(false).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(false, nil).Once()
 
-	// onReceipt should return immediately after trying to insert the receipt,
+	// onReceipt should return immediately after realizing the receipt is already in the mempool
 	// but without throwing any errors
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should ignore already pending receipt")
 
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Add", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-// try to submit a receipt for an already received result
+// Test that we store different receipts for the same result
 func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	originID := ms.ExeID
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-
-	ms.receiptValidator.On("Validate", receipt).Return(nil)
-
-	// setup the receipts mempool to check if we attempted to add the receipt to
-	// the mempool
-	ms.ReceiptsPL.On("Add", receipt).Return(true).Twice()
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
 
 	// setup the results mempool to check if we attempted to insert the
 	// incorporated result, and return false as if it was already in the mempool
+	// TODO: remove for later sealing phases
 	ms.ResultsPL.
 		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
-		Return(false, nil).Twice()
+		Return(false, nil).Once()
 
-	// onReceipt should return immediately after trying to pool the result, but
-	// without throwing any errors
+	// Expect the receipt to be added to mempool
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for already pending result")
-	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 1)
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
-
-	// resubmit receipt
-	err = ms.matching.onReceipt(receipt.ExecutorID, receipt)
-	ms.Require().NoError(err, "should ignore receipt for already pending result")
+	ms.Require().NoError(err, "should not error for different receipt for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertExpectations(ms.T())
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+}
+
+// TestOnReceipt_ReceiptInPersistentStorage verifies that Matching Engine adds
+// a receipt to the mempool, even if it is already in persistent storage. This
+// can happen after a crash, where the mempools got wiped
+func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
+	originID := ms.ExeID
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(originID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
+	)
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
+
+	// Persistent storage layer for Receipts has the receipt already stored
+	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
+
+	// The receipt should be added to the receipts mempool
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	// The result should be added to the IncorporatedReceipts mempool (shortcut sealing Phase 2b):
+	// TODO: remove for later sealing phases
+	ms.ResultsPL.
+		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
+		Return(true, nil).Once()
+
+	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	ms.Require().NoError(err, "should not error for different receipt for already pending result")
+	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
 // try to submit a receipt that should be valid
@@ -190,10 +220,10 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
 
 	// we expect that receipt is added to mempool
-	ms.ReceiptsPL.On("Add", receipt).Return(true).Once()
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	// setup the results mempool to check if we attempted to add the incorporated result
 	ms.ResultsPL.
@@ -218,14 +248,14 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputError("")).Once()
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 
 	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
 	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
 	ms.Assert().True(engine.IsInvalidInputError(err))
 
 	ms.receiptValidator.AssertExpectations(ms.T())
-	ms.ResultsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -387,137 +417,6 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 	ms.Require().Error(err)
 }
 
-// TestSealableResultsInvalidChunks tests that matching.Engine.sealableResults()
-// performs the following chunk checks on the result:
-//   * the number k of chunks in the execution result equals to
-//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
-//   * for each index idx := 0, 1, ..., k
-//     there exists once chunk
-// Here we test that an IncorporatedResult with too _few_ chunks is not sealed and removed from the mempool
-func (ms *MatchingSuite) TestSealableResults_TooFewChunks() {
-	subgrph := ms.ValidSubgraphFixture()
-	chunks := subgrph.Result.Chunks
-	subgrph.Result.Chunks = chunks[0 : len(chunks)-2] // drop the last chunk
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with too many chunks")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_TooManyChunks tests that matching.Engine.sealableResults()
-// performs the following chunk checks on the result:
-//   * the number k of chunks in the execution result equals to
-//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
-//   * for each index idx := 0, 1, ..., k
-//     there exists once chunk
-// Here we test that an IncorporatedResult with too _many_ chunks is not sealed and removed from the mempool
-func (ms *MatchingSuite) TestSealableResults_TooManyChunks() {
-	subgrph := ms.ValidSubgraphFixture()
-	chunks := subgrph.Result.Chunks
-	subgrph.Result.Chunks = append(chunks, chunks[len(chunks)-1]) // duplicate the last entry
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with too few chunks")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_InvalidChunks tests that matching.Engine.sealableResults()
-// performs the following chunk checks on the result:
-//   * the number k of chunks in the execution result equals to
-//     the number of collections in the corresponding block _plus_ 1 (for system chunk)
-//   * for each index idx := 0, 1, ..., k
-//     there exists once chunk
-// Here we test that an IncorporatedResult with
-//   * correct number of chunks
-//   * but one missing chunk and one duplicated chunk
-// is not sealed and removed from the mempool
-func (ms *MatchingSuite) TestSealableResults_InvalidChunks() {
-	subgrph := ms.ValidSubgraphFixture()
-	chunks := subgrph.Result.Chunks
-	chunks[len(chunks)-2] = chunks[len(chunks)-1] // overwrite second-last with last entry, which is now duplicated
-	// yet we have the correct number of elements in the chunk list
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_NoPayload_MissingChunk tests that matching.Engine.sealableResults()
-// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
-//  * execution receipt with missing system chunk should be rejected
-func (ms *MatchingSuite) TestSealableResults_NoPayload_MissingChunk() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.Block.Payload = nil                                                              // override block's payload to nil
-	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
-	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
-	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[0:0] // empty chunk list
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	// the result should not be matched
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_NoPayload_TooManyChunk tests that matching.Engine.sealableResults()
-// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
-//  * execution receipt with more than one chunk should be rejected
-func (ms *MatchingSuite) TestSealableResults_NoPayload_TooManyChunk() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.Block.Payload = nil                                                              // override block's payload to nil
-	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
-	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
-	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[0:2] // two chunks
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
-// TestSealableResults_NoPayload_WrongIndexChunk tests that matching.Engine.sealableResults()
-// enforces the correct number of chunks for empty blocks, i.e. blocks with no payload:
-//  * execution receipt with a single chunk, but wrong chunk index, should be rejected
-func (ms *MatchingSuite) TestSealableResults_NoPayload_WrongIndexChunk() {
-	subgrph := ms.ValidSubgraphFixture()
-	subgrph.Block.Payload = nil                                                              // override block's payload to nil
-	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.Block.ID()                      // update block's ID
-	subgrph.IncorporatedResult.Result.BlockID = subgrph.Block.ID()                           // update block's ID
-	subgrph.IncorporatedResult.Result.Chunks = subgrph.IncorporatedResult.Result.Chunks[2:2] // chunk with chunkIndex == 2
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	// we expect business logic to remove the incorporated result with failed sub-graph check from mempool
-	ms.ResultsPL.On("Rem", unittest.EntityWithID(subgrph.IncorporatedResult.ID())).Return(true).Once()
-
-	results, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.Assert().Empty(results, "should not select result with invalid chunk list")
-	ms.ResultsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
 // TestSealableResultsUnassignedVerifiers tests that matching.Engine.sealableResults():
 // only considers approvals from assigned verifiers
 func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
@@ -611,9 +510,62 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	ms.Assert().Empty(results, "expecting no sealable result")
 }
 
-// TestRequestReceiptsPendingBlocks tests matching.Engine.requestPending():
+// TestSealableResultsEmergencySealingMultipleCandidates tests matching.Engine.sealableResults():
+// When emergency sealing is active we should be able to identify and pick as candidates incorporated results
+// that are deep enough but still without verifications.
+func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates() {
+	// make sure that emergency sealing is enabled
+	ms.matching.emergencySealingActive = true
+	emergencySealingCandidates := make([]flow.Identifier, 10)
+
+	for i := range emergencySealingCandidates {
+		block := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
+		receipt := unittest.ExecutionReceiptFixture(
+			unittest.WithExecutorID(ms.ExeID),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))))
+		block.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{receipt},
+		})
+		// TODO: replace this with block.ID(), for now IncoroporatedBlockID == ExecutionResult.BlockID
+		emergencySealingCandidates[i] = receipt.ExecutionResult.BlockID
+		ms.Extend(&block)
+		delete(ms.PendingApprovals[receipt.ExecutionResult.ID()], uint64(len(receipt.ExecutionResult.Chunks)-1))
+		ms.LatestFinalizedBlock = &block
+	}
+
+	// at this point we have results without enough approvals
+	// no sealable results expected
+	results, err := ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Assert().Empty(results, "expecting no sealable result")
+
+	// setup a new finalized block which is new enough that satisfies emergency sealing condition
+	for i := 0; i < DefaultEmergencySealingThreshold; i++ {
+		block := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
+		ms.Extend(&block)
+		ms.LatestFinalizedBlock = &block
+	}
+
+	// once emergency sealing is active and ERs are deep enough in chain
+	// we are expecting all stalled seals to be selected as candidates
+	results, err = ms.matching.sealableResults()
+	ms.Require().NoError(err)
+	ms.Require().Equal(len(emergencySealingCandidates), len(results), "expecting valid number of sealable results")
+	for _, id := range emergencySealingCandidates {
+		matched := false
+		for _, ir := range results {
+			if ir.IncorporatedBlockID == id {
+				matched = true
+				break
+			}
+		}
+		ms.Assert().True(matched, "expect to find IR with valid ID")
+	}
+}
+
+// TestRequestPendingReceipts tests matching.Engine.requestPendingReceipts():
 //   * generate n=100 consecutive blocks, where the first one is sealed and the last one is final
-func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
+func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	// create blocks
 	n := 100
 	orderedBlocks := make([]flow.Block, 0, n)
@@ -627,7 +579,7 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 
 	// progress latest sealed and latest finalized:
 	ms.LatestSealedBlock = orderedBlocks[0]
-	ms.LatestFinalizedBlock = orderedBlocks[n-1]
+	ms.LatestFinalizedBlock = &orderedBlocks[n-1]
 
 	// Expecting all blocks to be requested: from sealed height + 1 up to (incl.) latest finalized
 	for i := 1; i < n; i++ {
@@ -636,9 +588,215 @@ func (ms *MatchingSuite) TestRequestReceiptsPendingBlocks() {
 	}
 	ms.SealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
 
-	err := ms.matching.requestPending()
+	err := ms.matching.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.EntityByID(<blockID>, filter.Any) was called
+}
+
+// TestRequestPendingApprovals checks that requests are sent only for chunks
+// that have not collected enough approvals yet, and are sent only to the
+// verifiers assigned to those chunks. It also checks that the threshold and
+// rate limiting is respected.
+func (ms *MatchingSuite) TestRequestPendingApprovals() {
+
+	// n is the total number of blocks and incorporated-results we add to the
+	// chain and mempool
+	n := 100
+
+	// s is the number of incorporated results that have already collected
+	// enough approval for every chunk, so they should not require any approval
+	// requests
+	s := 50
+
+	// create blocks
+	unsealedFinalizedBlocks := make([]flow.Block, 0, n)
+	parentBlock := ms.UnfinalizedBlock
+	for i := 0; i < n; i++ {
+		block := unittest.BlockWithParentFixture(parentBlock.Header)
+		ms.Blocks[block.ID()] = &block
+		unsealedFinalizedBlocks = append(unsealedFinalizedBlocks, block)
+		parentBlock = block
+	}
+
+	// progress latest sealed and latest finalized:
+	ms.LatestSealedBlock = unsealedFinalizedBlocks[0]
+	ms.LatestFinalizedBlock = &unsealedFinalizedBlocks[n-1]
+
+	// add an unfinalized block; it shouldn't require an approval request
+	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock.Header)
+	ms.Blocks[unfinalizedBlock.ID()] = &unfinalizedBlock
+
+	// we will assume that all chunks are assigned to the same two verifiers.
+	verifiers := unittest.IdentifierListFixture(2)
+
+	// the matching engine requires approvals from both verifiers for each chunk
+	ms.matching.requiredApprovalsForSealConstruction = 2
+
+	// expectedRequests collects the set of ApprovalRequests that should be sent
+	expectedRequests := []*messages.ApprovalRequest{}
+
+	// populate the incorporated-results mempool with:
+	// - 50 that have collected two signatures per chunk
+	// - 25 that have collected only one signature
+	// - 25 that have collected no signatures
+	//
+	// each chunk is assigned to both verifiers we defined above
+	//
+	// we populate expectedRequests with requests for chunks that are missing
+	// signatures, and that are below the approval request threshold.
+	//
+	//     sealed          unsealed/finalized
+	// |              ||                        |
+	// 1 <- 2 <- .. <- s <- s+1 <- .. <- n-t <- n
+	//                 |                  |
+	//                    expected reqs
+	for i := 0; i < n; i++ {
+
+		// Create an incorporated result for unsealedFinalizedBlocks[i].
+		// By default the result will contain 17 chunks.
+		ir := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(
+				unittest.ExecutionResultFixture(
+					unittest.WithBlock(&unsealedFinalizedBlocks[i]),
+				),
+			),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(
+				unsealedFinalizedBlocks[i].ID(),
+			),
+		)
+
+		assignment := chunks.NewAssignment()
+
+		for _, chunk := range ir.Result.Chunks {
+
+			// assign the verifier to this chunk
+			assignment.Add(chunk, verifiers)
+			ms.Assigner.On("Assign", ir.Result, ir.IncorporatedBlockID).Return(assignment, nil)
+
+			if i < s {
+				// the first s results receive 2 signatures per chunk
+				ir.AddSignature(chunk.Index, verifiers[0], unittest.SignatureFixture())
+				ir.AddSignature(chunk.Index, verifiers[1], unittest.SignatureFixture())
+			} else {
+				if i < s+25 {
+					// the next 25 have only 1 signature
+					ir.AddSignature(chunk.Index, verifiers[0], unittest.SignatureFixture())
+				}
+				// all these chunks are missing at least one signature so we
+				// expect requests to be sent out if the result's block is below
+				// the threshold
+				if i < n-int(ms.matching.approvalRequestsThreshold) {
+					expectedRequests = append(expectedRequests,
+						&messages.ApprovalRequest{
+							ResultID:   ir.Result.ID(),
+							ChunkIndex: chunk.Index,
+						})
+				}
+			}
+		}
+
+		ms.PendingResults[ir.ID()] = ir
+	}
+
+	// exp is the number of requests that we expect
+	exp := n - s - int(ms.matching.approvalRequestsThreshold)
+
+	// add an incorporated-result for a block that was already sealed. We
+	// expect that no approval requests will be sent for this result, even if it
+	// hasn't collected any approvals yet.
+	sealedBlockIR := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(&ms.LatestSealedBlock),
+			),
+		),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(
+			ms.LatestSealedBlock.ID(),
+		),
+	)
+	ms.PendingResults[sealedBlockIR.ID()] = sealedBlockIR
+
+	// add an incorporated-result for an unfinalized block. It should not
+	// generate any requests either.
+	unfinalizedBlockIR := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(
+			unittest.ExecutionResultFixture(
+				unittest.WithBlock(&unfinalizedBlock),
+			),
+		),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(
+			unfinalizedBlock.ID(),
+		),
+	)
+	ms.PendingResults[unfinalizedBlock.ID()] = unfinalizedBlockIR
+
+	// wire-up the approval requests conduit to keep track of all sent requests
+	// and check that the targets match with the verifiers who haven't signed
+	requests := []*messages.ApprovalRequest{}
+	conduit := &mocknetwork.Conduit{}
+	// mock the Publish method when requests are sent to 2 verifiers
+	conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			// collect the request
+			ar, ok := args[0].(*messages.ApprovalRequest)
+			ms.Assert().True(ok)
+			requests = append(requests, ar)
+		})
+	// mock the Publish method when requests are sent to only 1 verifier (which
+	// should be verifiers[1] by design, because we only included a signature
+	// from verifiers[0])
+	conduit.On("Publish", mock.Anything, mock.Anything).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			// collect the request
+			ar, ok := args[0].(*messages.ApprovalRequest)
+			ms.Assert().True(ok)
+			requests = append(requests, ar)
+
+			// check that the target is the verifier for which the approval is
+			// missing
+			target, ok := args[1].(flow.Identifier)
+			ms.Assert().True(ok)
+			ms.Assert().Equal(verifiers[1], target)
+		})
+	ms.matching.approvalConduit = conduit
+
+	err := ms.matching.requestPendingApprovals()
+	ms.Require().NoError(err)
+
+	// first time it goes through, no requests should be made because of the
+	// blackout period
+	ms.Assert().Len(requests, 0)
+
+	// Check the request tracker
+	ms.Assert().Equal(exp, len(ms.matching.requestTracker.index))
+	for _, expectedRequest := range expectedRequests {
+		requestItem := ms.matching.requestTracker.Get(
+			expectedRequest.ResultID,
+			expectedRequest.ChunkIndex,
+		)
+		ms.Assert().Equal(uint(0), requestItem.Requests)
+	}
+
+	// wait for the max blackout period to elapse and retry
+	time.Sleep(3 * time.Second)
+	err = ms.matching.requestPendingApprovals()
+	ms.Require().NoError(err)
+
+	// now we expect that requests have been sent for the chunks that haven't
+	// collected enough approvals
+	ms.Assert().Len(requests, len(expectedRequests))
+
+	// Check the request tracker
+	ms.Assert().Equal(exp, len(ms.matching.requestTracker.index))
+	for _, expectedRequest := range expectedRequests {
+		requestItem := ms.matching.requestTracker.Get(
+			expectedRequest.ResultID,
+			expectedRequest.ChunkIndex,
+		)
+		ms.Assert().Equal(uint(1), requestItem.Requests)
+	}
 }
 
 // incorporatedResult returns a testify `argumentMatcher` that only accepts an

@@ -147,10 +147,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	}
 
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
-		},
+		BlockID: block.ID(),
+		Chunks:  chunks,
 	}
 
 	receipt := flow.ExecutionReceipt{
@@ -219,10 +217,8 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 	}
 
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: blockID,
-			Chunks:  chunks,
-		},
+		BlockID: blockID,
+		Chunks:  chunks,
 	}
 
 	receipt := flow.ExecutionReceipt{

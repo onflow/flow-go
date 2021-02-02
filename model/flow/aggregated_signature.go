@@ -1,6 +1,8 @@
 package flow
 
-import "github.com/onflow/flow-go/crypto"
+import (
+	"github.com/onflow/flow-go/crypto"
+)
 
 // AggregatedSignature contains a set of of signatures from verifiers attesting
 // to the validity of an execution result chunk.
@@ -12,24 +14,17 @@ type AggregatedSignature struct {
 	SignerIDs []Identifier
 }
 
-// Len returns the number of signatures in the AggregatedSignature
-func (a *AggregatedSignature) Len() int {
+// NumberSigners returns the number of signers that contributed to the AggregatedSignature
+func (a *AggregatedSignature) NumberSigners() int {
 	return len(a.VerifierSignatures)
 }
 
-// BySigner returns a signer's signature if it exists
-func (a *AggregatedSignature) BySigner(signerID Identifier) (*crypto.Signature, bool) {
-	for index, id := range a.SignerIDs {
+// HasSigner returns true if and only if signer's signature is part of this aggregated signature
+func (a *AggregatedSignature) HasSigner(signerID Identifier) bool {
+	for _, id := range a.SignerIDs {
 		if id == signerID {
-			return &a.VerifierSignatures[index], true
+			return true
 		}
 	}
-	return nil, false
-}
-
-// Add appends a signature.
-// ATTENTION: it does not check for duplicates
-func (a *AggregatedSignature) Add(signerID Identifier, signature crypto.Signature) {
-	a.SignerIDs = append(a.SignerIDs, signerID)
-	a.VerifierSignatures = append(a.VerifierSignatures, signature)
+	return false
 }

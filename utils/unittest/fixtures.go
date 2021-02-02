@@ -489,12 +489,9 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: IdentifierFixture(),
-			BlockID:          IdentifierFixture(),
-			Chunks:           ChunksFixture(2, blockID),
-		},
-		Signatures: SignaturesFixture(6),
+		PreviousResultID: IdentifierFixture(),
+		BlockID:          IdentifierFixture(),
+		Chunks:           ChunksFixture(2, blockID),
 	}
 
 	for _, apply := range opts {
@@ -858,10 +855,8 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	}
 
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
-		},
+		BlockID: block.ID(),
+		Chunks:  chunks,
 	}
 
 	// computes chunk end state
@@ -983,12 +978,9 @@ func BatchListFixture(n int) []flow.Batch {
 
 func BootstrapExecutionResultFixture(block *flow.Block, commit flow.StateCommitment) *flow.ExecutionResult {
 	result := &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID:          block.ID(),
-			PreviousResultID: flow.ZeroID,
-			Chunks:           chunks.ChunkListFromCommit(commit),
-		},
-		Signatures: nil,
+		BlockID:          block.ID(),
+		PreviousResultID: flow.ZeroID,
+		Chunks:           chunks.ChunkListFromCommit(commit),
 	}
 	return result
 }
@@ -1186,4 +1178,44 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	}
 
 	return blocks
+}
+
+func ReceiptChainFor(blocks []*flow.Block, result0 *flow.ExecutionResult) []*flow.ExecutionReceipt {
+	receipts := make([]*flow.ExecutionReceipt, len(blocks))
+	receipts[0] = ExecutionReceiptFixture(WithResult(result0))
+	receipts[0].ExecutionResult.BlockID = blocks[0].ID()
+
+	for i := 1; i < len(blocks); i++ {
+		b := blocks[i]
+		prevReceipt := receipts[i-1]
+		receipt := ReceiptForBlockFixture(b)
+		receipt.ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
+		prevLastChunk := prevReceipt.ExecutionResult.Chunks[len(prevReceipt.ExecutionResult.Chunks)-1]
+		receipt.ExecutionResult.Chunks[0].StartState = prevLastChunk.EndState
+		receipts[i] = receipt
+	}
+
+	return receipts
+}
+
+// ReconnectBlocksAndReceipts re-computes each block's PayloadHash and ParentID
+// so that all the blocks are connected.
+// blocks' height have to be in strict increasing order.
+func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.ExecutionReceipt) {
+	for i := 1; i < len(blocks); i++ {
+		b := blocks[i]
+		p := i - 1
+		prev := blocks[p]
+		if prev.Header.Height+1 != b.Header.Height {
+			panic(fmt.Sprintf("height has gap when connecting blocks: expect %v, but got %v", prev.Header.Height+1, b.Header.Height))
+		}
+		b.Header.ParentID = prev.ID()
+		b.Header.PayloadHash = b.Payload.Hash()
+		receipts[i].ExecutionResult.BlockID = prev.ID()
+		prevReceipt := receipts[p]
+		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
+		for _, c := range receipts[i].ExecutionResult.Chunks {
+			c.BlockID = prev.ID()
+		}
+	}
 }
