@@ -1,17 +1,17 @@
 package matching
 
 import (
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )

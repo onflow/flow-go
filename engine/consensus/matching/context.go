@@ -21,7 +21,7 @@ type Event struct {
 }
 
 // EventProvider is an interface which provides polling mechanism for
-// events that are ready to be processed
+// events that are ready to be processedengine/consensus/matching/context_test.go
 type EventProvider interface {
 	Poll(maxBatchSize int) []*Event
 }
