@@ -22,6 +22,13 @@ import (
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 3
 
+var validENIDs = []string{"9686399a8a5418a12e762cfaeff2ea348c2137f554560917760e0d47acf2cda4",
+	"160241f88cbfaa0f361cf64adb0a1c9fc19dec1daf4b96550cd67b7a9fb26cd9",
+	"4ab025ab974e7ad7f344fbd16e5fbcb17fb8769fc8849b9d241ae518787695bd",
+}
+
+var validENMap map[flow.Identifier]bool
+
 // Backends implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
@@ -48,6 +55,7 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
+	validENs          map[flow.Identifier]struct{}
 }
 
 func New(
@@ -81,7 +89,7 @@ func New(
 			staticExecutionRPC: executionRPC,
 			connFactory:        connFactory,
 			state:              state,
-			log: log,
+			log:                log,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -97,7 +105,7 @@ func New(
 			retry:                retry,
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
-			log: log,
+			log:                  log,
 		},
 		backendEvents: backendEvents{
 			staticExecutionRPC: executionRPC,
@@ -121,7 +129,7 @@ func New(
 			headers:            headers,
 			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
-			log: log,
+			log:                log,
 		},
 		collections:       collections,
 		executionReceipts: executionReceipts,
@@ -130,6 +138,15 @@ func New(
 	}
 
 	retry.SetBackend(b)
+
+	validENMap = make(map[flow.Identifier]bool, len(validENIDs))
+	for _, idStr := range validENIDs {
+		id, err := flow.HexStringToIdentifier(idStr)
+		if err != nil {
+			panic(err)
+		}
+		validENMap[id] = true
+	}
 
 	return b
 }
@@ -219,18 +236,35 @@ func executionNodesForBlockID(
 		executorIDs = append(executorIDs, receipt.ExecutorID)
 	}
 
+	// for now only query Dapperlabs ENs
 	if len(executorIDs) == 0 {
 		return flow.IdentityList{}, nil
 	}
 
-	// find the node identities of these execution nodes
-	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executorIDs...))
+	allENs, err := validENs(state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
+
+	// find the node identities of these execution nodes
+	executionIdentities := allENs.Filter(filter.HasNodeID(executorIDs...))
 
 	// randomly choose upto maxExecutionNodesCnt identities
 	executionIdentitiesRandom := executionIdentities.Sample(maxExecutionNodesCnt)
 
 	return executionIdentitiesRandom, nil
+}
+
+func validENs(state protocol.State) (flow.IdentityList, error) {
+	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
+	}
+
+	filterFn := func(identity *flow.Identity) bool {
+		return validENMap[identity.ID()]
+	}
+
+	ens := allENs.Filter(filterFn)
+	return ens, nil
 }
