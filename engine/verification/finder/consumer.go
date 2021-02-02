@@ -75,7 +75,7 @@ func (w *Worker) FinishProcessing(blockID flow.Identifier) {
 // it's a callback so that the worker can convert the chunk id into a job
 // id, and notify the consumer about a finished job with the
 type finishProcessing interface {
-	FinishProcessing(chunkID flow.Identifier)
+	FinishProcessing(blockID flow.Identifier)
 }
 
 // BlockConsumer listens to the OnFinalizedBlock event
