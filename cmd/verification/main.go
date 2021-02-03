@@ -48,7 +48,8 @@ const (
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
 	// this value is set following this issue (3443)
-	failureThreshold = 2
+	// such a big number means we will retry forever (100 days)
+	failureThreshold = 10000000
 )
 
 func main() {
