@@ -226,7 +226,6 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		log.Debug().Msg("propagating transaction to cluster")
 
-
 		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
