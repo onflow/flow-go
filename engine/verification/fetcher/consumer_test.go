@@ -120,11 +120,12 @@ func TestProduceConsume(t *testing.T) {
 				}(i)
 			}
 
-			time.Sleep(100 * time.Millisecond)
+			// expect the mock engine receives all 100 calls
+			require.Eventually(t, func() bool {
+				return int(total.Load()) == 100
+			}, time.Second*10, time.Millisecond*10)
 
 			<-consumer.Done()
-			// expect the mock engine receives all 100 calls
-			require.Equal(t, 100, int(total.Load()))
 		})
 	})
 }
