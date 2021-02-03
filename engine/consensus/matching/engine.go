@@ -43,7 +43,7 @@ type Engine struct {
 	unit                                 *engine.Unit
 	log                                  zerolog.Logger
 	me                                   module.Local
-	core                               *Core
+	core                                 *Core
 	engineMetrics                        module.EngineMetrics
 	receiptSink                          EventSink
 	approvalSink                         EventSink
@@ -84,7 +84,7 @@ func NewEngine(log zerolog.Logger,
 		unit:                                 engine.NewUnit(),
 		log:                                  log,
 		me:                                   me,
-		engine:                               nil,
+		core:                                 nil,
 		engineMetrics:                        engineMetrics,
 		receiptSink:                          receiptsChannel,
 		approvalSink:                         approvalsChannel,
@@ -111,7 +111,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	c.engine, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
+	c.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
 		indexDB, incorporatedResults, receipts, approvals, seals, assigner, validator,
 		requiredApprovalsForSealConstruction, emergencySealingActive, receiptsChannel, approvalsChannel, approvalResponsesChannel, approvalConduit)
 	if err != nil {
@@ -233,10 +233,10 @@ func (c *Engine) Ready() <-chan struct{} {
 		c.processEvents()
 	})
 	<-started
-	return c.engine.Ready()
+	return c.core.Ready()
 }
 
 func (c *Engine) Done() <-chan struct{} {
 	<-c.unit.Done()
-	return c.engine.Done()
+	return c.core.Done()
 }

@@ -54,7 +54,7 @@ func (ms *EngineContextSuite) SetupTest() {
 	ms.context = &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
-		engine: &Core{
+		core: &Core{
 			tracer:                               tracer,
 			unit:                                 engine.NewUnit(),
 			log:                                  log,
