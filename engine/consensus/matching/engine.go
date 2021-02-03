@@ -30,11 +30,9 @@ const defaultApprovalQueueCapacity = 10000
 // defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
 const defaultApprovalResponseQueueCapacity = 10000
 
-// EventProvider is an interface which provides polling mechanism for
-// events that are ready to be processedengine/consensus/matching/engine_test.go
 type (
-	EventProvider <-chan *Event
-	EventSink     chan<- *Event
+	EventProvider <-chan *Event // Channel to get pending events that are ready to be processed
+	EventSink     chan<- *Event // Channel to push pending events
 )
 
 // Engine is a wrapper for matching `Core` which implements logic for
