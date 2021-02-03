@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"github.com/onflow/flow-go/module/trace"
 	"os"
 	"testing"
 	"time"
@@ -40,6 +41,7 @@ func (ms *EngineContextSuite) SetupTest() {
 
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.requester = new(mockmodule.Requester)
@@ -53,6 +55,7 @@ func (ms *EngineContextSuite) SetupTest() {
 		log:  log,
 		unit: engine.NewUnit(),
 		engine: &Core{
+			tracer:                               tracer,
 			unit:                                 engine.NewUnit(),
 			log:                                  log,
 			engineMetrics:                        metrics,

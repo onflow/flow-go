@@ -167,7 +167,6 @@ func (c *Engine) processPendingEvent(event *Event) {
 	switch event.Msg.(type) {
 	case *flow.ExecutionReceipt:
 		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-
 		if c.pendingReceipts.Len() < defaultReceiptQueueCapacity {
 			c.pendingReceipts.PushBack(event)
 		}
