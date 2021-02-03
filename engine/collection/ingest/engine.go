@@ -222,9 +222,10 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if the message was submitted internally (ie. via the Access API)
 	// propagate it to members of the responsible cluster (either our cluster
 	// or a different cluster)
-	if originID == e.me.NodeID() {
+	if originID == e.me.NodeID() && len(txCluster.NodeIDs()) > 1 {
 
 		log.Debug().Msg("propagating transaction to cluster")
+
 
 		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 		if err != nil {
