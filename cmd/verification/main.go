@@ -70,17 +70,13 @@ func main() {
 		pendingResults      *stdmap.ResultDataPacks    // used in match engine
 		pendingChunks       *match.Chunks              // used in match engine
 		headerStorage       *storage.Headers           // used in match and finder engines
-		resultsDB           *storage.ExecutionResults  // used in match engine
 		syncCore            *synchronization.Core      // used in follower engine
 		pendingBlocks       *buffer.PendingBlocks      // used in follower engine
 		finderEng           *finder.Engine             // the finder engine
-		blockConsumer       *finder.BlockConsumer      // to handle OnFinalizedBlock from follower engine
 		verifierEng         *verifier.Engine           // the verifier engine
 		matchEng            *match.Engine              // the match engine
 		followerEng         *followereng.Engine        // the follower engine
 		collector           module.VerificationMetrics // used to collect metrics of all engines
-		chunksQueue         *storage.ChunksQueue       // store chunks to be verified
-		chunkConsumer       *match.ChunkConsumer       // for finder engine to notify match engine about a new chunk
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -190,17 +186,6 @@ func main() {
 
 			return nil
 		}).
-		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
-			chunksQueue = storage.NewChunksQueue(node.DB)
-			ok, err := chunksQueue.Init(match.DefaultJobIndex)
-			if err != nil {
-				return fmt.Errorf("failed to init chunks queue: %w", err)
-			}
-			if ok {
-				node.Logger.Warn().Msg("chunks queue latest index not found, initalized")
-			}
-			return nil
-		}).
 		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
 			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
 			if err != nil {
@@ -293,10 +278,13 @@ func main() {
 				node.Me,
 				chunkVerifier,
 				approvalStorage)
-
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
+			if err != nil {
+				return nil, err
+			}
 			matchEng, err = match.New(node.Logger,
 				collector,
 				node.Tracer,
@@ -305,36 +293,15 @@ func main() {
 				pendingResults,
 				chunkIDsByResult,
 				verifierEng,
+				assigner,
 				node.State,
 				pendingChunks,
 				headerStorage,
 				requestInterval,
-				failureThreshold,
-			)
+				failureThreshold)
 			return matchEng, err
 		}).
-		Component("match engine consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			maxProcessing := int64(10)
-			maxFinished := int64(400)
-			processedIndex := storage.NewConsumeProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
-			// the chunk worker needs to be passed to the finder engine, so that
-			// finder can notify the match engine that new chunk has been added
-			// to the queue, and triggers the chunk queue to process them.
-			chunkConsumer = match.NewChunkConsumer(
-				node.Logger,
-				processedIndex,
-				chunksQueue,
-				matchEng,
-				maxProcessing,
-				maxFinished,
-			)
-			return chunkConsumer, nil
-		}).
 		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
-			if err != nil {
-				return nil, err
-			}
 			finderEng, err = finder.New(node.Logger,
 				collector,
 				node.Tracer,
@@ -351,30 +318,8 @@ func main() {
 				receiptIDsByBlock,
 				receiptIDsByResult,
 				blockIDsCache,
-				processInterval,
-				assigner,
-				chunksQueue,
-				chunkConsumer,
-			)
-
+				processInterval)
 			return finderEng, err
-		}).
-		Component("finder engine consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			maxProcessing := int64(10)
-			maxFinished := int64(400)
-			processedHeight := storage.NewConsumeProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
-			blockConsumer, err := finder.NewBlockConsumer(
-				node.Logger,
-				processedHeight,
-				node.State,
-				finderEng,
-				maxProcessing,
-				maxFinished,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not init block consumer: %w", err)
-			}
-			return blockConsumer, nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -408,7 +353,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, blockConsumer, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
