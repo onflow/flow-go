@@ -3,30 +3,33 @@ package processor
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/network"
 )
 
 // Engine implements the crypto DKGProcessor interface which provides means for
 // DKG nodes to exchange private and public messages. The same instance can be
 // used across epochs, but transitions should be accompanied by a call to
-// SetEpoch, such that DKGMessages can be prepended with the appropriate epoch
+// SetEpoch, such that messages can be prepended with the appropriate epoch
 // ID.
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	me           module.Local
-	conduit      network.Conduit
-	msgCh        chan dkg.DKGMessage
-	committee    flow.IdentifierList
-	myIndex      int
-	epochCounter uint64
+	unit              *engine.Unit
+	log               zerolog.Logger
+	me                module.Local
+	conduit           network.Conduit
+	dkgContractClient module.DKGContractClient
+	msgCh             chan msg.DKGMessage
+	committee         flow.IdentifierList
+	myIndex           int
+	dkgInstanceID     string
+	dkgInstanceIDLock sync.Mutex
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -38,9 +41,10 @@ func New(
 	logger zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	msgCh chan dkg.DKGMessage,
+	msgCh chan msg.DKGMessage,
 	committee flow.IdentifierList,
-	epochCounter uint64) (*Engine, error) {
+	dkgContractClient module.DKGContractClient,
+	dkgInstanceID string) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
 
@@ -56,13 +60,14 @@ func New(
 	}
 
 	eng := Engine{
-		unit:         engine.NewUnit(),
-		log:          log,
-		me:           me,
-		msgCh:        msgCh,
-		committee:    committee,
-		myIndex:      index,
-		epochCounter: epochCounter,
+		unit:              engine.NewUnit(),
+		log:               log,
+		me:                me,
+		msgCh:             msgCh,
+		committee:         committee,
+		myIndex:           index,
+		dkgInstanceID:     dkgInstanceID,
+		dkgContractClient: dkgContractClient,
 	}
 
 	var err error
@@ -74,11 +79,18 @@ func New(
 	return &eng, nil
 }
 
-// SetEpoch changes the epoch counter of the engine.
-func (e *Engine) SetEpoch(epochCounter uint64) {
-	e.unit.Lock()
-	defer e.unit.Unlock()
-	e.epochCounter = epochCounter
+// SetDKGInstanceID changes the DKG instance identifier of the engine.
+func (e *Engine) SetDKGInstanceID(value string) {
+	e.dkgInstanceIDLock.Lock()
+	defer e.dkgInstanceIDLock.Unlock()
+	e.dkgInstanceID = value
+}
+
+// GetDKGInstanceID returns the currenty DKG instance identifier.
+func (e *Engine) GetDKGInstanceID() string {
+	e.dkgInstanceIDLock.Lock()
+	defer e.dkgInstanceIDLock.Unlock()
+	return e.dkgInstanceID
 }
 
 // Ready implements the module ReadyDoneAware interface. It returns a channel
@@ -123,36 +135,26 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
-	case dkg.DKGMessage:
-		return e.onDKGMessage(originID, v)
+	case msg.DKGMessage:
+		return e.onMessage(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-func (e *Engine) onDKGMessage(originID flow.Identifier, msg dkg.DKGMessage) error {
-
-	// check that the message corresponds to the current epoch
-	e.unit.Lock()
-	defer e.unit.Unlock()
-	if e.epochCounter != msg.EpochCounter {
-		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, e.epochCounter)
+func (e *Engine) onMessage(originID flow.Identifier, msg msg.DKGMessage) error {
+	if currentDKG := e.GetDKGInstanceID(); currentDKG != msg.DKGInstanceID {
+		return fmt.Errorf("wrong DKG instance ID. Got %v, want %v", msg.DKGInstanceID, currentDKG)
 	}
-
-	// check that the message's origin is not out of range
 	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
 		return fmt.Errorf("origin id out of range: %d", msg.Orig)
 	}
-
-	// check that the message's origin matches the sender's flow identifier
 	nodeID := e.committee[msg.Orig]
 	if !bytes.Equal(nodeID[:], originID[:]) {
 		return fmt.Errorf("OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 	}
-
-	e.log.Debug().Msgf("forwarding DKGMessage to controller")
+	e.log.Debug().Msgf("forwarding Message to controller")
 	e.msgCh <- msg
-
 	return nil
 }
 
@@ -161,31 +163,46 @@ Implement DKGProcessor
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 // PrivateSend sends a DKGMessage to a destination over a private channel. It
-// appends the current Epoch ID to the message.
+// appends the current DKG instance ID to the message.
 func (e *Engine) PrivateSend(dest int, data []byte) {
-
+	dkgInstance := e.GetDKGInstanceID()
 	if dest >= len(e.committee) || dest < 0 {
 		e.log.Error().Msgf("destination id out of range: %d", dest)
 		return
 	}
-
 	destID := e.committee[dest]
-
-	dkgMessage := dkg.NewDKGMessage(
+	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.epochCounter,
+		dkgInstance,
 	)
-
 	err := e.conduit.Unicast(dkgMessage, destID)
 	if err != nil {
-		e.log.Error().Msgf("Could not send DKGMessage to %v: %v", destID, err)
-		return
+		e.log.Error().
+			Err(err).
+			Str("dkg_instance_id", dkgInstance).
+			Msgf("could not send private message to %v", destID)
 	}
 }
 
 // Broadcast broadcasts a message to all participants.
-func (e *Engine) Broadcast(data []byte) {}
+func (e *Engine) Broadcast(data []byte) {
+	dkgInstance := e.GetDKGInstanceID()
+	dkgMessage := msg.NewDKGMessage(
+		e.myIndex,
+		data,
+		dkgInstance,
+	)
+	err := e.dkgContractClient.Broadcast(dkgMessage)
+	if err != nil {
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Str("dkg_instance_id", dkgInstance).
+				Msg("could not broadcast message")
+		}
+	}
+}
 
 // Disqualify flags that a node is misbehaving and got disqualified
 func (e *Engine) Disqualify(node int, log string) {}

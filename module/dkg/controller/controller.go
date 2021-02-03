@@ -1,6 +1,6 @@
 /*
 
-Package dkg implements a controller that manages the lifecycle of a Joint
+Package controller implements a controller that manages the lifecycle of a Joint
 Feldman DKG node.
 
 The state-machine can be represented as follows:
@@ -39,7 +39,7 @@ from Phase 2 and after successfully computing the DKG artifacts. Whereas the
 Shutdown state can be reached from any other state.
 
 */
-package dkg
+package controller
 
 import (
 	"fmt"
@@ -48,6 +48,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
+	msg "github.com/onflow/flow-go/model/messages"
 )
 
 // Controller controls the execution of a Joint Feldman DKG instance.
@@ -68,7 +69,7 @@ type Controller struct {
 	// msgCh is the channel through which the controller receives private and
 	// broadcast messages. It is assumed that the messages are valid. All
 	// validity checks should be performed upstream.
-	msgCh chan DKGMessage
+	msgCh chan msg.DKGMessage
 
 	// Channels used internally to trigger state transitions
 	h0Ch       chan struct{}
@@ -92,7 +93,7 @@ type Controller struct {
 func NewController(
 	dkg crypto.DKGState,
 	seed []byte,
-	msgCh chan DKGMessage,
+	msgCh chan msg.DKGMessage,
 	log zerolog.Logger) *Controller {
 
 	return &Controller{
@@ -234,6 +235,9 @@ func (c *Controller) doBackgroundWork() {
 		select {
 		case msg := <-c.msgCh:
 			c.dkgLock.Lock()
+			// The DKG controller doesn't use the epoch and phase values defined
+			// in the DKGMessage. These values are used by upstream objects such
+			// as the DKG processor engine, and the DKG smart contract.
 			err := c.dkg.HandleMsg(msg.Orig, msg.Data)
 			if err != nil {
 				c.log.Err(err).Msg("Error processing DKG message")
@@ -259,9 +263,7 @@ func (c *Controller) start() error {
 	}
 
 	c.log.Debug().Msg("DKG engine started")
-
 	c.SetState(Phase0)
-
 	return nil
 }
 
@@ -272,7 +274,6 @@ func (c *Controller) phase0() error {
 	}
 
 	c.log.Debug().Msg("Waiting for end of phase 0")
-
 	for {
 		select {
 		case <-c.h0Ch:
@@ -297,7 +298,6 @@ func (c *Controller) phase1() error {
 	}
 
 	c.log.Debug().Msg("Waiting for end of phase 1")
-
 	for {
 		select {
 		case <-c.h1Ch:
@@ -322,7 +322,6 @@ func (c *Controller) phase2() error {
 	}
 
 	c.log.Debug().Msg("Waiting for end of phase 2")
-
 	for {
 		select {
 		case <-c.endCh:
