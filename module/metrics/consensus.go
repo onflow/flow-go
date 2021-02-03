@@ -106,17 +106,17 @@ func (cc *ConsensusCollector) EmergencySeal() {
 	cc.emergencySealedBlocks.Inc()
 }
 
-// IncreaseOnReceiptDuration increases the number of seconds spent processing receipts
-func (cc *ConsensusCollector) IncreaseOnReceiptDuration(duration time.Duration) {
+// OnReceiptProcessingDuration increases the number of seconds spent processing receipts
+func (cc *ConsensusCollector) OnReceiptProcessingDuration(duration time.Duration) {
 	cc.onReceiptDuration.Add(duration.Seconds())
 }
 
-// IncreaseOnApprovalDuration increases the number of seconds spent processing approvals
-func (cc *ConsensusCollector) IncreaseOnApprovalDuration(duration time.Duration) {
+// OnApprovalProcessingDuration increases the number of seconds spent processing approvals
+func (cc *ConsensusCollector) OnApprovalProcessingDuration(duration time.Duration) {
 	cc.onApprovalDuration.Add(duration.Seconds())
 }
 
-// IncreaseCheckSealingDuration increases the number of seconds spent in checkSealing
-func (cc *ConsensusCollector) IncreaseCheckSealingDuration(duration time.Duration) {
+// CheckSealingDuration increases the number of seconds spent in checkSealing
+func (cc *ConsensusCollector) CheckSealingDuration(duration time.Duration) {
 	cc.checkSealingDuration.Add(duration.Seconds())
 }

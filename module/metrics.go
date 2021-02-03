@@ -141,14 +141,14 @@ type ConsensusMetrics interface {
 	// EmergencySeal increments the number of seals that were created in emergency mode
 	EmergencySeal()
 
-	// IncreaseOnReceiptDuration increases the number of seconds spent processing receipts
-	IncreaseOnReceiptDuration(duration time.Duration)
+	// OnReceiptProcessingDuration records the number of seconds spent processing a receipt
+	OnReceiptProcessingDuration(duration time.Duration)
 
-	// IncreaseOnApprovalDuration increases the number of seconds spent processing approval
-	IncreaseOnApprovalDuration(duration time.Duration)
+	// OnApprovalProcessingDuration records the number of seconds spent processing an approval
+	OnApprovalProcessingDuration(duration time.Duration)
 
-	// IncreaseCheckSealingDuration records absolute time for the full sealing check by the consensus match engine
-	IncreaseCheckSealingDuration(duration time.Duration)
+	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+	CheckSealingDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {

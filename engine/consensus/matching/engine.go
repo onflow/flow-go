@@ -247,7 +247,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	startTime := time.Now()
 	receiptSpan := e.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
 	defer func() {
-		e.metrics.IncreaseOnReceiptDuration(time.Since(startTime))
+		e.metrics.OnReceiptProcessingDuration(time.Since(startTime))
 		receiptSpan.Finish()
 	}()
 
@@ -394,7 +394,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	startTime := time.Now()
 	approvalSpan := e.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
 	defer func() {
-		e.metrics.IncreaseOnApprovalDuration(time.Since(startTime))
+		e.metrics.OnApprovalProcessingDuration(time.Since(startTime))
 		approvalSpan.Finish()
 	}()
 
@@ -481,7 +481,7 @@ func (e *Engine) checkingSealing() error {
 	startTime := time.Now()
 	sealingSpan, _ := e.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealing)
 	defer func() {
-		e.metrics.IncreaseCheckSealingDuration(time.Since(startTime))
+		e.metrics.CheckSealingDuration(time.Since(startTime))
 		sealingSpan.Finish()
 	}()
 
@@ -492,13 +492,12 @@ func (e *Engine) checkingSealing() error {
 	if err != nil {
 		return fmt.Errorf("could not get sealable execution results: %w", err)
 	}
-
-	// skip if no results can be sealed yet
 	if len(sealableResults) == 0 {
+		// skip if no results can be sealed yet
 		return nil
-	} else {
-		e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
 	}
+	e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
+
 	// log warning if we are going to overflow the seals mempool
 	if space := e.seals.Limit() - e.seals.Size(); len(sealableResults) > int(space) {
 		e.log.Warn().
