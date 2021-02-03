@@ -42,18 +42,19 @@ type (
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
 // them to `Engine`.
 type Core2 struct {
-	unit                     *engine.Unit
-	log                      zerolog.Logger
-	me                       module.Local
-	engine                   *Engine
-	engineMetrics            module.EngineMetrics
-	receiptSink              EventSink
-	approvalSink             EventSink
-	approvalResponseSink     EventSink
-	pendingReceipts          deque.Deque
-	pendingApprovals         deque.Deque
-	pendingApprovalResponses deque.Deque
-	pendingEventSink         chan *Event
+	unit                                 *engine.Unit
+	log                                  zerolog.Logger
+	me                                   module.Local
+	engine                               *Engine
+	engineMetrics                        module.EngineMetrics
+	receiptSink                          EventSink
+	approvalSink                         EventSink
+	approvalResponseSink                 EventSink
+	pendingReceipts                      deque.Deque
+	pendingApprovals                     deque.Deque
+	pendingApprovalResponses             deque.Deque
+	pendingEventSink                     chan *Event
+	requiredApprovalsForSealConstruction uint
 }
 
 // NewEngine constructs new `Core2` which runs on it's own unit.
@@ -82,15 +83,16 @@ func NewEngine(log zerolog.Logger,
 	approvalsChannel := make(chan *Event)
 	approvalResponsesChannel := make(chan *Event)
 	c := &Core2{
-		unit:                 engine.NewUnit(),
-		log:                  log,
-		me:                   me,
-		engine:               nil,
-		engineMetrics:        engineMetrics,
-		receiptSink:          receiptsChannel,
-		approvalSink:         approvalsChannel,
-		approvalResponseSink: approvalResponsesChannel,
-		pendingEventSink:     make(chan *Event),
+		unit:                                 engine.NewUnit(),
+		log:                                  log,
+		me:                                   me,
+		engine:                               nil,
+		engineMetrics:                        engineMetrics,
+		receiptSink:                          receiptsChannel,
+		approvalSink:                         approvalsChannel,
+		approvalResponseSink:                 approvalResponsesChannel,
+		pendingEventSink:                     make(chan *Event),
+		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 
 	// register engine with the receipt provider
@@ -167,16 +169,25 @@ func (c *Core2) processPendingEvent(event *Event) {
 	switch event.Msg.(type) {
 	case *flow.ExecutionReceipt:
 		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+
 		if c.pendingReceipts.Len() < defaultReceiptQueueCapacity {
 			c.pendingReceipts.PushBack(event)
 		}
 	case *flow.ResultApproval:
 		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if c.requiredApprovalsForSealConstruction < 1 {
+			// if we don't require approvals to construct a seal, don't even process approvals.
+			return
+		}
 		if c.pendingApprovals.Len() < defaultApprovalQueueCapacity {
 			c.pendingApprovals.PushBack(event)
 		}
 	case *messages.ApprovalResponse:
 		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if c.requiredApprovalsForSealConstruction < 1 {
+			// if we don't require approvals to construct a seal, don't even process approvals.
+			return
+		}
 		if c.pendingApprovalResponses.Len() < defaultApprovalResponseQueueCapacity {
 			c.pendingApprovalResponses.PushBack(event)
 		}
