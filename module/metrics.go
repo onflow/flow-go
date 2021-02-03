@@ -138,11 +138,17 @@ type ConsensusMetrics interface {
 	// FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 	FinishBlockToSeal(blockID flow.Identifier)
 
-	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
-	CheckSealingDuration(duration time.Duration)
-
 	// EmergencySeal increments the number of seals that were created in emergency mode
 	EmergencySeal()
+
+	// OnReceiptProcessingDuration records the number of seconds spent processing a receipt
+	OnReceiptProcessingDuration(duration time.Duration)
+
+	// OnApprovalProcessingDuration records the number of seconds spent processing an approval
+	OnApprovalProcessingDuration(duration time.Duration)
+
+	// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+	CheckSealingDuration(duration time.Duration)
 }
 
 type VerificationMetrics interface {
