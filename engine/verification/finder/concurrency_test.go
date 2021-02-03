@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/utils"
@@ -211,7 +212,16 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 					}
 					mutatorLock.Unlock()
 
-					verNode.FinderEngine.ProcessFinalizedBlock(block)
+					// casts block into a Hotstuff block for notifier
+					hotstuffBlock := &model.Block{
+						BlockID:     block.ID(),
+						View:        block.Header.View,
+						ProposerID:  block.Header.ProposerID,
+						QC:          nil,
+						PayloadHash: block.Header.PayloadHash,
+						Timestamp:   block.Header.Timestamp,
+					}
+					verNode.FinderEngine.OnFinalizedBlock(hotstuffBlock)
 				}
 
 				// sendReceipt sends the execution receipt to the finder engine of verification node.

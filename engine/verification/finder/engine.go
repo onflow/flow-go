@@ -9,6 +9,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
@@ -35,18 +36,12 @@ import (
 // This engine ensures that each (ready) result is passed to match engine only once.
 // Hence, among concurrent ready receipts with shared result, only one instance of result is passed to match engine.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	metrics module.VerificationMetrics
-	me      module.Local
-	match   network.Engine
-	state   protocol.State
-
-	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify
-	chunksQueue      storage.ChunksQueue   // to store chunks to be verified
-	newChunkListener module.NewJobListener // to notify about a new chunk
-	finishProcessing finishProcessing      // to report a block has been processed
-
+	unit                     *engine.Unit
+	log                      zerolog.Logger
+	metrics                  module.VerificationMetrics
+	me                       module.Local
+	match                    network.Engine
+	state                    protocol.State
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
 	readyReceipts            mempool.ReceiptDataPacks // used to keep the receipts ready for process
@@ -78,10 +73,6 @@ func New(
 	receiptsIDsByResult mempool.IdentifierMap,
 	blockIDsCache mempool.Identifiers,
 	processInterval time.Duration,
-
-	assigner module.ChunkAssigner,
-	chunksQueue storage.ChunksQueue,
-	newChunkListener module.NewJobListener,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:                     engine.NewUnit(),
@@ -101,9 +92,6 @@ func New(
 		blockIDsCache:            blockIDsCache,
 		processInterval:          processInterval,
 		tracer:                   tracer,
-		assigner:                 assigner,
-		chunksQueue:              chunksQueue,
-		newChunkListener:         newChunkListener,
 	}
 
 	_, err := net.Register(engine.ReceiveReceipts, e)
@@ -111,10 +99,6 @@ func New(
 		return nil, fmt.Errorf("could not register engine on execution receipt provider channel: %w", err)
 	}
 	return e, nil
-}
-
-func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
-	e.finishProcessing = finishProcessing
 }
 
 // Ready returns a channel that is closed when the finder engine is ready.
@@ -230,10 +214,29 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	return nil
 }
 
-func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
-	// the block consumer will pull as many finalized blocks as
-	// it can consume to process
+// To implement FinalizationConsumer
+func (e *Engine) OnBlockIncorporated(*model.Block) {
+
 }
+
+// OnFinalizedBlock is part of implementing FinalizationConsumer interface
+// On receiving a block, it caches the block ID to be checked in the next onTimer loop.
+//
+// OnFinalizedBlock notifications are produced by the Finalization Logic whenever
+// a block has been finalized. They are emitted in the order the blocks are finalized.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+func (e *Engine) OnFinalizedBlock(block *model.Block) {
+	ok := e.blockIDsCache.Add(block.BlockID)
+	e.log.Debug().
+		Bool("added_new_blocks", ok).
+		Hex("block_id", logging.ID(block.BlockID)).
+		Msg("new finalized block received")
+}
+
+// To implement FinalizationConsumer
+func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 // isProcessable returns true if the block for execution result is available in the storage
 // otherwise it returns false. In the current version, it checks solely against the block that

@@ -799,6 +799,7 @@ func (suite *MatchEngineTestSuite) NewTestMatchEngine(maxTry int) *match.Engine 
 		suite.results,
 		suite.chunkIDsByResult,
 		suite.verifier,
+		suite.assigner,
 		suite.state,
 		suite.chunks,
 		suite.headers,
@@ -857,11 +858,4 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
 		ChunkID: chunkID,
 	}
-}
-
-func TestChooseChunkDataPackTarget(t *testing.T) {
-	t.Run("enough nodes produced same results", func(t *testing.T) { panic("TBI") })
-	t.Run("1 node produced the result, some nodes produced different results", func(t *testing.T) { panic("TBI") })
-	t.Run("1 node produced the result, no node produced different results", func(t *testing.T) { panic("TBI") })
-	t.Run("1 node produced the result, all other nodes produced different results", func(t *testing.T) { panic("TBI") })
 }
