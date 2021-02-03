@@ -1,7 +1,6 @@
 package processor
 
 import (
-	"math/rand"
 	"testing"
 	"time"
 
@@ -19,19 +18,17 @@ import (
 
 // variables that are used throughout the tests
 var (
-	committee = unittest.IdentifierListFixture(2) // dkg nodes
-	orig      = 0                                 // message sender
-	dest      = 1                                 // message destination
-	msgb      = []byte("hello world")             // message content
+	committee     = unittest.IdentifierListFixture(2) // dkg nodes
+	orig          = 0                                 // message sender
+	dest          = 1                                 // message destination
+	msgb          = []byte("hello world")             // message content
+	dkgInstanceID = "flow-testnet-42"                 // dkg instance identifier
 )
 
 // Helper function to initialise an engine with the default committee, a mock
 // conduit for private messages, and a mock dkg contract client for broadcast
 // messages.
 func createTestEngine(t *testing.T, nodeID flow.Identifier) *Engine {
-
-	// define epoch ID
-	epochCounter := rand.Uint64()
 
 	// setup mock conduit
 	conduit := &mocknetwork.Conduit{}
@@ -51,7 +48,7 @@ func createTestEngine(t *testing.T, nodeID flow.Identifier) *Engine {
 		make(chan msg.DKGMessage),
 		committee,
 		&module.DKGContractClient{},
-		epochCounter,
+		dkgInstanceID,
 	)
 	require.NoError(t, err)
 
@@ -77,8 +74,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.GetEpoch(),
-		engine.GetPhase(),
+		engine.dkgInstanceID,
 	)
 
 	// override the conduit to check that the Unicast call matches the expected
@@ -126,8 +122,7 @@ func TestProcessMessage_Valid(t *testing.T) {
 	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.GetEpoch(),
-		engine.GetPhase(),
+		engine.dkgInstanceID,
 	)
 
 	// launch a background routine to capture messages forwarded to the msgCh
@@ -166,8 +161,7 @@ func TestProcessMessage_InvalidOrigin(t *testing.T) {
 		dkgMsg := msg.NewDKGMessage(
 			badIndex,
 			msgb,
-			engine.GetEpoch(),
-			engine.GetPhase(),
+			engine.dkgInstanceID,
 		)
 		err := engine.Process(unittest.IdentifierFixture(), dkgMsg)
 		require.Error(t, err)
@@ -178,8 +172,7 @@ func TestProcessMessage_InvalidOrigin(t *testing.T) {
 	dkgMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.GetEpoch(),
-		engine.GetPhase(),
+		engine.dkgInstanceID,
 	)
 	err := engine.Process(unittest.IdentifierFixture(), dkgMsg)
 	require.Error(t, err)
@@ -196,8 +189,7 @@ func TestBroadcastMessage(t *testing.T) {
 	expectedMsg := msg.NewDKGMessage(
 		orig,
 		msgb,
-		engine.GetEpoch(),
-		engine.GetPhase(),
+		engine.dkgInstanceID,
 	)
 
 	// check that the dkg contract client is called with the expected message
@@ -213,34 +205,31 @@ func TestBroadcastMessage(t *testing.T) {
 
 // TestReadMessages checks that the engine correctly calls the smart contract
 // to fetch broadcast messages, and forwards the messages to the msgCh.
-func TestReadMessages(t *testing.T) {
+func TestReadBroadcastMessages(t *testing.T) {
 
 	engine := createTestEngine(t, committee[orig])
 	blockID := unittest.IdentifierFixture()
 	expectedMsgs := []msg.DKGMessage{
 		msg.NewDKGMessage(
 			orig,
-			msgb,
-			engine.GetEpoch(),
-			engine.GetPhase(),
+			[]byte("message 1"),
+			engine.dkgInstanceID,
 		),
 		msg.NewDKGMessage(
 			orig,
-			msgb,
-			engine.GetEpoch(),
-			engine.GetPhase(),
+			[]byte("message 2"),
+			engine.dkgInstanceID,
 		),
 		msg.NewDKGMessage(
 			orig,
-			msgb,
-			engine.GetEpoch(),
-			engine.GetPhase(),
+			[]byte("message 3"),
+			engine.dkgInstanceID,
 		),
 	}
 
 	// check that the dkg contract client is called correctly
 	contractClient := &module.DKGContractClient{}
-	contractClient.On("ReadBroadcast", blockID, engine.GetEpoch(), engine.GetPhase(), engine.GetOffset()).
+	contractClient.On("ReadBroadcast", engine.messageOffset, blockID).
 		Return(expectedMsgs, nil).
 		Once()
 	engine.dkgContractClient = contractClient

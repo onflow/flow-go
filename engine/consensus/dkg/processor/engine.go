@@ -3,7 +3,6 @@ package processor
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -29,12 +28,8 @@ type Engine struct {
 	msgCh             chan msg.DKGMessage      // channel to forward DKG messages to the consumer
 	committee         flow.IdentifierList      // IDs of DKG members
 	myIndex           int                      // index of this instance in the committee
-	epochCounter      uint64                   // identifier of the current epoch
-	epochCounterLock  sync.Mutex               // lock to safely manipulate epochCounter
-	dkgPhase          msg.DKGPhase             // current DKG phase
-	dkgPhaseLock      sync.Mutex               // lock to safely manipulate dkgPhase
-	messageOffset     int                      // index of next broadcast message to query
-	messageOffsetLock sync.Mutex               // lock to safely manipulate messageOffset
+	dkgInstanceID     string                   // unique identifier of the current dkg run (prevent replay attacks)
+	messageOffset     uint                     // index of next broadcast message to query
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -49,7 +44,7 @@ func New(
 	msgCh chan msg.DKGMessage,
 	committee flow.IdentifierList,
 	dkgContractClient module.DKGContractClient,
-	epochCounter uint64) (*Engine, error) {
+	dkgInstanceID string) (*Engine, error) {
 
 	log := logger.With().Str("engine", "dkg-processor").Logger()
 
@@ -71,7 +66,7 @@ func New(
 		msgCh:             msgCh,
 		committee:         committee,
 		myIndex:           index,
-		epochCounter:      epochCounter,
+		dkgInstanceID:     dkgInstanceID,
 		dkgContractClient: dkgContractClient,
 	}
 
@@ -82,51 +77,6 @@ func New(
 	}
 
 	return &eng, nil
-}
-
-// SetEpoch changes the epoch counter of the engine and resets the phase to
-// Phase1.
-func (e *Engine) SetEpoch(epochCounter uint64) {
-	e.epochCounterLock.Lock()
-	e.epochCounter = epochCounter
-	e.epochCounterLock.Unlock()
-	e.SetPhase(msg.DKGPhase1)
-}
-
-// GetEpoch returns the current epoch counter.
-func (e *Engine) GetEpoch() uint64 {
-	e.epochCounterLock.Lock()
-	defer e.epochCounterLock.Unlock()
-	return e.epochCounter
-}
-
-// SetPhase changes the DKG phase of the engine, and resets message offset.
-func (e *Engine) SetPhase(phase msg.DKGPhase) {
-	e.dkgPhaseLock.Lock()
-	e.dkgPhase = phase
-	defer e.dkgPhaseLock.Unlock()
-	e.SetOffset(0)
-}
-
-// GetPhase returns the current DKG phase.
-func (e *Engine) GetPhase() msg.DKGPhase {
-	e.dkgPhaseLock.Lock()
-	defer e.dkgPhaseLock.Unlock()
-	return e.dkgPhase
-}
-
-// SetOffset updates the value of messageOffset.
-func (e *Engine) SetOffset(value int) {
-	e.messageOffsetLock.Lock()
-	defer e.messageOffsetLock.Unlock()
-	e.messageOffset = value
-}
-
-// GetOffset returns the current messageOffset.
-func (e *Engine) GetOffset() int {
-	e.messageOffsetLock.Lock()
-	defer e.messageOffsetLock.Unlock()
-	return e.messageOffset
 }
 
 // Ready implements the module ReadyDoneAware interface. It returns a channel
@@ -182,7 +132,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) onPrivateMessage(originID flow.Identifier, msg msg.DKGMessage) error {
-	err := e.checkMessageEpochAndOrigin(msg)
+	err := e.checkMessageInstanceAndOrigin(msg)
 	if err != nil {
 		return err
 	}
@@ -199,16 +149,13 @@ func (e *Engine) onPrivateMessage(originID flow.Identifier, msg msg.DKGMessage) 
 // fetchBroadcastMessages calls the DKG smart contract to get missing DKG
 // messages for the current epoch, and forwards them to the msgCh.
 // It should be called with the ID of block whose seal is finalized.
-func (e *Engine) fetchBroadcastMessages(blockID flow.Identifier) error {
-	epoch := e.GetEpoch()
-	phase := e.GetPhase()
-	offset := e.GetOffset()
-	msgs, err := e.dkgContractClient.ReadBroadcast(blockID, epoch, phase, offset)
+func (e *Engine) fetchBroadcastMessages(referenceBlock flow.Identifier) error {
+	msgs, err := e.dkgContractClient.ReadBroadcast(e.messageOffset, referenceBlock)
 	if err != nil {
 		return fmt.Errorf("could not read broadcast messages: %w", err)
 	}
 	for _, msg := range msgs {
-		err := e.checkMessageEpochAndOrigin(msg)
+		err := e.checkMessageInstanceAndOrigin(msg)
 		if err != nil {
 			e.log.Error().Err(err).Msg("bad broadcast message")
 			continue
@@ -216,17 +163,17 @@ func (e *Engine) fetchBroadcastMessages(blockID flow.Identifier) error {
 		e.log.Debug().Msgf("forwarding broadcast message to controller")
 		e.msgCh <- msg
 	}
-	e.SetOffset(offset + len(msgs))
+	e.messageOffset += uint(len(msgs))
 	return nil
 }
 
-// checkMessageEpochAndOrigin returns an error if the message's epochCounter
-// does not correspond to the current epoch, or if the message's origin index is
-// out of range with respect to the committee list.
-func (e *Engine) checkMessageEpochAndOrigin(msg messages.DKGMessage) error {
+// checkMessageInstanceAndOrigin returns an error if the message's dkgInstanceID
+// does not correspond to the current instance, or if the message's origin index
+// is out of range with respect to the committee list.
+func (e *Engine) checkMessageInstanceAndOrigin(msg messages.DKGMessage) error {
 	// check that the message corresponds to the current epoch
-	if currentEpoch := e.GetEpoch(); currentEpoch != msg.EpochCounter {
-		return fmt.Errorf("wrong epoch counter. Got %d, want %d", msg.EpochCounter, currentEpoch)
+	if e.dkgInstanceID != msg.DKGInstanceID {
+		return fmt.Errorf("wrong DKG instance. Got %s, want %s", msg.DKGInstanceID, e.dkgInstanceID)
 	}
 	// check that the message's origin is not out of range
 	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
@@ -240,7 +187,7 @@ Implement DKGProcessor
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 // PrivateSend sends a DKGMessage to a destination over a private channel. It
-// appends the current Epoch ID to the message.
+// appends the current DKG instance ID to the message.
 func (e *Engine) PrivateSend(dest int, data []byte) {
 	if dest >= len(e.committee) || dest < 0 {
 		e.log.Error().Msgf("destination id out of range: %d", dest)
@@ -250,13 +197,14 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.GetEpoch(),
-		e.GetPhase(),
+		e.dkgInstanceID,
 	)
 	err := e.conduit.Unicast(dkgMessage, destID)
 	if err != nil {
-		e.log.Error().Msgf("Could not send Message to %v: %v", destID, err)
-		return
+		e.log.Error().
+			Err(err).
+			Str("dkg_instance_id", e.dkgInstanceID).
+			Msgf("could not send private message to %v", destID)
 	}
 }
 
@@ -265,12 +213,16 @@ func (e *Engine) Broadcast(data []byte) {
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.GetEpoch(),
-		e.GetPhase(),
+		e.dkgInstanceID,
 	)
 	err := e.dkgContractClient.Broadcast(dkgMessage)
 	if err != nil {
-		e.log.Error().Msgf("Could not broadcast message: %v", err)
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Str("dkg_instance_id", e.dkgInstanceID).
+				Msg("could not broadcast message")
+		}
 	}
 }
 

@@ -89,16 +89,17 @@ func (n *node) run() error {
 // processor is an implementation of DKGProcessor that enables nodes to exchange
 // private and public messages.
 type processor struct {
-	id       int
-	channels []chan msg.DKGMessage
-	logger   zerolog.Logger
+	id            int
+	channels      []chan msg.DKGMessage
+	logger        zerolog.Logger
+	dkgInstanceID string
 }
 
 func (proc *processor) PrivateSend(dest int, data []byte) {
 	proc.channels[dest] <- msg.NewDKGMessage(
 		proc.id,
 		data,
-		0, 0) // epoch and phase are not relevant at the controller level
+		proc.dkgInstanceID)
 }
 
 // ATTENTION: Normally the processor requires Broadcast to provide guaranteed
@@ -112,7 +113,7 @@ func (proc *processor) Broadcast(data []byte) {
 			continue
 		}
 		// epoch and phase are not relevant at the controller level
-		proc.channels[i] <- msg.NewDKGMessage(proc.id, data, 0, 0)
+		proc.channels[i] <- msg.NewDKGMessage(proc.id, data, proc.dkgInstanceID)
 	}
 }
 
