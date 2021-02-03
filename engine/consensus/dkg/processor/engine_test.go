@@ -261,4 +261,7 @@ func TestReadBroadcastMessages(t *testing.T) {
 		},
 		time.Second)
 	require.Equal(t, expectedMsgs, receivedMsgs)
+
+	// check that the message offset has been incremented
+	require.Equal(t, uint(len(expectedMsgs)), engine.messageOffset)
 }
