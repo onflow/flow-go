@@ -1,7 +1,6 @@
 package matching
 
 import (
-	"github.com/onflow/flow-go/module/trace"
 	"os"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
