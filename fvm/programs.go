@@ -25,19 +25,19 @@ func NewPrograms(parent *Programs) *Programs {
 	}
 }
 
-func (p *Programs) Get(locationID common.LocationID) *interpreter.Program {
+func (p *Programs) Get(location common.Location) *interpreter.Program {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	// First check if the program is available here
-	if programEntry, ok := p.programs[locationID]; ok {
+	if programEntry, ok := p.programs[location.ID()]; ok {
 		return programEntry.Program
 	}
 
 	// Second, check if the program is available in the parent (if any)
 
 	if p.parent != nil {
-		return p.parent.Get(locationID)
+		return p.parent.Get(location)
 	}
 
 	// The program is neither available here nor in the parent

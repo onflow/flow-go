@@ -275,7 +275,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 
-	program := e.ctx.Programs.Get(location.ID())
+	program := e.ctx.Programs.Get(location)
 	if program != nil {
 		// Program was found, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
