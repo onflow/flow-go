@@ -65,9 +65,9 @@ type Core struct {
 	receipts                             mempool.ExecutionTree           // holds execution receipts in memory
 	approvals                            mempool.Approvals               // holds result approvals in memory
 	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
-	resultApprovalsQueue                 EventProvider                   // queue that holds incomming `ResultApproval` messages
-	receiptsQueue                        EventProvider                   // queue that holds incomming `ExecutionReceipt` messages
-	approvalResponsesQueue               EventProvider                   // queue that holds incomming `ApprovalResponse` messages
+	approvalEventProvider                EventProvider                   // channel that serves `ResultApproval` messages
+	receiptEventProvider                 EventProvider                   // channel that serves `ExecutionReceipt` messages
+	approvalResponseEventProvider        EventProvider                   // channel that serves `ApprovalResponse` messages
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
 	assigner                             module.ChunkAssigner            // chunk assignment object
 	isCheckingSealing                    *atomic.Bool                    // used to rate limit the checksealing call
@@ -134,9 +134,9 @@ func NewCore(
 		requestTracker:                       NewRequestTracker(10, 30),
 		approvalRequestsThreshold:            10,
 		emergencySealingActive:               emergencySealingActive,
-		receiptsQueue:                        receiptsProvider,
-		resultApprovalsQueue:                 resultApprovalsProvider,
-		approvalResponsesQueue:               approvalResponseProvider,
+		receiptEventProvider:                 receiptsProvider,
+		approvalEventProvider:                resultApprovalsProvider,
+		approvalResponseEventProvider:        approvalResponseProvider,
 		approvalConduit:                      approvalConduit,
 	}
 
@@ -196,11 +196,11 @@ func (e *Core) processPendingEvents() {
 
 	for {
 		select {
-		case event := <-e.receiptsQueue:
+		case event := <-e.receiptEventProvider:
 			processItem(event)
-		case event := <-e.resultApprovalsQueue:
+		case event := <-e.approvalEventProvider:
 			processItem(event)
-		case event := <-e.approvalResponsesQueue:
+		case event := <-e.approvalResponseEventProvider:
 			processItem(event)
 		case <-checkSealingTicker:
 			e.checkSealing()
