@@ -21,6 +21,11 @@ init:
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY) \
 
+# Creates a light version of the localnet with just 1 instance for each node type
+.PHONY: light
+light:
+	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+
 .PHONY: start
 start:
 	docker-compose -f docker-compose.metrics.yml up -d
