@@ -39,7 +39,7 @@ var clusterBlocksCmd = &cobra.Command{
 		clusterBlocks := badger.NewClusterBlocks(db, chainID, headers, clusterPayloads)
 
 		if flagClusterBlockID != "" && flagHeight != 0 {
-			log.Fatal().Msg("provide either a --id or --height and not both")
+			log.Error().Msg("provide either a --id or --height and not both")
 			return
 		}
 
@@ -47,13 +47,15 @@ var clusterBlocksCmd = &cobra.Command{
 			log.Info().Msgf("got flag cluster block id: %s", flagClusterBlockID)
 			clusterBlockID, err := flow.HexStringToIdentifier(flagClusterBlockID)
 			if err != nil {
-				log.Fatal().Err(err).Msg("malformed cluster block id")
+				log.Error().Err(err).Msg("malformed cluster block id")
+				return
 			}
 
 			log.Info().Msgf("getting cluster block by id: %v", clusterBlockID)
 			clusterBlock, err := clusterBlocks.ByID(clusterBlockID)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get cluster block with id: %v", clusterBlockID)
+				log.Error().Err(err).Msgf("could not get cluster block with id: %v", clusterBlockID)
+				return
 			}
 
 			common.PrettyPrint(clusterBlock)
@@ -64,7 +66,8 @@ var clusterBlocksCmd = &cobra.Command{
 			log.Info().Msgf("getting cluster block by height: %v", flagHeight)
 			clusterBlock, err := clusterBlocks.ByHeight(flagHeight)
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not get cluster block with height: %v", flagHeight)
+				log.Error().Err(err).Msgf("could not get cluster block with height: %v", flagHeight)
+				return
 			}
 
 			log.Info().Msgf("block id: %v", clusterBlock.ID())
@@ -72,6 +75,6 @@ var clusterBlocksCmd = &cobra.Command{
 			return
 		}
 
-		log.Fatal().Msg("provide either a --id or --height")
+		log.Error().Msg("provide either a --id or --height")
 	},
 }

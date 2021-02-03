@@ -67,3 +67,38 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, event flow.EventTyp
 
 	return events, nil
 }
+
+type ServiceEvents struct {
+	db *badger.DB
+}
+
+func NewServiceEvents(db *badger.DB) *ServiceEvents {
+	return &ServiceEvents{
+		db: db,
+	}
+}
+
+// Store will store events for the given block ID
+func (e *ServiceEvents) Store(blockID flow.Identifier, events []flow.Event) error {
+	return operation.RetryOnConflict(e.db.Update, func(btx *badger.Txn) error {
+		for _, event := range events {
+			err := operation.SkipDuplicates(operation.InsertServiceEvent(blockID, event))(btx)
+			if err != nil {
+				return fmt.Errorf("could not insert event: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+// ByBlockID returns the events for the given block ID
+func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
+
+	var events []flow.Event
+	err := e.db.View(operation.LookupServiceEventsByBlockID(blockID, &events))
+	if err != nil {
+		return nil, handleError(err, flow.Event{})
+	}
+
+	return events, nil
+}
