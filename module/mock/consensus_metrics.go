@@ -14,6 +14,11 @@ type ConsensusMetrics struct {
 	mock.Mock
 }
 
+// CheckSealingDuration provides a mock function with given fields: duration
+func (_m *ConsensusMetrics) CheckSealingDuration(duration time.Duration) {
+	_m.Called(duration)
+}
+
 // EmergencySeal provides a mock function with given fields:
 func (_m *ConsensusMetrics) EmergencySeal() {
 	_m.Called()
@@ -29,18 +34,13 @@ func (_m *ConsensusMetrics) FinishCollectionToFinalized(collectionID flow.Identi
 	_m.Called(collectionID)
 }
 
-// IncreaseCheckSealingDuration provides a mock function with given fields: duration
-func (_m *ConsensusMetrics) IncreaseCheckSealingDuration(duration time.Duration) {
+// OnApprovalProcessingDuration provides a mock function with given fields: duration
+func (_m *ConsensusMetrics) OnApprovalProcessingDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
-// IncreaseOnApprovalDuration provides a mock function with given fields: duration
-func (_m *ConsensusMetrics) IncreaseOnApprovalDuration(duration time.Duration) {
-	_m.Called(duration)
-}
-
-// IncreaseOnReceiptDuration provides a mock function with given fields: duration
-func (_m *ConsensusMetrics) IncreaseOnReceiptDuration(duration time.Duration) {
+// OnReceiptProcessingDuration provides a mock function with given fields: duration
+func (_m *ConsensusMetrics) OnReceiptProcessingDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 

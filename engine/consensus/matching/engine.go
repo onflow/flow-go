@@ -154,6 +154,17 @@ func New(
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
+	// Context:
+	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
+	// information only changes significantly with new blocks or new receipts.
+	// We used to kick off the sealing check after every approval and receipt. In cases where
+	// the sealing check takes a lot more time than processing the actual messages (which we
+	// assume for the current implementation), we incur a large overhead as we check a lot
+	// of conditions, which only change with new blocks or new receipts.
+	// TEMPORARY FIX: to avoid sealing checks to monopolize the engine and delay processing
+	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
+	e.unit.LaunchPeriodically(e.checkSealing, 2*time.Second, 120*time.Second)
+
 	return e, nil
 }
 
@@ -227,12 +238,20 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
+			// if we don't require approvals to construct a seal, don't even process approvals.
+			return nil
+		}
 		e.unit.Lock()
 		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	case *messages.ApprovalResponse:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
+			// if we don't require approvals to construct a seal, don't even process approvals.
+			return nil
+		}
 		e.unit.Lock()
 		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
@@ -332,9 +351,6 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("failed to store incorporated result: %w", err)
 	}
 	log.Info().Msg("execution result processed and stored")
-
-	// kick off a check for potential seal formation
-	e.unit.Launch(e.checkSealing)
 
 	return nil
 }
@@ -451,9 +467,6 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return nil
 	}
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
-
-	// kick off a check for potential seal formation
-	e.unit.Launch(e.checkSealing)
 
 	return nil
 }
