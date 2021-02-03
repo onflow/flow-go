@@ -43,7 +43,7 @@ type Engine struct {
 	unit                                 *engine.Unit
 	log                                  zerolog.Logger
 	me                                   module.Local
-	engine                               *Core
+	core                               *Core
 	engineMetrics                        module.EngineMetrics
 	receiptSink                          EventSink
 	approvalSink                         EventSink
