@@ -286,7 +286,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		require.Same(t,
 			contractProgram,
-			execCtx.Programs.Get(contractLocation.ID()),
+			execCtx.Programs.Get(contractLocation),
 		)
 	})
 
