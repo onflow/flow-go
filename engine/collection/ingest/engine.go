@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
@@ -222,7 +223,14 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// if the message was submitted internally (ie. via the Access API)
 	// propagate it to members of the responsible cluster (either our cluster
 	// or a different cluster)
-	if originID == e.me.NodeID() && len(txCluster.NodeIDs()) > 1 {
+	if originID == e.me.NodeID() {
+
+		// if the target cluster has no collection node other than possibly this
+		// collection node then don't attempt to propagate the transaction further
+		recipientIDs := txCluster.Filter(filter.Not(filter.HasNodeID(e.me.NodeID())))
+		if len(recipientIDs) == 0 {
+			return nil
+		}
 
 		log.Debug().Msg("propagating transaction to cluster")
 
