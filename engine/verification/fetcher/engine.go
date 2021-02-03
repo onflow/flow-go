@@ -59,7 +59,7 @@ func New(
 		unit:          engine.NewUnit(),
 		metrics:       metrics,
 		tracer:        tracer,
-		log:           log.With().Str("engine", "match").Logger(),
+		log:           log.With().Str("engine", "fetcher").Logger(),
 		me:            me,
 		verifier:      verifier,
 		state:         state,
