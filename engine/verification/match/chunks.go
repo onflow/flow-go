@@ -11,6 +11,7 @@ import (
 type ChunkStatus struct {
 	Chunk             *flow.Chunk
 	ExecutionResultID flow.Identifier
+	Height            uint64
 	Agrees            []flow.Identifier
 	Disagrees         []flow.Identifier
 	LastAttempt       time.Time
@@ -28,12 +29,14 @@ func (s *ChunkStatus) Checksum() flow.Identifier {
 func NewChunkStatus(
 	chunk *flow.Chunk,
 	resultID flow.Identifier,
+	height uint64,
 	agrees []flow.Identifier,
 	disagrees []flow.Identifier,
 ) *ChunkStatus {
 	return &ChunkStatus{
 		Chunk:             chunk,
 		ExecutionResultID: resultID,
+		Height:            height,
 		Agrees:            agrees,
 		Disagrees:         disagrees,
 	}
