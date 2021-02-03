@@ -228,18 +228,17 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		// if the target cluster has no collection node other than possibly this
 		// collection node then don't attempt to propagate the transaction further
 		recipientIDs := txCluster.Filter(filter.Not(filter.HasNodeID(e.me.NodeID())))
-		if len(recipientIDs) == 0 {
-			return nil
+		if len(recipientIDs) > 0 {
+
+			log.Debug().Msg("propagating transaction to cluster")
+
+			err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, recipientIDs.NodeIDs()...)
+			if err != nil {
+				return fmt.Errorf("could not route transaction to cluster: %w", err)
+			}
+
+			e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		}
-
-		log.Debug().Msg("propagating transaction to cluster")
-
-		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
-		if err != nil {
-			return fmt.Errorf("could not route transaction to cluster: %w", err)
-		}
-
-		e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 	}
 
 	log.Info().Msg("transaction processed")
