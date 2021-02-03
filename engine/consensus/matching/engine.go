@@ -32,7 +32,7 @@ import (
 
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
 // for subsequent inclusion in block.
-const DefaultRequiredApprovalsForSealConstruction = 1
+const DefaultRequiredApprovalsForSealConstruction = 0
 
 // DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
 // sealing.
