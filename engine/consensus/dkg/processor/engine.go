@@ -165,6 +165,7 @@ Implement DKGProcessor
 // PrivateSend sends a DKGMessage to a destination over a private channel. It
 // appends the current DKG instance ID to the message.
 func (e *Engine) PrivateSend(dest int, data []byte) {
+	dkgInstance := e.GetDKGInstanceID()
 	if dest >= len(e.committee) || dest < 0 {
 		e.log.Error().Msgf("destination id out of range: %d", dest)
 		return
@@ -173,25 +174,33 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.GetDKGInstanceID(),
+		dkgInstance,
 	)
 	err := e.conduit.Unicast(dkgMessage, destID)
 	if err != nil {
-		e.log.Error().Msgf("Could not send Message to %v: %v", destID, err)
-		return
+		e.log.Error().
+			Err(err).
+			Str("dkg_instance_id", dkgInstance).
+			Msgf("could not send private message to %v", destID)
 	}
 }
 
 // Broadcast broadcasts a message to all participants.
 func (e *Engine) Broadcast(data []byte) {
+	dkgInstance := e.GetDKGInstanceID()
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		e.GetDKGInstanceID(),
+		dkgInstance,
 	)
 	err := e.dkgContractClient.Broadcast(dkgMessage)
 	if err != nil {
-		e.log.Error().Msgf("Could not broadcast message: %v", err)
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Str("dkg_instance_id", dkgInstance).
+				Msg("could not broadcast message")
+		}
 	}
 }
 
