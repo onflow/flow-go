@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // when maxAttempt is set to 3, CanTry will only return true for the first 3 times.
@@ -24,4 +25,17 @@ func TestCanTry(t *testing.T) {
 		}
 		require.Equal(t, []bool{true, true, true, false, false}, results)
 	})
+}
+
+func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
+	chunk := &flow.Chunk{
+		Index: uint64(index),
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: uint(index),
+			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
+			BlockID:         blockID,
+		},
+		EndState: unittest.StateCommitmentFixture(),
+	}
+	return chunk
 }
