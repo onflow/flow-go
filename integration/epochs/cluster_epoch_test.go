@@ -23,7 +23,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// ClusterEpochTestSuite ...
+// ClusterEpochTestSuite tests the quorum certificate voting process against the
+// QCAggregator contract running on the emulator. 
 type ClusterEpochTestSuite struct {
 	suite.Suite
 
