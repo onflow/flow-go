@@ -625,7 +625,7 @@ func (e *Engine) checkingSealing() error {
 	}
 
 	lg.Info().
-		Int("sealed_block_count", len(sealedBlockIDs)).
+  	Int("sealable_incorporated_results", len(sealedBlockIDs)).
 		Str("duration", time.Since(startTime).String()).
 		Bool("mempool_has_next_seal", mempoolHasNextSeal).
 		Int("pending_receipts_requested", pendingReceiptsRequested).
