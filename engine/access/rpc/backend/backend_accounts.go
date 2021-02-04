@@ -2,9 +2,11 @@ package backend
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -20,6 +22,7 @@ type backendAccounts struct {
 	headers            storage.Headers
 	executionReceipts  storage.ExecutionReceipts
 	connFactory        ConnectionFactory
+	log                zerolog.Logger
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -79,29 +82,29 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	var exeRes *execproto.GetAccountAtBlockIDResponse
-	var err error
+	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
+	}
 
-	if b.staticExecutionRPC != nil {
+	var exeRes *execproto.GetAccountAtBlockIDResponse
+	if len(execNodes) == 0 {
+		if b.staticExecutionRPC == nil {
+			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node")
+		}
 
 		exeRes, err = b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
 		if err != nil {
 			convertedErr := getAccountError(err)
 			return nil, convertedErr
 		}
+
 	} else {
-
-		execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
-		}
-
 		exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	account, err := convert.MessageToAccount(exeRes.GetAccount())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert account message: %v", err)
@@ -121,11 +124,28 @@ func getAccountError(err error) error {
 func (b *backendAccounts) getAccountFromAnyExeNode(ctx context.Context, execNodes flow.IdentityList, req execproto.GetAccountAtBlockIDRequest) (*execproto.GetAccountAtBlockIDResponse, error) {
 	var errors *multierror.Error // captures all error except
 	for _, execNode := range execNodes {
+		// TODO: use the GRPC Client interceptor
+		start := time.Now()
+
 		resp, err := b.tryGetAccount(ctx, execNode, req)
+		duration := time.Since(start)
 		if err == nil {
 			// return if any execution node replied successfully
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", req.GetBlockId()).
+				Hex("address", req.GetAddress()).
+				Int64("rtt_ms", duration.Milliseconds()).
+				Msg("Successfully got account info")
 			return resp, nil
 		}
+		b.log.Error().
+			Str("execution_node", execNode.String()).
+			Hex("block_id", req.GetBlockId()).
+			Hex("address", req.GetAddress()).
+			Int64("rtt_ms", duration.Milliseconds()).
+			Err(err).
+			Msg("failed to execute GetAccount")
 		errors = multierror.Append(errors, err)
 	}
 	// if we made it till here means there was at least one error
