@@ -593,6 +593,7 @@ func (e *Engine) checkingSealing() error {
 	requestReceiptsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
 	pendingReceiptRequests, err := e.requestPendingReceipts()
 	requestReceiptsSpan.Finish()
+
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
@@ -1055,7 +1056,7 @@ func (e *Engine) requestPendingReceipts() (int, error) {
 
 	// request missing execution results, if sealed height is low enough
 	if len(missingBlocksOrderedByHeight) > 0 {
-		log.Info().
+		log.Debug().
 			Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
 			Msg("requesting receipts")
 		for _, blockID := range missingBlocksOrderedByHeight {
@@ -1223,7 +1224,7 @@ func (e *Engine) requestPendingApprovals() (int, error) {
 	}
 
 	if requestCount > 0 {
-		log.Info().Msgf("requested %d approvals", requestCount)
+		log.Debug().Msgf("requested %d approvals", requestCount)
 	}
 
 	return requestCount, nil
