@@ -139,7 +139,7 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 	for index, cluster := range clustering {
 
 		// create cadence value
-		clusterIndicies = append(clusterIndicies, cadence.NewUInt16(uint16(index)))
+		clusterIndices = append(clusterIndices, cadence.NewUInt16(uint16(index)))
 
 		// create list of string node ids
 		nodeIDs := make([]cadence.Value, nodeCount/clusterCount)
