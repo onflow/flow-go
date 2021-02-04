@@ -28,22 +28,22 @@ import (
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
-	unit     *engine.Unit   // used to control startup/shutdown
-	log      zerolog.Logger // used to log relevant actions with context
-	metrics  module.EngineMetrics
-	tracer   module.Tracer
-	mempool  module.MempoolMetrics
-	spans    module.ConsensusMetrics
-	me       module.Local
-	cleaner  storage.Cleaner
-	headers  storage.Headers
-	payloads storage.Payloads
-	state    protocol.MutableState
-	con      network.Conduit
-	prov     network.Engine
-	pending  module.PendingBlockBuffer // pending block cache
-	sync     module.BlockRequester
-	hotstuff module.HotStuff
+	unit              *engine.Unit   // used to control startup/shutdown
+	log               zerolog.Logger // used to log relevant actions with context
+	metrics           module.EngineMetrics
+	tracer            module.Tracer
+	mempool           module.MempoolMetrics
+	complianceMetrics module.ComplianceMetrics
+	me                module.Local
+	cleaner           storage.Cleaner
+	headers           storage.Headers
+	payloads          storage.Payloads
+	state             protocol.MutableState
+	con               network.Conduit
+	prov              network.Engine
+	pending           module.PendingBlockBuffer // pending block cache
+	sync              module.BlockRequester
+	hotstuff          module.HotStuff
 }
 
 // New creates a new consensus propagation engine.
@@ -52,7 +52,7 @@ func New(
 	collector module.EngineMetrics,
 	tracer module.Tracer,
 	mempool module.MempoolMetrics,
-	spans module.ConsensusMetrics,
+	complianceMetrics module.ComplianceMetrics,
 	net module.Network,
 	me module.Local,
 	cleaner storage.Cleaner,
@@ -66,21 +66,21 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "compliance").Logger(),
-		metrics:  collector,
-		tracer:   tracer,
-		mempool:  mempool,
-		spans:    spans,
-		me:       me,
-		cleaner:  cleaner,
-		headers:  headers,
-		payloads: payloads,
-		state:    state,
-		prov:     prov,
-		pending:  pending,
-		sync:     sync,
-		hotstuff: nil, // use `WithConsensus`
+		unit:              engine.NewUnit(),
+		log:               log.With().Str("engine", "compliance").Logger(),
+		metrics:           collector,
+		tracer:            tracer,
+		mempool:           mempool,
+		complianceMetrics: complianceMetrics,
+		me:                me,
+		cleaner:           cleaner,
+		headers:           headers,
+		payloads:          payloads,
+		state:             state,
+		prov:              prov,
+		pending:           pending,
+		sync:              sync,
+		hotstuff:          nil, // use `WithConsensus`
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
@@ -330,15 +330,15 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
+	blockSpan, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
 	if !ok {
-		span = e.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
-		span.SetTag("block_id", proposal.Header.ID())
-		span.SetTag("view", proposal.Header.View)
-		span.SetTag("proposer", proposal.Header.ProposerID.String())
+		blockSpan = e.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
+		blockSpan.SetTag("block_id", proposal.Header.ID())
+		blockSpan.SetTag("view", proposal.Header.View)
+		blockSpan.SetTag("proposer", proposal.Header.ProposerID.String())
 	}
-	childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
-	defer childSpan.Finish()
+	onBlockProposalSpan := e.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposal)
+	defer onBlockProposalSpan.Finish()
 
 	for _, g := range proposal.Payload.Guarantees {
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
@@ -445,9 +445,15 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not check parent: %w", err)
 	}
 
-	// at this point, we should be able to connect the proposal to the finalized
-	// state and should process it to see whether to forward to hotstuff or not
+	// At this point, we should be able to connect the proposal to the finalized
+	// state and should process it to see whether to forward to hotstuff or not.
+	// processBlockProposal is a recursive method. Here we trace the execution
+	// of the entire recursion, which might include processing the proposal's
+	// pending children. There is another span within processBlockProposal that
+	// measures the time spent for a single proposal.
+	recursiveProcessSpan := e.tracer.StartSpanFromParent(onBlockProposalSpan, trace.CONCompOnBlockProposalProcessRecursive)
 	err = e.processBlockProposal(proposal)
+	recursiveProcessSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -466,6 +472,22 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // the children are also still on a valid chain and all missing links are there;
 // no need to do all the processing again.
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
+	// processBlockProposal is a recursive method that will also process all
+	// the pending children. Here we collect traces for a single proposal by
+	// stopping metrics short before the recursive call.
+	startTime := time.Now()
+	blockSpan, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
+	if !ok {
+		blockSpan = e.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
+		blockSpan.SetTag("block_id", proposal.Header.ID())
+		blockSpan.SetTag("view", proposal.Header.View)
+		blockSpan.SetTag("proposer", proposal.Header.ProposerID.String())
+	}
+	childSpan := e.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposalProcessSingle)
+	stopMetrics := func() {
+		e.complianceMetrics.BlockProposalDuration(time.Since(startTime))
+		childSpan.Finish()
+	}
 
 	header := proposal.Header
 
@@ -493,6 +515,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {
+		stopMetrics()
 		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
 			header.ID(), header.Height, err)
 	}
@@ -500,16 +523,19 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// if the error is an known outdated extension of the protocol state, then
 	// the input is outdated
 	if state.IsOutdatedExtensionError(err) {
+		stopMetrics()
 		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
 	}
 
 	if err != nil {
+		stopMetrics()
 		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
 
 	// retrieve the parent
 	parent, err := e.headers.ByBlockID(header.ParentID)
 	if err != nil {
+		stopMetrics()
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
@@ -517,6 +543,9 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 
 	// submit the model to hotstuff for processing
 	e.hotstuff.SubmitProposal(header, parent.View)
+
+	// stop metrics before recursive call
+	stopMetrics()
 
 	// check for any descendants of the block to process
 	err = e.processPendingChildren(header)

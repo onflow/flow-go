@@ -291,7 +291,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
-				conMetrics,
+				node.Metrics.Compliance,
 				node.Network,
 				node.Me,
 				cleaner,

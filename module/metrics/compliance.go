@@ -14,6 +14,7 @@ type ComplianceCollector struct {
 	sealedHeight             prometheus.Gauge
 	finalizedBlocks          prometheus.Counter
 	sealedBlocks             prometheus.Counter
+	blockProposalDuration    prometheus.Counter
 	finalizedPayload         *prometheus.CounterVec
 	sealedPayload            *prometheus.CounterVec
 	lastBlockFinalizedAt     time.Time
@@ -50,6 +51,13 @@ func NewComplianceCollector() *ComplianceCollector {
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of sealed blocks",
+		}),
+
+		blockProposalDuration: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "consensus_committee_block_proposal_duration_seconds_total",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "time spent processing block proposals in seconds",
 		}),
 
 		finalizedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -115,4 +123,8 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 	cc.sealedBlocks.Inc()
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
+}
+
+func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
+	cc.blockProposalDuration.Add(duration.Seconds())
 }
