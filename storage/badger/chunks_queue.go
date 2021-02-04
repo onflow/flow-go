@@ -11,10 +11,10 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-// ChunksQueue stores a queue of chunks that assigned to me to be verified.
+// ChunkLocatorQueue stores a queue of chunks that assigned to me to be verified.
 // Job consumers can read the chunk as job from the queue by index
 // Chunks stored in this queue are unique
-type ChunksQueue struct {
+type ChunkLocatorQueue struct {
 	db *badger.DB
 }
 
@@ -22,14 +22,14 @@ const JobQueueChunksQueue = "JobQueueChunksQueue"
 
 // NewChunksQueue will initialize the index of the latest chunk stored with
 // the given default index if it was never initialized
-func NewChunksQueue(db *badger.DB) *ChunksQueue {
-	return &ChunksQueue{
+func NewChunksQueue(db *badger.DB) *ChunkLocatorQueue {
+	return &ChunkLocatorQueue{
 		db: db,
 	}
 }
 
 // Init initial chunks queue's latest index witht the given default index
-func (q *ChunksQueue) Init(defaultIndex int64) (bool, error) {
+func (q *ChunkLocatorQueue) Init(defaultIndex int64) (bool, error) {
 	_, err := q.LatestIndex()
 	if errors.Is(err, storage.ErrNotFound) {
 		err = q.db.Update(operation.InitJobLatestIndex(JobQueueChunksQueue, defaultIndex))
@@ -48,12 +48,12 @@ func (q *ChunksQueue) Init(defaultIndex int64) (bool, error) {
 // StoreChunk stores a new chunk that assigned to me to the job queue
 // true will be returned, if the chunk was a new chunk
 // false will be returned, if the chunk was a duplicate
-func (q *ChunksQueue) StoreChunk(chunk *flow.Chunk) (bool, error) {
+func (q *ChunkLocatorQueue) StoreChunk(chunkID flow.Identifier, resultID flow.Identifier) (bool, error) {
 	err := operation.RetryOnConflict(q.db.Update, func(tx *badger.Txn) error {
 		// make sure the chunk is unique
-		err := operation.InsertChunk(chunk)(tx)
+		err := operation.InsertChunkResultIDs(chunkID, resultID)(tx)
 		if err != nil {
-			return fmt.Errorf("failed to insert chunk: %w", err)
+			return fmt.Errorf("failed to insert (chunkID, resultID): %w", err)
 		}
 
 		// read the latest index
@@ -65,7 +65,7 @@ func (q *ChunksQueue) StoreChunk(chunk *flow.Chunk) (bool, error) {
 
 		// insert to the next index
 		next := latest + 1
-		err = operation.InsertJobAtIndex(JobQueueChunksQueue, next, chunk.ID())(tx)
+		err = operation.InsertJobAtIndex(JobQueueChunksQueue, next, chunkID)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to set job index for chunks queue at index %v: %w", next, err)
 		}
@@ -91,7 +91,7 @@ func (q *ChunksQueue) StoreChunk(chunk *flow.Chunk) (bool, error) {
 
 // LatestIndex returns the index of the latest chunk stored
 // in the queue
-func (q *ChunksQueue) LatestIndex() (int64, error) {
+func (q *ChunkLocatorQueue) LatestIndex() (int64, error) {
 	var latest int64
 	err := q.db.View(operation.RetrieveJobLatestIndex(JobQueueChunksQueue, &latest))
 	if err != nil {
@@ -102,7 +102,7 @@ func (q *ChunksQueue) LatestIndex() (int64, error) {
 
 // AtIndex returns the chunk stored at the given index in the
 // queue
-func (q *ChunksQueue) AtIndex(index int64) (*flow.Chunk, error) {
+func (q *ChunkLocatorQueue) AtIndex(index int64) (*flow.Chunk, error) {
 	var chunkID flow.Identifier
 	err := q.db.View(operation.RetrieveJobAtIndex(JobQueueChunksQueue, index, &chunkID))
 	if err != nil {

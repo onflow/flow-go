@@ -11,7 +11,7 @@ type ChunkLocator struct {
 	Index    uint64          // index of chunk in the execution result
 }
 
-// ID returns a unique id for chunk locator
+// ID returns a unique id for chunk locator.
 func (c ChunkLocator) ID() flow.Identifier {
 	return flow.MakeID(c)
 }

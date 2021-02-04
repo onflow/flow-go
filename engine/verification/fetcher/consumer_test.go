@@ -43,7 +43,7 @@ func TestProduceConsume(t *testing.T) {
 			defer lock.Unlock()
 			called = append(called, chunk)
 		}
-		WithConsumer(t, neverFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, neverFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
 			<-consumer.Ready()
 
 			block := unittest.BlockFixture()
@@ -73,7 +73,7 @@ func TestProduceConsume(t *testing.T) {
 			called = append(called, chunk)
 			go finishProcessing.FinishProcessing(chunk.ID())
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
 			<-consumer.Ready()
 
 			block := unittest.BlockFixture()
@@ -102,7 +102,7 @@ func TestProduceConsume(t *testing.T) {
 			called = append(called, chunk)
 			go finishProcessing.FinishProcessing(chunk.ID())
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
 			<-consumer.Ready()
 
 			block := unittest.BlockFixture()
@@ -133,7 +133,7 @@ func TestProduceConsume(t *testing.T) {
 func WithConsumer(
 	t *testing.T,
 	process func(fetcher.FinishProcessing, *flow.Chunk),
-	withConsumer func(*fetcher.ChunkConsumer, *storage.ChunksQueue),
+	withConsumer func(*fetcher.ChunkConsumer, *storage.ChunkLocatorQueue),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
