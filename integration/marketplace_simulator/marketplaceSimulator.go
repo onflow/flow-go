@@ -170,9 +170,9 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	// mint a lot of moments (1000 for now)
+	// mint a lot of moments
 	// GenerateBatchMintMomentScript(topShotAddr flow.Address, destinationAccount flow.Address, setID, playID uint32, quantity uint64)
-	script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 0, 0, 1000)
+	script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 0, 0, uint64(m.simulatorConfig.NumberOfMoments))
 	tx = flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
