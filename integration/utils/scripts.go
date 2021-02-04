@@ -167,7 +167,7 @@ access(all) contract MyFavContract {
 }
 `
 
-const deployingMyFavContractScriptTemplate = `
+const deployingContractScriptTemplate = `
 transaction {
   prepare(signer: AuthAccount) {
     signer.setCode("%s".decodeHex())
@@ -176,8 +176,7 @@ transaction {
 `
 
 func DeployingMyFavContractScript() []byte {
-	return []byte(fmt.Sprintf(deployingMyFavContractScriptTemplate, hex.EncodeToString([]byte(myFavContract))))
-
+	return []byte(fmt.Sprintf(deployingContractScriptTemplate, hex.EncodeToString([]byte(myFavContract))))
 }
 
 const eventHeavyScriptTemplate = `
@@ -233,5 +232,3 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 
 	return cadence.NewArray(values)
 }
-
-// TODO add tx size heavy similar to add keys
