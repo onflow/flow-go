@@ -626,21 +626,22 @@ func (e *Engine) checkingSealing() error {
 	return nil
 }
 
-func nextUnsealedID(state protocol.State) (flow.Identifier, bool) {
+func nextUnsealedID(state protocol.State) (flow.Identifier, bool, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
-		return flow.ZeroID, false
+		return flow.ZeroID, false, fmt.Errorf("could not get last sealed: %w", err)
 	}
 
 	nextUnsealedHeight := lastSealed.Height + 1
 	nextUnsealed, err := state.AtHeight(nextUnsealedHeight).Head()
 	if errors.Is(err, storage.ErrNotFound) {
 		// next unsealed block has not been finalized yet.
-		return flow.ZeroID, false
-	} else if err != nil {
-		return flow.ZeroID, false
+		return flow.ZeroID, false, nil
 	}
-	return nextUnsealed.ID(), true
+	if err != nil {
+		return flow.ZeroID, false, fmt.Errorf("could not get block at heigh:%v, %w", nextUnsealed, err)
+	}
+	return nextUnsealed.ID(), true, nil
 }
 
 // sealableResults returns the IncorporatedResults from the mempool that have
@@ -656,7 +657,10 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 		return nil, nil, fmt.Errorf("failed to get last finalized block: %w", err)
 	}
 
-	nextUnsealed, nextUnsealedIsFinalized := nextUnsealedID(e.state)
+	nextUnsealed, nextUnsealedIsFinalized, err := nextUnsealedID(e.state)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get the next unsealed block id: %w", err)
+	}
 
 	nextUnsealeds := make([]*nextUnsealedResult, 0)
 	// go through the results mempool and check which ones we have collected
