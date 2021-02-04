@@ -228,11 +228,11 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 		log.Debug().Msg("propagating transaction to cluster")
 
 		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
-		if !errors.Is(err, network.EmptyTargetList) {
-			if err != nil {
-				// if mutlicast to a target cluster with at least one node failed, return an error
-				return fmt.Errorf("could not route transaction to cluster: %w", err)
-			}
+		if err != nil && !errors.Is(err, network.EmptyTargetList) {
+			// if mutlicast to a target cluster with at least one node failed, return an error
+			return fmt.Errorf("could not route transaction to cluster: %w", err)
+		}
+		if err == nil {
 			e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		}
 	}
