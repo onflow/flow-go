@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -236,7 +237,6 @@ func (suite *Suite) TestInvalidTransaction() {
 // should store transactions for local cluster and propagate to other cluster members
 func (suite *Suite) TestRoutingLocalCluster() {
 
-	myID := suite.me.NodeID()
 	local, _, ok := suite.clusters.ByNodeID(suite.me.NodeID())
 	suite.Require().True(ok)
 
@@ -245,10 +245,9 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
-	expectedIDs := local.Filter(filter.Not(filter.HasNodeID(myID)))
 	// should route to local cluster
 	suite.conduit.
-		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, expectedIDs.NodeIDs()[0]).
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, local.NodeIDs()[0], local.NodeIDs()[1]).
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
@@ -280,6 +279,38 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	suite.conduit.
 		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, remote[0].NodeID, remote[1].NodeID).
 		Return(nil)
+
+	err := suite.engine.ProcessLocal(&tx)
+	suite.Assert().NoError(err)
+
+	// should not be added to local mempool
+	counter, err := suite.epochQuery.Current().Counter()
+	suite.Assert().NoError(err)
+	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.conduit.AssertExpectations(suite.T())
+}
+
+// should not store transactions for a different cluster and should not fail when propagating
+// to an empty cluster
+func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
+
+	// find a remote cluster
+	_, index, ok := suite.clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
+
+	emptyIdentityList := flow.IdentityList{}
+	nextClusterIndex := (index + 1) % suite.N_CLUSTERS
+	suite.clusters[nextClusterIndex] = emptyIdentityList
+
+	// get a transaction that will be routed to remote cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, emptyIdentityList, func(transaction *flow.TransactionBody) {})
+
+	// should attempt route to remote cluster without any node ids
+	suite.conduit.
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1).
+		Return(network.EmptyTargetList)
 
 	err := suite.engine.ProcessLocal(&tx)
 	suite.Assert().NoError(err)
@@ -373,10 +404,8 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, epoch2Clusters, epoch2Local, func(transaction *flow.TransactionBody) {})
 
-	epoch2LocalWithoutMe := epoch2Local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))
 	// should route to local cluster
-	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1,
-		epoch2LocalWithoutMe.NodeIDs()[0]).Return(nil).Once()
+	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch2Local.NodeIDs()[0], epoch2Local.NodeIDs()[1]).Return(nil).Once()
 
 	err := suite.engine.ProcessLocal(&tx)
 	suite.Assert().NoError(err)
@@ -481,8 +510,7 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	tx = unittest.AlterTransactionForCluster(tx, epoch3Clusters, epoch3Local, func(transaction *flow.TransactionBody) {})
 
 	// should route to local cluster
-	epoch3LocalWithoutMe := epoch3Local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))
-	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch3LocalWithoutMe.NodeIDs()[0]).Return(nil).Once()
+	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch3Local.NodeIDs()[0], epoch3Local.NodeIDs()[1]).Return(nil).Once()
 
 	err = suite.engine.ProcessLocal(&tx)
 	suite.Assert().NoError(err)

@@ -402,9 +402,9 @@ func (n *Network) sendOnChannel(channel network.Channel, message interface{}, ta
 		if err != nil {
 			return err
 		}
-		// if the filtration resulted in an empty list
+		// if the filtration resulted in an empty list, throw an error
 		if len(targetIDs) == 0 {
-			return fmt.Errorf("empty list of target ids")
+			return network.EmptyTargetList
 		}
 	}
 

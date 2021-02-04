@@ -3,6 +3,7 @@
 package ingest
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -10,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
@@ -225,18 +225,14 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 	// or a different cluster)
 	if originID == e.me.NodeID() {
 
-		// if the target cluster has no collection node other than possibly this
-		// collection node then don't attempt to propagate the transaction further
-		recipientIDs := txCluster.Filter(filter.Not(filter.HasNodeID(e.me.NodeID())))
-		if len(recipientIDs) > 0 {
+		log.Debug().Msg("propagating transaction to cluster")
 
-			log.Debug().Msg("propagating transaction to cluster")
-
-			err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, recipientIDs.NodeIDs()...)
+		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
+		if !errors.Is(err, network.EmptyTargetList) {
 			if err != nil {
+				// if mutlicast to a target cluster with at least one node failed, return an error
 				return fmt.Errorf("could not route transaction to cluster: %w", err)
 			}
-
 			e.engMetrics.MessageSent(metrics.EngineCollectionIngest, metrics.MessageTransaction)
 		}
 	}
