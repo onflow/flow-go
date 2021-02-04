@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -25,35 +26,36 @@ func init() {
 }
 
 func TestHead(t *testing.T) {
-	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	stateRoot := fixtureStateRootWithParticipants(t, identities)
-	util.RunWithBootstrapState(t, stateRoot, func(db *badger.DB, state *bprotocol.State) {
-		header := stateRoot.Block().Header
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
 
 		t.Run("works with block number", func(t *testing.T) {
-			retrieved, err := state.AtHeight(header.Height).Head()
+			retrieved, err := state.AtHeight(head.Height).Head()
 			require.NoError(t, err)
-			require.Equal(t, header.ID(), retrieved.ID())
+			require.Equal(t, head.ID(), retrieved.ID())
 		})
 
 		t.Run("works with block id", func(t *testing.T) {
-			retrieved, err := state.AtBlockID(header.ID()).Head()
+			retrieved, err := state.AtBlockID(head.ID()).Head()
 			require.NoError(t, err)
-			require.Equal(t, header.ID(), retrieved.ID())
+			require.Equal(t, head.ID(), retrieved.ID())
 		})
 
 		t.Run("works with finalized block", func(t *testing.T) {
 			retrieved, err := state.Final().Head()
 			require.NoError(t, err)
-			require.Equal(t, header.ID(), retrieved.ID())
+			require.Equal(t, head.ID(), retrieved.ID())
 		})
 	})
 }
 
 func TestIdentities(t *testing.T) {
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	stateRoot := fixtureStateRootWithParticipants(t, identities)
-	util.RunWithBootstrapState(t, stateRoot, func(db *badger.DB, state *bprotocol.State) {
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
 
 		t.Run("no filter", func(t *testing.T) {
 			actual, err := state.Final().Identities(filter.Any)
@@ -92,9 +94,7 @@ func TestClusters(t *testing.T) {
 	collectors := unittest.IdentityListFixture(nCollectors, unittest.WithRole(flow.RoleCollection))
 	identities := append(unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleCollection)), collectors...)
 
-	stateRoot := fixtureStateRootWithParticipants(t, identities)
-	seal := stateRoot.Seal()
-
+	root, result, seal := unittest.BootstrapFixture(identities)
 	setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
 	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
@@ -103,7 +103,10 @@ func TestClusters(t *testing.T) {
 		commit.ClusterQCs[i] = unittest.QuorumCertificateFixture()
 	}
 
-	util.RunWithBootstrapState(t, stateRoot, func(db *badger.DB, state *bprotocol.State) {
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture())
+	require.NoError(t, err)
+
+	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
 		expectedClusters, err := flow.NewClusterList(setup.Assignments, collectors)
 		require.NoError(t, err)
 		actualClusters, err := state.Final().Epochs().Current().Clustering()
@@ -125,14 +128,16 @@ func TestClusters(t *testing.T) {
 // test retrieving quorum certificate and seed
 func TestQuorumCertificate(t *testing.T) {
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	stateRoot := fixtureStateRootWithParticipants(t, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
 
 	// should not be able to get QC or random beacon seed from a block with no children
 	t.Run("no children", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			// create a block to query
-			block1 := unittest.BlockWithParentFixture(stateRoot.Block().Header)
+			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
 			err := state.Extend(&block1)
 			require.Nil(t, err)
@@ -148,16 +153,16 @@ func TestQuorumCertificate(t *testing.T) {
 	// should not be able to get random beacon seed from a block with only invalid
 	// or unvalidated children
 	t.Run("un-validated child", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			// create a block to query
-			block1 := unittest.BlockWithParentFixture(stateRoot.Block().Header)
+			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
 			err := state.Extend(&block1)
 			require.Nil(t, err)
 
 			// add child
-			unvalidatedChild := unittest.BlockWithParentFixture(stateRoot.Block().Header)
+			unvalidatedChild := unittest.BlockWithParentFixture(head)
 			unvalidatedChild.SetPayload(flow.EmptyPayload())
 			err = state.Extend(&unvalidatedChild)
 			assert.Nil(t, err)
@@ -172,15 +177,21 @@ func TestQuorumCertificate(t *testing.T) {
 
 	// should be able to get QC and random beacon seed from root block
 	t.Run("root block", func(t *testing.T) {
-		// TODO
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// since we bootstrap with a root snapshot, this will be the root block
+			_, err := state.AtBlockID(head.ID()).QuorumCertificate()
+			assert.NoError(t, err)
+			_, err = state.AtBlockID(head.ID()).Seed(1, 2, 3, 4)
+			assert.NoError(t, err)
+		})
 	})
 
 	// should be able to get QC and random beacon seed from a block with a valid child
 	t.Run("valid child", func(t *testing.T) {
-		util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			// add a block so we aren't testing against root
-			block1 := unittest.BlockWithParentFixture(stateRoot.Block().Header)
+			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
 			err := state.Extend(&block1)
 			require.Nil(t, err)
@@ -213,9 +224,11 @@ func TestQuorumCertificate(t *testing.T) {
 // test that we can query current/next/previous epochs from a snapshot
 func TestSnapshot_EpochQuery(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
-	stateRoot := fixtureStateRootWithParticipants(t, identities)
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *bprotocol.MutableState) {
-		seal := stateRoot.Seal()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	seal, err := rootSnapshot.LatestSeal()
+	require.NoError(t, err)
+
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
 		epoch1Counter := seal.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
 		epoch2Counter := epoch1Counter + 1
 
@@ -312,9 +325,13 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 // test that querying the first view of an epoch returns the appropriate value
 func TestSnapshot_EpochFirstView(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
-	stateRoot := fixtureStateRootWithParticipants(t, identities)
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *bprotocol.MutableState) {
-		root, seal := stateRoot.Block(), stateRoot.Seal()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	seal, err := rootSnapshot.LatestSeal()
+	require.NoError(t, err)
+
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
 
 		// Prepare an epoch builder, which builds epochs with 6 blocks, A,B,C,D,E,F
 		// See EpochBuilder documentation for details of these blocks.
@@ -341,7 +358,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 			CompleteEpoch()
 
 		// figure out the expected first views of the epochs
-		epoch1FirstView := root.Header.View
+		epoch1FirstView := head.View
 		epoch2FirstView := seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView + 1
 
 		epoch1Heights := []uint64{0, 1, 2, 3, 4, 5}
@@ -415,8 +432,8 @@ func TestSnapshot_CrossEpochIdentities(t *testing.T) {
 	// epoch 3 has no overlap with epoch 2
 	epoch3Identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
 
-	stateRoot := fixtureStateRootWithParticipants(t, epoch1Identities)
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *bprotocol.MutableState) {
+	rootSnapshot := unittest.RootSnapshotFixture(epoch1Identities)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
 
 		// Prepare an epoch builder, which builds epochs with 6 blocks, A,B,C,D,E,F
 		// See EpochBuilder documentation for details of these blocks.
@@ -541,10 +558,10 @@ func TestSnapshot_PostSporkIdentities(t *testing.T) {
 		block.Header.ParentID = unittest.IdentifierFixture()
 	})
 
-	stateRoot, err := flow.NewStateRoot(root, result, seal, 0)
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture())
 	require.NoError(t, err)
 
-	util.RunWithBootstrapState(t, stateRoot, func(db *badger.DB, state *bprotocol.State) {
+	util.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
 		actual, err := state.Final().Identities(filter.Any)
 		require.Nil(t, err)
 		assert.ElementsMatch(t, expected, actual)

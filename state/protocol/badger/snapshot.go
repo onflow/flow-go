@@ -257,7 +257,6 @@ func (s *Snapshot) LatestSeal() (*flow.Seal, error) {
 	return seal, nil
 }
 
-// TODO inject results storage
 func (s *Snapshot) LatestResult() (*flow.ExecutionResult, error) {
 	seal, err := s.LatestSeal()
 	if err != nil {
