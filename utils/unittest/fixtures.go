@@ -998,7 +998,7 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 		View:      uint64(rand.Uint32()),
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
-		SigData:   SeedFixture(32 * 3),
+		SigData:   CombinedSignatureFixture(2),
 	}
 }
 

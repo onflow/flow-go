@@ -127,7 +127,17 @@ func Bootstrap(
 			return fmt.Errorf("could not index root block seal: %w", err)
 		}
 
-		// 4) initialize the current protocol state values
+		// 4) insert the root quorum certificate into the database
+		qc, err := root.QuorumCertificate()
+		if err != nil {
+			return fmt.Errorf("could not get root qc: %w", err)
+		}
+		err = operation.InsertRootQuorumCertificate(qc)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root qc: %w", err)
+		}
+
+		// 5) initialize the current protocol state values
 		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
@@ -149,7 +159,7 @@ func Bootstrap(
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		// 5) initialize values related to the epoch logic
+		// 6) initialize values related to the epoch logic
 		err = state.bootstrapEpoch(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
