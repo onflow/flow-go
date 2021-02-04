@@ -591,7 +591,7 @@ func (e *Engine) checkingSealing() error {
 
 	// request execution receipts for unsealed finalized blocks
 	requestReceiptsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
-	pendingReceiptsRequested, err := e.requestPendingReceipts()
+	pendingReceiptRequests, err := e.requestPendingReceipts()
 	requestReceiptsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
@@ -599,7 +599,7 @@ func (e *Engine) checkingSealing() error {
 
 	// request result approvals for pending incorporated results
 	requestApprovalsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingApprovals)
-	pendingApprovalsRequested, err := e.requestPendingApprovals()
+	pendingApprovalRequests, err := e.requestPendingApprovals()
 	requestApprovalsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
@@ -616,7 +616,7 @@ func (e *Engine) checkingSealing() error {
 	}
 
 	lg.Info().
-  	    Int("sealable_incorporated_results", len(sealedBlockIDs)).
+		Int("sealable_incorporated_results", len(sealedBlockIDs)).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
 		Bool("mempool_has_next_seal", mempoolHasNextSeal).
 		Int("pending_receipt_requests", pendingReceiptRequests).
@@ -731,20 +731,17 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 			results = append(results, incorporatedResult)
 		}
 
-		// whether we sealed the result when the emergency sealing is active and triggered
-		sealedByEmergency := !matched && matchedAfterConsideringEmergency
-
 		if nextUnsealedIsFinalized {
 			if incorporatedResult.Result.BlockID == nextUnsealed {
 				nextUnsealeds = append(nextUnsealeds, &nextUnsealedResult{
-					BlockID:                  incorporatedResult.Result.BlockID,
-					Height:                   block.Height,
-					ResultID:                 incorporatedResult.Result.ID(),
-					IncorporatedResultID:     incorporatedResult.ID(),
-					TotalChunks:              len(incorporatedResult.Result.Chunks),
-					FirstUnmatchedChunkIndex: unmatchedIndex,
-					SufficientApprovalsForSealing:              matched,
-					QualifiesForEmergencySealing:        emergencySealed,
+					BlockID:                       incorporatedResult.Result.BlockID,
+					Height:                        block.Height,
+					ResultID:                      incorporatedResult.Result.ID(),
+					IncorporatedResultID:          incorporatedResult.ID(),
+					TotalChunks:                   len(incorporatedResult.Result.Chunks),
+					FirstUnmatchedChunkIndex:      unmatchedIndex,
+					SufficientApprovalsForSealing: matched,
+					QualifiesForEmergencySealing:  emergencySealed,
 				})
 			}
 		}
