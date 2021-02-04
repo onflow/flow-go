@@ -20,21 +20,6 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
-type NetworkConfig struct {
-	ServiceAccountAddress       *flowsdk.Address
-	FlowTokenAddress            *flowsdk.Address
-	FungibleTokenAddress        *flowsdk.Address
-	NonFungibleTokenAddress     *flowsdk.Address
-	ServiceAccountPrivateKeyHex string
-	AccessNodeAddresses         []string
-}
-
-type SimulatorConfig struct {
-	numberOfAccounts int
-	numberOfMoments  int
-	delay            time.Duration
-}
-
 // MarketPlaceSimulator simulates continuous variable load with interactions
 type MarketPlaceSimulator struct {
 	log               zerolog.Logger
@@ -58,7 +43,7 @@ func NewMarketPlaceSimulator(
 		networkConfig:     networkConfig,
 		simulatorConfig:   simulatorConfig,
 		marketAccounts:    make([]marketPlaceAccount, 0),
-		availableAccounts: make(chan *marketPlaceAccount, simulatorConfig.numberOfAccounts),
+		availableAccounts: make(chan *marketPlaceAccount, simulatorConfig.NumberOfAccounts),
 		stopped:           false,
 	}
 
@@ -96,7 +81,7 @@ func (m *MarketPlaceSimulator) Setup() error {
 		return fmt.Errorf("error loading service account %w", err)
 	}
 
-	accounts, err := m.createAccounts(serviceAcc, m.simulatorConfig.numberOfAccounts+1) // first one is for nba
+	accounts, err := m.createAccounts(serviceAcc, m.simulatorConfig.NumberOfAccounts+1) // first one is for nba
 	if err != nil {
 		return err
 	}
