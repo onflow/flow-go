@@ -3,7 +3,7 @@ package badger
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -12,8 +12,9 @@ import (
 func validSetup(setup *flow.EpochSetup) error {
 	// STEP 1: general sanity checks
 	// the seed needs to be at least minimum length
-	if len(setup.RandomSource) < crypto.MinSeedLength {
-		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.RandomSource), crypto.MinSeedLength)
+	// TODO: what is the appropriate minimum length here? Previously used sdk/crypto.SeedMinLength
+	if len(setup.RandomSource) < crypto.SeedMinLenDKG {
+		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.RandomSource), crypto.SeedMinLenDKG)
 	}
 
 	// STEP 2: sanity checks of all nodes listed as participants
@@ -92,6 +93,10 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return fmt.Errorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
+	}
+
+	if commit.Counter != setup.Counter {
+		return fmt.Errorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", commit.Counter, setup.Counter)
 	}
 
 	// make sure we have a valid DKG public key
