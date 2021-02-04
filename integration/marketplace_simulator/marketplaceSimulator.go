@@ -334,7 +334,7 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 	count := cadence.NewInt(num)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(
-		24*60*60*100,
+		24*60*60*0.01,
 		0,
 	)
 	if err != nil {
