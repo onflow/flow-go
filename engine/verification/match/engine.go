@@ -350,6 +350,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
+		// skips requesting chunks of already sealed blocks
 		isSealed := header.Height <= sealedHeight
 		if isSealed {
 			e.pendingChunks.Rem(chunkID)
