@@ -4,7 +4,6 @@ package matching
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -472,14 +471,6 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	return nil
 }
 
-func nextUnsealedsPrintable(nextUnsealeds []*nextUnsealedResult) string {
-	nextUnsealedResultsAsJSON, err := json.Marshal(nextUnsealeds)
-	if err != nil {
-		return fmt.Sprintf("can not convert next unsealeds to json: %s", err.Error())
-	}
-	return string(nextUnsealedResultsAsJSON)
-}
-
 // checkSealing checks if there is anything worth sealing at the moment.
 func (e *Engine) checkSealing() {
 	// only check sealing when no one else is checking
@@ -517,7 +508,7 @@ func (e *Engine) checkingSealing() error {
 
 	lg := e.log.With().
 		Int("sealable_results_count", len(sealableResults)).
-		Str("next_unsealed_results", nextUnsealedsPrintable(nextUnsealeds)).
+		Str("next_unsealed_results", nextUnsealeds.String()).
 		Logger()
 
 	if len(sealableResults) == 0 {
@@ -657,7 +648,7 @@ func nextUnsealedID(state protocol.State) (flow.Identifier, bool) {
 // function. It also filters out results that have an incorrect sub-graph.
 // It specifically returns the information for the next unsealed results which will
 // be useful for debugging the potential sealing halt issue
-func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, []*nextUnsealedResult, error) {
+func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResults, error) {
 	var results []*flow.IncorporatedResult
 
 	lastFinalized, err := e.state.Final().Head()
@@ -760,18 +751,6 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, []*nextUnsealedR
 	}
 
 	return results, nextUnsealeds, nil
-}
-
-// This struct is made for debugging potential sealing halt
-type nextUnsealedResult struct {
-	BlockID                  flow.Identifier // the block of of the next unsealed block
-	Height                   uint64          // the height of the block
-	ResultID                 flow.Identifier // if we haven't received the result, it would be ZeroID
-	IncorporatedResultID     flow.Identifier // to find seal in mempool
-	TotalChunks              int
-	FirstUnmatchedChunkIndex int  // show which chunk hasn't received approval
-	CanBeSealed              bool // if true, then it should soon go to seals mempool
-	SealedByEmergency        bool // if sealed by emergency since there are too many unsealed blocks
 }
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
