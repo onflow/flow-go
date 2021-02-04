@@ -298,6 +298,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	_, index, ok := suite.clusters.ByNodeID(suite.me.NodeID())
 	suite.Require().True(ok)
 
+	// set the next cluster to be empty
 	emptyIdentityList := flow.IdentityList{}
 	nextClusterIndex := (index + 1) % suite.N_CLUSTERS
 	suite.clusters[nextClusterIndex] = emptyIdentityList
@@ -307,7 +308,7 @@ func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, emptyIdentityList, func(transaction *flow.TransactionBody) {})
 
-	// should attempt route to remote cluster without any node ids
+	// should attempt route to remote cluster without providing any node ids
 	suite.conduit.
 		On("Multicast", &tx, suite.conf.PropagationRedundancy+1).
 		Return(network.EmptyTargetList)
