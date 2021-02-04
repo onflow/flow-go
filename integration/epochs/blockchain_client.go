@@ -12,7 +12,9 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 )
 
-type BlockChainClient struct {
+// EmulatorClient is a wrapper around the emulator to implement the same interface
+// used by the SDK client. Used for testing against the emulator.
+type EmulatorClient struct {
 	blockchain *emulator.Blockchain
 }
 
