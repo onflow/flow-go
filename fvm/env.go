@@ -299,7 +299,7 @@ func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) e
 	return e.ctx.ASTCache.SetProgram(location, program)
 }
 
-func (e *hostEnv) Log(message string) error {
+func (e *hostEnv) ProgramLog(message string) error {
 	if e.ctx.CadenceLoggingEnabled {
 		e.logs = append(e.logs, message)
 	}
@@ -546,6 +546,11 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
+}
+
+func (e *hostEnv) ImplementationDebugLog(message string) error {
+	e.ctx.Logger.Debug().Msg(fmt.Sprintf("Cadence: %s", message))
+	return nil
 }
 
 // Transaction Environment
