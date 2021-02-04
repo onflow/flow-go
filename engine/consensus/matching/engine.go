@@ -625,11 +625,11 @@ func (e *Engine) checkingSealing() error {
 	}
 
 	lg.Info().
-  	Int("sealable_incorporated_results", len(sealedBlockIDs)).
-		Str("duration", time.Since(startTime).String()).
+  	    Int("sealable_incorporated_results", len(sealedBlockIDs)).
+		Int64("duration_ms", time.Since(startTime).Milliseconds()).
 		Bool("mempool_has_next_seal", mempoolHasNextSeal).
-		Int("pending_receipts_requested", pendingReceiptsRequested).
-		Int("pending_approvals_requested", pendingApprovalsRequested).
+		Int("pending_receipt_requests", pendingReceiptRequests).
+		Int("pending_approval_requests", pendingApprovalRequests).
 		Msg("checking sealing finished successfully")
 
 	return nil
@@ -716,7 +716,7 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, []*nextUnsealedR
 			}
 		}
 
-		matchedAfterConsideringEmergency := matched
+		emergencySealed := false
 		// ATTENTION: this is a temporary solution called emergency sealing. Emergency sealing is a special case
 		// when we seal ERs that don't have enough approvals but are deep enough in the chain resulting in halting sealing
 		// process. This will be removed when implementation of seal & verification is finished.
@@ -731,11 +731,11 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, []*nextUnsealedR
 			// and lastFinalized, it means there are as many unsealed and finalized blocks, because
 			// should trigger the emergency sealing
 			if incorporatedBlock.Height+DefaultEmergencySealingThreshold <= lastFinalized.Height {
-				matchedAfterConsideringEmergency = true
+				emergencySealed = true
 			}
 		}
 
-		if matchedAfterConsideringEmergency {
+		if matched || emergencySealed {
 			// add the result to the results that should be sealed
 			results = append(results, incorporatedResult)
 		}
@@ -752,8 +752,8 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, []*nextUnsealedR
 					IncorporatedResultID:     incorporatedResult.ID(),
 					TotalChunks:              len(incorporatedResult.Result.Chunks),
 					FirstUnmatchedChunkIndex: unmatchedIndex,
-					CanBeSealed:              matchedAfterConsideringEmergency,
-					SealedByEmergency:        sealedByEmergency,
+					SufficientApprovalsForSealing:              matched,
+					QualifiesForEmergencySealing:        emergencySealed,
 				})
 			}
 		}
