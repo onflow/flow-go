@@ -254,12 +254,7 @@ func TestReadBroadcastMessages(t *testing.T) {
 	contractClient.AssertExpectations(t)
 
 	// check that the messages have been received and forwarded to the msgCh
-	unittest.AssertReturnsBefore(
-		t,
-		func() {
-			<-doneCh
-		},
-		time.Second)
+	unittest.AssertClosesBefore(t, doneCh, time.Second)
 	require.Equal(t, expectedMsgs, receivedMsgs)
 
 	// check that the message offset has been incremented
