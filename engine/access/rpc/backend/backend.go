@@ -81,7 +81,7 @@ func New(
 			staticExecutionRPC: executionRPC,
 			connFactory:        connFactory,
 			state:              state,
-			log: log,
+			log:                log,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
@@ -97,7 +97,7 @@ func New(
 			retry:                retry,
 			connFactory:          connFactory,
 			previousAccessNodes:  historicalAccessNodes,
-			log: log,
+			log:                  log,
 		},
 		backendEvents: backendEvents{
 			staticExecutionRPC: executionRPC,
@@ -121,7 +121,7 @@ func New(
 			headers:            headers,
 			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
-			log: log,
+			log:                log,
 		},
 		collections:       collections,
 		executionReceipts: executionReceipts,
