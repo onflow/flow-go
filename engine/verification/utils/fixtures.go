@@ -146,8 +146,13 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		Payload: &payload,
 	}
 
+	blockID := block.ID()
+	for _, chunk := range chunks {
+		require.Equal(t, blockID, chunk.BlockID, "inconsistent block id in chunk fixture")
+	}
+
 	result := flow.ExecutionResult{
-		BlockID: block.ID(),
+		BlockID: blockID,
 		Chunks:  chunks,
 	}
 
