@@ -319,8 +319,7 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
-		SetScript(createAccountsScript(*m.networkConfig.FungibleTokenAddress,
-			*m.networkConfig.FlowTokenAddress)).
+		SetScript(createAccountsScript(*m.networkConfig.FlowTokenAddress, *m.networkConfig.FungibleTokenAddress)).
 		SetReferenceBlockID(blockRef.ID).
 		SetProposalKey(
 			*serviceAcc.address,
