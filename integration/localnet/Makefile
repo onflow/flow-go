@@ -37,3 +37,7 @@ stop:
 .PHONY: load
 load:
 	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+
+.PHONY: marketplace
+marketplace:
+	go run --tags relic ../marketplace_simulator/main -log-level debug
