@@ -3,12 +3,12 @@ package processor
 import (
 	"bytes"
 	"fmt"
-	"sync"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
@@ -23,13 +23,13 @@ type Engine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
 	me                module.Local
-	conduit           network.Conduit
-	dkgContractClient module.DKGContractClient
-	msgCh             chan msg.DKGMessage
-	committee         flow.IdentifierList
-	myIndex           int
-	dkgInstanceID     string
-	dkgInstanceIDLock sync.Mutex
+	conduit           network.Conduit          // network conduit for sending and receiving private messages
+	dkgContractClient module.DKGContractClient // client to communicate with the DKG smart contract
+	msgCh             chan msg.DKGMessage      // channel to forward DKG messages to the consumer
+	committee         flow.IdentifierList      // IDs of DKG members
+	myIndex           int                      // index of this instance in the committee
+	dkgInstanceID     string                   // unique identifier of the current dkg run (prevent replay attacks)
+	messageOffset     uint                     // index of next broadcast message to query
 }
 
 // New returns a new DKGProcessor engine. Instances participating in a common
@@ -79,23 +79,12 @@ func New(
 	return &eng, nil
 }
 
-// SetDKGInstanceID changes the DKG instance identifier of the engine.
-func (e *Engine) SetDKGInstanceID(value string) {
-	e.dkgInstanceIDLock.Lock()
-	defer e.dkgInstanceIDLock.Unlock()
-	e.dkgInstanceID = value
-}
-
-// GetDKGInstanceID returns the currenty DKG instance identifier.
-func (e *Engine) GetDKGInstanceID() string {
-	e.dkgInstanceIDLock.Lock()
-	defer e.dkgInstanceIDLock.Unlock()
-	return e.dkgInstanceID
-}
-
 // Ready implements the module ReadyDoneAware interface. It returns a channel
 // that will close when the engine has successfully
 // started.
+//
+// It instructs the engine to periodically read broadcast messages from the DKG
+// smart contract.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
@@ -136,25 +125,60 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
 	case msg.DKGMessage:
-		return e.onMessage(originID, v)
+		return e.onPrivateMessage(originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-func (e *Engine) onMessage(originID flow.Identifier, msg msg.DKGMessage) error {
-	if currentDKG := e.GetDKGInstanceID(); currentDKG != msg.DKGInstanceID {
-		return fmt.Errorf("wrong DKG instance ID. Got %v, want %v", msg.DKGInstanceID, currentDKG)
+func (e *Engine) onPrivateMessage(originID flow.Identifier, msg msg.DKGMessage) error {
+	err := e.checkMessageInstanceAndOrigin(msg)
+	if err != nil {
+		return err
 	}
-	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
-		return fmt.Errorf("origin id out of range: %d", msg.Orig)
-	}
+	// check that the message's origin matches the sender's flow identifier
 	nodeID := e.committee[msg.Orig]
 	if !bytes.Equal(nodeID[:], originID[:]) {
 		return fmt.Errorf("OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 	}
-	e.log.Debug().Msgf("forwarding Message to controller")
+	e.log.Debug().Msgf("forwarding private message to controller")
 	e.msgCh <- msg
+	return nil
+}
+
+// fetchBroadcastMessages calls the DKG smart contract to get missing DKG
+// messages for the current epoch, and forwards them to the msgCh.
+// It should be called with the ID of block whose seal is finalized.
+func (e *Engine) fetchBroadcastMessages(referenceBlock flow.Identifier) error {
+	msgs, err := e.dkgContractClient.ReadBroadcast(e.messageOffset, referenceBlock)
+	if err != nil {
+		return fmt.Errorf("could not read broadcast messages: %w", err)
+	}
+	for _, msg := range msgs {
+		err := e.checkMessageInstanceAndOrigin(msg)
+		if err != nil {
+			e.log.Error().Err(err).Msg("bad broadcast message")
+			continue
+		}
+		e.log.Debug().Msgf("forwarding broadcast message to controller")
+		e.msgCh <- msg
+	}
+	e.messageOffset += uint(len(msgs))
+	return nil
+}
+
+// checkMessageInstanceAndOrigin returns an error if the message's dkgInstanceID
+// does not correspond to the current instance, or if the message's origin index
+// is out of range with respect to the committee list.
+func (e *Engine) checkMessageInstanceAndOrigin(msg messages.DKGMessage) error {
+	// check that the message corresponds to the current epoch
+	if e.dkgInstanceID != msg.DKGInstanceID {
+		return fmt.Errorf("wrong DKG instance. Got %s, want %s", msg.DKGInstanceID, e.dkgInstanceID)
+	}
+	// check that the message's origin is not out of range
+	if msg.Orig >= len(e.committee) || msg.Orig < 0 {
+		return fmt.Errorf("origin id out of range: %d", msg.Orig)
+	}
 	return nil
 }
 
@@ -165,7 +189,6 @@ Implement DKGProcessor
 // PrivateSend sends a DKGMessage to a destination over a private channel. It
 // appends the current DKG instance ID to the message.
 func (e *Engine) PrivateSend(dest int, data []byte) {
-	dkgInstance := e.GetDKGInstanceID()
 	if dest >= len(e.committee) || dest < 0 {
 		e.log.Error().Msgf("destination id out of range: %d", dest)
 		return
@@ -174,31 +197,30 @@ func (e *Engine) PrivateSend(dest int, data []byte) {
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		dkgInstance,
+		e.dkgInstanceID,
 	)
 	err := e.conduit.Unicast(dkgMessage, destID)
 	if err != nil {
 		e.log.Error().
 			Err(err).
-			Str("dkg_instance_id", dkgInstance).
+			Str("dkg_instance_id", e.dkgInstanceID).
 			Msgf("could not send private message to %v", destID)
 	}
 }
 
 // Broadcast broadcasts a message to all participants.
 func (e *Engine) Broadcast(data []byte) {
-	dkgInstance := e.GetDKGInstanceID()
 	dkgMessage := msg.NewDKGMessage(
 		e.myIndex,
 		data,
-		dkgInstance,
+		e.dkgInstanceID,
 	)
 	err := e.dkgContractClient.Broadcast(dkgMessage)
 	if err != nil {
 		if err != nil {
 			e.log.Error().
 				Err(err).
-				Str("dkg_instance_id", dkgInstance).
+				Str("dkg_instance_id", e.dkgInstanceID).
 				Msg("could not broadcast message")
 		}
 	}
