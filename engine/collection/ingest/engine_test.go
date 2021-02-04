@@ -236,6 +236,7 @@ func (suite *Suite) TestInvalidTransaction() {
 // should store transactions for local cluster and propagate to other cluster members
 func (suite *Suite) TestRoutingLocalCluster() {
 
+	myID := suite.me.NodeID()
 	local, _, ok := suite.clusters.ByNodeID(suite.me.NodeID())
 	suite.Require().True(ok)
 
@@ -244,9 +245,10 @@ func (suite *Suite) TestRoutingLocalCluster() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, local, func(transaction *flow.TransactionBody) {})
 
+	expectedIDs := local.Filter(filter.Not(filter.HasNodeID(myID)))
 	// should route to local cluster
 	suite.conduit.
-		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, local.NodeIDs()[0], local.NodeIDs()[1]).
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, expectedIDs.NodeIDs()[0]).
 		Return(nil)
 
 	err := suite.engine.ProcessLocal(&tx)
@@ -371,8 +373,10 @@ func (suite *Suite) TestRouting_ClusterAssignmentChanged() {
 	tx.ReferenceBlockID = suite.root.ID()
 	tx = unittest.AlterTransactionForCluster(tx, epoch2Clusters, epoch2Local, func(transaction *flow.TransactionBody) {})
 
+	epoch2LocalWithoutMe := epoch2Local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))
 	// should route to local cluster
-	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch2Local.NodeIDs()[0], epoch2Local.NodeIDs()[1]).Return(nil).Once()
+	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1,
+		epoch2LocalWithoutMe.NodeIDs()[0]).Return(nil).Once()
 
 	err := suite.engine.ProcessLocal(&tx)
 	suite.Assert().NoError(err)
@@ -477,7 +481,8 @@ func (suite *Suite) TestRouting_ClusterAssignmentAdded() {
 	tx = unittest.AlterTransactionForCluster(tx, epoch3Clusters, epoch3Local, func(transaction *flow.TransactionBody) {})
 
 	// should route to local cluster
-	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch3Local.NodeIDs()[0], epoch3Local.NodeIDs()[1]).Return(nil).Once()
+	epoch3LocalWithoutMe := epoch3Local.Filter(filter.Not(filter.HasNodeID(suite.me.NodeID())))
+	suite.conduit.On("Multicast", &tx, suite.conf.PropagationRedundancy+1, epoch3LocalWithoutMe.NodeIDs()[0]).Return(nil).Once()
 
 	err = suite.engine.ProcessLocal(&tx)
 	suite.Assert().NoError(err)
