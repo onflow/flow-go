@@ -98,37 +98,44 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	for i := range blockIDs {
 		blockIDs[i] = blockHeaders[i].ID()
 	}
+
+	if len(blockIDs) == 0 {
+		return []flow.BlockEvents{}, nil
+	}
+
 	req := execproto.GetEventsForBlockIDsRequest{
 		Type:     eventType,
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
 	}
 
+	// choose the last block ID to find the list of execution nodes
+	lastBlockID := blockIDs[len(blockIDs)-1]
+
+	execNodes, err := executionNodesForBlockID(lastBlockID, b.executionReceipts, b.state)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+	}
+
 	var resp *execproto.GetEventsForBlockIDsResponse
-	var err error
-	if b.staticExecutionRPC != nil {
+	if len(execNodes) == 0 {
+		if b.staticExecutionRPC == nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node")
+		}
+
 		// call the execution node gRPC
 		resp, err = b.staticExecutionRPC.GetEventsForBlockIDs(ctx, &req)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
 		}
 	} else {
-
-		// choose the last block ID to find the list of execution nodes
-		lastBlockID := blockIDs[len(blockIDs)-1]
-
-		execNodes, err := executionNodesForBlockID(lastBlockID, b.executionReceipts, b.state)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
-		}
-
 		var successfulNode *flow.Identity
 		resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
+			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution nodes %s: %v", execNodes, err)
 		}
 		b.log.Trace().
 			Str("execution_id", successfulNode.String()).
-			Str("block_id", lastBlockID.String()).
+			Str("last_block_id", lastBlockID.String()).
 			Msg("successfully got events")
 	}
 
