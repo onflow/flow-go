@@ -13,6 +13,7 @@ import (
 	nbaData "github.com/dapperlabs/nba-smart-contracts/lib/go/templates/data"
 	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
+	coreContract "github.com/onflow/flow-nft/lib/go/contracts"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -53,10 +54,6 @@ func NewMarketPlaceSimulator(
 	}
 	return sim
 }
-
-// // Do I need this ? (maybe for network setup?)
-// 	coreContract "github.com/onflow/flow-nft/lib/go/contracts"
-// contract := coreContract.NonFungibleToken()
 
 func (m *MarketPlaceSimulator) Setup() error {
 
@@ -114,12 +111,19 @@ func (m *MarketPlaceSimulator) Setup() error {
 }
 
 func (m *MarketPlaceSimulator) setupContracts() error {
-	err := m.deployContract(nbaContract.GenerateTopShotContract(m.networkConfig.NonFungibleTokenAddress.Hex()))
+
+	// deploy nonFungibleContract
+	err := m.deployContract(coreContract.NonFungibleToken())
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract(nbaContract.GenerateTopShotShardedCollectionContract(m.networkConfig.NonFungibleTokenAddress.Hex(),
+	err = m.deployContract(nbaContract.GenerateTopShotContract(m.nbaTopshotAccount.Address().Hex()))
+	if err != nil {
+		return err
+	}
+
+	err = m.deployContract(nbaContract.GenerateTopShotShardedCollectionContract(m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
 	if err != nil {
 		return err
@@ -132,7 +136,7 @@ func (m *MarketPlaceSimulator) setupContracts() error {
 	}
 
 	err = m.deployContract(nbaContract.GenerateTopShotMarketContract(m.networkConfig.FungibleTokenAddress.Hex(),
-		m.networkConfig.NonFungibleTokenAddress.Hex(),
+		m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
 
@@ -197,7 +201,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
-			nbaTemplates.GenerateSetupAccountScript(*m.networkConfig.NonFungibleTokenAddress, *m.nbaTopshotAccount.Address())
+			nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address())
 
 		}
 	}

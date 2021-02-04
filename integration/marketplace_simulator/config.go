@@ -10,7 +10,6 @@ type NetworkConfig struct {
 	ServiceAccountAddress       *flowsdk.Address
 	FlowTokenAddress            *flowsdk.Address
 	FungibleTokenAddress        *flowsdk.Address
-	NonFungibleTokenAddress     *flowsdk.Address
 	ServiceAccountPrivateKeyHex string
 	AccessNodeAddresses         []string
 }
