@@ -1,4 +1,4 @@
-package utils
+package marketplace
 
 import (
 	"context"
@@ -83,8 +83,7 @@ func (m *MarketPlaceSimulator) Setup() error {
 	}
 
 	// setup tracker (TODO simplify this by using default values and empty txStatsTracker)
-	txStatsTracker := NewTxStatsTracker(&StatsConfig{1, 1, 1, 1, 1, m.simulatorConfig.numberOfAccounts})
-	m.txTracker, err = NewTxTracker(m.log, 1000, 10, m.networkConfig.AccessNodeAddresses[0], 1, txStatsTracker)
+	m.txTracker, err = NewTxTracker(m.log, 1000, 10, m.networkConfig.AccessNodeAddresses[0], 1)
 	if err != nil {
 		return nil
 	}
@@ -162,7 +161,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	}
 
 	nbaAddress := m.nbaTopshotAccount.Address()
-	// add many plays and add many sets (adds plays to sets)
+	// TODO add many plays and add many sets (adds plays to sets)
+	// this adds a play with id 0
 	script := nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
@@ -170,6 +170,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+	// this creates set with id 0
 	script = nbaTemplates.GenerateMintSetScript(*nbaAddress, "test set")
 	tx = flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
@@ -177,10 +178,21 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	// GenerateAddPlaysToSetScript(topShotAddr flow.Address, setID uint32, playIDs []uint32)
+	script = nbaTemplates.GenerateAddPlaysToSetScript(*nbaAddress, 0, []uint32{0})
+	tx = flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef.ID).
+		SetScript(script)
 
-	// mint a lot of moments
+	m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
+	// mint a lot of moments (1000 for now)
 	// GenerateBatchMintMomentScript(topShotAddr flow.Address, destinationAccount flow.Address, setID, playID uint32, quantity uint64)
+	script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 0, 0, 1000)
+	tx = flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef.ID).
+		SetScript(script)
+
+	m.sendTxAndWait(tx, m.nbaTopshotAccount)
 	return nil
 }
 
@@ -318,7 +330,7 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 
 	// Generate an account creation script
 	createAccountTx := flowsdk.NewTransaction().
-		SetScript(CreateAccountsScript(*m.networkConfig.FungibleTokenAddress,
+		SetScript(createAccountsScript(*m.networkConfig.FungibleTokenAddress,
 			*m.networkConfig.FlowTokenAddress)).
 		SetReferenceBlockID(blockRef.ID).
 		SetProposalKey(
@@ -333,7 +345,7 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 	count := cadence.NewInt(num)
 
 	initialTokenAmount, err := cadence.NewUFix64FromParts(
-		24*60*60*tokensPerTransfer, //  (24 hours at 1 block per second and 10 tokens sent)
+		24*60*60,
 		0,
 	)
 	if err != nil {
@@ -445,7 +457,6 @@ type marketPlaceAccount struct {
 	log        zerolog.Logger
 	account    *flowAccount
 	friends    []flowAccount
-	blockRef   *BlockRef
 	flowClient *client.Client
 	txTracker  *TxTracker
 }
@@ -459,7 +470,7 @@ func newMarketPlaceAccount(account *flowAccount,
 		1,  // number of workers
 		accessNodeAddr,
 		1, // number of accounts
-		NewTxStatsTracker(&StatsConfig{}))
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -476,7 +487,6 @@ func newMarketPlaceAccount(account *flowAccount,
 		friends:    friends,
 		txTracker:  txTracker,
 		flowClient: fclient,
-		blockRef:   NewBlockRef(fclient),
 	}
 }
 
@@ -491,84 +501,78 @@ func (m *marketPlaceAccount) Act() {
 
 	// with some chance don't do anything
 
-	// randomly select one or two friend and send assets
-	assets := m.GetAssets()
+	// // randomly select one or two friend and send assets
+	// assets := m.GetAssets()
 
-	assetToMove := assets[rand.Intn(len(assets))]
+	// assetToMove := assets[rand.Intn(len(assets))]
 
-	_ = assetToMove
+	// _ = assetToMove
 
-	blockRef, err := m.blockRef.Get()
-	if err != nil {
-		m.log.Error().Err(err).Msgf("error getting reference block")
-		return
-	}
+	// // TODO txScript for assetToMove
+	// txScript := []byte("")
 
-	// TODO txScript for assetToMove
-	txScript := []byte("")
+	// tx := flowsdk.NewTransaction().
+	// 	SetReferenceBlockID(blockRef).
+	// 	SetScript(txScript).
+	// 	SetProposalKey(*m.account.address, 0, m.account.seqNumber).
+	// 	SetPayer(*m.account.address).
+	// 	AddAuthorizer(*m.account.address)
 
-	tx := flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef).
-		SetScript(txScript).
-		SetProposalKey(*m.account.address, 0, m.account.seqNumber).
-		SetPayer(*m.account.address).
-		AddAuthorizer(*m.account.address)
+	// err = m.account.signTx(tx, 0)
+	// if err != nil {
+	// 	m.log.Error().Err(err).Msgf("error signing transaction")
+	// 	return
+	// }
 
-	err = m.account.signTx(tx, 0)
-	if err != nil {
-		m.log.Error().Err(err).Msgf("error signing transaction")
-		return
-	}
+	// // wait till success and then update the list
+	// // send tx
+	// err = m.flowClient.SendTransaction(context.Background(), *tx)
+	// if err != nil {
+	// 	m.log.Error().Err(err).Msgf("error sending transaction")
+	// 	return
+	// }
 
-	// wait till success and then update the list
-	// send tx
-	err = m.flowClient.SendTransaction(context.Background(), *tx)
-	if err != nil {
-		m.log.Error().Err(err).Msgf("error sending transaction")
-		return
-	}
+	// // tracking
+	// stopped := false
+	// wg := sync.WaitGroup{}
+	// m.txTracker.AddTx(tx.ID(),
+	// 	nil,
+	// 	func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+	// 		m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+	// 	}, // on finalized
+	// 	func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+	// 		m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
+	// 		if !stopped {
+	// 			stopped = true
+	// 			wg.Done()
+	// 		}
+	// 	}, // on sealed
+	// 	func(_ flowsdk.Identifier) {
+	// 		m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+	// 		if !stopped {
+	// 			stopped = true
+	// 			wg.Done()
+	// 		}
+	// 	}, // on expired
+	// 	func(_ flowsdk.Identifier) {
+	// 		m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+	// 		if !stopped {
+	// 			stopped = true
+	// 			wg.Done()
+	// 		}
+	// 	}, // on timout
+	// 	func(_ flowsdk.Identifier, err error) {
+	// 		m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
+	// 		if !stopped {
+	// 			stopped = true
+	// 			wg.Done()
+	// 		}
+	// 	}, // on error
+	// 	60)
+	// wg.Add(1)
+	// wg.Wait()
 
-	// tracking
-	stopped := false
-	wg := sync.WaitGroup{}
-	m.txTracker.AddTx(tx.ID(),
-		nil,
-		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
-		}, // on finalized
-		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
-			if !stopped {
-				stopped = true
-				wg.Done()
-			}
-		}, // on sealed
-		func(_ flowsdk.Identifier) {
-			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
-			if !stopped {
-				stopped = true
-				wg.Done()
-			}
-		}, // on expired
-		func(_ flowsdk.Identifier) {
-			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
-			if !stopped {
-				stopped = true
-				wg.Done()
-			}
-		}, // on timout
-		func(_ flowsdk.Identifier, err error) {
-			m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
-			if !stopped {
-				stopped = true
-				wg.Done()
-			}
-		}, // on error
-		60)
-	wg.Add(1)
-	wg.Wait()
-
-	return
+	// return
 }
 
 func samplePlay() *nbaData.PlayMetadata {
