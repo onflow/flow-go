@@ -69,6 +69,11 @@ func validSetup(setup *flow.EpochSetup) error {
 		return fmt.Errorf("need at least one verification node")
 	}
 
+	// first view must be before final view
+	if setup.FirstView >= setup.FinalView {
+		return fmt.Errorf("first view (%d) must be before final view (%d)", setup.FirstView, setup.FinalView)
+	}
+
 	// we need at least one collection cluster
 	if len(setup.Assignments) == 0 {
 		return fmt.Errorf("need at least one collection cluster")
