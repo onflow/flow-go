@@ -220,7 +220,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Hex("payload_hash", header.PayloadHash[:]).
 		Int("gaurantees_count", len(payload.Guarantees)).
 		Int("seals_count", len(payload.Seals)).
-		Int("receiptss_count", len(payload.Receipts)).
+		Int("receipts_count", len(payload.Receipts)).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
