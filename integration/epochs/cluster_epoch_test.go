@@ -35,6 +35,8 @@ type ClusterEpochTestSuite struct {
 	qcAddress    sdk.Address
 	qcAccountKey *sdk.AccountKey
 	qcSigner     sdkcrypto.Signer
+
+	epochCounter uint
 }
 
 func TestClusterEpoch(t *testing.T) {
@@ -43,6 +45,7 @@ func TestClusterEpoch(t *testing.T) {
 
 // SetupTest creates an instance of the emulated chain and deploys the EpochQC contract
 func (s *ClusterEpochTestSuite) SetupTest() {
+	s.epochCounter = 1
 
 	// create a new instance of the emulated blockchain
 	blockchain, err := emulator.NewBlockchain()
@@ -85,10 +88,10 @@ func (s *ClusterEpochTestSuite) deployEpochQCContract() {
 }
 
 // CreateClusterList creates a clustering with the nodes split evenly and returns the resulting `ClusterList`
-func (s *ClusterEpochTestSuite) CreateClusterList(clusterCount, nodeCount int) (flow.ClusterList, flow.IdentityList) {
+func (s *ClusterEpochTestSuite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.ClusterList, flow.IdentityList) {
 
 	// create list of nodes to be used for the clustering
-	nodes := unittest.IdentityListFixture(nodeCount, unittest.WithRole(flow.RoleCollection))
+	nodes := unittest.IdentityListFixture(clusterCount*nodesPerCluster, unittest.WithRole(flow.RoleCollection))
 	// create cluster assignment
 	clusterAssignment := unittest.ClusterAssignment(uint(clusterCount), nodes)
 
@@ -118,7 +121,7 @@ func (s *ClusterEpochTestSuite) PublishVoter() {
 
 // StartVoting starts the voting in the EpochQCContract with the admin resource
 // for a specific clustering
-func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, clusterCount, nodeCount int) {
+func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerCluster int) {
 	// submit admin transaction to start voting
 	startVotingTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartVotingScript(s.env)).
@@ -139,8 +142,8 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 		clusterIndices = append(clusterIndices, cadence.NewUInt16(uint16(index)))
 
 		// create list of string node ids
-		nodeIDs := make([]cadence.Value, nodeCount/clusterCount)
-		nodeWeights := make([]cadence.Value, nodeCount/clusterCount)
+		nodeIDs := make([]cadence.Value, nodesPerCluster)
+		nodeWeights := make([]cadence.Value, nodesPerCluster)
 
 		for _, node := range cluster {
 			nodeIDs = append(nodeIDs, cadence.NewString(node.NodeID.String()))

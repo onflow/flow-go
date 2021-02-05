@@ -39,12 +39,12 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 
 	// initial cluster and total node count
 	clusterCount := 3
-	nodeCount := 30
+	nodesPerCluster := 10
 
 	s.SetupTest()
 
 	// create clustering with x clusters with x*y nodes
-	clustering, nodes := s.CreateClusterList(clusterCount, nodeCount)
+	clustering, nodes := s.CreateClusterList(clusterCount, nodesPerCluster)
 
 	// create initial ClusterNodes list
 	clusterNodes := make([]*ClusterNode, clusterCount)
@@ -66,7 +66,7 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 
 	s.PublishVoter()
 
-	s.StartVoting(clustering, clusterCount, nodeCount)
+	s.StartVoting(clustering, clusterCount, nodesPerCluster)
 
 	s.CreateVoterResource(clusterNodes)
 
