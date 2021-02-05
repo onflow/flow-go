@@ -80,7 +80,7 @@ func NewEngine(log zerolog.Logger,
 	receiptsChannel := make(chan *Event)
 	approvalsChannel := make(chan *Event)
 	approvalResponsesChannel := make(chan *Event)
-	c := &Engine{
+	e := &Engine{
 		unit:                                 engine.NewUnit(),
 		log:                                  log,
 		me:                                   me,
@@ -94,36 +94,36 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	// register engine with the receipt provider
-	_, err := net.Register(engine.ReceiveReceipts, c)
+	_, err := net.Register(engine.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
 	// register engine with the approval provider
-	_, err = net.Register(engine.ReceiveApprovals, c)
+	_, err = net.Register(engine.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
 	}
 
 	// register engine to the channel for requesting missing approvals
-	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, c)
+	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	c.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
+	e.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
 		indexDB, incorporatedResults, receipts, approvals, seals, assigner, validator,
 		requiredApprovalsForSealConstruction, emergencySealingActive, receiptsChannel, approvalsChannel, approvalResponsesChannel, approvalConduit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init matching engine: %w", err)
 	}
 
-	return c, nil
+	return e, nil
 }
 
 // Process sends event into channel with pending events. Generally speaking shouldn't lock for too long.
-func (c *Engine) Process(originID flow.Identifier, event interface{}) error {
-	c.pendingEventSink <- &Event{
+func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+	e.pendingEventSink <- &Event{
 		OriginID: originID,
 		Msg:      event,
 	}
@@ -133,7 +133,7 @@ func (c *Engine) Process(originID flow.Identifier, event interface{}) error {
 // processEvents is processor of pending events which drives events from networking layer to business logic in `Core`.
 // Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
 // Should be run as a separate goroutine.
-func (c *Engine) processEvents() {
+func (e *Engine) processEvents() {
 	fetchEvent := func(queue *deque.Deque, sink EventSink) (*Event, EventSink) {
 		event, ok := queue.PopFront()
 		if !ok {
@@ -143,19 +143,19 @@ func (c *Engine) processEvents() {
 	}
 
 	for {
-		pendingReceipt, receiptSink := fetchEvent(&c.pendingReceipts, c.receiptSink)
-		pendingApproval, approvalSink := fetchEvent(&c.pendingApprovals, c.approvalSink)
-		pendingApprovalResponse, approvalResponseSink := fetchEvent(&c.pendingApprovalResponses, c.approvalResponseSink)
+		pendingReceipt, receiptSink := fetchEvent(&e.pendingReceipts, e.receiptSink)
+		pendingApproval, approvalSink := fetchEvent(&e.pendingApprovals, e.approvalSink)
+		pendingApprovalResponse, approvalResponseSink := fetchEvent(&e.pendingApprovalResponses, e.approvalResponseSink)
 		select {
-		case event := <-c.pendingEventSink:
-			c.processPendingEvent(event)
+		case event := <-e.pendingEventSink:
+			e.processPendingEvent(event)
 		case receiptSink <- pendingReceipt:
 			continue
 		case approvalSink <- pendingApproval:
 			continue
 		case approvalResponseSink <- pendingApprovalResponse:
 			continue
-		case <-c.unit.Quit():
+		case <-e.unit.Quit():
 			return
 		}
 	}
@@ -163,80 +163,80 @@ func (c *Engine) processEvents() {
 
 // processPendingEvent saves pending event in corresponding queue for further processing by `Core`.
 // While this function runs in separate goroutine it shouldn't do heavy processing to maintain efficient data polling/pushing.
-func (c *Engine) processPendingEvent(event *Event) {
+func (e *Engine) processPendingEvent(event *Event) {
 	switch event.Msg.(type) {
 	case *flow.ExecutionReceipt:
-		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		if c.pendingReceipts.Len() < defaultReceiptQueueCapacity {
-			c.pendingReceipts.PushBack(event)
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		if e.pendingReceipts.Len() < defaultReceiptQueueCapacity {
+			e.pendingReceipts.PushBack(event)
 		}
 	case *flow.ResultApproval:
-		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		if c.requiredApprovalsForSealConstruction < 1 {
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
 			// if we don't require approvals to construct a seal, don't even process approvals.
 			return
 		}
-		if c.pendingApprovals.Len() < defaultApprovalQueueCapacity {
-			c.pendingApprovals.PushBack(event)
+		if e.pendingApprovals.Len() < defaultApprovalQueueCapacity {
+			e.pendingApprovals.PushBack(event)
 		}
 	case *messages.ApprovalResponse:
-		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		if c.requiredApprovalsForSealConstruction < 1 {
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
 			// if we don't require approvals to construct a seal, don't even process approvals.
 			return
 		}
-		if c.pendingApprovalResponses.Len() < defaultApprovalResponseQueueCapacity {
-			c.pendingApprovalResponses.PushBack(event)
+		if e.pendingApprovalResponses.Len() < defaultApprovalResponseQueueCapacity {
+			e.pendingApprovalResponses.PushBack(event)
 		}
 	}
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (c *Engine) SubmitLocal(event interface{}) {
-	c.Submit(c.me.NodeID(), event)
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.Submit(e.me.NodeID(), event)
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (c *Engine) Submit(originID flow.Identifier, event interface{}) {
-	err := c.Process(originID, event)
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+	err := e.Process(originID, event)
 	if err != nil {
-		engine.LogError(c.log, err)
+		engine.LogError(e.log, err)
 	}
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (c *Engine) ProcessLocal(event interface{}) error {
-	return c.Process(c.me.NodeID(), event)
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.Process(e.me.NodeID(), event)
 }
 
 // HandleReceipt pipes explicitly requested receipts to the process function.
 // Receipts can come from this function or the receipt provider setup in the
 // engine constructor.
-func (c *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
-	c.log.Debug().Msg("received receipt from requester engine")
+func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
+	e.log.Debug().Msg("received receipt from requester engine")
 
-	err := c.Process(originID, receipt)
+	err := e.Process(originID, receipt)
 	if err != nil {
-		c.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
+		e.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
 	}
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
-func (c *Engine) Ready() <-chan struct{} {
+func (e *Engine) Ready() <-chan struct{} {
 	started := make(chan struct{})
-	c.unit.Launch(func() {
+	e.unit.Launch(func() {
 		close(started)
-		c.processEvents()
+		e.processEvents()
 	})
 	<-started
-	return c.core.Ready()
+	return e.core.Ready()
 }
 
-func (c *Engine) Done() <-chan struct{} {
-	<-c.unit.Done()
-	return c.core.Done()
+func (e *Engine) Done() <-chan struct{} {
+	<-e.unit.Done()
+	return e.core.Done()
 }
