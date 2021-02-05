@@ -21,6 +21,7 @@ type NetworkCollector struct {
 	duplicateMessagesDropped *prometheus.CounterVec
 	queueSize                *prometheus.GaugeVec
 	queueDuration            *prometheus.HistogramVec
+	inboundProcessTime       *prometheus.CounterVec
 	outboundConnectionCount  prometheus.Gauge
 	inboundConnectionCount   prometheus.Gauge
 }
@@ -67,6 +68,13 @@ func NewNetworkCollector() *NetworkCollector {
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
 		}, []string{LabelPriority}),
 
+		inboundProcessTime: promauto.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
+			Name:      "engine_message_processing_time_seconds",
+			Help:      "duration [seconds; measured with float64 precision] of how long a queue worker blocked for an engine processing message",
+		}, []string{LabelChannel}),
+
 		outboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
@@ -112,6 +120,11 @@ func (nc *NetworkCollector) MessageRemoved(priority int) {
 
 func (nc *NetworkCollector) QueueDuration(duration time.Duration, priority int) {
 	nc.queueDuration.WithLabelValues(strconv.Itoa(priority)).Observe(duration.Seconds())
+}
+
+// InboundProcessDuration tracks the time a queue worker blocked by an engine for processing an incoming message on specified topic (i.e., channel).
+func (nc *NetworkCollector) InboundProcessDuration(topic string, duration time.Duration) {
+	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
 }
 
 func (nc *NetworkCollector) OutboundConnections(connectionCount uint) {

@@ -10,6 +10,7 @@ import (
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -38,6 +39,7 @@ type backendTransactions struct {
 	connFactory          ConnectionFactory
 
 	previousAccessNodes []accessproto.AccessAPIClient
+	log                 zerolog.Logger
 }
 
 // SendTransaction forwards the transaction to the collection node
@@ -88,18 +90,25 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
 	}
 
-	var sendErrors error
+	var sendErrors *multierror.Error
+	logAnyError := func() {
+		err = sendErrors.ErrorOrNil()
+		if err != nil {
+			b.log.Info().Err(err).Msg("failed to send transactions to collector nodes")
+		}
+	}
+	defer logAnyError()
 
 	// try sending the transaction to one of the chosen collection nodes
 	for _, addr := range collAddrs {
 		err = b.sendTransactionToCollector(ctx, tx, addr)
-		if err != nil {
-			sendErrors = multierror.Append(sendErrors, err)
-		} else {
+		if err == nil {
 			return nil
 		}
+		sendErrors = multierror.Append(sendErrors, err)
 	}
-	return sendErrors
+
+	return sendErrors.ErrorOrNil()
 }
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
@@ -153,6 +162,10 @@ func (b *backendTransactions) grpcTxSend(ctx context.Context, client accessproto
 	colReq := &accessproto.SendTransactionRequest{
 		Transaction: convert.TransactionToMessage(*tx),
 	}
+
+	clientDeadline := time.Now().Add(time.Duration(2) * time.Second)
+	ctx, cancel := context.WithDeadline(ctx, clientDeadline)
+	defer cancel()
 	_, err := client.SendTransaction(ctx, colReq)
 	return err
 }
@@ -386,9 +399,17 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID,
 	}
 
+	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+	if err != nil {
+		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
+	}
+
 	var resp *execproto.GetTransactionResultResponse
-	var err error
-	if b.executionRPC != nil {
+	if len(execNodes) == 0 {
+		if b.executionRPC == nil {
+			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node")
+		}
+
 		// call the execution node gRPC
 		resp, err = b.executionRPC.GetTransactionResult(ctx, &req)
 		if err != nil {
@@ -397,11 +418,8 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 			}
 			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 		}
+
 	} else {
-		execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
-		if err != nil {
-			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
-		}
 		resp, err = b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
 		if err != nil {
 			if status.Code(err) == codes.NotFound {
@@ -426,6 +444,11 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Con
 	for _, execNode := range execNodes {
 		resp, err := b.tryGetTransactionResult(ctx, execNode, req)
 		if err == nil {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", req.GetBlockId()).
+				Hex("transaction_id", req.GetTransactionId()).
+				Msg("Successfully got account info")
 			return resp, nil
 		}
 		if status.Code(err) == codes.NotFound {
