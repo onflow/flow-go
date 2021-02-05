@@ -246,8 +246,11 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			fmt.Println(">>e>", err)
 			fmt.Println(">>r>", result)
 
+			// TODO RAMTIN switch me with GenerateFulfillPackScript
 			//  transfer some moments
-			script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4})
+			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
+			script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			// script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
 			tx = flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
