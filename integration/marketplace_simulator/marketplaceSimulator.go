@@ -157,9 +157,6 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	fmt.Println(">>e>", err)
-	fmt.Println(">>r>", result)
-
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
 		return err
@@ -175,9 +172,6 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	fmt.Println(">>e>", err)
-	fmt.Println(">>r>", result)
-
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a set failed: %w , %w", result.Error, err)
 		return err
@@ -192,26 +186,33 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	fmt.Println(">>e>", err)
-	fmt.Println(">>r>", result)
-
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
-		// return err
+		return err
 	}
 
 	m.log.Info().Msgf("play added to a set")
 
-	// mint a lot of moments
-	script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(m.simulatorConfig.NumberOfMoments))
-	tx = flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef.ID).
-		SetScript(script)
+	batchSize := 100
+	steps := m.simulatorConfig.NumberOfMoments / batchSize
+	totalMinted := 0
+	for i := 0; i < steps; i++ {
+		// mint a lot of moments
+		script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(batchSize))
+		tx = flowsdk.NewTransaction().
+			SetReferenceBlockID(blockRef.ID).
+			SetScript(script)
 
-	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+		result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	fmt.Println(">>e>", err)
-	fmt.Println(">>r>", result)
+		if err != nil || result.Error != nil {
+			m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+			return err
+		}
+		totalMinted += batchSize
+	}
+
+	m.log.Info().Msgf("%d moment has been minted", totalMinted)
 	return nil
 }
 
