@@ -225,6 +225,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 		return err
 	}
 	groupSize := 10
+	momentCounter := uint64(1)
 	for i := 0; i < len(accounts); i += groupSize {
 		group := accounts[i : i+groupSize]
 		// randomly select an access nodes
@@ -242,12 +243,22 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 				SetScript(script)
 
 			result, err := m.sendTxAndWait(tx, ma.Account())
-			println(">>e>", err)
-			println(">>r>", result)
+			fmt.Println(">>e>", err)
+			fmt.Println(">>r>", result)
+
+			//  transfer some moments
+			script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4})
+			tx = flowsdk.NewTransaction().
+				SetReferenceBlockID(blockRef.ID).
+				SetScript(script)
+
+			result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+			fmt.Println("2>>e>", err)
+			fmt.Println("2>>r>", result)
+			momentCounter += 5
 		}
 	}
 
-	// TODO transfer some moments
 	return nil
 }
 
