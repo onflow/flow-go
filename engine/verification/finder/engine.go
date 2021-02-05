@@ -502,13 +502,7 @@ func (e *Engine) discardReceiptsFromPending(receiptIDs flow.IdentifierList, bloc
 			Hex("result_id", logging.ID(resultID)).
 			Logger()
 
-		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-		// for opentracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-		func() {
-			var span opentracing.Span
-			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
-			defer span.Finish()
-
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts, func() {
 			// marks result id of receipt as discarded.
 			added := e.discardedResultIDs.Add(resultID)
 			log.Debug().
@@ -520,7 +514,7 @@ func (e *Engine) discardReceiptsFromPending(receiptIDs flow.IdentifierList, bloc
 			log.Debug().
 				Bool("removed", removed).
 				Msg("removes receipt from pending receipts")
-		}()
+		})
 	}
 }
 
