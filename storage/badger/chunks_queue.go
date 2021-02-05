@@ -28,7 +28,7 @@ func NewChunkQueue(db *badger.DB) *ChunksQueue {
 	}
 }
 
-// Init initial chunk locator queue's latest index with the given default index.
+// Init initializes chunk queue's latest index with the given default index.
 func (q *ChunksQueue) Init(defaultIndex int64) (bool, error) {
 	_, err := q.LatestIndex()
 	if errors.Is(err, storage.ErrNotFound) {
