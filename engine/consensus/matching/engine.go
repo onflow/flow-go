@@ -39,7 +39,7 @@ type (
 // Engine is a wrapper for matching `Core` which implements logic for
 // queuing and filtering network messages which later will be processed by matching engine.
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
-// them to `Core`.
+// them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	unit                                 *engine.Unit
 	log                                  zerolog.Logger
@@ -192,7 +192,7 @@ func (e *Engine) processPendingEvent(event *Event) {
 	}
 }
 
-// processPendingEvents processes pending events that are stored in respective queues.
+// consumeEvents consumes events that are ready to be processed.
 func (e *Engine) consumeEvents() {
 	// Context:
 	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
@@ -226,20 +226,20 @@ func (e *Engine) consumeEvents() {
 }
 
 // consumeSingleEvent processes single event for the propagation engine on the consensus node.
-func (c *Engine) consumeSingleEvent(pendingEvent *Event) {
+func (e *Engine) consumeSingleEvent(pendingEvent *Event) {
 	var err error
 	switch event := pendingEvent.Msg.(type) {
 	case *flow.ExecutionReceipt:
-		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		err = c.core.onReceipt(pendingEvent.OriginID, event)
+		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		err = e.core.onReceipt(pendingEvent.OriginID, event)
 	case *flow.ResultApproval:
-		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		err = c.core.onApproval(pendingEvent.OriginID, event)
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		err = e.core.onApproval(pendingEvent.OriginID, event)
 	case *messages.ApprovalResponse:
-		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		err = c.core.onApproval(pendingEvent.OriginID, &event.Approval)
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		err = e.core.onApproval(pendingEvent.OriginID, &event.Approval)
 	default:
 		err = fmt.Errorf("invalid event type (%T)", pendingEvent.Msg)
 	}
@@ -249,7 +249,7 @@ func (c *Engine) consumeSingleEvent(pendingEvent *Event) {
 		//   of normal operations in an untrusted environment, we can just log an error.
 		// * However, if we receive an error indicating internal node failure or state
 		//   internal state corruption, we should probably crash the node.
-		c.log.Error().Err(err).Hex("origin", pendingEvent.OriginID[:]).Msgf("could not process event")
+		e.log.Error().Err(err).Hex("origin", pendingEvent.OriginID[:]).Msgf("could not process event")
 	}
 }
 

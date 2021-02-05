@@ -52,6 +52,8 @@ const DefaultEmergencySealingActive = false
 //    Seal is generated and stored in the IncorporatedResultSeals mempool.
 //    Spwecifically, we require that each chunk must have a minimal number of
 //    approvals, `requiredApprovalsForSealConstruction`, from assigned Verifiers.
+// NOTE: Core is designed to be non-thread safe and cannot be used in concurrent environment
+// user of this object needs to ensure single thread access.
 type Core struct {
 	log                                  zerolog.Logger                  // used to log relevant actions with context
 	engineMetrics                        module.EngineMetrics            // used to track sent and received messages
