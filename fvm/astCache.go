@@ -41,7 +41,7 @@ func (cache *LRUASTCache) GetProgram(location common.Location) (*ast.Program, er
 		// Return a new program to clear importedPrograms.
 		// This will avoid a concurrent map write when attempting to
 		// resolveImports.
-		return &ast.Program{Declarations: cachedProgram.Declarations}, nil
+		return ast.NewProgram(cachedProgram.Declarations()), nil
 	}
 	return nil, nil
 }
