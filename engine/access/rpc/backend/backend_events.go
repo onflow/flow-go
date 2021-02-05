@@ -48,7 +48,7 @@ func (b *backendEvents) GetEventsForHeightRange(
 	// start height should not be beyond the last sealed height
 	if head.Height < startHeight {
 		return nil, status.Errorf(codes.Internal,
-			" start height %d is greater than the sealed block height %d", startHeight, head.Height)
+			" start height %d is greater than the last sealed block height %d", startHeight, head.Height)
 	}
 
 	// limit max height to last sealed block in the chain
