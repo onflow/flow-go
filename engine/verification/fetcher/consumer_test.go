@@ -24,7 +24,7 @@ func TestChunkLocatorToJob(t *testing.T) {
 		ResultID: unittest.IdentifierFixture(),
 		Index:    rand.Uint64(),
 	}
-	actual := fetcher.JobToChunk(fetcher.ChunkLocatorToJob(locator))
+	actual := fetcher.JobToChunkLocator(fetcher.ChunkLocatorToJob(locator))
 	require.Equal(t, locator, actual)
 }
 

@@ -16,37 +16,36 @@ const (
 	DefaultJobIndex = int64(0)
 )
 
-// ChunkJob converts a Chunk into a Job to be used by job queue
+// ChunkJob converts a chunk locator into a Job to be used by job queue.
 type ChunkJob struct {
 	ChunkLocator *chunks.Locator
 }
 
-// ID converts chunk id into job id, which guarantees uniqueness
+// ID converts chunk locator identifier into job id, which guarantees uniqueness.
 func (j *ChunkJob) ID() module.JobID {
-	return chunkIDToJobID(j.ChunkLocator.ID())
+	return locatorIDToJobID(j.ChunkLocator.ID())
 }
 
-func chunkIDToJobID(chunkID flow.Identifier) module.JobID {
-	return module.JobID(fmt.Sprintf("%v", chunkID))
+func locatorIDToJobID(locatorID flow.Identifier) module.JobID {
+	return module.JobID(fmt.Sprintf("%v", locatorID))
 }
 
 func ChunkLocatorToJob(locator *chunks.Locator) *ChunkJob {
 	return &ChunkJob{ChunkLocator: locator}
 }
 
-func JobToChunk(job storage.Job) *chunks.Locator {
+func JobToChunkLocator(job storage.Job) *chunks.Locator {
 	chunkjob, _ := job.(*ChunkJob)
 	return chunkjob.ChunkLocator
 }
 
-// ChunksJob wraps the storage layer to provide an abstraction for
-// consumers to read jobs
+// ChunksJob wraps the storage layer to provide an abstraction for consumers to read jobs.
 type ChunksJob struct {
-	chunks storage.ChunksQueue
+	locators storage.ChunksQueue
 }
 
 func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
-	chunk, err := j.chunks.AtIndex(index)
+	chunk, err := j.locators.AtIndex(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
 	}
@@ -74,12 +73,12 @@ func NewWorker(engine EngineWorker) *Worker {
 // Run converts the job to Chunk, it's guaranteed to work, because
 // ChunksJob converted chunk into job symmetrically
 func (w *Worker) Run(job storage.Job) {
-	chunk := JobToChunk(job)
+	chunk := JobToChunkLocator(job)
 	w.engine.ProcessMyChunk(chunk)
 }
 
 func (w *Worker) FinishProcessing(chunkID flow.Identifier) {
-	jobID := chunkIDToJobID(chunkID)
+	jobID := locatorIDToJobID(chunkID)
 	w.consumer.FinishJob(jobID)
 }
 
@@ -111,7 +110,7 @@ func NewChunkConsumer(
 	worker := NewWorker(engine)
 	engine.WithFinishProcessing(worker)
 
-	jobs := &ChunksJob{chunks: chunksQueue}
+	jobs := &ChunksJob{locators: chunksQueue}
 
 	// TODO: adding meta to logger
 	consumer := jobqueue.NewConsumer(
