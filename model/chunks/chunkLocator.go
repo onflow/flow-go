@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Locator is used located a chunk by providing the execution result the chunk belongs to as well as the chunk index within that execution result.
+// Locator is used to locate a chunk by providing the execution result the chunk belongs to as well as the chunk index within that execution result.
 type Locator struct {
 	ResultID flow.Identifier // execution result id that chunk belongs to
 	Index    uint64          // index of chunk in the execution result
