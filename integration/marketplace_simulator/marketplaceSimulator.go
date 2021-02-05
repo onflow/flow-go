@@ -236,7 +236,8 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 	template := `
 	transaction {
 		prepare(signer: AuthAccount) {
-			signer.contracts.add("%s", "%s".decodeHex())
+			signer.contracts.add(name: "%s",
+			                     code: "%s".decodeHex())
 		}
 	}
 	`
