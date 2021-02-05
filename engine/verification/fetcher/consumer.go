@@ -42,7 +42,7 @@ func JobToChunk(job storage.Job) *chunkmodels.Locator {
 // ChunksJob wraps the storage layer to provide an abstraction for
 // consumers to read jobs
 type ChunksJob struct {
-	chunks storage.ChunkLocatorQueue
+	chunks storage.ChunkQueue
 }
 
 func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
@@ -102,7 +102,7 @@ type ChunkConsumer struct {
 func NewChunkConsumer(
 	log zerolog.Logger,
 	processedIndex storage.ConsumerProgress, // to persist the processed index
-	chunksQueue storage.ChunkLocatorQueue, // to read jobs (chunks) from
+	chunksQueue storage.ChunkQueue, // to read jobs (chunks) from
 	engine EngineWorker, // to process jobs (chunks)
 	maxProcessing int64, // max number of jobs to be processed in parallel
 	maxFinished int64, // when the next unprocessed job is not finished,
