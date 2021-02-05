@@ -47,8 +47,8 @@ const (
 	// failureThreshold represents the number of retries match engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// this value is set following this issue (3443)
-	// such a big number means we will retry forever (100 days)
+	// Currently setting the threshold to a very large value (corresponding to 100 days),
+	// which for all practical purposes is equivalent to the Verifier trying indefinitely.
 	failureThreshold = 10000000
 )
 

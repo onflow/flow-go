@@ -346,7 +346,7 @@ func (e *Engine) onTimer() {
 
 		header, err := e.headers.ByBlockID(chunk.Chunk.BlockID)
 		if err != nil {
-			log.Error().Err(err).Msgf("could not get header for block")
+			log.Fatal().Err(err).Msgf("could not get header for block")
 			continue
 		}
 
