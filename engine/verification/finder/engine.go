@@ -323,13 +323,7 @@ func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier
 // further in the pipeline depending on whether they are processable or not.
 func (e *Engine) checkCachedReceipts() {
 	for _, rdp := range e.cachedReceipts.All() {
-		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-		func() {
-			var span opentracing.Span
-			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckCachedReceipts)
-			defer span.Finish()
-
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckCachedReceipts, func() {
 			receiptID := rdp.Receipt.ID()
 			resultID := rdp.Receipt.ExecutionResult.ID()
 
@@ -379,7 +373,7 @@ func (e *Engine) checkCachedReceipts() {
 				Bool("added_to_discarded_mempool", discarded).
 				Bool("added_to_ready_mempool", added).
 				Msg("cached receipt checked for adding to ready mempool")
-		}()
+		})
 	}
 }
 
@@ -470,13 +464,7 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			Hex("result_id", logging.ID(resultID)).
 			Logger()
 
-		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-		// for opentracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-		func() {
-			var span opentracing.Span
-			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
-			defer span.Finish()
-
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts, func() {
 			// moves receipt from pending to ready mempool
 			removed := e.pendingReceipts.Rem(receiptID)
 			log.Debug().
@@ -487,7 +475,7 @@ func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Ide
 			log.Debug().
 				Bool("added", added).
 				Msg("adds receipt to ready receipts")
-		}()
+		})
 	}
 }
 
