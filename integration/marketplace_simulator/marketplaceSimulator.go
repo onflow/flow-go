@@ -137,7 +137,6 @@ func (m *MarketPlaceSimulator) setupContracts() error {
 
 	err = m.deployContract("Market", nbaContract.GenerateTopShotMarketContract(m.networkConfig.FungibleTokenAddress.Hex(),
 		m.nbaTopshotAccount.Address().Hex(),
-		m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
 
 	return err
