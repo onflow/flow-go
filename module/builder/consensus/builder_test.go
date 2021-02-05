@@ -836,8 +836,8 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 		}
 	}
 	// for receipts _not_ included in blocks, add only receipt for A and C but NOT B
-	bs.build.recPool.AddReceipt(receiptSABC[1], blockSABC[1].Header)
-	bs.build.recPool.AddReceipt(receiptSABC[3], blockSABC[3].Header)
+	_, _ = bs.build.recPool.AddReceipt(receiptSABC[1], blockSABC[1].Header)
+	_, _ = bs.build.recPool.AddReceipt(receiptSABC[3], blockSABC[3].Header)
 
 	_, err := bs.build.BuildOn(blockSABC[3].ID(), bs.setter)
 	bs.Require().NoError(err)
