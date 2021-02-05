@@ -38,6 +38,10 @@ func (p EpochPhase) String() string {
 	}[p]
 }
 
+// EpochSetupRandomSourceMinLength is the minimum length of the random source
+// included in an EpochSetup service event.
+const EpochSetupRandomSourceMinLength = crypto.SignatureLenBLSBLS12381
+
 // EpochSetup is a service event emitted when the network is ready to set up
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.

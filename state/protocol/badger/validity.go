@@ -12,8 +12,7 @@ import (
 func validSetup(setup *flow.EpochSetup) error {
 	// STEP 1: general sanity checks
 	// the seed needs to be at least minimum length
-	// TODO: what is the appropriate minimum length here? Previously used sdk/crypto.SeedMinLength
-	if len(setup.RandomSource) < crypto.SeedMinLenDKG {
+	if len(setup.RandomSource) < flow.EpochSetupRandomSourceMinLength {
 		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.RandomSource), crypto.SeedMinLenDKG)
 	}
 
