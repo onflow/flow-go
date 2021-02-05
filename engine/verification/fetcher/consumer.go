@@ -18,7 +18,7 @@ const (
 
 // ChunkJob converts a Chunk into a Job to be used by job queue
 type ChunkJob struct {
-	ChunkLocator *chunkmodels.ChunkLocator
+	ChunkLocator *chunkmodels.Locator
 }
 
 // ID converts chunk id into job id, which guarantees uniqueness
@@ -30,11 +30,11 @@ func chunkIDToJobID(chunkID flow.Identifier) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", chunkID))
 }
 
-func ChunkLocatorToJob(locator *chunkmodels.ChunkLocator) *ChunkJob {
+func ChunkLocatorToJob(locator *chunkmodels.Locator) *ChunkJob {
 	return &ChunkJob{ChunkLocator: locator}
 }
 
-func JobToChunk(job storage.Job) *chunkmodels.ChunkLocator {
+func JobToChunk(job storage.Job) *chunkmodels.Locator {
 	chunkjob, _ := job.(*ChunkJob)
 	return chunkjob.ChunkLocator
 }
@@ -54,7 +54,7 @@ func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
 }
 
 type EngineWorker interface {
-	ProcessMyChunk(locator *chunkmodels.ChunkLocator)
+	ProcessMyChunk(locator *chunkmodels.Locator)
 	WithFinishProcessing(finishProcessing FinishProcessing)
 }
 

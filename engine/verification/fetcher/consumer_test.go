@@ -20,7 +20,7 @@ import (
 
 // TestChunkLocatorToJob evaluates that a chunk locator can be converted to a job, and its corresponding job can be converted back to a locator.
 func TestChunkLocatorToJob(t *testing.T) {
-	locator := &chunks.ChunkLocator{
+	locator := &chunks.Locator{
 		ResultID: unittest.IdentifierFixture(),
 		Index:    rand.Uint64(),
 	}
@@ -36,21 +36,21 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine blocking on the jobs,
 	// results in engine only receiving 3 jobs.
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
-		called := make([]*chunks.ChunkLocator, 0)
+		called := make([]*chunks.Locator, 0)
 		lock := &sync.Mutex{}
-		neverFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.ChunkLocator) {
+		neverFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 		}
-		WithConsumer(t, neverFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
+		WithConsumer(t, neverFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkQueue) {
 			<-consumer.Ready()
 
-			locators := make([]*chunks.ChunkLocator, 0)
+			locators := make([]*chunks.Locator, 0)
 			resultID := unittest.IdentifierFixture()
 
 			for i := 0; i < 10; i++ {
-				chunkLocator := &chunks.ChunkLocator{
+				chunkLocator := &chunks.Locator{
 					ResultID: resultID,
 					Index:    uint64(i),
 				}
@@ -72,22 +72,22 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
 	// results in engine eventually receiving all 10 jobs.
 	t.Run("pushing 10 receive 10", func(t *testing.T) {
-		called := make([]*chunks.ChunkLocator, 0)
+		called := make([]*chunks.Locator, 0)
 		lock := &sync.Mutex{}
-		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.ChunkLocator) {
+		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 			go finishProcessing.FinishProcessing(locator.ID())
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkQueue) {
 			<-consumer.Ready()
 
-			locators := make([]*chunks.ChunkLocator, 0)
+			locators := make([]*chunks.Locator, 0)
 			resultID := unittest.IdentifierFixture()
 
 			for i := 0; i < 10; i++ {
-				chunkLocator := &chunks.ChunkLocator{
+				chunkLocator := &chunks.Locator{
 					ResultID: resultID,
 					Index:    uint64(i),
 				}
@@ -107,22 +107,22 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 100 jobs concurrently to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
 	// results in engine eventually receiving all 100 jobs.
 	t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
-		called := make([]*chunks.ChunkLocator, 0)
+		called := make([]*chunks.Locator, 0)
 		lock := &sync.Mutex{}
-		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.ChunkLocator) {
+		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 			go finishProcessing.FinishProcessing(locator.ID())
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkQueue) {
 			<-consumer.Ready()
 			total := atomic.NewUint32(0)
 			resultID := unittest.IdentifierFixture()
 
 			for i := 0; i < 100; i++ {
 				go func(i int) {
-					chunkLocator := &chunks.ChunkLocator{
+					chunkLocator := &chunks.Locator{
 						ResultID: resultID,
 						Index:    uint64(i),
 					}
@@ -146,8 +146,8 @@ func TestProduceConsume(t *testing.T) {
 
 func WithConsumer(
 	t *testing.T,
-	process func(fetcher.FinishProcessing, *chunks.ChunkLocator),
-	withConsumer func(*fetcher.ChunkConsumer, *storage.ChunkLocatorQueue),
+	process func(fetcher.FinishProcessing, *chunks.Locator),
+	withConsumer func(*fetcher.ChunkConsumer, *storage.ChunkQueue),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
@@ -178,10 +178,10 @@ func WithConsumer(
 
 type MockEngine struct {
 	finishProcessing fetcher.FinishProcessing
-	process          func(finishProcessing fetcher.FinishProcessing, locator *chunks.ChunkLocator)
+	process          func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator)
 }
 
-func (e *MockEngine) ProcessMyChunk(locator *chunks.ChunkLocator) {
+func (e *MockEngine) ProcessMyChunk(locator *chunks.Locator) {
 	e.process(e.finishProcessing, locator)
 }
 
