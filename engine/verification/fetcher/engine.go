@@ -22,8 +22,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Engine takes processable execution results, finds the chunks the are assigned to me, fetches
-// the chunk data pack from execution nodes, and passes verifiable chunks to Verifier engine
+// Fetch engine processes each chunk in the chunk job queue, fetches its chunk data pack
+// from the execution nodes who produced the receipts, and when the chunk data pack are
+// received, it passes the verifiable chunk data to verifier engine to verify the chunk.
 type Engine struct {
 	unit             *engine.Unit
 	log              zerolog.Logger

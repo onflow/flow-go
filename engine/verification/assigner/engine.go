@@ -10,6 +10,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// The Assigner engine reads the receipts from each finalized block.
+// For each receipt, it reads its result and find the chunks the assigned
+// to me to verify, and then save it to the chunks job queue for the
+// fetcher engine to process.
 type Engine struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
@@ -89,6 +93,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
+// ProcessFinalizedBlock process each finalized block, and find the chunks that
+// assigned to me, and store it to the chunks job queue.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	// the block consumer will pull as many finalized blocks as
 	// it can consume to process
