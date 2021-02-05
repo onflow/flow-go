@@ -198,7 +198,6 @@ type VerificationNode struct {
 	ReceiptIDsByResult       mempool.IdentifierMap
 	ChunkIDsByResult         mempool.IdentifierMap
 	PendingChunks            *match.Chunks
-	HeaderStorage            storage.Headers
 	VerifierEngine           network.Engine
 	FinderEngine             *finder.Engine
 	MatchEngine              network.Engine
