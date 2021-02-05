@@ -152,27 +152,18 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	var err error
-
 	switch resource := event.(type) {
 	case *flow.ExecutionReceipt:
-		err = e.handleExecutionReceipt(originID, resource)
+		e.handleExecutionReceipt(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
-	}
-
-	if err != nil {
-		// logs the error instead of returning that.
-		// returning error would be projected at a higher level by network layer.
-		// however, this is an engine-level error, and not network layer error.
-		e.log.Debug().Err(err).Msg("engine could not process event successfully")
 	}
 
 	return nil
 }
 
 // handleExecutionReceipt receives an execution receipt and adds it to the cached receipt mempool.
-func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
 	span, ok := e.tracer.GetSpan(receipt.ID(), trace.VERProcessExecutionReceipt)
 	ctx := context.Background()
 	if !ok {
@@ -181,37 +172,34 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		defer span.Finish()
 	}
 	ctx = opentracing.ContextWithSpan(ctx, span)
-	childSpan, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindHandleExecutionReceipt)
-	defer childSpan.Finish()
 
-	receiptID := receipt.ID()
-	resultID := receipt.ExecutionResult.ID()
+	e.tracer.WithSpanFromContext(ctx, trace.VERFindHandleExecutionReceipt, func() {
 
-	log := e.log.With().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("receipt_id", logging.ID(receiptID)).
-		Hex("result_id", logging.ID(resultID)).Logger()
-	log.Info().
-		Msg("execution receipt arrived")
+		receiptID := receipt.ID()
+		resultID := receipt.ExecutionResult.ID()
 
-	// monitoring: increases number of received execution receipts
-	e.metrics.OnExecutionReceiptReceived()
+		log := e.log.With().
+			Hex("origin_id", logging.ID(originID)).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Hex("result_id", logging.ID(resultID)).Logger()
+		log.Info().
+			Msg("execution receipt arrived")
 
-	// caches receipt as a receipt data pack for further processing
-	rdp := &verification.ReceiptDataPack{
-		Receipt:  receipt,
-		OriginID: originID,
-		Ctx:      ctx,
-	}
+		// monitoring: increases number of received execution receipts
+		e.metrics.OnExecutionReceiptReceived()
 
-	ok = e.cachedReceipts.Add(rdp)
-	if !ok {
-		return fmt.Errorf("duplicate execution receipt. receipt_id: %x", logging.ID(receiptID))
-	}
-	log.Debug().
-		Msg("execution receipt successfully handled")
+		// caches receipt as a receipt data pack for further processing
+		rdp := &verification.ReceiptDataPack{
+			Receipt:  receipt,
+			OriginID: originID,
+			Ctx:      ctx,
+		}
 
-	return nil
+		ok = e.cachedReceipts.Add(rdp)
+		log.Debug().
+			Bool("added_to_cached_receipts", ok).
+			Msg("execution receipt successfully handled")
+	})
 }
 
 // To implement FinalizationConsumer
