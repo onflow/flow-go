@@ -387,6 +387,10 @@ func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 
 	flowAddress := flow.Address(address)
 
+	if flowAddress == e.ctx.Chain.ServiceAddress() {
+		return fmt.Errorf("cannot freeze service account")
+	}
+
 	if e.transactionEnv.isAuthorizerServiceAccount() {
 		return fmt.Errorf("SetAccountFrozen can only be used in transactions authorized by service account")
 	}

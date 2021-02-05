@@ -320,4 +320,90 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, tx.Err)
 
 	})
+
+	t.Run("service account cannot freeze itself", func(t *testing.T) {
+
+		rt := runtime.NewInterpreterRuntime()
+		log := zerolog.Nop()
+		vm := fvm.New(rt)
+		// create default context
+		context := fvm.NewContext(log)
+
+		ledger := testutil.RootBootstrappedLedger(vm, context)
+
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, context.Chain)
+		require.NoError(t, err)
+
+		address := accounts[0]
+
+		codeAccount := fmt.Sprintf(`
+			transaction {
+				execute {
+					setAccountFrozen(0x%s, true)
+				}
+			}
+		`, address.String())
+
+		serviceAddress := context.Chain.ServiceAddress()
+		codeService := fmt.Sprintf(`
+			transaction {
+				execute {
+					setAccountFrozen(0x%s, true)
+				}
+			}
+		`, serviceAddress.String())
+
+		// sign tx by service account now
+		txBody := &flow.TransactionBody{Script: []byte(codeAccount)}
+		txBody.SetProposalKey(serviceAddress, 0, 0)
+		txBody.SetPayer(serviceAddress)
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(context, tx, ledger)
+		require.NoError(t, err)
+		require.NoError(t, tx.Err)
+
+		accountsService := state.NewAccounts(state.NewState(ledger))
+
+		frozen, err := accountsService.GetAccountFrozen(address)
+		require.NoError(t, err)
+		require.True(t, frozen)
+
+		// make sure service account is not frozen before
+		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
+		require.NoError(t, err)
+		require.False(t, frozen)
+
+		// service account cannot be frozen
+		txBody = &flow.TransactionBody{Script: []byte(codeService)}
+		txBody.SetProposalKey(serviceAddress, 0, 1)
+		txBody.SetPayer(serviceAddress)
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx = fvm.Transaction(txBody, 0)
+		err = vm.Run(context, tx, ledger)
+		require.NoError(t, err)
+		require.Error(t, tx.Err)
+
+		accountsService = state.NewAccounts(state.NewState(ledger))
+
+		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
+		require.NoError(t, err)
+		require.False(t, frozen)
+	})
 }
