@@ -5,9 +5,11 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/chunks"
@@ -26,14 +28,13 @@ func TestChunkToJob(t *testing.T) {
 	require.Equal(t, locator, actual)
 }
 
-// TestProduceConsume evaluates that on a consumer with 3 workers:
-// 1. if pushing 10 jobs to chunks queue, then engine will receive only 3 jobs.
-// 2. if pushing 10 jobs to chunks queue, and engine will call finish will all the jobs, then engine will process 10 jobs in total.
-// 3. pushing 100 jobs concurrently, could end up having 100 jobs processed by the consumer.
+// TestProduceConsume evaluates different scenarios on passing jobs to chunk queue with 3 workers on the consumer side. It evaluates blocking and
+// none-blocking engines attacked to the workers in sequential and concurrent scenarios.
 func TestProduceConsume(t *testing.T) {
 	t.Parallel()
 
-	// if pushing 10 jobs to chunks queue, then engine will receive only 3 jobs, since consumer only has 3 workers.
+	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine blocking on the jobs,
+	// results in engine only receiving 3 jobs.
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
 		called := make([]*chunks.ChunkLocator, 0)
 		lock := &sync.Mutex{}
@@ -69,70 +70,81 @@ func TestProduceConsume(t *testing.T) {
 		})
 	})
 
-	//t.Run("pushing 10 receive 10", func(t *testing.T) {
-	//	called := make([]*flow.Chunk, 0)
-	//	lock := &sync.Mutex{}
-	//	alwaysFinish := func(finishProcessing fetcher.FinishProcessing, chunk *flow.Chunk) {
-	//		lock.Lock()
-	//		defer lock.Unlock()
-	//		called = append(called, chunk)
-	//		go finishProcessing.FinishProcessing(chunk.ID())
-	//	}
-	//	WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
-	//		<-consumer.Ready()
-	//
-	//		block := unittest.BlockFixture()
-	//		chunks := make([]*flow.Chunk, 0)
-	//		for i := 0; i < 10; i++ {
-	//			chunk := unittest.ChunkFixture(block.ID(), uint(i))
-	//			ok, err := chunksQueue.StoreChunkLocator(chunk)
-	//			require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
-	//			require.True(t, ok)
-	//			chunks = append(chunks, chunk)
-	//			consumer.Check() // notify the consumer
-	//		}
-	//
-	//		<-consumer.Done()
-	//		// expect the mock engine receives all 10 calls
-	//		require.Equal(t, chunks, called)
-	//	})
-	//})
+	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
+	// results in engine eventually receiving all 10 jobs.
+	t.Run("pushing 10 receive 10", func(t *testing.T) {
+		called := make([]*chunks.ChunkLocator, 0)
+		lock := &sync.Mutex{}
+		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.ChunkLocator) {
+			lock.Lock()
+			defer lock.Unlock()
+			called = append(called, locator)
+			go finishProcessing.FinishProcessing(locator.ID())
+		}
+		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
+			<-consumer.Ready()
 
-	//t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
-	//	called := make([]*chunks.ChunkLocator, 0)
-	//	lock := &sync.Mutex{}
-	//	alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.ChunkLocator) {
-	//		lock.Lock()
-	//		defer lock.Unlock()
-	//		called = append(called, locator)
-	//		go finishProcessing.FinishProcessing(locator.ID())
-	//	}
-	//	WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
-	//		<-consumer.Ready()
-	//
-	//		block := unittest.BlockFixture()
-	//
-	//		total := atomic.NewUint32(0)
-	//		blockID := block.ID()
-	//		for i := 0; i < 100; i++ {
-	//			go func(i int) {
-	//				chunk := unittest.ChunkFixture(blockID, uint(i))
-	//				ok, err := chunksQueue.StoreChunkLocator(chunk)
-	//				require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
-	//				require.True(t, ok)
-	//				total.Inc()
-	//				consumer.Check() // notify the consumer
-	//			}(i)
-	//		}
-	//
-	//		// expect the mock engine receives all 100 calls
-	//		require.Eventually(t, func() bool {
-	//			return int(total.Load()) == 100
-	//		}, time.Second*10, time.Millisecond*10)
-	//
-	//		<-consumer.Done()
-	//	})
-	//})
+			locators := make([]*chunks.ChunkLocator, 0)
+			resultID := unittest.IdentifierFixture()
+
+			for i := 0; i < 10; i++ {
+				chunkID := unittest.IdentifierFixture()
+				chunkLocator := &chunks.ChunkLocator{
+					ResultID: resultID,
+					Index:    uint64(i),
+				}
+				ok, err := chunksQueue.StoreChunkLocator(chunkID, chunkLocator)
+				require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
+				require.True(t, ok)
+				locators = append(locators, chunkLocator)
+				consumer.Check() // notify the consumer
+			}
+
+			<-consumer.Done()
+			// expect the mock engine receives all 10 calls
+			require.Equal(t, locators, called)
+		})
+	})
+
+	// pushing 100 jobs concurrently to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
+	// results in engine eventually receiving all 100 jobs.
+	t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
+		called := make([]*chunks.ChunkLocator, 0)
+		lock := &sync.Mutex{}
+		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.ChunkLocator) {
+			lock.Lock()
+			defer lock.Unlock()
+			called = append(called, locator)
+			go finishProcessing.FinishProcessing(locator.ID())
+		}
+		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunkLocatorQueue) {
+			<-consumer.Ready()
+			total := atomic.NewUint32(0)
+			resultID := unittest.IdentifierFixture()
+
+			for i := 0; i < 100; i++ {
+				go func(i int) {
+					chunkID := unittest.IdentifierFixture()
+					chunkLocator := &chunks.ChunkLocator{
+						ResultID: resultID,
+						Index:    uint64(i),
+					}
+					ok, err := chunksQueue.StoreChunkLocator(chunkID, chunkLocator)
+					require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
+					require.True(t, ok)
+					total.Inc()
+					consumer.Check() // notify the consumer
+				}(i)
+			}
+
+			// expect the mock engine receives all 100 calls
+			require.Eventually(t, func() bool {
+				return int(total.Load()) == 100
+			}, time.Second*10, time.Millisecond*10)
+
+			<-consumer.Done()
+		})
+	})
 }
 
 func WithConsumer(
