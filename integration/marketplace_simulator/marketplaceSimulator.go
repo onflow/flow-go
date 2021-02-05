@@ -248,6 +248,9 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 
 	result, err := m.sendTxAndWait(deploymentTx, m.nbaTopshotAccount)
 
+	fmt.Println(result)
+	fmt.Println(">>>>", result.Events)
+
 	// TODO fix me
 	if err != nil {
 		m.log.Info().Msgf("contract %s is deployed : %s", name, result)
