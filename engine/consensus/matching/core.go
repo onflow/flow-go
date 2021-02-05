@@ -43,10 +43,16 @@ const DefaultEmergencySealingThreshold = 400
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
 
-// Core is the Matching engine, which builds seals by matching receipts (aka
-// ExecutionReceipt, from execution nodes) and approvals (aka ResultApproval,
-// from verification nodes), and saves the seals into seals mempool for adding
-// into a new block.
+// Core implements the core algorithms of the sealing protocol, i.e.
+// determining, which Execution Result has accumulated sufficient approvals for
+// it to be sealable. Specifically:
+//  * Core tracks which execution Results (from ExecutionReceipts) were
+//    incorporated in the blocks.
+//  * It processes the ResultApprovals and matches them to execution results.
+//  * When an incorporated Result has collected sufficient approvals, a candidate
+//    Seal is generated and stored in the IncorporatedResultSeals mempool.
+//    Spwecifically, we require that each chunk must have a minimal number of
+//    approvals, `requiredApprovalsForSealConstruction`, from assigned Verifiers.
 type Core struct {
 	unit                                 *engine.Unit                    // used to control startup/shutdown
 	log                                  zerolog.Logger                  // used to log relevant actions with context
@@ -75,8 +81,8 @@ type Core struct {
 	maxResultsToRequest                  int                             // max number of finalized blocks for which we request execution results
 	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
 	receiptValidator                     module.ReceiptValidator         // used to validate receipts
-	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
-	approvalRequestsThreshold            uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
+	requestTracker                       *RequestTracker                 // tracks ongoing re-requests of missing result approvals, incl. blackout periods
+	approvalRequestsThreshold            uint64                          // lower threshold on height difference between <latest finalized block> and <block incorporating a result>, when re-requesting approvals starts
 	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 }
 
@@ -151,13 +157,13 @@ func NewCore(
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
-func (e *Core) Ready() <-chan struct{} {
+func (c *Core) Ready() <-chan struct{} {
 	started := make(chan struct{})
-	e.unit.Launch(func() {
+	c.unit.Launch(func() {
 		close(started)
-		e.processPendingEvents()
+		c.processPendingEvents()
 	})
-	return e.unit.Ready(func() {
+	return c.unit.Ready(func() {
 		<-started
 	})
 }
@@ -165,20 +171,12 @@ func (e *Core) Ready() <-chan struct{} {
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the propagation engine, it closes the channel when all submit goroutines
 // have ended.
-func (e *Core) Done() <-chan struct{} {
-	return e.unit.Done()
+func (c *Core) Done() <-chan struct{} {
+	return c.unit.Done()
 }
 
 // processPendingEvents processes pending events that are stored in respective queues.
-func (e *Core) processPendingEvents() {
-	processItem := func(pendingEvent *Event) {
-		originID, event := pendingEvent.OriginID, pendingEvent.Msg
-		err := e.processPendingEvent(originID, event)
-		if err != nil {
-			e.log.Error().Err(err).Hex("origin", originID[:]).Msgf("could not process event")
-		}
-	}
-
+func (c *Core) processPendingEvents() {
 	// Context:
 	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
 	// information only changes significantly with new blocks or new receipts.
@@ -190,55 +188,64 @@ func (e *Core) processPendingEvents() {
 	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
 	checkSealingTicker := make(chan struct{})
 	defer close(checkSealingTicker)
-	e.unit.LaunchPeriodically(func() {
+	c.unit.LaunchPeriodically(func() {
 		checkSealingTicker <- struct{}{}
 	}, 2*time.Second, 120*time.Second)
 
 	for {
 		select {
-		case event := <-e.receiptEventProvider:
-			processItem(event)
-		case event := <-e.approvalEventProvider:
-			processItem(event)
-		case event := <-e.approvalResponseEventProvider:
-			processItem(event)
+		case event := <-c.receiptEventProvider:
+			c.processEvent(event)
+		case event := <-c.approvalEventProvider:
+			c.processEvent(event)
+		case event := <-c.approvalResponseEventProvider:
+			c.processEvent(event)
 		case <-checkSealingTicker:
-			e.checkSealing()
-		case <-e.unit.Quit():
+			c.checkSealing()
+		case <-c.unit.Quit():
 			return
 		}
 	}
 }
 
 // processPendingEvent processes single event for the propagation engine on the consensus node.
-func (e *Core) processPendingEvent(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
+func (c *Core) processEvent(pendingEvent *Event) {
+	var err error
+	switch event := pendingEvent.Msg.(type) {
 	case *flow.ExecutionReceipt:
-		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		return e.onReceipt(originID, ev)
+		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		err = c.onReceipt(pendingEvent.OriginID, event)
 	case *flow.ResultApproval:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		return e.onApproval(originID, ev)
+		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		err = c.onApproval(pendingEvent.OriginID, event)
 	case *messages.ApprovalResponse:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		return e.onApproval(originID, &ev.Approval)
+		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		err = c.onApproval(pendingEvent.OriginID, &event.Approval)
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		err = fmt.Errorf("invalid event type (%T)", pendingEvent.Msg)
+	}
+	if err != nil {
+		// TODO: we probably want to check the type of the error here
+		// * If the message was invalid (e.g. NewInvalidInputError), which is expected as part
+		//   of normal operations in an untrusted environment, we can just log an error.
+		// * However, if we receive an error indicating internal node failure or state
+		//   internal state corruption, we should probably crash the node.
+		c.log.Error().Err(err).Hex("origin", pendingEvent.OriginID[:]).Msgf("could not process event")
 	}
 }
 
 // onReceipt processes a new execution receipt.
-func (e *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	startTime := time.Now()
-	receiptSpan := e.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
+	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
 	defer func() {
-		e.metrics.OnReceiptProcessingDuration(time.Since(startTime))
+		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
 		receiptSpan.Finish()
 	}()
 
-	log := e.log.With().
+	log := c.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
@@ -259,7 +266,7 @@ func (e *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
-	head, err := e.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
+	head, err := c.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
 		return nil
@@ -273,7 +280,7 @@ func (e *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 
 	// if Execution Receipt is for block whose height is lower or equal to already sealed height
 	//  => drop Receipt
-	sealed, err := e.state.Sealed().Head()
+	sealed, err := c.state.Sealed().Head()
 	if err != nil {
 		return fmt.Errorf("could not find sealed block: %w", err)
 	}
@@ -287,14 +294,14 @@ func (e *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	// if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
 	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
 	// eventually request the parent receipt with the `requestPending` function
-	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
-	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
+	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
+	err = c.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 	childSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
-	err = e.storeReceipt(receipt, head, &log)
+	err = c.storeReceipt(receipt, head, &log)
 	if err != nil {
 		if engine.IsDuplicatedEntryError(err) {
 			return nil
@@ -311,7 +318,7 @@ func (e *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
 	// will be the ID of the first block on its fork that contains a receipt
 	// committing to this result.
-	err = e.storeIncorporatedResult(receipt, &log)
+	err = c.storeIncorporatedResult(receipt, &log)
 	if err != nil {
 		if engine.IsDuplicatedEntryError(err) {
 			return nil
@@ -328,8 +335,8 @@ func (e *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 // 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool and we don't need to process this again
 //	* exception in case something went wrong
 // 	* nil in case of success
-func (e *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, log *zerolog.Logger) error {
-	added, err := e.receipts.AddReceipt(receipt, head)
+func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, log *zerolog.Logger) error {
+	added, err := c.receipts.AddReceipt(receipt, head)
 	if err != nil {
 		return fmt.Errorf("adding receipt (%x) to mempool failed: %w", receipt.ID(), err)
 	}
@@ -337,12 +344,12 @@ func (e *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, l
 		log.Debug().Msg("skipping receipt already in mempool")
 		return engine.NewDuplicatedEntryErrorf("")
 	}
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
+	c.mempool.MempoolEntries(metrics.ResourceReceipt, c.receipts.Size())
 
 	// persist receipt in database. Even if the receipt is already in persistent storage,
 	// we still need to process it, as it is not in the mempool. This can happen if the
 	// mempool was wiped during a node crash.
-	err = e.receiptsDB.Store(receipt) // internally de-duplicates
+	err = c.receiptsDB.Store(receipt) // internally de-duplicates
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return fmt.Errorf("could not persist receipt: %w", err)
 	}
@@ -354,9 +361,9 @@ func (e *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, l
 // 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool
 //	* exception in case something went wrong
 // 	* nil in case of success
-func (e *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
+func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
 	// Create an IncorporatedResult and add it to the mempool
-	added, err := e.incorporatedResults.Add(
+	added, err := c.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
 			receipt.ExecutionResult.BlockID,
 			&receipt.ExecutionResult,
@@ -369,20 +376,20 @@ func (e *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zero
 		log.Debug().Msg("skipping result already in mempool")
 		return engine.NewDuplicatedEntryErrorf("")
 	}
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
+	c.mempool.MempoolEntries(metrics.ResourceResult, c.incorporatedResults.Size())
 	return nil
 }
 
 // onApproval processes a new result approval.
-func (e *Core) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
 	startTime := time.Now()
-	approvalSpan := e.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
+	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
 	defer func() {
-		e.metrics.OnApprovalProcessingDuration(time.Since(startTime))
+		c.metrics.OnApprovalProcessingDuration(time.Since(startTime))
 		approvalSpan.Finish()
 	}()
 
-	log := e.log.With().
+	log := c.log.With().
 		Hex("approval_id", logging.Entity(approval)).
 		Hex("block_id", approval.Body.BlockID[:]).
 		Hex("result_id", approval.Body.ExecutionResultID[:]).
@@ -398,7 +405,7 @@ func (e *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 	}
 
 	// check if we already have the block the approval pertains to
-	head, err := e.state.AtBlockID(approval.Body.BlockID).Head()
+	head, err := c.state.AtBlockID(approval.Body.BlockID).Head()
 	if err != nil {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
@@ -407,7 +414,7 @@ func (e *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 		// else-branch below are called again when we try to match approvals to chunks.
 	} else {
 		// drop approval, if it is for block whose height is lower or equal to already sealed height
-		sealed, err := e.state.Sealed().Head()
+		sealed, err := c.state.Sealed().Head()
 		if err != nil {
 			return fmt.Errorf("could not find sealed block: %w", err)
 		}
@@ -417,7 +424,7 @@ func (e *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 		}
 
 		// Check if the approver was a staked verifier at that block.
-		err = e.ensureStakedNodeWithRole(approval.Body.ApproverID, head, flow.RoleVerification)
+		err = c.ensureStakedNodeWithRole(approval.Body.ApproverID, head, flow.RoleVerification)
 		if err != nil {
 			return fmt.Errorf("failed to process approval: %w", err)
 		}
@@ -426,7 +433,7 @@ func (e *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 	}
 
 	// store in the memory pool (it won't be added if it is already in there).
-	added, err := e.approvals.Add(approval)
+	added, err := c.approvals.Add(approval)
 	if err != nil {
 		return err
 	}
@@ -434,39 +441,39 @@ func (e *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 		log.Debug().Msg("skipping approval already in mempool")
 		return nil
 	}
-	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
+	c.mempool.MempoolEntries(metrics.ResourceApproval, c.approvals.Size())
 
 	return nil
 }
 
 // checkSealing checks if there is anything worth sealing at the moment.
-func (e *Core) checkSealing() {
+func (c *Core) checkSealing() {
 	// only check sealing when no one else is checking
-	canCheck := e.isCheckingSealing.CAS(false, true)
+	canCheck := c.isCheckingSealing.CAS(false, true)
 	if !canCheck {
 		return
 	}
 
-	defer e.isCheckingSealing.Store(false)
+	defer c.isCheckingSealing.Store(false)
 
-	err := e.checkingSealing()
+	err := c.checkingSealing()
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("error in sealing protocol")
+		c.log.Fatal().Err(err).Msg("error in sealing protocol")
 	}
 }
 
-func (e *Core) checkingSealing() error {
+func (c *Core) checkingSealing() error {
 	startTime := time.Now()
-	sealingSpan, _ := e.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealing)
+	sealingSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealing)
 	defer func() {
-		e.metrics.CheckSealingDuration(time.Since(startTime))
+		c.metrics.CheckSealingDuration(time.Since(startTime))
 		sealingSpan.Finish()
 	}()
 
-	sealableResultsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingSealableResults)
+	sealableResultsSpan := c.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingSealableResults)
 
 	// get all results that have collected enough approvals on a per-chunk basis
-	sealableResults, err := e.sealableResults()
+	sealableResults, err := c.sealableResults()
 	if err != nil {
 		return fmt.Errorf("could not get sealable execution results: %w", err)
 	}
@@ -474,11 +481,11 @@ func (e *Core) checkingSealing() error {
 		// skip if no results can be sealed yet
 		return nil
 	}
-	e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
+	c.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
 
 	// log warning if we are going to overflow the seals mempool
-	if space := e.seals.Limit() - e.seals.Size(); len(sealableResults) > int(space) {
-		e.log.Warn().
+	if space := c.seals.Limit() - c.seals.Size(); len(sealableResults) > int(space) {
+		c.log.Warn().
 			Int("space", int(space)).
 			Msg("overflowing seals mempool")
 	}
@@ -488,21 +495,21 @@ func (e *Core) checkingSealing() error {
 	for _, incorporatedResult := range sealableResults {
 		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
 		// start a child span that will run until this function returns.
-		if span, ok := e.tracer.GetSpan(incorporatedResult.Result.BlockID, trace.CONProcessBlock); ok {
-			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
+		if span, ok := c.tracer.GetSpan(incorporatedResult.Result.BlockID, trace.CONProcessBlock); ok {
+			childSpan := c.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
 			defer childSpan.Finish()
 		}
 
 		// For each execution result, we load all the collection that are in the executed block.
-		index, err := e.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
+		index, err := c.indexDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
 			continue
 		}
 		for _, id := range index.CollectionIDs {
 			// For each collection, we load the trace.CONProcessCollection span. If we find it, we start a child span
 			// that will run until this function returns.
-			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
-				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
+			if span, ok := c.tracer.GetSpan(id, trace.CONProcessCollection); ok {
+				childSpan := c.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
 				defer childSpan.Finish()
 			}
 		}
@@ -512,7 +519,7 @@ func (e *Core) checkingSealing() error {
 	var sealedResultIDs []flow.Identifier
 	var sealedBlockIDs []flow.Identifier
 	for _, incorporatedResult := range sealableResults {
-		err := e.sealResult(incorporatedResult)
+		err := c.sealResult(incorporatedResult)
 		if err != nil {
 			return fmt.Errorf("failed to seal result (%x): %w", incorporatedResult.ID(), err)
 		}
@@ -528,40 +535,40 @@ func (e *Core) checkingSealing() error {
 		sealedBlockIDs = append(sealedBlockIDs, incorporatedResult.Result.BlockID)
 	}
 
-	e.log.Debug().Int("sealed", len(sealedResultIDs)).Msg("sealed execution results")
+	c.log.Debug().Int("sealed", len(sealedResultIDs)).Msg("sealed execution results")
 
 	// finish tracing spans
 	sealableResultsSpan.Finish()
 	for _, blockID := range sealedBlockIDs {
-		index, err := e.indexDB.ByBlockID(blockID)
+		index, err := c.indexDB.ByBlockID(blockID)
 		if err != nil {
 			continue
 		}
 		for _, id := range index.CollectionIDs {
-			e.tracer.FinishSpan(id, trace.CONProcessCollection)
+			c.tracer.FinishSpan(id, trace.CONProcessCollection)
 		}
-		e.tracer.FinishSpan(blockID, trace.CONProcessBlock)
+		c.tracer.FinishSpan(blockID, trace.CONProcessBlock)
 	}
 
 	// clear the memory pools
-	clearPoolsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingClearPools)
-	err = e.clearPools(sealedResultIDs)
+	clearPoolsSpan := c.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingClearPools)
+	err = c.clearPools(sealedResultIDs)
 	clearPoolsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("failed to clean mempools: %w", err)
 	}
 
 	// request execution receipts for unsealed finalized blocks
-	requestReceiptsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
-	err = e.requestPendingReceipts()
+	requestReceiptsSpan := c.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
+	err = c.requestPendingReceipts()
 	requestReceiptsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
 
 	// request result approvals for pending incorporated results
-	requestApprovalsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingApprovals)
-	err = e.requestPendingApprovals()
+	requestApprovalsSpan := c.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingApprovals)
+	err = c.requestPendingApprovals()
 	requestApprovalsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
@@ -573,22 +580,22 @@ func (e *Core) checkingSealing() error {
 // sealableResults returns the IncorporatedResults from the mempool that have
 // collected enough approvals on a per-chunk basis, as defined by the matchChunk
 // function. It also filters out results that have an incorrect sub-graph.
-func (e *Core) sealableResults() ([]*flow.IncorporatedResult, error) {
+func (c *Core) sealableResults() ([]*flow.IncorporatedResult, error) {
 	var results []*flow.IncorporatedResult
 
-	lastFinalized, err := e.state.Final().Head()
+	lastFinalized, err := c.state.Final().Head()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get last finalized block: %w", err)
 	}
 
 	// go through the results mempool and check which ones we have collected
 	// enough approvals for
-	for _, incorporatedResult := range e.incorporatedResults.All() {
+	for _, incorporatedResult := range c.incorporatedResults.All() {
 		// not finding the block header for an incorporated result is a fatal
 		// implementation bug, as we only add results to the IncorporatedResults
 		// mempool, where _both_ the block that incorporates the result as well
 		// as the block the result pertains to are known
-		block, err := e.headersDB.ByBlockID(incorporatedResult.Result.BlockID)
+		block, err := c.headersDB.ByBlockID(incorporatedResult.Result.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -599,7 +606,7 @@ func (e *Core) sealableResults() ([]*flow.IncorporatedResult, error) {
 
 		// the chunk assigment is based on the first block in its fork which
 		// contains a receipt that commits to this result.
-		assignment, err := e.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
+		assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
 		if state.IsNoValidChildBlockError(err) {
 			continue
 		}
@@ -618,7 +625,7 @@ func (e *Core) sealableResults() ([]*flow.IncorporatedResult, error) {
 		matched := false
 		// check that each chunk collects enough approvals
 		for _, chunk := range incorporatedResult.Result.Chunks {
-			matched, err = e.matchChunk(incorporatedResult, block, chunk, assignment)
+			matched, err = c.matchChunk(incorporatedResult, block, chunk, assignment)
 			if err != nil {
 				return nil, fmt.Errorf("could not match chunk: %w", err)
 			}
@@ -630,8 +637,8 @@ func (e *Core) sealableResults() ([]*flow.IncorporatedResult, error) {
 		// ATTENTION: this is a temporary solution called emergency sealing. Emergency sealing is a special case
 		// when we seal ERs that don't have enough approvals but are deep enough in the chain resulting in halting sealing
 		// process. This will be removed when implementation of seal & verification is finished.
-		if !matched && e.emergencySealingActive {
-			block, err := e.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
+		if !matched && c.emergencySealingActive {
+			block, err := c.headersDB.ByBlockID(incorporatedResult.IncorporatedBlockID)
 			if err != nil {
 				return nil, fmt.Errorf("could not get block %v: %w", incorporatedResult.IncorporatedBlockID, err)
 			}
@@ -652,10 +659,10 @@ func (e *Core) sealableResults() ([]*flow.IncorporatedResult, error) {
 // matchChunk checks that the number of ResultApprovals collected by a chunk
 // exceeds the required threshold. It also populates the IncorporatedResult's
 // collection of approval signatures to avoid repeated work.
-func (e *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *flow.Header, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
+func (c *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *flow.Header, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
 
 	// get all the chunk approvals from mempool
-	approvals := e.approvals.ByChunk(incorporatedResult.Result.ID(), chunk.Index)
+	approvals := c.approvals.ByChunk(incorporatedResult.Result.ID(), chunk.Index)
 
 	validApprovals := uint(0)
 	for approverID, approval := range approvals {
@@ -669,10 +676,10 @@ func (e *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *fl
 
 		// if the approval comes from a node that wasn't even a staked
 		// verifier at that block, remove the approval from the mempool.
-		err := e.ensureStakedNodeWithRole(approverID, block, flow.RoleVerification)
+		err := c.ensureStakedNodeWithRole(approverID, block, flow.RoleVerification)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
-				_, err = e.approvals.RemApproval(approval)
+				_, err = c.approvals.RemApproval(approval)
 				if err != nil {
 					return false, fmt.Errorf("failed to remove approval from mempool: %w", err)
 				}
@@ -690,7 +697,7 @@ func (e *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *fl
 		validApprovals++
 	}
 
-	return validApprovals >= e.requiredApprovalsForSealConstruction, nil
+	return validApprovals >= c.requiredApprovalsForSealConstruction, nil
 }
 
 // TODO: to be extracted as a common function in state/protocol/state.go
@@ -705,9 +712,9 @@ func (e *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *fl
 // Note: the method receives the block header as proof of its existence.
 // Therefore, we consider the case where the respective block is unknown to the
 // protocol state as a symptom of a fatal implementation bug.
-func (e *Core) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.Header, expectedRole flow.Role) error {
+func (c *Core) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.Header, expectedRole flow.Role) error {
 	// get the identity of the origin node
-	identity, err := e.state.AtBlockID(block.ID()).Identity(nodeID)
+	identity, err := c.state.AtBlockID(block.ID()).Identity(nodeID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return engine.NewInvalidInputErrorf("unknown node identity: %w", err)
@@ -736,7 +743,7 @@ func (e *Core) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.Head
 
 // sealResult creates a seal for the incorporated result and adds it to the
 // seals mempool.
-func (e *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
+func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	// collect aggregate signatures
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
@@ -758,7 +765,7 @@ func (e *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err := e.seals.Add(&flow.IncorporatedResultSeal{
+	_, err := c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})
@@ -773,14 +780,14 @@ func (e *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 // already sealed. If we don't know the block, we purge the entities once we
 // have called checkSealing 1000 times without seeing the block (it's probably
 // no longer a valid extension of the state anyway).
-func (e *Core) clearPools(sealedIDs []flow.Identifier) error {
+func (c *Core) clearPools(sealedIDs []flow.Identifier) error {
 
 	clear := make(map[flow.Identifier]bool)
 	for _, sealedID := range sealedIDs {
 		clear[sealedID] = true
 	}
 
-	sealed, err := e.state.Sealed().Head()
+	sealed, err := c.state.Sealed().Head()
 	if err != nil {
 		return fmt.Errorf("could not get sealed head: %w", err)
 	}
@@ -789,10 +796,10 @@ func (e *Core) clearPools(sealedIDs []flow.Identifier) error {
 	// if it references the block with the given ID
 	missingIDs := make(map[flow.Identifier]bool) // count each missing block only once
 	shouldClear := func(blockID flow.Identifier) (bool, error) {
-		if e.missing[blockID] >= 1000 {
+		if c.missing[blockID] >= 1000 {
 			return true, nil // clear if block is missing for 1000 seals already
 		}
-		header, err := e.headersDB.ByBlockID(blockID)
+		header, err := c.headersDB.ByBlockID(blockID)
 		if errors.Is(err, storage.ErrNotFound) {
 			missingIDs[blockID] = true
 			return false, nil // keep if the block is missing, but count times missing
@@ -812,32 +819,32 @@ func (e *Core) clearPools(sealedIDs []flow.Identifier) error {
 	// a finalized seal. Results of sufficient height for forks that conflict with the finalized fork
 	// are retained in the mempool. However, such orphaned forks do not grow anymore and their
 	// results will be progressively flushed out with increasing sealed-finalized height.
-	err = e.receipts.PruneUpToHeight(sealed.Height)
+	err = c.receipts.PruneUpToHeight(sealed.Height)
 	if err != nil {
 		return fmt.Errorf("failed to clean receipts mempool: %w", err)
 	}
 
 	// for each memory pool, clear if the related block is no longer relevant or
 	// if the seal was already built for it (except for seals themselves)
-	for _, result := range e.incorporatedResults.All() {
+	for _, result := range c.incorporatedResults.All() {
 		remove, err := shouldClear(result.Result.BlockID)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate cleaning condition for incorporated results mempool: %w", err)
 		}
 		if remove || clear[result.ID()] {
-			_ = e.incorporatedResults.Rem(result)
+			_ = c.incorporatedResults.Rem(result)
 		}
 	}
 
 	// clear approvals mempool
-	for _, approval := range e.approvals.All() {
+	for _, approval := range c.approvals.All() {
 		remove, err := shouldClear(approval.Body.BlockID)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate cleaning condition for approvals mempool: %w", err)
 		}
 		if remove || clear[approval.Body.ExecutionResultID] {
 			// delete all the approvals for the corresponding chunk
-			_, err = e.approvals.RemChunk(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
+			_, err = c.approvals.RemChunk(approval.Body.ExecutionResultID, approval.Body.ChunkIndex)
 			if err != nil {
 				return fmt.Errorf("failed to clean approvals mempool: %w", err)
 			}
@@ -845,67 +852,67 @@ func (e *Core) clearPools(sealedIDs []flow.Identifier) error {
 	}
 
 	// clear seals mempool
-	for _, seal := range e.seals.All() {
+	for _, seal := range c.seals.All() {
 		remove, err := shouldClear(seal.Seal.BlockID)
 		if err != nil {
 			return fmt.Errorf("failed to evaluate cleaning condition for seals mempool: %w", err)
 		}
 		if remove {
-			_ = e.seals.Rem(seal.ID())
+			_ = c.seals.Rem(seal.ID())
 		}
 	}
 
 	// clear the request tracker of all items corresponding to results that are
 	// no longer in the incorporated-results mempool
-	for resultID := range e.requestTracker.GetAll() {
-		if _, _, ok := e.incorporatedResults.ByResultID(resultID); !ok {
-			e.requestTracker.Remove(resultID)
+	for resultID := range c.requestTracker.GetAll() {
+		if _, _, ok := c.incorporatedResults.ByResultID(resultID); !ok {
+			c.requestTracker.Remove(resultID)
 		}
 	}
 
 	// for each missing block that we are tracking, remove it from tracking if
 	// we now know that block or if we have just cleared related resources; then
 	// increase the count for the remaining missing blocks
-	for missingID, count := range e.missing {
-		_, err := e.headersDB.ByBlockID(missingID)
+	for missingID, count := range c.missing {
+		_, err := c.headersDB.ByBlockID(missingID)
 		if count >= 1000 || err == nil {
-			delete(e.missing, missingID)
+			delete(c.missing, missingID)
 		}
 	}
 	for missingID := range missingIDs {
-		e.missing[missingID]++
+		c.missing[missingID]++
 	}
 
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
-	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
-	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
+	c.mempool.MempoolEntries(metrics.ResourceResult, c.incorporatedResults.Size())
+	c.mempool.MempoolEntries(metrics.ResourceReceipt, c.receipts.Size())
+	c.mempool.MempoolEntries(metrics.ResourceApproval, c.approvals.Size())
+	c.mempool.MempoolEntries(metrics.ResourceSeal, c.seals.Size())
 	return nil
 }
 
 // requestPendingReceipts requests the execution receipts of unsealed finalized
 // blocks.
-func (e *Core) requestPendingReceipts() error {
+func (c *Core) requestPendingReceipts() error {
 
 	// last sealed block
-	sealed, err := e.state.Sealed().Head()
+	sealed, err := c.state.Sealed().Head()
 	if err != nil {
 		return fmt.Errorf("could not get sealed height: %w", err)
 	}
 
 	// last finalized block
-	final, err := e.state.Final().Head()
+	final, err := c.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not get finalized height: %w", err)
 	}
 
 	// only request if number of unsealed finalized blocks exceeds the threshold
-	log := e.log.With().
+	log := c.log.With().
 		Uint64("finalized_height", final.Height).
 		Uint64("sealed_height", sealed.Height).
-		Uint("sealing_threshold", e.sealingThreshold).
+		Uint("sealing_threshold", c.sealingThreshold).
 		Logger()
-	if uint(final.Height-sealed.Height) < e.sealingThreshold {
+	if uint(final.Height-sealed.Height) < c.sealingThreshold {
 		log.Debug().Msg("skip requesting receipts as number of unsealed finalized blocks is below threshold")
 		return nil
 	}
@@ -915,14 +922,14 @@ func (e *Core) requestPendingReceipts() error {
 	// right order. The right order gives the priority to the execution result
 	// of lower height blocks to be requested first, since a gap in the sealing
 	// heights would stop the sealing.
-	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxResultsToRequest)
+	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, c.maxResultsToRequest)
 
 	// turn mempool into Lookup table: BlockID -> Result
 	knownResultForBlock := make(map[flow.Identifier]struct{})
-	for _, r := range e.incorporatedResults.All() {
+	for _, r := range c.incorporatedResults.All() {
 		knownResultForBlock[r.Result.BlockID] = struct{}{}
 	}
-	for _, s := range e.seals.All() {
+	for _, s := range c.seals.All() {
 		knownResultForBlock[s.Seal.BlockID] = struct{}{}
 	}
 
@@ -931,12 +938,12 @@ func (e *Core) requestPendingReceipts() error {
 	// order to request them.
 	for height := sealed.Height + 1; height <= final.Height; height++ {
 		// add at most <maxUnsealedResults> number of results
-		if len(missingBlocksOrderedByHeight) >= e.maxResultsToRequest {
+		if len(missingBlocksOrderedByHeight) >= c.maxResultsToRequest {
 			break
 		}
 
 		// get the block header at this height (should not error as heights are finalized)
-		header, err := e.headersDB.ByHeight(height)
+		header, err := c.headersDB.ByHeight(height)
 		if err != nil {
 			return fmt.Errorf("could not get header (height=%d): %w", height, err)
 		}
@@ -954,7 +961,7 @@ func (e *Core) requestPendingReceipts() error {
 			Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
 			Msg("requesting receipts")
 		for _, blockID := range missingBlocksOrderedByHeight {
-			e.receiptRequester.EntityByID(blockID, filter.Any)
+			c.receiptRequester.EntityByID(blockID, filter.Any)
 		}
 	}
 
@@ -972,26 +979,26 @@ func (e *Core) requestPendingReceipts() error {
 //                              |                   |
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
-func (e *Core) requestPendingApprovals() error {
+func (c *Core) requestPendingApprovals() error {
 	// skip requesting approvals if they are not required for sealing
-	if e.requiredApprovalsForSealConstruction == 0 {
+	if c.requiredApprovalsForSealConstruction == 0 {
 		return nil
 	}
 
-	sealed, err := e.state.Sealed().Head() // last sealed block
+	sealed, err := c.state.Sealed().Head() // last sealed block
 	if err != nil {
 		return fmt.Errorf("could not get sealed height: %w", err)
 	}
-	final, err := e.state.Final().Head() // last finalized block
+	final, err := c.state.Final().Head() // last finalized block
 	if err != nil {
 		return fmt.Errorf("could not get finalized height: %w", err)
 	}
-	log := e.log.With().
+	log := c.log.With().
 		Uint64("finalized_height", final.Height).
 		Uint64("sealed_height", sealed.Height).
-		Uint64("approval_requests_threshold", e.approvalRequestsThreshold).
+		Uint64("approval_requests_threshold", c.approvalRequestsThreshold).
 		Logger()
-	if sealed.Height+e.approvalRequestsThreshold >= final.Height {
+	if sealed.Height+c.approvalRequestsThreshold >= final.Height {
 		log.Debug().Msg("skip requesting approvals as number of unsealed finalized blocks is below threshold")
 		return nil
 	}
@@ -999,15 +1006,15 @@ func (e *Core) requestPendingApprovals() error {
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - approvalRequestsThreshold
 	// Hence, the following operation cannot underflow
-	maxHeightForRequesting := final.Height - e.approvalRequestsThreshold
+	maxHeightForRequesting := final.Height - c.approvalRequestsThreshold
 
 	requestCount := 0
-	for _, r := range e.incorporatedResults.All() {
+	for _, r := range c.incorporatedResults.All() {
 		resultID := r.Result.ID()
 
 		// not finding the block that the result was incorporated in is a fatal
 		// error at this stage
-		block, err := e.headersDB.ByBlockID(r.IncorporatedBlockID)
+		block, err := c.headersDB.ByBlockID(r.IncorporatedBlockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -1021,7 +1028,7 @@ func (e *Core) requestPendingApprovals() error {
 
 		// Skip result if it is incorporated in a block that is _not_ part of
 		// the finalized fork.
-		finalizedBlockAtHeight, err := e.headersDB.ByHeight(block.Height)
+		finalizedBlockAtHeight, err := c.headersDB.ByHeight(block.Height)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
 		}
@@ -1034,7 +1041,7 @@ func (e *Core) requestPendingApprovals() error {
 		// results will eventually be removed from the mempool, there is a small
 		// period, where they might still be in the mempool (until the cleanup
 		// algorithm has caught them).
-		resultBlock, err := e.headersDB.ByBlockID(r.Result.BlockID)
+		resultBlock, err := c.headersDB.ByBlockID(r.Result.BlockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -1046,7 +1053,7 @@ func (e *Core) requestPendingApprovals() error {
 		// from verifiers that were assigned to the chunk. Note that the
 		// assigner keeps a cache of computed assignments, so this is not
 		// necessarily an expensive operation.
-		assignment, err := e.assigner.Assign(r.Result, r.IncorporatedBlockID)
+		assignment, err := c.assigner.Assign(r.Result, r.IncorporatedBlockID)
 		if err != nil {
 			// at this point, we know the block and a valid child block exists.
 			// Not being able to compute the assignment constitutes a fatal
@@ -1056,18 +1063,18 @@ func (e *Core) requestPendingApprovals() error {
 
 		// send approval requests for chunks that haven't collected enough
 		// approvals
-		for _, c := range r.Result.Chunks {
+		for _, chunk := range r.Result.Chunks {
 
 			// skip if we already have enough valid approvals for this chunk
-			sigs, haveChunkApprovals := r.GetChunkSignatures(c.Index)
-			if haveChunkApprovals && uint(sigs.NumberSigners()) >= e.requiredApprovalsForSealConstruction {
+			sigs, haveChunkApprovals := r.GetChunkSignatures(chunk.Index)
+			if haveChunkApprovals && uint(sigs.NumberSigners()) >= c.requiredApprovalsForSealConstruction {
 				continue
 			}
 
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := e.requestTracker.Get(resultID, c.Index)
+			requestTrackerItem := c.requestTracker.Get(resultID, chunk.Index)
 			if requestTrackerItem.IsBlackout() {
 				continue
 			}
@@ -1076,9 +1083,9 @@ func (e *Core) requestPendingApprovals() error {
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10
 			if requestTrackerItem.Requests >= 10 {
-				e.log.Debug().Msgf("requesting approvals for result %v chunk %d: %d requests",
+				c.log.Debug().Msgf("requesting approvals for result %v chunk %d: %d requests",
 					resultID,
-					c.Index,
+					chunk.Index,
 					requestTrackerItem.Requests,
 				)
 			}
@@ -1087,11 +1094,11 @@ func (e *Core) requestPendingApprovals() error {
 			req := &messages.ApprovalRequest{
 				Nonce:      rand.Uint64(),
 				ResultID:   resultID,
-				ChunkIndex: c.Index,
+				ChunkIndex: chunk.Index,
 			}
 
 			// get the list of verification nodes assigned to this chunk
-			assignedVerifiers := assignment.Verifiers(c)
+			assignedVerifiers := assignment.Verifiers(chunk)
 
 			// keep only the ids of verifiers who haven't provided an approval
 			var targetIDs flow.IdentifierList
@@ -1108,10 +1115,10 @@ func (e *Core) requestPendingApprovals() error {
 
 			// publish the approval request to the network
 			requestCount++
-			err = e.approvalConduit.Publish(req, targetIDs...)
+			err = c.approvalConduit.Publish(req, targetIDs...)
 			if err != nil {
-				e.log.Error().Err(err).
-					Hex("chunk_id", logging.Entity(c)).
+				c.log.Error().Err(err).
+					Hex("chunk_id", logging.Entity(chunk)).
 					Msg("could not publish approval request for chunk")
 			}
 		}
