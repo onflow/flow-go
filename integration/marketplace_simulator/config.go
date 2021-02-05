@@ -18,4 +18,6 @@ type SimulatorConfig struct {
 	NumberOfAccounts int
 	NumberOfMoments  int
 	Delay            time.Duration
+	// DoSetup              bool
+	// AccountsJSONFilePath string // if not provided will creates and prints the private key hex
 }

@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
+// TODO add read from file
+// TODO update the seqNumber on load
 type flowAccount struct {
 	i          int
 	address    *flowsdk.Address

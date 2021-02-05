@@ -157,8 +157,12 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+	fmt.Println(">>e>", err)
+	fmt.Println(">>r>", result)
+
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
+		return err
 	}
 
 	m.log.Info().Msgf("a play has been minted")
@@ -171,8 +175,12 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+	fmt.Println(">>e>", err)
+	fmt.Println(">>r>", result)
+
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a set failed: %w , %w", result.Error, err)
+		return err
 	}
 
 	m.log.Info().Msgf("a set has been minted")
@@ -184,8 +192,12 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+	fmt.Println(">>e>", err)
+	fmt.Println(">>r>", result)
+
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+		return err
 	}
 
 	m.log.Info().Msgf("play added to a set")
@@ -199,8 +211,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	println(">>e>", err)
-	println(">>r>", result)
+	fmt.Println(">>e>", err)
+	fmt.Println(">>r>", result)
 	return nil
 }
 
@@ -208,6 +220,10 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// setup marketplace accounts
 	// break accounts into batches of 10
 	// TODO not share the same client
+	blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
+	if err != nil {
+		return err
+	}
 	groupSize := 10
 	for i := 0; i < len(accounts); i += groupSize {
 		group := accounts[i : i+groupSize]
@@ -220,13 +236,18 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
-			nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address())
+			script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address())
+			tx := flowsdk.NewTransaction().
+				SetReferenceBlockID(blockRef.ID).
+				SetScript(script)
 
+			result, err := m.sendTxAndWait(tx, ma.Account())
+			println(">>e>", err)
+			println(">>r>", result)
 		}
 	}
 
 	// TODO transfer some moments
-
 	return nil
 }
 
@@ -511,6 +532,10 @@ func newMarketPlaceAccount(account *flowAccount,
 		txTracker:  txTracker,
 		flowClient: fclient,
 	}
+}
+
+func (m *marketPlaceAccount) Account() *flowAccount {
+	return m.account
 }
 
 func (m *marketPlaceAccount) GetAssets() []uint {
