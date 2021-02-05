@@ -7,10 +7,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func InsertChunkLocator(chunkID flow.Identifier, locator *chunks.ChunkLocator) func(*badger.Txn) error {
-	return insert(makePrefix(codeChunk, chunkID), locator)
+func InsertChunkLocator(locator *chunks.ChunkLocator) func(*badger.Txn) error {
+	return insert(makePrefix(codeChunk, locator.ID()), locator)
 }
 
-func RetrieveChunkLocator(chunkID flow.Identifier, locator *chunks.ChunkLocator) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeChunk, chunkID), locator)
+func RetrieveChunkLocator(locatorID flow.Identifier, locator *chunks.ChunkLocator) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeChunk, locatorID), locator)
 }
