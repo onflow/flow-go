@@ -57,23 +57,23 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("cannot get export blocks")
 	}
 
-	log.Info().Msg("start exporting events")
-	err = ExportEvents(blockID, flagDatadir, flagOutputDir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get export events")
-	}
+	// log.Info().Msg("start exporting events")
+	// err = ExportEvents(blockID, flagDatadir, flagOutputDir)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("cannot get export events")
+	// }
 
-	log.Info().Msg("start exporting transactions")
-	err = ExportExecutedTransactions(blockID, flagDatadir, flagOutputDir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get export transactions")
-	}
+	// log.Info().Msg("start exporting transactions")
+	// err = ExportExecutedTransactions(blockID, flagDatadir, flagOutputDir)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("cannot get export transactions")
+	// }
 
-	log.Info().Msg("start exporting delta snapshots")
-	err = ExportDeltaSnapshots(blockID, flagDatadir, flagOutputDir)
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot get export delta snapshots")
-	}
+	// log.Info().Msg("start exporting delta snapshots")
+	// err = ExportDeltaSnapshots(blockID, flagDatadir, flagOutputDir)
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("cannot get export delta snapshots")
+	// }
 
 	log.Info().Msg("start exporting ledger")
 	// if state commitment not provided do the fall back to the one connected to the block
