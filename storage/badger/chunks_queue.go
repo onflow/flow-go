@@ -48,10 +48,10 @@ func (q *ChunkLocatorQueue) Init(defaultIndex int64) (bool, error) {
 // StoreChunkLocator stores a new chunk locator that assigned to me to the job queue.
 // true will be returned, if the chunk was a new chunk.
 // false will be returned, if the chunk was a duplicate.
-func (q *ChunkLocatorQueue) StoreChunkLocator(chunkID flow.Identifier, locator *chunks.ChunkLocator) (bool, error) {
+func (q *ChunkLocatorQueue) StoreChunkLocator(locator *chunks.ChunkLocator) (bool, error) {
 	err := operation.RetryOnConflict(q.db.Update, func(tx *badger.Txn) error {
 		// make sure the chunk locator is unique
-		err := operation.InsertChunkLocator(chunkID, locator)(tx)
+		err := operation.InsertChunkLocator(locator)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to insert chunk locator: %w", err)
 		}
@@ -65,7 +65,7 @@ func (q *ChunkLocatorQueue) StoreChunkLocator(chunkID flow.Identifier, locator *
 
 		// insert to the next index
 		next := latest + 1
-		err = operation.InsertJobAtIndex(JobQueueChunkLocatorQueue, next, chunkID)(tx)
+		err = operation.InsertJobAtIndex(JobQueueChunkLocatorQueue, next, locator.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("failed to set job index for chunk locator queue at index %v: %w", next, err)
 		}
