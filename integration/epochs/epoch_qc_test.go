@@ -64,29 +64,22 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 		clusterNodes = append(clusterNodes, clusterNode)
 	}
 
-	err := s.PublishVoter()
-	require.NoError(s.T(), err)
+	s.PublishVoter()
 
-	err = s.StartVoting(clustering, clusterCount, nodeCount)
-	require.NoError(s.T(), err)
+	s.StartVoting(clustering, clusterCount, nodeCount)
 
-	err = s.CreateVoterResource(clusterNodes)
-	require.NoError(s.T(), err)
+	s.CreateVoterResource(clusterNodes)
 
 	// cast vote to qc contract for each node
 	for _, node := range clusterNodes {
-		err = node.Voter.Vote(context.Background(), epoch)
-		require.NoError(s.T(), err)
+		node.Voter.Vote(context.Background(), epoch)
 	}
 
-	err = s.StopVoting()
-	require.NoError(s.T(), err)
+	s.StopVoting()
 
 	// check if each node has voted
 	for _, node := range clusterNodes {
-		hasVoted, err := s.NodeHasVoted(node.NodeID)
-		require.NoError(s.T(), err)
-
+		hasVoted := s.NodeHasVoted(node.NodeID)
 		assert.True(s.T(), hasVoted)
 	}
 }

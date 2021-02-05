@@ -1,7 +1,6 @@
 package epochs
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,13 +23,13 @@ import (
 )
 
 // ClusterEpochTestSuite tests the quorum certificate voting process against the
-// QCAggregator contract running on the emulator. 
+// QCAggregator contract running on the emulator.
 type ClusterEpochTestSuite struct {
 	suite.Suite
 
 	env            templates.Environment
 	blockchain     *emulator.Blockchain
-	emulatorClient *BlockChainClient
+	emulatorClient *EmulatorClient
 
 	// Quorum Certificate deployed account and address
 	qcAddress    sdk.Address
@@ -51,20 +50,17 @@ func (s *ClusterEpochTestSuite) SetupTest() {
 	s.blockchain = blockchain
 
 	// create client instance
-	client := &BlockChainClient{
+	client := &EmulatorClient{
 		blockchain: blockchain,
 	}
 	s.emulatorClient = client
 
-	qcAddress, accountKey, signer := s.deployEpochQCContract()
-	s.qcAddress = qcAddress
-	s.qcAccountKey = accountKey
-	s.qcSigner = signer
+	s.deployEpochQCContract()
 }
 
-// deployEpochQCContract deploys the `EpochQC` contract to the emulated chain and returns the
-// Account key used along with the signer and the environment with the QC address set
-func (s *ClusterEpochTestSuite) deployEpochQCContract() (sdk.Address, *sdk.AccountKey, sdkcrypto.Signer) {
+// deployEpochQCContract deploys the `EpochQC` contract to the emulated chain and sets the
+// Account key used along with the signer and the environment with the QC address
+func (s *ClusterEpochTestSuite) deployEpochQCContract() {
 
 	// create new account keys for the Quorum Certificate account
 	QCAccountKey, QCSigner := test.AccountKeyGenerator().NewWithSigner()
@@ -83,8 +79,9 @@ func (s *ClusterEpochTestSuite) deployEpochQCContract() (sdk.Address, *sdk.Accou
 		QuorumCertificateAddress: QCAddress.Hex(),
 	}
 	s.env = env
-
-	return QCAddress, QCAccountKey, QCSigner
+	s.qcAddress = QCAddress
+	s.qcAccountKey = QCAccountKey
+	s.qcSigner = QCSigner
 }
 
 // CreateClusterList creates a clustering with the nodes split evenly and returns the resulting `ClusterList`
@@ -103,7 +100,7 @@ func (s *ClusterEpochTestSuite) CreateClusterList(clusterCount, nodeCount int) (
 }
 
 // PublishVoter publishes the Voter resource to a set path in candence
-func (s *ClusterEpochTestSuite) PublishVoter() error {
+func (s *ClusterEpochTestSuite) PublishVoter() {
 
 	// sign and publish voter transaction
 	publishVoterTx := sdk.NewTransaction().
@@ -114,14 +111,14 @@ func (s *ClusterEpochTestSuite) PublishVoter() error {
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
-	return s.SignAndSubmit(publishVoterTx,
+	s.SignAndSubmit(publishVoterTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
 }
 
 // StartVoting starts the voting in the EpochQCContract with the admin resource
 // for a specific clustering
-func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, clusterCount, nodeCount int) error {
+func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, clusterCount, nodeCount int) {
 	// submit admin transaction to start voting
 	startVotingTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartVotingScript(s.env)).
@@ -131,7 +128,7 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
-	clusterIndicies := make([]cadence.Value, clusterCount)
+	clusterIndices := make([]cadence.Value, clusterCount)
 	clusterNodeWeights := make([]cadence.Value, clusterCount)
 	clusterNodeIDs := make([]cadence.Value, clusterCount)
 
@@ -155,30 +152,24 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 	}
 
 	// add cluster indicies to tx argument
-	err := startVotingTx.AddArgument(cadence.NewArray(clusterIndicies))
-	if err != nil {
-		return nil
-	}
+	err := startVotingTx.AddArgument(cadence.NewArray(clusterIndices))
+	require.NoError(s.T(), err)
 
 	// add cluster node ids to tx argument
 	err = startVotingTx.AddArgument(cadence.NewArray(clusterNodeIDs))
-	if err != nil {
-		return nil
-	}
+	require.NoError(s.T(), err)
 
 	// add cluster weight to tx argument
 	err = startVotingTx.AddArgument(cadence.NewArray(clusterNodeWeights))
-	if err != nil {
-		return nil
-	}
+	require.NoError(s.T(), err)
 
-	return s.SignAndSubmit(startVotingTx,
+	s.SignAndSubmit(startVotingTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
 }
 
 // CreateVoterResource creates the Voter resource in cadence for a cluster node
-func (s *ClusterEpochTestSuite) CreateVoterResource(clusterNodes []*ClusterNode) error {
+func (s *ClusterEpochTestSuite) CreateVoterResource(clusterNodes []*ClusterNode) {
 
 	for _, node := range clusterNodes {
 		registerVoterTx := sdk.NewTransaction().
@@ -190,27 +181,18 @@ func (s *ClusterEpochTestSuite) CreateVoterResource(clusterNodes []*ClusterNode)
 			AddAuthorizer(node.Address)
 
 		err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
-		if err != nil {
-			return err
-		}
+		require.NoError(s.T(), err)
 
 		err = registerVoterTx.AddArgument(cadence.NewString(node.NodeID.String()))
-		if err != nil {
-			return err
-		}
+		require.NoError(s.T(), err)
 
-		err = s.SignAndSubmit(registerVoterTx,
+		s.SignAndSubmit(registerVoterTx,
 			[]sdk.Address{s.blockchain.ServiceKey().Address, node.Address},
 			[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), node.Signer})
-		if err != nil {
-			return err
-		}
 	}
-
-	return nil
 }
 
-func (s *ClusterEpochTestSuite) StopVoting() error {
+func (s *ClusterEpochTestSuite) StopVoting() {
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateStopVotingScript(s.env)).
 		SetGasLimit(100).
@@ -219,31 +201,28 @@ func (s *ClusterEpochTestSuite) StopVoting() error {
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
-	return s.SignAndSubmit(tx,
+	s.SignAndSubmit(tx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.qcAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.qcSigner})
 }
 
-func (s *ClusterEpochTestSuite) NodeHasVoted(nodeID flow.Identifier) (bool, error) {
+func (s *ClusterEpochTestSuite) NodeHasVoted(nodeID flow.Identifier) bool {
 	result, err := s.blockchain.ExecuteScript(templates.GenerateGetNodeHasVotedScript(s.env),
 		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID.String()))})
-	if err != nil {
-		return false, err
-	}
+	require.NoError(s.T(), err)
 
 	if !assert.True(s.T(), result.Succeeded()) {
-		return false, fmt.Errorf("transaction did not succeed")
+		return false
 	}
-	hasVoted := result.Value.ToGoValue().(bool)
 
-	return hasVoted, nil
+	return result.Value.ToGoValue().(bool)
 }
 
 /**
 Methods below are from the flow-core-contracts repo
 **/
 
-func (s *ClusterEpochTestSuite) SignAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) error {
+func (s *ClusterEpochTestSuite) SignAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) {
 
 	// sign transaction with each signer
 	for i := len(signerAddresses) - 1; i >= 0; i-- {
@@ -252,17 +231,15 @@ func (s *ClusterEpochTestSuite) SignAndSubmit(tx *sdk.Transaction, signerAddress
 
 		if i == 0 {
 			err := tx.SignEnvelope(signerAddress, 0, signer)
-			if err != nil {
-				return err
-			}
+			require.NoError(s.T(), err)
 		} else {
 			err := tx.SignPayload(signerAddress, 0, signer)
-			if err != nil {
-				return err
-			}
+			require.NoError(s.T(), err)
+
 		}
 	}
 
 	// submit transaction
-	return s.emulatorClient.Submit(tx)
+	err := s.emulatorClient.Submit(tx)
+	require.NoError(s.T(), err)
 }

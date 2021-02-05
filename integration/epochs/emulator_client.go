@@ -18,26 +18,26 @@ type EmulatorClient struct {
 	blockchain *emulator.Blockchain
 }
 
-func NewBlockChainClient(blockchain *emulator.Blockchain) *BlockChainClient {
-	client := &BlockChainClient{
+func NewEmulatorClient(blockchain *emulator.Blockchain) *EmulatorClient {
+	client := &EmulatorClient{
 		blockchain: blockchain,
 	}
 	return client
 }
 
-func (c *BlockChainClient) GetAccount(ctx context.Context, address sdk.Address, opts ...grpc.CallOption) (*sdk.Account, error) {
+func (c *EmulatorClient) GetAccount(ctx context.Context, address sdk.Address, opts ...grpc.CallOption) (*sdk.Account, error) {
 	return c.blockchain.GetAccount(address)
 }
 
-func (c *BlockChainClient) GetAccountAtLatestBlock(ctx context.Context, address sdk.Address, opts ...grpc.CallOption) (*sdk.Account, error) {
+func (c *EmulatorClient) GetAccountAtLatestBlock(ctx context.Context, address sdk.Address, opts ...grpc.CallOption) (*sdk.Account, error) {
 	return c.blockchain.GetAccount(address)
 }
 
-func (c *BlockChainClient) SendTransaction(ctx context.Context, tx sdk.Transaction, opts ...grpc.CallOption) error {
+func (c *EmulatorClient) SendTransaction(ctx context.Context, tx sdk.Transaction, opts ...grpc.CallOption) error {
 	return c.Submit(&tx)
 }
 
-func (c *BlockChainClient) GetLatestBlock(ctx context.Context, isSealed bool, opts ...grpc.CallOption) (*sdk.Block, error) {
+func (c *EmulatorClient) GetLatestBlock(ctx context.Context, isSealed bool, opts ...grpc.CallOption) (*sdk.Block, error) {
 	block, err := c.blockchain.GetLatestBlock()
 	if err != nil {
 		return nil, err
@@ -54,11 +54,11 @@ func (c *BlockChainClient) GetLatestBlock(ctx context.Context, isSealed bool, op
 	return sdkBlock, nil
 }
 
-func (c *BlockChainClient) GetTransactionResult(ctx context.Context, txID sdk.Identifier, opts ...grpc.CallOption) (*sdk.TransactionResult, error) {
+func (c *EmulatorClient) GetTransactionResult(ctx context.Context, txID sdk.Identifier, opts ...grpc.CallOption) (*sdk.TransactionResult, error) {
 	return c.blockchain.GetTransactionResult(txID)
 }
 
-func (c *BlockChainClient) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
+func (c *EmulatorClient) ExecuteScriptAtLatestBlock(ctx context.Context, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
 
 	arguments := [][]byte{}
 	for _, arg := range args {
@@ -77,7 +77,7 @@ func (c *BlockChainClient) ExecuteScriptAtLatestBlock(ctx context.Context, scrip
 	return scriptResult.Value, nil
 }
 
-func (c *BlockChainClient) Submit(tx *sdk.Transaction) error {
+func (c *EmulatorClient) Submit(tx *sdk.Transaction) error {
 	// submit the signed transaction
 	err := c.blockchain.AddTransaction(*tx)
 	if err != nil {
