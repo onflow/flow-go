@@ -11,7 +11,6 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
@@ -54,7 +53,6 @@ const DefaultEmergencySealingActive = false
 //    Spwecifically, we require that each chunk must have a minimal number of
 //    approvals, `requiredApprovalsForSealConstruction`, from assigned Verifiers.
 type Core struct {
-	unit                                 *engine.Unit                    // used to control startup/shutdown
 	log                                  zerolog.Logger                  // used to log relevant actions with context
 	engineMetrics                        module.EngineMetrics            // used to track sent and received messages
 	tracer                               module.Tracer                   // used to trace execution
@@ -71,12 +69,8 @@ type Core struct {
 	receipts                             mempool.ExecutionTree           // holds execution receipts in memory
 	approvals                            mempool.Approvals               // holds result approvals in memory
 	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
-	approvalEventProvider                EventProvider                   // channel that serves `ResultApproval` messages
-	receiptEventProvider                 EventProvider                   // channel that serves `ExecutionReceipt` messages
-	approvalResponseEventProvider        EventProvider                   // channel that serves `ApprovalResponse` messages
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
 	assigner                             module.ChunkAssigner            // chunk assignment object
-	isCheckingSealing                    *atomic.Bool                    // used to rate limit the checksealing call
 	sealingThreshold                     uint                            // how many blocks between sealed/finalized before we request execution receipts
 	maxResultsToRequest                  int                             // max number of finalized blocks for which we request execution results
 	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
@@ -107,14 +101,10 @@ func NewCore(
 	validator module.ReceiptValidator,
 	requiredApprovalsForSealConstruction uint,
 	emergencySealingActive bool,
-	receiptsProvider EventProvider,
-	resultApprovalsProvider EventProvider,
-	approvalResponseProvider EventProvider,
 	approvalConduit network.Conduit,
 ) (*Core, error) {
 	// initialize the propagation engine with its dependencies
 	e := &Core{
-		unit:                                 engine.NewUnit(),
 		log:                                  log.With().Str("engine", "matching").Logger(),
 		engineMetrics:                        engineMetrics,
 		tracer:                               tracer,
@@ -131,7 +121,6 @@ func NewCore(
 		approvals:                            approvals,
 		seals:                                seals,
 		missing:                              make(map[flow.Identifier]uint),
-		isCheckingSealing:                    atomic.NewBool(false),
 		sealingThreshold:                     10,
 		maxResultsToRequest:                  200,
 		assigner:                             assigner,
@@ -140,9 +129,6 @@ func NewCore(
 		requestTracker:                       NewRequestTracker(10, 30),
 		approvalRequestsThreshold:            10,
 		emergencySealingActive:               emergencySealingActive,
-		receiptEventProvider:                 receiptsProvider,
-		approvalEventProvider:                resultApprovalsProvider,
-		approvalResponseEventProvider:        approvalResponseProvider,
 		approvalConduit:                      approvalConduit,
 	}
 
@@ -152,88 +138,6 @@ func NewCore(
 	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
 
 	return e, nil
-}
-
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For the propagation engine, we consider the engine up and running
-// upon initialization.
-func (c *Core) Ready() <-chan struct{} {
-	started := make(chan struct{})
-	c.unit.Launch(func() {
-		close(started)
-		c.processPendingEvents()
-	})
-	return c.unit.Ready(func() {
-		<-started
-	})
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-// For the propagation engine, it closes the channel when all submit goroutines
-// have ended.
-func (c *Core) Done() <-chan struct{} {
-	return c.unit.Done()
-}
-
-// processPendingEvents processes pending events that are stored in respective queues.
-func (c *Core) processPendingEvents() {
-	// Context:
-	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
-	// information only changes significantly with new blocks or new receipts.
-	// We used to kick off the sealing check after every approval and receipt. In cases where
-	// the sealing check takes a lot more time than processing the actual messages (which we
-	// assume for the current implementation), we incur a large overhead as we check a lot
-	// of conditions, which only change with new blocks or new receipts.
-	// TEMPORARY FIX: to avoid sealing checks to monopolize the engine and delay processing
-	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
-	checkSealingTicker := make(chan struct{})
-	defer close(checkSealingTicker)
-	c.unit.LaunchPeriodically(func() {
-		checkSealingTicker <- struct{}{}
-	}, 2*time.Second, 120*time.Second)
-
-	for {
-		select {
-		case event := <-c.receiptEventProvider:
-			c.processEvent(event)
-		case event := <-c.approvalEventProvider:
-			c.processEvent(event)
-		case event := <-c.approvalResponseEventProvider:
-			c.processEvent(event)
-		case <-checkSealingTicker:
-			c.checkSealing()
-		case <-c.unit.Quit():
-			return
-		}
-	}
-}
-
-// processPendingEvent processes single event for the propagation engine on the consensus node.
-func (c *Core) processEvent(pendingEvent *Event) {
-	var err error
-	switch event := pendingEvent.Msg.(type) {
-	case *flow.ExecutionReceipt:
-		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		err = c.onReceipt(pendingEvent.OriginID, event)
-	case *flow.ResultApproval:
-		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		err = c.onApproval(pendingEvent.OriginID, event)
-	case *messages.ApprovalResponse:
-		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		err = c.onApproval(pendingEvent.OriginID, &event.Approval)
-	default:
-		err = fmt.Errorf("invalid event type (%T)", pendingEvent.Msg)
-	}
-	if err != nil {
-		// TODO: we probably want to check the type of the error here
-		// * If the message was invalid (e.g. NewInvalidInputError), which is expected as part
-		//   of normal operations in an untrusted environment, we can just log an error.
-		// * However, if we receive an error indicating internal node failure or state
-		//   internal state corruption, we should probably crash the node.
-		c.log.Error().Err(err).Hex("origin", pendingEvent.OriginID[:]).Msgf("could not process event")
-	}
 }
 
 // onReceipt processes a new execution receipt.
@@ -448,14 +352,6 @@ func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 
 // checkSealing checks if there is anything worth sealing at the moment.
 func (c *Core) checkSealing() {
-	// only check sealing when no one else is checking
-	canCheck := c.isCheckingSealing.CAS(false, true)
-	if !canCheck {
-		return
-	}
-
-	defer c.isCheckingSealing.Store(false)
-
 	err := c.checkingSealing()
 	if err != nil {
 		c.log.Fatal().Err(err).Msg("error in sealing protocol")

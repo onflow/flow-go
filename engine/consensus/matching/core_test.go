@@ -10,9 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/atomic"
-
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
@@ -22,6 +19,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -71,7 +69,6 @@ func (ms *MatchingSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SUITE ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.SetupChain()
 
-	unit := engine.NewUnit()
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -81,7 +78,6 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
 
 	ms.matching = &Core{
-		unit:                                 unit,
 		log:                                  log,
 		tracer:                               tracer,
 		engineMetrics:                        metrics,
@@ -96,7 +92,6 @@ func (ms *MatchingSuite) SetupTest() {
 		receipts:                             ms.ReceiptsPL,
 		approvals:                            ms.ApprovalsPL,
 		seals:                                ms.SealsPL,
-		isCheckingSealing:                    atomic.NewBool(false),
 		sealingThreshold:                     10,
 		maxResultsToRequest:                  200,
 		assigner:                             ms.Assigner,

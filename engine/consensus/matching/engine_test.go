@@ -7,7 +7,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -31,10 +30,6 @@ type EngineContextSuite struct {
 	context *Engine
 }
 
-//func (ms *EngineContextSuite) TearDownTest() {
-//<-ms.context.Done()
-//}
-
 func (ms *EngineContextSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SUITE ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.SetupChain()
@@ -56,7 +51,6 @@ func (ms *EngineContextSuite) SetupTest() {
 		unit: engine.NewUnit(),
 		core: &Core{
 			tracer:                               tracer,
-			unit:                                 engine.NewUnit(),
 			log:                                  log,
 			engineMetrics:                        metrics,
 			mempool:                              metrics,
@@ -70,7 +64,6 @@ func (ms *EngineContextSuite) SetupTest() {
 			receipts:                             ms.ReceiptsPL,
 			approvals:                            ms.ApprovalsPL,
 			seals:                                ms.SealsPL,
-			isCheckingSealing:                    atomic.NewBool(false),
 			sealingThreshold:                     10,
 			maxResultsToRequest:                  200,
 			assigner:                             ms.Assigner,
@@ -79,9 +72,6 @@ func (ms *EngineContextSuite) SetupTest() {
 			approvalRequestsThreshold:            10,
 			requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
 			emergencySealingActive:               false,
-			approvalEventProvider:                approvalsProvider,
-			approvalResponseEventProvider:        approvalResponseProvider,
-			receiptEventProvider:                 receiptsProvider,
 		},
 		approvalSink:         approvalsProvider,
 		approvalResponseSink: approvalResponseProvider,

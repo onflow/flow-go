@@ -2,6 +2,8 @@ package matching
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/ef-ds/deque"
 	"github.com/rs/zerolog"
@@ -31,8 +33,7 @@ const defaultApprovalQueueCapacity = 10000
 const defaultApprovalResponseQueueCapacity = 10000
 
 type (
-	EventProvider <-chan *Event // Channel to get pending events that are ready to be processed
-	EventSink     chan<- *Event // Channel to push pending events
+	EventSink chan *Event // Channel to push pending events
 )
 
 // Engine is a wrapper for matching `Core` which implements logic for
@@ -51,7 +52,7 @@ type Engine struct {
 	pendingReceipts                      deque.Deque
 	pendingApprovals                     deque.Deque
 	pendingApprovalResponses             deque.Deque
-	pendingEventSink                     chan *Event
+	pendingEventSink                     EventSink
 	requiredApprovalsForSealConstruction uint
 }
 
@@ -113,7 +114,7 @@ func NewEngine(log zerolog.Logger,
 
 	e.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
 		indexDB, incorporatedResults, receipts, approvals, seals, assigner, validator,
-		requiredApprovalsForSealConstruction, emergencySealingActive, receiptsChannel, approvalsChannel, approvalResponsesChannel, approvalConduit)
+		requiredApprovalsForSealConstruction, emergencySealingActive, approvalConduit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init matching engine: %w", err)
 	}
@@ -191,6 +192,67 @@ func (e *Engine) processPendingEvent(event *Event) {
 	}
 }
 
+// processPendingEvents processes pending events that are stored in respective queues.
+func (e *Engine) consumeEvents() {
+	// Context:
+	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
+	// information only changes significantly with new blocks or new receipts.
+	// We used to kick off the sealing check after every approval and receipt. In cases where
+	// the sealing check takes a lot more time than processing the actual messages (which we
+	// assume for the current implementation), we incur a large overhead as we check a lot
+	// of conditions, which only change with new blocks or new receipts.
+	// TEMPORARY FIX: to avoid sealing checks to monopolize the engine and delay processing
+	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
+	checkSealingTicker := make(chan struct{})
+	defer close(checkSealingTicker)
+	e.unit.LaunchPeriodically(func() {
+		checkSealingTicker <- struct{}{}
+	}, 2*time.Second, 120*time.Second)
+
+	for {
+		select {
+		case event := <-e.receiptSink:
+			e.consumeSingleEvent(event)
+		case event := <-e.approvalSink:
+			e.consumeSingleEvent(event)
+		case event := <-e.approvalResponseSink:
+			e.consumeSingleEvent(event)
+		case <-checkSealingTicker:
+			e.core.checkSealing()
+		case <-e.unit.Quit():
+			return
+		}
+	}
+}
+
+// consumeSingleEvent processes single event for the propagation engine on the consensus node.
+func (c *Engine) consumeSingleEvent(pendingEvent *Event) {
+	var err error
+	switch event := pendingEvent.Msg.(type) {
+	case *flow.ExecutionReceipt:
+		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		err = c.core.onReceipt(pendingEvent.OriginID, event)
+	case *flow.ResultApproval:
+		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		err = c.core.onApproval(pendingEvent.OriginID, event)
+	case *messages.ApprovalResponse:
+		c.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		defer c.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+		err = c.core.onApproval(pendingEvent.OriginID, &event.Approval)
+	default:
+		err = fmt.Errorf("invalid event type (%T)", pendingEvent.Msg)
+	}
+	if err != nil {
+		// TODO: we probably want to check the type of the error here
+		// * If the message was invalid (e.g. NewInvalidInputError), which is expected as part
+		//   of normal operations in an untrusted environment, we can just log an error.
+		// * However, if we receive an error indicating internal node failure or state
+		//   internal state corruption, we should probably crash the node.
+		c.log.Error().Err(err).Hex("origin", pendingEvent.OriginID[:]).Msgf("could not process event")
+	}
+}
+
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
 	e.Submit(e.me.NodeID(), event)
@@ -227,16 +289,21 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
-	started := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(2)
 	e.unit.Launch(func() {
-		close(started)
+		wg.Done()
 		e.processEvents()
 	})
-	<-started
-	return e.core.Ready()
+	e.unit.Launch(func() {
+		wg.Done()
+		e.consumeEvents()
+	})
+	return e.unit.Ready(func() {
+		wg.Wait()
+	})
 }
 
 func (e *Engine) Done() <-chan struct{} {
-	<-e.unit.Done()
-	return e.core.Done()
+	return e.unit.Done()
 }
