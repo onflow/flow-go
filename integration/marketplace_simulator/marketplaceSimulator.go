@@ -185,7 +185,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	m.log.Info().Msgf("a set has been minted")
 
-	script = nbaTemplates.GenerateAddPlaysToSetScript(*nbaAddress, 0, []uint32{0})
+	script = nbaTemplates.GenerateAddPlaysToSetScript(*nbaAddress, 1, []uint32{1})
 	tx = flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
@@ -197,14 +197,13 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
-		return err
+		// return err
 	}
 
 	m.log.Info().Msgf("play added to a set")
 
 	// mint a lot of moments
-	// GenerateBatchMintMomentScript(topShotAddr flow.Address, destinationAccount flow.Address, setID, playID uint32, quantity uint64)
-	script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 0, 0, uint64(m.simulatorConfig.NumberOfMoments))
+	script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(m.simulatorConfig.NumberOfMoments))
 	tx = flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
