@@ -18,7 +18,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestChunkLocatorToJob evaluates that a chunk locator can be converted to a job, and its corresponding job can be converted back to a locator.
+// TestChunkLocatorToJob evaluates that a chunk locator can be converted to a job,
+// and its corresponding job can be converted back to the same locator.
 func TestChunkLocatorToJob(t *testing.T) {
 	locator := &chunks.Locator{
 		ResultID: unittest.IdentifierFixture(),
