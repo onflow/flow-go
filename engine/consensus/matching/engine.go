@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -153,6 +154,17 @@ func New(
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
+	// Context:
+	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
+	// information only changes significantly with new blocks or new receipts.
+	// We used to kick off the sealing check after every approval and receipt. In cases where
+	// the sealing check takes a lot more time than processing the actual messages (which we
+	// assume for the current implementation), we incur a large overhead as we check a lot
+	// of conditions, which only change with new blocks or new receipts.
+	// TEMPORARY FIX: to avoid sealing checks to monopolize the engine and delay processing
+	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
+	e.unit.LaunchPeriodically(e.checkSealing, 2*time.Second, 120*time.Second)
+
 	return e, nil
 }
 
@@ -226,12 +238,20 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onReceipt(originID, ev)
 	case *flow.ResultApproval:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
+			// if we don't require approvals to construct a seal, don't even process approvals.
+			return nil
+		}
 		e.unit.Lock()
 		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		return e.onApproval(originID, ev)
 	case *messages.ApprovalResponse:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
+			// if we don't require approvals to construct a seal, don't even process approvals.
+			return nil
+		}
 		e.unit.Lock()
 		defer e.unit.Unlock()
 		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
@@ -243,6 +263,13 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onReceipt processes a new execution receipt.
 func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+	startTime := time.Now()
+	receiptSpan := e.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
+	defer func() {
+		e.metrics.OnReceiptProcessingDuration(time.Since(startTime))
+		receiptSpan.Finish()
+	}()
+
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
@@ -292,7 +319,9 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
 	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
 	// eventually request the parent receipt with the `requestPending` function
+	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
 	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
+	childSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
@@ -321,11 +350,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		}
 		return fmt.Errorf("failed to store incorporated result: %w", err)
 	}
-
 	log.Info().Msg("execution result processed and stored")
-
-	// kick off a check for potential seal formation
-	e.unit.Launch(e.checkSealing)
 
 	return nil
 }
@@ -382,6 +407,13 @@ func (e *Engine) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *ze
 
 // onApproval processes a new result approval.
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+	startTime := time.Now()
+	approvalSpan := e.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
+	defer func() {
+		e.metrics.OnApprovalProcessingDuration(time.Since(startTime))
+		approvalSpan.Finish()
+	}()
+
 	log := e.log.With().
 		Hex("approval_id", logging.Entity(approval)).
 		Hex("block_id", approval.Body.BlockID[:]).
@@ -436,9 +468,6 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 	}
 	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
 
-	// kick off a check for potential seal formation
-	e.unit.Launch(e.checkSealing)
-
 	return nil
 }
 
@@ -462,21 +491,26 @@ func (e *Engine) checkSealing() {
 }
 
 func (e *Engine) checkingSealing() error {
-	start := time.Now()
+	startTime := time.Now()
+	sealingSpan, _ := e.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealing)
+	defer func() {
+		e.metrics.CheckSealingDuration(time.Since(startTime))
+		sealingSpan.Finish()
+	}()
+
+	sealableResultsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingSealableResults)
 
 	// get all results that have collected enough approvals on a per-chunk basis
 	sealableResults, err := e.sealableResults()
 	if err != nil {
 		return fmt.Errorf("could not get sealable execution results: %w", err)
 	}
-
-	// skip if no results can be sealed yet
 	if len(sealableResults) == 0 {
+		// skip if no results can be sealed yet
 		return nil
 	}
-	if len(sealableResults) > 0 {
-		e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
-	}
+	e.log.Info().Int("num_results", len(sealableResults)).Msg("identified sealable execution results")
+
 	// log warning if we are going to overflow the seals mempool
 	if space := e.seals.Limit() - e.seals.Size(); len(sealableResults) > int(space) {
 		e.log.Warn().
@@ -490,7 +524,7 @@ func (e *Engine) checkingSealing() error {
 		// For each execution result, we load the trace.CONProcessBlock span for the executed block. If we find it, we
 		// start a child span that will run until this function returns.
 		if span, ok := e.tracer.GetSpan(incorporatedResult.Result.BlockID, trace.CONProcessBlock); ok {
-			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(start))
+			childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
 			defer childSpan.Finish()
 		}
 
@@ -503,7 +537,7 @@ func (e *Engine) checkingSealing() error {
 			// For each collection, we load the trace.CONProcessCollection span. If we find it, we start a child span
 			// that will run until this function returns.
 			if span, ok := e.tracer.GetSpan(id, trace.CONProcessCollection); ok {
-				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(start))
+				childSpan := e.tracer.StartSpanFromParent(span, trace.CONMatchCheckSealing, opentracing.StartTime(startTime))
 				defer childSpan.Finish()
 			}
 		}
@@ -531,13 +565,8 @@ func (e *Engine) checkingSealing() error {
 
 	e.log.Debug().Int("sealed", len(sealedResultIDs)).Msg("sealed execution results")
 
-	// clear the memory pools
-	err = e.clearPools(sealedResultIDs)
-	if err != nil {
-		return fmt.Errorf("failed to clean mempools: %w", err)
-	}
-
 	// finish tracing spans
+	sealableResultsSpan.Finish()
 	for _, blockID := range sealedBlockIDs {
 		index, err := e.indexDB.ByBlockID(blockID)
 		if err != nil {
@@ -549,20 +578,30 @@ func (e *Engine) checkingSealing() error {
 		e.tracer.FinishSpan(blockID, trace.CONProcessBlock)
 	}
 
+	// clear the memory pools
+	clearPoolsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingClearPools)
+	err = e.clearPools(sealedResultIDs)
+	clearPoolsSpan.Finish()
+	if err != nil {
+		return fmt.Errorf("failed to clean mempools: %w", err)
+	}
+
 	// request execution receipts for unsealed finalized blocks
+	requestReceiptsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
 	err = e.requestPendingReceipts()
+	requestReceiptsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
 
 	// request result approvals for pending incorporated results
+	requestApprovalsSpan := e.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingApprovals)
 	err = e.requestPendingApprovals()
+	requestApprovalsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
 	}
 
-	// record duration of check sealing
-	e.metrics.CheckSealingDuration(time.Since(start))
 	return nil
 }
 
@@ -1056,7 +1095,7 @@ func (e *Engine) requestPendingApprovals() error {
 
 			// skip if we already have enough valid approvals for this chunk
 			sigs, haveChunkApprovals := r.GetChunkSignatures(c.Index)
-			if haveChunkApprovals && uint(sigs.Len()) >= e.requiredApprovalsForSealConstruction {
+			if haveChunkApprovals && uint(sigs.NumberSigners()) >= e.requiredApprovalsForSealConstruction {
 				continue
 			}
 
@@ -1091,10 +1130,10 @@ func (e *Engine) requestPendingApprovals() error {
 
 			// keep only the ids of verifiers who haven't provided an approval
 			var targetIDs flow.IdentifierList
-			if haveChunkApprovals && sigs.Len() > 0 {
+			if haveChunkApprovals && sigs.NumberSigners() > 0 {
 				targetIDs = flow.IdentifierList{}
 				for _, id := range assignedVerifiers {
-					if _, ok := sigs.BySigner(id); !ok {
+					if sigs.HasSigner(id) {
 						targetIDs = append(targetIDs, id)
 					}
 				}
