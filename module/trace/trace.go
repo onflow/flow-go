@@ -132,6 +132,16 @@ func (t *OpenTracer) StartSpanFromParent(
 	return t.Tracer.StartSpan(string(operationName), opts...)
 }
 
+func (t *OpenTracer) WithSpanFromContext(ctx context.Context,
+	operationName SpanName,
+	f func(),
+	opts ...opentracing.StartSpanOption) {
+	span, _ := t.StartSpanFromContext(ctx, operationName, opts...)
+	defer span.Finish()
+
+	f()
+}
+
 // in order to avoid different spans using the same entityID as the key, which creates a conflict,
 // we use span name and entity id as the key for a span.
 func spanKey(entityID flow.Identifier, spanName SpanName) string {

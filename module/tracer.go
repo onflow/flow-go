@@ -29,4 +29,9 @@ type Tracer interface {
 		operationName trace.SpanName,
 		opts ...opentracing.StartSpanOption,
 	) opentracing.Span
+
+	WithSpanFromContext(ctx context.Context,
+		operationName trace.SpanName,
+		f func(),
+		opts ...opentracing.StartSpanOption)
 }
