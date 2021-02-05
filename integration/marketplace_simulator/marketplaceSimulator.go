@@ -113,29 +113,29 @@ func (m *MarketPlaceSimulator) Setup() error {
 func (m *MarketPlaceSimulator) setupContracts() error {
 
 	// deploy nonFungibleContract
-	err := m.deployContract(coreContract.NonFungibleToken())
+	err := m.deployContract("nonfungible token", coreContract.NonFungibleToken())
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract(nbaContract.GenerateTopShotContract(m.nbaTopshotAccount.Address().Hex()))
+	err = m.deployContract("nbatopshot", nbaContract.GenerateTopShotContract(m.nbaTopshotAccount.Address().Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract(nbaContract.GenerateTopShotShardedCollectionContract(m.nbaTopshotAccount.Address().Hex(),
+	err = m.deployContract("nbatopshot sharded collection", nbaContract.GenerateTopShotShardedCollectionContract(m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract(nbaContract.GenerateTopshotAdminReceiverContract(m.nbaTopshotAccount.Address().Hex(),
+	err = m.deployContract("nbatopshot admin", nbaContract.GenerateTopshotAdminReceiverContract(m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract(nbaContract.GenerateTopShotMarketContract(m.networkConfig.FungibleTokenAddress.Hex(),
+	err = m.deployContract("nbatopshot marketplace", nbaContract.GenerateTopShotMarketContract(m.networkConfig.FungibleTokenAddress.Hex(),
 		m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
@@ -157,7 +157,11 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
+	// TODO Ramtin clean up
+	fmt.Println(result)
+	fmt.Println(">>>>", result.Events)
 
 	// this creates set with id 0
 	script = nbaTemplates.GenerateMintSetScript(*nbaAddress, "test set")
@@ -165,14 +169,14 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
 	script = nbaTemplates.GenerateAddPlaysToSetScript(*nbaAddress, 0, []uint32{0})
 	tx = flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
 	// mint a lot of moments
 	// GenerateBatchMintMomentScript(topShotAddr flow.Address, destinationAccount flow.Address, setID, playID uint32, quantity uint64)
@@ -181,7 +185,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
 	return nil
 }
 
@@ -222,7 +227,7 @@ func (m *MarketPlaceSimulator) Run() error {
 	return nil
 }
 
-func (m *MarketPlaceSimulator) deployContract(contract []byte) error {
+func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) error {
 	blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
 	if err != nil {
 		return err
@@ -241,24 +246,32 @@ func (m *MarketPlaceSimulator) deployContract(contract []byte) error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	m.sendTxAndWait(deploymentTx, m.nbaTopshotAccount)
-	return nil
+	result, err := m.sendTxAndWait(deploymentTx, m.nbaTopshotAccount)
+
+	// TODO fix me
+	if err != nil {
+		m.log.Info().Msgf("contract %s is deployed : %s", name, result)
+	}
+	return err
 }
 
 // TODO update this to support multiple tx submissions
-func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount) {
+func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount) (*flowsdk.TransactionResult, error) {
 
-	err := sender.PrepareAndSignTx(tx, 0)
+	var result *flowsdk.TransactionResult
+	var err error
+
+	err = sender.PrepareAndSignTx(tx, 0)
 	if err != nil {
-		m.log.Error().Err(err).Msg("error preparing and signing the transaction")
-		return
+		return nil, fmt.Errorf("error preparing and signing the transaction: %w", err)
 	}
 
 	err = m.flowClient.SendTransaction(context.Background(), *tx)
 	if err != nil {
-		m.log.Error().Err(err).Msg("error sending the transaction")
-		return
+		return nil, fmt.Errorf("error sending the transaction: %w", err)
+
 	}
+
 	stopped := false
 	wg := sync.WaitGroup{}
 	m.txTracker.AddTx(tx.ID(),
@@ -267,6 +280,7 @@ func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *fl
 			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
 			if !stopped {
 				stopped = true
+				result = res
 				wg.Done()
 			}
 		}, // on finalized
@@ -287,16 +301,19 @@ func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *fl
 				wg.Done()
 			}
 		}, // on timout
-		func(_ flowsdk.Identifier, err error) {
+		func(_ flowsdk.Identifier, e error) {
 			m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
 			if !stopped {
 				stopped = true
+				err = e
 				wg.Done()
 			}
 		}, // on error
 		60)
 	wg.Add(1)
 	wg.Wait()
+
+	return result, nil
 }
 
 func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) ([]flowAccount, error) {
