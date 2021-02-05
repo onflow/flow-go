@@ -38,6 +38,7 @@ type ClusterNode struct {
 func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 
 	// initial cluster and total node count
+	epochCounter := 1
 	clusterCount := 3
 	nodesPerCluster := 10
 
@@ -51,14 +52,14 @@ func (s *ClusterEpochTestSuite) TestQuorumCertificate() {
 
 	// mock the epoch object to return counter 0 and clustering as our clusterList
 	epoch := &protomock.Epoch{}
-	epoch.On("Counter").Return(1, nil)
+	epoch.On("Counter").Return(epochCounter, nil)
 	epoch.On("Clustering").Return(clustering, nil)
 
 	for _, node := range nodes {
 
 		// find cluster and create root block
 		cluster, _, _ := clustering.ByNodeID(node.NodeID)
-		rootBlock := clusterstate.CanonicalRootBlock(1, cluster)
+		rootBlock := clusterstate.CanonicalRootBlock(uint64(epochCounter), cluster)
 
 		clusterNode := s.CreateClusterNode(rootBlock, node)
 		clusterNodes = append(clusterNodes, clusterNode)

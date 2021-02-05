@@ -35,8 +35,6 @@ type ClusterEpochTestSuite struct {
 	qcAddress    sdk.Address
 	qcAccountKey *sdk.AccountKey
 	qcSigner     sdkcrypto.Signer
-
-	epochCounter uint
 }
 
 func TestClusterEpoch(t *testing.T) {
@@ -45,8 +43,6 @@ func TestClusterEpoch(t *testing.T) {
 
 // SetupTest creates an instance of the emulated chain and deploys the EpochQC contract
 func (s *ClusterEpochTestSuite) SetupTest() {
-	s.epochCounter = 1
-
 	// create a new instance of the emulated blockchain
 	blockchain, err := emulator.NewBlockchain()
 	require.NoError(s.T(), err)
