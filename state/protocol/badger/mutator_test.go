@@ -607,6 +607,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			unittest.WithParticipants(epoch2Participants),
 			unittest.SetupWithCounter(epoch1Setup.Counter+1),
 			unittest.WithFinalView(epoch1FinalView+1000),
+			unittest.WithFirstView(epoch1FinalView+1),
 		)
 
 		// create the seal referencing block1 and including the setup event
@@ -804,11 +805,13 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 			unittest.WithParticipants(rootSetup.Participants),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
 			unittest.WithFinalView(rootSetup.FinalView+1000),
+			unittest.WithFirstView(rootSetup.FinalView+1),
 		)
 		nextEpochSetup2 := unittest.EpochSetupFixture(
 			unittest.WithParticipants(rootSetup.Participants),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
-			unittest.WithFinalView(rootSetup.FinalView+2000),
+			unittest.WithFinalView(rootSetup.FinalView+2000), // final view differs
+			unittest.WithFirstView(rootSetup.FinalView+1),
 		)
 
 		// create one seal containing the first setup event
@@ -880,6 +883,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				unittest.WithParticipants(epoch2Participants),
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
+				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
 			seal := unittest.Seal.Fixture(
 				unittest.Seal.WithBlockID(block1.ID()),
@@ -973,6 +977,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 				unittest.WithParticipants(epoch2Participants),
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
+				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
 			seal := unittest.Seal.Fixture(
 				unittest.Seal.WithResult(sealedResult),
@@ -1117,6 +1122,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 			unittest.WithParticipants(epoch2Participants),
 			unittest.SetupWithCounter(epoch1Setup.Counter+1),
 			unittest.WithFinalView(epoch1FinalView+1000),
+			unittest.WithFirstView(epoch1FinalView+1),
 		)
 
 		// create the seal referencing block1 and including the setup event
