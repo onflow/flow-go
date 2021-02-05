@@ -45,6 +45,7 @@ type Engine struct {
 	log                                  zerolog.Logger
 	me                                   module.Local
 	core                                 *Core
+	cacheMetrics                         module.MempoolMetrics
 	engineMetrics                        module.EngineMetrics
 	receiptSink                          EventSink
 	approvalSink                         EventSink
@@ -77,20 +78,17 @@ func NewEngine(log zerolog.Logger,
 	validator module.ReceiptValidator,
 	requiredApprovalsForSealConstruction uint,
 	emergencySealingActive bool) (*Engine, error) {
-	// create channels that will be used to feed data to matching core.
-	receiptsChannel := make(chan *Event)
-	approvalsChannel := make(chan *Event)
-	approvalResponsesChannel := make(chan *Event)
 	e := &Engine{
 		unit:                                 engine.NewUnit(),
 		log:                                  log,
 		me:                                   me,
 		core:                                 nil,
 		engineMetrics:                        engineMetrics,
-		receiptSink:                          receiptsChannel,
-		approvalSink:                         approvalsChannel,
-		approvalResponseSink:                 approvalResponsesChannel,
-		pendingEventSink:                     make(chan *Event),
+		cacheMetrics:                         mempool,
+		receiptSink:                          make(EventSink),
+		approvalSink:                         make(EventSink),
+		approvalResponseSink:                 make(EventSink),
+		pendingEventSink:                     make(EventSink),
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 
@@ -171,6 +169,7 @@ func (e *Engine) processPendingEvent(event *Event) {
 		if e.pendingReceipts.Len() < defaultReceiptQueueCapacity {
 			e.pendingReceipts.PushBack(event)
 		}
+		e.cacheMetrics.MempoolEntries(metrics.ResourceReceiptQueue, uint(e.pendingReceipts.Len()))
 	case *flow.ResultApproval:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
 		if e.requiredApprovalsForSealConstruction < 1 {
@@ -180,6 +179,7 @@ func (e *Engine) processPendingEvent(event *Event) {
 		if e.pendingApprovals.Len() < defaultApprovalQueueCapacity {
 			e.pendingApprovals.PushBack(event)
 		}
+		e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalQueue, uint(e.pendingApprovals.Len()))
 	case *messages.ApprovalResponse:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
 		if e.requiredApprovalsForSealConstruction < 1 {
@@ -189,6 +189,8 @@ func (e *Engine) processPendingEvent(event *Event) {
 		if e.pendingApprovalResponses.Len() < defaultApprovalResponseQueueCapacity {
 			e.pendingApprovalResponses.PushBack(event)
 		}
+		e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalResponseQueue,
+			uint(e.pendingApprovalResponses.Len()))
 	}
 }
 

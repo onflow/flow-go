@@ -78,6 +78,7 @@ func (ms *EngineContextSuite) SetupTest() {
 		receiptSink:          receiptsProvider,
 		pendingEventSink:     make(chan *Event),
 		engineMetrics:        metrics,
+		cacheMetrics:         metrics,
 	}
 
 	<-ms.context.Ready()
