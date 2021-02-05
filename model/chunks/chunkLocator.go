@@ -19,3 +19,5 @@ func (c Locator) ID() flow.Identifier {
 func (c Locator) Checksum() flow.Identifier {
 	return flow.MakeID(c)
 }
+
+type LocatorList []*Locator

@@ -37,7 +37,7 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine blocking on the jobs,
 	// results in engine only receiving 3 jobs.
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
-		called := make([]*chunks.Locator, 0)
+		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
 		neverFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
@@ -47,7 +47,7 @@ func TestProduceConsume(t *testing.T) {
 		WithConsumer(t, neverFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 
-			locators := make([]*chunks.Locator, 0)
+			locators := chunks.LocatorList{}
 			resultID := unittest.IdentifierFixture()
 
 			for i := 0; i < 10; i++ {
@@ -73,7 +73,7 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
 	// results in engine eventually receiving all 10 jobs.
 	t.Run("pushing 10 receive 10", func(t *testing.T) {
-		called := make([]*chunks.Locator, 0)
+		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
 		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
@@ -84,7 +84,7 @@ func TestProduceConsume(t *testing.T) {
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 
-			locators := make([]*chunks.Locator, 0)
+			locators := chunks.LocatorList{}
 			resultID := unittest.IdentifierFixture()
 
 			for i := 0; i < 10; i++ {
@@ -108,7 +108,7 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 100 jobs concurrently to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
 	// results in engine eventually receiving all 100 jobs.
 	t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
-		called := make([]*chunks.Locator, 0)
+		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
 		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
