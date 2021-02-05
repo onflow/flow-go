@@ -991,6 +991,7 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) error {
 
 // requestPendingReceipts requests the execution receipts of unsealed finalized
 // blocks.
+// it returns the number of pending receipts requests being created
 func (e *Engine) requestPendingReceipts() (int, error) {
 
 	// last sealed block
@@ -1078,6 +1079,7 @@ func (e *Engine) requestPendingReceipts() (int, error) {
 //                              |                   |
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
+// it returns the number of pending approvals requests being created
 func (e *Engine) requestPendingApprovals() (int, error) {
 	// skip requesting approvals if they are not required for sealing
 	if e.requiredApprovalsForSealConstruction == 0 {
