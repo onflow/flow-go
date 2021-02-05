@@ -21,10 +21,7 @@ import (
 // TestChunkLocatorToJob evaluates that a chunk locator can be converted to a job,
 // and its corresponding job can be converted back to the same locator.
 func TestChunkLocatorToJob(t *testing.T) {
-	locator := &chunks.Locator{
-		ResultID: unittest.IdentifierFixture(),
-		Index:    rand.Uint64(),
-	}
+	locator := unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64())
 	actual := fetcher.JobToChunkLocator(fetcher.ChunkLocatorToJob(locator))
 	require.Equal(t, locator, actual)
 }
@@ -47,19 +44,12 @@ func TestProduceConsume(t *testing.T) {
 		WithConsumer(t, neverFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 
-			locators := chunks.LocatorList{}
-			resultID := unittest.IdentifierFixture()
+			locators := unittest.ChunkLocatorListFixture(10)
 
-			for i := 0; i < 10; i++ {
-				chunkLocator := &chunks.Locator{
-					ResultID: resultID,
-					Index:    uint64(i),
-				}
-
-				ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
+			for i, locator := range locators {
+				ok, err := chunksQueue.StoreChunkLocator(locator)
 				require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))
 				require.True(t, ok)
-				locators = append(locators, chunkLocator)
 				consumer.Check() // notify the consumer
 			}
 
@@ -84,18 +74,12 @@ func TestProduceConsume(t *testing.T) {
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 
-			locators := chunks.LocatorList{}
-			resultID := unittest.IdentifierFixture()
+			locators := unittest.ChunkLocatorListFixture(10)
 
-			for i := 0; i < 10; i++ {
-				chunkLocator := &chunks.Locator{
-					ResultID: resultID,
-					Index:    uint64(i),
-				}
-				ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
+			for i, locator := range locators {
+				ok, err := chunksQueue.StoreChunkLocator(locator)
 				require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))
 				require.True(t, ok)
-				locators = append(locators, chunkLocator)
 				consumer.Check() // notify the consumer
 			}
 
@@ -119,15 +103,12 @@ func TestProduceConsume(t *testing.T) {
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 			total := atomic.NewUint32(0)
-			resultID := unittest.IdentifierFixture()
 
-			for i := 0; i < 100; i++ {
+			locators := unittest.ChunkLocatorListFixture(100)
+
+			for i := 0; i < len(locators); i++ {
 				go func(i int) {
-					chunkLocator := &chunks.Locator{
-						ResultID: resultID,
-						Index:    uint64(i),
-					}
-					ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
+					ok, err := chunksQueue.StoreChunkLocator(locators[i])
 					require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))
 					require.True(t, ok)
 					total.Inc()
