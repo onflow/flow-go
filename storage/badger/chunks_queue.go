@@ -101,16 +101,16 @@ func (q *ChunksQueue) LatestIndex() (int64, error) {
 
 // AtIndex returns the chunk locator stored at the given index in the queue.
 func (q *ChunksQueue) AtIndex(index int64) (*chunks.Locator, error) {
-	var chunkID flow.Identifier
-	err := q.db.View(operation.RetrieveJobAtIndex(JobQueueChunksQueue, index, &chunkID))
+	var locatorID flow.Identifier
+	err := q.db.View(operation.RetrieveJobAtIndex(JobQueueChunksQueue, index, &locatorID))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve chunk locator in queue: %w", err)
 	}
 
 	var locator chunks.Locator
-	err = q.db.View(operation.RetrieveChunkLocator(chunkID, &locator))
+	err = q.db.View(operation.RetrieveChunkLocator(locatorID, &locator))
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve locator for chunk id %v: %w", chunkID, err)
+		return nil, fmt.Errorf("could not retrieve locator for chunk id %v: %w", locatorID, err)
 	}
 
 	return &locator, nil
