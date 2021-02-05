@@ -3,8 +3,10 @@ module github.com/onflow/flow-go/integration
 go 1.13
 
 require (
-	github.com/dapperlabs/nba-smart-contracts/lib/go/contracts v0.2.0
-	github.com/dapperlabs/nba-smart-contracts/lib/go/templates v0.3.0
+	github.com/dapperlabs/nba-smart-contracts/contracts v0.1.9 // indirect
+	github.com/dapperlabs/nba-smart-contracts/lib/go/contracts v0.2.1-0.20210125204614-484f243aae7c
+	github.com/dapperlabs/nba-smart-contracts/lib/go/templates v0.3.1-0.20210125204614-484f243aae7c
+	github.com/dapperlabs/nba-smart-contracts/templates v0.1.10 // indirect
 	github.com/dapperlabs/testingdock v0.4.3-0.20200626075145-ea23fc16bb90
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
