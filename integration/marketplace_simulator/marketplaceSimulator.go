@@ -205,6 +205,9 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 		result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+		fmt.Println("2>>e>", err)
+		fmt.Println("2>>r>", result)
+
 		if err != nil || result.Error != nil {
 			m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
 			return err
