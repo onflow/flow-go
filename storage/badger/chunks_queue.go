@@ -19,7 +19,7 @@ type ChunksQueue struct {
 	db *badger.DB
 }
 
-const JobQueueChunkQueue = "JobQueueChunkQueue"
+const JobQueueChunksQueue = "JobQueueChunksQueue"
 
 // NewChunkQueue will initialize the underlying badger database of chunk locator queue.
 func NewChunkQueue(db *badger.DB) *ChunksQueue {
@@ -32,7 +32,7 @@ func NewChunkQueue(db *badger.DB) *ChunksQueue {
 func (q *ChunksQueue) Init(defaultIndex int64) (bool, error) {
 	_, err := q.LatestIndex()
 	if errors.Is(err, storage.ErrNotFound) {
-		err = q.db.Update(operation.InitJobLatestIndex(JobQueueChunkQueue, defaultIndex))
+		err = q.db.Update(operation.InitJobLatestIndex(JobQueueChunksQueue, defaultIndex))
 		if err != nil {
 			return false, fmt.Errorf("could not init chunk locator queue with default index %v: %w", defaultIndex, err)
 		}
@@ -58,20 +58,20 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 
 		// read the latest index
 		var latest int64
-		err = operation.RetrieveJobLatestIndex(JobQueueChunkQueue, &latest)(tx)
+		err = operation.RetrieveJobLatestIndex(JobQueueChunksQueue, &latest)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve job index for chunk locator queue: %w", err)
 		}
 
 		// insert to the next index
 		next := latest + 1
-		err = operation.InsertJobAtIndex(JobQueueChunkQueue, next, locator.ID())(tx)
+		err = operation.InsertJobAtIndex(JobQueueChunksQueue, next, locator.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("failed to set job index for chunk locator queue at index %v: %w", next, err)
 		}
 
 		// update the next index as the latest index
-		err = operation.SetJobLatestIndex(JobQueueChunkQueue, next)(tx)
+		err = operation.SetJobLatestIndex(JobQueueChunksQueue, next)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to update latest index %v: %w", next, err)
 		}
@@ -92,7 +92,7 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 // LatestIndex returns the index of the latest chunk locator stored in the queue.
 func (q *ChunksQueue) LatestIndex() (int64, error) {
 	var latest int64
-	err := q.db.View(operation.RetrieveJobLatestIndex(JobQueueChunkQueue, &latest))
+	err := q.db.View(operation.RetrieveJobLatestIndex(JobQueueChunksQueue, &latest))
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve latest index for chunks queue: %w", err)
 	}
@@ -102,7 +102,7 @@ func (q *ChunksQueue) LatestIndex() (int64, error) {
 // AtIndex returns the chunk locator stored at the given index in the queue.
 func (q *ChunksQueue) AtIndex(index int64) (*chunks.Locator, error) {
 	var chunkID flow.Identifier
-	err := q.db.View(operation.RetrieveJobAtIndex(JobQueueChunkQueue, index, &chunkID))
+	err := q.db.View(operation.RetrieveJobAtIndex(JobQueueChunksQueue, index, &chunkID))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve chunk locator in queue: %w", err)
 	}
