@@ -5,7 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	chunkmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
@@ -18,7 +18,7 @@ const (
 
 // ChunkJob converts a Chunk into a Job to be used by job queue
 type ChunkJob struct {
-	ChunkLocator *chunkmodels.Locator
+	ChunkLocator *chunks.Locator
 }
 
 // ID converts chunk id into job id, which guarantees uniqueness
@@ -30,11 +30,11 @@ func chunkIDToJobID(chunkID flow.Identifier) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", chunkID))
 }
 
-func ChunkLocatorToJob(locator *chunkmodels.Locator) *ChunkJob {
+func ChunkLocatorToJob(locator *chunks.Locator) *ChunkJob {
 	return &ChunkJob{ChunkLocator: locator}
 }
 
-func JobToChunk(job storage.Job) *chunkmodels.Locator {
+func JobToChunk(job storage.Job) *chunks.Locator {
 	chunkjob, _ := job.(*ChunkJob)
 	return chunkjob.ChunkLocator
 }
@@ -54,7 +54,7 @@ func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
 }
 
 type EngineWorker interface {
-	ProcessMyChunk(locator *chunkmodels.Locator)
+	ProcessMyChunk(locator *chunks.Locator)
 	WithFinishProcessing(finishProcessing FinishProcessing)
 }
 
