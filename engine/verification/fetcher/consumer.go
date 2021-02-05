@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	chunkmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
@@ -17,31 +18,31 @@ const (
 
 // ChunkJob converts a Chunk into a Job to be used by job queue
 type ChunkJob struct {
-	Chunk *flow.Chunk
+	ChunkLocator *chunkmodels.ChunkLocator
 }
 
 // ID converts chunk id into job id, which guarantees uniqueness
 func (j *ChunkJob) ID() module.JobID {
-	return chunkIDToJobID(j.Chunk.ID())
+	return chunkIDToJobID(j.ChunkLocator.ID())
 }
 
 func chunkIDToJobID(chunkID flow.Identifier) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", chunkID))
 }
 
-func ChunkToJob(chunk *flow.Chunk) *ChunkJob {
-	return &ChunkJob{Chunk: chunk}
+func ChunkLocatorToJob(locator *chunkmodels.ChunkLocator) *ChunkJob {
+	return &ChunkJob{ChunkLocator: locator}
 }
 
-func JobToChunk(job storage.Job) *flow.Chunk {
+func JobToChunk(job storage.Job) *chunkmodels.ChunkLocator {
 	chunkjob, _ := job.(*ChunkJob)
-	return chunkjob.Chunk
+	return chunkjob.ChunkLocator
 }
 
 // ChunksJob wraps the storage layer to provide an abstraction for
 // consumers to read jobs
 type ChunksJob struct {
-	chunks storage.ChunksQueue
+	chunks storage.ChunkLocatorQueue
 }
 
 func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
@@ -49,11 +50,11 @@ func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
 	}
-	return ChunkToJob(chunk), nil
+	return ChunkLocatorToJob(chunk), nil
 }
 
 type EngineWorker interface {
-	ProcessMyChunk(chunk *flow.Chunk)
+	ProcessMyChunk(locator *chunkmodels.ChunkLocator)
 	WithFinishProcessing(finishProcessing FinishProcessing)
 }
 
@@ -101,7 +102,7 @@ type ChunkConsumer struct {
 func NewChunkConsumer(
 	log zerolog.Logger,
 	processedIndex storage.ConsumerProgress, // to persist the processed index
-	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
+	chunksQueue storage.ChunkLocatorQueue, // to read jobs (chunks) from
 	engine EngineWorker, // to process jobs (chunks)
 	maxProcessing int64, // max number of jobs to be processed in parallel
 	maxFinished int64, // when the next unprocessed job is not finished,
