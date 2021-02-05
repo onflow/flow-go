@@ -66,10 +66,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
-	var payload flow.Payload
-	var block flow.Block
-	header := unittest.BlockHeaderWithParentFixture(root)
-
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := completeLedger.NewLedger(dir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
@@ -183,17 +179,9 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 				EndState: endStateCommitment,
 			}
 
-		for i := 0; i < len(collections); i++ {
-			collection := collections[i]
-			guarantee := guarantees[i]
-			chunk, chunkDataPack, endStateCommitment, spock := executeCollection(t,
-				collection,
-				guarantee,
-				uint(i),
-				startStateCommitment,
-				view,
-				bc,
-				led)
+			// chunkDataPack
+			allRegisters := view.Interactions().AllRegisters()
+			allKeys := state.RegisterIDSToKeys(allRegisters)
 
 			query, err := ledger.NewQuery(chunk.StartState, allKeys)
 			require.NoError(t, err)
@@ -223,14 +211,13 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	header := unittest.BlockHeaderWithParentFixture(root)
 	header.PayloadHash = payload.Hash()
 
-	// makes sure all chunks are referencing the correct block id.
-	blockID := block.ID()
-	for _, chunk := range chunks {
-		require.Equal(t, blockID, chunk.BlockID, "inconsistent block id in chunk fixture")
+	block := flow.Block{
+		Header:  &header,
+		Payload: &payload,
 	}
 
 	result := flow.ExecutionResult{
-		BlockID: blockID,
+		BlockID: block.ID(),
 		Chunks:  chunks,
 	}
 
