@@ -437,9 +437,14 @@ func (e *Engine) onChunkDataPack(
 func (e *Engine) verifyChunkWithChunkDataPack(
 	chunk *flow.Chunk, resultID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection,
 ) error {
-	header, err := e.headers.ByBlockID(chunk.BlockID)
+	sealed, header, err := blockIsSealed(e.state, e.headers, blockID)
 	if err != nil {
-		return fmt.Errorf("could not get block header: %w", err)
+		return fmt.Error("could not get sealed block: %w", err)
+	}
+
+	// skip sealed block
+	if sealed {
+		return nil
 	}
 
 	result, err := e.getResultByID(chunk.BlockID, resultID)
@@ -554,12 +559,4 @@ func (e *Engine) makeVerifiableChunkData(
 // can be tried again.
 func CanTry(maxAttempt int, chunk *ChunkStatus) bool {
 	return chunk.Attempt < maxAttempt
-}
-
-// IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
-// Otherwise, it returns false.
-// In the current version, a chunk is a system chunk if it is the last chunk of the
-// execution result.
-func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
-	return chunkIndex == uint64(len(result.Chunks)-1)
 }

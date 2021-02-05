@@ -1,5 +1,7 @@
 package flow
 
+import "github.com/dapperlabs/flow-go/model/flow"
+
 // ExecutionResult ...
 type ExecutionResult struct {
 	PreviousResultID Identifier // commit of the previous ER
@@ -46,4 +48,12 @@ func (er ExecutionResult) InitialStateCommit() (StateCommitment, bool) {
 	}
 	s := er.Chunks[0].StartState
 	return s, len(s) > 0
+}
+
+// IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
+// Otherwise, it returns false.
+// In the current version, a chunk is a system chunk if it is the last chunk of the
+// execution result.
+func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
+	return chunkIndex == uint64(len(result.Chunks)-1)
 }
