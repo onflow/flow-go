@@ -128,6 +128,7 @@ func New(log zerolog.Logger,
 
 	if rpcMetricsEnabled {
 		// Not interested in legacy metrics, so initialize here
+		grpc_prometheus.EnableHandlingTimeHistogram()
 		grpc_prometheus.Register(grpcServer)
 	}
 

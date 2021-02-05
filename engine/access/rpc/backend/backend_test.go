@@ -521,6 +521,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.Run("with fixed execution node", func() {
 
+		// create receipt mocks that always returns empty
+		receipts := new(storagemock.ExecutionReceipts)
+		receipts.
+			On("ByBlockIDAllExecutionReceipts", mock.Anything).
+			Return([]flow.ExecutionReceipt{}, nil).Once()
+
 		// create the handler
 		backend := New(
 			suite.state,
@@ -528,7 +534,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil, nil,
 			suite.blocks,
 			nil, nil, nil,
-			suite.receipts,
+			receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
@@ -548,7 +554,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, // no default client, hence the receipts storage should be looked up
+			nil,
 			nil, nil,
 			suite.blocks,
 			nil, nil, nil,
@@ -566,6 +572,30 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		suite.Require().Equal(expected, actual)
 	})
+
+	suite.Run("with an empty block ID list", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, // no default client, hence the receipts storage should be looked up
+			nil, nil,
+			suite.blocks,
+			nil, nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			suite.log,
+		)
+
+		// execute request with an empty block id list and expect an error (not a panic)
+		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
+		require.NoError(suite.T(), err)
+		require.Empty(suite.T(), resp)
+	})
+
 	suite.assertAllExpectations()
 }
 
@@ -597,6 +627,11 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		return headers
 	}
+
+	// use the static execution node
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -844,6 +879,10 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		On("ByHeight", height).
 		Return(&h, nil).
 		Once()
+
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()
