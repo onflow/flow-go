@@ -28,6 +28,7 @@ func constructRootResultAndSeal(
 
 	epochSetup := &flow.EpochSetup{
 		Counter:      flagEpochCounter,
+		FirstView:    block.Header.View,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  assignments,
