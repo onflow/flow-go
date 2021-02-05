@@ -758,7 +758,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	suite.Run("invalid request last_sealed_block_height < min height", func() {
 
-		// set finalized height to one less than the request start height
+		// set sealed height to one less than the request start height
 		headHeight = minHeight - 1
 
 		// setup mocks
