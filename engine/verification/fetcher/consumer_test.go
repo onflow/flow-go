@@ -50,13 +50,12 @@ func TestProduceConsume(t *testing.T) {
 			resultID := unittest.IdentifierFixture()
 
 			for i := 0; i < 10; i++ {
-				chunkID := unittest.IdentifierFixture()
 				chunkLocator := &chunks.ChunkLocator{
 					ResultID: resultID,
 					Index:    uint64(i),
 				}
 
-				ok, err := chunksQueue.StoreChunkLocator(chunkID, chunkLocator)
+				ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
 				require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))
 				require.True(t, ok)
 				locators = append(locators, chunkLocator)
@@ -88,12 +87,11 @@ func TestProduceConsume(t *testing.T) {
 			resultID := unittest.IdentifierFixture()
 
 			for i := 0; i < 10; i++ {
-				chunkID := unittest.IdentifierFixture()
 				chunkLocator := &chunks.ChunkLocator{
 					ResultID: resultID,
 					Index:    uint64(i),
 				}
-				ok, err := chunksQueue.StoreChunkLocator(chunkID, chunkLocator)
+				ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
 				require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
 				require.True(t, ok)
 				locators = append(locators, chunkLocator)
@@ -124,12 +122,11 @@ func TestProduceConsume(t *testing.T) {
 
 			for i := 0; i < 100; i++ {
 				go func(i int) {
-					chunkID := unittest.IdentifierFixture()
 					chunkLocator := &chunks.ChunkLocator{
 						ResultID: resultID,
 						Index:    uint64(i),
 					}
-					ok, err := chunksQueue.StoreChunkLocator(chunkID, chunkLocator)
+					ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
 					require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
 					require.True(t, ok)
 					total.Inc()
