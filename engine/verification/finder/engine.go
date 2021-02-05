@@ -591,16 +591,11 @@ func (e *Engine) checkPendingReceipts() {
 // checkReadyReceipts iterates over receipts ready for process and processes them.
 func (e *Engine) checkReadyReceipts() {
 	for _, rdp := range e.readyReceipts.All() {
-		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-		func() {
-			span, ctx := e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckReadyReceipts)
-			defer span.Finish()
-
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckReadyReceipts, func() {
 			receiptID := rdp.Receipt.ID()
 			resultID := rdp.Receipt.ExecutionResult.ID()
 
-			ok, err := e.processResult(ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
+			ok, err := e.processResult(rdp.Ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
 			if err != nil {
 				e.log.Error().
 					Err(err).
@@ -616,13 +611,13 @@ func (e *Engine) checkReadyReceipts() {
 			}
 
 			// performs clean up
-			e.onResultProcessed(ctx, resultID)
+			e.onResultProcessed(rdp.Ctx, resultID)
 
 			e.log.Debug().
 				Hex("receipt_id", logging.ID(receiptID)).
 				Hex("result_id", logging.ID(resultID)).
 				Msg("result processed successfully")
-		}()
+		})
 	}
 }
 
