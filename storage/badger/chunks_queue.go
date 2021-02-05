@@ -12,24 +12,24 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-// ChunkQueue stores a queue of chunk locators that assigned to me to verify.
+// ChunksQueue stores a queue of chunk locators that assigned to me to verify.
 // Job consumers can read the locators as job from the queue by index.
 // Chunk locators stored in this queue are unique.
-type ChunkQueue struct {
+type ChunksQueue struct {
 	db *badger.DB
 }
 
 const JobQueueChunkQueue = "JobQueueChunkQueue"
 
 // NewChunkQueue will initialize the underlying badger database of chunk locator queue.
-func NewChunkQueue(db *badger.DB) *ChunkQueue {
-	return &ChunkQueue{
+func NewChunkQueue(db *badger.DB) *ChunksQueue {
+	return &ChunksQueue{
 		db: db,
 	}
 }
 
 // Init initial chunk locator queue's latest index with the given default index.
-func (q *ChunkQueue) Init(defaultIndex int64) (bool, error) {
+func (q *ChunksQueue) Init(defaultIndex int64) (bool, error) {
 	_, err := q.LatestIndex()
 	if errors.Is(err, storage.ErrNotFound) {
 		err = q.db.Update(operation.InitJobLatestIndex(JobQueueChunkQueue, defaultIndex))
@@ -48,7 +48,7 @@ func (q *ChunkQueue) Init(defaultIndex int64) (bool, error) {
 // StoreChunkLocator stores a new chunk locator that assigned to me to the job queue.
 // A true will be returned, if the locator was new.
 // A false will be returned, if the locator was duplicate.
-func (q *ChunkQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
+func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 	err := operation.RetryOnConflict(q.db.Update, func(tx *badger.Txn) error {
 		// make sure the chunk locator is unique
 		err := operation.InsertChunkLocator(locator)(tx)
@@ -90,7 +90,7 @@ func (q *ChunkQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 }
 
 // LatestIndex returns the index of the latest chunk locator stored in the queue.
-func (q *ChunkQueue) LatestIndex() (int64, error) {
+func (q *ChunksQueue) LatestIndex() (int64, error) {
 	var latest int64
 	err := q.db.View(operation.RetrieveJobLatestIndex(JobQueueChunkQueue, &latest))
 	if err != nil {
@@ -100,7 +100,7 @@ func (q *ChunkQueue) LatestIndex() (int64, error) {
 }
 
 // AtIndex returns the chunk locator stored at the given index in the queue.
-func (q *ChunkQueue) AtIndex(index int64) (*chunks.Locator, error) {
+func (q *ChunksQueue) AtIndex(index int64) (*chunks.Locator, error) {
 	var chunkID flow.Identifier
 	err := q.db.View(operation.RetrieveJobAtIndex(JobQueueChunkQueue, index, &chunkID))
 	if err != nil {
