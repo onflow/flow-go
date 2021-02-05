@@ -17,11 +17,11 @@ type Engine struct {
 	me      module.Local
 	state   protocol.State
 
-	headerStorage    storage.Headers       // used to check block existence before verifying
-	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify
-	chunksQueue      storage.ChunksQueue   // to store chunks to be verified
-	newChunkListener module.NewJobListener // to notify about a new chunk
-	finishProcessing finishProcessing      // to report a block has been processed
+	headerStorage    storage.Headers           // used to check block existence before verifying
+	assigner         module.ChunkAssigner      // used to determine chunks this node needs to verify
+	chunksQueue      storage.ChunkLocatorQueue // to store chunks to be verified
+	newChunkListener module.NewJobListener     // to notify about a new chunk
+	finishProcessing finishProcessing          // to report a block has been processed
 }
 
 func New(
@@ -32,7 +32,7 @@ func New(
 	state protocol.State,
 	headerStorage storage.Headers,
 	assigner module.ChunkAssigner,
-	chunksQueue storage.ChunksQueue,
+	chunksQueue storage.ChunkLocatorQueue,
 	newChunkListener module.NewJobListener,
 ) *Engine {
 	e := &Engine{
