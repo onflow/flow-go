@@ -326,6 +326,43 @@ func (ms *MatchingSuite) TestOnApprovalInvalid() {
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
+// try to submit an approval which is already outdated.
+func (ms *MatchingSuite) TestOnApprovalOutdated() {
+	originID := ms.VerID
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithBlockID(ms.UnfinalizedBlock.ID()),
+		unittest.WithApproverID(originID),
+	)
+
+	// Make sure the approval is added to the cache for future processing
+	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
+
+	ms.approvalValidator.On("Validate", approval).Return(fmt.Errorf("")).Once()
+
+	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
+	ms.Require().Error(err, "should report error if invalid")
+
+	ms.approvalValidator.AssertExpectations(ms.T())
+	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+// try to submit an approval that is already in the mempool
+func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
+	originID := ms.VerID
+	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(originID))
+
+	// setup the approvals mempool to check that we attempted to add the
+	// approval, and return false ms if it was already in the mempool
+	ms.ApprovalsPL.On("Add", approval).Return(false, nil).Once()
+
+	// process as valid approval
+	ms.approvalValidator.On("Validate", approval).Return(nil).Once()
+
+	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
+	ms.Require().NoError(err)
+	ms.ApprovalsPL.AssertExpectations(ms.T())
+}
+
 // try to get matched results with nothing in memory pools
 func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
 	results, err := ms.matching.sealableResults()

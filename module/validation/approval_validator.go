@@ -30,8 +30,7 @@ func (v *approvalValidator) Validate(approval *flow.ResultApproval) error {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
 		}
-		// Don't error if the block is not known yet, because the checks in the
-		// else-branch below are called again when we try to match approvals to chunks.
+		return engine.NewOutdatedInputErrorf("no header for block: %v", approval.Body.BlockID)
 	} else {
 		// drop approval, if it is for block whose height is lower or equal to already sealed height
 		sealed, err := v.state.Sealed().Head()
