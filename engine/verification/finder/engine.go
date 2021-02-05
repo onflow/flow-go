@@ -284,39 +284,39 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 // is passed to the match engine. It marks the result as processed, and removes
 // all receipts with the same result from mempool.
 func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier) {
-	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindOnResultProcessed)
-	defer span.Finish()
+	e.tracer.WithSpanFromContext(ctx, trace.VERFindOnResultProcessed, func() {
+		log := e.log.With().
+			Hex("result_id", logging.ID(resultID)).
+			Logger()
 
-	log := e.log.With().
-		Hex("result_id", logging.ID(resultID)).
-		Logger()
-	// marks result as processed
-	added := e.processedResultIDs.Add(resultID)
-	if added {
-		log.Debug().Msg("result marked as processed")
-	}
+		// marks result as processed
+		added := e.processedResultIDs.Add(resultID)
+		if added {
+			log.Debug().Msg("result marked as processed")
+		}
 
-	// extracts all receipt ids with this result
-	receiptIDs, ok := e.receiptIDsByResult.Get(resultID)
-	if !ok {
-		log.Debug().Msg("could not retrieve receipt ids associated with this result")
-	}
+		// extracts all receipt ids with this result
+		receiptIDs, ok := e.receiptIDsByResult.Get(resultID)
+		if !ok {
+			log.Debug().Msg("could not retrieve receipt ids associated with this result")
+		}
 
-	// removes indices of all receipts associated with processed result
-	removed := e.receiptIDsByResult.Rem(resultID)
-	log.Debug().
-		Bool("removed", removed).
-		Msg("removes processed result id from receipt-ids-by-result")
-
-	// drops all receipts with the same result
-	for _, receiptID := range receiptIDs {
-		// removes receipt from mempool
-		removed := e.readyReceipts.Rem(receiptID)
+		// removes indices of all receipts associated with processed result
+		removed := e.receiptIDsByResult.Rem(resultID)
 		log.Debug().
 			Bool("removed", removed).
-			Hex("receipt_id", logging.ID(receiptID)).
-			Msg("removes receipt with process result")
-	}
+			Msg("removes processed result id from receipt-ids-by-result")
+
+		// drops all receipts with the same result
+		for _, receiptID := range receiptIDs {
+			// removes receipt from mempool
+			removed := e.readyReceipts.Rem(receiptID)
+			log.Debug().
+				Bool("removed", removed).
+				Hex("receipt_id", logging.ID(receiptID)).
+				Msg("removes receipt with process result")
+		}
+	})
 }
 
 // checkCachedReceipts iterates over the newly cached receipts and moves them
