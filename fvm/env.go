@@ -549,7 +549,7 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 }
 
 func (e *hostEnv) ImplementationDebugLog(message string) error {
-	e.ctx.Logger.Debug().Msg(fmt.Sprintf("Cadence: %s", message))
+	e.ctx.Logger.Debug().Msgf("Cadence: %s", message)
 	return nil
 }
 
