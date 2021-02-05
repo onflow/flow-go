@@ -35,20 +35,10 @@ type Conduit struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	channel   network.Channel
-	submit    SubmitFunc
 	publish   PublishFunc
 	unicast   UnicastFunc
 	multicast MulticastFunc
 	close     CloseFunc
-}
-
-// Submit will submit an event for delivery on the engine bus that is reserved
-// for events of the engine it was initialized with.
-func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
-	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel %s closed", c.channel)
-	}
-	return c.submit(c.channel, event, targetIDs...)
 }
 
 // Publish sends an event to the network layer for unreliable delivery
