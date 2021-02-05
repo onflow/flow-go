@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -75,6 +76,7 @@ func (ms *MatchingSuite) SetupTest() {
 	unit := engine.NewUnit()
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.requester = new(mockmodule.Requester)
@@ -84,6 +86,7 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.matching = &Engine{
 		unit:                                 unit,
 		log:                                  log,
+		tracer:                               tracer,
 		engineMetrics:                        metrics,
 		mempool:                              metrics,
 		metrics:                              metrics,

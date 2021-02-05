@@ -626,10 +626,6 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.HeaderStorage == nil {
-		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
-	}
-
 	if node.PendingChunks == nil {
 		node.PendingChunks = match.NewChunks(chunksLimit)
 
@@ -732,7 +728,7 @@ func VerificationNode(t testing.TB,
 			assigner,
 			node.State,
 			node.PendingChunks,
-			node.HeaderStorage,
+			node.Headers,
 			requestInterval,
 			int(failureThreshold))
 		require.Nil(t, err)
