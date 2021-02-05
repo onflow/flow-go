@@ -8,11 +8,6 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// SubmitFunc is a function that submits the given event for the given engine to
-// the overlay network, which should take care of delivering it to the given
-// recipients.
-type SubmitFunc func(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error
-
 // PublishFunc is a function that broadcasts the specified event
 // to all participants on the given channel.
 type PublishFunc func(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error
