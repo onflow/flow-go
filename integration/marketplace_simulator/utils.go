@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"sync"
 
+	nbaData "github.com/dapperlabs/nba-smart-contracts/lib/go/templates/data"
 	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
@@ -93,4 +94,32 @@ func bytesToCadenceArray(l []byte) cadence.Array {
 	}
 
 	return cadence.NewArray(values)
+}
+
+func samplePlay() *nbaData.PlayMetadata {
+	num := int32(10)
+	return &nbaData.PlayMetadata{
+		FullName:             "Ben Simmons",
+		FirstName:            "Ben",
+		LastName:             "Simmons",
+		Birthdate:            "1996-07-20",
+		Birthplace:           "Melbourne,, AUS",
+		JerseyNumber:         "25",
+		DraftTeam:            "Philadelphia 76ers",
+		TeamAtMomentNBAID:    "1610612755",
+		TeamAtMoment:         "Philadelphia 76ers",
+		PrimaryPosition:      "PG",
+		PlayerPosition:       "G",
+		TotalYearsExperience: "2",
+		NbaSeason:            "2019-20",
+		DateOfMoment:         "2019-12-29T01:00:00Z",
+		PlayCategory:         "Jump Shot",
+		PlayType:             "2 Pointer",
+		HomeTeamName:         "Miami Heat",
+		AwayTeamName:         "Philadelphia 76ers",
+		HomeTeamScore:        &num,
+		AwayTeamScore:        &num,
+		Height:               &num,
+		Weight:               &num,
+	}
 }

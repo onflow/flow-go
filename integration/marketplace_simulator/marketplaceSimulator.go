@@ -10,7 +10,6 @@ import (
 
 	nbaContract "github.com/dapperlabs/nba-smart-contracts/lib/go/contracts"
 	nbaTemplates "github.com/dapperlabs/nba-smart-contracts/lib/go/templates"
-	nbaData "github.com/dapperlabs/nba-smart-contracts/lib/go/templates/data"
 	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	coreContract "github.com/onflow/flow-nft/lib/go/contracts"
@@ -583,27 +582,4 @@ func (m *marketPlaceAccount) Act() {
 	// wg.Wait()
 
 	// return
-}
-
-func samplePlay() *nbaData.PlayMetadata {
-	return &nbaData.PlayMetadata{
-		FullName:             "Ben Simmons",
-		FirstName:            "Ben",
-		LastName:             "Simmons",
-		Birthdate:            "1996-07-20",
-		Birthplace:           "Melbourne,, AUS",
-		JerseyNumber:         "25",
-		DraftTeam:            "Philadelphia 76ers",
-		TeamAtMomentNBAID:    "1610612755",
-		TeamAtMoment:         "Philadelphia 76ers",
-		PrimaryPosition:      "PG",
-		PlayerPosition:       "G",
-		TotalYearsExperience: "2",
-		NbaSeason:            "2019-20",
-		DateOfMoment:         "2019-12-29T01:00:00Z",
-		PlayCategory:         "Jump Shot",
-		PlayType:             "2 Pointer",
-		HomeTeamName:         "Miami Heat",
-		AwayTeamName:         "Philadelphia 76ers",
-	}
 }
