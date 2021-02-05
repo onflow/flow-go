@@ -113,29 +113,29 @@ func (m *MarketPlaceSimulator) Setup() error {
 func (m *MarketPlaceSimulator) setupContracts() error {
 
 	// deploy nonFungibleContract
-	err := m.deployContract("nonfungible token", coreContract.NonFungibleToken())
+	err := m.deployContract("NonFungibleToken", coreContract.NonFungibleToken())
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract("nbatopshot", nbaContract.GenerateTopShotContract(m.nbaTopshotAccount.Address().Hex()))
+	err = m.deployContract("TopShot", nbaContract.GenerateTopShotContract(m.nbaTopshotAccount.Address().Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract("nbatopshot sharded collection", nbaContract.GenerateTopShotShardedCollectionContract(m.nbaTopshotAccount.Address().Hex(),
+	err = m.deployContract("TopShotShardedCollection", nbaContract.GenerateTopShotShardedCollectionContract(m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract("nbatopshot admin", nbaContract.GenerateTopshotAdminReceiverContract(m.nbaTopshotAccount.Address().Hex(),
+	err = m.deployContract("TopshotAdminReceiver", nbaContract.GenerateTopshotAdminReceiverContract(m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract("nbatopshot marketplace", nbaContract.GenerateTopShotMarketContract(m.networkConfig.FungibleTokenAddress.Hex(),
+	err = m.deployContract("Market", nbaContract.GenerateTopShotMarketContract(m.networkConfig.FungibleTokenAddress.Hex(),
 		m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex(),
 		m.nbaTopshotAccount.Address().Hex()))
@@ -236,11 +236,12 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 	template := `
 	transaction {
 		prepare(signer: AuthAccount) {
-			signer.setCode("%s".decodeHex())
+			signer.contracts.add("%s", "%s".decodeHex())
 		}
 	}
 	`
-	script := []byte(fmt.Sprintf(template, hex.EncodeToString([]byte(contract))))
+
+	script := []byte(fmt.Sprintf(template, name, hex.EncodeToString([]byte(contract))))
 
 	deploymentTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
