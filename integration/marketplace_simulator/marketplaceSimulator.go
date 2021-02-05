@@ -157,9 +157,11 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
-	// TODO Ramtin clean up
-	fmt.Println(result)
-	fmt.Println(">>>>", result.Events)
+	if err != nil || result.Error != nil {
+		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
+	}
+
+	m.log.Info().Msgf("a play has been minted")
 
 	// this creates set with id 0
 	script = nbaTemplates.GenerateMintSetScript(*nbaAddress, "test set")
@@ -169,12 +171,24 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+	if err != nil || result.Error != nil {
+		m.log.Error().Msgf("minting a set failed: %w , %w", result.Error, err)
+	}
+
+	m.log.Info().Msgf("a set has been minted")
+
 	script = nbaTemplates.GenerateAddPlaysToSetScript(*nbaAddress, 0, []uint32{0})
 	tx = flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
+	if err != nil || result.Error != nil {
+		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+	}
+
+	m.log.Info().Msgf("play added to a set")
 
 	// mint a lot of moments
 	// GenerateBatchMintMomentScript(topShotAddr flow.Address, destinationAccount flow.Address, setID, playID uint32, quantity uint64)
@@ -185,6 +199,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+	println(">>e>", err)
+	println(">>r>", result)
 	return nil
 }
 
@@ -248,13 +264,11 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 
 	result, err := m.sendTxAndWait(deploymentTx, m.nbaTopshotAccount)
 
-	fmt.Println(result)
-	fmt.Println(">>>>", result.Events)
-
-	// TODO fix me
-	if err != nil {
-		m.log.Info().Msgf("contract %s is deployed : %s", name, result)
+	if err != nil || result.Error != nil {
+		m.log.Error().Msgf("contract %s deployment is failed : %w , %w", name, result.Error, err)
 	}
+
+	m.log.Info().Msgf("contract %s is deployed : %s", name, result)
 	return err
 }
 
