@@ -56,8 +56,16 @@ type Snapshot interface {
 	// is the most recently sealed block as of this snapshot (ie. the block
 	// referenced by LatestSeal).
 	//
-	// This segment is used as the initial state for non-spork and non-genesis
-	// root states.
+	// TAIL <- B1 <- ... <- BN <- HEAD
+	//
+	// NOTE 1: TAIL is not always sealed by HEAD. In the case that the head of
+	// the snapshot contains no seals, TAIL must be sealed by the first ancestor
+	// of HEAD which contains any seal.
+	//
+	// NOTE 2: In the special case of a root snapshot generated for a spork,
+	// the sealing segment has exactly one block (the root block for the spork).
+	// For all other snapshots, the sealing segment contains at least 2 blocks.
+	//
 	SealingSegment() ([]*flow.Block, error)
 
 	// Pending returns the IDs of all descendants of the Head block. The IDs
