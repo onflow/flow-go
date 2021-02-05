@@ -185,6 +185,11 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	}
 }
 
+func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) (protocol.Snapshot, error) {
+	latestSealed := b.state.Sealed()
+	return latestSealed, nil
+}
+
 func convertStorageError(err error) error {
 	if err == nil {
 		return nil

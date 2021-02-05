@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 type Handler struct {
@@ -402,6 +405,28 @@ func (h *Handler) GetEventsForBlockIDs(
 
 	return &access.EventsResponse{
 		Results: resultEvents,
+	}, nil
+}
+
+// GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
+func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	serializable, err := inmem.FromSnapshot(snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(serializable)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: data,
 	}, nil
 }
 
