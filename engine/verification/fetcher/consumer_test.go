@@ -92,7 +92,7 @@ func TestProduceConsume(t *testing.T) {
 					Index:    uint64(i),
 				}
 				ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
-				require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
+				require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))
 				require.True(t, ok)
 				locators = append(locators, chunkLocator)
 				consumer.Check() // notify the consumer
@@ -127,7 +127,7 @@ func TestProduceConsume(t *testing.T) {
 						Index:    uint64(i),
 					}
 					ok, err := chunksQueue.StoreChunkLocator(chunkLocator)
-					require.NoError(t, err, fmt.Sprintf("chunk %v can't be stored", i))
+					require.NoError(t, err, fmt.Sprintf("chunk locator %v can't be stored", i))
 					require.True(t, ok)
 					total.Inc()
 					consumer.Check() // notify the consumer
@@ -154,7 +154,7 @@ func WithConsumer(
 		maxFinished := int64(8)
 
 		processedIndex := storage.NewConsumeProgress(db, module.ConsumeProgressVerificationChunkIndex)
-		chunksQueue := storage.NewChunkLocatorQueue(db)
+		chunksQueue := storage.NewChunkQueue(db)
 		ok, err := chunksQueue.Init(fetcher.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)

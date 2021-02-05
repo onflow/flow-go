@@ -21,8 +21,8 @@ type ChunkLocatorQueue struct {
 
 const JobQueueChunkLocatorQueue = "JobQueueChunkLocatorQueue"
 
-// NewChunkLocatorQueue will initialize the underlying badger database of chunk locator queue.
-func NewChunkLocatorQueue(db *badger.DB) *ChunkLocatorQueue {
+// NewChunkQueue will initialize the underlying badger database of chunk locator queue.
+func NewChunkQueue(db *badger.DB) *ChunkLocatorQueue {
 	return &ChunkLocatorQueue{
 		db: db,
 	}
