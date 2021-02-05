@@ -750,6 +750,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 
+				// TODO use validSetup
 				// We should only have a single epoch setup event per epoch.
 				if epochStatus.NextEpoch.SetupID != flow.ZeroID {
 					// true iff EpochSetup event for NEXT epoch was already included before
@@ -773,10 +774,6 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
 				}
 
-				// cache the first view to simplify epoch queries later on
-				// TODO remove
-				ev.FirstView = activeSetup.FinalView + 1
-
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
@@ -785,6 +782,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 
 			case *flow.EpochCommit:
 
+				// TODO use validCommit
 				// We should only have a single epoch commit event per epoch.
 				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
 					// true iff EpochCommit event for NEXT epoch was already included before
