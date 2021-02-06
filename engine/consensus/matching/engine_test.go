@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -96,6 +97,7 @@ func (ms *MatchingSuite) SetupTest() {
 		receipts:                             ms.ReceiptsPL,
 		approvals:                            ms.ApprovalsPL,
 		seals:                                ms.SealsPL,
+		pendingReceipts:                      stdmap.NewPendingReceipts(100),
 		isCheckingSealing:                    atomic.NewBool(false),
 		sealingThreshold:                     10,
 		maxResultsToRequest:                  200,

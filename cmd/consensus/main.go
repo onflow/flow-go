@@ -56,6 +56,7 @@ func main() {
 		resultLimit                            uint
 		approvalLimit                          uint
 		sealLimit                              uint
+		pendngReceiptsLimit                    uint
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
 		maxSealPerBlock                        uint
@@ -79,6 +80,7 @@ func main() {
 		receipts         mempool.ExecutionTree
 		approvals        mempool.Approvals
 		seals            mempool.IncorporatedResultSeals
+		pendingReceipts  mempool.PendingReceipts
 		prov             *provider.Engine
 		receiptRequester *requester.Engine
 		syncCore         *synchronization.Core
@@ -95,6 +97,7 @@ func main() {
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
+			flags.UintVar(&pendngReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
@@ -197,6 +200,10 @@ func main() {
 			}
 			return nil
 		}).
+		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingReceipts = stdmap.NewPendingReceipts(pendngReceiptsLimit)
+			return nil
+		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
 			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
@@ -239,6 +246,7 @@ func main() {
 				receipts,
 				approvals,
 				seals,
+				pendingReceipts,
 				chunkAssigner,
 				receiptValidator,
 				requiredApprovalsForSealConstruction,

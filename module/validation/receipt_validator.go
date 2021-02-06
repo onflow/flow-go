@@ -110,7 +110,7 @@ func (v *receiptValidator) previousResult(result *flow.ExecutionResult) (*flow.E
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
+			return nil, NewMissingPreviousResultError(result.PreviousResultID)
 		}
 		return nil, err
 	}
@@ -215,6 +215,11 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 		return fmt.Errorf("staked node invalid: %w", err)
 	}
 
+	prevResult, err := getPreviousResult(&receipt.ExecutionResult)
+	if err != nil {
+		return err
+	}
+
 	err = v.verifySignature(receipt, identity)
 	if err != nil {
 		return fmt.Errorf("invalid receipt signature: %w", err)
@@ -223,11 +228,6 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 	err = v.verifyChunksFormat(&receipt.ExecutionResult)
 	if err != nil {
 		return fmt.Errorf("invalid chunks format for result %v: %w", receipt.ExecutionResult.ID(), err)
-	}
-
-	prevResult, err := getPreviousResult(&receipt.ExecutionResult)
-	if err != nil {
-		return err
 	}
 
 	err = v.subgraphCheck(&receipt.ExecutionResult, prevResult)

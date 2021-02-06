@@ -65,6 +65,7 @@ type Engine struct {
 	receipts                             mempool.ExecutionTree           // holds execution receipts in memory
 	approvals                            mempool.Approvals               // holds result approvals in memory
 	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
+	pendingReceipts                      mempool.PendingReceipts         // to buffer receipts whose previous result is missing
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
 	assigner                             module.ChunkAssigner            // chunk assignment object
 	isCheckingSealing                    *atomic.Bool                    // used to rate limit the checksealing call
@@ -95,12 +96,12 @@ func New(
 	receipts mempool.ExecutionTree,
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
+	pendingReceipts mempool.PendingReceipts,
 	assigner module.ChunkAssigner,
 	validator module.ReceiptValidator,
 	requiredApprovalsForSealConstruction uint,
 	emergencySealingActive bool,
 ) (*Engine, error) {
-
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:                                 engine.NewUnit(),
@@ -119,6 +120,7 @@ func New(
 		receipts:                             receipts,
 		approvals:                            approvals,
 		seals:                                seals,
+		pendingReceipts:                      pendingReceipts,
 		missing:                              make(map[flow.Identifier]uint),
 		isCheckingSealing:                    atomic.NewBool(false),
 		sealingThreshold:                     10,
@@ -270,10 +272,12 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		receiptSpan.Finish()
 	}()
 
+	resultID := receipt.ExecutionResult.ID()
+
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("result_id", resultID[:]).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
@@ -316,13 +320,28 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
-	// if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
-	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
-	// eventually request the parent receipt with the `requestPending` function
 	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
 	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 	childSpan.Finish()
-	if err != nil {
+
+	if validation.IsMissingPreviousResultError(err) {
+		// If previous result is missing, we can't validate this receipt.
+		// althrough we will request its previous (potentially multiple receipts),
+		// We don't want to drop it now, because when the missing previous arrive
+		// in a wrong order, they will still be dropped, and causing the catch up
+		// to be inefficient.
+		// Instead, we could cache the receipt in case it arrives earlier than its
+		// previous receipt.
+		// for instance, given blocks A <- B <- C <- D <- E, if we receive their receipts
+		// in the order of [E,C,D,B,A], then:
+		// if we drop the missing previous receipts, then only A will be processed;
+		// if we cache the missing previous receipts, then all of them will be processed, because
+		// once A is processed, we will check if there is a child receipt pending,
+		// if yes, then process it.
+		e.pendingReceipts.Add(receipt)
+		log.Info().Msg("execution result cached because parent is missing")
+		return nil
+	} else if err != nil {
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
@@ -350,6 +369,18 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		}
 		return fmt.Errorf("failed to store incorporated result: %w", err)
 	}
+
+	previousResultID := receipt.ExecutionResult.PreviousResultID
+	childReceipt, ok := e.pendingReceipts.ByPreviousResultID(previousResultID)
+	// if the receipt has a child, we will process it.
+	// and it's guaranteed won't go to the pending receipt again,
+	// because we've stored its parent receipt.
+	if ok {
+		e.SubmitLocal(childReceipt)
+	}
+
+	e.pendingReceipts.Rem(receipt.ID())
+
 	log.Info().Msg("execution result processed and stored")
 
 	return nil
