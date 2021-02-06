@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -68,6 +69,7 @@ func (ms *EngineContextSuite) SetupTest() {
 			receipts:                             ms.ReceiptsPL,
 			approvals:                            ms.ApprovalsPL,
 			seals:                                ms.SealsPL,
+			pendingReceipts:                      stdmap.NewPendingReceipts(100),
 			sealingThreshold:                     10,
 			maxResultsToRequest:                  200,
 			assigner:                             ms.Assigner,
@@ -121,7 +123,6 @@ func (ms *EngineContextSuite) TestProcessValidReceipt() {
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
 // TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
@@ -184,6 +185,5 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertExpectations(ms.T())
 }

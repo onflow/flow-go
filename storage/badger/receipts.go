@@ -143,7 +143,10 @@ func (r *ExecutionReceipts) Index(blockID, receiptID flow.Identifier) error {
 	})
 }
 
-func (r *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID, executorID, receiptID flow.Identifier) error {
+func (r *ExecutionReceipts) IndexByExecutor(receipt *flow.ExecutionReceipt) error {
+	blockID := receipt.ExecutionResult.BlockID
+	executorID := receipt.ExecutorID
+	receiptID := receipt.ID()
 	return operation.RetryOnConflict(r.db.Update, func(tx *badger.Txn) error {
 
 		err := operation.IndexExecutionReceiptByBlockIDExecutionID(blockID, executorID, receiptID)(tx)
@@ -193,8 +196,8 @@ func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.ExecutionR
 	return r.byBlockID(blockID)(tx)
 }
 
-func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]flow.ExecutionReceipt, error) {
-	var receipts []flow.ExecutionReceipt
+func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+	var receipts []*flow.ExecutionReceipt
 	err := r.db.View(func(btx *badger.Txn) error {
 		var receiptIDs []flow.Identifier
 
@@ -208,7 +211,7 @@ func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifie
 			if err != nil {
 				return err
 			}
-			receipts = append(receipts, *receipt)
+			receipts = append(receipts, receipt)
 		}
 
 		return nil
