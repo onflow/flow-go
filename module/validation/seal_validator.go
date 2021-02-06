@@ -141,7 +141,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// collect IDs of blocks on the fork (from parent to last sealed)
 	var blockIDs []flow.Identifier
 
-	// loop through the fork backwards up to last sealed block and collect
+	// loop through the fork backwards from the parent block
+	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
 	ancestorID := header.ParentID
@@ -181,6 +182,17 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		}
 
 		ancestorID = ancestor.ParentID
+	}
+
+	// since the payload has passed the receiptExtend, the receipts must be incorporated.
+	// we must adding them to the incorporatedResults, otherwise if a matching receipt
+	// and seal are added in the same block, the seal would be considered as invalid by mistake.
+	for _, receipt := range candidate.Payload.Receipts {
+		resultID := receipt.ExecutionResult.ID()
+		incorporatedResults[resultID] = flow.NewIncorporatedResult(
+			receipt.ExecutionResult.BlockID,
+			&receipt.ExecutionResult,
+		)
 	}
 
 	// Loop forward across the fork and try to create a valid chain of seals.
