@@ -127,148 +127,165 @@ func TestClusters(t *testing.T) {
 
 // TestSealingSegment tests querying sealing segment with respect to various snapshots.
 func TestSealingSegment(t *testing.T) {
-	t.Run("bootstrapped from spork snapshot", func(t *testing.T) {
-		identities := unittest.CompleteIdentitySet()
-		rootSnapshot := unittest.RootSnapshotFixture(identities)
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
 
-		t.Run("root sealing segment", func(t *testing.T) {
-			util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-				expected, err := rootSnapshot.SealingSegment()
-				require.NoError(t, err)
-				actual, err := state.AtBlockID(head.ID()).SealingSegment()
-				require.NoError(t, err)
+	t.Run("root sealing segment", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			expected, err := rootSnapshot.SealingSegment()
+			require.NoError(t, err)
+			actual, err := state.AtBlockID(head.ID()).SealingSegment()
+			require.NoError(t, err)
 
-				assert.Len(t, actual, 1)
-				assert.Equal(t, len(expected), len(actual))
-				assert.Equal(t, expected[0].ID(), actual[0].ID())
-			})
+			assert.Len(t, actual, 1)
+			assert.Equal(t, len(expected), len(actual))
+			assert.Equal(t, expected[0].ID(), actual[0].ID())
 		})
+	})
 
-		// test sealing segment for non-root segment with simple sealing structure
-		// (no blocks in between reference block and latest sealed)
-		// ROOT <- B1 <- B2(S1)
-		// Expected sealing segment: [B1, B2]
-		t.Run("non-root", func(t *testing.T) {
-			util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-				// build a block to seal
-				block1 := unittest.BlockWithParentFixture(head)
-				err := state.Extend(&block1)
-				require.NoError(t, err)
+	// test sealing segment for non-root segment with simple sealing structure
+	// (no blocks in between reference block and latest sealed)
+	// ROOT <- B1 <- B2(S1)
+	// Expected sealing segment: [B1, B2]
+	t.Run("non-root", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// build a block to seal
+			block1 := unittest.BlockWithParentFixture(head)
+			err := state.Extend(&block1)
+			require.NoError(t, err)
 
-				// build a block sealing block1
-				block2 := unittest.BlockWithParentFixture(block1.Header)
-				block2.SetPayload(flow.Payload{
-					Seals: []*flow.Seal{
-						unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
-					},
-				})
-				err = state.Extend(&block2)
-				require.NoError(t, err)
-
-				segment, err := state.AtBlockID(block2.ID()).SealingSegment()
-				require.NoError(t, err)
-
-				// sealing segment should contain B1 and B2
-				// B2 is reference of snapshot, B1 is latest sealed
-				assert.Len(t, segment, 2)
-				assert.Equal(t, block1.ID(), segment[0].ID())
-				assert.Equal(t, block2.ID(), segment[1].ID())
+			// build a block sealing block1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{
+					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
+				},
 			})
+			err = state.Extend(&block2)
+			require.NoError(t, err)
+
+			segment, err := state.AtBlockID(block2.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			// sealing segment should contain B1 and B2
+			// B2 is reference of snapshot, B1 is latest sealed
+			assert.Len(t, segment, 2)
+			assert.Equal(t, block1.ID(), segment[0].ID())
+			assert.Equal(t, block2.ID(), segment[1].ID())
 		})
+	})
 
-		// test sealing segment for sealing segment with a large number of blocks
-		// between the reference block and latest sealed
-		// ROOT <- B1 <- .... <- BN(S1)
-		// Expected sealing segment: [B1, ..., BN]
-		t.Run("long sealing segment", func(t *testing.T) {
-			util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+	// test sealing segment for sealing segment with a large number of blocks
+	// between the reference block and latest sealed
+	// ROOT <- B1 <- .... <- BN(S1)
+	// Expected sealing segment: [B1, ..., BN]
+	t.Run("long sealing segment", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
-				// build a block to seal
-				block1 := unittest.BlockWithParentFixture(head)
-				err := state.Extend(&block1)
+			// build a block to seal
+			block1 := unittest.BlockWithParentFixture(head)
+			err := state.Extend(&block1)
+			require.NoError(t, err)
+
+			parent := block1
+			// build a large chain of intermediary blocks
+			for i := 0; i < 100; i++ {
+				next := unittest.BlockWithParentFixture(parent.Header)
+				err = state.Extend(&next)
 				require.NoError(t, err)
+				parent = next
+			}
 
-				parent := block1
-				// build a large chain of intermediary blocks
-				for i := 0; i < 100; i++ {
-					next := unittest.BlockWithParentFixture(parent.Header)
-					err = state.Extend(&next)
-					require.NoError(t, err)
-					parent = next
-				}
-
-				// build the block sealing block 1
-				blockN := unittest.BlockWithParentFixture(parent.Header)
-				blockN.SetPayload(flow.Payload{
-					Seals: []*flow.Seal{
-						unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
-					},
-				})
-				err = state.Extend(&blockN)
-				require.NoError(t, err)
-
-				segment, err := state.AtBlockID(blockN.ID()).SealingSegment()
-				require.NoError(t, err)
-
-				// sealing segment should cover range [B1, BN]
-				assert.Len(t, segment, 102)
-				// first and last blocks should be B1, BN
-				assert.Equal(t, block1.ID(), segment[0].ID())
-				assert.Equal(t, blockN.ID(), segment[101].ID())
+			// build the block sealing block 1
+			blockN := unittest.BlockWithParentFixture(parent.Header)
+			blockN.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{
+					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
+				},
 			})
+			err = state.Extend(&blockN)
+			require.NoError(t, err)
+
+			segment, err := state.AtBlockID(blockN.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			// sealing segment should cover range [B1, BN]
+			assert.Len(t, segment, 102)
+			// first and last blocks should be B1, BN
+			assert.Equal(t, block1.ID(), segment[0].ID())
+			assert.Equal(t, blockN.ID(), segment[101].ID())
 		})
+	})
 
-		// test sealing segment where the segment blocks contain seals for
-		// ancestor blocks prior to the sealing segment
-		// ROOT -> B1 -> B2 -> B3(S1) -> B4(S2)
-		// Expected sealing segment: [B2, B3, B4]
-		t.Run("overlapping sealing segment", func(t *testing.T) {
-			util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+	// test sealing segment where the segment blocks contain seals for
+	// ancestor blocks prior to the sealing segment
+	// ROOT -> B1 -> B2 -> B3(S1) -> B4(S2)
+	// Expected sealing segment: [B2, B3, B4]
+	t.Run("overlapping sealing segment", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
-				block1 := unittest.BlockWithParentFixture(head)
-				err := state.Extend(&block1)
-				require.NoError(t, err)
+			block1 := unittest.BlockWithParentFixture(head)
+			err := state.Extend(&block1)
+			require.NoError(t, err)
 
-				block2 := unittest.BlockWithParentFixture(block1.Header)
-				err = state.Extend(&block2)
-				require.NoError(t, err)
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			err = state.Extend(&block2)
+			require.NoError(t, err)
 
-				block3 := unittest.BlockWithParentFixture(block2.Header)
-				block3.SetPayload(flow.Payload{
-					Seals: []*flow.Seal{
-						unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
-					},
-				})
-				err = state.Extend(&block3)
-				require.NoError(t, err)
-
-				block4 := unittest.BlockWithParentFixture(block3.Header)
-				block4.SetPayload(flow.Payload{
-					Seals: []*flow.Seal{
-						unittest.Seal.Fixture(unittest.Seal.WithBlockID(block2.ID())),
-					},
-				})
-				err = state.Extend(&block4)
-				require.NoError(t, err)
-
-				segment, err := state.AtBlockID(block4.ID()).SealingSegment()
-				require.NoError(t, err)
-
-				// sealing segment should be [B2, B3, B4]
-				assert.Len(t, segment, 3)
-				assert.Equal(t, block2.ID(), segment[0].ID())
-				assert.Equal(t, block3.ID(), segment[1].ID())
-				assert.Equal(t, block4.ID(), segment[2].ID())
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{
+					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
+				},
 			})
+			err = state.Extend(&block3)
+			require.NoError(t, err)
+
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{
+					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block2.ID())),
+				},
+			})
+			err = state.Extend(&block4)
+			require.NoError(t, err)
+
+			segment, err := state.AtBlockID(block4.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			// sealing segment should be [B2, B3, B4]
+			assert.Len(t, segment, 3)
+			assert.Equal(t, block2.ID(), segment[0].ID())
+			assert.Equal(t, block3.ID(), segment[1].ID())
+			assert.Equal(t, block4.ID(), segment[2].ID())
 		})
+	})
+}
+
+func TestLatestResultAndSeal(t *testing.T) {
+	identities := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+
+	t.Run("root snapshot", func(t *testing.T) {
 
 	})
 
-}
+	t.Run("non-root snapshot", func(t *testing.T) {
+		t.Run("reference block contains seal", func(t *testing.T) {
 
-func TestLatestResultAndSeal(t *testing.T) {}
+		})
+
+		t.Run("reference block contains no seal", func(t *testing.T) {
+
+		})
+
+		t.Run("reference block contains multiple seals", func(t *testing.T) {
+
+		})
+	})
+}
 
 // test retrieving quorum certificate and seed
 func TestQuorumCertificate(t *testing.T) {
