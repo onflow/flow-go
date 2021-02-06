@@ -58,7 +58,7 @@ func NewBuilder(
 	cfg := Config{
 		minInterval:       500 * time.Millisecond,
 		maxInterval:       10 * time.Second,
-		maxSealCount:      100,
+		maxSealCount:      200,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,
 		expiry:            flow.DefaultTransactionExpiry,
