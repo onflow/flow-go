@@ -387,6 +387,13 @@ func (bc *BaseChainSuite) SetupChain() {
 			return results
 		},
 	).Maybe()
+	bc.ResultsPL.On("Add", mock.Anything).Return(
+		func(r *flow.IncorporatedResult) bool {
+			return false
+		}, func(r *flow.IncorporatedResult) error {
+			return nil
+		}).
+		Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~ SETUP APPROVALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.ApprovalsPL = &mempool.Approvals{}
