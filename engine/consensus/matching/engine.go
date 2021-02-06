@@ -511,11 +511,6 @@ func (e *Engine) checkingSealing() error {
 		Str("next_unsealed_results", nextUnsealeds.String()).
 		Logger()
 
-	if len(sealableResults) == 0 {
-		lg.Info().Msg("checking sealing finished. No results can be sealed yet")
-		return nil
-	}
-
 	// log warning if we are going to overflow the seals mempool
 	if space := e.seals.Limit() - e.seals.Size(); len(sealableResults) > int(space) {
 		lg.Warn().
@@ -622,6 +617,10 @@ func (e *Engine) checkingSealing() error {
 		Bool("mempool_has_next_seal", mempoolHasNextSeal).
 		Int("pending_receipt_requests", pendingReceiptRequests).
 		Int("pending_approval_requests", pendingApprovalRequests).
+		Uint("seals_size", e.seals.Size()).
+		Uint("receipts_size", e.receipts.Size()).
+		Uint("incorporated_size", e.incorporatedResults.Size()).
+		Uint("approval_size", e.approvals.Size()).
 		Msg("checking sealing finished successfully")
 
 	return nil
@@ -880,6 +879,9 @@ func (e *Engine) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 // have called checkSealing 1000 times without seeing the block (it's probably
 // no longer a valid extension of the state anyway).
 func (e *Engine) clearPools(sealedIDs []flow.Identifier) error {
+	if len(sealedIDs) == 0 {
+		return nil
+	}
 
 	clear := make(map[flow.Identifier]bool)
 	for _, sealedID := range sealedIDs {
