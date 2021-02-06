@@ -132,6 +132,8 @@ func (t *OpenTracer) StartSpanFromParent(
 	return t.Tracer.StartSpan(string(operationName), opts...)
 }
 
+// WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
+// executes the function f, and finishes the span once the function returns.
 func (t *OpenTracer) WithSpanFromContext(ctx context.Context,
 	operationName SpanName,
 	f func(),
