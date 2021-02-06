@@ -122,7 +122,7 @@ func New(
 		missing:                              make(map[flow.Identifier]uint),
 		isCheckingSealing:                    atomic.NewBool(false),
 		sealingThreshold:                     10,
-		maxResultsToRequest:                  200,
+		maxResultsToRequest:                  400,
 		assigner:                             assigner,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		receiptValidator:                     validator,
