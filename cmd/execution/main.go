@@ -51,6 +51,7 @@ func main() {
 		followerState         protocol.MutableState
 		ledgerStorage         *ledger.Ledger
 		events                *storage.Events
+		serviceEvents         *storage.ServiceEvents
 		txResults             *storage.TransactionResults
 		results               *storage.ExecutionResults
 		receipts              *storage.ExecutionReceipts
@@ -214,6 +215,9 @@ func main() {
 				chunkDataPacks,
 				results,
 				receipts,
+				events,
+				serviceEvents,
+				txResults,
 				node.DB,
 				node.Tracer,
 			)

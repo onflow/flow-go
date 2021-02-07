@@ -1009,10 +1009,10 @@ func (e *Engine) handleComputationResult(
 		snapshots[i] = &stateSnapshot.Snapshot
 	}
 
-	executionResult, err := e.saveExecutionResults(
+	receipt, err := e.saveExecutionResults(
 		ctx,
 		result.ExecutableBlock,
-		snapshots,
+		result.StateSnapshots,
 		result.Events,
 		result.ServiceEvents,
 		result.TransactionResult,
@@ -1020,25 +1020,6 @@ func (e *Engine) handleComputationResult(
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not save execution results: %w", err)
-	}
-
-	receipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate execution receipt: %w", err)
-	}
-
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionReceipt)
-		defer span.Finish()
-
-		err = e.execState.PersistExecutionReceipt(ctx, receipt)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not persist execution receipt: %w", err)
-		}
-		return nil
-	}()
-	if err != nil {
-		return nil, nil, err
 	}
 
 	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
@@ -1050,15 +1031,7 @@ func (e *Engine) handleComputationResult(
 }
 
 // save the execution result of a block
-func (e *Engine) saveExecutionResults(
-	ctx context.Context,
-	executableBlock *entity.ExecutableBlock,
-	stateInteractions []*delta.Snapshot,
-	events []flow.Event,
-	serviceEvents []flow.Event,
-	txResults []flow.TransactionResult,
-	startState flow.StateCommitment,
-) (*flow.ExecutionResult, error) {
+func (e *Engine) saveExecutionResults(ctx context.Context, executableBlock *entity.ExecutableBlock, spockSnapshots []*delta.SpockSnapshot, events []flow.Event, serviceEvents []flow.Event, txResults []flow.TransactionResult, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -1069,12 +1042,13 @@ func (e *Engine) saveExecutionResults(
 	// no need to persist the state interactions, since they are used only by state
 	// syncing, which is currently disabled
 
-	chunks := make([]*flow.Chunk, len(stateInteractions))
+	chunks := make([]*flow.Chunk, len(spockSnapshots))
+	chdps := make([]*flow.ChunkDataPack, len(spockSnapshots))
 
 	// TODO: check current state root == startState
 	var endState flow.StateCommitment = startState
 
-	for i, view := range stateInteractions {
+	for i, view := range spockSnapshots {
 		// TODO: deltas should be applied to a particular state
 		var err error
 		endState, err = e.execState.CommitDelta(childCtx, view.Delta, startState)
@@ -1085,7 +1059,7 @@ func (e *Engine) saveExecutionResults(
 		var collectionID flow.Identifier
 
 		// account for system chunk being last
-		if i < len(stateInteractions)-1 {
+		if i < len(spockSnapshots)-1 {
 			collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
 			completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collectionID = completeCollection.Collection().ID()
@@ -1108,80 +1082,88 @@ func (e *Engine) saveExecutionResults(
 
 		chdp := generateChunkDataPack(chunk, collectionID, proof)
 
-		err = e.execState.PersistChunkDataPack(childCtx, chdp)
-		if err != nil {
-			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
-		}
+		//err = e.execState.PersistChunkDataPack(childCtx, chdp)
+		//if err != nil {
+		//	return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
+		//}
 
+		chdps[i] = chdp
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
 	}
 
-	err := e.execState.PersistStateCommitment(childCtx, blockID, endState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store state commitment: %w", err)
-	}
+	//err := e.execState.PersistStateCommitment(childCtx, blockID, endState)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to store state commitment: %w", err)
+	//}
 
 	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState, serviceEvents)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	err = e.execState.PersistExecutionResult(childCtx, executionResult)
+	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, spockSnapshots)
 	if err != nil {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
+		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
+
+	//err = e.execState.PersistExecutionResult(childCtx, executionResult)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not persist execution result: %w", err)
+	//}
 
 	// not update the highest executed until the result and receipts are saved.
-	// TODO: better to save result, receipt and the latest height in one transaction
-	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
-	}
+	//// TODO: better to save result, receipt and the latest height in one transaction
+	//err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to update highest executed block: %w", err)
+	//}
 
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
-		defer span.Finish()
+	//err = func() error {
+	//	span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
+	//	defer span.Finish()
+	//
+	//	// store events 1K in each batch
+	//	chunkSize := uint(1000)
+	//	eventChunks := ChunkifyEvents(events, chunkSize)
+	//	for _, ch := range eventChunks {
+	//		err = e.events.Store(blockID, ch)
+	//		if err != nil {
+	//			return fmt.Errorf("failed to store events: %w", err)
+	//		}
+	//	}
+	//	// store service events events in 1K batches
+	//	chunkSize = uint(1000)
+	//	serviceEventChunks := ChunkifyEvents(serviceEvents, chunkSize)
+	//	for _, ch := range serviceEventChunks {
+	//		err = e.events.Store(blockID, ch)
+	//		if err != nil {
+	//			return fmt.Errorf("failed to store service events: %w", err)
+	//		}
+	//	}
+	//
+	//	return nil
+	//}()
+	//if err != nil {
+	//	return nil, err
+	//}
 
-		// store events 1K in each batch
-		chunkSize := uint(1000)
-		eventChunks := ChunkifyEvents(events, chunkSize)
-		for _, ch := range eventChunks {
-			err = e.events.Store(blockID, ch)
-			if err != nil {
-				return fmt.Errorf("failed to store events: %w", err)
-			}
-		}
-		// store service events events in 1K batches
-		chunkSize = uint(1000)
-		serviceEventChunks := ChunkifyEvents(serviceEvents, chunkSize)
-		for _, ch := range serviceEventChunks {
-			err = e.events.Store(blockID, ch)
-			if err != nil {
-				return fmt.Errorf("failed to store service events: %w", err)
-			}
-		}
+	//err = func() error {
+	//	span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
+	//	defer span.Finish()
+	//
+	//	err = e.transactionResults.BatchStore(blockID, txResults)
+	//	if err != nil {
+	//		return fmt.Errorf("failed to store transaction result error: %w", err)
+	//	}
+	//	return nil
+	//}()
+	//if err != nil {
+	//	return nil, err
+	//}
 
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
-		defer span.Finish()
-
-		err = e.transactionResults.BatchStore(blockID, txResults)
-		if err != nil {
-			return fmt.Errorf("failed to store transaction result error: %w", err)
-		}
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
+	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionResult, events, serviceEvents, txResults)
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(executableBlock)).
@@ -1189,7 +1171,7 @@ func (e *Engine) saveExecutionResults(
 		Hex("final_state", endState).
 		Msg("saved computation results")
 
-	return executionResult, nil
+	return executionReceipt, nil
 }
 
 // logExecutableBlock logs all data about an executable block

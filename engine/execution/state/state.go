@@ -80,19 +80,21 @@ type ExecutionState interface {
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(context.Context, delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
 
-	// PersistStateCommitment saves a state commitment by the given block ID.
-	PersistStateCommitment(context.Context, flow.Identifier, flow.StateCommitment) error
-
-	// PersistChunkDataPack stores a chunk data pack by chunk ID.
-	PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
-
-	PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error
-
-	PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
-
-	PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
+	//// PersistStateCommitment saves a state commitment by the given block ID.
+	//PersistStateCommitment(context.Context, flow.Identifier, flow.StateCommitment) error
+	//
+	//// PersistChunkDataPack stores a chunk data pack by chunk ID.
+	//PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
+	//
+	//PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error
+	//
+	//PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
+	//
+	//PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
+
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
 }
 
 const (
@@ -102,15 +104,18 @@ const (
 )
 
 type state struct {
-	tracer         module.Tracer
-	ls             ledger.Ledger
-	commits        storage.Commits
-	blocks         storage.Blocks
-	collections    storage.Collections
-	chunkDataPacks storage.ChunkDataPacks
-	results        storage.ExecutionResults
-	receipts       storage.ExecutionReceipts
-	db             *badger.DB
+	tracer             module.Tracer
+	ls                 ledger.Ledger
+	commits            storage.Commits
+	blocks             storage.Blocks
+	collections        storage.Collections
+	chunkDataPacks     storage.ChunkDataPacks
+	results            storage.ExecutionResults
+	receipts           storage.ExecutionReceipts
+	events             storage.Events
+	serviceEvents      storage.ServiceEvents
+	transactionResults storage.TransactionResults
+	db                 *badger.DB
 }
 
 func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
@@ -144,19 +149,25 @@ func NewExecutionState(
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
+	events storage.Events,
+	serviceEvents storage.ServiceEvents,
+	transactionResults storage.TransactionResults,
 	db *badger.DB,
 	tracer module.Tracer,
 ) ExecutionState {
 	return &state{
-		tracer:         tracer,
-		ls:             ls,
-		commits:        commits,
-		blocks:         blocks,
-		collections:    collections,
-		chunkDataPacks: chunkDataPacks,
-		results:        results,
-		receipts:       receipts,
-		db:             db,
+		tracer:             tracer,
+		ls:                 ls,
+		commits:            commits,
+		blocks:             blocks,
+		collections:        collections,
+		chunkDataPacks:     chunkDataPacks,
+		results:            results,
+		receipts:           receipts,
+		events:             events,
+		serviceEvents:      serviceEvents,
+		transactionResults: transactionResults,
+		db:                 db,
 	}
 
 }
@@ -377,6 +388,69 @@ func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Ident
 	}
 
 	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
+}
+
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+
+	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
+	defer span.Finish()
+
+	blockID := header.ID()
+
+	// Write Batch is BadgerDB feature designed for handling lots of writes
+	// in efficient and automatic manner, hence pushing all the updates we can
+	// as tightly as possible to let Badger manage it.
+	// Note, that it does not guarantee atomicity as transactions has size limit
+	// but it's the closes thing to atomicity we could have
+	batch := s.db.NewWriteBatch()
+
+	for _, chunkDataPack := range chunkDataPacks {
+		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
+		if err != nil {
+			return fmt.Errorf("cannot store chunk data pack: %w", err)
+		}
+	}
+
+	err := s.commits.BatchStore(blockID, endState, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store state commitment: %w", err)
+	}
+
+	err = s.results.BatchStore(executionResult, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store state commitment: %w", err)
+	}
+
+	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+	if err != nil {
+		return fmt.Errorf("cannot index state commitment: %w", err)
+	}
+
+	err = s.events.BatchStore(blockID, events, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store events: %w", err)
+	}
+
+	err = s.serviceEvents.BatchStore(blockID, events, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store service events: %w", err)
+	}
+
+	err = s.transactionResults.BatchStore(blockID, results, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store transaction result: %w", err)
+	}
+
+	err = batch.Flush()
+	if err != nil {
+		return fmt.Errorf("batch flush error: %w", err)
+	}
+
+	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
+	if err != nil {
+		return fmt.Errorf("cannot update highest executed block: %w", err)
+	}
+	return nil
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {
