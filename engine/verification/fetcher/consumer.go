@@ -39,12 +39,12 @@ func JobToChunkLocator(job storage.Job) *chunks.Locator {
 	return chunkjob.ChunkLocator
 }
 
-// ChunksJob wraps the storage layer to provide an abstraction for consumers to read jobs.
-type ChunksJob struct {
+// ChunkJobs wraps the storage layer to provide an abstraction for consumers to read jobs.
+type ChunkJobs struct {
 	locators storage.ChunksQueue
 }
 
-func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
+func (j ChunkJobs) AtIndex(index int64) (storage.Job, error) {
 	locator, err := j.locators.AtIndex(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
@@ -71,7 +71,7 @@ func NewWorker(engine EngineWorker) *Worker {
 }
 
 // Run converts the job to Chunk, it's guaranteed to work, because
-// ChunksJob converted chunk into job symmetrically
+// ChunkJobs converted chunk into job symmetrically
 func (w *Worker) Run(job storage.Job) {
 	chunk := JobToChunkLocator(job)
 	w.engine.ProcessMyChunk(chunk)
@@ -110,7 +110,7 @@ func NewChunkConsumer(
 	worker := NewWorker(engine)
 	engine.WithFinishProcessing(worker)
 
-	jobs := &ChunksJob{locators: chunksQueue}
+	jobs := &ChunkJobs{locators: chunksQueue}
 
 	// TODO: adding meta to logger
 	consumer := jobqueue.NewConsumer(
