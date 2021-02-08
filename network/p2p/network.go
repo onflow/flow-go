@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -167,7 +168,9 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()
 	defer n.Unlock()
-	top, err := n.top.GenerateFanout(n.ids)
+
+	subscribedChannels := n.subMngr.Channels()
+	top, err := n.top.GenerateFanout(n.ids, subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
@@ -435,7 +438,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 		return
 	}
 
-	// submit the message to the engine synchronously
+	// submits the message to the engine synchronously and
+	// tracks its processing time.
+	startTimestamp := time.Now()
+
 	err = eng.Process(qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
@@ -444,4 +450,6 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to process message")
 	}
+
+	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
 }

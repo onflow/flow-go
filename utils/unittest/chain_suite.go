@@ -1,6 +1,8 @@
 package unittest
 
 import (
+	"fmt"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -66,8 +68,8 @@ type BaseChainSuite struct {
 	ApprovalsPL      *mempool.Approvals
 	PendingApprovals map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval
 
-	// mock mempool.Receipts: used to test whether or not Matching Engine stores receipts
-	ReceiptsPL *mempool.Receipts
+	// mock mempool.ReceiptsForest: used to test whether or not Matching Engine stores receipts
+	ReceiptsPL *mempool.ExecutionTree
 
 	Assigner    *module.ChunkAssigner
 	Assignments map[flow.Identifier]*chunks.Assignment // index for assignments for given execution result
@@ -144,6 +146,15 @@ func (bc *BaseChainSuite) SetupChain() {
 		nil,
 	)
 
+	findBlockByHeight := func(blocks map[flow.Identifier]*flow.Block, height uint64) (*flow.Block, bool) {
+		for _, block := range blocks {
+			if block.Header.Height == height {
+				return block, true
+			}
+		}
+		return nil, false
+	}
+
 	// define the protocol state snapshot for any block in `bc.Blocks`
 	bc.State.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
@@ -152,6 +163,23 @@ func (bc *BaseChainSuite) SetupChain() {
 				return StateSnapshotForUnknownBlock()
 			}
 			return StateSnapshotForKnownBlock(block.Header, bc.Identities)
+		},
+	)
+
+	bc.State.On("AtHeight", mock.Anything).Return(
+		func(height uint64) realproto.Snapshot {
+			block, found := findBlockByHeight(bc.Blocks, height)
+			if found {
+				snapshot := &protocol.Snapshot{}
+				snapshot.On("Head").Return(
+					func() *flow.Header {
+						return block.Header
+					},
+					nil,
+				)
+				return snapshot
+			}
+			panic(fmt.Sprintf("unknown height: %v, final: %v, sealed: %v", height, bc.LatestFinalizedBlock.Header.Height, bc.LatestSealedBlock.Header.Height))
 		},
 	)
 
@@ -371,7 +399,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
-	bc.ReceiptsPL = &mempool.Receipts{}
+	bc.ReceiptsPL = &mempool.ExecutionTree{}
 	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SEALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~~~ //
@@ -543,6 +571,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.PendingApprovals[incorporatedResult.Result.ID()] = approvals
 		bc.PendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 		bc.Assignments[incorporatedResult.Result.ID()] = assignment
+		bc.PersistedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+		// TODO: adding receipt
 	}
 }
 

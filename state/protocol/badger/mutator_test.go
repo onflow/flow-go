@@ -684,6 +684,12 @@ func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
 }
 
 func TestExtendReceiptsNotSorted(t *testing.T) {
+	// Todo: this test needs to be updated:
+	// We don't require the receipts to be sorted by height anymore
+	// We could require an "parent first" ordering, which is less strict than
+	// a full ordering by height
+	t.Skip()
+
 	stateRoot := fixtureStateRoot(t)
 	block1 := stateRoot.Block()
 	block1.Payload.Guarantees = nil
