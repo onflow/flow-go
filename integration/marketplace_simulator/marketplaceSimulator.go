@@ -84,6 +84,7 @@ func (m *MarketPlaceSimulator) Setup() error {
 
 	// set the nbatopshot account first
 	m.nbaTopshotAccount = &accounts[0]
+	m.simulatorConfig.NBATopshotAddress = accounts[0].Address()
 	accounts = accounts[1:]
 
 	// setup and deploy contracts
@@ -251,7 +252,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 		accessNode := m.networkConfig.AccessNodeAddresses[rand.Intn(n)]
 
 		for _, acc := range group {
-			ma := newMarketPlaceAccount(&acc, group, m.log, accessNode)
+			ma := newMarketPlaceAccount(&acc, group, m.log, m.simulatorConfig, accessNode)
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
@@ -279,6 +280,9 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			fmt.Println(">>e>", err)
 			fmt.Println(">>r>", result)
 			totalMinted += batchSize
+
+			// get moments
+			ma.GetMoments()
 
 			// TODO RAMTIN switch me with GenerateFulfillPackScript
 			// //  transfer some moments
@@ -546,16 +550,18 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 }
 
 type marketPlaceAccount struct {
-	log        zerolog.Logger
-	account    *flowAccount
-	friends    []flowAccount
-	flowClient *client.Client
-	txTracker  *TxTracker
+	log             zerolog.Logger
+	account         *flowAccount
+	friends         []flowAccount
+	flowClient      *client.Client
+	txTracker       *TxTracker
+	simulatorConfig *SimulatorConfig
 }
 
 func newMarketPlaceAccount(account *flowAccount,
 	friends []flowAccount,
 	log zerolog.Logger,
+	simulatorConfig *SimulatorConfig,
 	accessNodeAddr string) *marketPlaceAccount {
 	txTracker, err := NewTxTracker(log,
 		10, // max in flight transactions
@@ -574,11 +580,12 @@ func newMarketPlaceAccount(account *flowAccount,
 	}
 
 	return &marketPlaceAccount{
-		log:        log,
-		account:    account,
-		friends:    friends,
-		txTracker:  txTracker,
-		flowClient: fclient,
+		log:             log,
+		account:         account,
+		friends:         friends,
+		txTracker:       txTracker,
+		flowClient:      fclient,
+		simulatorConfig: simulatorConfig,
 	}
 }
 
@@ -586,8 +593,30 @@ func (m *marketPlaceAccount) Account() *flowAccount {
 	return m.account
 }
 
-func (m *marketPlaceAccount) GetAssets() []uint {
-	// m.flowClient.Script()
+func (m *marketPlaceAccount) GetMoments() []uint {
+
+	template := `
+	import TopShot from 0x%s
+
+	pub fun main(account: Address): [UInt64] {
+
+		let acct = getAccount(account)
+
+		let collectionRef = acct.getCapability(/public/MomentCollection)
+								.borrow<&{TopShot.MomentCollectionPublic}>()!
+
+		log(collectionRef.getIDs())
+
+		return collectionRef.getIDs()
+	}
+	`
+
+	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String()))
+
+	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, []cadence.Value{cadence.Address(*m.account.Address())})
+
+	fmt.Println(">>>>>", res)
+	fmt.Println(">>>>>", err)
 	return nil
 }
 
