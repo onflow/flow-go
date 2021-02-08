@@ -99,7 +99,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		// set an invalid final view for the first epoch
 		setup.FinalView = setup.FirstView
 
-		err := validSetup(setup)
+		err := isValidEpochSetup(setup)
 		require.Error(t, err)
 	})
 
@@ -110,7 +110,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
 		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
 
-		err := validSetup(setup)
+		err := isValidEpochSetup(setup)
 		require.Error(t, err)
 	})
 
@@ -119,7 +119,7 @@ func TestEpochSetupValidity(t *testing.T) {
 		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
 		setup.RandomSource = unittest.SeedFixture(crypto.SeedMinLenDKG - 1)
 
-		err := validSetup(setup)
+		err := isValidEpochSetup(setup)
 		require.Error(t, err)
 	})
 }
@@ -132,7 +132,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		// use a different counter for the commit
 		commit.Counter = setup.Counter + 1
 
-		err := validCommit(commit, setup)
+		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 
@@ -143,7 +143,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		// add an extra QC to commit
 		commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
 
-		err := validCommit(commit, setup)
+		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 
@@ -153,7 +153,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
 		commit.DKGGroupKey = nil
 
-		err := validCommit(commit, setup)
+		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 
@@ -168,7 +168,7 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 			Index:    1,
 		}
 
-		err := validCommit(commit, setup)
+		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)
 	})
 }

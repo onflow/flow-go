@@ -210,10 +210,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := validSetup(setup); err != nil {
+			if err := isValidEpochSetup(setup); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
-			if err := validCommit(commit, setup); err != nil {
+			if err := isValidEpochCommit(commit, setup); err != nil {
 				return fmt.Errorf("invalid commit")
 			}
 
@@ -235,10 +235,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := validSetup(setup); err != nil {
+		if err := isValidEpochSetup(setup); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
-		if err := validCommit(commit, setup); err != nil {
+		if err := isValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid commit")
 		}
 
@@ -255,7 +255,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			if err != nil {
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
-			if err := validSetup(setup); err != nil {
+			if err := isValidEpochSetup(setup); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -266,7 +266,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 				return fmt.Errorf("could not get next epoch commit event: %w", err)
 			}
 			if err == nil {
-				if err := validCommit(commit, setup); err != nil {
+				if err := isValidEpochCommit(commit, setup); err != nil {
 					return fmt.Errorf("invalid commit")
 				}
 				commits = append(commits, commit)

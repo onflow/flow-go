@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-func validSetup(setup *flow.EpochSetup) error {
+func isValidEpochSetup(setup *flow.EpochSetup) error {
 	// STEP 1: general sanity checks
 	// the seed needs to be at least minimum length
 	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
@@ -87,7 +87,7 @@ func validSetup(setup *flow.EpochSetup) error {
 	return nil
 }
 
-func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return fmt.Errorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
@@ -120,8 +120,8 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	return nil
 }
 
-// validRootSnapshot checks internal consistency of root state snapshot
-func validRootSnapshot(snap protocol.Snapshot) error {
+// isValidRootSnapshot checks internal consistency of root state snapshot
+func isValidRootSnapshot(snap protocol.Snapshot) error {
 
 	segment, err := snap.SealingSegment()
 	if err != nil {
