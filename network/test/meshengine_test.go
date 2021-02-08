@@ -53,12 +53,6 @@ func (suite *MeshEngineTestSuite) TearDownTest() {
 	stopNetworks(suite.T(), suite.nets, 3*time.Second)
 }
 
-// TestAllToAll_Submit evaluates the network of mesh engines against allToAllScenario scenario.
-// Network instances during this test use their Submit method to disseminate messages.
-func (suite *MeshEngineTestSuite) TestAllToAll_Submit() {
-	suite.allToAllScenario(suite.Submit)
-}
-
 // TestAllToAll_Publish evaluates the network of mesh engines against allToAllScenario scenario.
 // Network instances during this test use their Publish method to disseminate messages.
 func (suite *MeshEngineTestSuite) TestAllToAll_Publish() {
@@ -75,12 +69,6 @@ func (suite *MeshEngineTestSuite) TestAllToAll_Multicast() {
 // Network instances during this test use their Unicast method to disseminate messages.
 func (suite *MeshEngineTestSuite) TestAllToAll_Unicast() {
 	suite.allToAllScenario(suite.Unicast)
-}
-
-// TestTargetedValidators_Submit tests if only the intended recipients in a 1-k messaging actually receive the message.
-// The messages are disseminated through the Submit method of conduits.
-func (suite *MeshEngineTestSuite) TestTargetedValidators_Submit() {
-	suite.targetValidatorScenario(suite.Submit)
 }
 
 // TestTargetedValidators_Unicast tests if only the intended recipients in a 1-k messaging actually receive the message.
@@ -100,12 +88,6 @@ func (suite *MeshEngineTestSuite) TestTargetedValidators_Multicast() {
 // The messages are disseminated through the Multicast method of conduits.
 func (suite *MeshEngineTestSuite) TestTargetedValidators_Publish() {
 	suite.targetValidatorScenario(suite.Publish)
-}
-
-// TestMaxMessageSize_Submit evaluates the messageSizeScenario scenario using
-// the Submit method of conduits.
-func (suite *MeshEngineTestSuite) TestMaxMessageSize_Submit() {
-	suite.messageSizeScenario(suite.Submit, p2p.DefaultMaxPubSubMsgSize)
 }
 
 // TestMaxMessageSize_Unicast evaluates the messageSizeScenario scenario using
@@ -136,12 +118,6 @@ func (suite *MeshEngineTestSuite) TestUnregister_Publish() {
 // or receive any messages after the conduit is closed
 func (suite *MeshEngineTestSuite) TestUnregister_Multicast() {
 	suite.conduitCloseScenario(suite.Multicast)
-}
-
-// TestUnregister_Publish tests that an engine cannot send any message using Submit
-// or receive any messages after the conduit is closed
-func (suite *MeshEngineTestSuite) TestUnregister_Submit() {
-	suite.conduitCloseScenario(suite.Submit)
 }
 
 // TestUnregister_Publish tests that an engine cannot send any message using Unicast
