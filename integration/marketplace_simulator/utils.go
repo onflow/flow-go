@@ -48,9 +48,8 @@ func loadServiceAccount(flowClient *client.Client,
 	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
 
 	return &flowAccount{
-		address:    servAccAddress,
+		Address:    servAccAddress,
 		accountKey: accountKey,
-		seqNumber:  accountKey.SequenceNumber,
 		signer:     signer,
 		signerLock: sync.Mutex{},
 	}, nil

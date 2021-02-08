@@ -85,7 +85,7 @@ func (m *MarketPlaceSimulator) Setup() error {
 
 	// set the nbatopshot account first
 	m.nbaTopshotAccount = &accounts[0]
-	m.simulatorConfig.NBATopshotAddress = accounts[0].Address()
+	m.simulatorConfig.NBATopshotAddress = accounts[0].Address
 	accounts = accounts[1:]
 
 	// setup and deploy contracts
@@ -119,26 +119,26 @@ func (m *MarketPlaceSimulator) setupContracts() error {
 		return err
 	}
 
-	err = m.deployContract("TopShot", nbaContract.GenerateTopShotContract(m.nbaTopshotAccount.Address().Hex()))
+	err = m.deployContract("TopShot", nbaContract.GenerateTopShotContract(m.nbaTopshotAccount.Address.Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract("TopShotShardedCollection", nbaContract.GenerateTopShotShardedCollectionContract(m.nbaTopshotAccount.Address().Hex(),
-		m.nbaTopshotAccount.Address().Hex()))
+	err = m.deployContract("TopShotShardedCollection", nbaContract.GenerateTopShotShardedCollectionContract(m.nbaTopshotAccount.Address.Hex(),
+		m.nbaTopshotAccount.Address.Hex()))
 	if err != nil {
 		return err
 	}
 
-	err = m.deployContract("TopshotAdminReceiver", nbaContract.GenerateTopshotAdminReceiverContract(m.nbaTopshotAccount.Address().Hex(),
-		m.nbaTopshotAccount.Address().Hex()))
+	err = m.deployContract("TopshotAdminReceiver", nbaContract.GenerateTopshotAdminReceiverContract(m.nbaTopshotAccount.Address.Hex(),
+		m.nbaTopshotAccount.Address.Hex()))
 	if err != nil {
 		return err
 	}
 
 	err = m.deployContract("Market", nbaContract.GenerateTopShotMarketContract(m.networkConfig.FungibleTokenAddress.Hex(),
-		m.nbaTopshotAccount.Address().Hex(),
-		m.nbaTopshotAccount.Address().Hex()))
+		m.nbaTopshotAccount.Address.Hex(),
+		m.nbaTopshotAccount.Address.Hex()))
 
 	return err
 }
@@ -149,7 +149,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		return err
 	}
 
-	nbaAddress := m.nbaTopshotAccount.Address()
+	nbaAddress := m.nbaTopshotAccount.Address
 
 	// numBuckets := 10
 	// // setup nba account to use sharded collections
@@ -259,7 +259,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// setup account to be able to intract with nba
 
 			// GenerateSetupShardedCollectionScript numBuckets
-			script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address())
+			script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address)
 			tx := flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
@@ -283,12 +283,12 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// fmt.Println(">>r>", result)
 			// totalMinted += batchSize
 
-			fmt.Println("account address:", ma.Account().Address())
+			fmt.Println("account address:", ma.Account().Address)
 			//  transfer some moments
 			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
 			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
 			// script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
-			script = generateBatchTransferMomentScript(m.nbaTopshotAccount.Address(), m.nbaTopshotAccount.Address(), ma.Account().Address(), moments)
+			script = generateBatchTransferMomentScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
 			tx = flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
@@ -434,12 +434,12 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 			*m.networkConfig.FlowTokenAddress)).
 		SetReferenceBlockID(blockRef.ID).
 		SetProposalKey(
-			*serviceAcc.address,
+			*serviceAcc.Address,
 			serviceAcc.accountKey.Index,
 			serviceAcc.accountKey.SequenceNumber,
 		).
-		AddAuthorizer(*serviceAcc.address).
-		SetPayer(*serviceAcc.address)
+		AddAuthorizer(*serviceAcc.Address).
+		SetPayer(*serviceAcc.Address)
 
 	publicKey := bytesToCadenceArray(accountKey.Encode())
 	count := cadence.NewInt(num)
@@ -470,7 +470,7 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 	// TODO replace with account.Sign
 	serviceAcc.signerLock.Lock()
 	err = createAccountTx.SignEnvelope(
-		*serviceAcc.address,
+		*serviceAcc.Address,
 		serviceAcc.accountKey.Index,
 		serviceAcc.signer,
 	)
@@ -520,9 +520,10 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 
 					signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 
-					newAcc := newFlowAccount(i, &accountAddress, accountKey, signer)
+					newAcc := newFlowAccount(i, &accountAddress, string(privKey.Encode()), accountKey, signer)
 					i++
 
+					newAcc.ToJSON()
 					accounts = append(accounts, *newAcc)
 
 					m.log.Debug().
@@ -616,7 +617,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String()))
 
-	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, []cadence.Value{cadence.Address(*m.account.Address())})
+	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, []cadence.Value{cadence.Address(*m.account.Address)})
 
 	fmt.Println(">>>>>", res.ToGoValue())
 	fmt.Println(">>>>>", err)

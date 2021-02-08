@@ -1,36 +1,33 @@
 package marketplace
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 
+	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 )
 
-// TODO add read from file
-// TODO update the seqNumber on load
 type flowAccount struct {
-	i          int
-	address    *flowsdk.Address
-	accountKey *flowsdk.AccountKey
-	seqNumber  uint64
-	signer     crypto.InMemorySigner
-	signerLock sync.Mutex
-}
-
-func (acc *flowAccount) Address() *flowsdk.Address {
-	return acc.address
+	Address              *flowsdk.Address
+	AccountPrivateKeyHex string
+	accountKey           *flowsdk.AccountKey
+	signer               crypto.InMemorySigner
+	signerLock           sync.Mutex
 }
 
 func (acc *flowAccount) signTx(tx *flowsdk.Transaction, keyID int) error {
 	acc.signerLock.Lock()
 	defer acc.signerLock.Unlock()
-	err := tx.SignEnvelope(*acc.address, keyID, acc.signer)
+	err := tx.SignEnvelope(*acc.Address, keyID, acc.signer)
 	if err != nil {
 		return err
 	}
-	acc.seqNumber++
+	acc.accountKey.SequenceNumber++
 	return nil
 }
 
@@ -38,25 +35,69 @@ func (acc *flowAccount) PrepareAndSignTx(tx *flowsdk.Transaction, keyID int) err
 	acc.signerLock.Lock()
 	defer acc.signerLock.Unlock()
 
-	tx.SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
+	tx.SetProposalKey(*acc.Address, 0, acc.accountKey.SequenceNumber).
+		SetPayer(*acc.Address).
+		AddAuthorizer(*acc.Address)
 
-	err := tx.SignEnvelope(*acc.address, keyID, acc.signer)
+	err := tx.SignEnvelope(*acc.Address, keyID, acc.signer)
 	if err != nil {
 		return err
 	}
-	acc.seqNumber++
 	return nil
 }
 
-func newFlowAccount(i int, address *flowsdk.Address, accountKey *flowsdk.AccountKey, signer crypto.InMemorySigner) *flowAccount {
-	return &flowAccount{
-		i:          i,
-		address:    address,
-		accountKey: accountKey,
-		signer:     signer,
-		seqNumber:  uint64(0),
-		signerLock: sync.Mutex{},
+func (acc *flowAccount) SyncAccountKey(flowClient *client.Client) error {
+	acc.signerLock.Lock()
+	defer acc.signerLock.Unlock()
+
+	account, err := flowClient.GetAccount(context.Background(), *acc.Address)
+	if err != nil {
+		return fmt.Errorf("error while calling get account: %w", err)
 	}
+	acc.accountKey = account.Keys[0]
+	return nil
+}
+
+func (acc *flowAccount) ToJSON() ([]byte, error) {
+	b, err := json.Marshal(acc)
+	fmt.Println(string(b))
+	return b, err
+}
+
+func newFlowAccount(i int, address *flowsdk.Address, accountPrivateKeyHex string, accountKey *flowsdk.AccountKey, signer crypto.InMemorySigner) *flowAccount {
+	return &flowAccount{
+		Address:              address,
+		AccountPrivateKeyHex: accountPrivateKeyHex,
+		accountKey:           accountKey,
+		signer:               signer,
+		signerLock:           sync.Mutex{},
+	}
+}
+
+func newFlowAccountFromFile(flowClient *client.Client) (*flowAccount, error) {
+
+	// TODO read from file
+	var address *flowsdk.Address
+	var accountPrivateKeyHex string
+
+	acc, err := flowClient.GetAccount(context.Background(), *address)
+	if err != nil {
+		return nil, fmt.Errorf("error while calling get account: %w", err)
+	}
+	accountKey := acc.Keys[0]
+
+	privateKey, err := crypto.DecodePrivateKeyHex(accountKey.SigAlgo, accountPrivateKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("error while decoding account private key hex: %w", err)
+	}
+
+	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+
+	return &flowAccount{
+		Address:              address,
+		AccountPrivateKeyHex: accountPrivateKeyHex,
+		accountKey:           accountKey,
+		signer:               signer,
+		signerLock:           sync.Mutex{},
+	}, nil
 }
