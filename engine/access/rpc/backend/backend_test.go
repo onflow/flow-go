@@ -411,7 +411,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have finalized an expiry block
 			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
 			// we have NOT observed all intermediary collections
-			fullHeight = headBlock.Header.Height - flow.DefaultTransactionExpiry/2
+			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
 
 			result, err := backend.GetTransactionResult(ctx, txID)
 			suite.checkResponse(result, err)
@@ -421,12 +421,11 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 			// we have NOT finalized an expiry block
 			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry/2
 			// we have observed all intermediary collections
-			fullHeight = headBlock.Header.Height - flow.DefaultTransactionExpiry + 1
+			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
 			result, err := backend.GetTransactionResult(ctx, txID)
 			suite.checkResponse(result, err)
 			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
-
 		})
 
 	})
@@ -437,7 +436,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		// we have finalized an expiry block
 		headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
 		// we have observed all intermediary collections
-		fullHeight = headBlock.Header.Height
+		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
 
 		result, err := backend.GetTransactionResult(ctx, txID)
 		suite.checkResponse(result, err)
