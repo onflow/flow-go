@@ -157,6 +157,11 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
+	if err != nil || result.Error != nil {
+		m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
+		return err
+	}
+
 	// TODO add many plays and add many sets (adds plays to sets)
 	// this adds a play with id 0
 	script = nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
