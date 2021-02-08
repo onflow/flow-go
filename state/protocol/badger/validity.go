@@ -121,6 +121,7 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 }
 
 // isValidRootSnapshot checks internal consistency of root state snapshot
+// TODO not used
 func isValidRootSnapshot(snap protocol.Snapshot) error {
 
 	segment, err := snap.SealingSegment()
@@ -135,19 +136,31 @@ func isValidRootSnapshot(snap protocol.Snapshot) error {
 	if len(segment) == 0 {
 		return fmt.Errorf("invalid empty sealing segment")
 	}
+	// TAIL <- ... <- HEAD
 	head := segment[len(segment)-1] // reference block of the snapshot
 	tail := segment[0]              // last sealed block
+	headID := head.ID()
+	tailID := tail.ID()
 
-	if result.BlockID != tail.ID() {
+	if result.BlockID != tailID {
 		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, tail.ID())
 	}
 
-	if seal.BlockID != tail.ID() {
+	if seal.BlockID != tailID {
 		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, tail.ID())
 	}
 
 	if seal.ResultID != result.ID() {
 		return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+	}
+
+	// root qc must be for reference block of snapshot
+	qc, err := snap.QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not get qc for root snapshot: %w", err)
+	}
+	if qc.BlockID != headID {
+		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, headID)
 	}
 
 	firstView, err := snap.Epochs().Current().FirstView()
