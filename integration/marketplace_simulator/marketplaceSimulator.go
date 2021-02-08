@@ -148,28 +148,29 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	}
 
 	nbaAddress := m.nbaTopshotAccount.Address()
-	numBuckets := 10
-	// setup nba account to use sharded collections
-	script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
+
+	// numBuckets := 10
+	// // setup nba account to use sharded collections
+	// script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
+	// tx := flowsdk.NewTransaction().
+	// 	SetReferenceBlockID(blockRef.ID).
+	// 	SetScript(script)
+
+	// result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
+	// if err != nil || result.Error != nil {
+	// 	m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
+	// 	return err
+	// }
+
+	// TODO add many plays and add many sets (adds plays to sets)
+	// this adds a play with id 0
+	script := nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
-
-	if err != nil || result.Error != nil {
-		m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
-		return err
-	}
-
-	// TODO add many plays and add many sets (adds plays to sets)
-	// this adds a play with id 0
-	script = nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
-	tx = flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef.ID).
-		SetScript(script)
-
-	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
@@ -207,25 +208,25 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	m.log.Info().Msgf("play added to a set")
 
-	batchSize := 100
-	steps := m.simulatorConfig.NumberOfMoments / batchSize
-	totalMinted := 0
-	for i := 0; i < steps; i++ {
-		// mint a lot of moments
-		script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(batchSize))
-		tx = flowsdk.NewTransaction().
-			SetReferenceBlockID(blockRef.ID).
-			SetScript(script)
+	// batchSize := 100
+	// steps := m.simulatorConfig.NumberOfMoments / batchSize
+	// totalMinted := 0
+	// for i := 0; i < steps; i++ {
+	// 	// mint a lot of moments
+	// 	script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(batchSize))
+	// 	tx = flowsdk.NewTransaction().
+	// 		SetReferenceBlockID(blockRef.ID).
+	// 		SetScript(script)
 
-		result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
-		if err != nil || result.Error != nil {
-			m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
-			return err
-		}
-		totalMinted += batchSize
-	}
+	// 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	// 	if err != nil || result.Error != nil {
+	// 		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+	// 		return err
+	// 	}
+	// 	totalMinted += batchSize
+	// }
 
-	m.log.Info().Msgf("%d moment has been minted", totalMinted)
+	// m.log.Info().Msgf("%d moment has been minted", totalMinted)
 	return nil
 }
 
@@ -239,7 +240,10 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	}
 	groupSize := 10
 	numBuckets := 10
-	momentCounter := uint64(1)
+	// momentCounter := uint64(1)
+	totalMinted := 0
+	batchSize := 100
+
 	for i := 0; i < len(accounts); i += groupSize {
 		group := accounts[i : i+groupSize]
 		// randomly select an access nodes
@@ -261,19 +265,34 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			fmt.Println(">>e>", err)
 			fmt.Println(">>r>", result)
 
-			// TODO RAMTIN switch me with GenerateFulfillPackScript
-			//  transfer some moments
-			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
-			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
-			script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			// mint moments for that account
+			script = nbaTemplates.GenerateBatchMintMomentScript(*m.nbaTopshotAccount.Address(), *ma.Account().Address(), 1, 1, uint64(batchSize))
 			tx = flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
 
 			result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
-			fmt.Println("2>>e>", err)
-			fmt.Println("2>>r>", result)
-			momentCounter += 5
+			if err != nil || result.Error != nil {
+				m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+				return err
+			}
+			fmt.Println(">>e>", err)
+			fmt.Println(">>r>", result)
+			totalMinted += batchSize
+
+			// TODO RAMTIN switch me with GenerateFulfillPackScript
+			// //  transfer some moments
+			// moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
+			// // script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			// script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			// tx = flowsdk.NewTransaction().
+			// 	SetReferenceBlockID(blockRef.ID).
+			// 	SetScript(script)
+
+			// result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+			// fmt.Println("2>>e>", err)
+			// fmt.Println("2>>r>", result)
+			// momentCounter += 5
 		}
 	}
 
