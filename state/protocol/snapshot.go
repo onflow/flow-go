@@ -37,15 +37,11 @@ type Snapshot interface {
 	// selected point of the protocol state history. It will error if it doesn't exist.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
-	// LatestSeal returns the most recent included seal as of this block. The seal
-	// may have been included in a parent block, if this block is empty. If this
-	// block contains multiple seals, this returns the seal for the block with
-	// the greatest height.
-	LatestSeal() (*flow.Seal, error)
-
-	// LatestResult returns the execution result referenced by the most recent
-	// included seal as of this block (see LatestSeal).
-	LatestResult() (*flow.ExecutionResult, error)
+	// LatestSealed returns the most recent included seal as of this block and
+	// the corresponding execution result. The seal may have been included in a
+	// parent block, if this block is empty. If this block contains multiple
+	// seals, this returns the seal for the block with the greatest height.
+	LatestSealedResult() (*flow.ExecutionResult, *flow.Seal, error)
 
 	// Commit returns the state commitment of the most recently included seal
 	// as of this block. It represents the sealed state.
