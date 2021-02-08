@@ -1,11 +1,13 @@
 package storage
 
-import "github.com/onflow/flow-go/model/flow"
+import (
+	"github.com/onflow/flow-go/model/chunks"
+)
 
 type ChunksQueue interface {
-	StoreChunk(*flow.Chunk) (bool, error)
+	StoreChunkLocator(locator *chunks.Locator) (bool, error)
 
 	LatestIndex() (int64, error)
 
-	AtIndex(index int64) (*flow.Chunk, error)
+	AtIndex(index int64) (*chunks.Locator, error)
 }
