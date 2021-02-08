@@ -234,15 +234,34 @@ func (b *backendTransactions) DeriveTransactionStatus(
 		if err != nil {
 			return flow.TransactionStatusUnknown, err
 		}
+		refHeight := referenceBlock.Height
 		// get the latest finalized block from the state
 		finalized, err := b.state.Final().Head()
 		if err != nil {
 			return flow.TransactionStatusUnknown, err
 		}
+		finalizedHeight := finalized.Height
 
-		// Have to check if finalized height is greater than reference block height rather than rely on the subtraction, since
-		// heights are unsigned ints
-		if finalized.Height > referenceBlock.Height && finalized.Height-referenceBlock.Height > flow.DefaultTransactionExpiry {
+		// the last full height is the height where we have recieved all
+		// collections for all blocks with a lower height
+		fullHeight, err := b.blocks.GetLastFullBlockHeight()
+		if err != nil {
+			return flow.TransactionStatusUnknown, err
+		}
+
+		// In order to be sure that a transaction has expired, we must have
+		// all collections locally that the transaction could possibly have
+		// been included in -- otherwise it's possible that the transaction
+		// was included in a collection we just haven't seen yet.
+		//
+		// So - we check that a block has been finalized that expires the
+		// transaction (finalizedHeight-refHeight>EXPIRY) AND we check implicitly
+		// that no collection in the interim contains the transaction
+		// (fullHeight-refHeight>EXPIRY)
+		expiredWRTFinalized := finalizedHeight > refHeight && finalizedHeight-refHeight > flow.DefaultTransactionExpiry
+		expiredWRTFull := fullHeight > refHeight && fullHeight-refHeight > flow.DefaultTransactionExpiry
+
+		if expiredWRTFinalized && expiredWRTFull {
 			return flow.TransactionStatusExpired, err
 		}
 
