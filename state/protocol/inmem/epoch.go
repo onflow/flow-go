@@ -103,7 +103,7 @@ func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 }
 
 func (es *setupEpoch) Clustering() (flow.ClusterList, error) {
-	collectorFilter := filter.And(filter.HasStake(true), filter.HasRole(flow.RoleCollection))
+	collectorFilter := filter.HasRole(flow.RoleCollection)
 	clustering, err := flow.NewClusterList(es.setupEvent.Assignments, es.setupEvent.Participants.Filter(collectorFilter))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate ClusterList from collector identities: %w", err)
