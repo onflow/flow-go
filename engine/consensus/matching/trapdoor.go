@@ -38,7 +38,9 @@ func (td *Trapdoor) Activate() {
 
 func (td *Trapdoor) Pass() {
 	td.cnd.L.Lock()
-	td.cnd.Wait() // only return when awoken by Broadcast or Signal
+	for !td.activated {
+		td.cnd.Wait() // only return when awoken by Broadcast or Signal
+	}
 	td.activated = false
 	td.cnd.L.Unlock()
 }
