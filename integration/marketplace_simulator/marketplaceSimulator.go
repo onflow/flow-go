@@ -602,7 +602,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 		let acct = getAccount(account)
 
-		let collectionRef = acct.getCapability(/public/MomentCollection)
+		let collectionRef = acct.getCapability(/public/ShardedMomentCollection)
 								.borrow<&{TopShot.MomentCollectionPublic}>()!
 
 		log(collectionRef.getIDs())
