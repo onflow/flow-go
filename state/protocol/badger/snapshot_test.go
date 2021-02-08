@@ -387,7 +387,7 @@ func TestQuorumCertificate(t *testing.T) {
 func TestSnapshot_EpochQuery(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	seal, err := rootSnapshot.LatestSeal()
+	_, seal, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
@@ -490,7 +490,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	seal, err := rootSnapshot.LatestSeal()
+	_, seal, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {

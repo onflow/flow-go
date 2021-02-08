@@ -127,13 +127,9 @@ func isValidRootSnapshot(snap protocol.Snapshot) error {
 	if err != nil {
 		return fmt.Errorf("could not get sealing segment: %w", err)
 	}
-	seal, err := snap.LatestSeal()
+	result, seal, err := snap.SealedResult()
 	if err != nil {
-		return fmt.Errorf("could not latest seal: %w", err)
-	}
-	result, err := snap.LatestResult()
-	if err != nil {
-		return fmt.Errorf("could not get latest result: %w", err)
+		return fmt.Errorf("could not latest sealed result: %w", err)
 	}
 
 	if len(segment) == 0 {

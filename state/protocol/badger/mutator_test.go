@@ -62,7 +62,7 @@ func TestBootstrapValid(t *testing.T) {
 		err = db.View(operation.LookupBlockSeal(genesisID, &sealID))
 		require.NoError(t, err)
 
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 		err = db.View(operation.RetrieveSeal(sealID, seal))
 		require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 		finalCommit, err := state.Final().Commit()
 		require.NoError(t, err)
@@ -566,7 +566,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// we should begin the epoch in the staking phase
@@ -766,7 +766,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// add two conflicting blocks for each service event to reference
@@ -859,7 +859,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// add a block for the first seal to reference
@@ -941,7 +941,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// add a block for the first seal to reference
@@ -1088,7 +1088,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// add a block for the first seal to reference
@@ -1223,7 +1223,7 @@ func TestHeaderExtendValid(t *testing.T) {
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		seal, err := rootSnapshot.LatestSeal()
+		_, seal, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		extend := unittest.BlockWithParentFixture(head)

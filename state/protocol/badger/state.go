@@ -99,10 +99,10 @@ func Bootstrap(
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
 
-		// 2) insert the root execution result into the database and index it
-		result, err := root.LatestResult()
+		// 2) insert the root execution result and seal into the database and index it
+		result, seal, err := root.SealedResult()
 		if err != nil {
-			return fmt.Errorf("could not get latest result from root snapshot: %w", err)
+			return fmt.Errorf("could not get sealed result from root snapshot: %w", err)
 		}
 		err = operation.SkipDuplicates(operation.InsertExecutionResult(result))(tx)
 		if err != nil {
@@ -111,12 +111,6 @@ func Bootstrap(
 		err = operation.IndexExecutionResult(result.BlockID, result.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
-		}
-
-		// 3) insert the root block seal into the database and index it
-		seal, err := root.LatestSeal()
-		if err != nil {
-			return fmt.Errorf("could not get latest seal from root snapshot: %w", err)
 		}
 		err = operation.SkipDuplicates(operation.InsertSeal(seal.ID(), seal))(tx)
 		if err != nil {
@@ -127,7 +121,7 @@ func Bootstrap(
 			return fmt.Errorf("could not index root block seal: %w", err)
 		}
 
-		// 4) insert the root quorum certificate into the database
+		// 3) insert the root quorum certificate into the database
 		qc, err := root.QuorumCertificate()
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
@@ -137,7 +131,7 @@ func Bootstrap(
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
 
-		// 5) initialize the current protocol state values
+		// 4) initialize the current protocol state values
 		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
@@ -159,7 +153,7 @@ func Bootstrap(
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		// 6) initialize values related to the epoch logic
+		// 5) initialize values related to the epoch logic
 		err = state.bootstrapEpoch(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)

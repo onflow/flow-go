@@ -42,10 +42,6 @@ func (u *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return nil, nil, u.err
 }
 
-func (u *Snapshot) LatestResult() (*flow.ExecutionResult, error) {
-	return nil, u.err
-}
-
 func (u *Snapshot) SealingSegment() ([]*flow.Block, error) {
 	return nil, u.err
 }
