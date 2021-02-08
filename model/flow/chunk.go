@@ -66,6 +66,7 @@ func (cl ChunkList) Items() []*Chunk {
 	return cl
 }
 
+// Empty returns true if the chunk list is empty. Otherwise it returns false.
 func (cl ChunkList) Empty() bool {
 	return len(cl) == 0
 }
