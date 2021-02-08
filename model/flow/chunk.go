@@ -66,6 +66,10 @@ func (cl ChunkList) Items() []*Chunk {
 	return cl
 }
 
+func (cl ChunkList) Empty() bool {
+	return len(cl) == 0
+}
+
 // ByChecksum returns an entity from the list by entity fingerprint
 func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 	for _, ch := range cl {
