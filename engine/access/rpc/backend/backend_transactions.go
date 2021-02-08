@@ -309,12 +309,12 @@ func (b *backendTransactions) DeriveTransactionStatus(
 }
 
 // isExpired checks whether a transaction is expired given the height of the
-// transaction's reference block and the current height.
-func (b *backendTransactions) isExpired(refHeight, curHeight uint64) bool {
-	if curHeight <= refHeight {
+// transaction's reference block and the height to compare against.
+func (b *backendTransactions) isExpired(refHeight, compareToHeight uint64) bool {
+	if compareToHeight <= refHeight {
 		return false
 	}
-	return curHeight-refHeight > flow.DefaultTransactionExpiry
+	return compareToHeight-refHeight > flow.DefaultTransactionExpiry
 }
 
 func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
