@@ -148,14 +148,23 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	}
 
 	nbaAddress := m.nbaTopshotAccount.Address()
-	// TODO add many plays and add many sets (adds plays to sets)
-	// this adds a play with id 0
-	script := nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
+	numBuckets := 10
+	// setup nba account to use sharded collections
+	script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
+	// TODO add many plays and add many sets (adds plays to sets)
+	// this adds a play with id 0
+	script = nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
+	tx = flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef.ID).
+		SetScript(script)
+
+	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
@@ -224,6 +233,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 		return err
 	}
 	groupSize := 10
+	numBuckets := 10
 	momentCounter := uint64(1)
 	for i := 0; i < len(accounts); i += groupSize {
 		group := accounts[i : i+groupSize]
@@ -236,7 +246,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
-			script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address())
+
+			script := nbaTemplates.GenerateSetupShardedCollectionScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), numBuckets)
 			tx := flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
