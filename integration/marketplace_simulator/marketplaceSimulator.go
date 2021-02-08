@@ -204,10 +204,6 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 			SetScript(script)
 
 		result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
-
-		fmt.Println("2>>e>", err)
-		fmt.Println("2>>r>", result)
-
 		if err != nil || result.Error != nil {
 			m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
 			return err
@@ -252,8 +248,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// TODO RAMTIN switch me with GenerateFulfillPackScript
 			//  transfer some moments
 			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
-			script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
-			// script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
 			tx = flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
@@ -565,6 +561,8 @@ func (m *marketPlaceAccount) Act() {
 	// nbaTemplates.GenerateTransferMomentScript(nbaTopshotAddress, nbaTopshotAddress, recipientAddr flow.Address, tokenID int)
 
 	// with some chance don't do anything
+
+	// query for active listings to buy
 
 	// // randomly select one or two friend and send assets
 	// assets := m.GetAssets()
