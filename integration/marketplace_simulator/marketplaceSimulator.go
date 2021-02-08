@@ -283,9 +283,6 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// fmt.Println(">>r>", result)
 			// totalMinted += batchSize
 
-			// get moments
-			ma.GetMoments()
-
 			//  transfer some moments
 			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
 			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
@@ -299,6 +296,9 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			fmt.Println("2>>e>", err)
 			fmt.Println("2>>r>", result)
 			momentCounter += 5
+
+			// get moments
+			ma.GetMoments()
 		}
 	}
 
@@ -604,8 +604,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 		let acct = getAccount(account)
 
-		let collectionRef = acct.getCapability(/public/MomentCollection)
-								.borrow<&{TopShot.MomentCollectionPublic}>()!
+		let collectionRef = acct.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
 
 		log(collectionRef.getIDs())
 
