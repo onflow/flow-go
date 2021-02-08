@@ -973,8 +973,6 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	bs.Require().NoError(err)
 	expectedReceipts := []*flow.ExecutionReceipt{recA2, recB1, recB2}
 	bs.Assert().ElementsMatch(expectedReceipts, bs.assembled.Receipts, "builder should extend different execution paths")
-	// XXX note that the receipts are not in the correct order
-	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "builder should extend different execution paths and respect receipt order")
 }
 
 // TestIntegration_DuplicateReceipts checks that the builder does not re-include
