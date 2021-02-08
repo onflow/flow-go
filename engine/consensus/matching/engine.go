@@ -133,26 +133,28 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
 // Should be run as a separate goroutine.
 func (e *Engine) processEvents() {
-	fetchEvent := func(queue *deque.Deque, sink EventSink) (*Event, EventSink) {
-		event, ok := queue.PopFront()
-		if !ok {
-			return nil, nil
+	// takes pending event from one of the queues
+	// nil sink means nothing to send, this prevents blocking on select
+	fetchEvent := func() (*Event, EventSink, *deque.Deque) {
+		if val, ok := e.pendingReceipts.Front(); ok {
+			return val.(*Event), e.receiptSink, &e.pendingReceipts
 		}
-		return event.(*Event), sink
+		if val, ok := e.pendingApprovals.Front(); ok {
+			return val.(*Event), e.approvalSink, &e.pendingApprovals
+		}
+		if val, ok := e.pendingApprovalResponses.Front(); ok {
+			return val.(*Event), e.approvalResponseSink, &e.pendingApprovalResponses
+		}
+		return nil, nil, nil
 	}
 
 	for {
-		pendingReceipt, receiptSink := fetchEvent(&e.pendingReceipts, e.receiptSink)
-		pendingApproval, approvalSink := fetchEvent(&e.pendingApprovals, e.approvalSink)
-		pendingApprovalResponse, approvalResponseSink := fetchEvent(&e.pendingApprovalResponses, e.approvalResponseSink)
+		pendingEvent, sink, fifo := fetchEvent()
 		select {
 		case event := <-e.pendingEventSink:
 			e.processPendingEvent(event)
-		case receiptSink <- pendingReceipt:
-			continue
-		case approvalSink <- pendingApproval:
-			continue
-		case approvalResponseSink <- pendingApprovalResponse:
+		case sink <- pendingEvent:
+			fifo.PopFront()
 			continue
 		case <-e.unit.Quit():
 			return
