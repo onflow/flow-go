@@ -32,7 +32,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		expected.Receipts = make([]*flow.ExecutionReceipt, 0)
 
 		// store payload
-		err := store.Store(blockID, expected)
+		err := store.Store(blockID, &expected)
 		require.NoError(t, err)
 
 		// fetch payload

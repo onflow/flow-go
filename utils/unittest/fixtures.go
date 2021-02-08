@@ -166,28 +166,39 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 	}
 }
 
-func PayloadFixture(options ...func(*flow.Payload)) *flow.Payload {
-	payload := flow.Payload{
-		Guarantees: CollectionGuaranteesFixture(16),
-		Seals:      Seal.Fixtures(16),
-	}
+func ReceiptAndSealForBlock(block *flow.Block) (*flow.ExecutionReceipt, *flow.Seal) {
+	receipt := ReceiptForBlockFixture(block)
+	seal := Seal.Fixture(Seal.WithBlock(block.Header), Seal.WithResult(&receipt.ExecutionResult))
+	return receipt, seal
+}
+
+func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
+	payload := flow.EmptyPayload()
 	for _, option := range options {
 		option(&payload)
 	}
-	return &payload
+	return payload
 }
 
-func WithoutSeals(payload *flow.Payload) {
-	payload.Seals = nil
+func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.Seals = append(payload.Seals, seals...)
+	}
+}
+
+func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.Receipts = append(payload.Receipts, receipts...)
+	}
 }
 
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
-	payload := PayloadFixture(WithoutSeals)
+	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  &header,
-		Payload: payload,
+		Payload: &payload,
 	}
 }
 
@@ -229,7 +240,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
 		Header:  &header,
-		Payload: payload,
+		Payload: &payload,
 	}
 
 	var stateInteractions []*delta.Snapshot

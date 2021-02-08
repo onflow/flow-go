@@ -269,20 +269,72 @@ func TestLatestSealedResult(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
 	t.Run("root snapshot", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			gotResult, gotSeal, err := state.Final().SealedResult()
+			require.NoError(t, err)
+			expectedResult, expectedSeal, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
 
+			assert.Equal(t, expectedResult, gotResult)
+			assert.Equal(t, expectedSeal, gotSeal)
+		})
 	})
 
 	t.Run("non-root snapshot", func(t *testing.T) {
-		t.Run("reference block contains seal", func(t *testing.T) {
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
 
-		})
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			block1 := unittest.BlockWithParentFixture(head)
+			err = state.Extend(&block1)
+			require.NoError(t, err)
 
-		t.Run("reference block contains no seal", func(t *testing.T) {
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
+			err = state.Extend(&block2)
+			require.NoError(t, err)
 
-		})
+			// B1 <- B2(R1,S1)
+			// querying B2 should return result R1, seal S1
+			t.Run("reference block contains seal", func(t *testing.T) {
+				gotResult, gotSeal, err := state.AtBlockID(block2.ID()).SealedResult()
+				require.NoError(t, err)
+				assert.Equal(t, &block2.Payload.Receipts[0].ExecutionResult, gotResult)
+				assert.Equal(t, block2.Payload.Seals[0], gotSeal)
+			})
 
-		t.Run("reference block contains multiple seals", func(t *testing.T) {
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			err = state.Extend(&block3)
+			require.NoError(t, err)
 
+			// B1 <- B2(R1,S1) <- B3
+			// querying B3 should still return (R1,S1) even though they are in parent block
+			t.Run("reference block contains no seal", func(t *testing.T) {
+				gotResult, gotSeal, err := state.AtBlockID(block2.ID()).SealedResult()
+				require.NoError(t, err)
+				assert.Equal(t, &receipt1.ExecutionResult, gotResult)
+				assert.Equal(t, seal1, gotSeal)
+			})
+
+			// B1 <- B2(R1,S1) <- B3 <- B4(R2,S2,R3,S3)
+			// There are two seals in B4 - should return latest by height (S3,R3)
+			t.Run("reference block contains multiple seals", func(t *testing.T) {
+				receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
+				receipt3, seal3 := unittest.ReceiptAndSealForBlock(&block3)
+				block4 := unittest.BlockWithParentFixture(block3.Header)
+				block4.SetPayload(unittest.PayloadFixture(
+					unittest.WithReceipts(receipt2, receipt3),
+					unittest.WithSeals(seal2, seal3),
+				))
+				err = state.Extend(&block4)
+				require.NoError(t, err)
+
+				gotResult, gotSeal, err := state.AtBlockID(block4.ID()).SealedResult()
+				require.NoError(t, err)
+				assert.Equal(t, &receipt3.ExecutionResult, gotResult)
+				assert.Equal(t, seal3, gotSeal)
+			})
 		})
 	})
 }
