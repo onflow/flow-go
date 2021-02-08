@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 	"time"
 
@@ -288,7 +289,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			//  transfer some moments
 			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
 			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
-			script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			// script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
+			script = generateBatchTransferMomentScript(m.nbaTopshotAccount.Address(), m.nbaTopshotAccount.Address(), ma.Account().Address(), moments)
 			tx = flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
@@ -602,7 +604,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 		let acct = getAccount(account)
 
-		let collectionRef = acct.getCapability(/public/ShardedMomentCollection)
+		let collectionRef = acct.getCapability(/public/MomentCollection)
 								.borrow<&{TopShot.MomentCollectionPublic}>()!
 
 		log(collectionRef.getIDs())
@@ -700,4 +702,42 @@ func (m *marketPlaceAccount) Act() {
 	// wg.Wait()
 
 	// return
+}
+
+func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
+	template := `
+		import NonFungibleToken from 0x%s
+		import TopShot from 0x%s
+		transaction {
+			let transferTokens: @NonFungibleToken.Collection
+			
+			prepare(acct: AuthAccount) {
+				let momentIDs = [%s]
+		
+				self.transferTokens <- acct.borrow<&TopShot.Collection>(from: /storage/MomentCollection)!.batchWithdraw(ids: momentIDs)
+			}
+		
+			execute {
+				// get the recipient's public account object
+				let recipient = getAccount(0x%s)
+		
+				// get the Collection reference for the receiver
+				let receiverRef = recipient.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
+		
+				// deposit the NFT in the receivers collection
+				receiverRef.batchDeposit(tokens: <-self.transferTokens)
+			}
+		}`
+
+	// Stringify moment IDs
+	momentIDList := ""
+	for _, momentID := range momentIDs {
+		id := strconv.Itoa(int(momentID))
+		momentIDList = momentIDList + `UInt64(` + id + `), `
+	}
+	// Remove comma and space from last entry
+	if idListLen := len(momentIDList); idListLen > 2 {
+		momentIDList = momentIDList[:len(momentIDList)-2]
+	}
+	return []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
 }
