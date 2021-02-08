@@ -280,43 +280,49 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 	return true, nil
 }
 
-// onResultProcessed is called whenever a result is processed completely and
+// onResultProcessedWithTracing is called whenever a result is processed completely and
 // is passed to the match engine. It marks the result as processed, and removes
 // all receipts with the same result from mempool.
-func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier) {
+func (e *Engine) onResultProcessedWithTracing(ctx context.Context, resultID flow.Identifier) {
 	e.tracer.WithSpanFromContext(ctx, trace.VERFindOnResultProcessed, func() {
-		log := e.log.With().
-			Hex("result_id", logging.ID(resultID)).
-			Logger()
+		e.onResultProcessed(resultID)
+	})
+}
 
-		// marks result as processed
-		added := e.processedResultIDs.Add(resultID)
-		if added {
-			log.Debug().Msg("result marked as processed")
-		}
+// onResultProcessed marks the result as processed, and removes
+// all receipts with the same result from mempool.
+func (e *Engine) onResultProcessed(resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Logger()
 
-		// extracts all receipt ids with this result
-		receiptIDs, ok := e.receiptIDsByResult.Get(resultID)
-		if !ok {
-			log.Debug().Msg("could not retrieve receipt ids associated with this result")
-		}
+	// marks result as processed
+	added := e.processedResultIDs.Add(resultID)
+	if added {
+		log.Debug().Msg("result marked as processed")
+	}
 
-		// removes indices of all receipts associated with processed result
-		removed := e.receiptIDsByResult.Rem(resultID)
+	// extracts all receipt ids with this result
+	receiptIDs, ok := e.receiptIDsByResult.Get(resultID)
+	if !ok {
+		log.Debug().Msg("could not retrieve receipt ids associated with this result")
+	}
+
+	// removes indices of all receipts associated with processed result
+	removed := e.receiptIDsByResult.Rem(resultID)
+	log.Debug().
+		Bool("removed", removed).
+		Msg("removes processed result id from receipt-ids-by-result")
+
+	// drops all receipts with the same result
+	for _, receiptID := range receiptIDs {
+		// removes receipt from mempool
+		removed := e.readyReceipts.Rem(receiptID)
 		log.Debug().
 			Bool("removed", removed).
-			Msg("removes processed result id from receipt-ids-by-result")
-
-		// drops all receipts with the same result
-		for _, receiptID := range receiptIDs {
-			// removes receipt from mempool
-			removed := e.readyReceipts.Rem(receiptID)
-			log.Debug().
-				Bool("removed", removed).
-				Hex("receipt_id", logging.ID(receiptID)).
-				Msg("removes receipt with process result")
-		}
-	})
+			Hex("receipt_id", logging.ID(receiptID)).
+			Msg("removes receipt with process result")
+	}
 }
 
 // checkCachedReceiptsWithTracing iterates over the newly cached receipts and moves them
@@ -606,7 +612,7 @@ func (e *Engine) checkReadyReceipt(rdp *verification.ReceiptDataPack) {
 	}
 
 	// performs clean up
-	e.onResultProcessed(rdp.Ctx, resultID)
+	e.onResultProcessedWithTracing(rdp.Ctx, resultID)
 
 	e.log.Debug().
 		Hex("receipt_id", logging.ID(receiptID)).
