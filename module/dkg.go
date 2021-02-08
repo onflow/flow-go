@@ -1,3 +1,5 @@
+// +build relic
+
 package module
 
 import (
@@ -9,8 +11,6 @@ import (
 // DKGContractClient enables interacting with the DKG smart contract. This
 // contract is deployed to the service account as part of a collection of
 // smart contracts that facilitate and manage epoch transitions.
-//
-// TODO type for DKGResult? - should be all participant public keys plus group public key
 type DKGContractClient interface {
 
 	// Broadcast broadcasts a message to all other nodes participating in the
@@ -37,5 +37,50 @@ type DKGContractClient interface {
 	// DKG participant and the group public key.
 	//
 	// SubmitResult must be called strictly after the final phase has ended.
+	SubmitResult([]crypto.PublicKey) error
+}
+
+// DKGController controls the execution of a Joint Feldman DKG instance.
+type DKGController interface {
+
+	// Run starts the DKG controller. It is a blocking call that blocks until
+	// the controller is shutdown or until an error is encountered in one of the
+	// protocol phases.
+	Run() error
+
+	// EndPhase0 notifies the controller to end phase 0, and start phase 1.
+	EndPhase0() error
+
+	// EndPhase1 notifies the controller to end phase 1, and start phase 2.
+	EndPhase1() error
+
+	// End terminates the DKG state machine and records the artifacts.
+	End() error
+
+	// Shutdown stops the controller regardless of the current state.
+	Shutdown()
+
+	// GetArtifacts returns the private and public shares, as well as the set of
+	// public keys computed by DKG.
+	GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey)
+}
+
+// DKGBroker extends the crypto.DKGProcessor interface with methods that enable
+// a controller to use the underlying message channel and actively fetch new DKG
+// broadcast messages.
+type DKGBroker interface {
+	crypto.DKGProcessor
+
+	// GetMsgCh returns the channel through which a user of the DKGBroker (ex
+	// DKGController) can receive incoming DKGMessages (private and broadcast).
+	GetMsgCh() chan messages.DKGMessage
+
+	// Poll instructs the broker to actively fetch broadcast messages (ex. read
+	// from DKG smart contract). The messages will be forwarded through the
+	// broker's message channel (cf. GetMsgCh).
+	Poll(referenceBlock flow.Identifier) error
+
+	// SubmitResult instructs the broker to publish the results of the DKG run
+	// (ex. publish to DKG smart contract).
 	SubmitResult([]crypto.PublicKey) error
 }

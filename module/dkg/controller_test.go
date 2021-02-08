@@ -1,4 +1,4 @@
-package controller
+package dkg
 
 import (
 	"crypto/rand"
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	msg "github.com/onflow/flow-go/model/messages"
 )
 
@@ -86,44 +87,60 @@ func (n *node) run() error {
 	}
 }
 
-// processor is an implementation of DKGProcessor that enables nodes to exchange
-// private and public messages.
-type processor struct {
+// broker is a test implementation of DKGBroker that enables nodes to exchange
+// private and public messages through a shared set of channels.
+type broker struct {
 	id            int
 	channels      []chan msg.DKGMessage
 	logger        zerolog.Logger
 	dkgInstanceID string
 }
 
-func (proc *processor) PrivateSend(dest int, data []byte) {
-	proc.channels[dest] <- msg.NewDKGMessage(
-		proc.id,
+// PrivateSend implements the crypto.DKGProcessor interface.
+func (b *broker) PrivateSend(dest int, data []byte) {
+	b.channels[dest] <- msg.NewDKGMessage(
+		b.id,
 		data,
-		proc.dkgInstanceID)
+		b.dkgInstanceID)
 }
 
+// Broadcast implements the crypto.DKGProcessor interface.
+//
 // ATTENTION: Normally the processor requires Broadcast to provide guaranteed
 // delivery (either all nodes receive the message or none of them receive it).
 // Here we are just assuming that with a long enough duration for phases 1 and
 // 2, all nodes are guaranteed to see everyone's messages. So it is important
 // to set timeouts carefully in the tests.
-func (proc *processor) Broadcast(data []byte) {
-	for i := 0; i < len(proc.channels); i++ {
-		if i == proc.id {
+func (b *broker) Broadcast(data []byte) {
+	for i := 0; i < len(b.channels); i++ {
+		if i == b.id {
 			continue
 		}
 		// epoch and phase are not relevant at the controller level
-		proc.channels[i] <- msg.NewDKGMessage(proc.id, data, proc.dkgInstanceID)
+		b.channels[i] <- msg.NewDKGMessage(b.id, data, b.dkgInstanceID)
 	}
 }
 
-func (proc *processor) Disqualify(node int, log string) {
-	proc.logger.Debug().Msgf("node %d disqualified node %d: %s", proc.id, node, log)
+// Disqulify implements the crypto.DKGProcessor interface.
+func (b *broker) Disqualify(node int, log string) {
+	b.logger.Debug().Msgf("node %d disqualified node %d: %s", b.id, node, log)
 }
 
-func (proc *processor) FlagMisbehavior(node int, logData string) {
-	proc.logger.Debug().Msgf("node %d flagged node %d: %s", proc.id, node, logData)
+// FlagMisbehavior implements the crypto.DKGProcessor interface.
+func (b *broker) FlagMisbehavior(node int, logData string) {
+	b.logger.Debug().Msgf("node %d flagged node %d: %s", b.id, node, logData)
 }
+
+// GetMsgCh implements the DKGBroker interface.
+func (b *broker) GetMsgCh() chan msg.DKGMessage {
+	return b.channels[b.id]
+}
+
+// Poll implements the DKGBroker interface.
+func (b *broker) Poll(referenceBlock flow.Identifier) error { return nil }
+
+// SubmitResult implements the DKGBroker interface.
+func (b *broker) SubmitResult([]crypto.PublicKey) error { return nil }
 
 type testCase struct {
 	totalNodes     int
@@ -140,9 +157,9 @@ func TestDKGHappyPath(t *testing.T) {
 	// sent during phase 1 and 2, all messaging is done in phase 0. So we can
 	// can set shorter durations for phase 1 and 2..
 	testCases := []testCase{
-		testCase{totalNodes: 5, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
-		testCase{totalNodes: 10, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
-		testCase{totalNodes: 15, phase0Duration: 5 * time.Second, phase1Duration: 2 * time.Second, phase2Duration: 2 * time.Second},
+		{totalNodes: 5, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
+		{totalNodes: 10, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
+		{totalNodes: 15, phase0Duration: 5 * time.Second, phase1Duration: 2 * time.Second, phase2Duration: 2 * time.Second},
 	}
 
 	// run each test case
@@ -207,28 +224,29 @@ func initNodes(t *testing.T, n int, phase0Duration, phase1Duration, phase2Durati
 
 	// Setup
 	for i := 0; i < n; i++ {
-		seed := make([]byte, 20)
-		_, _ = rand.Read(seed)
-
 		logger := zerolog.New(os.Stderr).With().Int("id", i).Logger()
 
-		processor := &processor{
+		broker := &broker{
 			id:       i,
 			channels: channels,
 			logger:   logger,
 		}
 
-		dkg, err := crypto.NewJointFeldman(n, optimalThreshold(n), i, processor)
+		seed := make([]byte, 20)
+		_, _ = rand.Read(seed)
+
+		dkg, err := crypto.NewJointFeldman(n, optimalThreshold(n), i, broker)
 		require.NoError(t, err)
 
 		controller := NewController(
+			logger,
+			"dkg_test",
 			dkg,
 			seed,
-			channels[i],
-			logger)
+			broker)
+		require.NoError(t, err)
 
 		node := newNode(i, controller, phase0Duration, phase1Duration, phase2Duration)
-
 		nodes = append(nodes, node)
 	}
 
@@ -262,35 +280,30 @@ func wait(t *testing.T, nodes []*node, timeout time.Duration) {
 
 // Check that all nodes have produced the same set of public keys
 func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
-	for i := 1; i < len(nodes); i++ {
-		require.NotEmpty(t, nodes[i].controller.privateShare)
-		require.NotEmpty(t, nodes[i].controller.groupPublicKey)
+	_, refGroupPublicKey, refPublicKeys := nodes[0].controller.GetArtifacts()
 
-		require.True(t, nodes[0].controller.groupPublicKey.Equals(nodes[i].controller.groupPublicKey),
+	for i := 1; i < len(nodes); i++ {
+		privateShare, groupPublicKey, publicKeys := nodes[i].controller.GetArtifacts()
+
+		require.NotEmpty(t, privateShare)
+		require.NotEmpty(t, groupPublicKey)
+
+		require.True(t, refGroupPublicKey.Equals(groupPublicKey),
 			"node %d has a different groupPubKey than node 0: %s %s",
 			i,
-			nodes[i].controller.groupPublicKey,
-			nodes[0].controller.groupPublicKey)
+			groupPublicKey,
+			refGroupPublicKey)
 
-		require.Len(t, nodes[i].controller.publicKeys, totalNodes)
+		require.Len(t, publicKeys, totalNodes)
 
 		for j := 0; j < totalNodes; j++ {
-			if !nodes[0].controller.publicKeys[j].Equals(nodes[i].controller.publicKeys[j]) {
+			if !refPublicKeys[j].Equals(publicKeys[j]) {
 				t.Fatalf("node %d has a different pubs[%d] than node 0: %s, %s",
 					i,
 					j,
-					nodes[0].controller.publicKeys[j],
-					nodes[i].controller.publicKeys[j])
+					refPublicKeys[j],
+					publicKeys[j])
 			}
 		}
-
 	}
-}
-
-// optimal threshold (t) to allow the largest number of malicious nodes (m)
-// assuming the protocol requires:
-//   m<=t for unforgeability
-//   n-m>=t+1 for robustness
-func optimalThreshold(size int) int {
-	return (size - 1) / 2
 }
