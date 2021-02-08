@@ -576,8 +576,8 @@ func (e *Engine) checkPendingReceipts() {
 	}
 }
 
-// checkReadyReceipts iterates over receipts ready for process and processes them.
-func (e *Engine) checkReadyReceipts() {
+// checkReadyReceiptsWithTracing iterates over receipts ready for process and processes them.
+func (e *Engine) checkReadyReceiptsWithTracing() {
 	for _, rdp := range e.readyReceipts.All() {
 		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckReadyReceipts, func() {
 			e.checkReadyReceipt(rdp)
@@ -585,7 +585,7 @@ func (e *Engine) checkReadyReceipts() {
 	}
 }
 
-// checkReadyReceipts iterates over receipts ready for process and processes them.
+// checkReadyReceipt iterates over receipts ready for process and processes them.
 func (e *Engine) checkReadyReceipt(rdp *verification.ReceiptDataPack) {
 	receiptID := rdp.Receipt.ID()
 	resultID := rdp.Receipt.ExecutionResult.ID()
@@ -635,7 +635,7 @@ func (e *Engine) onTimer() {
 
 	// processes ready receipts
 	go func() {
-		e.checkReadyReceipts()
+		e.checkReadyReceiptsWithTracing()
 		wg.Done()
 	}()
 
