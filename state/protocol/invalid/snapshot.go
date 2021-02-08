@@ -38,8 +38,8 @@ func (u *Snapshot) Commit() (flow.StateCommitment, error) {
 	return nil, u.err
 }
 
-func (u *Snapshot) LatestSeal() (*flow.Seal, error) {
-	return nil, u.err
+func (u *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
+	return nil, nil, u.err
 }
 
 func (u *Snapshot) LatestResult() (*flow.ExecutionResult, error) {

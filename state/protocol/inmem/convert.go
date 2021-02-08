@@ -30,13 +30,9 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
-	snap.LatestSeal, err = from.LatestSeal()
+	snap.LatestResult, snap.LatestSeal, err = from.SealedResult()
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal: %w", err)
-	}
-	snap.LatestResult, err = from.LatestResult()
-	if err != nil {
-		return nil, fmt.Errorf("could not get result: %w", err)
 	}
 	snap.SealingSegment, err = from.SealingSegment()
 	if err != nil {

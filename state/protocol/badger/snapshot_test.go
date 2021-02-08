@@ -264,7 +264,7 @@ func TestSealingSegment(t *testing.T) {
 	})
 }
 
-func TestLatestResultAndSeal(t *testing.T) {
+func TestLatestSealedResult(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
