@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ef-ds/deque"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -18,11 +17,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type Event struct {
-	OriginID flow.Identifier
-	Msg      interface{}
-}
-
 // defaultReceiptQueueCapacity maximum capacity of receipts queue
 const defaultReceiptQueueCapacity = 10000
 
@@ -31,10 +25,6 @@ const defaultApprovalQueueCapacity = 10000
 
 // defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
 const defaultApprovalResponseQueueCapacity = 10000
-
-type (
-	EventSink chan *Event // Channel to push pending events
-)
 
 // Engine is a wrapper for matching `Core` which implements logic for
 // queuing and filtering network messages which later will be processed by matching engine.
@@ -47,14 +37,13 @@ type Engine struct {
 	core                                 *Core
 	cacheMetrics                         module.MempoolMetrics
 	engineMetrics                        module.EngineMetrics
-	receiptSink                          EventSink
-	approvalSink                         EventSink
-	approvalResponseSink                 EventSink
-	pendingReceipts                      deque.Deque
-	pendingApprovals                     deque.Deque
-	pendingApprovalResponses             deque.Deque
-	pendingEventSink                     EventSink
 	requiredApprovalsForSealConstruction uint
+
+	// channels for inbound messages
+	trapdoor           Trapdoor // trapdoor is used for suspending worker thread
+	pendingReceipts    *FifoQueue
+	pendingApprovals   *FifoQueue
+	requestedApprovals *FifoQueue
 }
 
 // NewEngine constructs new `EngineEngine` which runs on it's own unit.
@@ -85,15 +74,40 @@ func NewEngine(log zerolog.Logger,
 		core:                                 nil,
 		engineMetrics:                        engineMetrics,
 		cacheMetrics:                         mempool,
-		receiptSink:                          make(EventSink),
-		approvalSink:                         make(EventSink),
-		approvalResponseSink:                 make(EventSink),
-		pendingEventSink:                     make(EventSink),
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
+		trapdoor:                             NewTrapdoor(false),
+	}
+
+	// FiFo queue for inbound receipts
+	var err error
+	e.pendingReceipts, err = NewFifoQueue(
+		WithCapacity(defaultReceiptQueueCapacity),
+		WithLenMetric(func(len int) { mempool.MempoolEntries(metrics.ResourceReceiptQueue, uint(len)) }),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
+	}
+
+	// FiFo queue for broadcasted approvals
+	e.pendingApprovals, err = NewFifoQueue(
+		WithCapacity(defaultApprovalQueueCapacity),
+		WithLenMetric(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
+	}
+
+	// FiFo queue for requested approvals
+	e.requestedApprovals, err = NewFifoQueue(
+		WithCapacity(defaultApprovalResponseQueueCapacity),
+		WithLenMetric(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalResponseQueue, uint(len)) }),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for requested approvals: %w", err)
 	}
 
 	// register engine with the receipt provider
-	_, err := net.Register(engine.ReceiveReceipts, e)
+	_, err = net.Register(engine.ReceiveReceipts, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
@@ -121,77 +135,26 @@ func NewEngine(log zerolog.Logger,
 }
 
 // Process sends event into channel with pending events. Generally speaking shouldn't lock for too long.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	e.pendingEventSink <- &Event{
-		OriginID: originID,
-		Msg:      event,
-	}
-	return nil
-}
-
-// processEvents is processor of pending events which drives events from networking layer to business logic in `Core`.
-// Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
-// Should be run as a separate goroutine.
-func (e *Engine) processEvents() {
-	fetchEvent := func(queue *deque.Deque, sink EventSink) (*Event, EventSink) {
-		event, ok := queue.PopFront()
-		if !ok {
-			return nil, nil
-		}
-		return event.(*Event), sink
-	}
-
-	for {
-		pendingReceipt, receiptSink := fetchEvent(&e.pendingReceipts, e.receiptSink)
-		pendingApproval, approvalSink := fetchEvent(&e.pendingApprovals, e.approvalSink)
-		pendingApprovalResponse, approvalResponseSink := fetchEvent(&e.pendingApprovalResponses, e.approvalResponseSink)
-		select {
-		case event := <-e.pendingEventSink:
-			e.processPendingEvent(event)
-		case receiptSink <- pendingReceipt:
-			continue
-		case approvalSink <- pendingApproval:
-			continue
-		case approvalResponseSink <- pendingApprovalResponse:
-			continue
-		case <-e.unit.Quit():
-			return
-		}
-	}
-}
-
-// processPendingEvent saves pending event in corresponding queue for further processing by `Core`.
-// While this function runs in separate goroutine it shouldn't do heavy processing to maintain efficient data polling/pushing.
-func (e *Engine) processPendingEvent(event *Event) {
-	switch event.Msg.(type) {
+func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
+	switch message.(type) {
 	case *flow.ExecutionReceipt:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		if e.pendingReceipts.Len() < defaultReceiptQueueCapacity {
-			e.pendingReceipts.PushBack(event)
-		}
-		e.cacheMetrics.MempoolEntries(metrics.ResourceReceiptQueue, uint(e.pendingReceipts.Len()))
+		e.pendingReceipts.Push(originID, message)
 	case *flow.ResultApproval:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
 		if e.requiredApprovalsForSealConstruction < 1 {
-			// if we don't require approvals to construct a seal, don't even process approvals.
-			return
+			return nil // drop approvals, if we don't require them to construct seals
 		}
-		if e.pendingApprovals.Len() < defaultApprovalQueueCapacity {
-			e.pendingApprovals.PushBack(event)
-		}
-		e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalQueue, uint(e.pendingApprovals.Len()))
+		e.pendingApprovals.Push(originID, message)
 	case *messages.ApprovalResponse:
 		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
 		if e.requiredApprovalsForSealConstruction < 1 {
-			// if we don't require approvals to construct a seal, don't even process approvals.
-			return
+			return nil // drop approvals, if we don't require them to construct seals
 		}
-		if e.pendingApprovalResponses.Len() < defaultApprovalResponseQueueCapacity {
-			e.pendingApprovalResponses.PushBack(event)
-		}
-		e.cacheMetrics.MempoolEntries(metrics.ResourceApprovalResponseQueue,
-			uint(e.pendingApprovalResponses.Len()))
+		e.requestedApprovals.Push(originID, message)
 	}
+	e.trapdoor.Activate()
+	return nil
 }
 
 // consumeEvents consumes events that are ready to be processed.
@@ -207,52 +170,82 @@ func (e *Engine) consumeEvents() {
 	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
 	checkSealingTicker := make(chan struct{})
 	defer close(checkSealingTicker)
-	e.unit.LaunchPeriodically(func() {
-		checkSealingTicker <- struct{}{}
-	}, 2*time.Second, 120*time.Second)
+	e.unit.LaunchPeriodically(
+		func() {
+			checkSealingTicker <- struct{}{}
+			e.trapdoor.Activate()
+		},
+		2*time.Second, 120*time.Second,
+	)
 
 	for {
-		select {
-		case event := <-e.receiptSink:
-			e.consumeSingleEvent(event)
-		case event := <-e.approvalSink:
-			e.consumeSingleEvent(event)
-		case event := <-e.approvalResponseSink:
-			e.consumeSingleEvent(event)
-		case <-checkSealingTicker:
-			e.core.checkSealing()
-		case <-e.unit.Quit():
-			return
+		checkForInputs := true
+		for checkForInputs {
+			// check if engine was terminated first
+			select {
+			case <-e.unit.Quit():
+				return
+			default: // fall through
+			}
+
+			select {
+			case <-checkSealingTicker:
+				e.core.checkSealing()
+			default: // fall through to process events
+			}
+
+			checkForInputs = e.processNextEvent()
 		}
+
+		e.trapdoor.Pass()
 	}
 }
 
-// consumeSingleEvent processes single event for the propagation engine on the consensus node.
-func (e *Engine) consumeSingleEvent(pendingEvent *Event) {
-	var err error
-	switch event := pendingEvent.Msg.(type) {
-	case *flow.ExecutionReceipt:
-		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		err = e.core.onReceipt(pendingEvent.OriginID, event)
-	case *flow.ResultApproval:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		err = e.core.onApproval(pendingEvent.OriginID, event)
-	case *messages.ApprovalResponse:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		defer e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		err = e.core.onApproval(pendingEvent.OriginID, &event.Approval)
-	default:
-		err = fmt.Errorf("invalid event type (%T)", pendingEvent.Msg)
+func (e *Engine) processNextEvent() bool {
+	originID, message, ok := e.pendingReceipts.Pop()
+	if ok {
+		err := e.core.onReceipt(originID, message.(*flow.ExecutionReceipt))
+		if err != nil {
+			// TODO: we probably want to check the type of the error here
+			// * If the message was invalid (e.g. NewInvalidInputError), which is expected as part
+			//   of normal operations in an untrusted environment, we can just log an error.
+			// * However, if we receive an error indicating internal node failure or state
+			//   internal state corruption, we should probably crash the node.
+			e.log.Error().Err(err).Hex("origin", originID[:]).Msgf("could not process receipt")
+		}
+		return true
 	}
-	if err != nil {
-		// TODO: we probably want to check the type of the error here
-		// * If the message was invalid (e.g. NewInvalidInputError), which is expected as part
-		//   of normal operations in an untrusted environment, we can just log an error.
-		// * However, if we receive an error indicating internal node failure or state
-		//   internal state corruption, we should probably crash the node.
-		e.log.Error().Err(err).Hex("origin", pendingEvent.OriginID[:]).Msgf("could not process event")
+
+	originID, message, ok = e.requestedApprovals.Pop()
+	if ok {
+		reqApproval := message.(*messages.ApprovalResponse)
+		err := e.core.onApproval(originID, &reqApproval.Approval)
+		if err != nil {
+			// TODO: we probably want to check the type of the error here
+			// * If the message was invalid (e.g. NewInvalidInputError), which is expected as part
+			//   of normal operations in an untrusted environment, we can just log an error.
+			// * However, if we receive an error indicating internal node failure or state
+			//   internal state corruption, we should probably crash the node.
+			e.log.Error().Err(err).Hex("origin", originID[:]).Msgf("could not process approval")
+		}
+		return true
 	}
+
+	originID, message, ok = e.pendingApprovals.Pop()
+	if ok {
+		err := e.core.onApproval(originID, message.(*flow.ResultApproval))
+		if err != nil {
+			// TODO: we probably want to check the type of the error here
+			// * If the message was invalid (e.g. NewInvalidInputError), which is expected as part
+			//   of normal operations in an untrusted environment, we can just log an error.
+			// * However, if we receive an error indicating internal node failure or state
+			//   internal state corruption, we should probably crash the node.
+			e.log.Error().Err(err).Hex("origin", originID[:]).Msgf("could not process approval")
+		}
+		return true
+	}
+
+	return false
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -292,11 +285,7 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
 	var wg sync.WaitGroup
-	wg.Add(2)
-	e.unit.Launch(func() {
-		wg.Done()
-		e.processEvents()
-	})
+	wg.Add(1)
 	e.unit.Launch(func() {
 		wg.Done()
 		e.consumeEvents()
