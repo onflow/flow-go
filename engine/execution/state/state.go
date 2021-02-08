@@ -446,6 +446,7 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		return fmt.Errorf("batch flush error: %w", err)
 	}
 
+	//outside batch because it requires read access
 	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
 	if err != nil {
 		return fmt.Errorf("cannot update highest executed block: %w", err)

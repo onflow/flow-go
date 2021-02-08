@@ -1082,21 +1082,11 @@ func (e *Engine) saveExecutionResults(ctx context.Context, executableBlock *enti
 
 		chdp := generateChunkDataPack(chunk, collectionID, proof)
 
-		//err = e.execState.PersistChunkDataPack(childCtx, chdp)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
-		//}
-
 		chdps[i] = chdp
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
 	}
-
-	//err := e.execState.PersistStateCommitment(childCtx, blockID, endState)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to store state commitment: %w", err)
-	//}
 
 	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState, serviceEvents)
 	if err != nil {
@@ -1108,62 +1098,10 @@ func (e *Engine) saveExecutionResults(ctx context.Context, executableBlock *enti
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	//err = e.execState.PersistExecutionResult(childCtx, executionResult)
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not persist execution result: %w", err)
-	//}
-
-	// not update the highest executed until the result and receipts are saved.
-	//// TODO: better to save result, receipt and the latest height in one transaction
-	//err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to update highest executed block: %w", err)
-	//}
-
-	//err = func() error {
-	//	span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
-	//	defer span.Finish()
-	//
-	//	// store events 1K in each batch
-	//	chunkSize := uint(1000)
-	//	eventChunks := ChunkifyEvents(events, chunkSize)
-	//	for _, ch := range eventChunks {
-	//		err = e.events.Store(blockID, ch)
-	//		if err != nil {
-	//			return fmt.Errorf("failed to store events: %w", err)
-	//		}
-	//	}
-	//	// store service events events in 1K batches
-	//	chunkSize = uint(1000)
-	//	serviceEventChunks := ChunkifyEvents(serviceEvents, chunkSize)
-	//	for _, ch := range serviceEventChunks {
-	//		err = e.events.Store(blockID, ch)
-	//		if err != nil {
-	//			return fmt.Errorf("failed to store service events: %w", err)
-	//		}
-	//	}
-	//
-	//	return nil
-	//}()
-	//if err != nil {
-	//	return nil, err
-	//}
-
-	//err = func() error {
-	//	span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
-	//	defer span.Finish()
-	//
-	//	err = e.transactionResults.BatchStore(blockID, txResults)
-	//	if err != nil {
-	//		return fmt.Errorf("failed to store transaction result error: %w", err)
-	//	}
-	//	return nil
-	//}()
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionResult, events, serviceEvents, txResults)
+	if err != nil {
+		return nil, fmt.Errorf("cannot persist execution state: %w", err)
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(executableBlock)).
