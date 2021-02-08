@@ -593,9 +593,6 @@ func (m *marketPlaceAccount) Account() *flowAccount {
 	return m.account
 }
 
-// let collectionRef = acct.getCapability(/public/ShardedMomentCollection)
-// .borrow<&{TopShot.MomentCollectionPublic}>()!
-
 func (m *marketPlaceAccount) GetMoments() []uint {
 
 	template := `
@@ -605,7 +602,8 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 		let acct = getAccount(account)
 
-		let collectionRef = acct.getCapability(/public/ShardedMomentCollection).borrow<&TopShotShardedCollection.ShardedCollection>(from: /storage/ShardedMomentCollection)!
+		let collectionRef = acct.getCapability(/public/ShardedMomentCollection)
+								.borrow<&{TopShot.MomentCollectionPublic}>()!
 
 		log(collectionRef.getIDs())
 
