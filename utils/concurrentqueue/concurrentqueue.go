@@ -6,7 +6,7 @@ import (
 	"github.com/ef-ds/deque"
 )
 
-// ConcurrentQueue implements a thread safe interface for FIFO queue.
+// ConcurrentQueue implements a thread safe interface for unbounded FIFO queue.
 type ConcurrentQueue struct {
 	q deque.Deque
 	m sync.Mutex
