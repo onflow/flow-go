@@ -122,7 +122,10 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("collection_id", logging.Entity(collection.Guarantee)).Msg("executing collection")
+		e.log.Debug().
+			Hex("block_id", logging.Entity(block)).
+			Hex("collection_id", logging.Entity(collection.Guarantee)).
+			Msg("executing collection")
 
 		collEvents, collServiceEvents, txResults, nextIndex, gas, err := e.executeCollection(
 			ctx, txIndex, blockCtx, collectionView, collection,
@@ -215,7 +218,9 @@ func (e *blockComputer) executeCollection(
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
 
 	for _, txBody := range collection.Transactions {
-		txEvents, txServiceEvents, txResult, txGasUsed, err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
+
+		txEvents, txServiceEvents, txResult, txGasUsed, err :=
+			e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
 
 		txIndex++
 		events = append(events, txEvents...)
@@ -262,6 +267,10 @@ func (e *blockComputer) executeTransaction(
 			txSpan.Finish()
 		}()
 	}
+
+	e.log.Debug().
+		Hex("tx_id", logging.Entity(txBody)).
+		Msg("executing transaction")
 
 	txView := collectionView.NewChild()
 
