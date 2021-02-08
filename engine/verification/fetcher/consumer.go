@@ -45,7 +45,7 @@ type ChunksJob struct {
 }
 
 func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
-	chunk, err := j.locators.AtIndex(index)
+	locator, err := j.locators.AtIndex(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
 	}
