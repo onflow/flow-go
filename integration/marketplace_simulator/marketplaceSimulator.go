@@ -616,7 +616,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, []cadence.Value{cadence.Address(*m.account.Address())})
 
-	fmt.Println(">>>>>", res)
+	fmt.Println(">>>>>", res.ToGoValue())
 	fmt.Println(">>>>>", err)
 	return nil
 }
@@ -649,7 +649,7 @@ func (m *marketPlaceAccount) Act() {
 	// err = m.account.signTx(tx, 0)
 	// if err != nil {
 	// 	m.log.Error().Err(err).Msgf("error signing transaction")
-	// 	return
+	// 	return`
 	// }
 
 	// // wait till success and then update the list
