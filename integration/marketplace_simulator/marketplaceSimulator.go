@@ -296,6 +296,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 			fmt.Println("2>>e>", err)
 			fmt.Println("2>>r>", result)
+			fmt.Println("2>>o>", result.Events)
 			momentCounter += 5
 
 			// get moments
