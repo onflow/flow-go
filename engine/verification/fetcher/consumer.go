@@ -49,7 +49,7 @@ func (j ChunksJob) AtIndex(index int64) (storage.Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
 	}
-	return ChunkLocatorToJob(chunk), nil
+	return ChunkLocatorToJob(locator), nil
 }
 
 type EngineWorker interface {
