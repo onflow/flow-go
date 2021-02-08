@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // The Assigner engine reads the receipts from each finalized block.
@@ -106,9 +107,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // ProcessFinalizedBlock process each finalized block, and find the chunks that
 // assigned to me, and store it to the chunks job queue.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
-	// the block consumer will pull as many finalized blocks as
-	// it can consume to process
 	blockID := block.ID()
+	e.log.Debug().
+		Hex("block_id", logging.ID(blockID)).
+		Int("receipt_num", len(block.Payload.Receipts)).
+		Msg("new finalized block arrived")
 	for _, receipt := range block.Payload.Receipts {
 		e.handleExecutionReceipt(receipt, blockID)
 	}
