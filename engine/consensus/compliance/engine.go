@@ -205,6 +205,12 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
 
+	// retrieve the payload for the block
+	payload, err := e.payloads.ByBlockID(header.ID())
+	if err != nil {
+		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
+	}
+
 	log := e.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -212,6 +218,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Hex("block_id", logging.Entity(header)).
 		Hex("parent_id", header.ParentID[:]).
 		Hex("payload_hash", header.PayloadHash[:]).
+		Int("gaurantees_count", len(payload.Guarantees)).
+		Int("seals_count", len(payload.Seals)).
+		Int("receipts_count", len(payload.Receipts)).
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
@@ -219,12 +228,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Logger()
 
 	log.Info().Msg("processing proposal broadcast request from hotstuff")
-
-	// retrieve the payload for the block
-	payload, err := e.payloads.ByBlockID(header.ID())
-	if err != nil {
-		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
-	}
 
 	for _, g := range payload.Guarantees {
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
