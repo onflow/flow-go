@@ -192,11 +192,18 @@ func (et *ExecutionTreeTestSuite) Test_AddResult_Bridge() {
 		return false
 	}
 
-	err := et.Forest.AddResult(results["r[C12]"], blocks["C12"].Header)
-	assert.NoError(et.T(), err)
+	// before we add result r[C12], tree search should not be able to reach r[C13]
 	collectedReceipts, err := et.Forest.ReachableReceipts(results["r[B10]"].ID(), blockFilter, anyReceipt())
 	assert.NoError(et.T(), err)
-	expected := et.toSet("ER[r[B10]]", "ER[r[C11]]_1", "ER[r[C11]]_2", "ER[r[C13]]")
+	expected := et.toSet("ER[r[B10]]", "ER[r[C11]]_1", "ER[r[C11]]_2")
+	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
+
+	// after we added r[C12], tree search should reach r[C13] and hence include the corresponding receipt ER[r[C13]]
+	err = et.Forest.AddResult(results["r[C12]"], blocks["C12"].Header)
+	assert.NoError(et.T(), err)
+	collectedReceipts, err = et.Forest.ReachableReceipts(results["r[B10]"].ID(), blockFilter, anyReceipt())
+	assert.NoError(et.T(), err)
+	expected = et.toSet("ER[r[B10]]", "ER[r[C11]]_1", "ER[r[C11]]_2", "ER[r[C13]]")
 	et.Assert().True(reflect.DeepEqual(expected, et.receiptSet(collectedReceipts, receipts)))
 }
 
