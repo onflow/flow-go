@@ -243,8 +243,7 @@ func (b *backendTransactions) DeriveTransactionStatus(
 		finalizedHeight := finalized.Height
 
 		// if we haven't seen the expiry block for this transaction, it's not expired
-		expiredWRTFinalized := finalizedHeight > refHeight && finalizedHeight-refHeight > flow.DefaultTransactionExpiry
-		if !expiredWRTFinalized {
+		if !b.isExpired(refHeight, finalizedHeight) {
 			return flow.TransactionStatusPending, nil
 		}
 
@@ -263,8 +262,7 @@ func (b *backendTransactions) DeriveTransactionStatus(
 		}
 
 		// if we have received collections for all blocks up to the expiry block, the transaction is expired
-		expiredWRTFull := fullHeight > refHeight && fullHeight-refHeight > flow.DefaultTransactionExpiry
-		if expiredWRTFull {
+		if b.isExpired(refHeight, fullHeight) {
 			return flow.TransactionStatusExpired, err
 		}
 
@@ -297,6 +295,15 @@ func (b *backendTransactions) DeriveTransactionStatus(
 
 	// otherwise, this block has been executed, and sealed, so report as sealed
 	return flow.TransactionStatusSealed, nil
+}
+
+// isExpired checks whether a transaction is expired given the height of the
+// transaction's reference block and the current height.
+func (b *backendTransactions) isExpired(refHeight, curHeight uint64) bool {
+	if curHeight <= refHeight {
+		return false
+	}
+	return curHeight-refHeight > flow.DefaultTransactionExpiry
 }
 
 func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, error) {
