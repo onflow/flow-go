@@ -283,6 +283,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// fmt.Println(">>r>", result)
 			// totalMinted += batchSize
 
+			fmt.Println("account address:", ma.Account().Address())
 			//  transfer some moments
 			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
 			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
