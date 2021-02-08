@@ -242,26 +242,29 @@ func (b *backendTransactions) DeriveTransactionStatus(
 		}
 		finalizedHeight := finalized.Height
 
-		// the last full height is the height where we have recieved all
+		// if we haven't seen the expiry block for this transaction, it's not expired
+		expiredWRTFinalized := finalizedHeight > refHeight && finalizedHeight-refHeight > flow.DefaultTransactionExpiry
+		if !expiredWRTFinalized {
+			return flow.TransactionStatusPending, nil
+		}
+
+		// At this point, we have seen the expiry block for the transaction.
+		// This means that, if no collections prior to the expiry block contain
+		// the transaction, it can never be included and is expired.
+		//
+		// To ensure this, we need to have received all collections up to the
+		// expiry block to ensure the transaction did not appear in any.
+
+		// the last full height is the height where we have received all
 		// collections for all blocks with a lower height
 		fullHeight, err := b.blocks.GetLastFullBlockHeight()
 		if err != nil {
 			return flow.TransactionStatusUnknown, err
 		}
 
-		// In order to be sure that a transaction has expired, we must have
-		// all collections locally that the transaction could possibly have
-		// been included in -- otherwise it's possible that the transaction
-		// was included in a collection we just haven't seen yet.
-		//
-		// So - we check that a block has been finalized that expires the
-		// transaction (finalizedHeight-refHeight>EXPIRY) AND we check implicitly
-		// that no collection in the interim contains the transaction
-		// (fullHeight-refHeight>EXPIRY)
-		expiredWRTFinalized := finalizedHeight > refHeight && finalizedHeight-refHeight > flow.DefaultTransactionExpiry
+		// if we have received collections for all blocks up to the expiry block, the transaction is expired
 		expiredWRTFull := fullHeight > refHeight && fullHeight-refHeight > flow.DefaultTransactionExpiry
-
-		if expiredWRTFinalized && expiredWRTFull {
+		if expiredWRTFull {
 			return flow.TransactionStatusExpired, err
 		}
 
