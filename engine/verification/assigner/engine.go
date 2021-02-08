@@ -1,11 +1,17 @@
 package assigner
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -54,6 +60,10 @@ func New(
 	return e
 }
 
+func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
+
+}
+
 func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
 	e.finishProcessing = finishProcessing
 }
@@ -98,4 +108,45 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	// the block consumer will pull as many finalized blocks as
 	// it can consume to process
+	blockID := block.ID()
+	for _, receipt := range block.Payload.Receipts {
+		e.handleExecutionReceipt(receipt, blockID)
+	}
+}
+
+// myChunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
+func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
+	var span opentracing.Span
+	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
+	defer span.Finish()
+
+	assignment, err := e.assigner.Assign(result, result.BlockID)
+	if err != nil {
+		return nil, err
+	}
+
+	mine, err := myChunks(e.me.NodeID(), assignment, result.Chunks)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine my assignments: %w", err)
+	}
+
+	return mine, nil
+}
+
+func myChunks(myID flow.Identifier, assignment *chunks.Assignment, chunks flow.ChunkList) (flow.ChunkList, error) {
+	// indices of chunks assigned to verifier
+	chunkIndices := assignment.ByNodeID(myID)
+
+	// chunks keeps the list of chunks assigned to the verifier
+	myChunks := make(flow.ChunkList, 0, len(chunkIndices))
+	for _, index := range chunkIndices {
+		chunk, ok := chunks.ByIndex(index)
+		if !ok {
+			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		}
+
+		myChunks = append(myChunks, chunk)
+	}
+
+	return myChunks, nil
 }
