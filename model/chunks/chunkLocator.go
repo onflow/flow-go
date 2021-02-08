@@ -5,6 +5,7 @@ import (
 )
 
 // Locator is used to locate a chunk by providing the execution result the chunk belongs to as well as the chunk index within that execution result.
+// Since a chunk is unique by the result ID and its index in the result's chunk list.
 type Locator struct {
 	ResultID flow.Identifier // execution result id that chunk belongs to
 	Index    uint64          // index of chunk in the execution result
