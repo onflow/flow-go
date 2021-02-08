@@ -122,7 +122,7 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 	originID := ms.ExeID
 
 	receipts := make([]*flow.ExecutionReceipt, 20)
-	for i, _ := range receipts {
+	for i := range receipts {
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(originID),
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
