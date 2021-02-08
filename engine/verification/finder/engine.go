@@ -154,7 +154,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *flow.ExecutionReceipt:
-		e.handleExecutionReceipt(originID, resource)
+		e.handleExecutionReceiptWithTracing(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -162,8 +162,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-// handleExecutionReceipt receives an execution receipt and adds it to the cached receipt mempool.
-func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
+// handleExecutionReceiptWithTracing receives an execution receipt and adds it to the cached receipt mempool.
+func (e *Engine) handleExecutionReceiptWithTracing(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
 	span, ok := e.tracer.GetSpan(receipt.ID(), trace.VERProcessExecutionReceipt)
 	ctx := context.Background()
 	if !ok {
@@ -174,32 +174,37 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	ctx = opentracing.ContextWithSpan(ctx, span)
 
 	e.tracer.WithSpanFromContext(ctx, trace.VERFindHandleExecutionReceipt, func() {
-
-		receiptID := receipt.ID()
-		resultID := receipt.ExecutionResult.ID()
-
-		log := e.log.With().
-			Hex("origin_id", logging.ID(originID)).
-			Hex("receipt_id", logging.ID(receiptID)).
-			Hex("result_id", logging.ID(resultID)).Logger()
-		log.Info().
-			Msg("execution receipt arrived")
-
-		// monitoring: increases number of received execution receipts
-		e.metrics.OnExecutionReceiptReceived()
-
-		// caches receipt as a receipt data pack for further processing
-		rdp := &verification.ReceiptDataPack{
-			Receipt:  receipt,
-			OriginID: originID,
-			Ctx:      ctx,
-		}
-
-		ok = e.cachedReceipts.Add(rdp)
-		log.Debug().
-			Bool("added_to_cached_receipts", ok).
-			Msg("execution receipt successfully handled")
+		e.handleExecutionReceipt(ctx, originID, receipt)
 	})
+}
+
+// handleExecutionReceipt adds the execution receipt to the cached receipt mempool.
+func (e *Engine) handleExecutionReceipt(ctx context.Context, originID flow.Identifier, receipt *flow.ExecutionReceipt) {
+
+	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.ID()
+
+	log := e.log.With().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("result_id", logging.ID(resultID)).Logger()
+	log.Info().
+		Msg("execution receipt arrived")
+
+	// monitoring: increases number of received execution receipts
+	e.metrics.OnExecutionReceiptReceived()
+
+	// caches receipt as a receipt data pack for further processing
+	rdp := &verification.ReceiptDataPack{
+		Receipt:  receipt,
+		OriginID: originID,
+		Ctx:      ctx,
+	}
+
+	ok := e.cachedReceipts.Add(rdp)
+	log.Debug().
+		Bool("added_to_cached_receipts", ok).
+		Msg("execution receipt successfully handled")
 }
 
 // To implement FinalizationConsumer
