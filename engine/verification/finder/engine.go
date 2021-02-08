@@ -535,8 +535,8 @@ func (e *Engine) discardReceiptsFromPending(receiptIDs flow.IdentifierList, bloc
 	}
 }
 
-// checkReceipts iterates over the new cached finalized blocks. It moves
-// their corresponding receipt from pending to ready mempools.
+// checkPendingReceipts iterates over the new cached finalized blocks. It moves
+// their corresponding receipt from pending to ready memory pool.
 func (e *Engine) checkPendingReceipts() {
 	for _, blockID := range e.blockIDsCache.All() {
 		// removes blockID from new blocks mempool
