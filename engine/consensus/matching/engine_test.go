@@ -383,7 +383,7 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 
 // try to get matched results with nothing in memory pools
 func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
-	results, err := ms.matching.sealableResults()
+	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err, "should not error with empty mempools")
 	ms.Assert().Empty(results, "should not have matched results with empty mempools")
 }
@@ -399,7 +399,7 @@ func (ms *MatchingSuite) TestSealableResultsValid() {
 	ms.AddSubgraphFixtureToMempools(valSubgrph)
 
 	// test output of Matching Engine's sealableResults()
-	results, err := ms.matching.sealableResults()
+	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Equal(1, len(results), "expecting a single return value")
 	ms.Assert().Equal(valSubgrph.IncorporatedResult.ID(), results[0].ID(), "expecting a single return value")
@@ -416,7 +416,7 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 	ms.AddSubgraphFixtureToMempools(valSubgrph)
 	delete(ms.Blocks, valSubgrph.Block.ID()) // remove block the execution receipt pertains to
 
-	_, err := ms.matching.sealableResults()
+	_, _, err := ms.matching.sealableResults()
 	ms.Require().Error(err)
 }
 
@@ -443,7 +443,7 @@ func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 
 	ms.AddSubgraphFixtureToMempools(subgrph)
 
-	results, err := ms.matching.sealableResults()
+	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "should not select result with ")
 	ms.ApprovalsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
@@ -464,7 +464,7 @@ func (ms *MatchingSuite) TestSealableResults_ApprovalsForUnknownBlockRemain() {
 	chunkApprovals[app1.Body.ApproverID] = app1
 	ms.ApprovalsPL.On("ByChunk", er.ID(), 0).Return(chunkApprovals)
 
-	_, err := ms.matching.sealableResults()
+	_, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "RemApproval", 0)
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "RemChunk", 0)
@@ -494,7 +494,7 @@ func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
 	ms.ApprovalsPL.On("RemApproval", unittest.EntityWithID(app2.ID())).Return(true, nil).Once()
 	ms.ApprovalsPL.On("RemApproval", unittest.EntityWithID(app3.ID())).Return(true, nil).Once()
 
-	_, err := ms.matching.sealableResults()
+	_, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.ApprovalsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
 }
@@ -508,7 +508,7 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	ms.AddSubgraphFixtureToMempools(subgrph)
 
 	// test output of Matching Engine's sealableResults()
-	results, err := ms.matching.sealableResults()
+	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "expecting no sealable result")
 }
@@ -538,7 +538,7 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 
 	// at this point we have results without enough approvals
 	// no sealable results expected
-	results, err := ms.matching.sealableResults()
+	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "expecting no sealable result")
 
@@ -551,7 +551,7 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 
 	// once emergency sealing is active and ERs are deep enough in chain
 	// we are expecting all stalled seals to be selected as candidates
-	results, err = ms.matching.sealableResults()
+	results, _, err = ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Require().Equal(len(emergencySealingCandidates), len(results), "expecting valid number of sealable results")
 	for _, id := range emergencySealingCandidates {
@@ -591,7 +591,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	}
 	ms.SealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
 
-	err := ms.matching.requestPendingReceipts()
+	_, err := ms.matching.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.EntityByID(<blockID>, filter.Any) was called
 }
@@ -765,7 +765,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 		})
 	ms.matching.approvalConduit = conduit
 
-	err := ms.matching.requestPendingApprovals()
+	_, err := ms.matching.requestPendingApprovals()
 	ms.Require().NoError(err)
 
 	// first time it goes through, no requests should be made because of the
@@ -784,7 +784,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 
 	// wait for the max blackout period to elapse and retry
 	time.Sleep(3 * time.Second)
-	err = ms.matching.requestPendingApprovals()
+	_, err = ms.matching.requestPendingApprovals()
 	ms.Require().NoError(err)
 
 	// now we expect that requests have been sent for the chunks that haven't

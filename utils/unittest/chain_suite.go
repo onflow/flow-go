@@ -1,6 +1,8 @@
 package unittest
 
 import (
+	"fmt"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -144,6 +146,15 @@ func (bc *BaseChainSuite) SetupChain() {
 		nil,
 	)
 
+	findBlockByHeight := func(blocks map[flow.Identifier]*flow.Block, height uint64) (*flow.Block, bool) {
+		for _, block := range blocks {
+			if block.Header.Height == height {
+				return block, true
+			}
+		}
+		return nil, false
+	}
+
 	// define the protocol state snapshot for any block in `bc.Blocks`
 	bc.State.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
@@ -152,6 +163,23 @@ func (bc *BaseChainSuite) SetupChain() {
 				return StateSnapshotForUnknownBlock()
 			}
 			return StateSnapshotForKnownBlock(block.Header, bc.Identities)
+		},
+	)
+
+	bc.State.On("AtHeight", mock.Anything).Return(
+		func(height uint64) realproto.Snapshot {
+			block, found := findBlockByHeight(bc.Blocks, height)
+			if found {
+				snapshot := &protocol.Snapshot{}
+				snapshot.On("Head").Return(
+					func() *flow.Header {
+						return block.Header
+					},
+					nil,
+				)
+				return snapshot
+			}
+			panic(fmt.Sprintf("unknown height: %v, final: %v, sealed: %v", height, bc.LatestFinalizedBlock.Header.Height, bc.LatestSealedBlock.Header.Height))
 		},
 	)
 
