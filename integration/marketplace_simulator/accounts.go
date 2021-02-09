@@ -75,30 +75,28 @@ func newFlowAccount(i int, address *flowsdk.Address, accountPrivateKeyHex string
 	}
 }
 
-func newFlowAccountFromFile(flowClient *client.Client) (*flowAccount, error) {
+func newFlowAccountFromJSON(jsonStr []byte, flowClient *client.Client) (*flowAccount, error) {
 
-	// TODO read from file
-	var address *flowsdk.Address
-	var accountPrivateKeyHex string
+	var account flowAccount
 
-	acc, err := flowClient.GetAccount(context.Background(), *address)
+	err := json.Unmarshal(jsonStr, &account)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding account from json: %w", err)
+	}
+
+	acc, err := flowClient.GetAccount(context.Background(), *account.Address)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account: %w", err)
 	}
-	accountKey := acc.Keys[0]
+	account.accountKey = acc.Keys[0]
 
-	privateKey, err := crypto.DecodePrivateKeyHex(accountKey.SigAlgo, accountPrivateKeyHex)
+	privateKey, err := crypto.DecodePrivateKeyHex(account.accountKey.SigAlgo, account.AccountPrivateKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("error while decoding account private key hex: %w", err)
 	}
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	account.signer = crypto.NewInMemorySigner(privateKey, account.accountKey.HashAlgo)
+	account.signerLock = sync.Mutex{}
 
-	return &flowAccount{
-		Address:              address,
-		AccountPrivateKeyHex: accountPrivateKeyHex,
-		accountKey:           accountKey,
-		signer:               signer,
-		signerLock:           sync.Mutex{},
-	}, nil
+	return &account, nil
 }
