@@ -614,8 +614,6 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 		let collectionRef = acct.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
 
-		log(collectionRef.getIDs())
-
 		return collectionRef.getIDs()
 	}
 	`
@@ -624,7 +622,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
-	fmt.Println(">>>", script)
+	fmt.Println(">>>", string(script))
 	fmt.Println(">>>>>", res.ToGoValue())
 	fmt.Println(">>>>>", err)
 	return nil
