@@ -32,6 +32,7 @@ type EncodableEpoch struct {
 	FinalView         uint64
 	RandomSource      []byte
 	InitialIdentities flow.IdentityList
+	Clustering        flow.ClusterList
 	Clusters          []EncodableCluster
 	DKG               *EncodableDKG
 }

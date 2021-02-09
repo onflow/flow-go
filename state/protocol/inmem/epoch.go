@@ -31,11 +31,7 @@ func (e Epoch) Seed(indices ...uint32) ([]byte, error) {
 }
 
 func (e Epoch) Clustering() (flow.ClusterList, error) {
-	var clusters flow.ClusterList
-	for _, cluster := range e.enc.Clusters {
-		clusters = append(clusters, cluster.Members)
-	}
-	return clusters, nil
+	return e.enc.Clustering, nil
 }
 
 func (e Epoch) DKG() (protocol.DKG, error) {

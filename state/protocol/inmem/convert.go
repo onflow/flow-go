@@ -107,6 +107,12 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 		return nil, fmt.Errorf("could not get random source: %w", err)
 	}
 
+	clustering, err := from.Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("could not get clustering: %w", err)
+	}
+	epoch.Clustering = clustering
+
 	// convert dkg
 	dkg, err := from.DKG()
 	// if this epoch hasn't been committed yet, return the epoch as-is
@@ -123,10 +129,6 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	epoch.DKG = &convertedDKG.enc
 
 	// convert clusters
-	clustering, err := from.Clustering()
-	if err != nil {
-		return nil, fmt.Errorf("could not get clustering: %w", err)
-	}
 	for index := range clustering {
 		cluster, err := from.Cluster(uint(index))
 		if err != nil {
