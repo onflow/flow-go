@@ -317,10 +317,11 @@ func (ms *MatchingSuite) TestOnApprovalInvalid() {
 		unittest.WithApproverID(originID),
 	)
 
-	ms.approvalValidator.On("Validate", approval).Return(fmt.Errorf("")).Once()
+	ms.approvalValidator.On("Validate", approval).Return(engine.NewInvalidInputError("")).Once()
 
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
 	ms.Require().Error(err, "should report error if invalid")
+	ms.Assert().True(engine.IsInvalidInputError(err))
 
 	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -337,10 +338,11 @@ func (ms *MatchingSuite) TestOnApprovalOutdated() {
 	// Make sure the approval is added to the cache for future processing
 	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
 
-	ms.approvalValidator.On("Validate", approval).Return(fmt.Errorf("")).Once()
+	ms.approvalValidator.On("Validate", approval).Return(engine.NewOutdatedInputErrorf("")).Once()
 
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
 	ms.Require().Error(err, "should report error if invalid")
+	ms.Assert().True(engine.IsOutdatedInputError(err))
 
 	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -352,7 +354,7 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(originID))
 
 	// setup the approvals mempool to check that we attempted to add the
-	// approval, and return false ms if it was already in the mempool
+	// approval, and return false (approval already in the mempool)
 	ms.ApprovalsPL.On("Add", approval).Return(false, nil).Once()
 
 	// process as valid approval

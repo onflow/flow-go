@@ -30,6 +30,7 @@ func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.
 // checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
 //   * has _positive_ weight
 //   * and has the expected role
+//   * and is not ejected
 // Returns the following errors:
 //   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
 // Note: the method receives the identity as proof of its existence.

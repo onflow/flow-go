@@ -31,7 +31,7 @@ func (v *approvalValidator) Validate(approval *flow.ResultApproval) error {
 			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
 		}
 		return engine.NewOutdatedInputErrorf("no header for block: %v", approval.Body.BlockID)
-	} else {
+	} 
 		// drop approval, if it is for block whose height is lower or equal to already sealed height
 		sealed, err := v.state.Sealed().Head()
 		if err != nil {
@@ -43,13 +43,13 @@ func (v *approvalValidator) Validate(approval *flow.ResultApproval) error {
 
 		identity, err := identityForNode(v.state, head.ID(), approval.Body.ApproverID)
 		if err != nil {
-			return fmt.Errorf("failed to get node identity: %v %w", approval.Body.ApproverID, err)
+			return fmt.Errorf("failed to get identity for node %v: %w", approval.Body.ApproverID, err)
 		}
 
 		// Check if the approver was a staked verifier at that block.
 		err = ensureStakedNodeWithRole(identity, flow.RoleVerification)
 		if err != nil {
-			return fmt.Errorf("staked node invalid: %w", err)
+			return fmt.Errorf("approval not from authorized verifier: %w", err)
 		}
 
 		err = v.verifySignature(approval, identity)
