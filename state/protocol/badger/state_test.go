@@ -50,8 +50,11 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 }
 
-// TestBootstrapNonRoot tests bootstrapping the protocol state
-// from arbitrary states.
+// TestBootstrapNonRoot tests bootstrapping the protocol state from arbitrary states.
+//
+// NOTE: for all these cases, we build a final child block (CHILD). This is
+// needed otherwise the parent block would not have a valid QC, since the QC
+// is stored in the child.
 func TestBootstrapNonRoot(t *testing.T) {
 
 	// start with a regular post-spork root snapshot
@@ -60,14 +63,45 @@ func TestBootstrapNonRoot(t *testing.T) {
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
+	// should be able to bootstrap from snapshot after building one block
+	// ROOT <- B1 <- CHILD
 	t.Run("with one block built", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
-			err = state.Extend(&block1)
-			require.NoError(t, err)
+			buildBlock(t, state, &block1)
+			child := unittest.BlockWithParentFixture(block1.Header)
+			buildBlock(t, state, &child)
+
+			return state.AtBlockID(block1.ID())
 		})
+
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			assert.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+		})
+	})
+
+	// should be able to bootstrap from snapshot after sealing a non-root block
+	// ROOT <- B1 <- B2(S1) <- CHILD
+	t.Run("with sealed block", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			block1 := unittest.BlockWithParentFixture(rootBlock)
+			buildBlock(t, state, &block1)
+
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
+			buildBlock(t, state, &block2)
+
+			child := unittest.BlockWithParentFixture(block2.Header)
+			buildBlock(t, state, &child)
+
+			return state.AtBlockID(block2.ID())
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			assert.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
 	})
 }
@@ -145,20 +179,27 @@ func bootstrap(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.S
 	f(state, err)
 }
 
-// snapshotAfter returns an in-memory state snapshot of the FINALIZED state after
-// bootstrapping the protocol state from the root snapshot, applying the state
-// mutating function f, and clearing the on-disk protocol state.
+// snapshotAfter bootstraps the protocol state from the root snapshot, applies
+// the state-changing function f, clears the on-disk state, and returns a
+// memory-backed snapshot corresponding to that returned by f.
 //
 // This is used for generating valid snapshots to use when testing bootstrapping
 // from non-root states.
-func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState)) protocol.Snapshot {
+func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotocol.FollowerState) protocol.Snapshot) protocol.Snapshot {
 	var after protocol.Snapshot
 	protoutil.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-		f(state)
-		final := state.Final()
+		snap := f(state)
 		var err error
-		after, err = inmem.FromSnapshot(final)
+		after, err = inmem.FromSnapshot(snap)
 		require.NoError(t, err)
 	})
 	return after
+}
+
+// buildBlock builds and marks valid the given block
+func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
+	err := state.Extend(block)
+	require.NoError(t, err)
+	err = state.MarkValid(block.ID())
+	require.NoError(t, err)
 }
