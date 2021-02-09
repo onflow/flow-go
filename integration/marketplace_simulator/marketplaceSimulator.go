@@ -214,6 +214,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
 	for i := 0; i < steps; i++ {
+		m.log.Info().Msgf("minting %s moments on nba account: %s", batchSize)
+
 		// mint a lot of moments
 		script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(batchSize))
 		tx = flowsdk.NewTransaction().
@@ -520,7 +522,12 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 
 					signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 
-					newAcc := newFlowAccount(i, &accountAddress, hex.EncodeToString(privKey.Encode()), accountKey, signer)
+					newAccKey := flowsdk.NewAccountKey().
+						FromPrivateKey(privKey).
+						SetHashAlgo(crypto.SHA3_256).
+						SetWeight(flowsdk.AccountKeyWeightThreshold)
+
+					newAcc := newFlowAccount(i, &accountAddress, hex.EncodeToString(privKey.Encode()), newAccKey, signer)
 					i++
 					accounts = append(accounts, *newAcc)
 
