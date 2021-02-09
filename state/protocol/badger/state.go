@@ -116,7 +116,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not insert root seal: %w", err)
 		}
-		err = operation.IndexBlockSeal(seal.BlockID, seal.ID())(tx)
+		err = operation.IndexBlockSeal(head.ID(), seal.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("could not index root block seal: %w", err)
 		}
@@ -140,7 +140,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertRootHeight(tail.Header.Height)(tx)
+		err = operation.InsertRootHeight(head.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
 		}
