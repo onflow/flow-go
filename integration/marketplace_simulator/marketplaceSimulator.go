@@ -624,6 +624,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, []cadence.Value{cadence.Address(*m.account.Address)})
 
+	fmt.Println(">>>", script)
 	fmt.Println(">>>>>", res.ToGoValue())
 	fmt.Println(">>>>>", err)
 	return nil
