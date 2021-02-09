@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -185,9 +186,13 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	}
 }
 
-func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) (protocol.Snapshot, error) {
-	latestSealed := b.state.Sealed()
-	return latestSealed, nil
+func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
+	data, err := convert.SnapshotToBytes(b.state.Sealed())
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func convertStorageError(err error) error {
