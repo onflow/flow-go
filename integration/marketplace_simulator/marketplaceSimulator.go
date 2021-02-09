@@ -290,6 +290,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			momentCounter += 5
 
 			// setup sales
+			// GenerateCreateSaleScript(m.nbaTopshotAccount.Address, ma.Account().Address, tokenStorageName string, 0.15)
 			// nbaTemplate.GenerateCreateSaleScript()
 
 			// get moments
@@ -302,12 +303,21 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 
 func (m *MarketPlaceSimulator) Run() error {
 
-	// acc := <-lg.availableAccounts
-	// defer func() { lg.availableAccounts <- acc }()
-
-	// select a random account
+	// select an account
 	// call Act and put it back to list when is returned
-	// go Run (wrap func into a one to return the account back to list)
+	duration := time.Second * 30
+	for start := time.Now(); ; {
+		if time.Since(start) > duration {
+			break
+		}
+		go func() {
+			acc := <-m.availableAccounts
+			defer func() { m.availableAccounts <- acc }()
+			acc.Act()
+			// TODO handle the retuned error
+		}()
+	}
+
 	return nil
 }
 
@@ -620,7 +630,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 	return nil
 }
 
-func (m *marketPlaceAccount) Act() {
+func (m *marketPlaceAccount) Act() error {
 
 	// with some chance don't do anything
 
@@ -635,71 +645,79 @@ func (m *marketPlaceAccount) Act() {
 
 	// _ = assetToMove
 
+	blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
+	if err != nil {
+		return err
+	}
+
 	// // TODO txScript for assetToMove
-	// txScript := []byte("")
+	// Transfer moment to a friend
+	n := len(m.friends)
+	friend := m.friends[rand.Intn(n)]
 
-	// tx := flowsdk.NewTransaction().
-	// 	SetReferenceBlockID(blockRef).
-	// 	SetScript(txScript).
-	// 	SetProposalKey(*m.account.address, 0, m.account.seqNumber).
-	// 	SetPayer(*m.account.address).
-	// 	AddAuthorizer(*m.account.address)
+	// TODO ramtin fix the fetch
+	txScript := generateBatchTransferMomentScript(m.simulatorConfig.NBATopshotAddress,
+		m.simulatorConfig.NBATopshotAddress,
+		friend.Address,
+		[]uint64{0})
 
-	// err = m.account.signTx(tx, 0)
-	// if err != nil {
-	// 	m.log.Error().Err(err).Msgf("error signing transaction")
-	// 	return`
-	// }
+	tx := flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef.ID).
+		SetScript(txScript)
 
-	// // wait till success and then update the list
-	// // send tx
-	// err = m.flowClient.SendTransaction(context.Background(), *tx)
-	// if err != nil {
-	// 	m.log.Error().Err(err).Msgf("error sending transaction")
-	// 	return
-	// }
+	err = m.Account().PrepareAndSignTx(tx, 0)
+	if err != nil {
+		return fmt.Errorf("error preparing and signing the transaction: %w", err)
+	}
 
-	// // tracking
-	// stopped := false
-	// wg := sync.WaitGroup{}
-	// m.txTracker.AddTx(tx.ID(),
-	// 	nil,
-	// 	func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-	// 		m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
-	// 	}, // on finalized
-	// 	func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-	// 		m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
-	// 		if !stopped {
-	// 			stopped = true
-	// 			wg.Done()
-	// 		}
-	// 	}, // on sealed
-	// 	func(_ flowsdk.Identifier) {
-	// 		m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
-	// 		if !stopped {
-	// 			stopped = true
-	// 			wg.Done()
-	// 		}
-	// 	}, // on expired
-	// 	func(_ flowsdk.Identifier) {
-	// 		m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
-	// 		if !stopped {
-	// 			stopped = true
-	// 			wg.Done()
-	// 		}
-	// 	}, // on timout
-	// 	func(_ flowsdk.Identifier, err error) {
-	// 		m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
-	// 		if !stopped {
-	// 			stopped = true
-	// 			wg.Done()
-	// 		}
-	// 	}, // on error
-	// 	60)
-	// wg.Add(1)
-	// wg.Wait()
+	// wait till success and then update the list
+	// send tx
+	err = m.flowClient.SendTransaction(context.Background(), *tx)
+	if err != nil {
+		return fmt.Errorf("error sending transaction: %w", err)
+	}
 
-	// return
+	// tracking
+	stopped := false
+	wg := sync.WaitGroup{}
+	m.txTracker.AddTx(tx.ID(),
+		nil,
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+		}, // on finalized
+		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on sealed
+		func(_ flowsdk.Identifier) {
+			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on timout
+		func(_ flowsdk.Identifier, err error) {
+			m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on error
+		60)
+	wg.Add(1)
+	wg.Wait()
+
+	return nil
 }
 
 func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
