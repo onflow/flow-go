@@ -347,6 +347,13 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 
+	// set up GetLastFullBlockHeight mock
+	fullHeight := headBlock.Header.Height
+	suite.blocks.On("GetLastFullBlockHeight").Return(
+		func() uint64 { return fullHeight },
+		func() error { return nil },
+	)
+
 	suite.snapshot.
 		On("Head").
 		Return(headBlock.Header, nil)
@@ -387,20 +394,54 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		suite.log,
 	)
 
-	// first call - referenced block isn't known yet, so should return pending status
-	result, err := backend.GetTransactionResult(ctx, txID)
-	suite.checkResponse(result, err)
+	// should return pending status when we have not observed an expiry block
+	suite.Run("pending", func() {
+		// referenced block isn't known yet, so should return pending status
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
 
-	suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+	})
 
-	// now go far into the future
-	headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+	// should return pending status when we have observed an expiry block but
+	// have not observed all intermediary collections
+	suite.Run("expiry un-confirmed", func() {
 
-	// second call - reference block is now very far behind, and should be considered expired
-	result, err = backend.GetTransactionResult(ctx, txID)
-	suite.checkResponse(result, err)
+		suite.Run("ONLY finalized expiry block", func() {
+			// we have finalized an expiry block
+			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+			// we have NOT observed all intermediary collections
+			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
 
-	suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
+			result, err := backend.GetTransactionResult(ctx, txID)
+			suite.checkResponse(result, err)
+			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+		})
+		suite.Run("ONLY observed intermediary collections", func() {
+			// we have NOT finalized an expiry block
+			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry/2
+			// we have observed all intermediary collections
+			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+			result, err := backend.GetTransactionResult(ctx, txID)
+			suite.checkResponse(result, err)
+			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+		})
+
+	})
+
+	// should return expired status only when we have observed an expiry block
+	// and have observed all intermediary collections
+	suite.Run("expired", func() {
+		// we have finalized an expiry block
+		headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+		// we have observed all intermediary collections
+		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
+		suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
+	})
 
 	suite.assertAllExpectations()
 }
@@ -521,6 +562,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.Run("with fixed execution node", func() {
 
+		// create receipt mocks that always returns empty
+		receipts := new(storagemock.ExecutionReceipts)
+		receipts.
+			On("ByBlockIDAllExecutionReceipts", mock.Anything).
+			Return([]flow.ExecutionReceipt{}, nil).Once()
+
 		// create the handler
 		backend := New(
 			suite.state,
@@ -528,7 +575,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil, nil,
 			suite.blocks,
 			nil, nil, nil,
-			suite.receipts,
+			receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
@@ -548,7 +595,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, // no default client, hence the receipts storage should be looked up
+			nil,
 			nil, nil,
 			suite.blocks,
 			nil, nil, nil,
@@ -566,6 +613,30 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		suite.Require().Equal(expected, actual)
 	})
+
+	suite.Run("with an empty block ID list", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, // no default client, hence the receipts storage should be looked up
+			nil, nil,
+			suite.blocks,
+			nil, nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			suite.log,
+		)
+
+		// execute request with an empty block id list and expect an error (not a panic)
+		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
+		require.NoError(suite.T(), err)
+		require.Empty(suite.T(), resp)
+	})
+
 	suite.assertAllExpectations()
 }
 
@@ -597,6 +668,11 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		return headers
 	}
+
+	// use the static execution node
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -815,6 +891,10 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		On("ByHeight", height).
 		Return(&h, nil).
 		Once()
+
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()

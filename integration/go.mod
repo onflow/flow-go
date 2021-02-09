@@ -13,15 +13,15 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.12.5
+	github.com/onflow/cadence v0.12.11
 	github.com/onflow/flow-go v0.11.1 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.14.2
+	github.com/onflow/flow-go-sdk v0.14.3
 	github.com/onflow/flow-go/crypto v0.12.0 // replaced by version on-disk
 	github.com/onflow/flow-nft/lib/go/contracts v0.0.0-20210113153210-aa62b6702e0d
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.19.0
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	google.golang.org/grpc v1.31.1
 	gopkg.in/yaml.v2 v2.3.0
 )

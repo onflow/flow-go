@@ -321,6 +321,14 @@ func (e *Engine) onTimer() {
 
 	now := time.Now()
 	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending pendingChunks")
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not get sealed height when calling onTimer")
+		return
+	}
+
+	sealedHeight := sealed.Height
+
 	defer e.log.Debug().
 		Int("processed", len(allChunks)-int(e.pendingChunks.Size())).
 		Uint("left", e.pendingChunks.Size()).
@@ -332,8 +340,24 @@ func (e *Engine) onTimer() {
 
 		log := e.log.With().
 			Hex("chunk_id", logging.ID(chunkID)).
+			Hex("block_id", logging.ID(chunk.Chunk.BlockID)).
 			Hex("result_id", logging.ID(chunk.ExecutionResultID)).
 			Logger()
+
+		header, err := e.headers.ByBlockID(chunk.Chunk.BlockID)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not get header for block")
+			continue
+		}
+
+		// skips requesting chunks of already sealed blocks
+		isSealed := header.Height <= sealedHeight
+		if isSealed {
+			e.pendingChunks.Rem(chunkID)
+			e.chunkMetaDataCleanup(chunkID, chunk.ExecutionResultID)
+			log.Debug().Msg("block has been sealed")
+			continue
+		}
 
 		// check if has reached max try
 		if !CanTry(e.maxAttempt, chunk) {
@@ -354,7 +378,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		err := e.requestChunkDataPack(chunk)
+		err = e.requestChunkDataPack(chunk)
 		if err != nil {
 			log.Warn().Msg("could not request chunk data pack")
 			continue
