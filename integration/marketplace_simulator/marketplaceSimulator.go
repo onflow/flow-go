@@ -620,6 +620,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String(), m.account.Address.String()))
 
+	time.Sleep(time.Second)
 	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
 	fmt.Println(">>>", string(script))
