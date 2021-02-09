@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -249,8 +250,12 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 
 	err := ms.matching.OnReceipt(receipt.ExecutorID, receipt)
-	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
-	ms.Assert().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "should handle error internally")
+
+	// return exception
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(fmt.Errorf("")).Once()
+	err = ms.matching.OnReceipt(receipt.ExecutorID, receipt)
+	ms.Require().Error(err, "should fail with exception")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
@@ -264,16 +269,14 @@ func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
 	err := ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "should handle error internally")
 
 	// approval from random origin but with valid ApproverID (i.e. a verification node)
 	originID = unittest.IdentifierFixture() // random origin
 	approval = unittest.ResultApprovalFixture(unittest.WithApproverID(ms.VerID))
 
 	err = ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "should handle error internally")
 
 	// In both cases, we expect the approval to be rejected without hitting the mempools
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -305,8 +308,7 @@ func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
 	)
 
 	err := ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval from wrong approver role")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "should handle error internally")
 
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
@@ -321,8 +323,7 @@ func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
 	ms.Identities[originID].Stake = 0
 
 	err := ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval from unstaked approver")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "should handle error internally")
 
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
