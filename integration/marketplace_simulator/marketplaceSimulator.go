@@ -631,11 +631,16 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 	res, err := m.flowClient.ExecuteScriptAtBlockID(context.Background(), blockRef.ID, script, nil)
 	// res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
+	result := make([]uint64, 0)
+	v := res.ToGoValue().([]interface{})
+	for _, i := range v {
+		result = append(result, i.(uint64))
+	}
 	fmt.Println(">>>", string(script))
-	fmt.Println(">>>>>", res.ToGoValue().([]uint64))
+	fmt.Println(">>>>>", result)
 	fmt.Println(">>>>>", err)
 
-	return res.ToGoValue().([]uint64), err
+	return result, err
 }
 
 func (m *marketPlaceAccount) Act() error {
