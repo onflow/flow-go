@@ -623,7 +623,7 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
 	fmt.Println(">>>", string(script))
-	fmt.Println(">>>>>", res.ToGoValue())
+	fmt.Println(">>>>>", res)
 	fmt.Println(">>>>>", err)
 	return nil
 }
