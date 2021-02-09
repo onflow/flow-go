@@ -84,6 +84,7 @@ func newFlowAccountFromJSON(jsonStr []byte, flowClient *client.Client) (*flowAcc
 		return nil, fmt.Errorf("error decoding account from json: %w", err)
 	}
 
+	fmt.Println(">->->", account.Address)
 	acc, err := flowClient.GetAccount(context.Background(), *account.Address)
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account: %w", err)
