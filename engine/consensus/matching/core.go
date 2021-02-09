@@ -142,8 +142,8 @@ func NewCore(
 	return e, nil
 }
 
-// onReceipt processes a new execution receipt.
-func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+// OnReceipt processes a new execution receipt.
+func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	startTime := time.Now()
 	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
 	defer func() {
@@ -162,8 +162,8 @@ func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 
 	initialState, finalState, err := validation.IntegrityCheck(receipt)
 	if err != nil {
-		log.Error().Msg("received execution receipt that didn't pass the integrity check")
-		return engine.NewInvalidInputErrorf("%w", err)
+		log.Err(err).Msg("received execution receipt that didn't pass the integrity check")
+		return nil
 	}
 
 	log = log.With().
@@ -204,6 +204,10 @@ func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	err = c.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 	childSpan.Finish()
 	if err != nil {
+		if engine.IsInvalidInputError(err) {
+			log.Err(err).Msg("invalid execution receipt")
+			return nil
+		}
 		return fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
@@ -286,8 +290,8 @@ func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zero
 	return nil
 }
 
-// onApproval processes a new result approval.
-func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+// OnApproval processes a new result approval.
+func (c *Core) OnApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
 	startTime := time.Now()
 	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
 	defer func() {
@@ -296,6 +300,7 @@ func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 	}()
 
 	log := c.log.With().
+		Hex("origin_id", originID[:]).
 		Hex("approval_id", logging.Entity(approval)).
 		Hex("block_id", approval.Body.BlockID[:]).
 		Hex("result_id", approval.Body.ExecutionResultID[:]).
@@ -307,7 +312,8 @@ func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 	// we rely on the networking layer for enforcing message integrity via the
 	// networking key.
 	if approval.Body.ApproverID != originID {
-		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
+		log.Error().Msgf("invalid origin ID for approval: %x", originID)
+		return nil
 	}
 
 	// check if we already have the block the approval pertains to
@@ -332,6 +338,10 @@ func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 		// Check if the approver was a staked verifier at that block.
 		err = c.ensureStakedNodeWithRole(approval.Body.ApproverID, head, flow.RoleVerification)
 		if err != nil {
+			if engine.IsInvalidInputError(err) {
+				log.Err(err).Msg("received approval from invalid node")
+				return nil
+			}
 			return fmt.Errorf("failed to process approval: %w", err)
 		}
 

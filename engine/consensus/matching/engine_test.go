@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/fifoqueue"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -75,13 +76,17 @@ func (ms *EngineContextSuite) SetupTest() {
 			emergencySealingActive:               false,
 		},
 		approvalSink:                         approvalsProvider,
-		approvalResponseSink:                 approvalResponseProvider,
+		requestedApprovalSink:                approvalResponseProvider,
 		receiptSink:                          receiptsProvider,
 		pendingEventSink:                     make(chan *Event),
 		engineMetrics:                        metrics,
 		cacheMetrics:                         metrics,
 		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
 	}
+
+	ms.context.pendingReceipts, _ = fifoqueue.NewFifoQueue()
+	ms.context.pendingApprovals, _ = fifoqueue.NewFifoQueue()
+	ms.context.pendingRequestedApprovals, _ = fifoqueue.NewFifoQueue()
 
 	<-ms.context.Ready()
 }

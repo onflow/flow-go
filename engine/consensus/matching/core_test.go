@@ -108,8 +108,8 @@ func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
 	// This receipt has a random block ID, so the matching engine won't find it.
 	receipt := unittest.ExecutionReceiptFixture()
 
-	// onReceipt should reject the receipt without throwing an error
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	// OnReceipt should reject the receipt without throwing an error
+	err := ms.matching.OnReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should drop receipt for unknown block without error")
 
 	ms.ReceiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -125,7 +125,7 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.LatestSealedBlock))),
 	)
 
-	err := ms.matching.onReceipt(originID, receipt)
+	err := ms.matching.OnReceipt(originID, receipt)
 	ms.Require().NoError(err, "should ignore receipt for sealed result")
 
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
@@ -145,9 +145,9 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 	// the mempool, and return false as we are testing the case where it was already in the mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(false, nil).Once()
 
-	// onReceipt should return immediately after realizing the receipt is already in the mempool
+	// OnReceipt should return immediately after realizing the receipt is already in the mempool
 	// but without throwing any errors
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	err := ms.matching.OnReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should ignore already pending receipt")
 
 	ms.ReceiptsPL.AssertExpectations(ms.T())
@@ -174,7 +174,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	// Expect the receipt to be added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	err := ms.matching.OnReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should not error for different receipt for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertExpectations(ms.T())
@@ -203,7 +203,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
 		Return(true, nil).Once()
 
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	err := ms.matching.OnReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should not error for different receipt for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertExpectations(ms.T())
@@ -228,8 +228,8 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
 		Return(true, nil).Once()
 
-	// onReceipt should run to completion without throwing an error
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	// OnReceipt should run to completion without throwing an error
+	err := ms.matching.OnReceipt(receipt.ExecutorID, receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
@@ -248,7 +248,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	)
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 
-	err := ms.matching.onReceipt(receipt.ExecutorID, receipt)
+	err := ms.matching.OnReceipt(receipt.ExecutorID, receipt)
 	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
 	ms.Assert().True(engine.IsInvalidInputError(err))
 
@@ -263,7 +263,7 @@ func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 	originID := ms.VerID
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
-	err := ms.matching.onApproval(originID, approval)
+	err := ms.matching.OnApproval(originID, approval)
 	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
 	ms.Require().True(engine.IsInvalidInputError(err))
 
@@ -271,7 +271,7 @@ func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 	originID = unittest.IdentifierFixture() // random origin
 	approval = unittest.ResultApprovalFixture(unittest.WithApproverID(ms.VerID))
 
-	err = ms.matching.onApproval(originID, approval)
+	err = ms.matching.OnApproval(originID, approval)
 	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
 	ms.Require().True(engine.IsInvalidInputError(err))
 
@@ -289,8 +289,8 @@ func (ms *MatchingSuite) TestApprovalUnknownBlock() {
 	// Make sure the approval is added to the cache for future processing
 	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
 
-	// onApproval should not throw an error
-	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
+	// OnApproval should not throw an error
+	err := ms.matching.OnApproval(approval.Body.ApproverID, approval)
 	ms.Require().NoError(err, "should cache approvals for unknown blocks")
 
 	ms.ApprovalsPL.AssertExpectations(ms.T())
@@ -304,7 +304,7 @@ func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
 		unittest.WithApproverID(originID),
 	)
 
-	err := ms.matching.onApproval(originID, approval)
+	err := ms.matching.OnApproval(originID, approval)
 	ms.Require().Error(err, "should reject approval from wrong approver role")
 	ms.Require().True(engine.IsInvalidInputError(err))
 
@@ -320,7 +320,7 @@ func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
 	)
 	ms.Identities[originID].Stake = 0
 
-	err := ms.matching.onApproval(originID, approval)
+	err := ms.matching.OnApproval(originID, approval)
 	ms.Require().Error(err, "should reject approval from unstaked approver")
 	ms.Require().True(engine.IsInvalidInputError(err))
 
@@ -335,7 +335,7 @@ func (ms *MatchingSuite) TestOnApprovalSealedResult() {
 		unittest.WithApproverID(originID),
 	)
 
-	err := ms.matching.onApproval(originID, approval)
+	err := ms.matching.OnApproval(originID, approval)
 	ms.Require().NoError(err, "should ignore approval for sealed result")
 
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -350,9 +350,9 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 	// approval, and return false as if it was already in the mempool
 	ms.ApprovalsPL.On("Add", approval).Return(false, nil).Once()
 
-	// onApproval should return immediately after trying to insert the approval,
+	// OnApproval should return immediately after trying to insert the approval,
 	// without throwing any errors
-	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
+	err := ms.matching.OnApproval(approval.Body.ApproverID, approval)
 	ms.Require().NoError(err, "should ignore approval if already pending")
 
 	ms.ApprovalsPL.AssertExpectations(ms.T())
@@ -369,8 +369,8 @@ func (ms *MatchingSuite) TestOnApprovalValid() {
 	// check that the approval is correctly added
 	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
 
-	// onApproval should run to completion without throwing any errors
-	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
+	// OnApproval should run to completion without throwing any errors
+	err := ms.matching.OnApproval(approval.Body.ApproverID, approval)
 	ms.Require().NoError(err, "should add approval to mempool if valid")
 
 	ms.ApprovalsPL.AssertExpectations(ms.T())
