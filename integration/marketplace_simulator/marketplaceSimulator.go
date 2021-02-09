@@ -255,7 +255,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 		accessNode := m.networkConfig.AccessNodeAddresses[rand.Intn(n)]
 
 		for _, acc := range group {
-			ma := newMarketPlaceAccount(&acc, group, m.log, m.simulatorConfig, accessNode)
+			c := acc
+			ma := newMarketPlaceAccount(&c, group, m.log, m.simulatorConfig, accessNode)
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
