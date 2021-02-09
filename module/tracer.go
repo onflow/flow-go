@@ -29,4 +29,11 @@ type Tracer interface {
 		operationName trace.SpanName,
 		opts ...opentracing.StartSpanOption,
 	) opentracing.Span
+
+	// WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
+	// executes the function f, and finishes the span once the function returns.
+	WithSpanFromContext(ctx context.Context,
+		operationName trace.SpanName,
+		f func(),
+		opts ...opentracing.StartSpanOption)
 }
