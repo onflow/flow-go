@@ -97,7 +97,7 @@ func testFeldmanVSSQual(t *testing.T) {
 
 // Testing JointFeldman by simulating a network of n nodes
 func testJointFeldman(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
+	log.SetLevel(log.InfoLevel)
 
 	n := 4
 	var threshold int
@@ -116,17 +116,17 @@ func testJointFeldman(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidShares)
 	})
 	// unhappy path, with invalid vector
-	t.Run(fmt.Sprintf("JointFeldman_InvalidVector_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	/*t.Run(fmt.Sprintf("JointFeldman_InvalidVector_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidVector)
-	})
+	})*/
 	// unhappy path, with invalid complaints
-	t.Run(fmt.Sprintf("JointFeldman_InvalidComplaints_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	/*t.Run(fmt.Sprintf("JointFeldman_InvalidComplaints_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaint)
 	})
 	// unhappy path, with invalid complaint answers
 	t.Run(fmt.Sprintf("JointFeldman_InvalidComplaintAnswers_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaintAnswer)
-	})
+	})*/
 }
 
 // Supported Key Generation protocols
@@ -288,6 +288,8 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// sync the two timeouts and start the next phase
 	for ; phase <= 2; phase++ {
 		sync.Wait()
+		// post processing required for some edge case tests
+		go timeoutPostProcess(processors, t, phase)
 		sync.Add(n)
 		for current := 0; current < n; current++ {
 			go dkgRunChan(&processors[current], &sync, t, phase)
@@ -359,10 +361,9 @@ func dkgRunChan(proc *testDKGProcessor,
 		case <-time.After(phaseSwitchTimeout):
 			switch phase {
 			case 0:
-				log.Infof("%d shares phase ended \n", proc.current)
+				log.Errorf("%d shares phase ended\n", proc.current)
 				err := proc.dkg.NextTimeout()
 				require.Nil(t, err)
-				timeoutPostProcess(proc, t, phase) // post processing required for some edge case tests
 			case 1:
 				log.Infof("%d complaints phase ended \n", proc.current)
 				err := proc.dkg.NextTimeout()
@@ -380,13 +381,17 @@ func dkgRunChan(proc *testDKGProcessor,
 }
 
 // post processing required for some edge case tests
-func timeoutPostProcess(proc *testDKGProcessor, t *testing.T, phase int) {
+func timeoutPostProcess(processors []testDKGProcessor, t *testing.T, phase int) {
 	if phase == 1 {
-		// to test timeouted messages, late messages are copied to the main channels
-		for i, ch := range proc.chans {
-			for msg := range ch {
-				proc.lateChansTimeout1[i] <- msg
-			}
+		for i := 0; i < len(processors); i++ {
+			go func(i int) {
+				for len(processors[0].lateChansTimeout1[i]) != 0 {
+					// to test timeouted messages, late messages are copied to the main channels
+					//for len(proc.lateChansTimeout1[proc.current]) != 0 {
+					msg := <-processors[0].lateChansTimeout1[i]
+					processors[0].chans[i] <- msg
+				}
+			}(i)
 		}
 	} else if phase == 2 {
 
@@ -497,7 +502,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
 		// choose a random reason for an invalid share
 		coin := mrand.Intn(100)
-		//coin = 5
+		coin = 5
 		gt.Logf("malicious send, coin is %d\n", coin%6)
 		switch coin % 6 {
 		case 0:
@@ -576,8 +581,9 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 
 	// choose a random reason of an invalid vector
 	coin := mrand.Intn(100)
-	gt.Logf("malicious vector broadcast, coin is %d\n", coin%4)
-	switch coin % 4 {
+	coin = 4
+	gt.Logf("malicious vector broadcast, coin is %d\n", coin%5)
+	switch coin % 5 {
 	case 0:
 		// invalid point serialization
 		newMsg.data[1] = 0xFF
@@ -590,9 +596,18 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 	case 3:
 		// wrong header, equivalent to not sending at all
 		newMsg.data[0] = byte(feldmanVSSShare)
+	case 4:
+		// send the vector after the first timeout, equivalent to not sending at all
+		// as the vector should be ignored.
+		for i := 0; i < proc.dkg.Size(); i++ {
+			if i != proc.current {
+				proc.lateChansTimeout1[i] <- newMsg
+			}
+		}
+		return
 	}
 	gt.Logf("%x\n", newMsg.data)
-	for i := 0; i < len(proc.chans); i++ {
+	for i := 0; i < proc.dkg.Size(); i++ {
 		if i != proc.current {
 			proc.chans[i] <- newMsg
 		}

@@ -316,6 +316,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 
 	// check the share timeout
 	if s.sharesTimeout {
+		fmt.Println("euuuuh - share")
 		s.processor.FlagMisbehavior(int(origin),
 			"private share is received after the shares timeout")
 		return
@@ -367,6 +368,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 
 	// check the share timeout
 	if s.sharesTimeout {
+		fmt.Println("euuuuh - vector")
 		s.processor.FlagMisbehavior(int(origin),
 			"verification vector received after the shares timeout")
 		return
