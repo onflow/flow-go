@@ -2,6 +2,7 @@ package requester
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/utils/logging"
 	"math"
 	"math/rand"
 	"time"
@@ -435,18 +436,22 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 			return fmt.Errorf("could not decode entity: %w", err)
 		}
 
-		// remove from needed items and pending items
-		delete(needed, entityID)
-		delete(e.items, entityID)
-
 		if item.checkIntegrity {
 			actualEntityID := entity.ID()
 			// validate that we got correct entity, exactly what we were expecting
 			if entityID != actualEntityID {
-				return engine.NewInvalidInputErrorf("could not validate response body for requested entity, expected: %v, actual: %v",
-					entityID, actualEntityID)
+				e.log.Error().
+					Hex("origin", logging.ID(originID)).
+					Hex("stated_entity_id", logging.ID(entityID)).
+					Hex("provided_entity", logging.ID(actualEntityID)).
+					Msg("provided entity does not match stated ID")
+				continue
 			}
 		}
+
+		// remove from needed items and pending items
+		delete(needed, entityID)
+		delete(e.items, entityID)
 
 		// process the entity
 		go e.handle(originID, entity)

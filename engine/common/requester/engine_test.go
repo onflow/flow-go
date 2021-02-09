@@ -368,14 +368,13 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	request.requests[req.Nonce] = req
 
 	err := request.onEntityResponse(targetID, res)
-	assert.Error(t, err)
-	assert.True(t, engine.IsInvalidInputError(err))
+	assert.NoError(t, err)
 
 	// check that the request was removed
 	assert.NotContains(t, request.requests, nonce)
 
-	// check that the provided items were removed
-	assert.NotContains(t, request.items, wanted.ID())
+	// check that the provided item wasn't removed
+	assert.Contains(t, request.items, wanted.ID())
 
 	// make sure we didn't process items
 	assert.Equal(t, 0, called)
