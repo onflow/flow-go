@@ -313,9 +313,10 @@ func (m *MarketPlaceSimulator) Run() error {
 		}
 		go func() {
 			acc := <-m.availableAccounts
-			fmt.Println("running account :", acc.Account().Address.String())
 			defer func() { m.availableAccounts <- acc }()
-			acc.Act()
+			fmt.Println("running account :", acc.Account().Address.String())
+			err := acc.Act()
+			fmt.Println("err: ", err)
 			// TODO handle the retuned error
 		}()
 	}
