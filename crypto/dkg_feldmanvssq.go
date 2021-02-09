@@ -184,6 +184,7 @@ func (s *feldmanVSSQualState) HandleBroadcastedMsg(orig int, msg []byte) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
+
 	if orig >= s.Size() || orig < 0 {
 		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
 			s.Size(), orig)
@@ -440,7 +441,7 @@ func (s *feldmanVSSQualState) checkComplaint(complainer index, c *complaint) boo
 
 // data = |complainee|
 func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
-	// check the complaints timeout
+	// check the complaint timeout
 	if s.complaintsTimeout {
 		s.processor.FlagMisbehavior(int(origin),
 			"complaint received after the complaint timeout")

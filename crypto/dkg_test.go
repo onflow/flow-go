@@ -64,6 +64,7 @@ const (
 	fewInvalidShares
 	invalidVectorBroadcast
 	invalidComplaintBroadcast
+	timeoutedComplaintBroadcast
 	invalidSharesComplainTrigger
 	invalidComplaintAnswerBroadcast
 )
@@ -114,17 +115,17 @@ func testJointFeldman(t *testing.T) {
 	// unhappy path, with invalid shares
 	/*t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidShares)
-	})*/
+	})
 	// unhappy path, with invalid vector
 	t.Run(fmt.Sprintf("JointFeldman_InvalidVector_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidVector)
-	})
+	})*/
 	// unhappy path, with invalid complaints
-	/*t.Run(fmt.Sprintf("JointFeldman_InvalidComplaints_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	t.Run(fmt.Sprintf("JointFeldman_InvalidComplaints_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaint)
 	})
 	// unhappy path, with invalid complaint answers
-	t.Run(fmt.Sprintf("JointFeldman_InvalidComplaintAnswers_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	/*t.Run(fmt.Sprintf("JointFeldman_InvalidComplaintAnswers_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaintAnswer)
 	})*/
 }
@@ -157,9 +158,11 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// create the node channels
 	chans := make([]chan *message, n)
 	lateChansTimeout1 := make([]chan *message, n)
+	lateChansTimeout2 := make([]chan *message, n)
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *message, 5*n)
 		lateChansTimeout1[i] = make(chan *message, 5*n)
+		lateChansTimeout2[i] = make(chan *message, 5*n)
 	}
 
 	// number of leaders in the protocol
@@ -178,6 +181,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 			current:           current,
 			chans:             chans,
 			lateChansTimeout1: lateChansTimeout1,
+			lateChansTimeout2: lateChansTimeout2,
 			protocol:          dkgType,
 			malicious:         honest,
 			disqualified:      list,
@@ -189,6 +193,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	mrand.Seed(rand)
 	t.Logf("math rand seed is %d", rand)
 	var r1, r2 int
+	var h int // h is the offset of the honest nodes to check the final protocol results are correct
 
 	switch test {
 	case happyPath:
@@ -197,6 +202,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	case invalidShares:
 		r1 = mrand.Intn(leaders + 1)      // leaders with invalid shares and will get disqualified
 		r2 = mrand.Intn(leaders - r1 + 1) // leaders with invalid shares but will recover
+		h = r1
 
 		var i int
 		for i = 0; i < r1; i++ {
@@ -209,7 +215,8 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	case invalidVector:
 		r1 = 1 + mrand.Intn(leaders) // leaders with invalid vector and will get disqualified
-		//r1 = 4
+		h = r1
+
 		// in this case r2 = 0
 		for i := 0; i < r1; i++ {
 			processors[i].malicious = invalidVectorBroadcast
@@ -218,19 +225,27 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	case invalidComplaint:
 		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaints and will get disqualified.
-		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the trigger leader below
+		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the trigger leader below.
+		r2 = mrand.Intn(leaders - r1) // participants with timeouted complaints: they are considered qualified by honest nodes
+		// but their results are invalid
+		h = r1 + r2 // r2 shouldn't be verified for protocol correctness
+
 		for i := 0; i < r1; i++ {
 			processors[i].malicious = invalidComplaintBroadcast
 		}
-		// the participant (r1) will send wrong shares and cause the 0..r1-1 leaders to send complaints
-		// this participant doesn't risk getting disqualified as the complaints against them
+		for i := r1; i < r1+r2; i++ {
+			processors[i].malicious = timeoutedComplaintBroadcast
+		}
+		// The participant (r1+r2) will send wrong shares and cause the 0..r1+r2-1 leaders to send complaints.
+		// This participant doesn't risk getting disqualified as the complaints against them
 		// are invalid and won't count.
-		processors[r1].malicious = invalidSharesComplainTrigger
-		t.Logf("%d participants will be disqualified\n", r1)
+		processors[r1+r2].malicious = invalidSharesComplainTrigger
+		t.Logf("%d participants will be disqualified, %d other participants won't be disqualified.\n", r1, r2)
 
 	case invalidComplaintAnswer:
 		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaint answers and will get disqualified.
 		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the complaint sender.
+		h = r1
 		// the 0..r1-1 leaders will send invalid shares to n-1 to trigger complaints.
 		for i := 0; i < r1; i++ {
 			processors[i].malicious = invalidComplaintAnswerBroadcast
@@ -307,7 +322,8 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	for i := 0; i < r1; i++ {
 		expected[i] = true
 	}
-	for i := r1; i < n; i++ {
+
+	for i := h; i < n; i++ {
 		t.Logf("node %d is not disqualified, its disqualified list is:\n", i)
 		t.Log(processors[i].disqualified)
 		assert.Equal(t, expected, processors[i].disqualified)
@@ -323,12 +339,12 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	} else {
 		t.Logf("dkg succeeded, there are %d disqualified nodes\n", r1)
 		// DKG has succeeded, check for final errors
-		for i := r1; i < n; i++ {
+		for i := h; i < n; i++ {
 			assert.NoError(t, processors[i].finalError)
 		}
 		// DKG has succeeded, check the final keys
-		for i := r1; i < n; i++ {
-			assert.True(t, processors[r1].pk.Equals(processors[i].pk),
+		for i := h; i < n; i++ {
+			assert.True(t, processors[h].pk.Equals(processors[i].pk),
 				"2 group public keys are mismatching")
 		}
 	}
@@ -387,14 +403,21 @@ func timeoutPostProcess(processors []testDKGProcessor, t *testing.T, phase int) 
 			go func(i int) {
 				for len(processors[0].lateChansTimeout1[i]) != 0 {
 					// to test timeouted messages, late messages are copied to the main channels
-					//for len(proc.lateChansTimeout1[proc.current]) != 0 {
 					msg := <-processors[0].lateChansTimeout1[i]
 					processors[0].chans[i] <- msg
 				}
 			}(i)
 		}
 	} else if phase == 2 {
-
+		for i := 0; i < len(processors); i++ {
+			go func(i int) {
+				for len(processors[0].lateChansTimeout2[i]) != 0 {
+					// to test timeouted messages, late messages are copied to the main channels
+					msg := <-processors[0].lateChansTimeout2[i]
+					processors[0].chans[i] <- msg
+				}
+			}(i)
+		}
 	}
 }
 
@@ -417,8 +440,9 @@ type testDKGProcessor struct {
 
 	// main message channels
 	chans []chan *message
-	// extra channels for late messges with regards to the first timeout
+	// extra channels for late messges with regards to the first timeout, and second timeout
 	lateChansTimeout1 []chan *message
+	lateChansTimeout2 []chan *message
 	// type of the protocol
 	protocol int
 
@@ -489,7 +513,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 	} else if proc.malicious == fewInvalidShares {
 		recipients = proc.dkg.Threshold() //  0 <= recipients <= t
 	} else if proc.malicious == invalidSharesComplainTrigger {
-		recipients = proc.current // equal to r1, which causes all r1 to complain
+		recipients = proc.current // equal to r1+r2, which causes all r1+r2 to complain
 	} else if proc.malicious == invalidComplaintAnswerBroadcast {
 		recipients = 0 // treat this case separately as the complaint trigger is the node n-1
 	} else {
@@ -555,7 +579,8 @@ func (proc *testDKGProcessor) Broadcast(data []byte) {
 
 		if data[0] == byte(feldmanVSSVerifVec) && proc.malicious == invalidVectorBroadcast {
 			proc.invalidVectorBroadcast(data)
-		} else if data[0] == byte(feldmanVSSComplaint) && proc.malicious == invalidComplaintBroadcast {
+		} else if data[0] == byte(feldmanVSSComplaint) &&
+			(proc.malicious == invalidComplaintBroadcast || proc.malicious == timeoutedComplaintBroadcast) {
 			proc.invalidComplaintBroadcast(data)
 		} else if data[0] == byte(feldmanVSSComplaintAnswer) && proc.malicious == invalidComplaintAnswerBroadcast {
 			proc.invalidComplaintAnswerBroadcast(data)
@@ -619,23 +644,35 @@ func (proc *testDKGProcessor) invalidComplaintBroadcast(data []byte) {
 	gt.Log("malicious broadcast:")
 	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 
-	// choose a random reason for an invalid complaint
-	coin := mrand.Intn(100)
-	gt.Logf("malicious complaint broadcast, coin is %d\n", coin%2)
-	switch coin % 2 {
-	case 0:
-		// invalid complainee
-		newMsg.data[1] = byte(proc.dkg.Size() + 1)
-	case 1:
-		// invalid length
-		newMsg.data = make([]byte, complaintSize+5)
-		copy(newMsg.data, data)
-	}
-	gt.Logf("%x\n", newMsg.data)
-	for i := 0; i < len(proc.chans); i++ {
-		if i != proc.current {
-			proc.chans[i] <- newMsg
+	if proc.malicious == invalidComplaintBroadcast {
+
+		// choose a random reason for an invalid complaint
+		coin := mrand.Intn(100)
+		gt.Logf("malicious complaint broadcast, coin is %d\n", coin%2)
+		switch coin % 2 {
+		case 0:
+			// invalid complainee
+			newMsg.data[1] = byte(proc.dkg.Size() + 1)
+		case 1:
+			// invalid length
+			newMsg.data = make([]byte, complaintSize+5)
+			copy(newMsg.data, data)
 		}
+		gt.Logf("%x\n", newMsg.data)
+		for i := 0; i < len(proc.chans); i++ {
+			if i != proc.current {
+				proc.chans[i] <- newMsg
+			}
+		}
+	} else if proc.malicious == timeoutedComplaintBroadcast {
+		// send the complaint after the second timeout, equivalent to not sending at all
+		// as the complaint should be ignored.
+		for i := 0; i < len(proc.chans); i++ {
+			if i != proc.current {
+				proc.lateChansTimeout2[i] <- newMsg
+			}
+		}
+		return
 	}
 }
 
