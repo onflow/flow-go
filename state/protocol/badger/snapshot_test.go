@@ -158,11 +158,8 @@ func TestSealingSegment(t *testing.T) {
 
 			// build a block sealing block1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			block2.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{
-					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
-				},
-			})
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
 			err = state.Extend(&block2)
 			require.NoError(t, err)
 
@@ -200,11 +197,8 @@ func TestSealingSegment(t *testing.T) {
 
 			// build the block sealing block 1
 			blockN := unittest.BlockWithParentFixture(parent.Header)
-			blockN.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{
-					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
-				},
-			})
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			blockN.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
 			err = state.Extend(&blockN)
 			require.NoError(t, err)
 
@@ -235,20 +229,14 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{
-					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block1.ID())),
-				},
-			})
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
 			err = state.Extend(&block3)
 			require.NoError(t, err)
 
 			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.SetPayload(flow.Payload{
-				Seals: []*flow.Seal{
-					unittest.Seal.Fixture(unittest.Seal.WithBlockID(block2.ID())),
-				},
-			})
+			receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
+			block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal2)))
 			err = state.Extend(&block4)
 			require.NoError(t, err)
 
