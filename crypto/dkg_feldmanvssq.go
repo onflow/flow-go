@@ -96,7 +96,7 @@ func (s *feldmanVSSQualState) init() {
 // The second call is a timeout for broadcasting the complaints.
 func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
-		return errors.New("dkg protocol is not running")
+		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
 	}
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
@@ -127,7 +127,7 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 // This is also a timeout to receiving all complaint answers
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
-		return nil, nil, nil, errors.New("dkg protocol is not running")
+		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
 	}
 	if !s.sharesTimeout || !s.complaintsTimeout {
 		return nil, nil, nil,
@@ -188,14 +188,14 @@ func (s *feldmanVSSQualState) HandleBroadcastedMsg(orig int, msg []byte) error {
 			s.Size(), orig)
 	}
 
-	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, "received message is empty")
-		return nil
-	}
-
 	// In case a message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
+		return nil
+	}
+
+	if len(msg) == 0 {
+		s.processor.FlagMisbehavior(orig, "received message is empty")
 		return nil
 	}
 
@@ -229,14 +229,14 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("wrong input")
 	}
 
-	if len(msg) == 0 {
-		s.processor.FlagMisbehavior(orig, "received message is empty")
-		return nil
-	}
-
 	// In case a private message is received by the origin node,
 	// the message is just ignored
 	if s.currentIndex == index(orig) {
+		return nil
+	}
+
+	if len(msg) == 0 {
+		s.processor.FlagMisbehavior(orig, "received message is empty")
 		return nil
 	}
 
