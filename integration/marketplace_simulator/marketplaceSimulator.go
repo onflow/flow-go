@@ -303,10 +303,6 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 }
 
 func (m *MarketPlaceSimulator) Run() error {
-	for acc := range m.availableAccounts {
-		fmt.Println(">>>>", acc)
-		fmt.Println(">>>>>>", acc.Account().Address)
-	}
 
 	// select an account
 	// call Act and put it back to list when is returned
