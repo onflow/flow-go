@@ -260,6 +260,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
 
+			m.log.Info().Msgf("setting up marketplace account with address %s", ma.Account().Address)
 			// GenerateSetupShardedCollectionScript numBuckets
 			script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address)
 			tx := flowsdk.NewTransaction().
@@ -267,25 +268,11 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 				SetScript(script)
 
 			result, err := m.sendTxAndWait(tx, ma.Account())
-			fmt.Println(">>e>", err)
-			fmt.Println(">>r>", result)
+			if err != nil || result.Error != nil {
+				m.log.Error().Msgf("setting up marketplace accounts failed: %w , %w", result.Error, err)
+				return err
+			}
 
-			// mint moments for that account
-			// script = nbaTemplates.GenerateBatchMintMomentScript(*m.nbaTopshotAccount.Address(), *ma.Account().Address(), 1, 1, uint64(batchSize))
-			// tx = flowsdk.NewTransaction().
-			// 	SetReferenceBlockID(blockRef.ID).
-			// 	SetScript(script)
-
-			// result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
-			// if err != nil || result.Error != nil {
-			// 	m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
-			// 	return err
-			// }
-			// fmt.Println(">>e>", err)
-			// fmt.Println(">>r>", result)
-			// totalMinted += batchSize
-
-			fmt.Println("account address:", ma.Account().Address)
 			//  transfer some moments
 			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
 			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
@@ -296,10 +283,14 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 				SetScript(script)
 
 			result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
-			fmt.Println("2>>e>", err)
-			fmt.Println("2>>r>", result)
-			fmt.Println("2>>o>", result.Events)
+			if err != nil || result.Error != nil {
+				m.log.Error().Msgf("transfering initial moments to a marketplace account failed: %w , %w", result.Error, err)
+				return err
+			}
 			momentCounter += 5
+
+			// setup sales
+			// nbaTemplate.GenerateCreateSaleScript()
 
 			// get moments
 			ma.GetMoments()
@@ -631,9 +622,9 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 
 func (m *marketPlaceAccount) Act() {
 
-	// nbaTemplates.GenerateTransferMomentScript(nbaTopshotAddress, nbaTopshotAddress, recipientAddr flow.Address, tokenID int)
-
 	// with some chance don't do anything
+
+	// list a moment to sell
 
 	// query for active listings to buy
 
