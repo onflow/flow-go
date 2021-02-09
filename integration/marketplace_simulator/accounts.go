@@ -43,6 +43,7 @@ func (acc *flowAccount) PrepareAndSignTx(tx *flowsdk.Transaction, keyID int) err
 	if err != nil {
 		return err
 	}
+	acc.accountKey.SequenceNumber++
 	return nil
 }
 
