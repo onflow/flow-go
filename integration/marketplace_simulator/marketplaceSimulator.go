@@ -521,10 +521,21 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 					signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 
 					newAcc := newFlowAccount(i, &accountAddress, string(privKey.Encode()), accountKey, signer)
+
+					js, err := newAcc.ToJSON()
+					if err != nil {
+						panic(err)
+					}
+
+					newAcc2, err := newFlowAccountFromJSON(js, m.flowClient)
+					if err != nil {
+						panic(err)
+					}
+
 					i++
 
 					newAcc.ToJSON()
-					accounts = append(accounts, *newAcc)
+					accounts = append(accounts, *newAcc2)
 
 					m.log.Debug().
 						Hex("address", accountAddress.Bytes()).
