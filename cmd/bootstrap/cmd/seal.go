@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -24,7 +25,12 @@ func constructRootResultAndSeal(
 	}
 
 	participants := model.ToIdentityList(participantNodes)
-	blockID := block.ID()
+
+	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err = rand.Read(randomSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not generate random source for epoch setup event")
+	}
 
 	epochSetup := &flow.EpochSetup{
 		Counter:      flagEpochCounter,
@@ -32,7 +38,7 @@ func constructRootResultAndSeal(
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  assignments,
-		RandomSource: blockID[:],
+		RandomSource: randomSource,
 	}
 
 	dkgLookup := model.ToDKGLookup(dkgData, participants)
