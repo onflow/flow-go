@@ -2,7 +2,6 @@ package requester
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/utils/logging"
 	"math"
 	"math/rand"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // HandleFunc is a function provided to the requester engine to handle an entity
