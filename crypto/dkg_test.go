@@ -112,13 +112,13 @@ func testJointFeldman(t *testing.T) {
 	n = 5
 	threshold = optimalThreshold(n)
 	// unhappy path, with invalid shares
-	t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	/*t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidShares)
-	})
-	// unhappy path, with invalid vector
-	/*t.Run(fmt.Sprintf("JointFeldman_InvalidVector_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
-		dkgCommonTest(t, jointFeldman, n, threshold, invalidVector)
 	})*/
+	// unhappy path, with invalid vector
+	t.Run(fmt.Sprintf("JointFeldman_InvalidVector_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+		dkgCommonTest(t, jointFeldman, n, threshold, invalidVector)
+	})
 	// unhappy path, with invalid complaints
 	/*t.Run(fmt.Sprintf("JointFeldman_InvalidComplaints_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaint)
@@ -209,6 +209,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 
 	case invalidVector:
 		r1 = 1 + mrand.Intn(leaders) // leaders with invalid vector and will get disqualified
+		//r1 = 4
 		// in this case r2 = 0
 		for i := 0; i < r1; i++ {
 			processors[i].malicious = invalidVectorBroadcast
@@ -348,12 +349,11 @@ func dkgRunChan(proc *testDKGProcessor,
 		case newMsg := <-proc.chans[proc.current]:
 			proc.startSync.Wait() // avoids reading a message when the receiving dkg instance
 			// hasn't started yet.
-			log.Debugf("%d Receiving from %d:", proc.current, newMsg.orig)
 			if newMsg.channel == private {
-				log.Infof("%d Receiving from %d:", proc.current, newMsg.orig)
 				err := proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
 				require.Nil(t, err)
 			} else {
+				//log.Infof("%d broadcast receiving from %d:", proc.current, newMsg.orig)
 				err := proc.dkg.HandleBroadcastedMsg(newMsg.orig, newMsg.data)
 				require.Nil(t, err)
 			}
@@ -502,7 +502,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
 		// choose a random reason for an invalid share
 		coin := mrand.Intn(100)
-		coin = 5
+		//coin = 5
 		gt.Logf("malicious send, coin is %d\n", coin%6)
 		switch coin % 6 {
 		case 0:
@@ -534,7 +534,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 				return
 			*/
 			// message will be sent after the shares timeout and will be considered late
-			// by the receiver. All late messages go into a separate channel and will be copied to
+			// by the receiver. All late messages go into a separate channel and will be sent to
 			// the main channel after the shares timeout.
 			proc.lateChansTimeout1[dest] <- newMsg
 			return
@@ -551,6 +551,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 func (proc *testDKGProcessor) Broadcast(data []byte) {
 	go func() {
 		gt.Logf("%d Broadcasting:", proc.current)
+		log.Infof("%d Broadcasting:", proc.current)
 
 		if data[0] == byte(feldmanVSSVerifVec) && proc.malicious == invalidVectorBroadcast {
 			proc.invalidVectorBroadcast(data)
@@ -581,7 +582,7 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 
 	// choose a random reason of an invalid vector
 	coin := mrand.Intn(100)
-	coin = 4
+	//coin = 4
 	gt.Logf("malicious vector broadcast, coin is %d\n", coin%5)
 	switch coin % 5 {
 	case 0:

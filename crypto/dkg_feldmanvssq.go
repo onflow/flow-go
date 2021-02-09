@@ -180,6 +180,7 @@ const (
 // HandleBroadcastedMsg processes a new broadcasted message received by the current node.
 // orig is the message origin index
 func (s *feldmanVSSQualState) HandleBroadcastedMsg(orig int, msg []byte) error {
+
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
@@ -316,7 +317,6 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 
 	// check the share timeout
 	if s.sharesTimeout {
-		fmt.Println("euuuuh - share")
 		s.processor.FlagMisbehavior(int(origin),
 			"private share is received after the shares timeout")
 		return
@@ -368,7 +368,6 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 
 	// check the share timeout
 	if s.sharesTimeout {
-		fmt.Println("euuuuh - vector")
 		s.processor.FlagMisbehavior(int(origin),
 			"verification vector received after the shares timeout")
 		return
