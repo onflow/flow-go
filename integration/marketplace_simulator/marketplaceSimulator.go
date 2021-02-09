@@ -577,7 +577,7 @@ func newMarketPlaceAccount(account *flowAccount,
 	}
 	rand.Seed(time.Now().Unix()) // initialize global pseudo random generator
 
-	fclient, err := client.New(accessNodeAddr, grpc.WithInsecure())
+	flowClient, err := client.New(accessNodeAddr, grpc.WithInsecure())
 	if err != nil {
 		panic(err)
 	}
@@ -587,7 +587,7 @@ func newMarketPlaceAccount(account *flowAccount,
 		account:         account,
 		friends:         friends,
 		txTracker:       txTracker,
-		flowClient:      fclient,
+		flowClient:      flowClient,
 		simulatorConfig: simulatorConfig,
 	}
 }
@@ -739,5 +739,7 @@ func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *fl
 	if idListLen := len(momentIDList); idListLen > 2 {
 		momentIDList = momentIDList[:len(momentIDList)-2]
 	}
-	return []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
+	script := []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
+	fmt.Println(script)
+	return script
 }
