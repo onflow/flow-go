@@ -740,6 +740,6 @@ func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *fl
 		momentIDList = momentIDList[:len(momentIDList)-2]
 	}
 	script := []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
-	fmt.Println(script)
+	fmt.Println(string(script))
 	return script
 }
