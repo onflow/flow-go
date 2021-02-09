@@ -186,6 +186,12 @@ func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
 	}
 }
 
+func WithGuarantees(guarantees ...*flow.CollectionGuarantee) func(*flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.Guarantees = append(payload.Guarantees, guarantees...)
+	}
+}
+
 func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	return func(payload *flow.Payload) {
 		payload.Receipts = append(payload.Receipts, receipts...)
