@@ -636,9 +636,9 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 	for _, i := range v {
 		result = append(result, i.(uint64))
 	}
-	fmt.Println(">>>", string(script))
-	fmt.Println(">>>>>", result)
-	fmt.Println(">>>>>", err)
+	// fmt.Println(">>>", string(script))
+	// fmt.Println(">>>>>", result)
+	// fmt.Println(">>>>>", err)
 
 	return result, err
 }
