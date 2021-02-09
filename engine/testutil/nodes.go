@@ -309,6 +309,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
 	eventsStorage := storage.NewEvents(node.DB)
+	serviceEventsStorage := storage.NewServiceEvents(node.DB)
 	txResultStorage := storage.NewTransactionResults(node.DB)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
@@ -400,6 +401,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Blocks,
 		collectionsStorage,
 		eventsStorage,
+		serviceEventsStorage,
 		txResultStorage,
 		computation,
 		pusherEngine,
@@ -624,10 +626,6 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.HeaderStorage == nil {
-		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
-	}
-
 	if node.PendingChunks == nil {
 		node.PendingChunks = match.NewChunks(chunksLimit)
 
@@ -730,7 +728,7 @@ func VerificationNode(t testing.TB,
 			assigner,
 			node.State,
 			node.PendingChunks,
-			node.HeaderStorage,
+			node.Headers,
 			requestInterval,
 			int(failureThreshold))
 		require.Nil(t, err)
