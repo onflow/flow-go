@@ -628,15 +628,14 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 
 	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String(), m.account.Address.String()))
 
-	time.Sleep(time.Second)
 	res, err := m.flowClient.ExecuteScriptAtBlockID(context.Background(), blockRef.ID, script, nil)
 	// res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
 	fmt.Println(">>>", string(script))
-	fmt.Println(">>>>>", res)
+	fmt.Println(">>>>>", res.ToGoValue().([]uint64))
 	fmt.Println(">>>>>", err)
-	// TODO fix me to return the resutls
-	return []uint64{0}, err
+
+	return res.ToGoValue().([]uint64), err
 }
 
 func (m *marketPlaceAccount) Act() error {
