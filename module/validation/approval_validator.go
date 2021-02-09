@@ -30,32 +30,33 @@ func (v *approvalValidator) Validate(approval *flow.ResultApproval) error {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
 		}
-		return engine.NewOutdatedInputErrorf("no header for block: %v", approval.Body.BlockID)
-	} 
-		// drop approval, if it is for block whose height is lower or equal to already sealed height
-		sealed, err := v.state.Sealed().Head()
-		if err != nil {
-			return fmt.Errorf("could not find sealed block: %w", err)
-		}
-		if sealed.Height >= head.Height {
-			return engine.NewOutdatedInputErrorf("result is for already sealed and finalized block height")
-		}
 
-		identity, err := identityForNode(v.state, head.ID(), approval.Body.ApproverID)
-		if err != nil {
-			return fmt.Errorf("failed to get identity for node %v: %w", approval.Body.ApproverID, err)
-		}
+		return engine.NewUnverifiableInputError("no header for block: %v", approval.Body.BlockID)
+	}
 
-		// Check if the approver was a staked verifier at that block.
-		err = ensureStakedNodeWithRole(identity, flow.RoleVerification)
-		if err != nil {
-			return fmt.Errorf("approval not from authorized verifier: %w", err)
-		}
+	// drop approval, if it is for block whose height is lower or equal to already sealed height
+	sealed, err := v.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not find sealed block: %w", err)
+	}
+	if sealed.Height >= head.Height {
+		return engine.NewOutdatedInputErrorf("result is for already sealed and finalized block height")
+	}
 
-		err = v.verifySignature(approval, identity)
-		if err != nil {
-			return fmt.Errorf("invalid approval signature: %w", err)
-		}
+	identity, err := identityForNode(v.state, head.ID(), approval.Body.ApproverID)
+	if err != nil {
+		return fmt.Errorf("failed to get identity for node %v: %w", approval.Body.ApproverID, err)
+	}
+
+	// Check if the approver was a staked verifier at that block.
+	err = ensureStakedNodeWithRole(identity, flow.RoleVerification)
+	if err != nil {
+		return fmt.Errorf("approval not from authorized verifier: %w", err)
+	}
+
+	err = v.verifySignature(approval, identity)
+	if err != nil {
+		return fmt.Errorf("invalid approval signature: %w", err)
 	}
 
 	return nil

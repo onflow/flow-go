@@ -3,7 +3,6 @@
 package matching
 
 import (
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -341,8 +340,7 @@ func (ms *MatchingSuite) TestOnApprovalOutdated() {
 	ms.approvalValidator.On("Validate", approval).Return(engine.NewOutdatedInputErrorf("")).Once()
 
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
-	ms.Require().Error(err, "should report error if invalid")
-	ms.Assert().True(engine.IsOutdatedInputError(err))
+	ms.Require().NoError(err, "should ingore if approval is outdated")
 
 	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)

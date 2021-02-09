@@ -73,8 +73,8 @@ func (as *ApprovalValidationSuite) TestApprovalUnknownBlock() {
 	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(originID)) // generates approval for random block ID
 
 	err := as.approvalValidator.Validate(approval)
-	as.Require().Error(err, "should mark block is outdated")
-	as.Require().True(engine.IsOutdatedInputError(err))
+	as.Require().Error(err, "should mark approval as unverifiable")
+	as.Require().True(engine.IsUnverifiableInputError(err))
 }
 
 // try to submit an approval from a consensus node
@@ -115,4 +115,24 @@ func (as *ApprovalValidationSuite) TestOnApprovalSealedResult() {
 	err := as.approvalValidator.Validate(approval)
 	as.Require().Error(err, "should ignore approval for sealed result")
 	as.Require().True(engine.IsOutdatedInputError(err))
+}
+
+// try to submit an approval from ejected node
+func (as *ApprovalValidationSuite) TestOnApprovalEjectedNode() {
+	verifier := as.Identities[as.VerID]
+	verifier.Ejected = true // mark as ejected
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithBlockID(as.UnfinalizedBlock.ID()),
+		unittest.WithApproverID(as.VerID),
+	)
+
+	approvalID := approval.ID()
+	as.verifier.On("Verify",
+		approvalID[:],
+		approval.VerifierSignature,
+		verifier.StakingPubKey).Return(true, nil).Once()
+
+	err := as.approvalValidator.Validate(approval)
+	as.Require().Error(err, "should fail because node is ejected")
+	as.Require().True(engine.IsInvalidInputError(err))
 }
