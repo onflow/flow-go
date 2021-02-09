@@ -608,9 +608,9 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 	template := `
 	import TopShot from 0x%s
 
-	pub fun main(account: Address): [UInt64] {
+	pub fun main(): [UInt64] {
 
-		let acct = getAccount(account)
+		let acct = getAccount(0x%s)
 
 		let collectionRef = acct.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
 
@@ -620,9 +620,9 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 	}
 	`
 
-	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String()))
+	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String(), m.account.Address.String()))
 
-	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, []cadence.Value{cadence.Address(*m.account.Address)})
+	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
 	fmt.Println(">>>", script)
 	fmt.Println(">>>>>", res.ToGoValue())
