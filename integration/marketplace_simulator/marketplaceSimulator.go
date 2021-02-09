@@ -604,7 +604,7 @@ func (m *marketPlaceAccount) Account() *flowAccount {
 	return m.account
 }
 
-func (m *marketPlaceAccount) GetMoments() []uint {
+func (m *marketPlaceAccount) GetMoments() []uint64 {
 
 	template := `
 	import TopShot from 0x%s
@@ -627,7 +627,8 @@ func (m *marketPlaceAccount) GetMoments() []uint {
 	fmt.Println(">>>", string(script))
 	fmt.Println(">>>>>", res)
 	fmt.Println(">>>>>", err)
-	return nil
+	// TODO fix me to return the resutls
+	return []uint64{0}
 }
 
 func (m *marketPlaceAccount) Act() error {
@@ -652,14 +653,16 @@ func (m *marketPlaceAccount) Act() error {
 
 	// // TODO txScript for assetToMove
 	// Transfer moment to a friend
-	n := len(m.friends)
-	friend := m.friends[rand.Intn(n)]
+	friend := m.friends[rand.Intn(len(m.friends))]
+
+	moments := m.GetMoments()
+	moment := moments[rand.Intn(len(moments))]
 
 	// TODO ramtin fix the fetch
 	txScript := generateBatchTransferMomentScript(m.simulatorConfig.NBATopshotAddress,
 		m.simulatorConfig.NBATopshotAddress,
 		friend.Address,
-		[]uint64{0})
+		[]uint64{moment})
 
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
@@ -756,6 +759,5 @@ func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *fl
 		momentIDList = momentIDList[:len(momentIDList)-2]
 	}
 	script := []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
-	fmt.Println(string(script))
 	return script
 }
