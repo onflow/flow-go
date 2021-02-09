@@ -6,6 +6,7 @@ import (
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
@@ -62,7 +63,77 @@ func New(
 }
 
 func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
+	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.ID()
+	referenceBlockID := receipt.ExecutionResult.BlockID
 
+	log := log.With().
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("result_id", logging.ID(resultID)).
+		Hex("reference_block_id", logging.ID(referenceBlockID)).
+		Hex("container_block_id", logging.ID(containerBlockID)).
+		Logger()
+
+	//
+	ok, err := e.processable(receipt)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not determine processability of receipt")
+		return
+	}
+	if !ok {
+		log.Debug().Err(err).Msg("receipt is not processable, skipping")
+		return
+	}
+
+	// chunk assignment
+	chunkList, err := e.chunkAssignments(context.Background(), &receipt.ExecutionResult)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not determine chunk assignment")
+		return
+	}
+	log.Info().
+		Int("total_assigned_chunks", len(chunkList)).
+		Msg("chunk assignment done")
+	if chunkList.Empty() {
+		// no chunk is assigned to this verification node
+		return
+	}
+
+	// pushes assigned chunks to
+	e.processChunks(chunkList, resultID)
+}
+
+func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifier) {
+	for _, chunk := range chunkList {
+		log := e.log.With().
+			Hex("result_id", logging.ID(resultID)).
+			Hex("chunk_id", logging.ID(chunk.ID())).
+			Uint64("chunk_index", chunk.Index).Logger()
+
+		locator := &chunks.Locator{
+			ResultID: resultID,
+			Index:    chunk.Index,
+		}
+
+		ok, err := e.chunksQueue.StoreChunkLocator(locator)
+
+		if err != nil {
+			log.Debug().Err(err).Msg("could not push chunk to chunks queue")
+			continue
+		}
+
+		if !ok {
+			log.Debug().Msg("could not push chunk to chunks queue")
+			continue
+		}
+
+		e.newChunkListener.Check()
+		log.Debug().Msg("chunk successfully pushed to chunks queue")
+	}
+}
+
+func (e *Engine) processable(receipt *flow.ExecutionReceipt) (bool, error) {
+	return true, nil
 }
 
 func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
@@ -117,8 +188,8 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	}
 }
 
-// myChunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
-func (e *Engine) myChunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
+// chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
+func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
 	var span opentracing.Span
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
