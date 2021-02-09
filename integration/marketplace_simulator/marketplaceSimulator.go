@@ -214,7 +214,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
 	for i := 0; i < steps; i++ {
-		m.log.Info().Msgf("minting %s moments on nba account: %s", batchSize)
+		m.log.Info().Msgf("minting %d moments on nba account", batchSize)
 
 		// mint a lot of moments
 		script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(batchSize))
