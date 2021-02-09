@@ -520,7 +520,7 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 
 					signer := crypto.NewInMemorySigner(privKey, accountKey.HashAlgo)
 
-					newAcc := newFlowAccount(i, &accountAddress, string(privKey.Encode()), accountKey, signer)
+					newAcc := newFlowAccount(i, &accountAddress, hex.EncodeToString(privKey.Encode()), accountKey, signer)
 					i++
 					accounts = append(accounts, *newAcc)
 

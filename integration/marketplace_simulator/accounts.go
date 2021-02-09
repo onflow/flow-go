@@ -61,7 +61,6 @@ func (acc *flowAccount) SyncAccountKey(flowClient *client.Client) error {
 
 func (acc *flowAccount) ToJSON() ([]byte, error) {
 	b, err := json.Marshal(acc)
-	fmt.Println(string(b))
 	return b, err
 }
 
