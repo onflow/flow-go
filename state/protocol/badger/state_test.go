@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -97,6 +98,26 @@ func TestBootstrapNonRoot(t *testing.T) {
 			buildBlock(t, state, &child)
 
 			return state.AtBlockID(block2.ID())
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			assert.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+		})
+	})
+
+	t.Run("with next epoch", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, state).BuildEpoch()
+
+			// find the point where we transition to the epoch setup phase
+			for height := rootBlock.Height + 1; ; height++ {
+				_, err := state.AtHeight(height).Epochs().Next().Counter()
+				if errors.Is(err, protocol.ErrNextEpochNotSetup) {
+					continue
+				}
+				return state.AtHeight(height)
+			}
 		})
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
