@@ -1055,17 +1055,16 @@ func WithFirstView(view uint64) func(*flow.EpochSetup) {
 
 func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	participants := IdentityListFixture(5, WithAllRoles())
-	assignments := ClusterAssignment(1, participants)
 	setup := &flow.EpochSetup{
 		Counter:      uint64(rand.Uint32()),
 		FinalView:    uint64(rand.Uint32() + 1000),
 		Participants: participants,
-		Assignments:  assignments,
 		RandomSource: SeedFixture(flow.EpochSetupRandomSourceLength),
 	}
 	for _, apply := range opts {
 		apply(setup)
 	}
+	setup.Assignments = ClusterAssignment(1, setup.Participants)
 	return setup
 }
 
