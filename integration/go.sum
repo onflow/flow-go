@@ -910,6 +910,7 @@ github.com/onflow/cadence v0.12.5 h1:C3n5Sa7j5h6Y1S+vALgTneqUgR6NCnwiG6q80MBruME
 github.com/onflow/cadence v0.12.5/go.mod h1:8NwJGO535nnY/+QWEMDc2rhvOFChToWQ9Bg7fUIIc/I=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1 h1:nmIDPf94F9Ecx6ecGyd4uYBUl4LluntWLvtwAJYt4tw=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1/go.mod h1:4zE/4A+5zyahxSFccQmcBqzp4ONXIwvGHaOKN8h8CRM=
+github.com/onflow/flow-ft v0.1.2 h1:DlnffFsNNSuK6bTwmQwIeutFKds0XIf8JYQ1TDd6bc8=
 github.com/onflow/flow-ft v0.1.2/go.mod h1:Sh/PKMT0mzGM5Zqb5tL/4wolfQis8KjXNiskkOSWdpU=
 github.com/onflow/flow-ft/contracts v0.1.3/go.mod h1:IKe3yEurEKpg/J15q5WBlHkuMmt1iRECSHgnIa1gvRw=
 github.com/onflow/flow-ft/lib/go/contracts v0.4.0 h1:M1I4z027GHOLcjkj9lL2UUUpZpEAF90hY5gRqvFGAPg=
