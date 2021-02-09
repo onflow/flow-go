@@ -683,6 +683,7 @@ func (m *marketPlaceAccount) Act() error {
 	// tracking
 	stopped := false
 	wg := sync.WaitGroup{}
+	wg.Add(1)
 	m.txTracker.AddTx(tx.ID(),
 		nil,
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
@@ -717,7 +718,6 @@ func (m *marketPlaceAccount) Act() error {
 			}
 		}, // on error
 		60)
-	wg.Add(1)
 	wg.Wait()
 
 	return nil
