@@ -606,7 +606,12 @@ func (m *marketPlaceAccount) Account() *flowAccount {
 	return m.account
 }
 
-func (m *marketPlaceAccount) GetMoments() []uint64 {
+func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
+
+	blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
+	if err != nil {
+		return nil, err
+	}
 
 	template := `
 	import TopShot from 0x%s
@@ -624,13 +629,14 @@ func (m *marketPlaceAccount) GetMoments() []uint64 {
 	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String(), m.account.Address.String()))
 
 	time.Sleep(time.Second)
-	res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
+	res, err := m.flowClient.ExecuteScriptAtBlockID(context.Background(), blockRef.ID, script, nil)
+	// res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
 	fmt.Println(">>>", string(script))
 	fmt.Println(">>>>>", res)
 	fmt.Println(">>>>>", err)
 	// TODO fix me to return the resutls
-	return []uint64{0}
+	return []uint64{0}, err
 }
 
 func (m *marketPlaceAccount) Act() error {
@@ -657,7 +663,10 @@ func (m *marketPlaceAccount) Act() error {
 	// Transfer moment to a friend
 	friend := m.friends[rand.Intn(len(m.friends))]
 
-	moments := m.GetMoments()
+	moments, err := m.GetMoments()
+	if err != nil {
+		return err
+	}
 	moment := moments[rand.Intn(len(moments))]
 
 	// TODO ramtin fix the fetch
