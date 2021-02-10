@@ -703,7 +703,13 @@ func (m *marketPlaceAccount) Act() error {
 		moment := moments[rand.Intn(len(moments))]
 
 		// TODO ramtin fix the fetch
-		txScript := generateBatchTransferMomentScript(m.simulatorConfig.NBATopshotAddress,
+		// txScript := generateBatchTransferMomentScript(m.simulatorConfig.NBATopshotAddress,
+		// 	m.simulatorConfig.NBATopshotAddress,
+		// 	friend.Address,
+		// 	[]uint64{moment})
+
+		txScript := generateBatchTransferMomentfromShardedCollectionScript(m.simulatorConfig.NBATopshotAddress,
+			m.simulatorConfig.NBATopshotAddress,
 			m.simulatorConfig.NBATopshotAddress,
 			friend.Address,
 			[]uint64{moment})
