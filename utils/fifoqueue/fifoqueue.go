@@ -7,18 +7,39 @@ import (
 	"github.com/ef-ds/deque"
 )
 
-// FifoQueue implements a FIFO queue with max capacity and
-// length observer.
+// FifoQueue implements a FIFO queue with max capacity and length observer.
+// Elements that exceeds the queue's max capacity are silently dropped.
+// By default, the theoretical capacity equals to the largest `int` value
+// (platform dependent). Capacity can be set at construction time via the
+// option `WithCapacity`.
+// Each time the queue's length changes, the QueueLengthObserver is called
+// with the new length. By default, the QueueLengthObserver is a NoOp.
+// A single QueueLengthObserver can be set at construction time via the
+// option `WithLengthObserver`.
+//
+// Caution:
+// * The queue is NOT concurrency safe.
+// * the QueueLengthObserver must be non-blocking
 type FifoQueue struct {
 	queue          deque.Deque
 	maxCapacity    int
 	lengthObserver QueueLengthObserver
 }
 
-type Options func(*FifoQueue) error
+// ConstructorOptions can are optional arguments for the `NewFifoQueue`
+// constructor to specify properties of the FifoQueue.
+type ConstructorOption func(*FifoQueue) error
+
+// QueueLengthObserver is a callback that can optionally provided
+// to the `NewFifoQueue` constructor (via `WithLengthObserver` option).
 type QueueLengthObserver func(int)
 
-func WithCapacity(capacity int) Options {
+// WithCapacity is a constructor option for NewFifoQueue. It specifies the
+// max number of elements the queue can hold. By default, the theoretical
+// capacity equals to the largest `int` value (platform dependent).
+// The WithCapacity option overrides the previous value (default value or
+// value specified by previous option).
+func WithCapacity(capacity int) ConstructorOption {
 	return func(queue *FifoQueue) error {
 		if capacity < 1 {
 			return fmt.Errorf("capacity for Fifo queue must be positive")
@@ -28,17 +49,22 @@ func WithCapacity(capacity int) Options {
 	}
 }
 
-func WithLenMetric(observer QueueLengthObserver) Options {
+// WithLengthObserver is a constructor option for NewFifoQueue. Each time the
+// queue's length changes, the queue calls the provided callback with the new
+// length. By default, the QueueLengthObserver is a NoOp.
+// Caution: the QueueLengthObserver callback must be non-blocking
+func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 	return func(queue *FifoQueue) error {
-		if observer == nil {
+		if callback == nil {
 			return fmt.Errorf("nil is not a valid QueueLengthObserver")
 		}
-		queue.lengthObserver = observer
+		queue.lengthObserver = callback
 		return nil
 	}
 }
 
-func NewFifoQueue(options ...Options) (*FifoQueue, error) {
+// Constructor for FifoQueue
+func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
 	// maximum value for platform-specific int: https://yourbasic.org/golang/max-min-int-uint/
 	maxInt := 1<<(mathbits.UintSize-1) - 1
 
@@ -56,20 +82,21 @@ func NewFifoQueue(options ...Options) (*FifoQueue, error) {
 }
 
 // Push appends the given value to the tail of the queue.
-// If queue capacity is reached, the message is dropped.
-func (q *FifoQueue) Push(value interface{}) {
+// If queue capacity is reached, the message is silently dropped.
+func (q *FifoQueue) Push(element interface{}) {
 	if q.queue.Len() < q.maxCapacity {
-		q.queue.PushBack(value)
+		q.queue.PushBack(element)
 		q.lengthObserver(q.queue.Len())
 	}
 }
 
-// Front peeks message at head of the queue.
+// Front peeks message at the head of the queue (without removing the head).
 func (q *FifoQueue) Front() (interface{}, bool) {
 	return q.queue.Front()
 }
 
-// Pop removes the given message from the head of the queue
+// Pop removes and returns the queue's head element.
+// If the queue is empty, (nil, false) is returned.
 func (q *FifoQueue) Pop() (interface{}, bool) {
 	event, ok := q.queue.PopFront()
 	q.lengthObserver(q.queue.Len())
@@ -79,6 +106,7 @@ func (q *FifoQueue) Pop() (interface{}, bool) {
 	return event, true
 }
 
+// Len returns the current length of the queue.
 func (q *FifoQueue) Len() int {
 	return q.queue.Len()
 }
