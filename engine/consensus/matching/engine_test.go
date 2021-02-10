@@ -569,7 +569,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	// Expecting all blocks to be requested: from sealed height + 1 up to (incl.) latest finalized
 	for i := 1; i < n; i++ {
 		id := orderedBlocks[i].ID()
-		ms.requester.On("EntityByID", id, mock.Anything).Return().Once()
+		ms.requester.On("Query", id, mock.Anything).Return().Once()
 	}
 	ms.SealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
 

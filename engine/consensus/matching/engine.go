@@ -1044,7 +1044,7 @@ func (e *Engine) requestPendingReceipts() (int, error) {
 			Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
 			Msg("requesting receipts")
 		for _, blockID := range missingBlocksOrderedByHeight {
-			e.receiptRequester.EntityByID(blockID, filter.Any)
+			e.receiptRequester.Query(blockID, filter.Any)
 		}
 	}
 
