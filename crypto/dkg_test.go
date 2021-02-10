@@ -17,8 +17,8 @@ import (
 var gt *testing.T
 
 func TestDKG(t *testing.T) {
-	//t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
-	//t.Run("FeldmanVSSQual", testFeldmanVSSQual)
+	t.Run("FeldmanVSSSimple", testFeldmanVSSSimple)
+	t.Run("FeldmanVSSQual", testFeldmanVSSQual)
 	t.Run("JointFeldman", testJointFeldman)
 }
 
@@ -50,10 +50,6 @@ const (
 	invalidVector
 	invalidComplaint
 	invalidComplaintAnswer
-	/*timeoutShares
-	timeoutVector
-	timeoutComplaint
-	timeoutComplaintAnswer*/
 )
 
 type behavior int
@@ -98,36 +94,36 @@ func testFeldmanVSSQual(t *testing.T) {
 
 // Testing JointFeldman by simulating a network of n nodes
 func testJointFeldman(t *testing.T) {
-	log.SetLevel(log.InfoLevel)
+	log.SetLevel(log.ErrorLevel)
 
 	n := 4
 	var threshold int
 	// happy path, test multiple values of thresold
-	/*for threshold = MinimumThreshold; threshold < n; threshold++ {
+	for threshold = MinimumThreshold; threshold < n; threshold++ {
 		t.Run(fmt.Sprintf("JointFeldman_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 			dkgCommonTest(t, jointFeldman, n, threshold, happyPath)
 		})
-	}*/
+	}
 
 	// unhappy path, with focus on the optimal threshold value
 	n = 5
 	threshold = optimalThreshold(n)
 	// unhappy path, with invalid shares
-	/*t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	t.Run(fmt.Sprintf("JointFeldman_InvalidShares_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidShares)
 	})
 	// unhappy path, with invalid vector
 	t.Run(fmt.Sprintf("JointFeldman_InvalidVector_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidVector)
-	})*/
+	})
 	// unhappy path, with invalid complaints
 	t.Run(fmt.Sprintf("JointFeldman_InvalidComplaints_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaint)
 	})
 	// unhappy path, with invalid complaint answers
-	/*t.Run(fmt.Sprintf("JointFeldman_InvalidComplaintAnswers_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+	t.Run(fmt.Sprintf("JointFeldman_InvalidComplaintAnswers_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaintAnswer)
-	})*/
+	})
 }
 
 // Supported Key Generation protocols
@@ -291,8 +287,8 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	for current := 0; current < n; current++ {
 		// start dkg in parallel
 		// ( one common PRG is used for all instances which causes a race
-		//	on generating randoms and leads to non-deterministic keys. If deterministic keys
-		//  are required, switch to sequential calls to dkg.Start()   )
+		//	in generating randoms and leads to non-deterministic keys. If deterministic keys
+		//  are required, switch to sequential calls to dkg.Start()  )
 		go func(current int) {
 			err := processors[current].dkg.Start(seed)
 			require.Nil(t, err)
@@ -304,7 +300,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// sync the two timeouts and start the next phase
 	for ; phase <= 2; phase++ {
 		sync.Wait()
-		// post processing required for some edge case tests
+		// post processing required for timeout edge case tests
 		go timeoutPostProcess(processors, t, phase)
 		sync.Add(n)
 		for current := 0; current < n; current++ {
@@ -369,7 +365,6 @@ func dkgRunChan(proc *testDKGProcessor,
 				err := proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
 				require.Nil(t, err)
 			} else {
-				//log.Infof("%d broadcast receiving from %d:", proc.current, newMsg.orig)
 				err := proc.dkg.HandleBroadcastedMsg(newMsg.orig, newMsg.data)
 				require.Nil(t, err)
 			}
@@ -377,7 +372,7 @@ func dkgRunChan(proc *testDKGProcessor,
 		case <-time.After(phaseSwitchTimeout):
 			switch phase {
 			case 0:
-				log.Errorf("%d shares phase ended\n", proc.current)
+				log.Infof("%d shares phase ended\n", proc.current)
 				err := proc.dkg.NextTimeout()
 				require.Nil(t, err)
 			case 1:
@@ -524,7 +519,6 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
 		// choose a random reason for an invalid share
 		coin := mrand.Intn(100)
-		//coin = 5
 		gt.Logf("%d maliciously send to %d, coin is %d\n", proc.current, dest, coin%6)
 		switch coin % 6 {
 		case 0:
@@ -545,16 +539,6 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 			// wrong header: equivalent to not sending the share at all
 			newMsg.data[0] = byte(feldmanVSSVerifVec)
 		case 5:
-			/*
-				// share sent after the shares timeout
-				// sleep for enough time till other participants call the timeout
-				time.Sleep(600 * time.Millisecond) //(totalWait / 2)
-				// send the message after waiting
-				gt.Logf("%x\n", newMsg.data)
-				log.Errorf("%d sending now to %d", proc.current, dest)
-				proc.chans[dest] <- newMsg
-				return
-			*/
 			// message will be sent after the shares timeout and will be considered late
 			// by the receiver. All late messages go into a separate channel and will be sent to
 			// the main channel after the shares timeout.
@@ -601,7 +585,6 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 
 	// choose a random reason of an invalid vector
 	coin := mrand.Intn(100)
-	//coin = 4
 	gt.Logf("%d malicious vector broadcast, coin is %d\n", proc.current, coin%5)
 	switch coin % 5 {
 	case 0:
@@ -684,7 +667,8 @@ func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
 		// invalid length
 		newMsg.data = make([]byte, complaintAnswerSize+5)
 		copy(newMsg.data, data)
-	case 2: // no answer at all
+	case 2:
+		// no answer at all
 		return
 	}
 	gt.Logf("%x\n", newMsg.data)
