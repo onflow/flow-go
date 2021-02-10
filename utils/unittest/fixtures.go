@@ -180,6 +180,16 @@ func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
 	return payload
 }
 
+// WithAllTheFixins ensures a payload contains no empty slice fields. When
+// encoding and decoding, nil vs empty slices are not preserved, which can
+// result in two models that are semantically equal being considered non-equal
+// by our testing framework.
+func WithAllTheFixins(payload *flow.Payload) {
+	payload.Seals = Seal.Fixtures(3)
+	payload.Guarantees = CollectionGuaranteesFixture(4)
+	payload.Receipts = []*flow.ExecutionReceipt{ExecutionReceiptFixture()}
+}
+
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
 	return func(payload *flow.Payload) {
 		payload.Seals = append(payload.Seals, seals...)
