@@ -151,28 +151,28 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	nbaAddress := m.nbaTopshotAccount.Address
 
-	// numBuckets := 10
-	// // setup nba account to use sharded collections
-	// script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
-	// tx := flowsdk.NewTransaction().
-	// 	SetReferenceBlockID(blockRef.ID).
-	// 	SetScript(script)
-
-	// result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
-
-	// if err != nil || result.Error != nil {
-	// 	m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
-	// 	return err
-	// }
-
-	// TODO add many plays and add many sets (adds plays to sets)
-	// this adds a play with id 0
-	script := nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
+	numBuckets := 32
+	// setup nba account to use sharded collections
+	script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
+	if err != nil || result.Error != nil {
+		m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
+		return err
+	}
+
+	// TODO add many plays and add many sets (adds plays to sets)
+	// this adds a play with id 0
+	script = nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
+	tx = flowsdk.NewTransaction().
+		SetReferenceBlockID(blockRef.ID).
+		SetScript(script)
+
+	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
@@ -283,8 +283,12 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// setup account to be able to intract with nba
 
 			m.log.Info().Msgf("setting up marketplace account with address %s", ma.Account().Address)
-			// GenerateSetupShardedCollectionScript numBuckets
-			script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address)
+			// GenerateSetupShardedCollectionScript numBuckets 32
+			numBuckets := 32
+			// script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address)
+
+			script := nbaTemplates.GenerateSetupShardedCollectionScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address, numBuckets)
+
 			tx := flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
@@ -301,9 +305,9 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 
 			moments := makeMomentRange(momentCounter, momentCounter+20)
 			momentCounter += 20
-			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
-			// script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
-			script = generateBatchTransferMomentScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
+			// script = generateBatchTransferMomentScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
+			script = generateBatchTransferMomentfromShardedCollectionScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
+
 			tx = flowsdk.NewTransaction().
 				SetReferenceBlockID(blockRef.ID).
 				SetScript(script)
@@ -651,9 +655,9 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 	for _, i := range v {
 		result = append(result, i.(uint64))
 	}
-	// fmt.Println(">>>", string(script))
-	// fmt.Println(">>>>>", result)
-	// fmt.Println(">>>>>", err)
+	fmt.Println(">>>", string(script))
+	fmt.Println(">>>>>", result)
+	fmt.Println(">>>>>", err)
 
 	return result, err
 }
@@ -809,4 +813,43 @@ func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *fl
 	}
 	script := []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
 	return script
+}
+
+func generateBatchTransferMomentfromShardedCollectionScript(nftAddr, tokenCodeAddr, shardedAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
+	template := `
+		import NonFungibleToken from 0x%s
+		import TopShot from 0x%s
+		import TopShotShardedCollection from 0x%s
+		transaction {
+			let transferTokens: @NonFungibleToken.Collection
+			
+			prepare(acct: AuthAccount) {
+				let momentIDs = [%s]
+		
+				self.transferTokens <- acct.borrow<&TopShotShardedCollection.ShardedCollection>(from: /storage/ShardedMomentCollection)!.batchWithdraw(ids: momentIDs)
+			}
+		
+			execute {
+				// get the recipient's public account object
+				let recipient = getAccount(0x%s)
+		
+				// get the Collection reference for the receiver
+				let receiverRef = recipient.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
+		
+				// deposit the NFT in the receivers collection
+				receiverRef.batchDeposit(tokens: <-self.transferTokens)
+			}
+		}`
+
+	// Stringify moment IDs
+	momentIDList := ""
+	for _, momentID := range momentIDs {
+		id := strconv.Itoa(int(momentID))
+		momentIDList = momentIDList + `UInt64(` + id + `), `
+	}
+	// Remove comma and space from last entry
+	if idListLen := len(momentIDList); idListLen > 2 {
+		momentIDList = momentIDList[:len(momentIDList)-2]
+	}
+	return []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), shardedAddr, momentIDList, recipientAddr))
 }
