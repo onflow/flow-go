@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -348,7 +347,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	header := proposal.Header
-
 	log := e.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -360,7 +358,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
-
 	log.Info().Msg("block proposal received")
 
 	e.prunePendingCache()
@@ -400,7 +397,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 		// add the block to the cache
 		_ = e.pending.Add(originID, proposal)
-
 		e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 
 		// go to the first missing ancestor
@@ -452,7 +448,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	// pending children. There is another span within processBlockProposal that
 	// measures the time spent for a single proposal.
 	recursiveProcessSpan := e.tracer.StartSpanFromParent(onBlockProposalSpan, trace.CONCompOnBlockProposalProcessRecursive)
-	err = e.processBlockProposal(proposal)
+	err = e.processBlockAndDescendants(proposal)
+	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
 	recursiveProcessSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
@@ -484,13 +481,12 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		blockSpan.SetTag("proposer", proposal.Header.ProposerID.String())
 	}
 	childSpan := e.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposalProcessSingle)
-	stopMetrics := func() {
+	defer func() {
 		e.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 		childSpan.Finish()
-	}
+	}()
 
 	header := proposal.Header
-
 	log := e.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -502,7 +498,6 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
-
 	log.Info().Msg("processing block proposal")
 
 	// see if the block is a valid extension of the protocol state
@@ -510,48 +505,29 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-
 	err := e.state.Extend(block)
-	// if the error is a known invalid extension of the protocol state, then
-	// the input is invalid
+	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {
-		stopMetrics()
 		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
 			header.ID(), header.Height, err)
 	}
-
-	// if the error is an known outdated extension of the protocol state, then
-	// the input is outdated
+	// of the protocol state aborted processing of block as it is on an abandoned fork, he is outdated
 	if state.IsOutdatedExtensionError(err) {
-		stopMetrics()
 		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
 	}
-
 	if err != nil {
-		stopMetrics()
 		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
 
 	// retrieve the parent
 	parent, err := e.headers.ByBlockID(header.ParentID)
 	if err != nil {
-		stopMetrics()
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	log.Info().Msg("forwarding block proposal to hotstuff")
-
 	// submit the model to hotstuff for processing
+	log.Info().Msg("forwarding block proposal to hotstuff")
 	e.hotstuff.SubmitProposal(header, parent.View)
-
-	// stop metrics before recursive call
-	stopMetrics()
-
-	// check for any descendants of the block to process
-	err = e.processPendingChildren(header)
-	if err != nil {
-		return fmt.Errorf("could not process pending children: %w", err)
-	}
 
 	return nil
 }
@@ -575,43 +551,54 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 	return nil
 }
 
-// processPendingChildren checks if there are proposals connected to the given
+// processBlockAndDescendants processes  if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(header *flow.Header) error {
-	blockID := header.ID()
+func (e *Engine) processBlockAndDescendants(proposal *messages.BlockProposal) error {
+	blockID := proposal.Header.ID()
 
-	// check if there are any children for this parent in the cache
+	// process block itself
+	err := e.processBlockProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("failed to process block %x: %w", blockID, err)
+	}
+
+	// process all children
+	// do not break on on invalid or outdated blocks as they should not prevent us
+	// from processing other valid children
 	children, has := e.pending.ByParentID(blockID)
 	if !has {
 		return nil
 	}
-
-	e.log.Debug().
-		Int("children", len(children)).
-		Msg("processing pending children")
-
-	// then try to process children only this once
-	result := new(multierror.Error)
 	for _, child := range children {
-		proposal := &messages.BlockProposal{
+		childProposal := &messages.BlockProposal{
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.processBlockProposal(proposal)
-		if err != nil {
-			result = multierror.Append(result, err)
+		cpr := e.processBlockAndDescendants(childProposal)
+		if cpr != nil {
+			// child is outdated by the time we started processing it
+			// => node was probably behind and is catching up. Log as warning
+			if engine.IsOutdatedInputError(cpr) {
+				e.log.Warn().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+				continue
+			}
+			// the block is invalid; log as error as we desire honest participation
+			// ToDo: potential slashing
+			if engine.IsInvalidInputError(err) {
+				e.log.Error().Err(err).Msg("invalid block (potential slashing evidence?)")
+				continue
+			}
+			if cpr != nil {
+				return fmt.Errorf("internal error processing block %x at height %d: %w", child.Header.ID(), child.Header.Height, err)
+			}
 		}
 	}
 
 	// drop all of the children that should have been processed now
 	e.pending.DropForParent(blockID)
 
-	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
-
-	// flatten out the error tree before returning the error
-	result = multierror.Flatten(result).(*multierror.Error)
-	return result.ErrorOrNil()
+	return nil
 }
 
 // prunePendingCache prunes the pending block cache.
