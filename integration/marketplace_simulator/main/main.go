@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"runtime"
+	"runtime/pprof"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
@@ -18,6 +20,7 @@ import (
 
 func main() {
 
+
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	logLvl := flag.String("log-level", "info", "set log level")
 
@@ -26,12 +29,12 @@ func main() {
 	// tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
 
-	access := flag.String("access", "localhost:3569", "access node address")
+	access := flag.String("access", "35.230.98.90:9000,34.83.22.110:9000,35.185.224.238:9000", "access node address")
 	serviceAccPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	// metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	// profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 
-	numberOfAccounts := flag.Int("account-count", 10, "number of accounts")
+	numberOfAccounts := flag.Int("account-count", 60, "number of accounts")
 	// maxTxInFlight := flag.Int("max-tx-in-flight", 8000, "maximum number of transactions in flight (txTracker)")
 	// workerDelayAfterEachFetch := flag.Duration("worker-fetch-delay", time.Second, "duration of worker sleep after each tx status fetch (prevents too much requests)")
 
@@ -93,9 +96,10 @@ func main() {
 
 	simulatorConfig := &marketplace.SimulatorConfig{
 		NumberOfAccounts: *numberOfAccounts,
-		NumberOfMoments:  1000,
+		NumberOfMoments:  2000,
 		Delay:            time.Second,
 	}
+
 
 	// accessNodeAddrs
 	go func() {
@@ -104,8 +108,19 @@ func main() {
 			log,
 			networkConfig,
 			simulatorConfig)
-		m.Run()
+			m.Run()
 	}()
+
+	f, err := os.Create("mem.prof")
+
+	if err != nil {
+            log.Fatal().Msgf("could not create memory profile: %w", err)
+        }
+        defer f.Close() // error handling omitted for example
+        runtime.GC() // get up-to-date statistics
+        if err := pprof.WriteHeapProfile(f); err != nil {
+            log.Fatal().Msgf("could not write memory profile: %w", err)
+        }
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
