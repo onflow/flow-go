@@ -60,8 +60,9 @@ func TestMatchingEngine(t *testing.T) {
 type MatchingSuite struct {
 	unittest.BaseChainSuite
 	// misc SERVICE COMPONENTS which are injected into Matching Engine
-	requester        *mockmodule.Requester
-	receiptValidator *mockmodule.ReceiptValidator
+	requester         *mockmodule.Requester
+	receiptValidator  *mockmodule.ReceiptValidator
+	approvalValidator *mockmodule.ApprovalValidator
 
 	// MATCHING ENGINE
 	matching *Engine
@@ -79,6 +80,7 @@ func (ms *MatchingSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.requester = new(mockmodule.Requester)
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
+	ms.approvalValidator = &mockmodule.ApprovalValidator{}
 
 	ms.matching = &Engine{
 		unit:                                 unit,
@@ -105,6 +107,7 @@ func (ms *MatchingSuite) SetupTest() {
 		approvalRequestsThreshold:            10,
 		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
 		emergencySealingActive:               false,
+		approvalValidator:                    ms.approvalValidator,
 	}
 }
 
@@ -284,65 +287,62 @@ func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-// Try to submit an approval for an unknown block.
-// As the block is unknown, the ID of the sender should
-// not matter as there is no block to verify it against
-func (ms *MatchingSuite) TestApprovalUnknownBlock() {
-	originID := ms.ConID
-	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(originID)) // generates approval for random block ID
+// try to submit an approval for a known block
+func (ms *MatchingSuite) TestOnApprovalValid() {
+	originID := ms.VerID
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithBlockID(ms.UnfinalizedBlock.ID()),
+		unittest.WithApproverID(originID),
+	)
+
+	ms.approvalValidator.On("Validate", approval).Return(nil).Once()
+
+	// check that the approval is correctly added
+	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
+
+	// onApproval should run to completion without throwing any errors
+	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
+	ms.Require().NoError(err, "should add approval to mempool if valid")
+
+	ms.approvalValidator.AssertExpectations(ms.T())
+	ms.ApprovalsPL.AssertExpectations(ms.T())
+}
+
+// try to submit an invalid approval
+func (ms *MatchingSuite) TestOnApprovalInvalid() {
+	originID := ms.VerID
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithBlockID(ms.UnfinalizedBlock.ID()),
+		unittest.WithApproverID(originID),
+	)
+
+	ms.approvalValidator.On("Validate", approval).Return(engine.NewInvalidInputError("")).Once()
+
+	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
+	ms.Require().Error(err, "should report error if invalid")
+	ms.Assert().True(engine.IsInvalidInputError(err))
+
+	ms.approvalValidator.AssertExpectations(ms.T())
+	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
+// try to submit an approval which is already outdated.
+func (ms *MatchingSuite) TestOnApprovalOutdated() {
+	originID := ms.VerID
+	approval := unittest.ResultApprovalFixture(
+		unittest.WithBlockID(ms.UnfinalizedBlock.ID()),
+		unittest.WithApproverID(originID),
+	)
 
 	// Make sure the approval is added to the cache for future processing
 	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
 
-	// onApproval should not throw an error
+	ms.approvalValidator.On("Validate", approval).Return(engine.NewOutdatedInputErrorf("")).Once()
+
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
-	ms.Require().NoError(err, "should cache approvals for unknown blocks")
+	ms.Require().NoError(err, "should ignore if approval is outdated")
 
-	ms.ApprovalsPL.AssertExpectations(ms.T())
-}
-
-// try to submit an approval from a consensus node
-func (ms *MatchingSuite) TestOnApprovalInvalidRole() {
-	originID := ms.ConID
-	approval := unittest.ResultApprovalFixture(
-		unittest.WithBlockID(ms.UnfinalizedBlock.ID()),
-		unittest.WithApproverID(originID),
-	)
-
-	err := ms.matching.onApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval from wrong approver role")
-	ms.Require().True(engine.IsInvalidInputError(err))
-
-	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-// try to submit an approval from an unstaked approver
-func (ms *MatchingSuite) TestOnApprovalInvalidStake() {
-	originID := ms.VerID
-	approval := unittest.ResultApprovalFixture(
-		unittest.WithBlockID(ms.UnfinalizedBlock.ID()),
-		unittest.WithApproverID(originID),
-	)
-	ms.Identities[originID].Stake = 0
-
-	err := ms.matching.onApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval from unstaked approver")
-	ms.Require().True(engine.IsInvalidInputError(err))
-
-	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-// try to submit an approval for a sealed result
-func (ms *MatchingSuite) TestOnApprovalSealedResult() {
-	originID := ms.VerID
-	approval := unittest.ResultApprovalFixture(
-		unittest.WithBlockID(ms.LatestSealedBlock.ID()),
-		unittest.WithApproverID(originID),
-	)
-
-	err := ms.matching.onApproval(originID, approval)
-	ms.Require().NoError(err, "should ignore approval for sealed result")
-
+	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
@@ -352,32 +352,14 @@ func (ms *MatchingSuite) TestOnApprovalPendingApproval() {
 	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(originID))
 
 	// setup the approvals mempool to check that we attempted to add the
-	// approval, and return false as if it was already in the mempool
+	// approval, and return false (approval already in the mempool)
 	ms.ApprovalsPL.On("Add", approval).Return(false, nil).Once()
 
-	// onApproval should return immediately after trying to insert the approval,
-	// without throwing any errors
+	// process as valid approval
+	ms.approvalValidator.On("Validate", approval).Return(nil).Once()
+
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
-	ms.Require().NoError(err, "should ignore approval if already pending")
-
-	ms.ApprovalsPL.AssertExpectations(ms.T())
-}
-
-// try to submit an approval for a known block
-func (ms *MatchingSuite) TestOnApprovalValid() {
-	originID := ms.VerID
-	approval := unittest.ResultApprovalFixture(
-		unittest.WithBlockID(ms.UnfinalizedBlock.ID()),
-		unittest.WithApproverID(originID),
-	)
-
-	// check that the approval is correctly added
-	ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
-
-	// onApproval should run to completion without throwing any errors
-	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
-	ms.Require().NoError(err, "should add approval to mempool if valid")
-
+	ms.Require().NoError(err)
 	ms.ApprovalsPL.AssertExpectations(ms.T())
 }
 
@@ -587,7 +569,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	// Expecting all blocks to be requested: from sealed height + 1 up to (incl.) latest finalized
 	for i := 1; i < n; i++ {
 		id := orderedBlocks[i].ID()
-		ms.requester.On("EntityByID", id, mock.Anything).Return().Once()
+		ms.requester.On("Query", id, mock.Anything).Return().Once()
 	}
 	ms.SealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
 
