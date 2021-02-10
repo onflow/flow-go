@@ -116,7 +116,7 @@ func VerificationHappyPath(t *testing.T,
 		require.Equal(t, root, rootBlock)
 
 		// extends state of node by block of `completeER`.
-		err = node.State.Extend(completeER.Block)
+		err = node.State.Extend(completeER.ReferenceBlock)
 		assert.Nil(t, err)
 	}
 
@@ -485,7 +485,7 @@ func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecu
 
 	return &verification.VerifiableChunkData{
 		Chunk:         er.Receipt.ExecutionResult.Chunks[chunkIndex],
-		Header:        er.Block.Header,
+		Header:        er.ReferenceBlock.Header,
 		Result:        &er.Receipt.ExecutionResult,
 		Collection:    er.Collections[chunkIndex],
 		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
