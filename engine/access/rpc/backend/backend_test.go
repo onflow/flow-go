@@ -793,6 +793,35 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		suite.Require().Equal(expectedResp, actualResp)
 	})
 
+	suite.Run("invalid request last_sealed_block_height < min height", func() {
+
+		// set sealed height to one less than the request start height
+		headHeight = minHeight - 1
+
+		// setup mocks
+		setupHeadHeight(headHeight)
+		blockHeaders = setupStorage(minHeight, maxHeight)
+
+		// create handler
+		backend := New(
+			suite.state,
+			suite.execClient,
+			nil, nil,
+			suite.blocks,
+			suite.headers,
+			nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			suite.log,
+		)
+
+		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
+		suite.Require().Error(err)
+	})
+
 }
 
 func (suite *Suite) TestGetAccount() {
