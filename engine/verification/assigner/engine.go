@@ -133,6 +133,8 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 	}
 }
 
+// preprocess performs initial evaluations on the receipt. It returns true if all following conditions satisfied.
+// 1- node is staked at the reference block of the execution result of the receipt.
 func (e *Engine) preprocess(receipt *flow.ExecutionReceipt) (bool, error) {
 	return true, nil
 }
