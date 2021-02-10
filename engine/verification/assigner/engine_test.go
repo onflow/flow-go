@@ -774,11 +774,20 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 
 // assignAllChunksToMe is a test helper that assigns all chunks in the complete execution receipt of
 // this test suite to its verification node.
-func (suite *AssignerEngineTestSuite) assignAllChunksToMe() {
+func (suite *AssignerEngineTestSuite) assignThisChunksToMe() {
 	a := chmodel.NewAssignment()
 	for _, chunk := range suite.completeER.Receipt.ExecutionResult.Chunks {
 		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
 	}
+	suite.assigner.On("Assign",
+		suite.completeER.Receipt.ExecutionResult,
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil)
+}
+
+// assignNoChunkToMe is a test helper that no chunk of the complete execution receipt of
+// this test suite to its verification node.
+func (suite *AssignerEngineTestSuite) assignNoChunkToMe() {
+	a := chmodel.NewAssignment()
 	suite.assigner.On("Assign",
 		suite.completeER.Receipt.ExecutionResult,
 		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil)

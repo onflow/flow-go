@@ -23,12 +23,12 @@ import (
 // to me to verify, and then save it to the chunks job queue for the
 // fetcher engine to process.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	metrics module.VerificationMetrics
-	me      module.Local
-	state   protocol.State
-
+	unit             *engine.Unit
+	log              zerolog.Logger
+	metrics          module.VerificationMetrics
+	tracer           module.Tracer
+	me               module.Local
+	state            protocol.State
 	headerStorage    storage.Headers       // used to check block existence before verifying
 	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify
 	chunksQueue      storage.ChunksQueue   // to store chunks to be verified
@@ -51,6 +51,7 @@ func New(
 		unit:             engine.NewUnit(),
 		log:              log.With().Str("engine", "assigner").Logger(),
 		metrics:          metrics,
+		tracer:           tracer,
 		me:               me,
 		state:            state,
 		headerStorage:    headerStorage,
@@ -75,13 +76,13 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		Logger()
 
 	//
-	ok, err := e.processable(receipt)
+	ok, err := e.preprocess(receipt)
 	if err != nil {
 		log.Debug().Err(err).Msg("could not determine processability of receipt")
 		return
 	}
 	if !ok {
-		log.Debug().Err(err).Msg("receipt is not processable, skipping")
+		log.Debug().Err(err).Msg("receipt is not preprocess, skipping")
 		return
 	}
 
@@ -132,7 +133,7 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 	}
 }
 
-func (e *Engine) processable(receipt *flow.ExecutionReceipt) (bool, error) {
+func (e *Engine) preprocess(receipt *flow.ExecutionReceipt) (bool, error) {
 	return true, nil
 }
 
