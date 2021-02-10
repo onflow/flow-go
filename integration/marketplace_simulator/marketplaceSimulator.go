@@ -172,7 +172,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
@@ -187,7 +187,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a set failed: %w , %w", result.Error, err)
@@ -201,7 +201,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
@@ -223,7 +223,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 			SetReferenceBlockID(blockRef.ID).
 			SetScript(script)
 
-		result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+		result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
 		if err != nil || result.Error != nil {
 			m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
 			return err
@@ -359,7 +359,7 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	result, err := m.sendTxAndWait(deploymentTx, m.nbaTopshotAccount)
+	result, err := m.sendTxAndWait(deploymentTx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("contract %s deployment is failed : %w , %w", name, result.Error, err)
@@ -370,12 +370,12 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 }
 
 // TODO update this to support multiple tx submissions
-func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount) (*flowsdk.TransactionResult, error) {
+func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount, keyIndex int) (*flowsdk.TransactionResult, error) {
 
 	var result *flowsdk.TransactionResult
 	var err error
 
-	err = sender.PrepareAndSignTx(tx, 0)
+	err = sender.PrepareAndSignTx(tx, keyIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error preparing and signing the transaction: %w", err)
 	}
