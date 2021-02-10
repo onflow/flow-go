@@ -313,7 +313,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// nbaTemplate.GenerateCreateSaleScript()
 
 			// get moments
-			ma.GetMoments()
+			// ma.GetMoments()
 		}
 	}
 
@@ -635,14 +635,17 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 	res, err := m.flowClient.ExecuteScriptAtBlockID(context.Background(), blockRef.ID, script, nil)
 	// res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
+	if err != nil {
+		return nil, err
+	}
 	result := make([]uint64, 0)
 	v := res.ToGoValue().([]interface{})
 	for _, i := range v {
 		result = append(result, i.(uint64))
 	}
-	fmt.Println(">>>", string(script))
-	fmt.Println(">>>>>", result)
-	fmt.Println(">>>>>", err)
+	// fmt.Println(">>>", string(script))
+	// fmt.Println(">>>>>", result)
+	// fmt.Println(">>>>>", err)
 
 	return result, err
 }
