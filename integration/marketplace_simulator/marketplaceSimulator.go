@@ -306,7 +306,7 @@ func (m *MarketPlaceSimulator) Run() error {
 
 	// select an account
 	// call Act and put it back to list when is returned
-	duration := time.Second * 120
+	duration := time.Minute * 10
 	for start := time.Now(); ; {
 		if time.Since(start) > duration {
 			break
