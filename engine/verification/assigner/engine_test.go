@@ -182,3 +182,37 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 	// job listener should not be notified as no new chunk is added.
 	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
 }
+
+// TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
+// This is important as without a new chunk successfully added to the chunks queue, the consumer should not be notified.
+func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
+	e := suite.NewAssignerEngine()
+
+	// assigns all chunks to this verification node
+	a := chmodel.NewAssignment()
+	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
+	for _, chunk := range chunks {
+		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
+	}
+	suite.assigner.On("Assign",
+		&suite.completeER.Receipt.ExecutionResult,
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
+
+	// mocks processing assigned chunks
+	// adding new chunks to queue returns false, which means a duplicate chunk.
+	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
+		Return(false, nil).
+		Times(len(chunks))
+	suite.newChunkListener.On("Check").Return().Times(len(chunks))
+
+	// sends block containing receipt to assigner engine
+	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
+
+	testifymock.AssertExpectationsForObjects(suite.T(),
+		suite.metrics,
+		suite.assigner,
+		suite.chunksQueue)
+
+	// job listener should not be notified as no new chunk is added.
+	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
+}
