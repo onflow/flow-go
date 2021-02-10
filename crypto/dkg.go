@@ -32,9 +32,9 @@ type DKGState interface {
 	Threshold() int
 	// Start starts running a DKG in the current node
 	Start(seed []byte) error
-	// HandleBroadcastedMsg processes a new broadcasted message received by the current node.
+	// HandleBroadcastMsg processes a new broadcasted message received by the current node.
 	// orig is the message origin index
-	HandleBroadcastedMsg(orig int, msg []byte) error
+	HandleBroadcastMsg(orig int, msg []byte) error
 	// HandlePrivateMsg processes a new private message received by the current node.
 	// orig is the message origin index
 	HandlePrivateMsg(orig int, msg []byte) error
