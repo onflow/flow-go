@@ -561,8 +561,9 @@ func (m *MarketPlaceSimulator) Run() error {
 	// select an account
 	// call Act and put it back to list when is returned
 
-	for actor := range m.availableAccounts {
+	for i := 0; i < len(m.marketAccounts); i++ {
 		go func() {
+			actor := m.marketAccounts[i]
 			fmt.Println("running account :", actor.Account().Address.String())
 			err := actor.Act()
 			fmt.Println("err: ", err)
