@@ -98,6 +98,7 @@ func New(
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
 	validator module.ReceiptValidator,
+	approvalValidator module.ApprovalValidator,
 	requiredApprovalsForSealConstruction uint,
 	emergencySealingActive bool,
 ) (*Engine, error) {
@@ -130,6 +131,7 @@ func New(
 		requestTracker:                       NewRequestTracker(10, 30),
 		approvalRequestsThreshold:            10,
 		emergencySealingActive:               emergencySealingActive,
+		approvalValidator:                    approvalValidator,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
