@@ -238,10 +238,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// setup marketplace accounts
 	// break accounts into batches of 10
 	// TODO not share the same client
-	blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
-	if err != nil {
-		return err
-	}
+
 	groupSize := 10
 	momentCounter := uint64(1)
 	// numBuckets := 10
@@ -249,6 +246,12 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// batchSize := 100
 
 	for i := 0; i < len(accounts); i += groupSize {
+
+		blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
+		if err != nil {
+			return err
+		}
+
 		group := accounts[i : i+groupSize]
 		// randomly select an access nodes
 		n := len(m.networkConfig.AccessNodeAddresses)
