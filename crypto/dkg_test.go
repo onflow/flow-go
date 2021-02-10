@@ -482,7 +482,6 @@ func (proc *testDKGProcessor) FlagMisbehavior(node int, logInfo string) {
 func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
 	go func() {
 		log.Infof("%d sending to %d", proc.current, dest)
-		gt.Logf("%d sending to %d", proc.current, dest)
 		if proc.malicious == fewInvalidShares || proc.malicious == manyInvalidShares ||
 			proc.malicious == invalidSharesComplainTrigger || proc.malicious == invalidComplaintAnswerBroadcast {
 			proc.invalidShareSend(dest, data)
@@ -495,8 +494,7 @@ func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
 // This is a testing function
 // it simulates sending a honest message from one node to another
 func (proc *testDKGProcessor) honestSend(dest int, data []byte) {
-	gt.Logf("honest send\n")
-	gt.Logf("%x\n", data)
+	gt.Logf("%d honestly sending to %d\n %x\n", proc.current, dest, data)
 	newMsg := &message{proc.current, proc.protocol, private, data}
 	proc.chans[dest] <- newMsg
 }
@@ -527,7 +525,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		// choose a random reason for an invalid share
 		coin := mrand.Intn(100)
 		//coin = 5
-		gt.Logf("malicious send, coin is %d\n", coin%6)
+		gt.Logf("%d maliciously send to %d, coin is %d\n", proc.current, dest, coin%6)
 		switch coin % 6 {
 		case 0:
 			// value doesn't match the verification vector
@@ -564,8 +562,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 			return
 		}
 	} else {
-		gt.Logf("turns out to be a honest send\n")
-		gt.Logf("%x\n", newMsg.data)
+		gt.Logf("turns out to be a honest send\n%x\n", data)
 		proc.chans[dest] <- newMsg
 	}
 }
@@ -574,7 +571,6 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 // it simulates broadcasting a message from one node to all nodes
 func (proc *testDKGProcessor) Broadcast(data []byte) {
 	go func() {
-		gt.Logf("%d Broadcasting:", proc.current)
 		log.Infof("%d Broadcasting:", proc.current)
 
 		if data[0] == byte(feldmanVSSVerifVec) && proc.malicious == invalidVectorBroadcast {
@@ -591,8 +587,7 @@ func (proc *testDKGProcessor) Broadcast(data []byte) {
 }
 
 func (proc *testDKGProcessor) honestBroadcast(data []byte) {
-	gt.Log("honest broadcast:")
-	gt.Logf("%x\n", data)
+	gt.Logf("%d honest broadcast:\n%x\n", proc.current, data)
 	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 	for i := 0; i < len(proc.chans); i++ {
 		if i != proc.current {
@@ -602,13 +597,12 @@ func (proc *testDKGProcessor) honestBroadcast(data []byte) {
 }
 
 func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
-	gt.Log("malicious broadcast:")
 	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 
 	// choose a random reason of an invalid vector
 	coin := mrand.Intn(100)
 	//coin = 4
-	gt.Logf("malicious vector broadcast, coin is %d\n", coin%5)
+	gt.Logf("%d malicious vector broadcast, coin is %d\n", proc.current, coin%5)
 	switch coin % 5 {
 	case 0:
 		// invalid point serialization
@@ -641,14 +635,13 @@ func (proc *testDKGProcessor) invalidVectorBroadcast(data []byte) {
 }
 
 func (proc *testDKGProcessor) invalidComplaintBroadcast(data []byte) {
-	gt.Log("malicious broadcast:")
 	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 
 	if proc.malicious == invalidComplaintBroadcast {
 
 		// choose a random reason for an invalid complaint
 		coin := mrand.Intn(100)
-		gt.Logf("malicious complaint broadcast, coin is %d\n", coin%2)
+		gt.Logf("%d malicious complaint broadcast, coin is %d\n", proc.current, coin%2)
 		switch coin % 2 {
 		case 0:
 			// invalid complainee
@@ -665,6 +658,7 @@ func (proc *testDKGProcessor) invalidComplaintBroadcast(data []byte) {
 			}
 		}
 	} else if proc.malicious == timeoutedComplaintBroadcast {
+		gt.Logf("%d timeouted complaint broadcast\n", proc.current)
 		// send the complaint after the second timeout, equivalent to not sending at all
 		// as the complaint should be ignored.
 		for i := 0; i < len(proc.chans); i++ {
@@ -677,12 +671,11 @@ func (proc *testDKGProcessor) invalidComplaintBroadcast(data []byte) {
 }
 
 func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
-	gt.Log("malicious broadcast:")
 	newMsg := &message{proc.current, proc.protocol, broadcast, data}
 
 	// choose a random reason for an invalid complaint
 	coin := mrand.Intn(100)
-	gt.Logf("malicious complaint broadcast, coin is %d\n", coin%3)
+	gt.Logf("%d malicious complaint answer broadcast, coin is %d\n", proc.current, coin%3)
 	switch coin % 3 {
 	case 0:
 		// invalid complainee
