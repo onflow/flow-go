@@ -65,7 +65,7 @@ func (m *MarketPlaceSimulator) Setup() error {
 	}
 
 	// setup tracker (TODO simplify this by using default values and empty txStatsTracker)
-	m.txTracker, err = NewTxTracker(m.log, 1000, 10, m.networkConfig.AccessNodeAddresses[0], 1)
+	m.txTracker, err = NewTxTracker(m.log, 1000, 5, m.networkConfig.AccessNodeAddresses[0], time.Second)
 	if err != nil {
 		return nil
 	}
@@ -376,6 +376,7 @@ func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *fl
 
 	stopped := false
 	wg := sync.WaitGroup{}
+	wg.Add(1)
 	m.txTracker.AddTx(tx.ID(),
 		nil,
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
@@ -411,8 +412,7 @@ func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *fl
 				wg.Done()
 			}
 		}, // on error
-		60)
-	wg.Add(1)
+		360)
 	wg.Wait()
 
 	return result, nil
@@ -581,9 +581,9 @@ func newMarketPlaceAccount(account *flowAccount,
 	accessNodeAddr string) *marketPlaceAccount {
 	txTracker, err := NewTxTracker(log,
 		10, // max in flight transactions
-		1,  // number of workers
+		2,  // number of workers
 		accessNodeAddr,
-		time.Second*2, // number of accounts
+		time.Second, // number of accounts
 	)
 	if err != nil {
 		panic(err)
