@@ -121,7 +121,6 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 }
 
 // isValidRootSnapshot checks internal consistency of root state snapshot
-// TODO not used
 func isValidRootSnapshot(snap protocol.Snapshot) error {
 
 	segment, err := snap.SealingSegment()
@@ -174,7 +173,7 @@ func isValidRootSnapshot(snap protocol.Snapshot) error {
 
 	// the segment must be fully within the current epoch
 	if firstView > tail.Header.View {
-		return fmt.Errorf("root block has lower view than first view of epoch")
+		return fmt.Errorf("tail block of sealing segment has lower view than first view of epoch")
 	}
 	if head.Header.View >= finalView {
 		return fmt.Errorf("final view of epoch less than first block view")

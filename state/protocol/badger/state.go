@@ -51,27 +51,87 @@ func Bootstrap(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	if err := isValidRootSnapshot(root); err != nil {
+		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
+	}
+
 	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
 
 		// 1) insert each block in the root chain segment
+		err = state.bootstrapSealingSegment(root)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap sealing chain segment: %w", err)
+		}
+
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		if len(segment) == 0 {
-			return fmt.Errorf("root sealing segment must contain at least one block")
-		}
-
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
-		tail := segment[0]
+		// TAIL <- ... <- HEAD
+		head := segment[len(segment)-1] // reference block of the snapshot
+		tail := segment[0]              // last sealed block
+
+		// 2) insert the root execution result and seal into the database and index it
+		err = state.bootstrapSealedResult(root)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap sealed result: %w", err)
+		}
+
+		// 3) insert the root quorum certificate into the database
+		qc, err := root.QuorumCertificate()
+		if err != nil {
+			return fmt.Errorf("could not get root qc: %w", err)
+		}
+		err = operation.InsertRootQuorumCertificate(qc)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root qc: %w", err)
+		}
+
+		// 4) initialize the current protocol state height/view pointers
+		err = state.bootstrapStatePointers(root)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
+		}
+
+		// 5) initialize values related to the epoch logic
+		err = state.bootstrapEpoch(root)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap epoch values: %w", err)
+		}
+
+		state.metrics.BlockSealed(tail)
+		state.metrics.SealedHeight(tail.Header.Height)
+		state.metrics.FinalizedHeight(head.Header.Height)
+		for _, block := range segment {
+			state.metrics.BlockFinalized(block)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("bootstrapping failed: %w", err)
+	}
+
+	return state, nil
+}
+
+// bootstrapSealingSegment inserts all blocks and associated metadata for the
+// protocol state root snapshot to disk.
+func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		segment, err := root.SealingSegment()
+		if err != nil {
+			return fmt.Errorf("could not get sealing segment: %w", err)
+		}
 		head := segment[len(segment)-1]
 
 		for i, block := range segment {
 			blockID := block.ID()
 			height := block.Header.Height
 
-			err = state.blocks.StoreTx(block)(tx)
+			err := state.blocks.StoreTx(block)(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
 			}
@@ -99,11 +159,21 @@ func Bootstrap(
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
 
-		// 2) insert the root execution result and seal into the database and index it
+		return nil
+	}
+}
+
+func (state *State) bootstrapSealedResult(root protocol.Snapshot) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		head, err := root.Head()
+		if err != nil {
+			return fmt.Errorf("could not get head from root snapshot: %w", err)
+		}
 		result, seal, err := root.SealedResult()
 		if err != nil {
 			return fmt.Errorf("could not get sealed result from root snapshot: %w", err)
 		}
+
 		err = operation.SkipDuplicates(operation.InsertExecutionResult(result))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root result: %w", err)
@@ -112,6 +182,7 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not index root result: %w", err)
 		}
+
 		err = operation.SkipDuplicates(operation.InsertSeal(seal.ID(), seal))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root seal: %w", err)
@@ -121,17 +192,22 @@ func Bootstrap(
 			return fmt.Errorf("could not index root block seal: %w", err)
 		}
 
-		// 3) insert the root quorum certificate into the database
-		qc, err := root.QuorumCertificate()
-		if err != nil {
-			return fmt.Errorf("could not get root qc: %w", err)
-		}
-		err = operation.InsertRootQuorumCertificate(qc)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert root qc: %w", err)
-		}
+		return nil
+	}
+}
 
-		// 4) initialize the current protocol state values
+// bootstrapStatePointers instantiates special pointers used to by the protocol
+// state to keep track of special block heights and views.
+func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		segment, err := root.SealingSegment()
+		if err != nil {
+			return fmt.Errorf("could not get sealing segment: %w", err)
+		}
+		head := segment[len(segment)-1]
+		tail := segment[0]
+
+		// insert initial views for HotStuff
 		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
@@ -140,6 +216,8 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
+
+		// insert height pointers
 		err = operation.InsertRootHeight(head.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
@@ -153,26 +231,8 @@ func Bootstrap(
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		// 5) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root)(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap epoch values: %w", err)
-		}
-
-		state.metrics.BlockSealed(tail)
-		state.metrics.SealedHeight(tail.Header.Height)
-		state.metrics.FinalizedHeight(head.Header.Height)
-		for _, block := range segment {
-			state.metrics.BlockFinalized(block)
-		}
-
 		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
-
-	return state, nil
 }
 
 // bootstrapEpoch bootstraps the protocol state database with information about
