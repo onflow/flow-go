@@ -146,12 +146,3 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
 	suite.chunksQueue.AssertNotCalled(suite.T(), "StoreChunkLocator")
 	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
 }
-
-// assignNoChunkToMe is a test helper that no chunk of the complete execution receipt of
-// this test suite to its verification node.
-func (suite *AssignerEngineTestSuite) assignNoChunkToMe() {
-	a := chmodel.NewAssignment()
-	suite.assigner.On("Assign",
-		suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
-}
