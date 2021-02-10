@@ -708,7 +708,7 @@ func (m *marketPlaceAccount) Act() error {
 			return fmt.Errorf("error preparing and signing the transaction: %w", err)
 		}
 
-		fmt.Println("transfering a moment %d from account %s to account %s (proposer %s, seq number %d)  :",
+		m.log.Debug().Msgf("transfering a moment %d from account %s to account %s (proposer %s, seq number %d)  :",
 			moment, m.Account().Address, friend.Address,
 			tx.ProposalKey.Address, tx.ProposalKey.SequenceNumber,
 		)
