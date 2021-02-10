@@ -162,7 +162,7 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 			if newMsg.channel == private {
 				err = proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
 			} else {
-				err = proc.dkg.HandleBroadcastedMsg(newMsg.orig, newMsg.data)
+				err = proc.dkg.HandleBroadcastMsg(newMsg.orig, newMsg.data)
 			}
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to receive DKG mst")

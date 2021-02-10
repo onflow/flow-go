@@ -177,10 +177,9 @@ const (
 	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
 )
 
-// HandleBroadcastedMsg processes a new broadcasted message received by the current node.
+// HandleBroadcastMsg processes a new broadcasted message received by the current node.
 // orig is the message origin index
-func (s *feldmanVSSQualState) HandleBroadcastedMsg(orig int, msg []byte) error {
-
+func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
