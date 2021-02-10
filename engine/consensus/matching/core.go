@@ -4,6 +4,7 @@ package matching
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -107,7 +108,7 @@ func NewCore(
 ) (*Core, error) {
 	// initialize the propagation engine with its dependencies
 	e := &Core{
-		log:                                  log.With().Str("engine", "matching").Logger(),
+		log:                                  log.With().Str("engine", "matching-core").Logger(),
 		engineMetrics:                        engineMetrics,
 		tracer:                               tracer,
 		mempool:                              mempool,
@@ -144,6 +145,23 @@ func NewCore(
 
 // OnReceipt processes a new execution receipt.
 func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+	err := c.onReceipt(originID, receipt)
+	if err != nil {
+		marshalled, err := json.Marshal(receipt)
+		if err != nil {
+			marshalled = []byte("json_marshalling_failed")
+		}
+		c.log.Error().Err(err).
+			Hex("origin", logging.ID(originID)).
+			Hex("receipt_id", logging.Entity(receipt)).
+			Str("receipt", string(marshalled)).
+			Msgf("unexpected error processing execution receipt")
+		return fmt.Errorf("internal error processing execution receipt %x: %w", receipt.ID(), err)
+	}
+	return nil
+}
+
+func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 	startTime := time.Now()
 	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
 	defer func() {
@@ -292,6 +310,24 @@ func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zero
 
 // OnApproval processes a new result approval.
 func (c *Core) OnApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+	err := c.onApproval(originID, approval)
+	if err != nil {
+		marshalled, err := json.Marshal(approval)
+		if err != nil {
+			marshalled = []byte("json_marshalling_failed")
+		}
+		c.log.Error().Err(err).
+			Hex("origin", logging.ID(originID)).
+			Hex("approval_id", logging.Entity(approval)).
+			Str("approval", string(marshalled)).
+			Msgf("unexpected error processing result approval")
+		return fmt.Errorf("internal error processing result approval %x: %w", approval.ID(), err)
+	}
+	return nil
+}
+
+// OnApproval processes a new result approval.
+func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
 	startTime := time.Now()
 	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
 	defer func() {
@@ -351,7 +387,7 @@ func (c *Core) OnApproval(originID flow.Identifier, approval *flow.ResultApprova
 	// store in the memory pool (it won't be added if it is already in there).
 	added, err := c.approvals.Add(approval)
 	if err != nil {
-		return err
+		return fmt.Errorf("error storing approval in mempool: %w", err)
 	}
 	if !added {
 		log.Debug().Msg("skipping approval already in mempool")
@@ -362,15 +398,16 @@ func (c *Core) OnApproval(originID flow.Identifier, approval *flow.ResultApprova
 	return nil
 }
 
-// checkSealing checks if there is anything worth sealing at the moment.
-func (c *Core) checkSealing() {
-	err := c.checkingSealing()
+// CheckSealing runs the sealing logic
+func (c *Core) CheckSealing() error {
+	err := c.checkSealing()
 	if err != nil {
-		c.log.Fatal().Err(err).Msg("error in sealing protocol")
+		return fmt.Errorf("internal error in sealing protocol")
 	}
+	return nil
 }
 
-func (c *Core) checkingSealing() error {
+func (c *Core) checkSealing() error {
 	startTime := time.Now()
 	sealingSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealing)
 	defer func() {
@@ -473,7 +510,6 @@ func (c *Core) checkingSealing() error {
 	requestReceiptsSpan := c.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
 	pendingReceiptRequests, err := c.requestPendingReceipts()
 	requestReceiptsSpan.Finish()
-
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
@@ -486,16 +522,14 @@ func (c *Core) checkingSealing() error {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
 	}
 
-	mempoolHasNextSeal := false
-
 	// check if we end up created a seal in mempool for the next unsealed block
+	mempoolHasNextSeal := false
 	for _, unsealed := range nextUnsealeds {
 		_, mempoolHasNextSeal = c.seals.ByID(unsealed.IncorporatedResultID)
 		if mempoolHasNextSeal {
 			break
 		}
 	}
-
 	lg.Info().
 		Int("sealable_incorporated_results", len(sealedBlockIDs)).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).

@@ -96,7 +96,7 @@ func NewEngine(log zerolog.Logger,
 	var err error
 	e.pendingReceipts, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultReceiptQueueCapacity),
-		fifoqueue.WithLenMetric(func(len int) { mempool.MempoolEntries(metrics.ResourceReceiptQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceReceiptQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
@@ -105,7 +105,7 @@ func NewEngine(log zerolog.Logger,
 	// FIFO queue for broadcasted approvals
 	e.pendingApprovals, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
-		fifoqueue.WithLenMetric(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
@@ -114,7 +114,7 @@ func NewEngine(log zerolog.Logger,
 	// FiFo queue for requested approvals
 	e.pendingRequestedApprovals, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalResponseQueueCapacity),
-		fifoqueue.WithLenMetric(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalResponseQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalResponseQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for requested approvals: %w", err)
@@ -233,31 +233,26 @@ func (e *Engine) consumeEvents() {
 
 	for {
 		var err error
-		var origin flow.Identifier
 		select {
 		case event := <-e.receiptSink:
-			origin = event.OriginID
 			err = e.core.OnReceipt(event.OriginID, event.Msg.(*flow.ExecutionReceipt))
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		case event := <-e.approvalSink:
-			origin = event.OriginID
 			err = e.core.OnApproval(event.OriginID, event.Msg.(*flow.ResultApproval))
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		case event := <-e.requestedApprovalSink:
-			origin = event.OriginID
 			err = e.core.OnApproval(event.OriginID, &event.Msg.(*messages.ApprovalResponse).Approval)
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		case <-checkSealingTicker:
-			e.core.checkSealing()
+			err = e.core.CheckSealing()
 		case <-e.unit.Quit():
 			return
 		}
-
 		if err != nil {
-			// Public methods of `Core` are designed in a way to handle all errors internally.
+			// Public methods of `Core` are supposed to handle all errors internally.
 			// Here if error happens it means that internal state is corrupted or we have caught
 			// exception while processing. In such case best just to abort the node.
-			e.log.Fatal().Err(err).Hex("origin", origin[:]).Msgf("fatal error while processing message")
+			e.log.Fatal().Err(err).Msgf("fatal internal error in matching core logic")
 		}
 	}
 }
