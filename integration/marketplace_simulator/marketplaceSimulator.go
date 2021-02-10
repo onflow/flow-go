@@ -582,7 +582,7 @@ func newMarketPlaceAccount(account *flowAccount,
 		10, // max in flight transactions
 		1,  // number of workers
 		accessNodeAddr,
-		1, // number of accounts
+		time.Second*2, // number of accounts
 	)
 	if err != nil {
 		panic(err)
@@ -704,15 +704,19 @@ func (m *marketPlaceAccount) Act() error {
 	m.txTracker.AddTx(tx.ID(),
 		nil,
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
-		}, // on finalized
-		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
-			if !stopped {
-				stopped = true
-				wg.Done()
+			defer wg.Done()
+
+			m.log.Debug().
+				Str("status", res.Status.String()).
+				Msg("marketplace tx executed")
+
+			if res.Error != nil {
+				m.log.Error().
+					Err(res.Error).
+					Msg("marketplace tx failed")
 			}
-		}, // on sealed
+		},
+		nil, // on sealed
 		func(_ flowsdk.Identifier) {
 			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
 			if !stopped {
@@ -734,7 +738,7 @@ func (m *marketPlaceAccount) Act() error {
 				wg.Done()
 			}
 		}, // on error
-		60)
+		120)
 	wg.Wait()
 
 	return nil
