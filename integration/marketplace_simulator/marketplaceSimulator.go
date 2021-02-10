@@ -151,28 +151,28 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	nbaAddress := m.nbaTopshotAccount.Address
 
-	numBuckets := 32
-	// setup nba account to use sharded collections
-	script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
+	// numBuckets := 32
+	// // setup nba account to use sharded collections
+	// script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
+	// tx := flowsdk.NewTransaction().
+	// 	SetReferenceBlockID(blockRef.ID).
+	// 	SetScript(script)
+
+	// result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
+
+	// if err != nil || result.Error != nil {
+	// 	m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
+	// 	return err
+	// }
+
+	// TODO add many plays and add many sets (adds plays to sets)
+	// this adds a play with id 0
+	script := nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
-
-	if err != nil || result.Error != nil {
-		m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
-		return err
-	}
-
-	// TODO add many plays and add many sets (adds plays to sets)
-	// this adds a play with id 0
-	script = nbaTemplates.GenerateMintPlayScript(*nbaAddress, *samplePlay())
-	tx = flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef.ID).
-		SetScript(script)
-
-	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
