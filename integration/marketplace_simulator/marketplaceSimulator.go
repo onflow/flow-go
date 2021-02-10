@@ -306,7 +306,7 @@ func (m *MarketPlaceSimulator) Run() error {
 
 	// select an account
 	// call Act and put it back to list when is returned
-	duration := time.Second * 30
+	duration := time.Second * 120
 	for start := time.Now(); ; {
 		if time.Since(start) > duration {
 			break
@@ -318,6 +318,7 @@ func (m *MarketPlaceSimulator) Run() error {
 			err := acc.Act()
 			fmt.Println("err: ", err)
 			// TODO handle the retuned error
+			time.Sleep(time.Second)
 		}()
 	}
 	fmt.Println("experiment is done")
