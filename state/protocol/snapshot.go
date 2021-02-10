@@ -50,7 +50,7 @@ type Snapshot interface {
 	// SealingSegment returns the chain segment such that the head (greatest
 	// height) is this snapshot's reference block and the tail (least height)
 	// is the most recently sealed block as of this snapshot (ie. the block
-	// referenced by LatestSeal).
+	// referenced by LatestSeal). The segment is in ascending height order.
 	//
 	// TAIL <- B1 <- ... <- BN <- HEAD
 	//
