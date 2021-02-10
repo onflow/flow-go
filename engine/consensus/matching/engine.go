@@ -78,6 +78,7 @@ type Engine struct {
 	maxResultsToRequest                  int                             // max number of finalized blocks for which we request execution results
 	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
 	receiptValidator                     module.ReceiptValidator         // used to validate receipts
+	approvalValidator                    module.ApprovalValidator        // used to validate ResultApprovals
 	requestTracker                       *RequestTracker                 // tracks ongoing re-requests of missing result approvals, incl. blackout periods
 	approvalRequestsThreshold            uint64                          // lower threshold on height difference between <latest finalized block> and <block incorporating a result>, when re-requesting approvals starts
 	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
@@ -102,6 +103,7 @@ func NewCore(
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
 	validator module.ReceiptValidator,
+	approvalValidator module.ApprovalValidator,
 	requiredApprovalsForSealConstruction uint,
 	emergencySealingActive bool,
 	approvalConduit network.Conduit,
@@ -129,6 +131,7 @@ func NewCore(
 		assigner:                             assigner,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		receiptValidator:                     validator,
+		approvalValidator:                    approvalValidator,
 		requestTracker:                       NewRequestTracker(10, 30),
 		approvalRequestsThreshold:            10,
 		emergencySealingActive:               emergencySealingActive,
@@ -352,36 +355,20 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return nil
 	}
 
-	// check if we already have the block the approval pertains to
-	head, err := e.state.AtBlockID(approval.Body.BlockID).Head()
+	err := e.approvalValidator.Validate(approval)
 	if err != nil {
-		if !errors.Is(err, storage.ErrNotFound) {
-			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
-		}
-		// Don't error if the block is not known yet, because the checks in the
-		// else-branch below are called again when we try to match approvals to chunks.
-	} else {
-		// drop approval, if it is for block whose height is lower or equal to already sealed height
-		sealed, err := e.state.Sealed().Head()
-		if err != nil {
-			return fmt.Errorf("could not find sealed block: %w", err)
-		}
-		if sealed.Height >= head.Height {
+		if engine.IsOutdatedInputError(err) {
 			log.Debug().Msg("discarding approval for already sealed and finalized block height")
 			return nil
+		} else if engine.IsUnverifiableInputError(err) {
+			log.Debug().Msg("discarding unverifiable approval")
+			return nil
+		} else if engine.IsInvalidInputError(err) {
+			log.Err(err).Msg("discarding invalid approval")
+			return nil
+		} else {
+			return err
 		}
-
-		// Check if the approver was a staked verifier at that block.
-		err = e.ensureStakedNodeWithRole(approval.Body.ApproverID, head, flow.RoleVerification)
-		if err != nil {
-			if engine.IsInvalidInputError(err) {
-				log.Err(err).Msg("received approval from invalid node")
-				return nil
-			}
-			return fmt.Errorf("failed to process approval: %w", err)
-		}
-
-		// TODO: check the approval's cryptographic integrity
 	}
 
 	// store in the memory pool (it won't be added if it is already in there).
@@ -975,7 +962,7 @@ func (e *Engine) requestPendingReceipts() (int, error) {
 			Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
 			Msg("requesting receipts")
 		for _, blockID := range missingBlocksOrderedByHeight {
-			e.receiptRequester.EntityByID(blockID, filter.Any)
+			e.receiptRequester.Query(blockID, filter.Any)
 		}
 	}
 

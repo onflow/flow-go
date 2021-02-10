@@ -247,8 +247,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
 	matchingEngine, err := matching.NewEngine(
 		node.Log,
@@ -268,7 +268,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		approvals,
 		seals,
 		assigner,
-		validator,
+		receiptValidator,
+		approvalValidator,
 		validation.DefaultRequiredApprovalsForSealValidation,
 		matching.DefaultEmergencySealingActive)
 	require.Nil(t, err)
