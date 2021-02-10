@@ -272,6 +272,9 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 		for _, acc := range group {
 			c := acc
 			ma := newMarketPlaceAccount(&c, group, m.log, txTracker, flowClient, m.simulatorConfig, accessNode)
+			if ma == nil {
+				panic("marketplace account was empty")
+			}
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
@@ -565,8 +568,9 @@ func (m *MarketPlaceSimulator) Run() error {
 	// call Act and put it back to list when is returned
 
 	for i := 0; i < len(m.marketAccounts); i++ {
+		j := i
 		go func() {
-			actor := m.marketAccounts[i]
+			actor := m.marketAccounts[j]
 			fmt.Println("running account :", actor.Account().Address.String())
 			err := actor.Act()
 			fmt.Println("err: ", err)
