@@ -307,7 +307,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 
 			result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
 			if err != nil || result.Error != nil {
-				m.log.Error().Msgf("transfering initial moments to a marketplace account failed: %w , %w", result.Error, err)
+				m.log.Error().Msgf("transfering initial moments to a marketplace account failed: %s , %w", result, err)
 				return err
 			}
 
