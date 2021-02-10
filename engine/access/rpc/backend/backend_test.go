@@ -405,6 +405,43 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.assertAllExpectations()
 }
 
+// TestTransactionResultUnknown tests that the status of transaction is reported as unknown when it is not found in the
+// local storage
+func (suite *Suite) TestTransactionResultUnknown() {
+
+	ctx := context.Background()
+	txID := unittest.IdentifierFixture()
+
+	// transaction storage returns an error
+	suite.transactions.
+		On("ByID", txID).
+		Return(nil, storage.ErrNotFound)
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		suite.transactions,
+		nil,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		suite.log,
+	)
+
+	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
+	result, err := backend.GetTransactionResult(ctx, txID)
+	suite.checkResponse(result, err)
+
+	// status should be reported as unknown
+	suite.Assert().Equal(flow.TransactionStatusUnknown, result.Status)
+}
+
 func (suite *Suite) TestGetLatestFinalizedBlock() {
 	// setup the mocks
 	expected := unittest.BlockFixture()
