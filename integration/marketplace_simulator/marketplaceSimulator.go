@@ -574,6 +574,8 @@ func (m *MarketPlaceSimulator) Run() error {
 			// TODO handle the retuned error
 			time.Sleep(time.Second)
 		}()
+
+		time.Sleep(time.Second * 5)
 	}
 	fmt.Println("experiment is done")
 
