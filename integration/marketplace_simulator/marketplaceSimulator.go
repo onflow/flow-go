@@ -698,6 +698,11 @@ func (m *marketPlaceAccount) Act() error {
 			return fmt.Errorf("error preparing and signing the transaction: %w", err)
 		}
 
+		fmt.Println("transfering a moment %d from account %s to account %s (proposer %s, seq number %d)  :",
+			moment, m.Account().Address, friend.Address,
+			tx.ProposalKey.Address, tx.ProposalKey.SequenceNumber,
+		)
+
 		// wait till success and then update the list
 		// send tx
 		err = m.flowClient.SendTransaction(context.Background(), *tx)
