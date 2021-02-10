@@ -2,9 +2,8 @@ package module
 
 import "github.com/onflow/flow-go/model/flow"
 
-// ApprovalValidator is used for validating
-// result approvals received from verification nodes with respect
-//	to current protocol state.
+// ApprovalValidator is used for validating result approvals received from
+// verification nodes with respect to current protocol state.
 // Returns the following:
 // * nil - in case of success
 // * sentinel engine.InvalidInputError when approval is invalid

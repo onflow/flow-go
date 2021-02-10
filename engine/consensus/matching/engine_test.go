@@ -340,7 +340,7 @@ func (ms *MatchingSuite) TestOnApprovalOutdated() {
 	ms.approvalValidator.On("Validate", approval).Return(engine.NewOutdatedInputErrorf("")).Once()
 
 	err := ms.matching.onApproval(approval.Body.ApproverID, approval)
-	ms.Require().NoError(err, "should ingore if approval is outdated")
+	ms.Require().NoError(err, "should ignore if approval is outdated")
 
 	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)

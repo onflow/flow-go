@@ -30,7 +30,6 @@ func (v *approvalValidator) Validate(approval *flow.ResultApproval) error {
 		if !errors.Is(err, storage.ErrNotFound) {
 			return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
 		}
-
 		return engine.NewUnverifiableInputError("no header for block: %v", approval.Body.BlockID)
 	}
 
