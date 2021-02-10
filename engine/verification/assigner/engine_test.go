@@ -51,6 +51,9 @@ func (suite *AssignerEngineTestSuite) SetupTest() {
 	suite.metrics = &module.VerificationMetrics{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.headerStorage = &storage.Headers{}
+	suite.assigner = &module.ChunkAssigner{}
+	suite.newChunkListener = &module.NewJobListener{}
+	suite.chunksQueue = &storage.ChunksQueue{}
 
 	// generates an execution result with a single collection, chunk, and transaction.
 	suite.completeER = utils.LightExecutionResultFixture(1)
@@ -86,21 +89,38 @@ func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *
 	return e
 }
 
-// TestNewBlock_HappyPath
+// TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
+// a receipt results in the assigner engine passing all assigned chunks in the result of the receipt to the
+// chunks queue and notifying the job listener of the assigne d chunks.
 func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 	e := suite.NewAssignerEngine()
 
-	// mocks metrics
-	// receiving an execution receipt
-	//suite.metrics.On("OnExecutionReceiptReceived").
-	//	Return().Once()
+	// assigns all chunks to this verification node
+	a := chmodel.NewAssignment()
+	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
+	for _, chunk := range chunks {
+		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
+	}
+	suite.assigner.On("Assign",
+		&suite.completeER.Receipt.ExecutionResult,
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
+
+	// mocks processing assigned chunks
+	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
+	// invoked for it.
+	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
+		Return(true, nil).
+		Times(len(chunks))
+	suite.newChunkListener.On("Check").Return().Times(len(chunks))
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(suite.completeER.ReferenceBlock)
+	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
 
 	testifymock.AssertExpectationsForObjects(suite.T(),
 		suite.metrics,
-		suite.cachedReceipts)
+		suite.assigner,
+		suite.chunksQueue,
+		suite.newChunkListener)
 }
 
 //
@@ -775,13 +795,7 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 // assignAllChunksToMe is a test helper that assigns all chunks in the complete execution receipt of
 // this test suite to its verification node.
 func (suite *AssignerEngineTestSuite) assignThisChunksToMe() {
-	a := chmodel.NewAssignment()
-	for _, chunk := range suite.completeER.Receipt.ExecutionResult.Chunks {
-		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil)
+
 }
 
 // assignNoChunkToMe is a test helper that no chunk of the complete execution receipt of
@@ -790,5 +804,5 @@ func (suite *AssignerEngineTestSuite) assignNoChunkToMe() {
 	a := chmodel.NewAssignment()
 	suite.assigner.On("Assign",
 		suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil)
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
 }
