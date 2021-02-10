@@ -122,3 +122,11 @@ func samplePlay() *nbaData.PlayMetadata {
 		Weight:               &num,
 	}
 }
+
+func makeMomentRange(min, max uint64) []uint64 {
+	a := make([]uint64, max-min)
+	for i := range a {
+		a[i] = min + uint64(i)
+	}
+	return a
+}

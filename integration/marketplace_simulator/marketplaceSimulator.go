@@ -295,7 +295,9 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			m.log.Debug().Msg("account setup is done")
 
 			//  transfer some moments
-			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
+
+			moments := makeMomentRange(momentCounter, momentCounter+20)
+			momentCounter += 20
 			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
 			// script = nbaTemplates.GenerateBatchTransferMomentScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
 			script = generateBatchTransferMomentScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
@@ -308,7 +310,6 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 				m.log.Error().Msgf("transfering initial moments to a marketplace account failed: %w , %w", result.Error, err)
 				return err
 			}
-			momentCounter += 5
 
 			m.log.Debug().Msg("transferring moments are done")
 			// setup sales
