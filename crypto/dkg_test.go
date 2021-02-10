@@ -393,7 +393,8 @@ func dkgRunChan(proc *testDKGProcessor,
 
 // post processing required for some edge case tests
 func timeoutPostProcess(processors []testDKGProcessor, t *testing.T, phase int) {
-	if phase == 1 {
+	switch phase {
+	case 1:
 		for i := 0; i < len(processors); i++ {
 			go func(i int) {
 				for len(processors[0].lateChansTimeout1[i]) != 0 {
@@ -403,7 +404,7 @@ func timeoutPostProcess(processors []testDKGProcessor, t *testing.T, phase int) 
 				}
 			}(i)
 		}
-	} else if phase == 2 {
+	case 2:
 		for i := 0; i < len(processors); i++ {
 			go func(i int) {
 				for len(processors[0].lateChansTimeout2[i]) != 0 {
@@ -501,15 +502,16 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 
 	// check the behavior
 	var recipients int // number of recipients to send invalid shares to
-	if proc.malicious == manyInvalidShares {
+	switch proc.malicious {
+	case manyInvalidShares:
 		recipients = proc.dkg.Threshold() + 1 //  t < recipients <= n
-	} else if proc.malicious == fewInvalidShares {
+	case fewInvalidShares:
 		recipients = proc.dkg.Threshold() //  0 <= recipients <= t
-	} else if proc.malicious == invalidSharesComplainTrigger {
+	case invalidSharesComplainTrigger:
 		recipients = proc.current // equal to r1+r2, which causes all r1+r2 to complain
-	} else if proc.malicious == invalidComplaintAnswerBroadcast {
+	case invalidComplaintAnswerBroadcast:
 		recipients = 0 // treat this case separately as the complaint trigger is the node n-1
-	} else {
+	default:
 		panic("invalid share send not supported")
 	}
 
