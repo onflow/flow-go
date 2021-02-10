@@ -94,14 +94,14 @@ func (m *MarketPlaceSimulator) Setup() error {
 		return err
 	}
 
-	// mint moments
-	err = m.mintMoments()
+	// setup marketplace accounts
+	err = m.setupMarketplaceAccounts(accounts)
 	if err != nil {
 		return err
 	}
 
-	// setup marketplace accounts
-	err = m.setupMarketplaceAccounts(accounts)
+	// mint moments
+	err = m.mintMoments()
 	if err != nil {
 		return err
 	}
@@ -211,13 +211,14 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	m.log.Info().Msgf("play added to a set")
 
 	batchSize := 100
-	steps := m.simulatorConfig.NumberOfMoments / batchSize
+	// steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
+	steps := len(m.marketAccounts)
 	for i := 0; i < steps; i++ {
 		m.log.Info().Msgf("minting %d moments on nba account", batchSize)
 
 		// mint a lot of moments
-		script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *nbaAddress, 1, 1, uint64(batchSize))
+		script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *m.marketAccounts[i].Account().Address, 1, 1, uint64(batchSize))
 		tx = flowsdk.NewTransaction().
 			SetReferenceBlockID(blockRef.ID).
 			SetScript(script)
@@ -240,7 +241,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// TODO not share the same client
 
 	groupSize := 10
-	momentCounter := uint64(1)
+	// momentCounter := uint64(1)
 	// numBuckets := 10
 	// totalMinted := 0
 	// batchSize := 100
@@ -301,24 +302,24 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 
 			m.log.Debug().Msg("account setup is done")
 
-			//  transfer some moments
-
-			moments := makeMomentRange(momentCounter, momentCounter+20)
-			momentCounter += 20
+			// // transfer some moments
+			// moments := makeMomentRange(momentCounter, momentCounter+20)
+			// momentCounter += 20
 			// script = generateBatchTransferMomentScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
-			script = generateBatchTransferMomentfromShardedCollectionScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
+			// // script = generateBatchTransferMomentfromShardedCollectionScript(m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, m.nbaTopshotAccount.Address, ma.Account().Address, moments)
 
-			tx = flowsdk.NewTransaction().
-				SetReferenceBlockID(blockRef.ID).
-				SetScript(script)
+			// tx = flowsdk.NewTransaction().
+			// 	SetReferenceBlockID(blockRef.ID).
+			// 	SetScript(script)
 
-			result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
-			if err != nil || result.Error != nil {
-				m.log.Error().Msgf("transfering initial moments to a marketplace account failed: %s , %w", result, err)
-				return err
-			}
+			// result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+			// if err != nil || result.Error != nil {
+			// 	m.log.Error().Msgf("transfering initial moments to a marketplace account failed: %s , %w", result, err)
+			// 	return err
+			// }
 
-			m.log.Debug().Msg("transferring moments are done")
+			// m.log.Debug().Msg("transferring moments are done")
+
 			// setup sales
 			// GenerateCreateSaleScript(m.nbaTopshotAccount.Address, ma.Account().Address, tokenStorageName string, 0.15)
 			// nbaTemplate.GenerateCreateSaleScript()
