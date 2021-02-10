@@ -91,7 +91,7 @@ func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *
 
 // TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
 // a receipt results in the assigner engine passing all assigned chunks in the result of the receipt to the
-// chunks queue and notifying the job listener of the assigne d chunks.
+// chunks queue and notifying the job listener of the assigned chunks.
 func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 	e := suite.NewAssignerEngine()
 
@@ -108,7 +108,6 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
 	// invoked for it.
-	// assigns all chunks to this node.
 	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
 		Return(true, nil).
 		Times(len(chunks))
@@ -122,6 +121,30 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 		suite.assigner,
 		suite.chunksQueue,
 		suite.newChunkListener)
+}
+
+// TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
+// a receipt with no assigned chunk for the verification node in its result. Assigner engine should
+// not pass any chunk to the chunks queue, and should not notify the job listener.
+func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
+	e := suite.NewAssignerEngine()
+
+	// assigns no chunk to this verification node
+	suite.assigner.On("Assign",
+		&suite.completeER.Receipt.ExecutionResult,
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(chmodel.NewAssignment(), nil).Once()
+
+	// sends block containing receipt to assigner engine
+	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
+
+	testifymock.AssertExpectationsForObjects(suite.T(),
+		suite.metrics,
+		suite.assigner)
+
+	// when there is no assigned chunk, nothing should be passed to chunks queue, and
+	// job listener should not be notified.
+	suite.chunksQueue.AssertNotCalled(suite.T(), "StoreChunkLocator")
+	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
 }
 
 // assignNoChunkToMe is a test helper that no chunk of the complete execution receipt of
