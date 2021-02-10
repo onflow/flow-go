@@ -520,7 +520,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 	if (dest < recipients) || (proc.current < recipients && dest < recipients+1) ||
 		(proc.malicious == invalidComplaintAnswerBroadcast && dest == proc.dkg.Size()-1) {
 		// choose a random reason for an invalid share
-		coin := mrand.Intn(5)
+		coin := mrand.Intn(6)
 		gt.Logf("%d maliciously sending to %d, coin is %d\n", proc.current, dest, coin)
 		switch coin {
 		case 0:
