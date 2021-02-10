@@ -9,131 +9,131 @@ const (
 	// State
 	// mutator.Extend - full payload check
 	ProtoStateMutatorExtend                SpanName = "common.state.proto.mutator.extend"
-	ProtoStateMutatorExtendCheckHeader              = "common.state.proto.mutator.extend.checkHeader"
-	ProtoStateMutatorExtendCheckGuarantees          = "common.state.proto.mutator.extend.checkGuarantees"
-	ProtoStateMutatorExtendCheckSeals               = "common.state.proto.mutator.extend.checkSeals"
-	ProtoStateMutatorExtendCheckReceipts            = "common.state.proto.mutator.extend.checkReceipts"
-	ProtoStateMutatorExtendDBInsert                 = "common.state.proto.mutator.extend.dbInsert"
+	ProtoStateMutatorExtendCheckHeader     SpanName = "common.state.proto.mutator.extend.checkHeader"
+	ProtoStateMutatorExtendCheckGuarantees SpanName = "common.state.proto.mutator.extend.checkGuarantees"
+	ProtoStateMutatorExtendCheckSeals      SpanName = "common.state.proto.mutator.extend.checkSeals"
+	ProtoStateMutatorExtendCheckReceipts   SpanName = "common.state.proto.mutator.extend.checkReceipts"
+	ProtoStateMutatorExtendDBInsert        SpanName = "common.state.proto.mutator.extend.dbInsert"
 
 	// mutator.HeaderExtend - header-only check
-	ProtoStateMutatorHeaderExtend              = "common.state.proto.mutator.headerExtend"
-	ProtoStateMutatorHeaderExtendGetLastSealed = "common.state.proto.mutator.headerExtend.lastSealed"
+	ProtoStateMutatorHeaderExtend              SpanName = "common.state.proto.mutator.headerExtend"
+	ProtoStateMutatorHeaderExtendGetLastSealed SpanName = "common.state.proto.mutator.headerExtend.lastSealed"
 
 	// mutator.Finalize
-	ProtoStateMutatorFinalize = "common.state.proto.mutator.finalize"
+	ProtoStateMutatorFinalize SpanName = "common.state.proto.mutator.finalize"
 
 	// Consensus Node
 	//
 
-	CONProcessCollection = "con.processCollection"
-	CONProcessBlock      = "con.processBlock"
+	CONProcessCollection SpanName = "con.processCollection"
+	CONProcessBlock      SpanName = "con.processBlock"
 
 	// Hotstuff
-	CONHotFinalizeCollection = "con.hotstuff.finalizeCollection"
-	CONHotFinalizeBlock      = "con.hotstuff.finalizeBlock"
+	CONHotFinalizeCollection SpanName = "con.hotstuff.finalizeCollection"
+	CONHotFinalizeBlock      SpanName = "con.hotstuff.finalizeBlock"
 
 	// Ingestion
-	CONIngOnCollectionGuarantee = "con.ingestion.onCollectionGuarantee"
+	CONIngOnCollectionGuarantee SpanName = "con.ingestion.onCollectionGuarantee"
 
 	// Propagation
-	CONPropOnGuarantee = "con.propagation.onGuarantee"
+	CONPropOnGuarantee SpanName = "con.propagation.onGuarantee"
 
 	// Provider
-	CONProvOnBlockProposal = "con.provider.onBlockProposal"
+	CONProvOnBlockProposal SpanName = "con.provider.onBlockProposal"
 
 	// Compliance
-	CONCompBroadcastProposalWithDelay      = "con.compliance.BroadcastProposalWithDelay"
-	CONCompOnBlockProposal                 = "con.compliance.onBlockProposal"
-	CONCompOnBlockProposalProcessRecursive = "con.compliance.onBlockProposal.processBlockProposal.recursive"
-	CONCompOnBlockProposalProcessSingle    = "con.compliance.onBlockProposal.processBlockProposal.single"
+	CONCompBroadcastProposalWithDelay      SpanName = "con.compliance.BroadcastProposalWithDelay"
+	CONCompOnBlockProposal                 SpanName = "con.compliance.onBlockProposal"
+	CONCompOnBlockProposalProcessRecursive SpanName = "con.compliance.onBlockProposal.processBlockProposal.recursive"
+	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
 
 	// Matching
-	CONMatchCheckSealing                        = "con.matching.checkSealing"
-	CONMatchCheckSealingSealableResults         = "con.matching.checkSealing.sealableResults"
-	CONMatchCheckSealingClearPools              = "con.matching.checkSealing.clearPools"
-	CONMatchCheckSealingRequestPendingReceipts  = "con.matching.checkSealing.requestPendingReceipts"
-	CONMatchCheckSealingRequestPendingApprovals = "con.matching.checkSealing.requestPendingApprovals"
-	CONMatchOnReceipt                           = "con.matching.onReceipt"
-	CONMatchOnReceiptVal                        = "con.matching.onReceipt.validation"
-	CONMatchOnApproval                          = "con.matching.onApproval"
+	CONMatchCheckSealing                        SpanName = "con.matching.checkSealing"
+	CONMatchCheckSealingSealableResults         SpanName = "con.matching.checkSealing.sealableResults"
+	CONMatchCheckSealingClearPools              SpanName = "con.matching.checkSealing.clearPools"
+	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.matching.checkSealing.requestPendingReceipts"
+	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.matching.checkSealing.requestPendingApprovals"
+	CONMatchOnReceipt                           SpanName = "con.matching.onReceipt"
+	CONMatchOnReceiptVal                        SpanName = "con.matching.onReceipt.validation"
+	CONMatchOnApproval                          SpanName = "con.matching.onApproval"
 
 	// Builder
-	CONBuildOn                        = "con.builder"
-	CONBuildOnCreatePayloadGuarantees = "con.builder.createPayload.guarantees"
-	CONBuildOnCreatePayloadSeals      = "con.builder.createPayload.seals"
-	CONBuildOnCreatePayloadReceipts   = "con.builder.createPayload.receipts"
-	CONBuildOnCreateHeader            = "con.builder.createHeader"
-	CONBuildOnDBInsert                = "con.builder.dbInsert"
+	CONBuildOn                        SpanName = "con.builder"
+	CONBuildOnCreatePayloadGuarantees SpanName = "con.builder.createPayload.guarantees"
+	CONBuildOnCreatePayloadSeals      SpanName = "con.builder.createPayload.seals"
+	CONBuildOnCreatePayloadReceipts   SpanName = "con.builder.createPayload.receipts"
+	CONBuildOnCreateHeader            SpanName = "con.builder.createHeader"
+	CONBuildOnDBInsert                SpanName = "con.builder.dbInsert"
 
 	// Collection Node
 	//
 
 	// Builder
-	COLBuildOn                  = "col.builder"
-	COLBuildOnSetup             = "col.builder.setup"
-	COLBuildOnUnfinalizedLookup = "col.builder.unfinalizedLookup"
-	COLBuildOnFinalizedLookup   = "col.builder.finalizedLookup"
-	COLBuildOnCreatePayload     = "col.builder.createPayload"
-	COLBuildOnCreateHeader      = "col.builder.createHeader"
-	COLBuildOnDBInsert          = "col.builder.dbInsert"
+	COLBuildOn                  SpanName = "col.builder"
+	COLBuildOnSetup             SpanName = "col.builder.setup"
+	COLBuildOnUnfinalizedLookup SpanName = "col.builder.unfinalizedLookup"
+	COLBuildOnFinalizedLookup   SpanName = "col.builder.finalizedLookup"
+	COLBuildOnCreatePayload     SpanName = "col.builder.createPayload"
+	COLBuildOnCreateHeader      SpanName = "col.builder.createHeader"
+	COLBuildOnDBInsert          SpanName = "col.builder.dbInsert"
 
 	// Cluster State
-	COLClusterStateMutatorExtend                       = "col.state.mutator.extend"
-	COLClusterStateMutatorExtendSetup                  = "col.state.mutator.extend.setup"
-	COLClusterStateMutatorExtendCheckAncestry          = "col.state.mutator.extend.ancestry"
-	COLClusterStateMutatorExtendCheckTransactionsValid = "col.state.mutator.extend.transactions.validity"
-	COLClusterStateMutatorExtendCheckTransactionsDupes = "col.state.mutator.extend.transactions.dupes"
-	COLClusterStateMutatorExtendDBInsert               = "col.state.mutator.extend.dbInsert"
+	COLClusterStateMutatorExtend                       SpanName = "col.state.mutator.extend"
+	COLClusterStateMutatorExtendSetup                  SpanName = "col.state.mutator.extend.setup"
+	COLClusterStateMutatorExtendCheckAncestry          SpanName = "col.state.mutator.extend.ancestry"
+	COLClusterStateMutatorExtendCheckTransactionsValid SpanName = "col.state.mutator.extend.transactions.validity"
+	COLClusterStateMutatorExtendCheckTransactionsDupes SpanName = "col.state.mutator.extend.transactions.dupes"
+	COLClusterStateMutatorExtendDBInsert               SpanName = "col.state.mutator.extend.dbInsert"
 
 	// Execution Node
 	//
 
-	EXEExecuteBlock           = "exe.ingestion.executeBlock"
-	EXESaveExecutionResults   = "exe.ingestion.saveExecutionResults"
-	EXESaveExecutionReceipt   = "exe.ingestion.saveExecutionReceipt"
-	EXESaveTransactionResults = "exe.ingestion.saveTransactionResults"
-	EXESaveTransactionEvents  = "exe.ingestion.saveTransactionEvents"
+	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
+	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
+	EXESaveExecutionReceipt   SpanName = "exe.ingestion.saveExecutionReceipt"
+	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"
+	EXESaveTransactionEvents  SpanName = "exe.ingestion.saveTransactionEvents"
 
-	EXEBroadcastExecutionReceipt = "exe.provider.broadcastExecutionReceipt"
+	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
-	EXEComputeBlock            = "exe.computer.computeBlock"
-	EXEComputeCollection       = "exe.computer.computeCollection"
-	EXEComputeSystemCollection = "exe.computer.computeSystemCollection"
-	EXEComputeTransaction      = "exe.computer.computeTransaction"
+	EXEComputeBlock            SpanName = "exe.computer.computeBlock"
+	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
+	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
+	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
 
-	EXECommitDelta                        = "exe.state.commitDelta"
-	EXEGetRegisters                       = "exe.state.getRegisters"
-	EXEGetRegistersWithProofs             = "exe.state.getRegistersWithProofs"
-	EXEPersistStateCommitment             = "exe.state.persistStateCommitment"
-	EXEPersistChunkDataPack               = "exe.state.persistChunkDataPack"
-	EXEGetExecutionResultID               = "exe.state.getExecutionResultID"
-	EXEPersistExecutionResult             = "exe.state.persistExecutionResult"
-	EXEPersistStateInteractions           = "exe.state.persistStateInteractions"
-	EXERetrieveStateDelta                 = "exe.state.retrieveStateDelta"
-	EXEUpdateHighestExecutedBlockIfHigher = "exe.state.updateHighestExecutedBlockIfHigher"
-	EXEGetHighestExecutedBlockID          = "exe.state.getHighestExecutedBlockID"
+	EXECommitDelta                        SpanName = "exe.state.commitDelta"
+	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
+	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
+	EXEPersistStateCommitment             SpanName = "exe.state.persistStateCommitment"
+	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
+	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
+	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
+	EXEPersistStateInteractions           SpanName = "exe.state.persistStateInteractions"
+	EXERetrieveStateDelta                 SpanName = "exe.state.retrieveStateDelta"
+	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
+	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 
 	// Verification node
 	//
 
-	VERProcessExecutionReceipt = "ver.processExecutionReceipt"
+	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
-	VERFindHandleExecutionReceipt = "ver.find.handleExecutionReceipt"
-	VERFindOnFinalizedBlock       = "ver.finder.OnFinalizedBlock"
-	VERFindCheckCachedReceipts    = "ver.finder.checkCachedReceipts"
-	VERFindCheckPendingReceipts   = "ver.finder.checkPendingReceipts"
-	VERFindCheckReadyReceipts     = "ver.finder.checkReadyReceipts"
-	VERFindProcessResult          = "ver.finder.processResult"
-	VERFindOnResultProcessed      = "ver.finder.onResultProcessed"
+	VERFindHandleExecutionReceipt SpanName = "ver.find.handleExecutionReceipt"
+	VERFindOnFinalizedBlock       SpanName = "ver.finder.OnFinalizedBlock"
+	VERFindCheckCachedReceipts    SpanName = "ver.finder.checkCachedReceipts"
+	VERFindCheckPendingReceipts   SpanName = "ver.finder.checkPendingReceipts"
+	VERFindCheckReadyReceipts     SpanName = "ver.finder.checkReadyReceipts"
+	VERFindProcessResult          SpanName = "ver.finder.processResult"
+	VERFindOnResultProcessed      SpanName = "ver.finder.onResultProcessed"
 
-	VERProcessExecutionResult = "ver.processExecutionResult"
+	VERProcessExecutionResult SpanName = "ver.processExecutionResult"
 	// children of VERProcessExecutionResult
-	VERMatchHandleExecutionResult = "ver.match.handleExecutionResult"
-	VERMatchHandleChunkDataPack   = "ver.match.handleChunkDataPack"
-	VERMatchMyChunkAssignments    = "ver.match.myChunkAssignments"
-	VERVerVerifyWithMetrics       = "ver.verify.verifyWithMetrics"
-	VERVerChunkVerify             = "ver.verify.ChunkVerifier.Verify"
-	VERVerGenerateResultApproval  = "ver.verify.GenerateResultApproval"
+	VERMatchHandleExecutionResult SpanName = "ver.match.handleExecutionResult"
+	VERMatchHandleChunkDataPack   SpanName = "ver.match.handleChunkDataPack"
+	VERMatchMyChunkAssignments    SpanName = "ver.match.myChunkAssignments"
+	VERVerVerifyWithMetrics       SpanName = "ver.verify.verifyWithMetrics"
+	VERVerChunkVerify             SpanName = "ver.verify.ChunkVerifier.Verify"
+	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 )
 
 // Tag names
