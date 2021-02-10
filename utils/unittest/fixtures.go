@@ -1021,12 +1021,16 @@ func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 }
 
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
-	return &flow.QuorumCertificate{
+	qc := flow.QuorumCertificate{
 		View:      uint64(rand.Uint32()),
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
 		SigData:   CombinedSignatureFixture(2),
 	}
+	for _, apply := range opts {
+		apply(&qc)
+	}
+	return &qc
 }
 
 func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
