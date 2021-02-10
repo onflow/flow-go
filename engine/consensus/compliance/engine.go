@@ -443,10 +443,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// At this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not.
-	// processBlockProposal is a recursive method. Here we trace the execution
-	// of the entire recursion, which might include processing the proposal's
-	// pending children. There is another span within processBlockProposal that
-	// measures the time spent for a single proposal.
+	// processBlockAndDescendants is a recursive function. Here we trace the
+	// execution of the entire recursion, which might include processing the
+	// proposal's pending children. There is another span within
+	// processBlockProposal that measures the time spent for a single proposal.
 	recursiveProcessSpan := e.tracer.StartSpanFromParent(onBlockProposalSpan, trace.CONCompOnBlockProposalProcessRecursive)
 	err = e.processBlockAndDescendants(proposal)
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
@@ -464,14 +464,58 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	return nil
 }
 
+// processBlockAndDescendants is a recursive function that processes a block and
+// its pending proposals for its children. By induction, any children connected
+// to a valid proposal are validly connected to the finalized state and can be
+// processed as well.
+func (e *Engine) processBlockAndDescendants(proposal *messages.BlockProposal) error {
+	blockID := proposal.Header.ID()
+
+	// process block itself
+	err := e.processBlockProposal(proposal)
+	if err != nil {
+		return fmt.Errorf("failed to process block %x: %w", blockID, err)
+	}
+
+	// process all children
+	// do not break on invalid or outdated blocks as they should not prevent us
+	// from processing other valid children
+	children, has := e.pending.ByParentID(blockID)
+	if !has {
+		return nil
+	}
+	for _, child := range children {
+		childProposal := &messages.BlockProposal{
+			Header:  child.Header,
+			Payload: child.Payload,
+		}
+		cpr := e.processBlockAndDescendants(childProposal)
+		if cpr != nil {
+			// child is outdated by the time we started processing it
+			// => node was probably behind and is catching up. Log as warning
+			if engine.IsOutdatedInputError(cpr) {
+				e.log.Warn().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+				continue
+			}
+			// the block is invalid; log as error as we desire honest participation
+			// ToDo: potential slashing
+			if engine.IsInvalidInputError(err) {
+				e.log.Error().Err(err).Msg("invalid block (potential slashing evidence?)")
+				continue
+			}
+			return fmt.Errorf("internal error processing block %x at height %d: %w", child.Header.ID(), child.Header.Height, err)
+		}
+	}
+
+	// drop all of the children that should have been processed now
+	e.pending.DropForParent(blockID)
+
+	return nil
+}
+
 // processBlockProposal processes blocks that are already known to connect to
-// the finalized state; if a parent of children is validly processed, it means
-// the children are also still on a valid chain and all missing links are there;
-// no need to do all the processing again.
+// the finalized state.
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
-	// processBlockProposal is a recursive method that will also process all
-	// the pending children. Here we collect traces for a single proposal by
-	// stopping metrics short before the recursive call.
 	startTime := time.Now()
 	blockSpan, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
 	if !ok {
@@ -547,56 +591,6 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 
 	// forward the vote to hotstuff for processing
 	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
-
-	return nil
-}
-
-// processBlockAndDescendants processes  if there are proposals connected to the given
-// parent block that was just processed; if this is the case, they should now
-// all be validly connected to the finalized state and we should process them.
-func (e *Engine) processBlockAndDescendants(proposal *messages.BlockProposal) error {
-	blockID := proposal.Header.ID()
-
-	// process block itself
-	err := e.processBlockProposal(proposal)
-	if err != nil {
-		return fmt.Errorf("failed to process block %x: %w", blockID, err)
-	}
-
-	// process all children
-	// do not break on on invalid or outdated blocks as they should not prevent us
-	// from processing other valid children
-	children, has := e.pending.ByParentID(blockID)
-	if !has {
-		return nil
-	}
-	for _, child := range children {
-		childProposal := &messages.BlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
-		}
-		cpr := e.processBlockAndDescendants(childProposal)
-		if cpr != nil {
-			// child is outdated by the time we started processing it
-			// => node was probably behind and is catching up. Log as warning
-			if engine.IsOutdatedInputError(cpr) {
-				e.log.Warn().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
-				continue
-			}
-			// the block is invalid; log as error as we desire honest participation
-			// ToDo: potential slashing
-			if engine.IsInvalidInputError(err) {
-				e.log.Error().Err(err).Msg("invalid block (potential slashing evidence?)")
-				continue
-			}
-			if cpr != nil {
-				return fmt.Errorf("internal error processing block %x at height %d: %w", child.Header.ID(), child.Header.Height, err)
-			}
-		}
-	}
-
-	// drop all of the children that should have been processed now
-	e.pending.DropForParent(blockID)
 
 	return nil
 }
