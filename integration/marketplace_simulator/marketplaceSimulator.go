@@ -273,6 +273,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			panic(err)
 		}
 
+		wg := sync.WaitGroup{}
+
 		for _, acc := range group {
 			c := acc
 			ma := newMarketPlaceAccount(&c, group, m.log, txTracker, flowClient, m.simulatorConfig, accessNode)
@@ -284,23 +286,26 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// setup account to be able to intract with nba
 
 			m.log.Info().Msgf("setting up marketplace account with address %s", ma.Account().Address)
-			// GenerateSetupShardedCollectionScript numBuckets 32
-			numBuckets := 32
-			// script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address)
 
-			script := nbaTemplates.GenerateSetupShardedCollectionScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address, numBuckets)
+			go func() {
+				wg.Add(1)
+				defer wg.Done()
+				// GenerateSetupShardedCollectionScript numBuckets 32
+				numBuckets := 32
+				// script := nbaTemplates.GenerateSetupAccountScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address)
 
-			tx := flowsdk.NewTransaction().
-				SetReferenceBlockID(blockRef.ID).
-				SetScript(script)
+				script := nbaTemplates.GenerateSetupShardedCollectionScript(*m.nbaTopshotAccount.Address, *m.nbaTopshotAccount.Address, numBuckets)
 
-			result, err := m.sendTxAndWait(tx, ma.Account())
-			if err != nil || result.Error != nil {
-				m.log.Error().Msgf("setting up marketplace accounts failed: %w , %w", result.Error, err)
-				return err
-			}
+				tx := flowsdk.NewTransaction().
+					SetReferenceBlockID(blockRef.ID).
+					SetScript(script)
+				result, err := ma.sendTxAndWait(tx, ma.Account())
+				if err != nil || result.Error != nil {
+					m.log.Error().Msgf("setting up marketplace accounts failed: %w , %w", result.Error, err)
+				}
+				m.log.Debug().Msg("account setup is done")
 
-			m.log.Debug().Msg("account setup is done")
+			}()
 
 			// // transfer some moments
 			// moments := makeMomentRange(momentCounter, momentCounter+20)
@@ -327,6 +332,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// get moments
 			// ma.GetMoments()
 		}
+		wg.Wait()
 	}
 
 	return nil
@@ -781,6 +787,66 @@ func (m *marketPlaceAccount) Act() error {
 	}
 
 	return nil
+}
+
+func (m *marketPlaceAccount) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount) (*flowsdk.TransactionResult, error) {
+
+	var result *flowsdk.TransactionResult
+	var err error
+
+	err = sender.PrepareAndSignTx(tx, 0)
+	if err != nil {
+		return nil, fmt.Errorf("error preparing and signing the transaction: %w", err)
+	}
+
+	err = m.flowClient.SendTransaction(context.Background(), *tx)
+	if err != nil {
+		return nil, fmt.Errorf("error sending the transaction: %w", err)
+
+	}
+
+	stopped := false
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	m.txTracker.AddTx(tx.ID(),
+		nil,
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+			if !stopped {
+				stopped = true
+				result = res
+				wg.Done()
+			}
+		}, // on finalized
+		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
+		}, // on sealed
+		func(_ flowsdk.Identifier) {
+			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on timout
+		func(_ flowsdk.Identifier, e error) {
+			m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
+			if !stopped {
+				stopped = true
+				err = e
+				wg.Done()
+			}
+		}, // on error
+		360)
+	wg.Wait()
+
+	return result, nil
 }
 
 func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
