@@ -26,3 +26,31 @@ func identityForNode(state protocol.State, blockID flow.Identifier, nodeID flow.
 
 	return identity, nil
 }
+
+// checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
+//   * has _positive_ weight
+//   * and has the expected role
+//   * and is not ejected
+// Returns the following errors:
+//   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
+// Note: the method receives the identity as proof of its existence.
+// Therefore, we consider the case where the respective identity is unknown to the
+// protocol state as a symptom of a fatal implementation bug.
+func ensureStakedNodeWithRole(identity *flow.Identity, expectedRole flow.Role) error {
+	// check that the origin is an expected node
+	if identity.Role != expectedRole {
+		return engine.NewInvalidInputErrorf("expected node %x to have identity %v but got %v", identity.NodeID, expectedRole, identity.Role)
+	}
+
+	// check if the identity has a stake
+	if identity.Stake == 0 {
+		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
+	}
+
+	// check that node was not ejected
+	if identity.Ejected {
+		return engine.NewInvalidInputErrorf("node was ejected from network (%x)", identity.NodeID)
+	}
+
+	return nil
+}
