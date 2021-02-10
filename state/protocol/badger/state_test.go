@@ -235,15 +235,64 @@ func TestBootstrapExistingAddress(t *testing.T) {
 }
 
 func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
-	// disconnected
-	// seal isn't for tail
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	// add an un-connected tail block to the sealing segment
+	tail := unittest.BlockFixture()
+	encodable.SealingSegment = append([]*flow.Block{&tail}, encodable.SealingSegment...)
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
 }
 
-func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {}
+func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	encodable.QuorumCertificate.BlockID = unittest.IdentifierFixture()
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
+}
 
 func TestBootstrap_SealMismatch(t *testing.T) {
-	// seal isn't for tail
-	// seal doesn't match result
+	t.Run("seal doesn't match tail block", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+		// convert to encodable to easily modify snapshot
+		encodable := rootSnapshot.Encodable()
+		encodable.LatestSeal.BlockID = unittest.IdentifierFixture()
+
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
+	})
+
+	t.Run("result doesn't match tail block", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+		// convert to encodable to easily modify snapshot
+		encodable := rootSnapshot.Encodable()
+		encodable.LatestResult.BlockID = unittest.IdentifierFixture()
+
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
+	})
+
+	t.Run("seal doesn't match result", func(t *testing.T) {
+		rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+		// convert to encodable to easily modify snapshot
+		encodable := rootSnapshot.Encodable()
+		encodable.LatestSeal.ResultID = unittest.IdentifierFixture()
+
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
+	})
 }
 
 // bootstraps protocol state with the given snapshot and invokes the callback
