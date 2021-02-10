@@ -289,6 +289,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 				return err
 			}
 
+			m.log.Debug().Msg("account setup is done")
+
 			//  transfer some moments
 			moments := []uint64{momentCounter, momentCounter + 1, momentCounter + 2, momentCounter + 3, momentCounter + 4}
 			// script = nbaTemplates.GenerateFulfillPackScript(*m.nbaTopshotAccount.Address(), *m.nbaTopshotAccount.Address(), *ma.Account().Address(), moments)
@@ -305,6 +307,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			}
 			momentCounter += 5
 
+			m.log.Debug().Msg("transferring moments are done")
 			// setup sales
 			// GenerateCreateSaleScript(m.nbaTopshotAccount.Address, ma.Account().Address, tokenStorageName string, 0.15)
 			// nbaTemplate.GenerateCreateSaleScript()
@@ -637,9 +640,9 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 	for _, i := range v {
 		result = append(result, i.(uint64))
 	}
-	// fmt.Println(">>>", string(script))
-	// fmt.Println(">>>>>", result)
-	// fmt.Println(">>>>>", err)
+	fmt.Println(">>>", string(script))
+	fmt.Println(">>>>>", result)
+	fmt.Println(">>>>>", err)
 
 	return result, err
 }
