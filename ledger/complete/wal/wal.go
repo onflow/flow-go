@@ -2,10 +2,11 @@ package wal
 
 import (
 	"fmt"
+	"sort"
 
-	"github.com/go-kit/kit/log"
+	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
-	prometheusWAL "github.com/prometheus/tsdb/wal"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -19,11 +20,12 @@ type LedgerWAL struct {
 	paused         bool
 	forestCapacity int
 	pathByteSize   int
+	log            zerolog.Logger
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize)
+func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
+	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
 		return nil, err
 	}
@@ -32,6 +34,7 @@ func NewWAL(logger log.Logger, reg prometheus.Registerer, dir string, forestCapa
 		paused:         false,
 		forestCapacity: forestCapacity,
 		pathByteSize:   pathByteSize,
+		log:            logger,
 	}, nil
 }
 
@@ -50,7 +53,7 @@ func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 
 	bytes := EncodeUpdate(update)
 
-	err := w.wal.Log(bytes)
+	_, err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
@@ -65,7 +68,7 @@ func (w *LedgerWAL) RecordDelete(rootHash ledger.RootHash) error {
 
 	bytes := EncodeDelete(rootHash)
 
-	err := w.wal.Log(bytes)
+	_, err := w.wal.Log(bytes)
 
 	if err != nil {
 		return fmt.Errorf("error while recording delete in LedgerWAL: %w", err)
@@ -97,12 +100,16 @@ func (w *LedgerWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	)
 }
 
+func (w *LedgerWAL) Segments() (first, last int, err error) {
+	return prometheusWAL.Segments(w.wal.Dir())
+}
+
 func (w *LedgerWAL) Replay(
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(ledger.RootHash) error,
 ) error {
-	from, to, err := w.wal.Segments()
+	from, to, err := w.Segments()
 	if err != nil {
 		return err
 	}
@@ -114,7 +121,7 @@ func (w *LedgerWAL) ReplayLogsOnly(
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
 ) error {
-	from, to, err := w.wal.Segments()
+	from, to, err := w.Segments()
 	if err != nil {
 		return err
 	}
@@ -129,11 +136,13 @@ func (w *LedgerWAL) replay(
 	useCheckpoints bool,
 ) error {
 
+	w.log.Debug().Msgf("replaying WAL from %d to %d", from, to)
+
 	if to < from {
 		return fmt.Errorf("end of range cannot be smaller than beginning")
 	}
 
-	loadedCheckpoint := false
+	loadedCheckpoint := -1
 	startSegment := from
 
 	checkpointer, err := w.NewCheckpointer()
@@ -142,33 +151,52 @@ func (w *LedgerWAL) replay(
 	}
 
 	if useCheckpoints {
-		latestCheckpoint, err := checkpointer.LatestCheckpoint()
+		allCheckpoints, err := checkpointer.Checkpoints()
 		if err != nil {
-			return fmt.Errorf("cannot get latest checkpoint: %w", err)
+			return fmt.Errorf("cannot get list of checkpoints: %w", err)
 		}
 
-		if latestCheckpoint != -1 && latestCheckpoint+1 >= from { //+1 to account for connected checkpoint and segments
+		var availableCheckpoints []int
+
+		// if there are no checkpoints already, don't bother
+		if len(allCheckpoints) > 0 {
+			// from-1 to account for checkpoints connected to segments, ie. checkpoint 8 if replaying segments 9-12
+			availableCheckpoints = getPossibleCheckpoints(allCheckpoints, from-1, to)
+		}
+
+		for len(availableCheckpoints) > 0 {
+			// as long as there are checkpoints to try, we always try with the last checkpoint file, since
+			// it allows us to load less segments.
+			latestCheckpoint := availableCheckpoints[len(availableCheckpoints)-1]
+
 			forestSequencing, err := checkpointer.LoadCheckpoint(latestCheckpoint)
 			if err != nil {
-				return fmt.Errorf("cannot load checkpoint %d: %w", latestCheckpoint, err)
+				w.log.Warn().Int("checkpoint", latestCheckpoint).Err(err).
+					Msg("checkpoint loading failed")
+
+				availableCheckpoints = availableCheckpoints[:len(availableCheckpoints)-1]
+				continue
 			}
+			w.log.Info().Int("checkpoint", latestCheckpoint).
+				Msg("checkpoint loaded")
 			err = checkpointFn(forestSequencing)
 			if err != nil {
 				return fmt.Errorf("error while handling checkpoint: %w", err)
 			}
-			loadedCheckpoint = true
+			loadedCheckpoint = latestCheckpoint
+			break
 		}
 
-		if loadedCheckpoint && to == latestCheckpoint {
+		if loadedCheckpoint != -1 && loadedCheckpoint == to {
 			return nil
 		}
 
-		if loadedCheckpoint {
-			startSegment = latestCheckpoint + 1
+		if loadedCheckpoint >= 0 {
+			startSegment = loadedCheckpoint + 1
 		}
 	}
 
-	if !loadedCheckpoint && startSegment == 0 {
+	if loadedCheckpoint == -1 && startSegment == 0 {
 		hasRootCheckpoint, err := checkpointer.HasRootCheckpoint()
 		if err != nil {
 			return fmt.Errorf("cannot check root checkpoint existence: %w", err)
@@ -184,6 +212,8 @@ func (w *LedgerWAL) replay(
 			}
 		}
 	}
+
+	w.log.Debug().Msgf("replying segments from %d to %d", startSegment, to)
 
 	sr, err := prometheusWAL.NewSegmentsRangeReader(prometheusWAL.SegmentRange{
 		Dir:   w.wal.Dir(),
@@ -223,7 +253,33 @@ func (w *LedgerWAL) replay(
 			return fmt.Errorf("cannot read LedgerWAL: %w", err)
 		}
 	}
+
+	w.log.Debug().Msgf("finished replaying WAL from %d to %d", from, to)
+
 	return nil
+}
+
+func getPossibleCheckpoints(allCheckpoints []int, from, to int) []int {
+	// list of checkpoints is sorted
+	indexFrom := sort.SearchInts(allCheckpoints, from)
+	indexTo := sort.SearchInts(allCheckpoints, to)
+
+	// all checkpoints are earlier, return last one
+	if indexTo == len(allCheckpoints) {
+		return allCheckpoints[indexFrom:indexTo]
+	}
+
+	// exact match
+	if allCheckpoints[indexTo] == to {
+		return allCheckpoints[indexFrom : indexTo+1]
+	}
+
+	// earliest checkpoint from list doesn't match, index 0 means no match at all
+	if indexTo == 0 {
+		return nil
+	}
+
+	return allCheckpoints[indexFrom:indexTo]
 }
 
 // NewCheckpointer returns a Checkpointer for this WAL

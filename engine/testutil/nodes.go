@@ -44,6 +44,7 @@ import (
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool"
+	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -152,7 +153,7 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator())
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -219,6 +220,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
+	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -226,8 +228,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results, err := stdmap.NewIncorporatedResults(1000)
 	require.NoError(t, err)
 
-	receipts, err := stdmap.NewReceipts(1000)
-	require.NoError(t, err)
+	receipts := consensusMempools.NewExecutionTree()
 
 	approvals, err := stdmap.NewApprovals(1000)
 	require.NoError(t, err)
@@ -240,16 +241,14 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
-	requesterEng, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
+	receiptRequester, err := requester.New(node.Log, node.Metrics, node.Net, node.Me, node.State, engine.RequestReceiptsByBlockID, filter.Any, func() flow.Entity { return &flow.ExecutionReceipt{} })
 	require.Nil(t, err)
 
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
-
-	requireApprovals := true
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
 	matchingEngine, err := matching.New(
 		node.Log,
@@ -260,8 +259,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Net,
 		node.State,
 		node.Me,
-		requesterEng,
-		resultsDB,
+		receiptRequester,
+		receiptsDB,
 		node.Headers,
 		node.Index,
 		results,
@@ -269,8 +268,10 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		approvals,
 		seals,
 		assigner,
-		validator,
-		requireApprovals)
+		receiptValidator,
+		approvalValidator,
+		validation.DefaultRequiredApprovalsForSealValidation,
+		matching.DefaultEmergencySealingActive)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{
@@ -309,6 +310,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
 	eventsStorage := storage.NewEvents(node.DB)
+	serviceEventsStorage := storage.NewServiceEvents(node.DB)
 	txResultStorage := storage.NewTransactionResults(node.DB)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
@@ -400,6 +402,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Blocks,
 		collectionsStorage,
 		eventsStorage,
+		serviceEventsStorage,
 		txResultStorage,
 		computation,
 		pusherEngine,
@@ -624,10 +627,6 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.HeaderStorage == nil {
-		node.HeaderStorage = storage.NewHeaders(node.Metrics, node.DB)
-	}
-
 	if node.PendingChunks == nil {
 		node.PendingChunks = match.NewChunks(chunksLimit)
 
@@ -705,13 +704,16 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 
+		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
+
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,
 			node.Tracer,
 			node.Net,
 			node.State,
 			node.Me,
-			chunkVerifier)
+			chunkVerifier,
+			approvalStorage)
 		require.Nil(t, err)
 	}
 
@@ -727,7 +729,7 @@ func VerificationNode(t testing.TB,
 			assigner,
 			node.State,
 			node.PendingChunks,
-			node.HeaderStorage,
+			node.Headers,
 			requestInterval,
 			int(failureThreshold))
 		require.Nil(t, err)

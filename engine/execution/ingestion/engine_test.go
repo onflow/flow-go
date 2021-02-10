@@ -91,6 +91,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
+	serviceEvents := storage.NewMockServiceEvents(ctrl)
 	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
@@ -149,6 +150,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		blocks,
 		collections,
 		events,
+		serviceEvents,
 		txResults,
 		computationManager,
 		providerEngine,
@@ -237,8 +239,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 			}),
 		).
 		Return(nil)
-
-	ctx.executionState.On("PersistStateInteractions", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	ctx.providerEngine.
 		On(
@@ -476,7 +476,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
 		Return(previousExecutionResultID, nil)
 
-	er, err := e.generateExecutionResultForBlock(context.Background(), executableBlock.Block, nil, endState)
+	er, err := e.generateExecutionResultForBlock(context.Background(), executableBlock.Block, nil, endState, nil)
 	assert.NoError(t, err)
 
 	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)
@@ -543,10 +543,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 
 		executionReceipt, err := ctx.engine.generateExecutionReceipt(
 			context.Background(),
-			&flow.ExecutionResult{
-				ExecutionResultBody: flow.ExecutionResultBody{},
-				Signatures:          nil,
-			},
+			&flow.ExecutionResult{},
 			snapshots,
 		)
 		require.NoError(t, err)
@@ -622,6 +619,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		ps,
 		blocks,
 		collections,
+		events,
 		events,
 		txResults,
 		computationManager,

@@ -47,8 +47,9 @@ const (
 	// failureThreshold represents the number of retries match engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// this value is set following this issue (3443)
-	failureThreshold = 2
+	// Currently setting the threshold to a very large value (corresponding to 100 days),
+	// which for all practical purposes is equivalent to the Verifier trying indefinitely.
+	failureThreshold = 10000000
 )
 
 func main() {
@@ -264,15 +265,20 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
 			rt := runtime.NewInterpreterRuntime()
-
 			vm := fvm.New(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
-			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
-				chunkVerifier)
+			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)
+			verifierEng, err = verifier.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Network,
+				node.State,
+				node.Me,
+				chunkVerifier,
+				approvalStorage)
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

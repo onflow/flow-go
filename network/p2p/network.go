@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -131,7 +132,6 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		ctx:       ctx,
 		cancel:    cancel,
 		channel:   channel,
-		submit:    n.submit,
 		publish:   n.publish,
 		unicast:   n.unicast,
 		multicast: n.multicast,
@@ -167,7 +167,9 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()
 	defer n.Unlock()
-	top, err := n.top.GenerateFanout(n.ids)
+
+	subscribedChannels := n.subMngr.Channels()
+	top, err := n.top.GenerateFanout(n.ids, subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
@@ -290,32 +292,6 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	return msg, nil
 }
 
-// submit method submits the given event for the given channel to the overlay layer
-// for processing; it is used by engines through conduits.
-func (n *Network) submit(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
-
-	// genNetworkMessage the event to get payload and event ID
-	msg, err := n.genNetworkMessage(channel, event, targetIDs...)
-	if err != nil {
-		return fmt.Errorf("could not cast the event into network message: %w", err)
-	}
-
-	// TODO: dedup the message here
-	if len(targetIDs) > 1 {
-		err = n.mw.Publish(msg, channel)
-	} else if len(targetIDs) == 1 {
-		err = n.mw.SendDirect(msg, targetIDs[0])
-	} else {
-		return fmt.Errorf("empty target ID list for the message")
-	}
-
-	if err != nil {
-		return fmt.Errorf("could not gossip event: %w", err)
-	}
-
-	return nil
-}
-
 // unicast sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
@@ -399,9 +375,9 @@ func (n *Network) sendOnChannel(channel network.Channel, message interface{}, ta
 		if err != nil {
 			return err
 		}
-		// if the filtration resulted in an empty list
+		// if the filtration resulted in an empty list, throw an error
 		if len(targetIDs) == 0 {
-			return fmt.Errorf("empty list of target ids")
+			return network.EmptyTargetList
 		}
 	}
 
@@ -435,7 +411,10 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 		return
 	}
 
-	// submit the message to the engine synchronously
+	// submits the message to the engine synchronously and
+	// tracks its processing time.
+	startTimestamp := time.Now()
+
 	err = eng.Process(qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
@@ -444,4 +423,6 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to process message")
 	}
+
+	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
 }

@@ -3,6 +3,7 @@ package fvm
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -28,6 +29,8 @@ const (
 	errCodeStorageCapacityExceeded = 11
 
 	errCodeEventLimitExceededError = 20
+
+	errCodeEncodingUnsupportedValue = 30
 
 	errCodeExecution = 100
 )
@@ -261,6 +264,25 @@ func (e *ExecutionError) Error() string {
 
 func (e *ExecutionError) Code() uint32 {
 	return errCodeExecution
+}
+
+// EncodingUnsupportedValueError indicates that Cadence attempted
+// to encode a value that is not supported.
+type EncodingUnsupportedValueError struct {
+	Value interpreter.Value
+	Path  []string
+}
+
+func (e *EncodingUnsupportedValueError) Error() string {
+	return fmt.Sprintf(
+		"encoding unsupported value to path [%s]: %[1]T, %[1]v",
+		strings.Join(e.Path, ","),
+		e.Value,
+	)
+}
+
+func (e *EncodingUnsupportedValueError) Code() uint32 {
+	return errCodeEncodingUnsupportedValue
 }
 
 func handleError(err error) (vmErr Error, fatalErr error) {

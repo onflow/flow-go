@@ -17,6 +17,9 @@ import (
 // Identifier represents a 32-byte unique identifier for an entity.
 type Identifier [32]byte
 
+// IdentifierFilter is a filter on identifiers.
+type IdentifierFilter func(Identifier) bool
+
 var (
 	// ZeroID is the lowest value in the 32-byte ID space.
 	ZeroID = Identifier{}
