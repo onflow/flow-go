@@ -259,9 +259,19 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			panic(err)
 		}
 
+		txTracker, err := NewTxTracker(m.log,
+			1000, // max in flight transactions
+			10,   // number of workers
+			accessNode,
+			time.Second,
+		)
+		if err != nil {
+			panic(err)
+		}
+
 		for _, acc := range group {
 			c := acc
-			ma := newMarketPlaceAccount(&c, group, m.log, flowClient, m.simulatorConfig, accessNode)
+			ma := newMarketPlaceAccount(&c, group, m.log, txTracker, flowClient, m.simulatorConfig, accessNode)
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
@@ -303,30 +313,6 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			ma.GetMoments()
 		}
 	}
-
-	return nil
-}
-
-func (m *MarketPlaceSimulator) Run() error {
-
-	// select an account
-	// call Act and put it back to list when is returned
-	duration := time.Minute * 10
-	for start := time.Now(); ; {
-		if time.Since(start) > duration {
-			break
-		}
-		go func() {
-			acc := <-m.availableAccounts
-			defer func() { m.availableAccounts <- acc }()
-			fmt.Println("running account :", acc.Account().Address.String())
-			err := acc.Act()
-			fmt.Println("err: ", err)
-			// TODO handle the retuned error
-			time.Sleep(time.Second)
-		}()
-	}
-	fmt.Println("experiment is done")
 
 	return nil
 }
@@ -570,6 +556,30 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 	return accounts, nil
 }
 
+func (m *MarketPlaceSimulator) Run() error {
+
+	// select an account
+	// call Act and put it back to list when is returned
+	duration := time.Minute * 10
+	for start := time.Now(); ; {
+		if time.Since(start) > duration {
+			break
+		}
+		go func() {
+			acc := <-m.availableAccounts
+			defer func() { m.availableAccounts <- acc }()
+			fmt.Println("running account :", acc.Account().Address.String())
+			err := acc.Act()
+			fmt.Println("err: ", err)
+			// TODO handle the retuned error
+			time.Sleep(time.Second)
+		}()
+	}
+	fmt.Println("experiment is done")
+
+	return nil
+}
+
 type marketPlaceAccount struct {
 	log             zerolog.Logger
 	account         *flowAccount
@@ -582,18 +592,11 @@ type marketPlaceAccount struct {
 func newMarketPlaceAccount(account *flowAccount,
 	friends []flowAccount,
 	log zerolog.Logger,
+	txTracker *TxTracker,
 	flowClient *client.Client,
 	simulatorConfig *SimulatorConfig,
 	accessNodeAddr string) *marketPlaceAccount {
-	txTracker, err := NewTxTracker(log,
-		10, // max in flight transactions
-		2,  // number of workers
-		accessNodeAddr,
-		time.Second, // number of accounts
-	)
-	if err != nil {
-		panic(err)
-	}
+
 	rand.Seed(time.Now().Unix()) // initialize global pseudo random generator
 
 	return &marketPlaceAccount{
