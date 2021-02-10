@@ -192,3 +192,15 @@ func (mr *MockRequesterMockRecorder) Force() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Force", reflect.TypeOf((*MockRequester)(nil).Force))
 }
+
+// Query mocks base method
+func (m *MockRequester) Query(arg0 flow.Identifier, arg1 flow.IdentityFilter) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Query", arg0, arg1)
+}
+
+// Query indicates an expected call of Query
+func (mr *MockRequesterMockRecorder) Query(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Query", reflect.TypeOf((*MockRequester)(nil).Query), arg0, arg1)
+}
