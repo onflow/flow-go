@@ -254,9 +254,14 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 		n := len(m.networkConfig.AccessNodeAddresses)
 		accessNode := m.networkConfig.AccessNodeAddresses[rand.Intn(n)]
 
+		flowClient, err := client.New(accessNode, grpc.WithInsecure())
+		if err != nil {
+			panic(err)
+		}
+
 		for _, acc := range group {
 			c := acc
-			ma := newMarketPlaceAccount(&c, group, m.log, m.simulatorConfig, accessNode)
+			ma := newMarketPlaceAccount(&c, group, m.log, flowClient, m.simulatorConfig, accessNode)
 			m.marketAccounts = append(m.marketAccounts, *ma)
 			m.availableAccounts <- ma
 			// setup account to be able to intract with nba
@@ -577,6 +582,7 @@ type marketPlaceAccount struct {
 func newMarketPlaceAccount(account *flowAccount,
 	friends []flowAccount,
 	log zerolog.Logger,
+	flowClient *client.Client,
 	simulatorConfig *SimulatorConfig,
 	accessNodeAddr string) *marketPlaceAccount {
 	txTracker, err := NewTxTracker(log,
@@ -589,11 +595,6 @@ func newMarketPlaceAccount(account *flowAccount,
 		panic(err)
 	}
 	rand.Seed(time.Now().Unix()) // initialize global pseudo random generator
-
-	flowClient, err := client.New(accessNodeAddr, grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
 
 	return &marketPlaceAccount{
 		log:             log,
