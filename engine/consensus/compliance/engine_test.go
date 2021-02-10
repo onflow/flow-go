@@ -412,41 +412,11 @@ func (cs *ComplianceSuite) TestOnBlockProposalInvalidExtension() {
 	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
 }
 
-func (cs *ComplianceSuite) TestOnSubmitVote() {
-
-	// create a vote
-	originID := unittest.IdentifierFixture()
-	vote := messages.BlockVote{
-		BlockID: unittest.IdentifierFixture(),
-		View:    rand.Uint64(),
-		SigData: unittest.SignatureFixture(),
-	}
-
-	// execute the vote submission
-	err := cs.e.onBlockVote(originID, &vote)
-	require.NoError(cs.T(), err, "block vote should pass")
-
-	// check the submit vote was called with correct parameters
-	cs.hotstuff.AssertCalled(cs.T(), "SubmitVote", originID, vote.BlockID, vote.View, vote.SigData)
-}
-
-func (cs *ComplianceSuite) TestProcessPendingChildrenNone() {
-
-	// generate random block ID
-	header := unittest.BlockHeaderFixture()
-
-	// execute handle connected children
-	err := cs.e.processPendingChildren(&header)
-	require.NoError(cs.T(), err, "should pass when no children")
-	cs.snapshot.AssertNotCalled(cs.T(), "Final")
-	cs.pending.AssertNotCalled(cs.T(), "DropForParent", mock.Anything)
-}
-
-func (cs *ComplianceSuite) TestProcessPendingChildren() {
+func (cs *ComplianceSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
-	parent := unittest.BlockFixture()
-	parent.Header.Height = cs.head.Height + 1
+	parent := unittest.BlockWithParentFixture(cs.head)
+	proposal := unittest.ProposalFromBlock(&parent)
 	block1 := unittest.BlockWithParentFixture(parent.Header)
 	block2 := unittest.BlockWithParentFixture(parent.Header)
 	block3 := unittest.BlockWithParentFixture(parent.Header)
@@ -466,7 +436,7 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
 	// execute the connected children handling
-	err := cs.e.processPendingChildren(parent.Header)
+	err := cs.e.processBlockAndDescendants(proposal)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -476,6 +446,24 @@ func (cs *ComplianceSuite) TestProcessPendingChildren() {
 
 	// make sure we drop the cache after trying to process
 	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
+}
+
+func (cs *ComplianceSuite) TestOnSubmitVote() {
+
+	// create a vote
+	originID := unittest.IdentifierFixture()
+	vote := messages.BlockVote{
+		BlockID: unittest.IdentifierFixture(),
+		View:    rand.Uint64(),
+		SigData: unittest.SignatureFixture(),
+	}
+
+	// execute the vote submission
+	err := cs.e.onBlockVote(originID, &vote)
+	require.NoError(cs.T(), err, "block vote should pass")
+
+	// check the submit vote was called with correct parameters
+	cs.hotstuff.AssertCalled(cs.T(), "SubmitVote", originID, vote.BlockID, vote.View, vote.SigData)
 }
 
 func (cs *ComplianceSuite) TestProposalBufferingOrder() {
