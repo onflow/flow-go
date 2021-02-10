@@ -25,8 +25,9 @@ func TestMatchingEngineContext(t *testing.T) {
 type EngineContextSuite struct {
 	unittest.BaseChainSuite
 	// misc SERVICE COMPONENTS which are injected into Matching Core
-	requester        *mockmodule.Requester
-	receiptValidator *mockmodule.ReceiptValidator
+	requester         *mockmodule.Requester
+	receiptValidator  *mockmodule.ReceiptValidator
+	approvalValidator *mockmodule.ApprovalValidator
 
 	// Context
 	context *Engine
@@ -43,6 +44,7 @@ func (ms *EngineContextSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.requester = new(mockmodule.Requester)
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
+	ms.approvalValidator = &mockmodule.ApprovalValidator{}
 
 	approvalsProvider := make(chan *Event)
 	approvalResponseProvider := make(chan *Event)
@@ -70,6 +72,7 @@ func (ms *EngineContextSuite) SetupTest() {
 			maxResultsToRequest:                  200,
 			assigner:                             ms.Assigner,
 			receiptValidator:                     ms.receiptValidator,
+			approvalValidator:                    ms.approvalValidator,
 			requestTracker:                       NewRequestTracker(1, 3),
 			approvalRequestsThreshold:            10,
 			requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
@@ -149,6 +152,7 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
 			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ID()),
 				unittest.WithApproverID(approverID))
+			ms.approvalValidator.On("Validate", approval).Return(nil).Once()
 			approvals = append(approvals, approval)
 			ms.ApprovalsPL.
 				On("Add", approval).Return(true, nil).Once()

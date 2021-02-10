@@ -75,7 +75,8 @@ func NewEngine(log zerolog.Logger,
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
 	assigner module.ChunkAssigner,
-	validator module.ReceiptValidator,
+	receiptValidator module.ReceiptValidator,
+	approvalValidator module.ApprovalValidator,
 	requiredApprovalsForSealConstruction uint,
 	emergencySealingActive bool) (*Engine, error) {
 	e := &Engine{
@@ -139,7 +140,7 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	e.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
-		indexDB, incorporatedResults, receipts, approvals, seals, assigner, validator,
+		indexDB, incorporatedResults, receipts, approvals, seals, assigner, receiptValidator, approvalValidator,
 		requiredApprovalsForSealConstruction, emergencySealingActive, approvalConduit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init matching engine: %w", err)
