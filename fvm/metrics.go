@@ -42,7 +42,7 @@ func (m metricsCollector) ProgramParsed(location common.Location, duration time.
 func (m metricsCollector) ProgramChecked(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
 		if _, ok := location.(common.TransactionLocation); ok {
-			m.checked += duration
+			m.checked = duration
 		}
 	}
 }
