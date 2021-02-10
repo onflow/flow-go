@@ -680,6 +680,9 @@ func (m *marketPlaceAccount) Act() error {
 	if err != nil {
 		return err
 	}
+	if len(moments) == 0 {
+		return nil
+	}
 	moment := moments[rand.Intn(len(moments))]
 
 	// TODO ramtin fix the fetch
