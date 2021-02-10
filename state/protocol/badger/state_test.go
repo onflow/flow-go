@@ -1,7 +1,6 @@
 package badger_test
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -77,7 +76,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 		})
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
 	})
@@ -101,26 +100,74 @@ func TestBootstrapNonRoot(t *testing.T) {
 		})
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
 	})
 
-	t.Run("with next epoch", func(t *testing.T) {
+	t.Run("with setup next epoch", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			unittest.NewEpochBuilder(t, state).BuildEpoch()
 
 			// find the point where we transition to the epoch setup phase
 			for height := rootBlock.Height + 1; ; height++ {
-				_, err := state.AtHeight(height).Epochs().Next().Counter()
-				if errors.Is(err, protocol.ErrNextEpochNotSetup) {
-					continue
+				phase, err := state.AtHeight(height).Phase()
+				require.NoError(t, err)
+				if phase == flow.EpochPhaseSetup {
+					return state.AtHeight(height)
 				}
-				return state.AtHeight(height)
 			}
 		})
 
 		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+		})
+	})
+
+	t.Run("with committed next epoch", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, state).BuildEpoch().CompleteEpoch()
+
+			// find the point where we transition to the epoch committed phase
+			for height := rootBlock.Height + 1; ; height++ {
+				phase, err := state.AtHeight(height).Phase()
+				require.NoError(t, err)
+				if phase == flow.EpochPhaseCommitted {
+					return state.AtHeight(height)
+				}
+			}
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+		})
+	})
+
+	t.Run("with previous and next epoch", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			unittest.NewEpochBuilder(t, state).
+				BuildEpoch().CompleteEpoch(). // build epoch 2
+				BuildEpoch()                  // build epoch 3
+
+			// find a snapshot from epoch setup phase in epoch 2
+			epoch1Counter, err := rootSnapshot.Epochs().Current().Counter()
+			require.NoError(t, err)
+			for height := rootBlock.Height + 1; ; height++ {
+				snap := state.AtHeight(height)
+				counter, err := snap.Epochs().Current().Counter()
+				require.NoError(t, err)
+				phase, err := snap.Phase()
+				require.NoError(t, err)
+				if phase == flow.EpochPhaseSetup && counter == epoch1Counter+1 {
+					return snap
+				}
+			}
+		})
+
+		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
 			assert.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
@@ -185,6 +232,18 @@ func TestBootstrapExistingAddress(t *testing.T) {
 	bootstrap(t, root, func(state *bprotocol.State, err error) {
 		assert.Error(t, err)
 	})
+}
+
+func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
+	// disconnected
+	// seal isn't for tail
+}
+
+func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {}
+
+func TestBootstrap_SealMismatch(t *testing.T) {
+	// seal isn't for tail
+	// seal doesn't match result
 }
 
 // bootstraps protocol state with the given snapshot and invokes the callback
