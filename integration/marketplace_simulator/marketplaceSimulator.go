@@ -703,7 +703,7 @@ func (m *marketPlaceAccount) Act() error {
 
 	// _ = assetToMove
 
-	duration := time.Minute * 10
+	duration := time.Minute * 20
 	for start := time.Now(); ; {
 		if time.Since(start) > duration {
 			break
