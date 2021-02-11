@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -34,7 +33,6 @@ type Core struct {
 	headers           storage.Headers
 	payloads          storage.Payloads
 	state             protocol.MutableState
-	con               network.Conduit
 	pending           module.PendingBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff

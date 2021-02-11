@@ -2,6 +2,12 @@ package compliance
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,10 +21,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/fifoqueue"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"sync"
-	"time"
 )
 
 type Event struct {
