@@ -245,7 +245,7 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 				}
 
 				senderWG.Done()
-			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
+			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.ReferenceBlock, completeER.Receipt)
 		}
 	}
 
