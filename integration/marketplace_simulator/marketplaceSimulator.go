@@ -185,7 +185,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
-		m.log.Error().Msgf("minting a play failed: %w , %w", result.Error, err)
+		m.log.Error().Msgf("minting a play failed: %w , %w", result, err)
 		return err
 	}
 
@@ -200,7 +200,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
-		m.log.Error().Msgf("minting a set failed: %w , %w", result.Error, err)
+		m.log.Error().Msgf("minting a set failed: %w , %w", result, err)
 		return err
 	}
 
@@ -214,7 +214,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
-		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result, err)
 		return err
 	}
 
@@ -243,7 +243,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 				result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, j)
 				if err != nil || result.Error != nil {
-					m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+					m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result, err)
 				}
 
 			}()
@@ -324,7 +324,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 					SetScript(script)
 				result, err := ma.sendTxAndWait(tx, ma.Account())
 				if err != nil || result.Error != nil {
-					m.log.Error().Msgf("setting up marketplace accounts failed: %w , %w", result.Error, err)
+					m.log.Error().Msgf("setting up marketplace accounts failed: %w , %w", result, err)
 				}
 				m.log.Debug().Msg("account setup is done")
 
@@ -385,7 +385,7 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 	result, err := m.sendTxAndWait(deploymentTx, m.nbaTopshotAccount, 0)
 
 	if err != nil || result.Error != nil {
-		m.log.Error().Msgf("contract %s deployment is failed : %w , %w", name, result.Error, err)
+		m.log.Error().Msgf("contract %s deployment is failed : %w , %w", name, result, err)
 	}
 
 	m.log.Info().Msgf("contract %s is deployed : %s", name, result)
