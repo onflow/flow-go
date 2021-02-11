@@ -226,8 +226,8 @@ func (suite *AssignerEngineTestSuite) stakedAtBlock() {
 	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
 }
 
-// assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks to verification identity
-// of this test suite.
+// assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks
+// of the execution result of this test suite to verification identity of this test suite.
 // It returns number of chunks assigned to verification node.
 func (suite *AssignerEngineTestSuite) assignAllChunks() int {
 	a := chmodel.NewAssignment()
@@ -240,7 +240,12 @@ func (suite *AssignerEngineTestSuite) assignAllChunks() int {
 		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
 
 	return len(chunks)
-	//suite.assigner.On("Assign",
-	//	&suite.completeER.Receipt.ExecutionResult,
-	//	suite.completeER.Receipt.ExecutionResult.BlockID).Return(chmodel.NewAssignment(), nil).Once()
+}
+
+// assignNoChunk is a test helper that mocks assigner of this test suite to assign no chunk
+// of the execution result of this test suite to verification identity of this test suite.
+func (suite *AssignerEngineTestSuite) assignNoChunk() {
+	suite.assigner.On("Assign",
+		&suite.completeER.Receipt.ExecutionResult,
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(chmodel.NewAssignment(), nil).Once()
 }
