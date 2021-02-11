@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	testifymock "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/verification/utils"
@@ -104,7 +104,7 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
 	// invoked for it.
-	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
+	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(true, nil).
 		Times(chunksNum)
 	suite.newChunkListener.On("Check").Return().Times(chunksNum)
@@ -112,7 +112,7 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
 
-	testifymock.AssertExpectationsForObjects(suite.T(),
+	mock.AssertExpectationsForObjects(suite.T(),
 		suite.metrics,
 		suite.assigner,
 		suite.chunksQueue,
@@ -134,7 +134,7 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
 
-	testifymock.AssertExpectationsForObjects(suite.T(),
+	mock.AssertExpectationsForObjects(suite.T(),
 		suite.metrics,
 		suite.assigner)
 
@@ -158,7 +158,7 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue results in an error
-	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
+	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(false, fmt.Errorf("error")).
 		Times(chunksNum)
 	suite.newChunkListener.On("Check").Return().Times(chunksNum)
@@ -166,7 +166,7 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
 
-	testifymock.AssertExpectationsForObjects(suite.T(),
+	mock.AssertExpectationsForObjects(suite.T(),
 		suite.metrics,
 		suite.assigner,
 		suite.chunksQueue)
@@ -188,7 +188,7 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
-	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
+	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(false, nil).
 		Times(chunksNum)
 	suite.newChunkListener.On("Check").Return().Times(chunksNum)
@@ -196,7 +196,7 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
 
-	testifymock.AssertExpectationsForObjects(suite.T(),
+	mock.AssertExpectationsForObjects(suite.T(),
 		suite.metrics,
 		suite.assigner,
 		suite.chunksQueue)
