@@ -227,12 +227,13 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	steps := len(m.marketAccounts)
 	wg := sync.WaitGroup{}
 
-	for i := 0; i < steps; i++ {
-		j := i
-		go func() {
-			wg.Add(1)
-			defer wg.Done()
-			for p := 0; p < momentsPerAccount/batchSize; p++ {
+	for p := 0; p < momentsPerAccount/batchSize; p++ {
+		for i := 0; i < steps; i++ {
+			j := i
+			go func() {
+				wg.Add(1)
+				defer wg.Done()
+
 				m.log.Info().Msgf("minting %d moments on nba account", batchSize)
 				// mint a lot of moments
 				script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *m.marketAccounts[j].Account().Address, 1, 1, uint64(batchSize))
@@ -244,10 +245,11 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 				if err != nil || result.Error != nil {
 					m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
 				}
-			}
-		}()
-		// totalMinted += batchSize
-		time.Sleep(time.Millisecond * 10)
+
+			}()
+			// totalMinted += batchSize
+			time.Sleep(time.Millisecond * 10)
+		}
 	}
 	wg.Wait()
 
