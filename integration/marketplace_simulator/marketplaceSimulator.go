@@ -151,6 +151,13 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	nbaAddress := m.nbaTopshotAccount.Address
 
+	m.log.Info().Msgf("adding keys")
+	// add keys first
+	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 100)
+	if err != nil {
+		return err
+	}
+
 	// numBuckets := 32
 	// // setup nba account to use sharded collections
 	// script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
@@ -455,8 +462,8 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 		SetReferenceBlockID(blockRef.ID).
 		SetProposalKey(
 			*serviceAcc.Address,
-			serviceAcc.accountKey.Index,
-			serviceAcc.accountKey.SequenceNumber,
+			serviceAcc.accountKeys[0].Index,
+			serviceAcc.accountKeys[0].SequenceNumber,
 		).
 		AddAuthorizer(*serviceAcc.Address).
 		SetPayer(*serviceAcc.Address)
@@ -491,13 +498,13 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 	serviceAcc.signerLock.Lock()
 	err = createAccountTx.SignEnvelope(
 		*serviceAcc.Address,
-		serviceAcc.accountKey.Index,
+		serviceAcc.accountKeys[0].Index,
 		serviceAcc.signer,
 	)
 	if err != nil {
 		return nil, err
 	}
-	serviceAcc.accountKey.SequenceNumber++
+	serviceAcc.accountKeys[0].SequenceNumber++
 	serviceAcc.signerLock.Unlock()
 
 	err = m.flowClient.SendTransaction(context.Background(), *createAccountTx)
@@ -545,7 +552,7 @@ func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) 
 						SetHashAlgo(crypto.SHA3_256).
 						SetWeight(flowsdk.AccountKeyWeightThreshold)
 
-					newAcc := newFlowAccount(i, &accountAddress, hex.EncodeToString(privKey.Encode()), newAccKey, signer)
+					newAcc := newFlowAccount(i, &accountAddress, hex.EncodeToString(privKey.Encode()), []*flowsdk.AccountKey{newAccKey}, signer)
 					i++
 					accounts = append(accounts, *newAcc)
 

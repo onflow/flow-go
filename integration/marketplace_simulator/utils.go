@@ -38,20 +38,20 @@ func loadServiceAccount(flowClient *client.Client,
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account for service account %w", err)
 	}
-	accountKey := acc.Keys[0]
+	accountKeys := acc.Keys
 
-	privateKey, err := crypto.DecodePrivateKeyHex(accountKey.SigAlgo, servAccPrivKeyHex)
+	privateKey, err := crypto.DecodePrivateKeyHex(accountKeys[0].SigAlgo, servAccPrivKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("error while decoding serice account private key hex %w", err)
 	}
 
-	signer := crypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
+	signer := crypto.NewInMemorySigner(privateKey, accountKeys[0].HashAlgo)
 
 	return &flowAccount{
-		Address:    servAccAddress,
-		accountKey: accountKey,
-		signer:     signer,
-		signerLock: sync.Mutex{},
+		Address:     servAccAddress,
+		accountKeys: accountKeys,
+		signer:      signer,
+		signerLock:  sync.Mutex{},
 	}, nil
 }
 
@@ -84,6 +84,18 @@ transaction(publicKey: [UInt8], count: Int, initialTokenAmount: UFix64) {
 // createAccountsScript returns a transaction script for creating an account
 func createAccountsScript(fungibleToken, flowToken flowsdk.Address) []byte {
 	return []byte(fmt.Sprintf(createAccountsScriptTemplate, fungibleToken, flowToken))
+}
+
+func AddKeyToAccountScript() ([]byte, error) {
+	return []byte(`
+    transaction(keys: [[UInt8]]) {
+      prepare(signer: AuthAccount) {
+      for key in keys {
+        signer.addPublicKey(key)
+      }
+      }
+    }
+    `), nil
 }
 
 func bytesToCadenceArray(l []byte) cadence.Array {

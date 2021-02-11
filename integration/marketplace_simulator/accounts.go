@@ -3,20 +3,23 @@ package marketplace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/onflow/cadence"
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/rs/zerolog"
 )
 
 // TODO move toward accountKeys instead of only one
 
 type flowAccount struct {
 	Address              *flowsdk.Address
-	AccountPrivateKeyHex string
-	accountKey           *flowsdk.AccountKey
+	AccountPrivateKeyHex string // TODO change me to an slice
+	accountKeys          []*flowsdk.AccountKey
 	signer               crypto.InMemorySigner
 	signerLock           sync.Mutex
 }
@@ -28,7 +31,7 @@ func (acc *flowAccount) signTx(tx *flowsdk.Transaction, keyID int) error {
 	if err != nil {
 		return err
 	}
-	acc.accountKey.SequenceNumber++
+	acc.accountKeys[keyID].SequenceNumber++
 	return nil
 }
 
@@ -36,7 +39,7 @@ func (acc *flowAccount) PrepareAndSignTx(tx *flowsdk.Transaction, keyID int) err
 	acc.signerLock.Lock()
 	defer acc.signerLock.Unlock()
 
-	tx.SetProposalKey(*acc.Address, 0, acc.accountKey.SequenceNumber).
+	tx.SetProposalKey(*acc.Address, keyID, acc.accountKeys[keyID].SequenceNumber).
 		SetPayer(*acc.Address).
 		AddAuthorizer(*acc.Address)
 
@@ -44,7 +47,7 @@ func (acc *flowAccount) PrepareAndSignTx(tx *flowsdk.Transaction, keyID int) err
 	if err != nil {
 		return err
 	}
-	acc.accountKey.SequenceNumber++
+	acc.accountKeys[keyID].SequenceNumber++
 	return nil
 }
 
@@ -56,7 +59,96 @@ func (acc *flowAccount) SyncAccountKey(flowClient *client.Client) error {
 	if err != nil {
 		return fmt.Errorf("error while calling get account: %w", err)
 	}
-	acc.accountKey = account.Keys[0]
+	acc.accountKeys = account.Keys
+	return nil
+}
+
+func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowClient *client.Client, numberOfKeysToAdd int) error {
+
+	blockRef, err := flowClient.GetLatestBlockHeader(context.Background(), false)
+	if err != nil {
+		return err
+	}
+
+	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
+	for i := 0; i < numberOfKeysToAdd; i++ {
+		cadenceKeys[i] = bytesToCadenceArray(acc.accountKeys[0].Encode())
+	}
+	cadenceKeysArray := cadence.NewArray(cadenceKeys)
+
+	addKeysScript, err := AddKeyToAccountScript()
+	if err != nil {
+		return errors.New("error getting add key to account script")
+	}
+
+	tx := flowsdk.NewTransaction().
+		SetScript(addKeysScript).
+		SetReferenceBlockID(blockRef.ID)
+
+	err = tx.AddArgument(cadenceKeysArray)
+	if err != nil {
+		return errors.New("error constructing add keys to account transaction")
+	}
+
+	acc.PrepareAndSignTx(tx, 0)
+
+	if err != nil {
+		return fmt.Errorf("error preparing and signing the transaction: %w", err)
+	}
+
+	err = flowClient.SendTransaction(context.Background(), *tx)
+	if err != nil {
+		return fmt.Errorf("error sending the transaction: %w", err)
+
+	}
+
+	stopped := false
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	txTracker.AddTx(tx.ID(),
+		nil,
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+			log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on finalized
+		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+			log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
+		}, // on sealed
+		func(_ flowsdk.Identifier) {
+			log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on expired
+		func(_ flowsdk.Identifier) {
+			log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+			if !stopped {
+				stopped = true
+				wg.Done()
+			}
+		}, // on timout
+		func(_ flowsdk.Identifier, e error) {
+			log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
+			if !stopped {
+				stopped = true
+				err = e
+				wg.Done()
+			}
+		}, // on error
+		360)
+	wg.Wait()
+
+	// resync
+	account, err := flowClient.GetAccount(context.Background(), *acc.Address)
+	if err != nil {
+		return fmt.Errorf("error while calling get account: %w", err)
+	}
+	acc.accountKeys = account.Keys
+
 	return nil
 }
 
@@ -65,11 +157,11 @@ func (acc *flowAccount) ToJSON() ([]byte, error) {
 	return b, err
 }
 
-func newFlowAccount(i int, address *flowsdk.Address, accountPrivateKeyHex string, accountKey *flowsdk.AccountKey, signer crypto.InMemorySigner) *flowAccount {
+func newFlowAccount(i int, address *flowsdk.Address, accountPrivateKeyHex string, accountKeys []*flowsdk.AccountKey, signer crypto.InMemorySigner) *flowAccount {
 	return &flowAccount{
 		Address:              address,
 		AccountPrivateKeyHex: accountPrivateKeyHex,
-		accountKey:           accountKey,
+		accountKeys:          accountKeys,
 		signer:               signer,
 		signerLock:           sync.Mutex{},
 	}
@@ -88,14 +180,14 @@ func newFlowAccountFromJSON(jsonStr []byte, flowClient *client.Client) (*flowAcc
 	if err != nil {
 		return nil, fmt.Errorf("error while calling get account: %w", err)
 	}
-	account.accountKey = acc.Keys[0]
+	account.accountKeys = acc.Keys
 
-	privateKey, err := crypto.DecodePrivateKeyHex(account.accountKey.SigAlgo, account.AccountPrivateKeyHex)
+	privateKey, err := crypto.DecodePrivateKeyHex(account.accountKeys[0].SigAlgo, account.AccountPrivateKeyHex)
 	if err != nil {
 		return nil, fmt.Errorf("error while decoding account private key hex: %w", err)
 	}
 
-	account.signer = crypto.NewInMemorySigner(privateKey, account.accountKey.HashAlgo)
+	account.signer = crypto.NewInMemorySigner(privateKey, account.accountKeys[0].HashAlgo)
 	account.signerLock = sync.Mutex{}
 
 	return &account, nil
