@@ -12,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// Broker implements the DKGBroker interface.
+// Broker is an implementation of the DKGBroker interface which is intended to
+// be used in conjuction with the DKG MessagingEngine for private messages, and
+// with the DKG smart-contract for broadcast messages.
 type Broker struct {
 	log               zerolog.Logger
 	dkgInstanceID     string                   // unique identifier of the current dkg run (prevent replay attacks)
@@ -24,6 +26,8 @@ type Broker struct {
 	messageOffset     uint                     // offset for next broadcast messages to fetch
 }
 
+// NewBroker instantiates a new epoch-specific broker capable of communicating
+// with other nodes via a network engine and dkg smart-contract.
 func NewBroker(
 	log zerolog.Logger,
 	dkgInstanceID string,
@@ -59,12 +63,8 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 		return
 	}
 	dkgMessageOut := messages.DKGMessageOut{
-		DestID: b.committee[dest],
-		DKGMessage: messages.NewDKGMessage(
-			b.myIndex,
-			data,
-			b.dkgInstanceID,
-		),
+		DKGMessage: messages.NewDKGMessage(b.myIndex, data, b.dkgInstanceID),
+		DestID:     b.committee[dest],
 	}
 	b.tunnel.SendOut(dkgMessageOut)
 }

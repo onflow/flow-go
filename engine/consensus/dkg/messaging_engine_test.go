@@ -4,14 +4,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 // Helper function to initialise an engine.
@@ -77,12 +78,8 @@ func TestForwardIncomingMessages(t *testing.T) {
 
 	originID := unittest.IdentifierFixture()
 	expectedMsg := msg.DKGMessageIn{
-		DKGMessage: msg.NewDKGMessage(
-			1,
-			[]byte("hello"),
-			"dkg-123",
-		),
-		OriginID: originID,
+		DKGMessage: msg.NewDKGMessage(1, []byte("hello"), "dkg-123"),
+		OriginID:   originID,
 	}
 
 	// launch a background routine to capture messages forwarded to the tunnel's

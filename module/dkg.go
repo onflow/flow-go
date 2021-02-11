@@ -43,16 +43,16 @@ type DKGContractClient interface {
 // DKGController controls the execution of a Joint Feldman DKG instance.
 type DKGController interface {
 
-	// Run starts the DKG controller. It is a blocking call that blocks until
-	// the controller is shutdown or until an error is encountered in one of the
-	// protocol phases.
+	// Run starts the DKG controller and starts phase 1. It is a blocking call
+	// that blocks until the controller is shutdown or until an error is
+	// encountered in one of the protocol phases.
 	Run() error
 
-	// EndPhase0 notifies the controller to end phase 0, and start phase 1.
-	EndPhase0() error
-
-	// EndPhase1 notifies the controller to end phase 1, and start phase 2.
+	// EndPhase0 notifies the controller to end phase 1, and start phase 2.
 	EndPhase1() error
+
+	// EndPhase1 notifies the controller to end phase 2, and start phase 3.
+	EndPhase2() error
 
 	// End terminates the DKG state machine and records the artifacts.
 	End() error
@@ -63,11 +63,26 @@ type DKGController interface {
 	// GetArtifacts returns the private and public shares, as well as the set of
 	// public keys computed by DKG.
 	GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey)
+
+	// Poll instructs the controller to actively fetch broadcast messages (ex.
+	// read from DKG smart contract).
+	Poll(blockReference flow.Identifier) error
+
+	// SubmitResult instructs the broker to publish the results of the DKG run
+	// (ex. publish to DKG smart contract).
+	SubmitResult() error
+}
+
+// DKGControllerFactory is a factory to create instances of DKGController.
+type DKGControllerFactory interface {
+
+	// Create instantiates a new DKGController.
+	Create(dkgInstanceID string, participants []flow.Identifier, myIndex int, seed []byte) (DKGController, error)
 }
 
 // DKGBroker extends the crypto.DKGProcessor interface with methods that enable
-// a controller to use the underlying message channel and actively fetch new DKG
-// broadcast messages.
+// a controller to access the channel of incoming messages, and actively fetch
+// new DKG broadcast messages.
 type DKGBroker interface {
 	crypto.DKGProcessor
 

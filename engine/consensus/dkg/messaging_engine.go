@@ -108,6 +108,9 @@ func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) e
 func (e *MessagingEngine) forwardOutgoingMessages() {
 	for {
 		msg := <-e.tunnel.MsgChOut
-		e.conduit.Unicast(msg.DKGMessage, msg.DestID)
+		err := e.conduit.Unicast(msg.DKGMessage, msg.DestID)
+		if err != nil {
+			e.log.Err(err).Msg("error sending dkg message")
+		}
 	}
 }

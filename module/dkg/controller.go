@@ -7,11 +7,13 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
 // Controller implements the DKGController interface. It controls the execution
-// of a Joint Feldman DKG instance.
+// of a Joint Feldman DKG instance. A new Controller must be instantiated for
+// every epoch.
 type Controller struct {
 	// The embedded state Manager is used to manage the controller's underlying
 	// state.
@@ -32,8 +34,8 @@ type Controller struct {
 	broker module.DKGBroker
 
 	// Channels used internally to trigger state transitions
-	h0Ch       chan struct{}
 	h1Ch       chan struct{}
+	h2Ch       chan struct{}
 	endCh      chan struct{}
 	shutdownCh chan struct{}
 
@@ -66,8 +68,8 @@ func NewController(
 		dkg:        dkg,
 		seed:       seed,
 		broker:     broker,
-		h0Ch:       make(chan struct{}),
 		h1Ch:       make(chan struct{}),
+		h2Ch:       make(chan struct{}),
 		endCh:      make(chan struct{}),
 		shutdownCh: make(chan struct{}),
 	}
@@ -77,12 +79,12 @@ func NewController(
 Implement DKGController
 *******************************************************************************/
 
-// Run starts the DKG controller. It is a blocking call that blocks until the
-// controller is shutdown or until an error is encountered in one of the
-// protocol phases.
+// Run starts the DKG controller and executes the DKG state-machine. It blocks
+// until the controller is shutdown or until an error is encountered in one of
+// the protocol phases.
 func (c *Controller) Run() error {
 
-	// Start DKG and transition to phase 0
+	// Start DKG and transition to phase 1
 	err := c.start()
 	if err != nil {
 		return err
@@ -98,11 +100,6 @@ func (c *Controller) Run() error {
 		c.log.Debug().Msgf("DKG: %s", c.state)
 
 		switch state {
-		case Phase0:
-			err := c.phase0()
-			if err != nil {
-				return err
-			}
 		case Phase1:
 			err := c.phase1()
 			if err != nil {
@@ -113,25 +110,17 @@ func (c *Controller) Run() error {
 			if err != nil {
 				return err
 			}
+		case Phase3:
+			err := c.phase3()
+			if err != nil {
+				return err
+			}
 		case End:
 			c.Shutdown()
 		case Shutdown:
 			return nil
 		}
 	}
-}
-
-// EndPhase0 notifies the controller to end phase 0, and start phase 1
-func (c *Controller) EndPhase0() error {
-	state := c.GetState()
-	if state != Phase0 {
-		return NewInvalidStateTransitionError(state, Phase1)
-	}
-
-	c.SetState(Phase1)
-	close(c.h0Ch)
-
-	return nil
 }
 
 // EndPhase1 notifies the controller to end phase 1, and start phase 2
@@ -147,10 +136,23 @@ func (c *Controller) EndPhase1() error {
 	return nil
 }
 
+// EndPhase2 notifies the controller to end phase 2, and start phase 3
+func (c *Controller) EndPhase2() error {
+	state := c.GetState()
+	if state != Phase2 {
+		return NewInvalidStateTransitionError(state, Phase3)
+	}
+
+	c.SetState(Phase3)
+	close(c.h2Ch)
+
+	return nil
+}
+
 // End terminates the DKG state machine and records the artifacts.
 func (c *Controller) End() error {
 	state := c.GetState()
-	if state != Phase2 {
+	if state != Phase3 {
 		return NewInvalidStateTransitionError(state, End)
 	}
 
@@ -191,6 +193,20 @@ func (c *Controller) GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []cryp
 	return c.privateShare, c.groupPublicKey, c.publicKeys
 }
 
+// Poll instructs the broker to read new broadcast messages, which will be
+// relayed through the message channel.
+func (c *Controller) Poll(blockReference flow.Identifier) error {
+	return c.broker.Poll(blockReference)
+}
+
+// SubmitResult instructs the broker to submit DKG results. It is up to the
+// caller to ensure that this method is called after a succesfull run of the
+// protocol.
+func (c *Controller) SubmitResult() error {
+	_, _, res := c.GetArtifacts()
+	return c.broker.SubmitResult(res)
+}
+
 /*******************************************************************************
 WORKERS
 *******************************************************************************/
@@ -229,38 +245,14 @@ func (c *Controller) start() error {
 	}
 
 	c.log.Debug().Msg("DKG engine started")
-	c.SetState(Phase0)
+	c.SetState(Phase1)
 	return nil
-}
-
-func (c *Controller) phase0() error {
-	state := c.GetState()
-	if state != Phase0 {
-		return fmt.Errorf("Cannot execute phase0 routine in state %s", state)
-	}
-
-	c.log.Debug().Msg("Waiting for end of phase 0")
-	for {
-		select {
-		case <-c.h0Ch:
-			return nil
-		case <-c.shutdownCh:
-			return nil
-		}
-	}
 }
 
 func (c *Controller) phase1() error {
 	state := c.GetState()
 	if state != Phase1 {
 		return fmt.Errorf("Cannot execute phase1 routine in state %s", state)
-	}
-
-	c.dkgLock.Lock()
-	err := c.dkg.NextTimeout()
-	c.dkgLock.Unlock()
-	if err != nil {
-		return fmt.Errorf("Error calling NextTimeout: %w", err)
 	}
 
 	c.log.Debug().Msg("Waiting for end of phase 1")
@@ -288,6 +280,30 @@ func (c *Controller) phase2() error {
 	}
 
 	c.log.Debug().Msg("Waiting for end of phase 2")
+	for {
+		select {
+		case <-c.h2Ch:
+			return nil
+		case <-c.shutdownCh:
+			return nil
+		}
+	}
+}
+
+func (c *Controller) phase3() error {
+	state := c.GetState()
+	if state != Phase3 {
+		return fmt.Errorf("Cannot execute phase3 routine in state %s", state)
+	}
+
+	c.dkgLock.Lock()
+	err := c.dkg.NextTimeout()
+	c.dkgLock.Unlock()
+	if err != nil {
+		return fmt.Errorf("Error calling NextTimeout: %w", err)
+	}
+
+	c.log.Debug().Msg("Waiting for end of phase 3")
 	for {
 		select {
 		case <-c.endCh:

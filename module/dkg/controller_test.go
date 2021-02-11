@@ -20,22 +20,22 @@ import (
 type node struct {
 	id             int
 	controller     *Controller
-	phase0Duration time.Duration
 	phase1Duration time.Duration
 	phase2Duration time.Duration
+	phase3Duration time.Duration
 }
 
 func newNode(id int, controller *Controller,
-	phase0Duration time.Duration,
 	phase1Duration time.Duration,
-	phase2Duration time.Duration) *node {
+	phase2Duration time.Duration,
+	phase3Duration time.Duration) *node {
 
 	return &node{
 		id:             id,
 		controller:     controller,
-		phase0Duration: phase0Duration,
 		phase1Duration: phase1Duration,
 		phase2Duration: phase2Duration,
+		phase3Duration: phase3Duration,
 	}
 }
 
@@ -51,33 +51,30 @@ func (n *node) run() error {
 	}()
 
 	// timers to control phase transitions
-	var phase0Timer <-chan time.Time
 	var phase1Timer <-chan time.Time
 	var phase2Timer <-chan time.Time
+	var phase3Timer <-chan time.Time
 
-	phase0Timer = time.After(n.phase0Duration)
+	phase1Timer = time.After(n.phase1Duration)
 
 	for {
 		select {
 		case err := <-runErrCh:
 			// received an error from the async run routine
 			return fmt.Errorf("Async Run error: %w", err)
-		case <-phase0Timer:
-			// end of phase 0
-			err := n.controller.EndPhase0()
-			if err != nil {
-				return fmt.Errorf("Error transitioning to Phase 1: %w", err)
-			}
-			phase1Timer = time.After(n.phase1Duration)
 		case <-phase1Timer:
-			// end of phase 1
 			err := n.controller.EndPhase1()
 			if err != nil {
 				return fmt.Errorf("Error transitioning to Phase 2: %w", err)
 			}
 			phase2Timer = time.After(n.phase2Duration)
 		case <-phase2Timer:
-			// end of phase 2
+			err := n.controller.EndPhase2()
+			if err != nil {
+				return fmt.Errorf("Error transitioning to Phase 3: %w", err)
+			}
+			phase3Timer = time.After(n.phase3Duration)
+		case <-phase3Timer:
 			err := n.controller.End()
 			if err != nil {
 				return fmt.Errorf("Error ending DKG: %w", err)
@@ -108,8 +105,8 @@ func (b *broker) PrivateSend(dest int, data []byte) {
 //
 // ATTENTION: Normally the processor requires Broadcast to provide guaranteed
 // delivery (either all nodes receive the message or none of them receive it).
-// Here we are just assuming that with a long enough duration for phases 1 and
-// 2, all nodes are guaranteed to see everyone's messages. So it is important
+// Here we are just assuming that with a long enough duration for phases 2 and
+// 3, all nodes are guaranteed to see everyone's messages. So it is important
 // to set timeouts carefully in the tests.
 func (b *broker) Broadcast(data []byte) {
 	for i := 0; i < len(b.channels); i++ {
@@ -144,9 +141,9 @@ func (b *broker) SubmitResult([]crypto.PublicKey) error { return nil }
 
 type testCase struct {
 	totalNodes     int
-	phase0Duration time.Duration
 	phase1Duration time.Duration
 	phase2Duration time.Duration
+	phase3Duration time.Duration
 }
 
 // TestDKGHappyPath tests the controller in optimal conditions, when all nodes are
@@ -154,18 +151,18 @@ type testCase struct {
 func TestDKGHappyPath(t *testing.T) {
 	// Define different test cases with varying number of nodes, and phase
 	// durations. Since these are all happy path cases, there are no messages
-	// sent during phase 1 and 2, all messaging is done in phase 0. So we can
-	// can set shorter durations for phase 1 and 2..
+	// sent during phase 2 and 3; all messaging is done in phase 1. So we can
+	// can set shorter durations for phases 2 and 3.
 	testCases := []testCase{
-		{totalNodes: 5, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
-		{totalNodes: 10, phase0Duration: time.Second, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond},
-		{totalNodes: 15, phase0Duration: 5 * time.Second, phase1Duration: 2 * time.Second, phase2Duration: 2 * time.Second},
+		{totalNodes: 5, phase1Duration: time.Second, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
+		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
+		{totalNodes: 15, phase1Duration: 5 * time.Second, phase2Duration: 2 * time.Second, phase3Duration: 2 * time.Second},
 	}
 
 	// run each test case
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("%d nodes", tc.totalNodes), func(t *testing.T) {
-			testDKG(t, tc.totalNodes, tc.totalNodes, tc.phase0Duration, tc.phase1Duration, tc.phase2Duration)
+			testDKG(t, tc.totalNodes, tc.totalNodes, tc.phase1Duration, tc.phase2Duration, tc.phase3Duration)
 		})
 	}
 }
@@ -176,9 +173,9 @@ func TestDKGThreshold(t *testing.T) {
 	// define different test cases with varying number of nodes, and phase
 	// durations
 	testCases := []testCase{
-		testCase{totalNodes: 5, phase0Duration: time.Second, phase1Duration: time.Second, phase2Duration: time.Second},
-		testCase{totalNodes: 10, phase0Duration: time.Second, phase1Duration: time.Second, phase2Duration: time.Second},
-		testCase{totalNodes: 15, phase0Duration: 5 * time.Second, phase1Duration: 2 * time.Second, phase2Duration: 2 * time.Second},
+		{totalNodes: 5, phase1Duration: time.Second, phase2Duration: time.Second, phase3Duration: time.Second},
+		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: time.Second, phase3Duration: time.Second},
+		{totalNodes: 15, phase1Duration: 5 * time.Second, phase2Duration: 2 * time.Second, phase3Duration: 2 * time.Second},
 	}
 
 	// run each test case
@@ -188,13 +185,13 @@ func TestDKGThreshold(t *testing.T) {
 		gn := tc.totalNodes - optimalThreshold(tc.totalNodes)
 
 		t.Run(fmt.Sprintf("%d/%d nodes", gn, tc.totalNodes), func(t *testing.T) {
-			testDKG(t, tc.totalNodes, gn, tc.phase0Duration, tc.phase1Duration, tc.phase2Duration)
+			testDKG(t, tc.totalNodes, gn, tc.phase1Duration, tc.phase2Duration, tc.phase3Duration)
 		})
 	}
 }
 
-func testDKG(t *testing.T, totalNodes int, goodNodes int, phase0Duration, phase1Duration, phase2Duration time.Duration) {
-	nodes := initNodes(t, totalNodes, phase0Duration, phase1Duration, phase2Duration)
+func testDKG(t *testing.T, totalNodes int, goodNodes int, phase1Duration, phase2Duration, phase3Duration time.Duration) {
+	nodes := initNodes(t, totalNodes, phase1Duration, phase2Duration, phase3Duration)
 	gnodes := nodes[:goodNodes]
 
 	// Start all the good nodes in parallel
@@ -206,14 +203,14 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phase0Duration, phase1
 	}
 
 	// Wait until they are all shutdown
-	wait(t, gnodes, 5*phase0Duration)
+	wait(t, gnodes, 5*phase1Duration)
 
 	// Check that all nodes have agreed on the same set of public keys
 	checkArtifacts(t, gnodes, totalNodes)
 }
 
 // Initialise nodes and communication channels.
-func initNodes(t *testing.T, n int, phase0Duration, phase1Duration, phase2Duration time.Duration) []*node {
+func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Duration time.Duration) []*node {
 	// Create the channels through which the nodes will communicate
 	channels := make([]chan msg.DKGMessage, 0, n)
 	for i := 0; i < n; i++ {
@@ -246,7 +243,7 @@ func initNodes(t *testing.T, n int, phase0Duration, phase1Duration, phase2Durati
 			broker)
 		require.NoError(t, err)
 
-		node := newNode(i, controller, phase0Duration, phase1Duration, phase2Duration)
+		node := newNode(i, controller, phase1Duration, phase2Duration, phase3Duration)
 		nodes = append(nodes, node)
 	}
 
