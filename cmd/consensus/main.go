@@ -294,7 +294,7 @@ func main() {
 			proposals := buffer.NewPendingBlocks()
 
 			// initialize the compliance engine
-			comp, err = compliance.New(
+			comp, err = compliance.NewEngine(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,

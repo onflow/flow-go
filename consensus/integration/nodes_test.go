@@ -49,7 +49,7 @@ type Node struct {
 	index      int
 	log        zerolog.Logger
 	id         *flow.Identity
-	compliance *compliance.Engine
+	compliance *compliance.Core
 	sync       *synceng.Engine
 	hot        *hotstuff.EventLoop
 	state      *protocol.MutableState
@@ -227,7 +227,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, metrics, tracer, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, fullState, prov, cache, syncCore)
+	comp, err := compliance.NewCore(log, metrics, tracer, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, fullState, prov, cache, syncCore)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
