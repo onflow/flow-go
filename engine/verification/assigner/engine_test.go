@@ -194,24 +194,18 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
 	e := suite.NewAssignerEngine()
 
+	// mocks verification node staked at the block of its execution result.
 	suite.stakedAtBlock()
 
-	// assigns all chunks to this verification node
-	a := chmodel.NewAssignment()
-	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
-	for _, chunk := range chunks {
-		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		&suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
+	// assigns all chunks to this verification node.
+	chunksNum := suite.assignAllChunks()
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
 	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
 		Return(false, nil).
-		Times(len(chunks))
-	suite.newChunkListener.On("Check").Return().Times(len(chunks))
+		Times(chunksNum)
+	suite.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
@@ -225,9 +219,28 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
 	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
 }
 
-// stakedAtBlock mocks the protocol state of test suite so that its verification identity is staked
+// stakedAtBlock is a test helper that mocks the protocol state of test suite so that its verification identity is staked
 // at the reference block of its execution result.
 func (suite *AssignerEngineTestSuite) stakedAtBlock() {
 	suite.state.On("AtBlockID", suite.completeER.Receipt.ExecutionResult.BlockID).Return(suite.snapshot)
 	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
+}
+
+// assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks to verification identity
+// of this test suite.
+// It returns number of chunks assigned to verification node.
+func (suite *AssignerEngineTestSuite) assignAllChunks() int {
+	a := chmodel.NewAssignment()
+	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
+	for _, chunk := range chunks {
+		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
+	}
+	suite.assigner.On("Assign",
+		&suite.completeER.Receipt.ExecutionResult,
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
+
+	return len(chunks)
+	//suite.assigner.On("Assign",
+	//	&suite.completeER.Receipt.ExecutionResult,
+	//	suite.completeER.Receipt.ExecutionResult.BlockID).Return(chmodel.NewAssignment(), nil).Once()
 }
