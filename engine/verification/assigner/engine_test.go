@@ -61,13 +61,6 @@ func (suite *AssignerEngineTestSuite) SetupTest() {
 	suite.verIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 }
 
-//
-//func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
-//	return func(testSuite *AssignerEngineTestSuite) {
-//		testSuite.verIdentity = identity
-//	}
-//}
-//
 // NewAssignerEngine returns an assigner engine for testing.
 func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
 	for _, apply := range opts {
