@@ -363,7 +363,7 @@ func MessagesToIdentifiers(l [][]byte) []flow.Identifier {
 	return results
 }
 
-// SnapshotToBytes converts a `protocol.Snapshot` to bytes
+// SnapshotToBytes converts a `protocol.Snapshot` to bytes, encoded as JSON
 func SnapshotToBytes(snapshot protocol.Snapshot) ([]byte, error) {
 	serializable, err := inmem.FromSnapshot(snapshot)
 	if err != nil {
