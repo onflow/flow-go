@@ -20,7 +20,7 @@ func NewPingCollector() *PingCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
-		}, []string{LabelNodeID, LabelNodeRole, LabelNodeInfo}),
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
 	}
 	return pc
 }
@@ -34,8 +34,9 @@ func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt
 	}
 
 	pc.reachable.With(prometheus.Labels{
-		LabelNodeID:   node.String(),
-		LabelNodeRole: node.Role.String(),
-		LabelNodeInfo: nodeInfo}).
+		LabelNodeID:      node.NodeID.String(),
+		LabelNodeAddress: node.Address,
+		LabelNodeRole:    node.Role.String(),
+		LabelNodeInfo:    nodeInfo}).
 		Set(rttValue)
 }
