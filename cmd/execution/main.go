@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -78,6 +79,7 @@ func main() {
 		syncFast              bool
 		syncThreshold         int
 		extensiveLog          bool
+		staker                epochs.Staker
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -202,6 +204,10 @@ func main() {
 
 			return compactor, nil
 		}).
+		Module("staked", func(node *cmd.FlowNodeBuilder) error {
+			staker = epochs.NewSealedStateStaker(node.Logger, node.State, node.Me)
+			return nil
+		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
@@ -226,6 +232,7 @@ func main() {
 				node.Me,
 				executionState,
 				collector,
+				staker,
 			)
 
 			return providerEngine, err
@@ -273,6 +280,7 @@ func main() {
 				deltas,
 				syncThreshold,
 				syncFast,
+				staker,
 			)
 
 			// TODO: we should solve these mutual dependencies better

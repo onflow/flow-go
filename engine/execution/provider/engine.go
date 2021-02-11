@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -38,6 +39,7 @@ type Engine struct {
 	me            module.Local
 	chunksConduit network.Conduit
 	metrics       module.ExecutionMetrics
+	staker        epochs.Staker
 }
 
 func New(
@@ -48,6 +50,7 @@ func New(
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
+	staker epochs.Staker,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
@@ -60,6 +63,7 @@ func New(
 		me:        me,
 		execState: execState,
 		metrics:   metrics,
+		staker:    staker,
 	}
 
 	var err error
@@ -148,6 +152,11 @@ func (e *Engine) onChunkDataRequest(
 
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
+
+	if !e.staker.AmIStaked() {
+		e.log.Warn().Str("origin_id", originID.String()).Msg("node not staked, but received chunk data pack request")
+		return nil
+	}
 
 	origin, err := e.state.Final().Identity(originID)
 	if err != nil {

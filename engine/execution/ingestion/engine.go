@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/mempool/queue"
@@ -64,6 +65,7 @@ type Engine struct {
 	syncConduit        network.Conduit     // sending state syncing requests
 	syncDeltas         mempool.Deltas      // storing the synced state deltas
 	syncFast           bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
+	staker             epochs.Staker       // component monitoring and indicating if the node is staked at present
 }
 
 func New(
@@ -87,6 +89,7 @@ func New(
 	syncDeltas mempool.Deltas,
 	syncThreshold int,
 	syncFast bool,
+	staker epochs.Staker,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -116,6 +119,7 @@ func New(
 		syncThreshold:      syncThreshold,
 		syncDeltas:         syncDeltas,
 		syncFast:           syncFast,
+		staker:             staker,
 	}
 
 	// move to state syncing engine
@@ -351,6 +355,11 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 
 		log.Info().Msg("all unexecuted have been successfully reloaded")
 
+		err = e.staker.Refresh()
+		if err != nil {
+			return fmt.Errorf("cannot refresh staker state: %w", err)
+		}
+
 		return nil
 	})
 }
@@ -557,7 +566,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
 	broadcasted := false
-	if !isExecutedBlockSealed {
+	if !isExecutedBlockSealed && e.staker.AmIStaked() {
 		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 		if err != nil {
 			e.log.Err(err).Msg("critical: failed to broadcast the receipt")
