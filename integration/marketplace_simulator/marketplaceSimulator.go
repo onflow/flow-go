@@ -235,7 +235,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 			for p := 0; p < momentsPerAccount/batchSize; p++ {
 				m.log.Info().Msgf("minting %d moments on nba account", batchSize)
 				// mint a lot of moments
-				script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *m.marketAccounts[i].Account().Address, 1, 1, uint64(batchSize))
+				script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *m.marketAccounts[j].Account().Address, 1, 1, uint64(batchSize))
 				tx = flowsdk.NewTransaction().
 					SetReferenceBlockID(blockRef.ID).
 					SetScript(script)
