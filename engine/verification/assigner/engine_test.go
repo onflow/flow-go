@@ -96,6 +96,8 @@ func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *
 func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 	e := suite.NewAssignerEngine()
 
+	suite.stakedAtBlock()
+
 	// assigns all chunks to this verification node
 	a := chmodel.NewAssignment()
 	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
@@ -130,6 +132,8 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
 	e := suite.NewAssignerEngine()
 
+	suite.stakedAtBlock()
+
 	// assigns no chunk to this verification node
 	suite.assigner.On("Assign",
 		&suite.completeER.Receipt.ExecutionResult,
@@ -153,6 +157,8 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
 // added to the chunks queue, the consumer should not be notified.
 func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 	e := suite.NewAssignerEngine()
+
+	suite.stakedAtBlock()
 
 	// assigns all chunks to this verification node
 	a := chmodel.NewAssignment()
@@ -188,6 +194,8 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
 	e := suite.NewAssignerEngine()
 
+	suite.stakedAtBlock()
+
 	// assigns all chunks to this verification node
 	a := chmodel.NewAssignment()
 	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
@@ -215,4 +223,11 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
 
 	// job listener should not be notified as no new chunk is added.
 	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
+}
+
+// stakedAtBlock mocks the protocol state of test suite so that its verification identity is staked
+// at the reference block of its execution result.
+func (suite *AssignerEngineTestSuite) stakedAtBlock() {
+	suite.state.On("AtBlockID", suite.completeER.Receipt.ExecutionResult.BlockID).Return(suite.snapshot)
+	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
 }
