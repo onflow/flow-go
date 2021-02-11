@@ -228,6 +228,12 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	wg := sync.WaitGroup{}
 
 	for p := 0; p < momentsPerAccount/batchSize; p++ {
+
+		blockRef, err = m.flowClient.GetLatestBlockHeader(context.Background(), false)
+		if err != nil {
+			return err
+		}
+
 		for i := 0; i < steps; i++ {
 			j := i
 			go func() {
