@@ -98,23 +98,16 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 
 	suite.stakedAtBlock()
 
-	// assigns all chunks to this verification node
-	a := chmodel.NewAssignment()
-	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
-	for _, chunk := range chunks {
-		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		&suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
+	// mocks verification node staked at the block of its execution result.
+	chunksNum := suite.assignAllChunks()
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
 	// invoked for it.
 	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
 		Return(true, nil).
-		Times(len(chunks))
-	suite.newChunkListener.On("Check").Return().Times(len(chunks))
+		Times(chunksNum)
+	suite.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
@@ -132,12 +125,11 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
 	e := suite.NewAssignerEngine()
 
+	// mocks verification node staked at the block of its execution result.
 	suite.stakedAtBlock()
 
 	// assigns no chunk to this verification node
-	suite.assigner.On("Assign",
-		&suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(chmodel.NewAssignment(), nil).Once()
+	suite.assignNoChunk()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
@@ -158,24 +150,18 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
 func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 	e := suite.NewAssignerEngine()
 
+	// mocks verification node staked at the block of its execution result.
 	suite.stakedAtBlock()
 
 	// assigns all chunks to this verification node
-	a := chmodel.NewAssignment()
-	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
-	for _, chunk := range chunks {
-		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		&suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
+	chunksNum := suite.assignAllChunks()
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue results in an error
 	suite.chunksQueue.On("StoreChunkLocator", testifymock.Anything).
 		Return(false, fmt.Errorf("error")).
-		Times(len(chunks))
-	suite.newChunkListener.On("Check").Return().Times(len(chunks))
+		Times(chunksNum)
+	suite.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
