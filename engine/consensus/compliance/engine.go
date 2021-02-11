@@ -30,24 +30,22 @@ type (
 )
 
 type Engine struct {
-	unit                  *engine.Unit
-	log                   zerolog.Logger
-	metrics               module.EngineMetrics
-	me                    module.Local
-	headers               storage.Headers
-	payloads              storage.Payloads
-	tracer                module.Tracer
-	state                 protocol.State
-	prov                  network.Engine
-	core                  *Core
-	pendingEventSink      EventSink
-	blockSink             EventSink
-	blockProposalSink     EventSink
-	voteSink              EventSink
-	pendingBlocks         *fifoqueue.FifoQueue
-	pendingBlockProposals *fifoqueue.FifoQueue
-	pendingVotes          *fifoqueue.FifoQueue
-	con                   network.Conduit
+	unit             *engine.Unit
+	log              zerolog.Logger
+	metrics          module.EngineMetrics
+	me               module.Local
+	headers          storage.Headers
+	payloads         storage.Payloads
+	tracer           module.Tracer
+	state            protocol.State
+	prov             network.Engine
+	core             *Core
+	pendingEventSink EventSink
+	blockSink        EventSink
+	voteSink         EventSink
+	pendingBlocks    *fifoqueue.FifoQueue
+	pendingVotes     *fifoqueue.FifoQueue
+	con              network.Conduit
 }
 
 func NewEngine(
@@ -190,7 +188,7 @@ func (e *Engine) processPendingEvent(event *Event) {
 		e.pendingBlocks.Push(event)
 	case *messages.BlockProposal:
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-		e.pendingBlockProposals.Push(event)
+		e.pendingBlocks.Push(event)
 	case *messages.BlockVote:
 		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
 		e.pendingVotes.Push(event)
@@ -199,15 +197,29 @@ func (e *Engine) processPendingEvent(event *Event) {
 
 // consumeEvents consumes events that are ready to be processed.
 func (e *Engine) consumeEvents() {
+	processBlock := func(event *Event) error {
+		var err error
+		switch t := event.Msg.(type) {
+		case *events.SyncedBlock:
+			proposal := &messages.BlockProposal{
+				Header:  t.Block.Header,
+				Payload: t.Block.Payload,
+			}
+			err = e.core.OnBlockProposal(event.OriginID, proposal)
+			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+
+		case *messages.BlockProposal:
+			err = e.core.OnBlockProposal(event.OriginID, t)
+			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		}
+		return err
+	}
+
 	for {
 		var err error
 		select {
 		case event := <-e.blockSink:
-			err = e.core.OnSyncedBlock(event.OriginID, event.Msg.(*events.SyncedBlock))
-			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageSyncedBlock)
-		case event := <-e.blockProposalSink:
-			err = e.core.onBlockProposal(event.OriginID, event.Msg.(*messages.BlockProposal))
-			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
+			err = processBlock(event)
 		case event := <-e.voteSink:
 			err = e.core.onBlockVote(event.OriginID, event.Msg.(*messages.BlockVote))
 			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockVote)

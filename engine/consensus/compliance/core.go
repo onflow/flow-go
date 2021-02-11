@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -77,18 +76,8 @@ func NewCore(
 	return e, nil
 }
 
-// OnSyncedBlock processes a block synced by the assembly engine.
-func (c *Core) OnSyncedBlock(originID flow.Identifier, synced *events.SyncedBlock) error {
-	// process as proposal
-	proposal := &messages.BlockProposal{
-		Header:  synced.Block.Header,
-		Payload: synced.Block.Payload,
-	}
-	return c.onBlockProposal(synced.Block.Header.ProposerID, proposal)
-}
-
-// onBlockProposal handles incoming block proposals.
-func (c *Core) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+// OnBlockProposal handles incoming block proposals.
+func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 	blockSpan, ok := c.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
 	if !ok {
 		blockSpan = c.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)

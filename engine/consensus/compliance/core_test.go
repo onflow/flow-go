@@ -263,7 +263,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	cs.headerDB[block.Header.ParentID] = cs.head
 
 	// it should be processed without error
-	err := cs.core.onBlockProposal(originID, proposal)
+	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
@@ -287,7 +287,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[ancestor.ID()] = ancestor.Header
 
 	// it should be processed without error
-	err := cs.core.onBlockProposal(originID, proposal)
+	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
@@ -320,7 +320,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	cs.state.On("Extend", mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error
-	err := cs.core.onBlockProposal(originID, proposal)
+	err := cs.core.OnBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
 	// we should extend the state with the header
@@ -416,7 +416,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 		)
 
 		// process and make sure no error occurs (as they are unverifiable)
-		err := cs.core.onBlockProposal(originID, proposal)
+		err := cs.core.OnBlockProposal(originID, proposal)
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
@@ -442,7 +442,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	)
 
 	// process the root proposal
-	err := cs.core.onBlockProposal(originID, missing)
+	err := cs.core.OnBlockProposal(originID, missing)
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// make sure we submitted all four proposals
