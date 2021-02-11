@@ -81,5 +81,5 @@ func StakedIdentity(state State, blockID flow.Identifier, identifier flow.Identi
 		return flow.Identity{}, fmt.Errorf("could not retrieve identity for identifier %v at block id snapshot %v: %w)", identifier, blockID, err)
 	}
 
-	return identity, nil
+	return *identity, nil
 }
