@@ -153,24 +153,12 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	m.log.Info().Msgf("adding keys")
 	// add keys first
-	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 80)
-	if err != nil {
-		return err
-	}
 
-	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 80)
-	if err != nil {
-		return err
-	}
-
-	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 80)
-	if err != nil {
-		return err
-	}
-
-	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 80)
-	if err != nil {
-		return err
+	for i := 0; i < 10; i++ {
+		err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 50)
+		if err != nil {
+			return err
+		}
 	}
 
 	// numBuckets := 32
