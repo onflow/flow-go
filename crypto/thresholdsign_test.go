@@ -306,7 +306,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				err := proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
 				require.Nil(t, err)
 			} else {
-				err := proc.dkg.HandleBroadcastedMsg(newMsg.orig, newMsg.data)
+				err := proc.dkg.HandleBroadcastMsg(newMsg.orig, newMsg.data)
 				require.Nil(t, err)
 			}
 

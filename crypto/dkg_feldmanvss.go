@@ -133,10 +133,10 @@ const (
 	verifVectorSize = PubKeyLenBLSBLS12381
 )
 
-// HandleBroadcastedMsg processes a new broadcasted message received by the current node.
+// HandleBroadcastMsg processes a new broadcasted message received by the current node.
 //
 // orig is the message origin index.
-func (s *feldmanVSSstate) HandleBroadcastedMsg(orig int, msg []byte) error {
+func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}

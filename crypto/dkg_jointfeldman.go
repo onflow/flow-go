@@ -194,14 +194,14 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	return x, Y, y, nil
 }
 
-// HandleBroadcastedMsg processes a new broadcasted message received by the current node
+// HandleBroadcastMsg processes a new broadcasted message received by the current node
 // orig is the message origin index
-func (s *JointFeldmanState) HandleBroadcastedMsg(orig int, msg []byte) error {
+func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
 		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
-		err := s.fvss[i].HandleBroadcastedMsg(orig, msg)
+		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
 		if err != nil {
 			return fmt.Errorf("handle message has failed: %w", err)
 		}
