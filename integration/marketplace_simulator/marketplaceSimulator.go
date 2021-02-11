@@ -245,7 +245,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 			}
 		}()
 		// totalMinted += batchSize
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond * 10)
 	}
 	wg.Wait()
 

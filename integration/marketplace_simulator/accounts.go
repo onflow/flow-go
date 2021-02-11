@@ -150,7 +150,6 @@ func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowCl
 	}
 	acc.accountKeys = account.Keys
 
-	fmt.Println(">>>>>>>>>><<<<>>>>", result, len(acc.accountKeys))
 	return nil
 }
 
