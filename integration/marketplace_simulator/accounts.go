@@ -102,6 +102,8 @@ func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowCl
 
 	}
 
+	var result *flowsdk.TransactionResult
+
 	stopped := false
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -110,6 +112,7 @@ func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowCl
 		nil, // on finalized
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			log.Debug().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+			result = res
 			if !stopped {
 				stopped = true
 				wg.Done()
@@ -147,7 +150,7 @@ func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowCl
 	}
 	acc.accountKeys = account.Keys
 
-	fmt.Println(">>>>>>>>>><<<<>>>>", len(acc.accountKeys))
+	fmt.Println(">>>>>>>>>><<<<>>>>", result, len(acc.accountKeys))
 	return nil
 }
 
