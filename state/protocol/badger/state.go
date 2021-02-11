@@ -35,6 +35,7 @@ func Bootstrap(
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
+	results storage.ExecutionResults,
 	blocks storage.Blocks,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -48,7 +49,7 @@ func Bootstrap(
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty database")
 	}
-	state := newState(metrics, db, headers, seals, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
 	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
 
@@ -126,7 +127,17 @@ func Bootstrap(
 			return fmt.Errorf("could not index root block seal: %w", err)
 		}
 
-		// 4) initialize the current protocol state values
+		// 4) insert the root quorum certificate into the database
+		qc, err := root.QuorumCertificate()
+		if err != nil {
+			return fmt.Errorf("could not get root qc: %w", err)
+		}
+		err = operation.InsertRootQuorumCertificate(qc)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert root qc: %w", err)
+		}
+
+		// 5) initialize the current protocol state values
 		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
@@ -148,7 +159,7 @@ func Bootstrap(
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
 
-		// 5) initialize values related to the epoch logic
+		// 6) initialize values related to the epoch logic
 		err = state.bootstrapEpoch(root)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
@@ -199,6 +210,13 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
+			if err := validSetup(setup); err != nil {
+				return fmt.Errorf("invalid setup: %w", err)
+			}
+			if err := validCommit(commit, setup); err != nil {
+				return fmt.Errorf("invalid commit")
+			}
+
 			setups = append(setups, setup)
 			commits = append(commits, commit)
 			status.PreviousEpoch.SetupID = setup.ID()
@@ -217,6 +235,13 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
+		if err := validSetup(setup); err != nil {
+			return fmt.Errorf("invalid setup: %w", err)
+		}
+		if err := validCommit(commit, setup); err != nil {
+			return fmt.Errorf("invalid commit")
+		}
+
 		setups = append(setups, setup)
 		commits = append(commits, commit)
 		status.CurrentEpoch.SetupID = setup.ID()
@@ -230,6 +255,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 			if err != nil {
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
+			if err := validSetup(setup); err != nil {
+				return fmt.Errorf("invalid setup: %w", err)
+			}
+
 			setups = append(setups, setup)
 			status.NextEpoch.SetupID = setup.ID()
 			commit, err := protocol.ToEpochCommit(next)
@@ -237,6 +266,9 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) err
 				return fmt.Errorf("could not get next epoch commit event: %w", err)
 			}
 			if err == nil {
+				if err := validCommit(commit, setup); err != nil {
+					return fmt.Errorf("invalid commit")
+				}
 				commits = append(commits, commit)
 				status.NextEpoch.CommitID = commit.ID()
 			}
@@ -287,66 +319,22 @@ func OpenState(
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
+	results storage.ExecutionResults,
 	blocks storage.Blocks,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-) (*State, *StateRoot, error) {
+) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
+		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
 	}
 	if !isBootstrapped {
-		return nil, nil, fmt.Errorf("expected database to contain bootstrapped state")
+		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, db, headers, seals, blocks, setups, commits, statuses)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	// read root block from database:
-	var rootHeight uint64
-	err = db.View(operation.RetrieveRootHeight(&rootHeight))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root height: %w", err)
-	}
-	rootBlock, err := blocks.ByHeight(rootHeight)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block: %w", err)
-	}
-
-	// read root execution result
-	var resultID flow.Identifier
-	err = db.View(operation.LookupExecutionResult(rootBlock.ID(), &resultID))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's execution result ID: %w", err)
-	}
-	var result flow.ExecutionResult
-	err = db.View(operation.RetrieveExecutionResult(resultID, &result))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's execution result: %w", err)
-	}
-
-	// read root seal
-	seal, err := seals.ByBlockID(rootBlock.ID())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's seal: %w", err)
-	}
-
-	// read root seal
-	epochStatus, err := statuses.ByBlockID(rootBlock.ID())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root block's epoch status: %w", err)
-	}
-	epochSetup, err := setups.ByID(epochStatus.CurrentEpoch.SetupID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed retrieve root epochs's setup event: %w", err)
-	}
-
-	// construct state Root
-	stateRoot, err := NewStateRoot(rootBlock, &result, seal, epochSetup.FirstView)
-	if err != nil {
-		return nil, nil, fmt.Errorf("constructing state root failed: %w", err)
-	}
-
-	return state, stateRoot, nil
+	return state, nil
 }
 
 func (s *State) Params() protocol.Params {
@@ -396,6 +384,7 @@ func newState(
 	db *badger.DB,
 	headers storage.Headers,
 	seals storage.Seals,
+	results storage.ExecutionResults,
 	blocks storage.Blocks,
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
@@ -405,6 +394,7 @@ func newState(
 		metrics: metrics,
 		db:      db,
 		headers: headers,
+		results: results,
 		seals:   seals,
 		blocks:  blocks,
 		epoch: struct {

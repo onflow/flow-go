@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -21,9 +20,9 @@ import (
 // to a memory-backed snapshot.
 func TestFromSnapshot(t *testing.T) {
 	identities := unittest.IdentityListFixture(10, unittest.WithAllRoles())
-	stateRoot := fixtureStateRoot(t, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
 
-	util.RunWithFollowerProtocolState(t, stateRoot, func(db *badger.DB, state *bprotocol.FollowerState) {
+	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
 		// See EpochBuilder documentation for details of these blocks.
@@ -142,11 +141,4 @@ func snapshotsEqual(t *testing.T, snap1, snap2 protocol.Snapshot) bool {
 
 func assertSnapshotsEqual(t *testing.T, snap1, snap2 protocol.Snapshot) {
 	assert.True(t, snapshotsEqual(t, snap1, snap2))
-}
-
-func fixtureStateRoot(t *testing.T, participants flow.IdentityList) *bprotocol.StateRoot {
-	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := bprotocol.NewStateRoot(root, result, seal, 0)
-	require.NoError(t, err)
-	return stateRoot
 }

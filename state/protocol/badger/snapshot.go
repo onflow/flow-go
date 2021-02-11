@@ -58,10 +58,13 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not get root: %w", err)
 	}
 
-	// TODO: store root QC
 	if s.blockID == root.ID() {
-		// TODO store root QC and return here
-		return nil, fmt.Errorf("root qc not stored")
+		var rootQC flow.QuorumCertificate
+		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
+		}
+		return &rootQC, nil
 	}
 
 	// CASE 2: for any other block, generate the root QC from a valid child
@@ -257,7 +260,6 @@ func (s *Snapshot) LatestSeal() (*flow.Seal, error) {
 	return seal, nil
 }
 
-// TODO inject results storage
 func (s *Snapshot) LatestResult() (*flow.ExecutionResult, error) {
 	seal, err := s.LatestSeal()
 	if err != nil {
@@ -322,6 +324,28 @@ func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
 // Seed returns the random seed at the given indices for the current block snapshot.
 func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
+	// CASE 1: for the root block, generate the seed from the root qc
+	root, err := s.state.Params().Root()
+	if err != nil {
+		return nil, fmt.Errorf("could not get root: %w", err)
+	}
+
+	if s.blockID == root.ID() {
+		var rootQC flow.QuorumCertificate
+		err := s.state.db.View(operation.RetrieveRootQuorumCertificate(&rootQC))
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve root qc: %w", err)
+		}
+
+		seed, err := seed.FromParentSignature(indices, rootQC.SigData)
+		if err != nil {
+			return nil, fmt.Errorf("could not create seed from root qc: %w", err)
+		}
+
+		return seed, nil
+	}
+
+	// CASE 2: for any other block, use any valid child
 	child, err := s.validChild()
 	if err != nil {
 		return nil, fmt.Errorf("could not get child: %w", err)

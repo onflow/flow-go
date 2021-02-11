@@ -146,11 +146,8 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	s := storage.InitAll(metric, db)
 	consumer := events.NewNoop()
 
-	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := badgerstate.NewStateRoot(root, result, seal, 0)
-	require.NoError(t, err)
-
-	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
 	require.NoError(t, err)
 
 	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
@@ -247,8 +244,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
 	matchingEngine, err := matching.New(
 		node.Log,
@@ -268,7 +265,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		approvals,
 		seals,
 		assigner,
-		validator,
+		receiptValidator,
+		approvalValidator,
 		validation.DefaultRequiredApprovalsForSealValidation,
 		matching.DefaultEmergencySealingActive)
 	require.Nil(t, err)

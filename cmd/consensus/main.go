@@ -71,22 +71,23 @@ func main() {
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
 
-		err              error
-		mutableState     protocol.MutableState
-		privateDKGData   *bootstrap.DKGParticipantPriv
-		guarantees       mempool.Guarantees
-		results          mempool.IncorporatedResults
-		receipts         mempool.ExecutionTree
-		approvals        mempool.Approvals
-		seals            mempool.IncorporatedResultSeals
-		prov             *provider.Engine
-		receiptRequester *requester.Engine
-		syncCore         *synchronization.Core
-		comp             *compliance.Engine
-		conMetrics       module.ConsensusMetrics
-		mainMetrics      module.HotstuffMetrics
-		receiptValidator module.ReceiptValidator
-		chunkAssigner    *chmodule.ChunkAssigner
+		err               error
+		mutableState      protocol.MutableState
+		privateDKGData    *bootstrap.DKGParticipantPriv
+		guarantees        mempool.Guarantees
+		results           mempool.IncorporatedResults
+		receipts          mempool.ExecutionTree
+		approvals         mempool.Approvals
+		seals             mempool.IncorporatedResultSeals
+		prov              *provider.Engine
+		receiptRequester  *requester.Engine
+		syncCore          *synchronization.Core
+		comp              *compliance.Engine
+		conMetrics        module.ConsensusMetrics
+		mainMetrics       module.HotstuffMetrics
+		receiptValidator  module.ReceiptValidator
+		approvalValidator module.ApprovalValidator
+		chunkAssigner     *chmodule.ChunkAssigner
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -141,13 +142,19 @@ func main() {
 				node.Storage.Results,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 
+			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+
+			approvalValidator = validation.NewApprovalValidator(
+				node.State,
+				resultApprovalSigVerifier)
+
 			sealValidator := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				node.Storage.Seals,
 				chunkAssigner,
-				signature.NewAggregationVerifier(encoding.ResultApprovalTag),
+				resultApprovalSigVerifier,
 				requiredApprovalsForSealVerification,
 				conMetrics)
 
@@ -241,6 +248,7 @@ func main() {
 				seals,
 				chunkAssigner,
 				receiptValidator,
+				approvalValidator,
 				requiredApprovalsForSealConstruction,
 				emergencySealing,
 			)

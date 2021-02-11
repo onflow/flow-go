@@ -81,14 +81,6 @@ func (suite *EchoEngineTestSuite) TestDuplicateChannel() {
 	require.Error(suite.T(), err)
 }
 
-// TestSingleMessage_Submit tests sending a single message from sender to receiver using
-// the Submit method of Conduit.
-func (suite *EchoEngineTestSuite) TestSingleMessage_Submit() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Submit")
-	// set to false for no echo expectation
-	suite.singleMessage(false, suite.Submit)
-}
-
 // TestSingleMessage_Publish tests sending a single message from sender to receiver using
 // the Publish method of Conduit.
 func (suite *EchoEngineTestSuite) TestSingleMessage_Publish() {
@@ -111,15 +103,6 @@ func (suite *EchoEngineTestSuite) TestSingleMessage_Multicast() {
 	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
 	// set to false for no echo expectation
 	suite.singleMessage(false, suite.Multicast)
-}
-
-// TestSingleEcho_Submit tests sending a single message from sender to receiver using
-// the Submit method of its Conduit.
-// It also evaluates the correct reception of an echo message back.
-func (suite *EchoEngineTestSuite) TestSingleEcho_Submit() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Submit")
-	// set to true for an echo expectation
-	suite.singleMessage(true, suite.Submit)
 }
 
 // TestSingleEcho_Publish tests sending a single message from sender to receiver using
@@ -149,15 +132,6 @@ func (suite *EchoEngineTestSuite) TestSingleEcho_Multicast() {
 	suite.singleMessage(true, suite.Multicast)
 }
 
-// TestMultiMsgSync_Submit tests sending multiple messages from sender to receiver
-// using the Submit method of its Conduit.
-// Sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestMultiMsgSync_Submit() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Submit")
-	// set to false for no echo expectation
-	suite.multiMessageSync(false, 10, suite.Submit)
-}
-
 // TestMultiMsgSync_Publish tests sending multiple messages from sender to receiver
 // using the Publish method of its Conduit.
 // Sender and receiver are synced over reception.
@@ -185,16 +159,6 @@ func (suite *EchoEngineTestSuite) TestMultiMsgSync_Multicast() {
 	suite.multiMessageSync(false, 10, suite.Multicast)
 }
 
-// TestEchoMultiMsgSync_Submit tests sending multiple messages from sender to receiver
-// using the Submit method of its Conduit.
-// It also evaluates the correct reception of an echo message back for each send
-// sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Submit() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Submit")
-	// set to true for an echo expectation
-	suite.multiMessageSync(true, 10, suite.Submit)
-}
-
 // TestEchoMultiMsgSync_Publish tests sending multiple messages from sender to receiver
 // using the Publish method of its Conduit.
 // It also evaluates the correct reception of an echo message back for each send
@@ -205,16 +169,6 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Publish() {
 	suite.multiMessageSync(true, 10, suite.Publish)
 }
 
-// TestEchoMultiMsgSync_Unicast tests sending multiple messages from sender to receiver
-// using the Unicast method of its Conduit.
-// It also evaluates the correct reception of an echo message back for each send
-// sender and receiver are synced over reception.
-func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
-	// set to true for an echo expectation
-	suite.multiMessageSync(true, 10, suite.Submit)
-}
-
 // TestEchoMultiMsgSync_Multicast tests sending multiple messages from sender to receiver
 // using the Multicast method of its Conduit.
 // It also evaluates the correct reception of an echo message back for each send
@@ -223,15 +177,6 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Multicast() {
 	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
 	// set to true for an echo expectation
 	suite.multiMessageSync(true, 10, suite.Multicast)
-}
-
-// TestMultiMsgAsync_Submit tests sending multiple messages from sender to receiver
-// using the Submit method of their Conduit.
-// Sender and receiver are not synchronized.
-func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Submit() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Submit")
-	// set to false for no echo expectation
-	suite.multiMessageAsync(false, 10, suite.Submit)
 }
 
 // TestMultiMsgAsync_Publish tests sending multiple messages from sender to receiver
@@ -261,15 +206,6 @@ func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Multicast() {
 	suite.multiMessageAsync(false, 10, suite.Multicast)
 }
 
-// TestEchoMultiMsgAsync_Submit tests sending multiple messages from sender to receiver
-// using the Submit method of their Conduit.
-// It also evaluates the correct reception of an echo message back for each send.
-// Sender and receiver are not synchronized
-func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Submit() {
-	// set to true for an echo expectation
-	suite.multiMessageAsync(true, 10, suite.Submit)
-}
-
 // TestEchoMultiMsgAsync_Publish tests sending multiple messages from sender to receiver
 // using the Publish method of their Conduit.
 // It also evaluates the correct reception of an echo message back for each send.
@@ -297,14 +233,6 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Multicast() {
 	suite.multiMessageAsync(true, 10, suite.Multicast)
 }
 
-// TestDuplicateMessageSequential_Submit evaluates the correctness of network layer on deduplicating
-// the received messages over Submit method of nodes' Conduits.
-// Messages are delivered to the receiver in a sequential manner.
-func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Submit() {
-	suite.skipTest("covered by TestDuplicateMessageParallel_Submit")
-	suite.duplicateMessageSequential(suite.Submit)
-}
-
 // TestDuplicateMessageSequential_Publish evaluates the correctness of network layer on deduplicating
 // the received messages over Publish method of nodes' Conduits.
 // Messages are delivered to the receiver in a sequential manner.
@@ -329,13 +257,6 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Multicast() {
 	suite.duplicateMessageSequential(suite.Multicast)
 }
 
-// TestDuplicateMessageParallel_Submit evaluates the correctness of network layer
-// on deduplicating the received messages via Submit method of nodes' Conduits.
-// Messages are delivered to the receiver in parallel via the Submit method of Conduits.
-func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Submit() {
-	suite.duplicateMessageParallel(suite.Submit)
-}
-
 // TestDuplicateMessageParallel_Publish evaluates the correctness of network layer
 // on deduplicating the received messages via Publish method of nodes' Conduits.
 // Messages are delivered to the receiver in parallel via the Publish method of Conduits.
@@ -355,14 +276,6 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Unicast() {
 // Messages are delivered to the receiver in parallel via the Multicast method of Conduits.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageParallel_Multicast() {
 	suite.duplicateMessageParallel(suite.Multicast)
-}
-
-// TestDuplicateMessageDifferentChan_Submit evaluates the correctness of network layer
-// on deduplicating the received messages via Submit method of Conduits against different engine ids. In specific, the
-// desire behavior is that the deduplication should happen based on both eventID and channel.
-// Messages are sent via the Submit method of the Conduits.
-func (suite *EchoEngineTestSuite) TestDuplicateMessageDifferentChan_Submit() {
-	suite.duplicateMessageDifferentChan(suite.Submit)
 }
 
 // TestDuplicateMessageDifferentChan_Publish evaluates the correctness of network layer

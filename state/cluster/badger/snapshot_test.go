@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -56,7 +55,7 @@ func (suite *SnapshotSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, _, _, blocks, setups, commits, statuses, _ := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, _, _, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
 	clusterStateRoot, err := NewStateRoot(suite.genesis)
@@ -67,10 +66,9 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.Assert().Nil(err)
 
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	root, result, seal := unittest.BootstrapFixture(participants)
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, unittest.QuorumCertificateFixture())
+	root := unittest.RootSnapshotFixture(participants)
 
-	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, blocks, setups, commits, statuses, rootSnapshot)
+	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, root)
 	require.NoError(suite.T(), err)
 
 	suite.Require().Nil(err)

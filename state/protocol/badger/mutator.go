@@ -761,10 +761,13 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 					return nil, state.NewInvalidExtensionErrorf("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
 				}
 
-				// The final view needs to be after the current epoch final view.
-				// NOTE: This kind of operates as an overflow check for the other checks.
-				if ev.FinalView <= activeSetup.FinalView {
-					return nil, state.NewInvalidExtensionErrorf("next epoch must be after current epoch (%d <= %d)", ev.FinalView, activeSetup.FinalView)
+				// The first view needs to be exactly one greater than the current epoch final view
+				if ev.FirstView != activeSetup.FinalView+1 {
+					return nil, state.NewInvalidExtensionErrorf(
+						"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
+						ev.FirstView,
+						activeSetup.FinalView,
+					)
 				}
 
 				// Finally, the epoch setup event must contain all necessary information.
@@ -772,9 +775,6 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
 				}
-
-				// cache the first view to simplify epoch queries later on
-				ev.FirstView = activeSetup.FinalView + 1
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.SetupID = ev.ID()

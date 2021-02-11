@@ -68,6 +68,32 @@ func IsOutdatedInputError(err error) bool {
 	return errors.As(err, &errOutdatedInputError)
 }
 
+// UnverifiableInputError are for inputs that cannot be verified at this moment.
+// Usually it means that we don't have enough data to verify it. A good example is missing
+// data in DB to process input.
+type UnverifiableInputError struct {
+	err error
+}
+
+func NewUnverifiableInputError(msg string, args ...interface{}) error {
+	return UnverifiableInputError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e UnverifiableInputError) Unwrap() error {
+	return e.err
+}
+
+func (e UnverifiableInputError) Error() string {
+	return e.err.Error()
+}
+
+func IsUnverifiableInputError(err error) bool {
+	var errUnverifiableInputError UnverifiableInputError
+	return errors.As(err, &errUnverifiableInputError)
+}
+
 type DuplicatedEntryError struct {
 	err error
 }

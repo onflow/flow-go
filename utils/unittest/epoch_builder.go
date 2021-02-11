@@ -145,6 +145,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	setupDefaults := []func(*flow.EpochSetup){
 		WithParticipants(identities),
 		SetupWithCounter(counter + 1),
+		WithFirstView(finalView + 1),
 		WithFinalView(finalView + 1000),
 	}
 

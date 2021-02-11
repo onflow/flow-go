@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -278,6 +279,39 @@ func (suite *Suite) TestRoutingRemoteCluster() {
 	suite.conduit.
 		On("Multicast", &tx, suite.conf.PropagationRedundancy+1, remote[0].NodeID, remote[1].NodeID).
 		Return(nil)
+
+	err := suite.engine.ProcessLocal(&tx)
+	suite.Assert().NoError(err)
+
+	// should not be added to local mempool
+	counter, err := suite.epochQuery.Current().Counter()
+	suite.Assert().NoError(err)
+	suite.Assert().False(suite.pools.ForEpoch(counter).Has(tx.ID()))
+	suite.conduit.AssertExpectations(suite.T())
+}
+
+// should not store transactions for a different cluster and should not fail when propagating
+// to an empty cluster
+func (suite *Suite) TestRoutingToRemoteClusterWithNoNodes() {
+
+	// find a remote cluster
+	_, index, ok := suite.clusters.ByNodeID(suite.me.NodeID())
+	suite.Require().True(ok)
+
+	// set the next cluster to be empty
+	emptyIdentityList := flow.IdentityList{}
+	nextClusterIndex := (index + 1) % suite.N_CLUSTERS
+	suite.clusters[nextClusterIndex] = emptyIdentityList
+
+	// get a transaction that will be routed to remote cluster
+	tx := unittest.TransactionBodyFixture()
+	tx.ReferenceBlockID = suite.root.ID()
+	tx = unittest.AlterTransactionForCluster(tx, suite.clusters, emptyIdentityList, func(transaction *flow.TransactionBody) {})
+
+	// should attempt route to remote cluster without providing any node ids
+	suite.conduit.
+		On("Multicast", &tx, suite.conf.PropagationRedundancy+1).
+		Return(network.EmptyTargetList)
 
 	err := suite.engine.ProcessLocal(&tx)
 	suite.Assert().NoError(err)
