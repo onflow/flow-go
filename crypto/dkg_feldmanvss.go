@@ -133,9 +133,10 @@ const (
 	verifVectorSize = PubKeyLenBLSBLS12381
 )
 
-// HandleMsg processes a new message received by the current node
-// orig is the message origin index
-func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
+// HandleBroadcastMsg processes a new broadcasted message received by the current node.
+//
+// orig is the message origin index.
+func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
@@ -156,12 +157,42 @@ func (s *feldmanVSSstate) HandleMsg(orig int, msg []byte) error {
 	}
 
 	// msg = |tag| Data |
-	switch dkgMsgTag(msg[0]) {
-	case feldmanVSSShare:
-		s.receiveShare(index(orig), msg[1:])
-	case feldmanVSSVerifVec:
+	if dkgMsgTag(msg[0]) == feldmanVSSVerifVec {
 		s.receiveVerifVector(index(orig), msg[1:])
-	default:
+	} else {
+		s.processor.FlagMisbehavior(orig,
+			fmt.Sprintf("the message header is invalid, got %d",
+				dkgMsgTag(msg[0])))
+	}
+	return nil
+}
+
+// HandlePrivateMsg processes a new private message received by the current node.
+//
+// orig is the message origin index.
+func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
+	if !s.running {
+		return errors.New("dkg is not running")
+	}
+	if orig >= s.Size() || orig < 0 {
+		return errors.New("wrong input")
+	}
+
+	if len(msg) == 0 {
+		s.processor.FlagMisbehavior(orig, "the received message is empty")
+		return nil
+	}
+
+	// In case a private message is received by the origin node,
+	// the message is just ignored
+	if s.currentIndex == index(orig) {
+		return nil
+	}
+
+	// msg = |tag| Data |
+	if dkgMsgTag(msg[0]) == feldmanVSSShare {
+		s.receiveShare(index(orig), msg[1:])
+	} else {
 		s.processor.FlagMisbehavior(orig,
 			fmt.Sprintf("the message header is invalid, got %d",
 				dkgMsgTag(msg[0])))

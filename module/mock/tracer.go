@@ -155,3 +155,15 @@ func (_m *Tracer) StartSpanFromParent(span opentracing.Span, operationName trace
 
 	return r0
 }
+
+// WithSpanFromContext provides a mock function with given fields: ctx, operationName, f, opts
+func (_m *Tracer) WithSpanFromContext(ctx context.Context, operationName trace.SpanName, f func(), opts ...opentracing.StartSpanOption) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, operationName, f)
+	_ca = append(_ca, _va...)
+	_m.Called(_ca...)
+}
