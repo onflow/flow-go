@@ -178,6 +178,24 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
+// stakedAtBlockID checks whether this instance of verification node has staked at specified block ID.
+// It returns true an  nil if verification node has staked at specified block ID, and returns false, and nil otherwise.
+// It returns false and error if it could not extract the stake of (verification node) node at the specified block.
+func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
+	// extracts identity of verification node at block height of result
+	identity, err := protocol.StakedIdentity(e.state, blockID, e.me.NodeID())
+	if err != nil {
+		return false, fmt.Errorf("could not check if node is staked at block %v: %w", blockID, err)
+	}
+
+	if identity.Role != flow.RoleVerification {
+		return false, fmt.Errorf("node is staked for an invalid role: %s", identity.Role)
+	}
+
+	staked := identity.Stake > 0
+	return staked, nil
+}
+
 // ProcessFinalizedBlock process each finalized block, and find the chunks that
 // assigned to me, and store it to the chunks job queue.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
