@@ -158,6 +158,21 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		return err
 	}
 
+	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 100)
+	if err != nil {
+		return err
+	}
+
+	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 100)
+	if err != nil {
+		return err
+	}
+
+	err = m.nbaTopshotAccount.AddKeys(m.log, m.txTracker, m.flowClient, 100)
+	if err != nil {
+		return err
+	}
+
 	// numBuckets := 32
 	// // setup nba account to use sharded collections
 	// script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
@@ -221,22 +236,30 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	// steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
 	steps := len(m.marketAccounts)
+	wg := sync.WaitGroup{}
+
 	for i := 0; i < steps; i++ {
-		m.log.Info().Msgf("minting %d moments on nba account", batchSize)
+		j := i
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
 
-		// mint a lot of moments
-		script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *m.marketAccounts[i].Account().Address, 1, 1, uint64(batchSize))
-		tx = flowsdk.NewTransaction().
-			SetReferenceBlockID(blockRef.ID).
-			SetScript(script)
+			m.log.Info().Msgf("minting %d moments on nba account", batchSize)
+			// mint a lot of moments
+			script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *m.marketAccounts[i].Account().Address, 1, 1, uint64(batchSize))
+			tx = flowsdk.NewTransaction().
+				SetReferenceBlockID(blockRef.ID).
+				SetScript(script)
 
-		result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
-		if err != nil || result.Error != nil {
-			m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
-			return err
-		}
-		totalMinted += batchSize
+			result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, j)
+			if err != nil || result.Error != nil {
+				m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result.Error, err)
+			}
+		}()
+		// totalMinted += batchSize
+		time.Sleep(time.Second)
 	}
+	wg.Wait()
 
 	m.log.Info().Msgf("%d moment has been minted", totalMinted)
 	return nil
