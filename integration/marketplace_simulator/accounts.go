@@ -108,24 +108,24 @@ func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowCl
 	txTracker.AddTx(tx.ID(),
 		nil,
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-			log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+			log.Debug().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
 			if !stopped {
 				stopped = true
 				wg.Done()
 			}
 		}, // on finalized
 		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-			log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
+			log.Debug().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
 		}, // on sealed
 		func(_ flowsdk.Identifier) {
-			log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+			log.Error().Str("tx_id", tx.ID().String()).Msgf("tx expired")
 			if !stopped {
 				stopped = true
 				wg.Done()
 			}
 		}, // on expired
 		func(_ flowsdk.Identifier) {
-			log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+			log.Error().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
 			if !stopped {
 				stopped = true
 				wg.Done()
@@ -149,6 +149,7 @@ func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowCl
 	}
 	acc.accountKeys = account.Keys
 
+	fmt.Println(">>>>>>>>>><<<<>>>>", len(acc.accountKeys))
 	return nil
 }
 
