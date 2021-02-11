@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -15,11 +16,11 @@ import (
 )
 
 const (
-	keyExists         = "exists"
-	keyCode           = "code"
-	keyContractNames  = "contract_names"
-	keyPublicKeyCount = "public_key_count"
-	keyStorageUsed    = "storage_used"
+	KeyExists         = "exists"
+	KeyCode           = "code"
+	KeyContractNames  = "contract_names"
+	KeyPublicKeyCount = "public_key_count"
+	KeyStorageUsed    = "storage_used"
 	uint64StorageSize = 8
 )
 
@@ -83,9 +84,9 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 }
 
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
-	exists, err := a.getValue(address, false, keyExists)
+	exists, err := a.getValue(address, false, KeyExists)
 	if err != nil {
-		return false, newLedgerGetError(keyExists, address, err)
+		return false, newLedgerGetError(KeyExists, address, err)
 	}
 
 	if len(exists) != 0 {
@@ -105,14 +106,14 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
 	}
 
-	storageUsedByStorageUsed := uint64(RegisterSize(newAddress, false, keyStorageUsed, make([]byte, uint64StorageSize)))
+	storageUsedByStorageUsed := uint64(RegisterSize(newAddress, false, KeyStorageUsed, make([]byte, uint64StorageSize)))
 	err = a.setStorageUsed(newAddress, storageUsedByStorageUsed)
 	if err != nil {
 		return err
 	}
 
 	// mark that this account exists
-	err = a.setValue(newAddress, false, keyExists, []byte{1})
+	err = a.setValue(newAddress, false, KeyExists, []byte{1})
 	if err != nil {
 		return fmt.Errorf("failed to update the ledger: %w", err)
 	}
@@ -138,9 +139,9 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 }
 
 func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
-	countBytes, err := a.getValue(address, true, keyPublicKeyCount)
+	countBytes, err := a.getValue(address, true, KeyPublicKeyCount)
 	if err != nil {
-		return 0, newLedgerGetError(keyPublicKeyCount, address, err)
+		return 0, newLedgerGetError(KeyPublicKeyCount, address, err)
 	}
 
 	countInt := new(big.Int).SetBytes(countBytes)
@@ -157,7 +158,7 @@ func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 func (a *Accounts) setPublicKeyCount(address flow.Address, count uint64) error {
 	newCount := new(big.Int).SetUint64(count)
 
-	return a.setValue(address, true, keyPublicKeyCount, newCount.Bytes())
+	return a.setValue(address, true, KeyPublicKeyCount, newCount.Bytes())
 }
 
 func (a *Accounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
@@ -227,16 +228,23 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 }
 
 func contractKey(contractName string) string {
-	return fmt.Sprintf("%s.%s", keyCode, contractName)
+	return fmt.Sprintf("%s.%s", KeyCode, contractName)
 }
 
 func (a *Accounts) getContract(contractName string, address flow.Address) ([]byte, error) {
+
 	contract, err := a.getValue(address,
 		true,
 		contractKey(contractName))
 	if err != nil {
 		return nil, newLedgerGetError(contractName, address, err)
 	}
+
+	log.Debug().
+		Str("address", address.String()).
+		Str("contract", contractName).
+		Int("contract_len", len(contract)).
+		Msg(fmt.Sprintf("a contract returned for %s.%s", address.String(), contractName))
 
 	return contract, nil
 }
@@ -292,7 +300,7 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	newContractNames := buf.Bytes()
 
 	var prevContractNames []byte
-	prevContractNames, err = a.getValue(address, true, keyContractNames)
+	prevContractNames, err = a.getValue(address, true, KeyContractNames)
 	if err != nil {
 		return fmt.Errorf("cannot retrieve current contract names: %w", err)
 	}
@@ -302,12 +310,12 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 		return nil
 	}
 
-	return a.setValue(address, true, keyContractNames, newContractNames)
+	return a.setValue(address, true, KeyContractNames, newContractNames)
 }
 
 // GetStorageUsed returns the amount of storage used in bytes by this account
 func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
-	storageUsedRegister, err := a.getValue(address, false, keyStorageUsed)
+	storageUsedRegister, err := a.getValue(address, false, KeyStorageUsed)
 	if err != nil {
 		return 0, err
 	}
@@ -325,7 +333,7 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 
 func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
 	usedBinary := utils.Uint64ToBinary(used)
-	return a.setValue(address, false, keyStorageUsed, usedBinary)
+	return a.setValue(address, false, KeyStorageUsed, usedBinary)
 }
 
 func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
@@ -334,9 +342,9 @@ func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValu
 
 func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.state.Read(string(address.Bytes()), string(address.Bytes()), key)
+		return a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
 	}
-	return a.state.Read(string(address.Bytes()), "", key)
+	return a.state.Get(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -351,13 +359,13 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	}
 
 	if isController {
-		return a.state.Update(string(address.Bytes()), string(address.Bytes()), key, value)
+		return a.state.Set(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return a.state.Update(string(address.Bytes()), "", key, value)
+	return a.state.Set(string(address.Bytes()), "", key, value)
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
-	if key == keyStorageUsed {
+	if key == KeyStorageUsed {
 		// size of this register is always uint64StorageSize
 		// don't double check this to save time and prevent recursion
 		return nil
@@ -417,10 +425,10 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 // TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.state.Read(string(address.Bytes()), string(address.Bytes()), key)
+		_, _ = a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
 		return
 	}
-	_, _ = a.state.Read(string(address.Bytes()), "", key)
+	_, _ = a.state.Get(string(address.Bytes()), "", key)
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {
@@ -441,7 +449,7 @@ func (a *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 }
 
 func (a *Accounts) getContractNames(address flow.Address) (contractNames, error) {
-	encContractNames, err := a.getValue(address, true, keyContractNames)
+	encContractNames, err := a.getValue(address, true, KeyContractNames)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
 	}

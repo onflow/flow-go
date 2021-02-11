@@ -57,9 +57,11 @@ func New(log zerolog.Logger,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
 	collectionGRPCPort uint,
+	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
 ) *Engine {
@@ -88,6 +90,11 @@ func New(log zerolog.Logger,
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
+	connectionFactory := &backend.ConnectionFactoryImpl{
+		CollectionGRPCPort: collectionGRPCPort,
+		ExecutionGRPCPort:  executionGRPCPort,
+	}
+
 	backend := backend.New(
 		state,
 		executionRPC,
@@ -97,11 +104,12 @@ func New(log zerolog.Logger,
 		headers,
 		collections,
 		transactions,
+		executionReceipts,
 		chainID,
 		transactionMetrics,
-		collectionGRPCPort,
-		&backend.ConnectionFactoryImpl{},
+		connectionFactory,
 		retryEnabled,
+		log,
 	)
 
 	eng := &Engine{
@@ -120,6 +128,7 @@ func New(log zerolog.Logger,
 
 	if rpcMetricsEnabled {
 		// Not interested in legacy metrics, so initialize here
+		grpc_prometheus.EnableHandlingTimeHistogram()
 		grpc_prometheus.Register(grpcServer)
 	}
 

@@ -79,7 +79,13 @@ func (e *blockComputer) ExecuteBlock(
 
 	if e.tracer != nil {
 		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
-		defer span.Finish()
+		defer func() {
+			span.SetTag("block.collectioncount", len(block.CompleteCollections))
+			span.LogFields(
+				log.String("block.hash", block.ID().String()),
+			)
+			span.Finish()
+		}()
 	}
 
 	results, err := e.executeBlock(ctx, block, stateView)
@@ -107,6 +113,7 @@ func (e *blockComputer) executeBlock(
 	interactions := make([]*delta.SpockSnapshot, len(collections)+1)
 
 	events := make([]flow.Event, 0)
+	serviceEvents := make([]flow.Event, 0)
 	blockTxResults := make([]flow.TransactionResult, 0)
 
 	var txIndex uint32
@@ -115,9 +122,12 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("collection_id", logging.Entity(collection.Guarantee)).Msg("executing collection")
+		e.log.Debug().
+			Hex("block_id", logging.Entity(block)).
+			Hex("collection_id", logging.Entity(collection.Guarantee)).
+			Msg("executing collection")
 
-		collEvents, txResults, nextIndex, gas, err := e.executeCollection(
+		collEvents, collServiceEvents, txResults, nextIndex, gas, err := e.executeCollection(
 			ctx, txIndex, blockCtx, collectionView, collection,
 		)
 		if err != nil {
@@ -128,6 +138,7 @@ func (e *blockComputer) executeBlock(
 
 		txIndex = nextIndex
 		events = append(events, collEvents...)
+		serviceEvents = append(serviceEvents, collServiceEvents...)
 		blockTxResults = append(blockTxResults, txResults...)
 
 		interactions[i] = collectionView.Interactions()
@@ -151,12 +162,13 @@ func (e *blockComputer) executeBlock(
 
 	txMetrics := fvm.NewMetricsCollector()
 
-	txEvents, txResult, txGas, err := e.executeTransaction(tx, colSpan, txMetrics, systemChunkView, e.systemChunkCtx, txIndex)
+	txEvents, txServiceEvents, txResult, txGas, err := e.executeTransaction(tx, colSpan, txMetrics, systemChunkView, e.systemChunkCtx, txIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
 
 	events = append(events, txEvents...)
+	serviceEvents = append(serviceEvents, txServiceEvents...)
 	blockTxResults = append(blockTxResults, txResult)
 	gasUsed += txGas
 	interactions[len(interactions)-1] = systemChunkView.Interactions()
@@ -166,6 +178,7 @@ func (e *blockComputer) executeBlock(
 		ExecutableBlock:   block,
 		StateSnapshots:    interactions,
 		Events:            events,
+		ServiceEvents:     serviceEvents,
 		TransactionResult: blockTxResults,
 		GasUsed:           gasUsed,
 		StateReads:        stateView.ReadsCount(),
@@ -178,18 +191,26 @@ func (e *blockComputer) executeCollection(
 	blockCtx fvm.Context,
 	collectionView *delta.View,
 	collection *entity.CompleteCollection,
-) ([]flow.Event, []flow.TransactionResult, uint32, uint64, error) {
+) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 
 	var colSpan opentracing.Span
 	if e.tracer != nil {
 		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
-		defer colSpan.Finish()
+		defer func() {
+			colSpan.SetTag("collection.txcount", len(collection.Transactions))
+			colSpan.LogFields(
+				log.String("collection.hash", collection.Guarantee.CollectionID.String()),
+			)
+			colSpan.Finish()
+		}()
+
 	}
 
 	var (
-		events    []flow.Event
-		txResults []flow.TransactionResult
-		gasUsed   uint64
+		events        []flow.Event
+		serviceEvents []flow.Event
+		txResults     []flow.TransactionResult
+		gasUsed       uint64
 	)
 
 	txMetrics := fvm.NewMetricsCollector()
@@ -197,19 +218,22 @@ func (e *blockComputer) executeCollection(
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
 
 	for _, txBody := range collection.Transactions {
-		txEvents, txResult, txGasUsed, err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
+
+		txEvents, txServiceEvents, txResult, txGasUsed, err :=
+			e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
 
 		txIndex++
 		events = append(events, txEvents...)
+		serviceEvents = append(serviceEvents, txServiceEvents...)
 		txResults = append(txResults, txResult)
 		gasUsed += txGasUsed
 
 		if err != nil {
-			return nil, nil, txIndex, 0, err
+			return nil, nil, nil, txIndex, 0, err
 		}
 	}
 
-	return events, txResults, txIndex, gasUsed, nil
+	return events, serviceEvents, txResults, txIndex, gasUsed, nil
 }
 
 func (e *blockComputer) executeTransaction(
@@ -219,7 +243,7 @@ func (e *blockComputer) executeTransaction(
 	collectionView *delta.View,
 	ctx fvm.Context,
 	txIndex uint32,
-) ([]flow.Event, flow.TransactionResult, uint64, error) {
+) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {
 	if e.tracer != nil {
 		txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
 
@@ -230,14 +254,23 @@ func (e *blockComputer) executeTransaction(
 			//
 			// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
 			// as well as any imported programs.
+			txSpan.SetTag("transaction.proposer", txBody.ProposalKey.Address.String())
+			txSpan.SetTag("transaction.payer", txBody.Payer.String())
 			txSpan.LogFields(
+				log.String("transaction.hash", txBody.ID().String()),
 				log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
 				log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
 				log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
+				log.Int64(trace.EXEValueEncodingDurationTag, int64(txMetrics.ValueEncoded())),
+				log.Int64(trace.EXEValueDecodingDurationTag, int64(txMetrics.ValueDecoded())),
 			)
 			txSpan.Finish()
 		}()
 	}
+
+	e.log.Debug().
+		Hex("tx_id", logging.Entity(txBody)).
+		Msg("executing transaction")
 
 	txView := collectionView.NewChild()
 
@@ -252,7 +285,7 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	if err != nil {
-		return nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to execute transaction: %w", err)
+		return nil, nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to execute transaction: %w", err)
 	}
 
 	txResult := flow.TransactionResult{
@@ -276,5 +309,5 @@ func (e *blockComputer) executeTransaction(
 		collectionView.MergeView(txView)
 	}
 
-	return tx.Events, txResult, tx.GasUsed, nil
+	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil
 }

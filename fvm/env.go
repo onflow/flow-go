@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 
 	"github.com/onflow/cadence"
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 
+	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -26,11 +26,13 @@ var _ runtime.HighLevelStorage = &hostEnv{}
 type hostEnv struct {
 	ctx              Context
 	st               *state.State
+	vm               *VirtualMachine
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *UUIDGenerator
 	runtime.Metrics
 	events             []flow.Event
+	serviceEvents      []flow.Event
 	totalEventByteSize uint64
 	logs               []string
 	totalGasUsed       uint64
@@ -39,6 +41,7 @@ type hostEnv struct {
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
+
 	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
 	if err != nil {
 		panic(fmt.Errorf("cannot create hasher: %w", err))
@@ -46,7 +49,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
+func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv, error) {
 	accounts := state.NewAccounts(st)
 	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
@@ -59,6 +62,7 @@ func newEnvironment(ctx Context, st *state.State) (*hostEnv, error) {
 	env := &hostEnv{
 		ctx:                ctx,
 		st:                 st,
+		vm:                 vm,
 		Metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
 		addressGenerator:   generator,
@@ -85,9 +89,9 @@ func (e *hostEnv) seedRNG(header *flow.Header) {
 	e.rng = rand.New(source)
 }
 
-func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, txIndex uint32) {
+func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	e.transactionEnv = newTransactionEnv(
-		vm,
+		e.vm,
 		e.ctx,
 		e.st,
 		e.accounts,
@@ -99,6 +103,10 @@ func (e *hostEnv) setTransaction(vm *VirtualMachine, tx *flow.TransactionBody, t
 
 func (e *hostEnv) getEvents() []flow.Event {
 	return e.events
+}
+
+func (e *hostEnv) getServiceEvents() []flow.Event {
+	return e.serviceEvents
 }
 
 func (e *hostEnv) getLogs() []string {
@@ -134,8 +142,54 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
 }
 
-func (e *hostEnv) GetStorageCapacity(_ common.Address) (value uint64, err error) {
-	return math.MaxUint64, nil
+func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
+	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+
+	err = e.vm.Run(
+		e.ctx,
+		script,
+		e.st,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	var capacity uint64
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
+	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
+	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
+	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+	if script.Err == nil {
+		// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
+		// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
+		capacity = script.Value.ToGoValue().(uint64) / 100
+	}
+
+	return capacity, nil
+}
+
+func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
+	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+
+	err = e.vm.Run(
+		e.ctx,
+		script,
+		e.st,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	var balance uint64
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
+	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
+	if script.Err == nil {
+		balance = script.Value.ToGoValue().(uint64)
+	}
+
+	return balance, nil
 }
 
 func (e *hostEnv) ResolveLocation(
@@ -143,7 +197,7 @@ func (e *hostEnv) ResolveLocation(
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
 
-	addressLocation, isAddress := location.(runtime.AddressLocation)
+	addressLocation, isAddress := location.(common.AddressLocation)
 
 	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
 	// then return a single resolved location which declares all identifiers.
@@ -191,7 +245,7 @@ func (e *hostEnv) ResolveLocation(
 	for i := range resolvedLocations {
 		identifier := identifiers[i]
 		resolvedLocations[i] = runtime.ResolvedLocation{
-			Location: runtime.AddressLocation{
+			Location: common.AddressLocation{
 				Address: addressLocation.Address,
 				Name:    identifier.Identifier,
 			},
@@ -203,7 +257,7 @@ func (e *hostEnv) ResolveLocation(
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
-	contractLocation, ok := location.(runtime.AddressLocation)
+	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
 		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
@@ -218,7 +272,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	return code, nil
 }
 
-func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) {
+func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, error) {
 	if e.ctx.ASTCache == nil {
 		return nil, nil
 	}
@@ -227,7 +281,7 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	if program != nil {
 		// Program was found within cache, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(runtime.AddressLocation); ok {
+		if addressLocation, ok := location.(common.AddressLocation); ok {
 			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
 		}
 	}
@@ -236,7 +290,7 @@ func (e *hostEnv) GetCachedProgram(location ast.Location) (*ast.Program, error) 
 	return program, err
 }
 
-func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) error {
+func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) error {
 	if e.ctx.ASTCache == nil {
 		return nil
 	}
@@ -245,7 +299,7 @@ func (e *hostEnv) CacheProgram(location ast.Location, program *ast.Program) erro
 	return e.ctx.ASTCache.SetProgram(location, program)
 }
 
-func (e *hostEnv) Log(message string) error {
+func (e *hostEnv) ProgramLog(message string) error {
 	if e.ctx.CadenceLoggingEnabled {
 		e.logs = append(e.logs, message)
 	}
@@ -281,6 +335,10 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 		TransactionIndex: e.transactionEnv.TxIndex(),
 		EventIndex:       uint32(len(e.events)),
 		Payload:          payload,
+	}
+
+	if fvmEvent.IsServiceEvent(event, e.ctx.Chain) {
+		e.serviceEvents = append(e.serviceEvents, flowEvent)
 	}
 
 	e.events = append(e.events, flowEvent)
@@ -337,8 +395,7 @@ func (e *hostEnv) VerifySignature(
 	)
 
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		panic(err)
+		return false, err
 	}
 
 	return valid, nil
@@ -444,7 +501,7 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
-	return e.GetCode(runtime.AddressLocation{
+	return e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
 	})
@@ -489,6 +546,11 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
+}
+
+func (e *hostEnv) ImplementationDebugLog(message string) error {
+	e.ctx.Logger.Debug().Msgf("Cadence: %s", message)
+	return nil
 }
 
 // Transaction Environment
@@ -554,22 +616,6 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	if e.ctx.ServiceAccountEnabled {
-		err = e.vm.invokeMetaTransaction(
-			e.ctx,
-			deductAccountCreationFeeTransaction(
-				flow.Address(payer),
-				e.ctx.Chain.ServiceAddress(),
-				e.ctx.RestrictedAccountCreationEnabled,
-			),
-			e.st,
-		)
-		if err != nil {
-			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-			return address, err
-		}
-	}
-
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
@@ -584,7 +630,11 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	if e.ctx.ServiceAccountEnabled {
 		err = e.vm.invokeMetaTransaction(
 			e.ctx,
-			initFlowTokenTransaction(flowAddress, e.ctx.Chain.ServiceAddress()),
+			initAccountTransaction(
+				flow.Address(payer),
+				flowAddress,
+				e.ctx.Chain.ServiceAddress(),
+				e.ctx.RestrictedAccountCreationEnabled),
 			e.st,
 		)
 		if err != nil {

@@ -21,3 +21,8 @@ func (_m *Requester) EntityByID(entityID flow.Identifier, selector flow.Identity
 func (_m *Requester) Force() {
 	_m.Called()
 }
+
+// Query provides a mock function with given fields: key, selector
+func (_m *Requester) Query(key flow.Identifier, selector flow.IdentityFilter) {
+	_m.Called(key, selector)
+}

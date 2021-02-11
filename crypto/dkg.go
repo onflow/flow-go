@@ -32,9 +32,12 @@ type DKGState interface {
 	Threshold() int
 	// Start starts running a DKG in the current node
 	Start(seed []byte) error
-	// HandleMsg processes a new message received by the current node.
+	// HandleBroadcastMsg processes a new broadcasted message received by the current node.
 	// orig is the message origin index
-	HandleMsg(orig int, msg []byte) error
+	HandleBroadcastMsg(orig int, msg []byte) error
+	// HandlePrivateMsg processes a new private message received by the current node.
+	// orig is the message origin index
+	HandlePrivateMsg(orig int, msg []byte) error
 	// End ends a DKG protocol in the current node.
 	// It returns the finalized public data and node private key share.
 	// - the group public key corresponding to the group secret key

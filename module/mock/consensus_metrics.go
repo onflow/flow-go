@@ -19,6 +19,11 @@ func (_m *ConsensusMetrics) CheckSealingDuration(duration time.Duration) {
 	_m.Called(duration)
 }
 
+// EmergencySeal provides a mock function with given fields:
+func (_m *ConsensusMetrics) EmergencySeal() {
+	_m.Called()
+}
+
 // FinishBlockToSeal provides a mock function with given fields: blockID
 func (_m *ConsensusMetrics) FinishBlockToSeal(blockID flow.Identifier) {
 	_m.Called(blockID)
@@ -27,6 +32,16 @@ func (_m *ConsensusMetrics) FinishBlockToSeal(blockID flow.Identifier) {
 // FinishCollectionToFinalized provides a mock function with given fields: collectionID
 func (_m *ConsensusMetrics) FinishCollectionToFinalized(collectionID flow.Identifier) {
 	_m.Called(collectionID)
+}
+
+// OnApprovalProcessingDuration provides a mock function with given fields: duration
+func (_m *ConsensusMetrics) OnApprovalProcessingDuration(duration time.Duration) {
+	_m.Called(duration)
+}
+
+// OnReceiptProcessingDuration provides a mock function with given fields: duration
+func (_m *ConsensusMetrics) OnReceiptProcessingDuration(duration time.Duration) {
+	_m.Called(duration)
 }
 
 // StartBlockToSeal provides a mock function with given fields: blockID

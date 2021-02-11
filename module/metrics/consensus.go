@@ -26,26 +26,58 @@ const (
 type ConsensusCollector struct {
 	tracer *trace.OpenTracer
 
-	// The duration of the full sealing check
-	checkSealingDuration prometheus.Histogram
+	// Total time spent in onReceipt excluding checkSealing
+	onReceiptDuration prometheus.Counter
+
+	// Total time spent in onApproval excluding checkSealing
+	onApprovalDuration prometheus.Counter
+
+	// Total time spent in checkSealing
+	checkSealingDuration prometheus.Counter
+
+	// The number of emergency seals
+	emergencySealedBlocks prometheus.Counter
 }
 
 // NewConsensusCollector created a new consensus collector
 func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ConsensusCollector {
-	checkSealingDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+	onReceiptDuration := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "push_receipts_on_receipt_duration_seconds_total",
 		Namespace: namespaceConsensus,
 		Subsystem: subsystemMatchEngine,
-		Name:      "check_sealing_duration_s",
-		Help:      "duration of consensus match engine sealing check in seconds",
+		Help:      "time spent in consensus matching engine's onReceipt method in seconds",
 	})
-
-	registerer.MustRegister(checkSealingDuration)
-
+	onApprovalDuration := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "on_approval_duration_seconds_total",
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
+		Help:      "time spent in consensus matching engine's onApproval method in seconds",
+	})
+	checkSealingDuration := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "check_sealing_duration_seconds_total",
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemMatchEngine,
+		Help:      "time spent in consensus matching engine's checkSealing method in seconds",
+	})
+	emergencySealedBlocks := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "emergency_sealed_blocks_total",
+		Namespace: namespaceConsensus,
+		Subsystem: subsystemCompliance,
+		Help:      "the number of blocks sealed in emergency mode",
+	})
+	registerer.MustRegister(
+		onReceiptDuration,
+		onApprovalDuration,
+		checkSealingDuration,
+		emergencySealedBlocks,
+	)
 	cc := &ConsensusCollector{
-		tracer:               tracer,
-		checkSealingDuration: checkSealingDuration,
+		tracer:                tracer,
+		onReceiptDuration:     onReceiptDuration,
+		onApprovalDuration:    onApprovalDuration,
+		checkSealingDuration:  checkSealingDuration,
+		emergencySealedBlocks: emergencySealedBlocks,
 	}
-
 	return cc
 }
 
@@ -69,7 +101,22 @@ func (cc *ConsensusCollector) FinishBlockToSeal(blockID flow.Identifier) {
 	cc.tracer.FinishSpan(blockID, consensusBlockToSeal)
 }
 
-// CheckSealingDuration records absolute time for the full sealing check by the consensus match engine
+// EmergencySeal increments the counter of emergency seals.
+func (cc *ConsensusCollector) EmergencySeal() {
+	cc.emergencySealedBlocks.Inc()
+}
+
+// OnReceiptProcessingDuration increases the number of seconds spent processing receipts
+func (cc *ConsensusCollector) OnReceiptProcessingDuration(duration time.Duration) {
+	cc.onReceiptDuration.Add(duration.Seconds())
+}
+
+// OnApprovalProcessingDuration increases the number of seconds spent processing approvals
+func (cc *ConsensusCollector) OnApprovalProcessingDuration(duration time.Duration) {
+	cc.onApprovalDuration.Add(duration.Seconds())
+}
+
+// CheckSealingDuration increases the number of seconds spent in checkSealing
 func (cc *ConsensusCollector) CheckSealingDuration(duration time.Duration) {
-	cc.checkSealingDuration.Observe(duration.Seconds())
+	cc.checkSealingDuration.Add(duration.Seconds())
 }

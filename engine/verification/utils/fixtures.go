@@ -66,6 +66,10 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
+	var payload flow.Payload
+	var block flow.Block
+	header := unittest.BlockHeaderWithParentFixture(root)
+
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := completeLedger.NewLedger(dir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
@@ -115,10 +119,23 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		sysGuarantee.ReferenceBlockID = root.ID()
 		guarantees = append(guarantees, sysGuarantee)
 
+		// shapes the block out of collections
+		payload = flow.Payload{
+			Guarantees: guarantees,
+		}
+		header.PayloadHash = payload.Hash()
+		block = flow.Block{
+			Header:  &header,
+			Payload: &payload,
+		}
+		blockID := block.ID()
+
+		// executes collections
 		for i := 0; i < len(collections); i++ {
 			collection := collections[i]
 			guarantee := guarantees[i]
 			chunk, chunkDataPack, endStateCommitment, spock := executeCollection(t,
+				blockID,
 				collection,
 				guarantee,
 				uint(i),
@@ -135,22 +152,16 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		}
 
 	})
-	payload := flow.Payload{
-		Guarantees: guarantees,
-	}
-	header := unittest.BlockHeaderWithParentFixture(root)
-	header.PayloadHash = payload.Hash()
 
-	block := flow.Block{
-		Header:  &header,
-		Payload: &payload,
+	// makes sure all chunks are referencing the correct block id.
+	blockID := block.ID()
+	for _, chunk := range chunks {
+		require.Equal(t, blockID, chunk.BlockID, "inconsistent block id in chunk fixture")
 	}
 
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  chunks,
-		},
+		BlockID: blockID,
+		Chunks:  chunks,
 	}
 
 	receipt := flow.ExecutionReceipt{
@@ -219,10 +230,8 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 	}
 
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: blockID,
-			Chunks:  chunks,
-		},
+		BlockID: blockID,
+		Chunks:  chunks,
 	}
 
 	receipt := flow.ExecutionReceipt{
@@ -252,6 +261,7 @@ func SystemChunkCollectionFixture(serviceAddress flow.Address) (*flow.Collection
 // It executes the collection and returns its corresponding chunk, chunk data pack, end state, and spock.
 func executeCollection(
 	t *testing.T,
+	blockID flow.Identifier,
 	collection *flow.Collection,
 	guarantee *flow.CollectionGuarantee,
 	chunkIndex uint,
@@ -303,7 +313,7 @@ func executeCollection(
 			StartState:      startStateCommitment,
 			// TODO: include event collection hash
 			EventCollection: flow.ZeroID,
-			BlockID:         executableBlock.ID(),
+			BlockID:         blockID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record number of txs

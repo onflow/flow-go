@@ -3,6 +3,7 @@ package fvm
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -25,7 +26,11 @@ const (
 
 	errCodeInvalidHashAlgorithm = 10
 
+	errCodeStorageCapacityExceeded = 11
+
 	errCodeEventLimitExceededError = 20
+
+	errCodeEncodingUnsupportedValue = 30
 
 	errCodeExecution = 100
 )
@@ -234,6 +239,21 @@ func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithm
 }
 
+// An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
+type StorageCapacityExceededError struct {
+	Address         flow.Address
+	StorageUsed     uint64
+	StorageCapacity uint64
+}
+
+func (e *StorageCapacityExceededError) Error() string {
+	return fmt.Sprintf("address %s storage %d is over capacity %d", e.Address, e.StorageUsed, e.StorageCapacity)
+}
+
+func (e *StorageCapacityExceededError) Code() uint32 {
+	return errCodeStorageCapacityExceeded
+}
+
 type ExecutionError struct {
 	Err runtime.Error
 }
@@ -244,6 +264,25 @@ func (e *ExecutionError) Error() string {
 
 func (e *ExecutionError) Code() uint32 {
 	return errCodeExecution
+}
+
+// EncodingUnsupportedValueError indicates that Cadence attempted
+// to encode a value that is not supported.
+type EncodingUnsupportedValueError struct {
+	Value interpreter.Value
+	Path  []string
+}
+
+func (e *EncodingUnsupportedValueError) Error() string {
+	return fmt.Sprintf(
+		"encoding unsupported value to path [%s]: %[1]T, %[1]v",
+		strings.Join(e.Path, ","),
+		e.Value,
+	)
+}
+
+func (e *EncodingUnsupportedValueError) Code() uint32 {
+	return errCodeEncodingUnsupportedValue
 }
 
 func handleError(err error) (vmErr Error, fatalErr error) {
