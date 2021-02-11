@@ -4,6 +4,7 @@ package matching
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -156,12 +157,19 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	// mempool, and process it later when its parent result has been received and processed.
 	// Therefore, if a receipt is processed, we will check if it is the previous results of
 	// some pending receipts and process them one after another.
-	processed, err := c.onCurrentReceipt(receipt)
+	processed, err := c.processReceipt(receipt)
 	if err != nil {
-		c.log.Error().
-			Err(err).
-			Hex("origin_id", originID[:]).
-			Msg("could not process receipt")
+		marshalled, err := json.Marshal(receipt)
+		if err != nil {
+			marshalled = []byte("json_marshalling_failed")
+		}
+
+		c.log.Fatal().Err(err).
+			Hex("origin", logging.ID(originID)).
+			Hex("receipt_id", logging.Entity(receipt)).
+			Str("receipt", string(marshalled)).
+			Msg("internal error processing execution receipt")
+
 		return nil
 	}
 
@@ -183,7 +191,10 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	return nil
 }
 
-func (c *Core) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
+// * bool: true if and only if the receipt is valid, which has not been processed before
+// error: any error indicates an unexpected problem in the protocol logic. The node's
+// internal state might be corrupted. Hence, returned errors should be treated as fatal.
+func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	startTime := time.Now()
 	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
 	defer func() {
@@ -203,8 +214,8 @@ func (c *Core) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	initialState, finalState, err := validation.IntegrityCheck(receipt)
 	if err != nil {
-		log.Error().Msg("received execution receipt that didn't pass the integrity check")
-		return false, engine.NewInvalidInputErrorf("%w", err)
+		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
+		return false, nil
 	}
 
 	log = log.With().
@@ -262,11 +273,19 @@ func (c *Core) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}
 
 	if err != nil {
+		if engine.IsInvalidInputError(err) {
+			log.Err(err).Msg("invalid execution receipt")
+			return false, nil
+		}
+
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
 	_, err = c.storeReceipt(receipt, head)
 	if err != nil {
+		if engine.IsDuplicatedEntryError(err) {
+			return true, nil
+		}
 		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
 
@@ -337,6 +356,24 @@ func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt) (bool, er
 
 // OnApproval processes a new result approval.
 func (c *Core) OnApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+	err := c.onApproval(originID, approval)
+	if err != nil {
+		marshalled, err := json.Marshal(approval)
+		if err != nil {
+			marshalled = []byte("json_marshalling_failed")
+		}
+		c.log.Error().Err(err).
+			Hex("origin", logging.ID(originID)).
+			Hex("approval_id", logging.Entity(approval)).
+			Str("approval", string(marshalled)).
+			Msgf("unexpected error processing result approval")
+		return fmt.Errorf("internal error processing result approval %x: %w", approval.ID(), err)
+	}
+	return nil
+}
+
+// OnApproval processes a new result approval.
+func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
 	startTime := time.Now()
 	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
 	defer func() {
@@ -345,6 +382,7 @@ func (c *Core) OnApproval(originID flow.Identifier, approval *flow.ResultApprova
 	}()
 
 	log := c.log.With().
+		Hex("origin_id", originID[:]).
 		Hex("approval_id", logging.Entity(approval)).
 		Hex("block_id", approval.Body.BlockID[:]).
 		Hex("result_id", approval.Body.ExecutionResultID[:]).
@@ -356,7 +394,8 @@ func (c *Core) OnApproval(originID flow.Identifier, approval *flow.ResultApprova
 	// we rely on the networking layer for enforcing message integrity via the
 	// networking key.
 	if approval.Body.ApproverID != originID {
-		return engine.NewInvalidInputErrorf("invalid origin for approval: %x", originID)
+		log.Debug().Msg("discarding approvals from invalid origin")
+		return nil
 	}
 
 	err := c.approvalValidator.Validate(approval)
@@ -891,7 +930,8 @@ func (c *Core) clearPools(sealedIDs []flow.Identifier) error {
 
 // requestPendingReceipts requests the execution receipts of unsealed finalized
 // blocks.
-// it returns the number of pending receipts requests being created
+// it returns the number of pending receipts requests being created, and
+// the first finalized height at which there is no receipt for the block
 func (c *Core) requestPendingReceipts() (int, uint64, error) {
 
 	// last sealed block

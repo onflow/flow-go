@@ -53,13 +53,13 @@ import (
 //     2. It should seal a matched result if the approvals are sufficient
 // 5. Matching engine should request results from execution nodes:
 //     1. If there are unsealed and finalized blocks, it should request the execution receipts from the execution nodes.
-func TestMatchingEngine(t *testing.T) {
+func TestMatchingCore(t *testing.T) {
 	suite.Run(t, new(MatchingSuite))
 }
 
 type MatchingSuite struct {
 	unittest.BaseChainSuite
-	// misc SERVICE COMPONENTS which are injected into Matching Engine
+	// misc SERVICE COMPONENTS which are injected into Matching Core
 	requester         *mockmodule.Requester
 	receiptValidator  *mockmodule.ReceiptValidator
 	approvalValidator *mockmodule.ApprovalValidator
@@ -115,7 +115,7 @@ func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
 	receipt := unittest.ExecutionReceiptFixture()
 
 	// onReceipt should reject the receipt without throwing an error
-	_, err := ms.matching.onCurrentReceipt(receipt)
+	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should drop receipt for unknown block without error")
 
 	ms.ReceiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -131,7 +131,7 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.LatestSealedBlock))),
 	)
 
-	_, err := ms.matching.onCurrentReceipt(receipt)
+	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should ignore receipt for sealed result")
 
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
@@ -153,7 +153,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
 
 	// onReceipt should return immediately after realizing the receipt is already in the mempool
 	// but without throwing any errors
-	_, err := ms.matching.onCurrentReceipt(receipt)
+	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should ignore already pending receipt")
 
 	ms.ReceiptsPL.AssertExpectations(ms.T())
@@ -179,13 +179,13 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	// Expect the receipt to be added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
-	_, err := ms.matching.onCurrentReceipt(receipt)
+	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should not error for different receipt for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
-// TestOnReceipt_ReceiptInPersistentStorage verifies that Matching Engine adds
+// TestOnReceipt_ReceiptInPersistentStorage verifies that Matching Core adds
 // a receipt to the mempool, even if it is already in persistent storage. This
 // can happen after a crash, where the mempools got wiped
 func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
@@ -202,7 +202,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 	// The receipt should be added to the receipts mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
-	_, err := ms.matching.onCurrentReceipt(receipt)
+	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should not error for different receipt for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
@@ -222,7 +222,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	// onReceipt should run to completion without throwing an error
-	_, err := ms.matching.onCurrentReceipt(receipt)
+	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
@@ -240,7 +240,7 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	)
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 
-	_, err := ms.matching.onCurrentReceipt(receipt)
+	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
 	ms.Assert().True(engine.IsInvalidInputError(err))
 
@@ -352,17 +352,17 @@ func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
 	ms.Assert().Empty(results, "should not have matched results with empty mempools")
 }
 
-// TestSealableResultsValid tests matching.Engine.sealableResults():
+// TestSealableResultsValid tests matching.Core.sealableResults():
 //  * a well-formed incorporated result R is in the mempool
 //  * sufficient number of valid result approvals for result R
 //  * R.PreviousResultID references a known result (i.e. stored in ResultsDB)
 //  * R forms a valid sub-graph with its previous result (aka parent result)
-// Method Engine.sealableResults() should return R as an element of the sealable results
+// Method Core.sealableResults() should return R as an element of the sealable results
 func (ms *MatchingSuite) TestSealableResultsValid() {
 	valSubgrph := ms.ValidSubgraphFixture()
 	ms.AddSubgraphFixtureToMempools(valSubgrph)
 
-	// test output of Matching Engine's sealableResults()
+	// test output of Matching Core's sealableResults()
 	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Equal(1, len(results), "expecting a single return value")
@@ -384,7 +384,7 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 	ms.Require().Error(err)
 }
 
-// TestSealableResultsUnassignedVerifiers tests that matching.Engine.sealableResults():
+// TestSealableResultsUnassignedVerifiers tests that matching.Core.sealableResults():
 // only considers approvals from assigned verifiers
 func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 	subgrph := ms.ValidSubgraphFixture()
@@ -413,7 +413,7 @@ func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 	ms.ApprovalsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
 }
 
-// TestSealableResults_UnknownVerifiers tests that matching.Engine.sealableResults():
+// TestSealableResults_UnknownVerifiers tests that matching.Core.sealableResults():
 //   * removes approvals from unknown verification nodes from mempool
 func (ms *MatchingSuite) TestSealableResults_ApprovalsForUnknownBlockRemain() {
 	// make child block for UnfinalizedBlock, i.e.:
@@ -434,7 +434,7 @@ func (ms *MatchingSuite) TestSealableResults_ApprovalsForUnknownBlockRemain() {
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "RemChunk", 0)
 }
 
-// TestRemoveApprovalsFromInvalidVerifiers tests that matching.Engine.sealableResults():
+// TestRemoveApprovalsFromInvalidVerifiers tests that matching.Core.sealableResults():
 //   * removes approvals from invalid verification nodes from mempool
 // This may occur when the block wasn't know when the node received the approval.
 // Note: we test a scenario here, were result is sealable; it just has additional
@@ -463,7 +463,7 @@ func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
 	ms.ApprovalsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
 }
 
-// TestSealableResultsInsufficientApprovals tests matching.Engine.sealableResults():
+// TestSealableResultsInsufficientApprovals tests matching.Core.sealableResults():
 //  * a result where at least one chunk has not enough approvals (require
 //    currently at least one) should not be sealable
 func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
@@ -471,13 +471,13 @@ func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	delete(subgrph.Approvals, uint64(len(subgrph.Result.Chunks)-1))
 	ms.AddSubgraphFixtureToMempools(subgrph)
 
-	// test output of Matching Engine's sealableResults()
+	// test output of Matching Core's sealableResults()
 	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
 	ms.Assert().Empty(results, "expecting no sealable result")
 }
 
-// TestSealableResultsEmergencySealingMultipleCandidates tests matching.Engine.sealableResults():
+// TestSealableResultsEmergencySealingMultipleCandidates tests matching.Core.sealableResults():
 // When emergency sealing is active we should be able to identify and pick as candidates incorporated results
 // that are deep enough but still without verifications.
 func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates() {
@@ -530,7 +530,7 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 	}
 }
 
-// TestRequestPendingReceipts tests matching.Engine.requestPendingReceipts():
+// TestRequestPendingReceipts tests matching.Core.requestPendingReceipts():
 //   * generate n=100 consecutive blocks, where the first one is sealed and the last one is final
 func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	// create blocks
