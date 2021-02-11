@@ -149,7 +149,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	e.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, net, state, me, receiptRequester, receiptsDB, headersDB,
+	e.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
 		indexDB, incorporatedResults, receipts, approvals, seals, pendingReceipts, assigner, receiptValidator, approvalValidator,
 		requiredApprovalsForSealConstruction, emergencySealingActive, approvalConduit)
 	if err != nil {

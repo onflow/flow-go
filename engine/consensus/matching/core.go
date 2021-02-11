@@ -67,11 +67,11 @@ type Core struct {
 	receiptsDB                           storage.ExecutionReceipts       // to persist received execution receipts
 	headersDB                            storage.Headers                 // used to check sealed headers
 	indexDB                              storage.Index                   // used to check payloads for results
-	incorporatedResults                  mempool.IncorporatedResults     // holds results that are connected to the sealed results waiting to be sealed
-	receipts                             mempool.ExecutionTree           // holds indexes execution receipts by heights and can return connected children forks from a parent
+	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results waiting to be sealed (the payload construction algorithm guarantees that such incorporated are connected to sealed results)
+	receipts                             mempool.ExecutionTree           // holds execution receipts; indexes them by height; can search all receipts derived from a given parent result
 	approvals                            mempool.Approvals               // holds result approvals in memory
-	seals                                mempool.IncorporatedResultSeals // holds the seals to be included in the next proposal
-	pendingReceipts                      mempool.PendingReceipts         // to buffer receipts whose previous result is missing
+	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	pendingReceipts                      mempool.PendingReceipts         // buffer for receipts where an ancestor result is missing, so they can't be connected to the sealed results
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
 	assigner                             module.ChunkAssigner            // chunk assignment object
 	sealingThreshold                     uint                            // how many blocks between sealed/finalized before we request execution receipts
@@ -80,7 +80,7 @@ type Core struct {
 	receiptValidator                     module.ReceiptValidator         // used to validate receipts
 	approvalValidator                    module.ApprovalValidator        // used to validate ResultApprovals
 	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
-	approvalRequestsThreshold            uint64                          // min height difference between the latest finalized block and the block incorporating a result we would re-request approvals for
+	approvalRequestsThreshold            uint64                          // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
 	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 }
 
@@ -90,7 +90,6 @@ func NewCore(
 	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	conMetrics module.ConsensusMetrics,
-	net module.Network,
 	state protocol.State,
 	me module.Local,
 	receiptRequester module.Requester,
@@ -149,13 +148,14 @@ func NewCore(
 }
 
 // OnReceipt processes a new execution receipt.
+// Any error indicates an unexpected problem in the protocol logic. The node's
+// internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	// when receiving a receipt, we might not be able to verify it if its previous result
+	// When receiving a receipt, we might not be able to verify it if its previous result
 	// is unknown.  In this case, instead of dropping it, we store it in the pending receipts
 	// mempool, and process it later when its parent result has been received and processed.
-	// therefore, if a receipt is processed, we will check if it is the previous results of
-	// some pending receipts, if there are, then processing them one after another, as onReceipt
-	// is behind a lock
+	// Therefore, if a receipt is processed, we will check if it is the previous results of
+	// some pending receipts and process them one after another.
 	processed, err := c.onCurrentReceipt(receipt)
 	if err != nil {
 		c.log.Error().
@@ -244,13 +244,13 @@ func (c *Core) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	if validation.IsMissingPreviousResultError(err) {
 		// If previous result is missing, we can't validate this receipt.
-		// althrough we will request its previous (potentially multiple receipts),
-		// We don't want to drop it now, because when the missing previous arrive
+		// Although we will request its previous receipt(s),
+		// we don't want to drop it now, because when the missing previous arrive
 		// in a wrong order, they will still be dropped, and causing the catch up
 		// to be inefficient.
-		// Instead, we could cache the receipt in case it arrives earlier than its
+		// Instead, we cache the receipt in case it arrives earlier than its
 		// previous receipt.
-		// for instance, given blocks A <- B <- C <- D <- E, if we receive their receipts
+		// For instance, given blocks A <- B <- C <- D <- E, if we receive their receipts
 		// in the order of [E,C,D,B,A], then:
 		// if we drop the missing previous receipts, then only A will be processed;
 		// if we cache the missing previous receipts, then all of them will be processed, because
@@ -292,9 +292,7 @@ func (c *Core) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 // storeReceipt adds the receipt to the receipts mempool as well as to the persistent storage layer.
 // Return values:
 //  * bool to indicate whether the receipt is stored.
-// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool and we don't need to process this again
-//	* exception in case something went wrong
-// 	* nil in case of success
+//  * exception in case something (unexpected) went wrong
 func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (bool, error) {
 	added, err := c.receipts.AddReceipt(receipt, head)
 	if err != nil {
@@ -316,11 +314,9 @@ func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (
 }
 
 // storeIncorporatedResult creates an `IncorporatedResult` and adds it to incorporated results mempool
-// Error returns:
+// returns:
 //  * bool to indicate whether the receipt is stored.
-// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool
-//	* exception in case something went wrong
-// 	* nil in case of success
+//  * exception in case something (unexpected) went wrong
 func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt) (bool, error) {
 	// Create an IncorporatedResult and add it to the mempool
 	added, err := c.incorporatedResults.Add(
@@ -518,7 +514,7 @@ func (c *Core) CheckSealing() error {
 	lg.Info().
 		Int("sealable_incorporated_results", len(sealedBlockIDs)).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
-		Bool("mempool_has_next_seal", mempoolHasNextSeal).
+		Bool("mempool_has_seal_for_next_height", mempoolHasNextSeal).
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
 		Uint("receipts_size", c.receipts.Size()).
