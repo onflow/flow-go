@@ -82,7 +82,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		return
 	}
 	if !ok {
-		log.Debug().Err(err).Msg("receipt is not preprocess, skipping")
+		log.Debug().Err(err).Msg("receipt is not preprocessable, skipping")
 		return
 	}
 
@@ -136,6 +136,23 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 // preprocess performs initial evaluations on the receipt. It returns true if all following conditions satisfied.
 // 1- node is staked at the reference block of the execution result of the receipt.
 func (e *Engine) preprocess(receipt *flow.ExecutionReceipt) (bool, error) {
+	log := log.With().
+		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("reference_block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		Logger()
+
+	// verification node should be staked at the reference block id.
+	ok, err := e.stakedAtBlockID(receipt.ExecutionResult.BlockID)
+	if err != nil {
+		return false, fmt.Errorf("could not verify stake of verification node for result: %w", err)
+	}
+
+	if !ok {
+		log.Debug().Msg("node is not staked at reference block id")
+		return false, nil
+	}
+
 	return true, nil
 }
 
