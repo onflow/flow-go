@@ -55,7 +55,6 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.Logger{}
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -122,10 +121,41 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	suite.Require().Equal(block.ParentID, header.ParentID)
 
 	suite.assertAllExpectations()
+
+}
+
+func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
+	// setup the snapshot mock
+	snap := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	suite.state.On("Sealed").Return(snap).Once()
+
+	backend := New(
+		suite.state,
+		nil, nil, nil, nil, nil,
+		nil, nil, nil,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		suite.log,
+	)
+
+	// query the handler for the latest sealed snapshot
+	bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+	suite.Require().NoError(err)
+
+	// make sure the returned bytes is equal to the serialized snapshot
+	convertedSnapshot, err := convert.SnapshotToBytes(snap)
+	suite.Require().NoError(err)
+	suite.Require().Equal(bytes, convertedSnapshot)
+
+	// suite.assertAllExpectations()
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	// setup the mocks
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(&block, nil).Once()
 
@@ -153,6 +183,8 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 }
 
 func (suite *Suite) TestGetTransaction() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	transaction := unittest.TransactionFixture()
 	expected := transaction.TransactionBody
 
@@ -182,6 +214,8 @@ func (suite *Suite) TestGetTransaction() {
 }
 
 func (suite *Suite) TestGetCollection() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	expected := unittest.CollectionFixture(1).Light()
 
 	suite.collections.
@@ -213,6 +247,7 @@ func (suite *Suite) TestGetCollection() {
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol state is updated
 func (suite *Suite) TestTransactionStatusTransition() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -336,6 +371,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 // TestTransactionExpiredStatusTransition tests that the status of transaction changes from Unknown to Expired
 // when enough blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -447,6 +483,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	// setup the mocks
 	expected := unittest.BlockFixture()
 	header := expected.Header
@@ -488,6 +526,8 @@ type mockCloser struct{}
 func (mc *mockCloser) Close() error { return nil }
 
 func (suite *Suite) TestGetEventsForBlockIDs() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	events := getEvents(10)
 
 	setupStorage := func(n int) []*flow.Header {
@@ -641,6 +681,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 }
 
 func (suite *Suite) TestGetEventsForHeightRange() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	var minHeight uint64 = 5
 	var maxHeight uint64 = 10
@@ -800,6 +842,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 }
 
 func (suite *Suite) TestGetAccount() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
 	suite.Require().NoError(err)
@@ -876,6 +919,8 @@ func (suite *Suite) TestGetAccount() {
 }
 
 func (suite *Suite) TestGetAccountAtBlockHeight() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	height := uint64(5)
 	address := unittest.AddressFixture()
 	account := &entitiesproto.Account{
@@ -940,6 +985,8 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 }
 
 func (suite *Suite) TestGetNetworkParameters() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	expectedChainID := flow.Mainnet
 
 	backend := New(
@@ -960,6 +1007,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 // TestExecutionNodesForBlockID tests the common method backend.executionNodesForBlockID used for serving all API calls
 // that need to talk to an execution node.
 func (suite *Suite) TestExecutionNodesForBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	totalBlocks := 3
 	receiptPerBlock := 2
