@@ -223,6 +223,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	batchSize := 100
 	// steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
+	momentsPerAccount := 5000
 	steps := len(m.marketAccounts)
 	wg := sync.WaitGroup{}
 
@@ -231,7 +232,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		go func() {
 			wg.Add(1)
 			defer wg.Done()
-			for p := 0; p < 10; p++ {
+			for p := 0; p < momentsPerAccount/batchSize; p++ {
 				m.log.Info().Msgf("minting %d moments on nba account", batchSize)
 				// mint a lot of moments
 				script = nbaTemplates.GenerateBatchMintMomentScript(*nbaAddress, *m.marketAccounts[i].Account().Address, 1, 1, uint64(batchSize))
@@ -715,6 +716,7 @@ func (m *marketPlaceAccount) Act() error {
 			continue
 		}
 
+		transferSize := 10
 		// // TODO txScript for assetToMove
 		// Transfer moment to a friend
 		friend := m.friends[rand.Intn(len(m.friends))]
@@ -728,7 +730,8 @@ func (m *marketPlaceAccount) Act() error {
 			time.Sleep(time.Second)
 			continue
 		}
-		moment := moments[rand.Intn(len(moments))]
+		r := rand.Intn(len(moments) - transferSize - 1)
+		selected := moments[r : r+transferSize]
 
 		// TODO ramtin fix the fetch
 		// txScript := generateBatchTransferMomentScript(m.simulatorConfig.NBATopshotAddress,
@@ -740,7 +743,7 @@ func (m *marketPlaceAccount) Act() error {
 			m.simulatorConfig.NBATopshotAddress,
 			m.simulatorConfig.NBATopshotAddress,
 			friend.Address,
-			[]uint64{moment})
+			selected)
 
 		tx := flowsdk.NewTransaction().
 			SetReferenceBlockID(blockRef.ID).
@@ -751,8 +754,8 @@ func (m *marketPlaceAccount) Act() error {
 			return fmt.Errorf("error preparing and signing the transaction: %w", err)
 		}
 
-		m.log.Debug().Msgf("transfering a moment %d from account %s to account %s (proposer %s, seq number %d)  :",
-			moment, m.Account().Address, friend.Address,
+		m.log.Debug().Msgf("transfering moments (%d) from account %s to account %s (proposer %s, seq number %d)  :",
+			moments, m.Account().Address, friend.Address,
 			tx.ProposalKey.Address, tx.ProposalKey.SequenceNumber,
 		)
 
