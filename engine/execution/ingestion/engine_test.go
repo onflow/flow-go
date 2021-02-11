@@ -202,12 +202,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 		ctx.executionState.
 			On("GetRegistersWithProofs", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil, nil)
-
-		//ctx.executionState.
-		//	On("PersistChunkDataPack", mock.Anything, mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
-		//		return bytes.Equal(f.StartState, executableBlock.StartState)
-		//	})).
-		//	Return(nil)
 	}
 
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
@@ -250,26 +244,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 		}
 
 	mocked.ReturnArguments = mock.Arguments{nil}
-
-	//ctx.executionState.
-	//	On(
-	//		"PersistExecutionResult",
-	//		mock.Anything,
-	//		mock.MatchedBy(func(executionResult *flow.ExecutionResult) bool {
-	//			return executionResult.BlockID == executableBlock.Block.ID() && executionResult.PreviousResultID == previousExecutionResultID
-	//		}),
-	//	).
-	//	Return(nil)
-	//
-	//ctx.executionState.
-	//	On(
-	//		"PersistExecutionReceipt",
-	//		mock.Anything,
-	//		mock.MatchedBy(func(receipt *flow.ExecutionReceipt) bool {
-	//			return receipt.ExecutionResult.BlockID == executableBlock.Block.ID() && receipt.ExecutionResult.PreviousResultID == previousExecutionResultID
-	//		}),
-	//	).
-	//	Return(nil)
 
 	ctx.providerEngine.
 		On(
@@ -339,24 +313,6 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 			mocked.ReturnArguments = mock.Arguments{flow.StateCommitment{}, storageerr.ErrNotFound}
 		}
 	}
-
-	//{
-	//	mocked := ctx.executionState.
-	//		On("PersistStateCommitment", mock.Anything, mock.Anything, mock.Anything)
-	//	mocked.RunFn =
-	//		func(args mock.Arguments) {
-	//			lock.Lock()
-	//			defer lock.Unlock()
-	//
-	//			blockID := args[1].(flow.Identifier)
-	//			commit := args[2].(flow.StateCommitment)
-	//			commits[blockID] = commit
-	//			onPersisted(blockID, commit)
-	//		}
-	//
-	//	mocked.ReturnArguments = mock.Arguments{nil}
-	//}
-
 }
 
 func TestChunkIndexIsSet(t *testing.T) {

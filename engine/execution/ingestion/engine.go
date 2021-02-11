@@ -1031,7 +1031,15 @@ func (e *Engine) handleComputationResult(
 }
 
 // save the execution result of a block
-func (e *Engine) saveExecutionResults(ctx context.Context, executableBlock *entity.ExecutableBlock, spockSnapshots []*delta.SpockSnapshot, events []flow.Event, serviceEvents []flow.Event, txResults []flow.TransactionResult, startState flow.StateCommitment) (*flow.ExecutionReceipt, error) {
+func (e *Engine) saveExecutionResults(
+	ctx context.Context,
+	executableBlock *entity.ExecutableBlock,
+	spockSnapshots []*delta.SpockSnapshot,
+	events []flow.Event,
+	serviceEvents []flow.Event,
+	txResults []flow.TransactionResult,
+	startState flow.StateCommitment,
+) (*flow.ExecutionReceipt, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
