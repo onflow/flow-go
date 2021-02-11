@@ -325,8 +325,8 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	return nil
 }
 
-// onBlockVote handles incoming block votes.
-func (c *Core) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+// OnBlockVote handles incoming block votes.
+func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
 	log := c.log.With().
 		Uint64("block_view", vote.View).
@@ -335,7 +335,6 @@ func (c *Core) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 		Logger()
 
 	log.Info().Msg("block vote received")
-
 	log.Info().Msg("forwarding block vote to hotstuff") // to keep logging consistent with proposals
 
 	// forward the vote to hotstuff for processing

@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,12 @@ type Event struct {
 type (
 	EventSink chan *Event // Channel to push pending events
 )
+
+// defaultApprovalQueueCapacity maximum capacity of approvals queue
+const defaultBlockQueueCapacity = 10000
+
+// defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
+const defaultVoteQueueCapacity = 10000
 
 type Engine struct {
 	unit             *engine.Unit
@@ -54,24 +61,44 @@ func NewEngine(
 	prov network.Engine,
 	core *Core) (*Engine, error) {
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      core.log,
-		me:       me,
-		metrics:  core.metrics,
-		headers:  core.headers,
-		payloads: core.payloads,
-		state:    core.state,
-		tracer:   core.tracer,
-		prov:     prov,
-		core:     core,
+		unit:             engine.NewUnit(),
+		log:              core.log,
+		me:               me,
+		metrics:          core.metrics,
+		headers:          core.headers,
+		payloads:         core.payloads,
+		state:            core.state,
+		tracer:           core.tracer,
+		prov:             prov,
+		core:             core,
+		pendingEventSink: make(EventSink),
+		blockSink:        make(EventSink),
+		voteSink:         make(EventSink),
 	}
 
+	var err error
 	// register the core with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusCommittee, e)
+	e.con, err = net.Register(engine.ConsensusCommittee, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register core: %w", err)
 	}
-	e.con = con
+
+	e.pendingBlocks, err = fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
+		//fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceReceiptQueue, uint(len)) }),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
+	}
+
+	// FIFO queue for broadcasted approvals
+	e.pendingVotes, err = fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
+		//fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
+	}
 
 	return e, nil
 }
@@ -90,8 +117,19 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.core.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
+	var wg sync.WaitGroup
+	wg.Add(2)
+	e.unit.Launch(func() {
+		wg.Done()
+		e.processEvents()
+	})
+	e.unit.Launch(func() {
+		wg.Done()
+		e.consumeEvents()
+	})
 	return e.unit.Ready(func() {
 		<-e.core.hotstuff.Ready()
+		wg.Wait()
 	})
 }
 
@@ -142,15 +180,12 @@ func (e *Engine) processEvents() {
 	// takes pending event from one of the queues
 	// nil sink means nothing to send, this prevents blocking on select
 	fetchEvent := func() (*Event, EventSink, *fifoqueue.FifoQueue) {
-		//if val, ok := core.pendingReceipts.Front(); ok {
-		//	return val.(*Event), core.receiptSink, core.pendingReceipts
-		//}
-		//if val, ok := core.pendingRequestedApprovals.Front(); ok {
-		//	return val.(*Event), core.requestedApprovalSink, core.pendingRequestedApprovals
-		//}
-		//if val, ok := core.pendingApprovals.Front(); ok {
-		//	return val.(*Event), core.approvalSink, core.pendingApprovals
-		//}
+		if val, ok := e.pendingBlocks.Front(); ok {
+			return val.(*Event), e.blockSink, e.pendingBlocks
+		}
+		if val, ok := e.pendingVotes.Front(); ok {
+			return val.(*Event), e.voteSink, e.pendingVotes
+		}
 		return nil, nil, nil
 	}
 
@@ -221,7 +256,7 @@ func (e *Engine) consumeEvents() {
 		case event := <-e.blockSink:
 			err = processBlock(event)
 		case event := <-e.voteSink:
-			err = e.core.onBlockVote(event.OriginID, event.Msg.(*messages.BlockVote))
+			err = e.core.OnBlockVote(event.OriginID, event.Msg.(*messages.BlockVote))
 			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockVote)
 		case <-e.unit.Quit():
 			return

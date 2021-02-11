@@ -293,23 +293,23 @@ func main() {
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(
-				node.Logger,
+			core, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
 				node.Metrics.Compliance,
-				node.Network,
-				node.Me,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				mutableState,
-				prov,
 				proposals,
-				syncCore,
-			)
+				syncCore)
+			if err != nil {
+				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Network, node.Me, prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}

@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"math/rand"
@@ -26,6 +27,15 @@ func (cs *ComplianceSuite) SetupTest() {
 	e, err := NewEngine(cs.net, cs.me, cs.prov, cs.core)
 	require.NoError(cs.T(), err)
 	cs.engine = e
+
+	ready := func() <-chan struct{} {
+		channel := make(chan struct{})
+		close(channel)
+		return channel
+	}()
+
+	cs.hotstuff.On("Ready", mock.Anything).Return(ready)
+	<-cs.engine.Ready()
 }
 
 func (cs *ComplianceSuite) TestSendVote() {
@@ -38,6 +48,14 @@ func (cs *ComplianceSuite) TestSendVote() {
 	// submit the vote
 	err := cs.engine.SendVote(blockID, view, sig, recipientID)
 	require.NoError(cs.T(), err, "should pass send vote")
+
+	done := func() <-chan struct{} {
+		channel := make(chan struct{})
+		close(channel)
+		return channel
+	}()
+
+	cs.hotstuff.On("Done", mock.Anything).Return(done)
 
 	// The vote is transmitted asynchronously. We allow 10ms for the vote to be received:
 	<-time.After(10 * time.Millisecond)
@@ -75,6 +93,8 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	block.Header.ChainID = ""
 	block.Header.Height = 0
 
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Return().Once()
+
 	// submit to broadcast proposal
 	err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
 	require.NoError(cs.T(), err, "header broadcast should pass")
@@ -87,6 +107,14 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 		Header:  header,
 		Payload: block.Payload,
 	}
+
+	done := func() <-chan struct{} {
+		channel := make(chan struct{})
+		close(channel)
+		return channel
+	}()
+
+	cs.hotstuff.On("Done", mock.Anything).Return(done)
 
 	<-time.After(10 * time.Millisecond)
 	<-cs.engine.Done()
@@ -109,4 +137,26 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	err = cs.engine.BroadcastProposalWithDelay(header, 0)
 	require.Error(cs.T(), err, "should fail with missing payload")
 	header.View--
+}
+
+func (cs *ComplianceSuite) TestSubmitingMultipleVotes() {
+	// create a vote
+	originID := unittest.IdentifierFixture()
+	voteCount := 15
+	for i := 0; i < voteCount; i++ {
+		vote := messages.BlockVote{
+			BlockID: unittest.IdentifierFixture(),
+			View:    rand.Uint64(),
+			SigData: unittest.SignatureFixture(),
+		}
+		cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+		// execute the vote submission
+		_ = cs.engine.Process(originID, &vote)
+	}
+
+	time.Sleep(time.Second)
+
+	// check the submit vote was called with correct parameters
+	//cs.hotstuff.AssertCalled(cs.T(), "SubmitVote", originID, vote.BlockID, vote.View, vote.SigData)
+	cs.hotstuff.AssertExpectations(cs.T())
 }

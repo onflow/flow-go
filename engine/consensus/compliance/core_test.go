@@ -226,14 +226,10 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
-	cs.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Return()
-	cs.hotstuff.On("SubmitVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return()
-	cs.hotstuff.On("Done", mock.Anything).Return(closed)
 
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
-
 	cs.sync.On("Done", mock.Anything).Return(closed)
 
 	// set up no-op metrics mock
@@ -262,6 +258,8 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
+	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
@@ -270,7 +268,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	cs.state.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should submit the proposal to hotstuff
-	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block.Header, cs.head.View)
+	cs.hotstuff.AssertExpectations(cs.T())
 }
 
 func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
@@ -286,6 +284,8 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.headerDB[parent.ID()] = parent.Header
 	cs.headerDB[ancestor.ID()] = ancestor.Header
 
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return()
+
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
@@ -294,7 +294,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	cs.state.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should submit the proposal to hotstuff
-	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block.Header, parent.Header.View)
+	cs.hotstuff.AssertExpectations(cs.T())
 }
 
 func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
@@ -327,7 +327,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	cs.state.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should not submit the proposal to hotstuff
-	cs.hotstuff.AssertNotCalled(cs.T(), "SubmitProposal", mock.Anything, mock.Anything)
+	cs.hotstuff.AssertExpectations(cs.T())
 }
 
 func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
@@ -353,14 +353,17 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
+	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return().Once()
+
 	// execute the connected children handling
 	err := cs.core.processBlockAndDescendants(proposal)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
-	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block1.Header, parent.Header.View)
-	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block2.Header, parent.Header.View)
-	cs.hotstuff.AssertCalled(cs.T(), "SubmitProposal", block3.Header, parent.Header.View)
+	cs.hotstuff.AssertExpectations(cs.T())
 
 	// make sure we drop the cache after trying to process
 	cs.pending.AssertCalled(cs.T(), "DropForParent", parent.Header.ID())
@@ -376,12 +379,14 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 		SigData: unittest.SignatureFixture(),
 	}
 
+	cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+
 	// execute the vote submission
-	err := cs.core.onBlockVote(originID, &vote)
+	err := cs.core.OnBlockVote(originID, &vote)
 	require.NoError(cs.T(), err, "block vote should pass")
 
 	// check the submit vote was called with correct parameters
-	cs.hotstuff.AssertCalled(cs.T(), "SubmitVote", originID, vote.BlockID, vote.View, vote.SigData)
+	cs.hotstuff.AssertExpectations(cs.T())
 }
 
 func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
@@ -420,7 +425,7 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 		require.NoError(cs.T(), err, "proposal buffering should pass")
 
 		// make sure no block is forwarded to hotstuff
-		cs.hotstuff.AssertNumberOfCalls(cs.T(), "SubmitProposal", 0)
+		cs.hotstuff.AssertExpectations(cs.T())
 	}
 
 	// check that we submit ech proposal in order
@@ -446,5 +451,5 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// make sure we submitted all four proposals
-	cs.hotstuff.AssertNumberOfCalls(cs.T(), "SubmitProposal", 4)
+	cs.hotstuff.AssertExpectations(cs.T())
 }
