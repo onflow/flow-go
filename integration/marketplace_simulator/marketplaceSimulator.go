@@ -710,7 +710,8 @@ func (m *marketPlaceAccount) Act() error {
 
 		blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
 		if err != nil {
-			return err
+			time.Sleep(time.Second)
+			continue
 		}
 
 		// // TODO txScript for assetToMove
@@ -719,10 +720,12 @@ func (m *marketPlaceAccount) Act() error {
 
 		moments, err := m.GetMoments()
 		if err != nil {
-			return err
+			time.Sleep(time.Second)
+			continue
 		}
 		if len(moments) == 0 {
-			return nil
+			time.Sleep(time.Second)
+			continue
 		}
 		moment := moments[rand.Intn(len(moments))]
 
