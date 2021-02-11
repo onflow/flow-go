@@ -127,36 +127,8 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
 	// setup the snapshot mock
-	block := unittest.BlockHeaderFixture()
-	suite.snapshot.On("Head").Return(&block, nil).Once()
-
-	identities := unittest.IdentityListFixture(10)
-	suite.snapshot.On("Identities", mock.Anything).Return(identities, nil).Once()
-
-	seal := unittest.Seal.Fixture()
-	suite.snapshot.On("LatestSeal").Return(seal, nil).Once()
-
-	result := unittest.ExecutionResultFixture()
-	suite.snapshot.On("LatestResult").Return(result, nil).Once()
-
-	blocks := unittest.BlockFixtures(5)
-	suite.snapshot.On("SealingSegment").Return(blocks, nil).Once()
-
-	qc := unittest.QuorumCertificateFixture()
-	suite.snapshot.On("QuorumCertificate").Return(qc, nil).Once()
-
-	phase := flow.EpochPhaseSetup
-	suite.snapshot.On("Phase").Return(phase, nil).Once()
-
-	epoch := protocol.EpochQuery{}
-	epoch.On("Current").Return(unittest.EpochSetupFixture(), nil)
-	epoch.On("Next").Return(unittest.EpochCommitFixture(), nil)
-	epoch.On("Preview").Return(unittest.EpochSetupFixture(), nil)
-
-	suite.snapshot.On("Epochs").Return(epoch, nil).Once()
-
-	// set up the state mock
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Once()
+	snap := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	suite.state.On("Sealed").Return(snap, nil).Once()
 
 	backend := New(
 		suite.state,
