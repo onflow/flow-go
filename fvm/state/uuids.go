@@ -9,17 +9,17 @@ import (
 const keyUUID = "uuid"
 
 type UUIDs struct {
-	ledger Ledger
+	state *State
 }
 
-func NewUUIDs(ledger Ledger) *UUIDs {
+func NewUUIDs(state *State) *UUIDs {
 	return &UUIDs{
-		ledger: ledger,
+		state: state,
 	}
 }
 
 func (u *UUIDs) GetUUID() (uint64, error) {
-	stateBytes, err := u.ledger.Get("", "", keyUUID)
+	stateBytes, err := u.state.Get("", "", keyUUID)
 	if err != nil {
 		return 0, err
 	}
@@ -31,5 +31,9 @@ func (u *UUIDs) GetUUID() (uint64, error) {
 func (u *UUIDs) SetUUID(uuid uint64) {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	u.ledger.Set("", "", keyUUID, bytes)
+	err := u.state.Set("", "", keyUUID, bytes)
+	// TODO return the error instead
+	if err != nil {
+		panic(err)
+	}
 }

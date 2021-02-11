@@ -70,6 +70,7 @@ func main() {
 		collector             module.ExecutionMetrics
 		mTrieCacheSize        uint32
 		checkpointDistance    uint
+		checkpointsToKeep     uint
 		stateDeltasLimit      uint
 		requestInterval       time.Duration
 		preferredExeNodeIDStr string
@@ -88,6 +89,7 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 10, "number of WAL segments between checkpoints")
+			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
@@ -140,8 +142,8 @@ func main() {
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
-			results = storage.NewExecutionResults(node.DB)
-			receipts = storage.NewExecutionReceipts(node.DB, results)
+			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
+			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -196,7 +198,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
 
 			return compactor, nil
 		}).
@@ -248,6 +250,7 @@ func main() {
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
+			serviceEvents := storage.NewServiceEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
@@ -258,6 +261,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				events,
+				serviceEvents,
 				txResults,
 				computationManager,
 				providerEngine,

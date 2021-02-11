@@ -4,7 +4,7 @@ package encoding
 //
 // Each Protocol-level signature involves hashing an entity.
 // To prevent domain malleability attacks and to simulate multiple
-// independent random oracles, the hashing process includes
+// orthogonal random oracles, the hashing process includes
 // a domain tag that specifies the type of the signed object.
 
 func tag(domain string) string {
@@ -15,9 +15,10 @@ func tag(domain string) string {
 const protocolPrefix = "FLOW-V0.0_"
 
 var (
-	// POPTag is used to generate proofs of possessions of the BLS private key
-	// POPTag tag value must be different than all the other tags.
-	POPTag = tag("Proof-of-Possession")
+	// all the tags below are application tags, the crypto library API guarantees
+	// that all application tags are different than the tag used to generate
+	// proofs of possession of BLS private keys.
+
 	// RandomBeaconTag is used for threshold signatures in the random beacon
 	RandomBeaconTag = tag("Random-Beacon")
 	// ConsensusVoteTag is used for Consensus Hotstuff votes

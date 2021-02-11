@@ -23,17 +23,18 @@ func (v *TransactionSignatureVerifier) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	ledger state.Ledger,
+	st *state.State,
 ) error {
-	accounts := state.NewAccounts(ledger)
-
-	return v.verifyTransactionSignatures(proc.Transaction, accounts)
+	return v.verifyTransactionSignatures(proc.Transaction, st)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx *flow.TransactionBody,
-	accounts *state.Accounts,
+	st *state.State,
 ) (err error) {
+
+	accounts := state.NewAccounts(st)
+
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -90,7 +91,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	return nil
+	return st.Commit()
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

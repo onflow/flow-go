@@ -41,6 +41,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// StateFixture is a test helper struct that encapsulates a flow protocol state
+// as well as all of its backend dependencies.
+type StateFixture struct {
+	DB             *badger.DB
+	Storage        *storage.All
+	DBDir          string
+	ProtocolEvents *events.Distributor
+	State          protocol.MutableState
+}
+
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
 	Log            zerolog.Logger
@@ -53,7 +63,7 @@ type GenericNode struct {
 	Seals          storage.Seals
 	Payloads       storage.Payloads
 	Blocks         storage.Blocks
-	State          protocol.State
+	State          protocol.MutableState
 	Index          storage.Index
 	Me             module.Local
 	Net            *stub.Network
@@ -89,7 +99,7 @@ type ConsensusNode struct {
 	GenericNode
 	Guarantees      mempool.Guarantees
 	Approvals       mempool.Approvals
-	Receipts        mempool.Receipts
+	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
 	MatchingEngine  *matching.Engine
@@ -176,18 +186,18 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
-	GenericNode
+	*GenericNode
 	CachedReceipts           mempool.ReceiptDataPacks
 	ReadyReceipts            mempool.ReceiptDataPacks
 	PendingReceipts          mempool.ReceiptDataPacks
 	PendingResults           mempool.ResultDataPacks
 	ProcessedResultIDs       mempool.Identifiers
+	DiscardedResultIDs       mempool.Identifiers
 	BlockIDsCache            mempool.Identifiers
 	PendingReceiptIDsByBlock mempool.IdentifierMap
 	ReceiptIDsByResult       mempool.IdentifierMap
 	ChunkIDsByResult         mempool.IdentifierMap
 	PendingChunks            *match.Chunks
-	HeaderStorage            storage.Headers
 	VerifierEngine           network.Engine
 	FinderEngine             *finder.Engine
 	MatchEngine              network.Engine

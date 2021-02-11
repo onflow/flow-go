@@ -2,6 +2,7 @@ package epochmgr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,7 +18,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
+// DefaultStartupTimeout is the default time we wait when starting epoch
+// components before giving up.
 const DefaultStartupTimeout = 30 * time.Second
+
+// ErrUnstakedForEpoch is returned when we attempt to create epoch components
+// for an epoch in which we are not staked. This is the case for epochs during
+// which this node is joining or leaving the network.
+var ErrUnstakedForEpoch = fmt.Errorf("we are not a staked node in the epoch")
 
 // EpochComponents represents all dependencies for running an epoch.
 type EpochComponents struct {
@@ -86,7 +94,12 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch counter: %w", err)
 	}
+
 	components, err := e.createEpochComponents(epoch)
+	// don't set up consensus components if we aren't staked in current epoch
+	if errors.Is(err, ErrUnstakedForEpoch) {
+		return e, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("could not create epoch components for current epoch: %w", err)
 	}
@@ -135,6 +148,10 @@ func (e *Engine) Done() <-chan struct{} {
 	})
 }
 
+// createEpochComponents instantiates and returns epoch-scoped components for
+// the given epoch, using the configured factory.
+//
+// Returns ErrUnstakedForEpoch if this node is not staked in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
 
 	state, prop, sync, hot, err := e.factory.Create(epoch)
@@ -179,8 +196,12 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 		return fmt.Errorf("could not get epoch counter: %w", err)
 	}
 
+	// greatest block height in the previous epoch is one less than the first
+	// block in current epoch
+	lastEpochMaxHeight := first.Height - 1
+
 	log := e.log.With().
-		Uint64("epoch_height", first.Height).
+		Uint64("epoch_max_height", lastEpochMaxHeight).
 		Uint64("epoch_counter", counter).
 		Logger()
 
@@ -195,6 +216,11 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 
 	// create components for new epoch
 	components, err := e.createEpochComponents(epoch)
+	// if we are not staked in this epoch, skip starting up cluster consensus
+	if errors.Is(err, ErrUnstakedForEpoch) {
+		e.prepareToStopEpochComponents(counter-1, lastEpochMaxHeight)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("could not create epoch components: %w", err)
 	}
@@ -207,32 +233,54 @@ func (e *Engine) onEpochTransition(first *flow.Header) error {
 
 	log.Info().Msg("epoch transition: new epoch components started successfully")
 
-	// Finally we set up a trigger to shut down the components of the previous
-	// epoch once we can no longer produce valid collections there. Transactions
-	// referencing blocks from the previous epoch are only valid for inclusion
-	// in collections built by clusters from that epoch. Consequently, it remains
-	// possible for the previous epoch's cluster to produce valid collections
-	// until all such transactions have expired. In fact, since these transactions
-	// can NOT be included by clusters in the new epoch, we MUST continue producing
-	// these collections within the previous epoch's clusters.
-	e.heightEvents.OnHeight(first.Height+flow.DefaultTransactionExpiry, func() {
+	// set up callback to stop previous epoch
+	e.prepareToStopEpochComponents(counter-1, lastEpochMaxHeight)
+
+	return nil
+}
+
+// prepareToStopEpochComponents registers a callback to stop the epoch with the
+// given counter once it is no longer possible to receive transactions from that
+// epoch. This occurs when we finalize sufficiently many blocks in the new epoch
+// that a transaction referencing any block from the previous epoch would be
+// considered immediately expired.
+//
+// Transactions referencing blocks from the previous epoch are only valid for
+// inclusion in collections built by clusters from that epoch. Consequently, it
+// remains possible for the previous epoch's cluster to produce valid collections
+// until all such transactions have expired. In fact, since these transactions
+// can NOT be included by clusters in the new epoch, we MUST continue producing
+// these collections within the previous epoch's clusters.
+//
+func (e *Engine) prepareToStopEpochComponents(epochCounter, epochMaxHeight uint64) {
+
+	stopAtHeight := epochMaxHeight + flow.DefaultTransactionExpiry + 1
+
+	log := e.log.With().
+		Uint64("epoch_max_height", epochMaxHeight).
+		Uint64("epoch_counter", epochCounter).
+		Uint64("stop_at_height", stopAtHeight).
+		Str("step", "epoch_transition").
+		Logger()
+
+	log.Debug().Msgf("preparing to stop epoch components at height %d", stopAtHeight)
+
+	e.heightEvents.OnHeight(stopAtHeight, func() {
 		e.unit.Launch(func() {
 			e.unit.Lock()
 			defer e.unit.Unlock()
 
-			log.Info().Msg("epoch transition: stopping components for previous epoch...")
+			log.Info().Msg("stopping components for previous epoch...")
 
-			err := e.stopEpochComponents(counter - 1)
+			err := e.stopEpochComponents(epochCounter)
 			if err != nil {
-				e.log.Error().Err(err).Msgf("epoch transition: failed to stop components for epoch %d", counter-1)
+				e.log.Error().Err(err).Msgf("failed to stop components for epoch %d", epochCounter)
 				return
 			}
 
-			log.Info().Msg("epoch transition: previous epoch components stopped successfully")
+			log.Info().Msg("previous epoch components stopped successfully")
 		})
 	})
-
-	return nil
 }
 
 // onEpochSetupPhaseStarted is called either when we transition into the epoch

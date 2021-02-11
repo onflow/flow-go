@@ -60,7 +60,7 @@ func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint
 	// retrieve a fully built block header from the builder
 	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields)
 	if err != nil {
-		return nil, fmt.Errorf("could not build header: %w", err)
+		return nil, fmt.Errorf("could not build block proposal on top of %v: %w", qc.BlockID, err)
 	}
 
 	// turn the signed flow header into a proposal

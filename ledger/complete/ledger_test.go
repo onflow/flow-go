@@ -375,7 +375,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2+"/root.checkpoint")
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 				assert.Equal(t, newState, state)
 
@@ -412,7 +412,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2+"/root.checkpoint")
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
 				led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
@@ -448,7 +448,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				state, err = led.Set(u)
 				require.NoError(t, err)
 
-				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2+"/root.checkpoint")
+				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
 				led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)

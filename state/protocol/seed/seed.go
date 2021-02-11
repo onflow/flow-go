@@ -28,9 +28,6 @@ func FromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).
 func FromRandomSource(indices []uint32, sor []byte) ([]byte, error) {
-	if len(indices)*4 > hash.KmacMaxParamsLen {
-		return nil, fmt.Errorf("unsupported number of indices")
-	}
 
 	// create the key used for the KMAC by concatenating all indices
 	keyLen := 4 * len(indices)

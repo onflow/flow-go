@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/utils"
@@ -79,26 +80,9 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	conIdentity := conIdentities[0]
 	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
 
-	// complete ER counter example
-	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, flow.Testnet.Chain())
-	result := &completeER.Receipt.ExecutionResult
-
+	// sets up verification node
 	// assigner and assignment
 	assigner := &mock.ChunkAssigner{}
-	assignment := chmodel.NewAssignment()
-	for _, chunk := range result.Chunks {
-		assignees := make([]flow.Identifier, 0)
-		if IsAssigned(chunk.Index, len(result.Chunks)) {
-			assignees = append(assignees, verIdentity.NodeID)
-		}
-		assignment.Add(chunk, assignees)
-	}
-
-	assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
-
-	// setup nodes
-	//
-	// verification node
 	collector := metrics.NewNoopCollector()
 	verNode := testutil.VerificationNode(t,
 		hub,
@@ -113,9 +97,30 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		chainID,
 		collector,
 		collector)
-	// inject block
-	err := verNode.Blocks.Store(completeER.Block)
-	assert.Nil(t, err)
+
+	// generate a child block out of root block of state in verification node,
+	// and creates its corresponding execution result.
+	root, err := verNode.State.Params().Root()
+	require.NoError(t, err)
+
+	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain(), root)
+	result := &completeER.Receipt.ExecutionResult
+
+	// stores block of execution result in state and mutate state accordingly
+	err = verNode.State.Extend(completeER.Block)
+	require.NoError(t, err)
+
+	// mocks chunk assignment
+	assignment := chmodel.NewAssignment()
+	for _, chunk := range result.Chunks {
+		assignees := make([]flow.Identifier, 0)
+		if IsAssigned(chunk.Index, len(result.Chunks)) {
+			assignees = append(assignees, verIdentity.NodeID)
+		}
+		assignment.Add(chunk, assignees)
+	}
+
+	assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
 
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()
@@ -150,7 +155,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
-	unittest.RequireReturnsBefore(t, conWG.Wait, 5*time.Second, "consensus nodes process")
+	unittest.RequireReturnsBefore(t, conWG.Wait, 10*time.Second, "consensus nodes process")
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)

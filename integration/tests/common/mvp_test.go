@@ -27,7 +27,8 @@ func TestMVP_Network(t *testing.T) {
 	}
 
 	consensusConfigs := append(collectionConfigs,
-		testnet.WithAdditionalFlag("--require-one-approval=true"), // require one approval per chunk when sealing)
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 
@@ -114,6 +115,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// wait for account to be created
 	accountCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), createAccountTx.ID())
 	require.NoError(t, err)
+	t.Log(accountCreationTxRes)
 
 	var newAccountAddress sdk.Address
 	for _, event := range accountCreationTxRes.Events {
@@ -164,7 +166,6 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		counter, err = readCounter(ctx, serviceAccountClient, newAccountAddress)
 		cancel()
 
-		t.Logf("read counter: counter=%d, err=%v", counter, err)
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)
 }

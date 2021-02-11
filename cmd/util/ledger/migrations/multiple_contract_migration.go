@@ -235,10 +235,10 @@ func migrateContractValue(p ledger.Payload) ([]ledger.Payload, *contractValueMap
 	}
 
 	value := interpreter.NewSomeValueOwningNonCopying(storedValue).Value.(*interpreter.CompositeValue)
-	pieces := strings.Split(string(value.TypeID), ".")
+	pieces := strings.Split(string(value.TypeID()), ".")
 	if len(pieces) != 3 {
 		log.Error().
-			Str("TypeId", string(value.TypeID)).
+			Str("TypeId", string(value.TypeID())).
 			Str("address", address.Hex()).
 			Msg("contract TypeId not in correct format")
 		return nil, nil, fmt.Errorf("contract TypeId not in correct format")
@@ -288,7 +288,7 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 			Msg("Cannot parse program at address")
 		return nil, err
 	}
-	declarations := program.Declarations
+	declarations := program.Declarations()
 
 	// find import declarations
 	importDeclarations := make([]ast.Declaration, 0)
@@ -323,7 +323,7 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 			Msg("Cannot parse program at address after removing declarations")
 		return nil, err
 	}
-	declarations = program.Declarations
+	declarations = program.Declarations()
 
 	switch len(declarations) {
 	case 0:

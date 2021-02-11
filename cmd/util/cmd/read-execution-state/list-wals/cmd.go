@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
@@ -34,7 +35,7 @@ func run(*cobra.Command, []string) {
 	startTime := time.Now()
 
 	w, err := wal.NewWAL(
-		nil,
+		zerolog.Nop(),
 		nil,
 		flagExecutionStateDir,
 		complete.DefaultCacheSize,

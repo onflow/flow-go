@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	mempoolAPIs "github.com/onflow/flow-go/module/mempool"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -34,6 +36,7 @@ type BuilderSuite struct {
 	finalizedBlockIDs []flow.Identifier                         // blocks between first and final
 	pendingBlockIDs   []flow.Identifier                         // blocks between final and parent
 	resultForBlock    map[flow.Identifier]*flow.ExecutionResult // map: BlockID -> Execution Result
+	resultByID        map[flow.Identifier]*flow.ExecutionResult // map: result ID -> Execution Result
 
 	// used to populate and test the seal mempool
 	chain   []*flow.Seal                                     // chain of seals starting first
@@ -44,9 +47,6 @@ type BuilderSuite struct {
 	pendingGuarantees []*flow.CollectionGuarantee
 	pendingReceipts   []*flow.ExecutionReceipt
 	pendingSeals      map[flow.Identifier]*flow.IncorporatedResultSeal // storage for the seal mempool
-
-	// mempool written to by builder
-	incorporatedResults []*flow.IncorporatedResult
 
 	// storage for dbs
 	headers map[flow.Identifier]*flow.Header
@@ -68,16 +68,14 @@ type BuilderSuite struct {
 	sealDB   *storage.Seals
 	indexDB  *storage.Index
 	blockDB  *storage.Blocks
+	resultDB *storage.ExecutionResults
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
-	recPool  *mempool.Receipts
-	resPool  *mempool.IncorporatedResults
+	recPool  *mempool.ExecutionTree
 
 	// tracking behaviour
-	assembled  *flow.Payload     // built payload
-	remCollIDs []flow.Identifier // guarantees removed from mempool
-	remRecIDs  []flow.Identifier // receipts removed from mempool
+	assembled *flow.Payload // built payload
 
 	// component under test
 	build *Builder
@@ -111,17 +109,22 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 
 		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(previousResult),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
-			// For sealing phase 2, the value for IncorporatedBlockID is the block the result pertains to (here parentBlock).
-			// In later development phases, we will change the logic such that IncorporatedBlockID references the
+			// ATTENTION: For sealing phase 2, the value for IncorporatedBlockID
+			// is the block the result pertains to (here parentBlock).
+			// In later development phases, we will change the logic such that
+			// IncorporatedBlockID references the
 			// block which actually incorporates the result:
-			//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+			//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID())
+			unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
 		)
+
 		result := unittest.ExecutionResultFixture(
 			unittest.WithBlock(&block),
 			unittest.WithPreviousResult(*previousResult),
 		)
+
 		bs.resultForBlock[result.BlockID] = result
+		bs.resultByID[result.ID()] = result
 	}
 
 	// record block in dbs
@@ -166,6 +169,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.pendingBlockIDs = nil
 	bs.finalizedBlockIDs = nil
 	bs.resultForBlock = make(map[flow.Identifier]*flow.ExecutionResult)
+	bs.resultByID = make(map[flow.Identifier]*flow.ExecutionResult)
 
 	bs.chain = nil
 	bs.irsMap = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
@@ -175,7 +179,6 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.pendingGuarantees = nil
 	bs.pendingSeals = nil
 	bs.pendingReceipts = nil
-	bs.incorporatedResults = nil
 
 	// initialise the dbs
 	bs.lastSeal = nil
@@ -186,23 +189,16 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// initialize behaviour tracking
 	bs.assembled = nil
-	bs.remCollIDs = nil
-	bs.remRecIDs = nil
 
 	// insert the first block in our range
 	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
-	firstSealedState, ok := firstResult.FinalStateCommitment()
-	if !ok {
-		panic("missing first execution result's final state commitment")
-	}
-	bs.lastSeal = &flow.Seal{
-		BlockID:    first.ID(),
-		ResultID:   firstResult.ID(),
-		FinalState: firstSealedState,
-	}
+	bs.lastSeal = unittest.Seal.Fixture(
+		unittest.Seal.WithResult(firstResult),
+	)
 	bs.resultForBlock[firstResult.BlockID] = firstResult
+	bs.resultByID[firstResult.ID()] = firstResult
 
 	// insert the finalized blocks between first and final
 	previous := first
@@ -321,6 +317,20 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.assembled = block.Payload
 	}).Return(nil)
 
+	bs.resultDB = &storage.ExecutionResults{}
+	bs.resultDB.On("ByID", mock.Anything).Return(
+		func(resultID flow.Identifier) *flow.ExecutionResult {
+			return bs.resultByID[resultID]
+		},
+		func(resultID flow.Identifier) error {
+			_, exists := bs.resultByID[resultID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
 	// set up memory pool mocks for tests
 	bs.guarPool = &mempool.Guarantees{}
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
@@ -329,10 +339,6 @@ func (bs *BuilderSuite) SetupTest() {
 			return bs.pendingGuarantees
 		},
 	)
-	bs.guarPool.On("Rem", mock.Anything).Run(func(args mock.Arguments) {
-		collID := args.Get(0).(flow.Identifier)
-		bs.remCollIDs = append(bs.remCollIDs, collID)
-	}).Return(true)
 
 	bs.sealPool = &mempool.IncorporatedResultSeals{}
 	bs.sealPool.On("Size").Return(uint(0)) // only used by metrics
@@ -355,26 +361,15 @@ func (bs *BuilderSuite) SetupTest() {
 		},
 	)
 
-	bs.recPool = &mempool.Receipts{}
-	bs.recPool.On("Size").Return(uint(0))
-	bs.recPool.On("All").Return(
-		func() []*flow.ExecutionReceipt {
+	bs.recPool = &mempool.ExecutionTree{}
+	bs.recPool.On("Size").Return(uint(0)).Maybe() // used for metrics only
+	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil)
+	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(
+		func(resultID flow.Identifier, blockFilter mempoolAPIs.BlockFilter, receiptFilter mempoolAPIs.ReceiptFilter) []*flow.ExecutionReceipt {
 			return bs.pendingReceipts
 		},
+		nil,
 	)
-	bs.recPool.On("Rem", mock.Anything).Run(func(args mock.Arguments) {
-		recID := args.Get(0).(flow.Identifier)
-		bs.remRecIDs = append(bs.remRecIDs, recID)
-	}).Return(true)
-
-	bs.resPool = &mempool.IncorporatedResults{}
-	bs.resPool.On("Size").Return(uint(0))
-	bs.resPool.On("Add", mock.Anything).Run(
-		func(args mock.Arguments) {
-			res := args.Get(0).(*flow.IncorporatedResult)
-			bs.incorporatedResults = append(bs.incorporatedResults, res)
-		},
-	).Return(true)
 
 	// initialize the builder
 	bs.build = NewBuilder(
@@ -384,8 +379,11 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.headerDB,
 		bs.sealDB,
 		bs.indexDB,
+		bs.blockDB,
+		bs.resultDB,
 		bs.guarPool,
 		bs.sealPool,
+		bs.recPool,
 		noopTracer,
 	)
 
@@ -416,22 +414,22 @@ func (bs *BuilderSuite) TestPayloadGuaranteeValid() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(bs.pendingGuarantees, bs.assembled.Guarantees, "should have guarantees from mempool in payload")
-	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
-	bs.Assert().Empty(bs.remCollIDs, "should not remove any valid guarantees")
 }
 
-func (bs *BuilderSuite) TestPayloadGuaranteeDuplicateFinalized() {
+func (bs *BuilderSuite) TestPayloadGuaranteeDuplicate() {
 
 	// create some valid guarantees
 	valid := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(bs.finalID))
 
-	// create some duplicate guarantees and add to random finalized block
+	forkBlocks := append(bs.finalizedBlockIDs, bs.pendingBlockIDs...)
+
+	// create some duplicate guarantees and add to random blocks on the fork
 	duplicated := unittest.CollectionGuaranteesFixture(12, unittest.WithCollRef(bs.finalID))
 	for _, guarantee := range duplicated {
-		finalizedID := bs.finalizedBlockIDs[rand.Intn(len(bs.finalizedBlockIDs))]
-		index := bs.index[finalizedID]
+		blockID := forkBlocks[rand.Intn(len(forkBlocks))]
+		index := bs.index[blockID]
 		index.CollectionIDs = append(index.CollectionIDs, guarantee.ID())
-		bs.index[finalizedID] = index
+		bs.index[blockID] = index
 	}
 
 	// add sixteen guarantees to the pool
@@ -439,32 +437,6 @@ func (bs *BuilderSuite) TestPayloadGuaranteeDuplicateFinalized() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid guarantees from mempool in payload")
-	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
-	bs.Assert().ElementsMatch(flow.GetIDs(duplicated), bs.remCollIDs, "should remove duplicate finalized guarantees from mempool")
-
-}
-
-func (bs *BuilderSuite) TestPayloadGuaranteeDuplicatePending() {
-
-	// create some valid guarantees
-	valid := unittest.CollectionGuaranteesFixture(4, unittest.WithCollRef(bs.finalID))
-
-	// create some duplicate guarantees and add to random finalized block
-	duplicated := unittest.CollectionGuaranteesFixture(12, unittest.WithCollRef(bs.finalID))
-	for _, guarantee := range duplicated {
-		pendingID := bs.pendingBlockIDs[rand.Intn(len(bs.pendingBlockIDs))]
-		index := bs.index[pendingID]
-		index.CollectionIDs = append(index.CollectionIDs, guarantee.ID())
-		bs.index[pendingID] = index
-	}
-
-	// add sixteen guarantees to the pool
-	bs.pendingGuarantees = append(valid, duplicated...)
-	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
-	bs.Require().NoError(err)
-	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid guarantees from mempool in payload")
-	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
-	bs.Assert().Empty(bs.remCollIDs, "should not remove duplicate pending guarantees from mempool")
 }
 
 func (bs *BuilderSuite) TestPayloadGuaranteeReferenceUnknown() {
@@ -480,8 +452,6 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceUnknown() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid from mempool in payload")
-	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
-	bs.Assert().ElementsMatch(flow.GetIDs(unknown), bs.remCollIDs, "should remove guarantees with unknown reference from mempool")
 }
 
 func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
@@ -500,8 +470,6 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid from mempool in payload")
-	bs.Assert().Empty(bs.assembled.Seals, "should have no seals in payload with empty mempool")
-	bs.Assert().ElementsMatch(flow.GetIDs(expired), bs.remCollIDs, "should remove guarantees with expired reference from mempool")
 }
 
 func (bs *BuilderSuite) TestPayloadSealAllValid() {
@@ -513,6 +481,22 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
+}
+
+// Test maxSealLimit is enforced
+func (bs *BuilderSuite) TestPayloadSealLimit() {
+
+	// use valid chain of seals in mempool
+	bs.pendingSeals = bs.irsMap
+
+	// change maxSealCount to one less than the number of items in the mempool
+	limit := uint(len(bs.irsMap) - 1)
+	bs.build.cfg.maxSealCount = limit
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+	bs.Assert().Equal(bs.chain[:limit], bs.assembled.Seals, "should have excluded seals above maxSealCount")
 }
 
 // TestPayloadSealOnlyFork checks that the builder only includes seals corresponding
@@ -545,6 +529,25 @@ func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 }
 
+// Test that seals for blocks that already have seals on the fork are rejected
+func (bs *BuilderSuite) TestPayloadSealDuplicate() {
+
+	// pretend that the first n blocks are already sealed
+	n := 4
+	lastSeal := bs.chain[n-1]
+	// trick the builder into thinking this is the last seal on the fork
+	mockSealDB := &storage.Seals{}
+	mockSealDB.On("ByBlockID", mock.Anything).Return(lastSeal, nil)
+	bs.build.seals = mockSealDB
+
+	// submit all the seals (containing n duplicates)
+	bs.pendingSeals = bs.irsMap
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.chain[n:], bs.assembled.Seals, "should have rejected duplicate seals")
+}
+
 func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 
 	// remove the seal at the start
@@ -556,11 +559,10 @@ func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	bs.Assert().Empty(bs.assembled.Seals, "should have not included any chains from cutoff chain")
+	bs.Assert().Empty(bs.assembled.Seals, "should not have included any seals from cutoff chain")
 }
 
 func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
-
 	// remove a seal in the middle
 	seal := bs.irsList[3]
 	delete(bs.irsMap, seal.ID())
@@ -571,4 +573,220 @@ func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
+}
+
+// TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult tests the receipt selection:
+// Expectation: Builder should trigger ExecutionTree to search Execution Tree from
+//              last sealed result on respective fork.
+// We test with the following main chain tree
+//                                                ┌-[X0] <- [X1{seals ..F4}]
+//                                                v
+// [lastSeal] <- [F0] <- [F1] <- [F2] <- [F3] <- [F4] <- [A0] <- [A1{seals ..F2}] <- [A2] <- [A3]
+// Where
+// * blocks [lastSeal], [F1], ... [F4], [A0], ... [A4], are created by BuilderSuite
+// * latest sealed block for a specific fork is provided by test-local seals storage mock
+func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult() {
+	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
+	x0 := bs.createAndRecordBlock(bs.blocks[bs.finalID])
+	x1 := bs.createAndRecordBlock(x0)
+
+	// set last sealed blocks:
+	f2 := bs.blocks[bs.finalizedBlockIDs[2]]
+	f2eal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[f2.ID()]))
+	f4Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[bs.finalID]))
+	bs.sealDB = &storage.Seals{}
+	bs.build.seals = bs.sealDB
+
+	// reset receipts mempool to verify calls made by Builder
+	bs.recPool = &mempool.ExecutionTree{}
+	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.build.recPool = bs.recPool
+
+	// building on top of X0: latest finalized block in fork is [lastSeal]; expect search to start with sealed result
+	bs.sealDB.On("ByBlockID", x0.ID()).Return(bs.lastSeal, nil)
+	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
+	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
+	_, err := bs.build.BuildOn(x0.ID(), bs.setter)
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
+
+	// building on top of X1: latest finalized block in fork is [F4]; expect search to start with sealed result
+	bs.sealDB.On("ByBlockID", x1.ID()).Return(f4Seal, nil)
+	bs.recPool.On("AddResult", bs.resultByID[f4Seal.ResultID], bs.blocks[bs.finalID].Header).Return(nil).Once()
+	bs.recPool.On("ReachableReceipts", f4Seal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
+	_, err = bs.build.BuildOn(x1.ID(), bs.setter)
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
+
+	// building on top of A3 (with ID bs.parentID): latest finalized block in fork is [F4]; expect search to start with sealed result
+	bs.sealDB.On("ByBlockID", bs.parentID).Return(f2eal, nil)
+	bs.recPool.On("AddResult", bs.resultByID[f2eal.ResultID], f2.Header).Return(nil).Once()
+	bs.recPool.On("ReachableReceipts", f2eal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
+	_, err = bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
+}
+
+// TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork tests the receipt selection:
+// In this test, we check that the Builder provides a BlockFilter which only allows
+// blocks on the fork, which we are extending. We construct the following chain tree:
+//       ┌--[X1]   ┌-[Y2]                                             ┌-- [A6]
+//       v         v                                                  v
+// <- [Final] <- [*B1*] <- [*B2*] <- [*B3*] <- [*B4{seals B1}*] <- [*B5*] <- ░newBlock░
+//                           ^
+//                           └-- [C3] <- [C4]
+//                                  ^--- [D4]
+// Expectation: BlockFilter should pass blocks marked with star: B1, ... ,B5
+//              All other blocks should be filtered out.
+// Context:
+// While the receipt selection itself is performed by the ExecutionTree, the Builder
+// controls the selection by providing suitable BlockFilter and ReceiptFilter.
+func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() {
+	b1 := bs.createAndRecordBlock(bs.blocks[bs.finalID])
+	b2 := bs.createAndRecordBlock(b1)
+	b3 := bs.createAndRecordBlock(b2)
+	b4 := bs.createAndRecordBlock(b3)
+	b5 := bs.createAndRecordBlock(b4)
+
+	x1 := bs.createAndRecordBlock(bs.blocks[bs.finalID])
+	y2 := bs.createAndRecordBlock(b1)
+	a6 := bs.createAndRecordBlock(b5)
+
+	c3 := bs.createAndRecordBlock(b2)
+	c4 := bs.createAndRecordBlock(c3)
+	d4 := bs.createAndRecordBlock(c3)
+
+	// set last sealed blocks:
+	b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[b1.ID()]))
+	bs.sealDB = &storage.Seals{}
+	bs.sealDB.On("ByBlockID", b5.ID()).Return(b1Seal, nil)
+	bs.build.seals = bs.sealDB
+
+	// setup mock to test the BlockFilter provided by Builder
+	bs.recPool = &mempool.ExecutionTree{}
+	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", bs.resultByID[b1Seal.ResultID], b1.Header).Return(nil).Once()
+	bs.recPool.On("ReachableReceipts", b1Seal.ResultID, mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			blockFilter := args[1].(mempoolAPIs.BlockFilter)
+			for _, h := range []*flow.Header{b1.Header, b2.Header, b3.Header, b4.Header, b5.Header} {
+				assert.True(bs.T(), blockFilter(h))
+			}
+			for _, h := range []*flow.Header{bs.blocks[bs.finalID].Header, x1.Header, y2.Header, a6.Header, c3.Header, c4.Header, d4.Header} {
+				assert.False(bs.T(), blockFilter(h))
+			}
+		}).Return([]*flow.ExecutionReceipt{}, nil).Once()
+	bs.build.recPool = bs.recPool
+
+	_, err := bs.build.BuildOn(b5.ID(), bs.setter)
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
+}
+
+// TestPayloadReceipts_SkipDuplicatedReceipts tests the receipt selection:
+// Expectation: we check that the Builder provides a ReceiptFilter which
+//              filters out duplicated receipts.
+// Comment:
+// While the receipt selection itself is performed by the ExecutionTree, the Builder
+// controls the selection by providing suitable BlockFilter and ReceiptFilter.
+func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
+	// setup mock to test the ReceiptFilter provided by Builder
+	bs.recPool = &mempool.ExecutionTree{}
+	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
+	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
+			// verify that all receipts already included in blocks are filtered out:
+			for _, block := range bs.blocks {
+				for _, rcpt := range block.Payload.Receipts {
+					assert.False(bs.T(), receiptFilter(rcpt))
+				}
+			}
+			// Verify that receipts for unsealed blocks, which are _not_ already incorporated are accepted:
+			for _, block := range bs.blocks {
+				if block.ID() != bs.firstID { // block with ID bs.firstID is already sealed
+					rcpt := unittest.ReceiptForBlockFixture(block)
+					assert.True(bs.T(), receiptFilter(rcpt))
+				}
+			}
+		}).Return([]*flow.ExecutionReceipt{}, nil).Once()
+	bs.build.recPool = bs.recPool
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
+}
+
+// TestPayloadReceipts_SkipReceiptsForSealedBlock tests the receipt selection:
+// Expectation: we check that the Builder provides a ReceiptFilter which
+//              filters out _any_ receipt for the sealed block.
+// Comment:
+// While the receipt selection itself is performed by the ExecutionTree, the Builder
+// controls the selection by providing suitable BlockFilter and ReceiptFilter.
+func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
+	// setup mock to test the ReceiptFilter provided by Builder
+	bs.recPool = &mempool.ExecutionTree{}
+	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
+	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
+
+			// receipt for sealed block committing to same result as the sealed result
+			rcpt := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.firstID]))
+			assert.False(bs.T(), receiptFilter(rcpt))
+
+			// receipt for sealed block committing to different result as the sealed result
+			rcpt = unittest.ReceiptForBlockFixture(bs.blocks[bs.firstID])
+			assert.False(bs.T(), receiptFilter(rcpt))
+		}).Return([]*flow.ExecutionReceipt{}, nil).Once()
+	bs.build.recPool = bs.recPool
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
+}
+
+// TestPayloadReceipts_BlockLimit tests that the builder does not include more
+// receipts than the configured maxReceiptCount.
+func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
+
+	// populate the mempool with 5 valid receipts
+	receipts := []*flow.ExecutionReceipt{}
+	var i uint64
+	for i = 0; i < 5; i++ {
+		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
+		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
+		receipts = append(receipts, pendingReceipt)
+	}
+	bs.pendingReceipts = receipts
+
+	// set maxReceiptCount to 3
+	var limit uint = 3
+	bs.build.cfg.maxReceiptCount = limit
+
+	// ensure that only 3 of the 5 receipts were included
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(bs.pendingReceipts[:limit], bs.assembled.Receipts, "should have excluded receipts above maxReceiptCount")
+}
+
+// TestPayloadReceipts_AsProvidedByReceiptForest tests the receipt selection.
+// Expectation: Builder should embed the Receipts as provided by the ExecutionTree
+func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
+	var expectedReceipts []*flow.ExecutionReceipt
+	for i := 0; i < 10; i++ {
+		expectedReceipts = append(expectedReceipts, unittest.ExecutionReceiptFixture())
+	}
+	bs.recPool = &mempool.ExecutionTree{}
+	bs.recPool.On("Size").Return(uint(0)).Maybe()
+	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil).Maybe()
+	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(expectedReceipts, nil).Once()
+	bs.build.recPool = bs.recPool
+
+	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+	bs.Require().NoError(err)
+	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "should include receipts as returned by ExecutionTree")
+	bs.recPool.AssertExpectations(bs.T())
 }

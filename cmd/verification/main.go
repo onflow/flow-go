@@ -47,8 +47,9 @@ const (
 	// failureThreshold represents the number of retries match engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// this value is set following this issue (3443)
-	failureThreshold = 2
+	// Currently setting the threshold to a very large value (corresponding to 100 days),
+	// which for all practical purposes is equivalent to the Verifier trying indefinitely.
+	failureThreshold = 10000000
 )
 
 func main() {
@@ -63,6 +64,7 @@ func main() {
 		readyReceipts       *stdmap.ReceiptDataPacks   // used in finder engine
 		blockIDsCache       *stdmap.Identifiers        // used in finder engine
 		processedResultsIDs *stdmap.Identifiers        // used in finder engine
+		discardedResultIDs  *stdmap.Identifiers        // used in finder engine
 		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
 		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
 		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
@@ -230,6 +232,18 @@ func main() {
 			}
 			return nil
 		}).
+		Module("discarded results ids mempool", func(node *cmd.FlowNodeBuilder) error {
+			discardedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
+			if err != nil {
+				return err
+			}
+			// registers size method of backend for metrics
+			err = node.Metrics.Mempool.Register(metrics.ResourceDiscardedResultID, discardedResultIDs.Size)
+			if err != nil {
+				return fmt.Errorf("could not register backend metric: %w", err)
+			}
+			return nil
+		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
 			// consensus cache for follower engine
 			pendingBlocks = buffer.NewPendingBlocks()
@@ -251,19 +265,24 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
 			rt := runtime.NewInterpreterRuntime()
-
 			vm := fvm.New(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
-			verifierEng, err = verifier.New(node.Logger, collector, node.Tracer, node.Network, node.State, node.Me,
-				chunkVerifier)
+			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)
+			verifierEng, err = verifier.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Network,
+				node.State,
+				node.Me,
+				chunkVerifier,
+				approvalStorage)
 			return verifierEng, err
 		}).
 		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewPublicAssignment(int(chunkAlpha), node.State)
+			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
 			if err != nil {
 				return nil, err
 			}
@@ -289,12 +308,14 @@ func main() {
 				node.Tracer,
 				node.Network,
 				node.Me,
+				node.State,
 				matchEng,
 				cachedReceipts,
 				pendingReceipts,
 				readyReceipts,
 				headerStorage,
 				processedResultsIDs,
+				discardedResultIDs,
 				receiptIDsByBlock,
 				receiptIDsByResult,
 				blockIDsCache,

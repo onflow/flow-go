@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
@@ -56,10 +57,13 @@ func New(log zerolog.Logger,
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
 	collectionGRPCPort uint,
+	executionGRPCPort uint,
 	retryEnabled bool,
+	rpcMetricsEnabled bool,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -69,13 +73,27 @@ func New(log zerolog.Logger,
 	}
 
 	// create a GRPC server to serve GRPC clients
-	grpcServer := grpc.NewServer(
+	grpcOpts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
-	)
+	}
+	if rpcMetricsEnabled {
+		grpcOpts = append(
+			grpcOpts,
+			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+			grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+		)
+	}
+
+	grpcServer := grpc.NewServer(grpcOpts...)
 
 	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
+
+	connectionFactory := &backend.ConnectionFactoryImpl{
+		CollectionGRPCPort: collectionGRPCPort,
+		ExecutionGRPCPort:  executionGRPCPort,
+	}
 
 	backend := backend.New(
 		state,
@@ -86,11 +104,12 @@ func New(log zerolog.Logger,
 		headers,
 		collections,
 		transactions,
+		executionReceipts,
 		chainID,
 		transactionMetrics,
-		collectionGRPCPort,
-		&backend.ConnectionFactoryImpl{},
+		connectionFactory,
 		retryEnabled,
+		log,
 	)
 
 	eng := &Engine{
@@ -106,6 +125,12 @@ func New(log zerolog.Logger,
 		eng.grpcServer,
 		access.NewHandler(backend, chainID.Chain()),
 	)
+
+	if rpcMetricsEnabled {
+		// Not interested in legacy metrics, so initialize here
+		grpc_prometheus.EnableHandlingTimeHistogram()
+		grpc_prometheus.Register(grpcServer)
+	}
 
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
 	legacyaccessproto.RegisterAccessAPIServer(

@@ -192,12 +192,9 @@ SearchLoop:
 
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: resultID,               // need genesis result
-			BlockID:          targetID,               // refer the target block
-			Chunks:           flow.ChunkList{&chunk}, // include only chunk
-		},
-		Signatures: nil,
+		PreviousResultID: resultID,               // need genesis result
+		BlockID:          targetID,               // refer the target block
+		Chunks:           flow.ChunkList{&chunk}, // include only chunk
 	}
 
 	ss.T().Logf("execution result generated (result: %x)", result.ID())

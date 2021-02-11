@@ -137,9 +137,6 @@ type PrivateKey interface {
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
 	Equals(PrivateKey) bool
-	// GeneratePOP returns a proof of possession (PoP) for the receiver private key
-	// using the given hasher.
-	GeneratePOP(hash.Hasher) (Signature, error)
 }
 
 // PublicKey is an unspecified signature scheme public key.
@@ -158,7 +155,4 @@ type PublicKey interface {
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
 	Equals(PublicKey) bool
-	// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
-	// using the given hasher.
-	VerifyPOP(Signature, hash.Hasher) (bool, error)
 }

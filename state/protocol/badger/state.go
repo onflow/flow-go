@@ -198,7 +198,7 @@ func OpenState(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed retrieve root block's epoch status: %w", err)
 	}
-	epochSetup, err := setups.ByID(epochStatus.CurrentEpoch.CommitID)
+	epochSetup, err := setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed retrieve root epochs's setup event: %w", err)
 	}
