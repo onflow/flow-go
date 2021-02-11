@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/verification/utils"
-	chmodel "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -216,7 +216,7 @@ func (suite *AssignerEngineTestSuite) stakedAtBlock() {
 // of the execution result of this test suite to verification identity of this test suite.
 // It returns number of chunks assigned to verification node.
 func (suite *AssignerEngineTestSuite) assignAllChunks() int {
-	a := chmodel.NewAssignment()
+	a := chunks.NewAssignment()
 	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
 	for _, chunk := range chunks {
 		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
@@ -233,5 +233,5 @@ func (suite *AssignerEngineTestSuite) assignAllChunks() int {
 func (suite *AssignerEngineTestSuite) assignNoChunk() {
 	suite.assigner.On("Assign",
 		&suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(chmodel.NewAssignment(), nil).Once()
+		suite.completeER.Receipt.ExecutionResult.BlockID).Return(chunks.NewAssignment(), nil).Once()
 }
