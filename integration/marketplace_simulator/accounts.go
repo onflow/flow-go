@@ -107,15 +107,13 @@ func (acc *flowAccount) AddKeys(log zerolog.Logger, txTracker *TxTracker, flowCl
 	wg.Add(1)
 	txTracker.AddTx(tx.ID(),
 		nil,
+		nil, // on finalized
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			log.Debug().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
 			if !stopped {
 				stopped = true
 				wg.Done()
 			}
-		}, // on finalized
-		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-			log.Debug().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
 		}, // on sealed
 		func(_ flowsdk.Identifier) {
 			log.Error().Str("tx_id", tx.ID().String()).Msgf("tx expired")
