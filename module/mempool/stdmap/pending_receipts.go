@@ -27,6 +27,9 @@ func NewPendingReceipts(limit uint) *PendingReceipts {
 		Backend:            NewBackend(WithLimit(limit)),
 		byPreviousResultID: make(map[flow.Identifier][]flow.Identifier),
 	}
+	// TODO: there is smarter eject exists. For instance:
+	// if the mempool fills up, we want to eject the receipts for the highest blocks
+	// See https://github.com/onflow/flow-go/pull/387/files#r574228078
 	r.RegisterEjectionCallbacks(func(entity flow.Entity) {
 		receipt := entity.(*flow.ExecutionReceipt)
 		removeReceipt(receipt, r.entities, r.byPreviousResultID)

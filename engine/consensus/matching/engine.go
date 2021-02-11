@@ -323,6 +323,8 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
+// TODO: move into a different component, as indexing receipts for finalized block
+// could be done in a different component, and we can keep the Engine simple
 // OnFinalizedBlock implements the callback from the protocol state to notify a block
 // is finalized, it guarantees every finalized block will be called at least once.
 func (e *Engine) OnFinalizedBlock(block *model.Block) {

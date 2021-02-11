@@ -138,13 +138,16 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 	return nil
 }
 
-// Validate performs checks for ExecutionReceipt being valid or no.
-// Checks performed:
-// 	* can find stake and stake is positive
-//	* signature is correct
+// Validate performs verifies that the ExecutionReceipt satisfies
+// the following conditions:
+// 	* is from Execution node with positive weight
+//	* has valid signature
 //	* chunks are in correct format
-// 	* execution result has a valid parent
-// Returns nil if all checks passed successfully
+// 	* execution result has a valid parent and satisfies the subgraph check
+// Returns nil if all checks passed successfully.
+// Expected errors during normal operations:
+// * engine.InvalidInputError
+// * validation.MissingPreviousResultError
 func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 	// lookup cache to avoid linear search when checking for previous result that is
 	// part of payload
