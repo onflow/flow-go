@@ -96,9 +96,10 @@ func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *
 func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 	e := suite.NewAssignerEngine()
 
+	// mocks verification node staked at the block of its execution result.
 	suite.stakedAtBlock()
 
-	// mocks verification node staked at the block of its execution result.
+	// assigns all chunks to verification node
 	chunksNum := suite.assignAllChunks()
 
 	// mocks processing assigned chunks
