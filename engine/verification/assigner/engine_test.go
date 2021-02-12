@@ -156,11 +156,15 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
-	block, assignment := createContainerBlock()
-	s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	// creates a container block, with a single receipt, that contains no chunks.
+	containerBlock, assignment := createContainerBlock()
+	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	s.mockStateAtBlockID(result.BlockID)
+	chunksNum := s.mockChunkAssigner(result, assignment)
+	require.Equal(t, chunksNum, 0)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(block)
+	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
 
