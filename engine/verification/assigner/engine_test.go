@@ -237,31 +237,32 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 
 // TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
 // This is important as without a new chunk successfully added to the chunks queue, the consumer should not be notified.
-func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
-	e := suite.NewAssignerEngine()
+func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
+	s := SetupTest()
+	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
-	suite.stakedAtBlock()
+	stakedAtBlock(s)
 
 	// assigns all chunks to this verification node.
-	chunksNum := suite.assignAllChunks()
+	chunksNum := assignAllChunks(s)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
-	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
+	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(false, nil).
 		Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
 
-	mock.AssertExpectationsForObjects(suite.T(),
-		suite.metrics,
-		suite.assigner,
-		suite.chunksQueue)
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner,
+		s.chunksQueue)
 
 	// job listener should not be notified as no new chunk is added.
-	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
+	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
 // stakedAtBlock is a test helper that mocks the protocol state of test suite so that its verification identity is staked
