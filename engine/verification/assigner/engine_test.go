@@ -61,6 +61,12 @@ func (suite *AssignerEngineTestSuite) SetupTest() {
 	suite.verIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 }
 
+func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
+	return func(testSuite *AssignerEngineTestSuite) {
+		testSuite.verIdentity = identity
+	}
+}
+
 // NewAssignerEngine returns an assigner engine for testing.
 func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
 	for _, apply := range opts {
@@ -185,7 +191,6 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Duplicate() {
 	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(false, nil).
 		Times(chunksNum)
-	suite.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
