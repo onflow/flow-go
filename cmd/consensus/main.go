@@ -85,7 +85,6 @@ func main() {
 		receiptRequester  *requester.Engine
 		syncCore          *synchronization.Core
 		comp              *compliance.Engine
-		match             *matching.Engine
 		conMetrics        module.ConsensusMetrics
 		mainMetrics       module.HotstuffMetrics
 		receiptValidator  module.ReceiptValidator
@@ -237,7 +236,7 @@ func main() {
 				return nil, err
 			}
 
-			match, err = matching.NewEngine(
+			match, err := matching.NewEngine(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
@@ -388,6 +387,10 @@ func main() {
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
+			// initialize the indexer to add index for receipts by the executed block id.
+			// so that receipts can be found by block id.
+			indexer := matching.NewIndexer(node.Logger, node.Receipts, node.Payloads)
+
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
 				node.Logger,
@@ -395,7 +398,7 @@ func main() {
 				node.Tracer,
 				node.Storage.Index,
 				node.RootChainID,
-				match,
+				indexer,
 			)
 			// make compliance engine as a FinalizationConsumer
 			// initialize the persister
