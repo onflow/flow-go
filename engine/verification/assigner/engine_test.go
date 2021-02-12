@@ -161,7 +161,6 @@ func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
 	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(false, fmt.Errorf("error")).
 		Times(chunksNum)
-	suite.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
