@@ -242,7 +242,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	batchSize := 100
 	// steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
-	momentsPerAccount := 5000
+	momentsPerAccount := 10000
 	steps := len(m.marketAccounts)
 
 	wg = sync.WaitGroup{}
