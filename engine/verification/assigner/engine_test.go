@@ -35,8 +35,10 @@ type AssignerEngineTestSuite struct {
 	verIdentity *flow.Identity // verification node
 }
 
-func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) {
+func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) int {
 	s.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
+	assignedChunks := assignment.ByNodeID(s.myID())
+	return len(assignedChunks)
 }
 
 // mockStateAtBlockID is a test helper that mocks the protocol state of test suite at the given block id. This is the
@@ -121,22 +123,21 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
-	// mocks verification node staked at the block of its execution result.
-	s.mockStateAtBlockID()
-	// assigns all chunks to verification node
-	chunksNum := assignChunks(t, s, 1)
-	createContainerBlock(test.WithChunks(test.WithAssignee(s.myID())))
+	block, assignment := createContainerBlock(
+		test.WithChunks(
+			test.WithAssignee(s.myID())))
+	s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
 	// invoked for it.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(true, nil).
-		Times(chunksNum)
-	s.newChunkListener.On("Check").Return().Times(chunksNum)
+		Times(len(assignment.ByNodeID(s.myID())))
+	s.newChunkListener.On("Check").Return().Times(len(assignment.ByNodeID(s.myID())))
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(block)
 
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
