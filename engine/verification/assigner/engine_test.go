@@ -39,6 +39,10 @@ type AssignerEngineTestSuite struct {
 	completeER utils.CompleteExecutionResult
 }
 
+func (s *AssignerEngineTestSuite) MockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) {
+	s.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
+}
+
 // SetupTest initiates the test setups prior to each test.
 func SetupTest(chunksNum int) *AssignerEngineTestSuite {
 	return &AssignerEngineTestSuite{
@@ -144,14 +148,13 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	stakedAtBlock(s)
 
 	// assigns no chunk to this verification node
-	assignNoChunk(s)
+	block, assignment := createContainerBlock()
+	s.MockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(block)
 
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner)
+	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
 
 	// when there is no assigned chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
@@ -245,12 +248,4 @@ func assignChunks(t *testing.T, s *AssignerEngineTestSuite, chunksNum int) int {
 		s.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
 
 	return len(chunks)
-}
-
-// assignNoChunk is a test helper that mocks assigner of this test suite to assign no chunk
-// of the execution result of this test suite to verification identity of this test suite.
-func assignNoChunk(s *AssignerEngineTestSuite) {
-	s.assigner.On("Assign",
-		&s.completeER.Receipt.ExecutionResult,
-		s.completeER.Receipt.ExecutionResult.BlockID).Return(chunks.NewAssignment(), nil).Once()
 }
