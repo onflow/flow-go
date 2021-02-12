@@ -123,6 +123,8 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
+	// creates a container block, with a single receipt, that contains
+	// one assigned chunk to verification node.
 	containerBlock, assignment := createContainerBlock(
 		test.WithChunks(
 			test.WithAssignee(s.myID())))
