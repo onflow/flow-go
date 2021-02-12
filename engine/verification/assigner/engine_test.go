@@ -202,14 +202,15 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 // TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
 // This is important as without a new chunk successfully added to the chunks queue, the consumer should not be notified.
 func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
-	s := SetupTest(1)
+	s := SetupTest()
 	e := NewAssignerEngine(s)
 
-	// mocks verification node staked at the block of its execution result.
-	stakedAtBlock(s)
-
-	// assigns all chunks to this verification node.
-	chunksNum := assignChunks(t, s, 1)
+	block, assignment := createContainerBlock(
+		test.WithChunks(
+			test.WithAssignee(s.myID())))
+	s.mockStateAtBlockID(block.ID())
+	chunksNum := s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	require.Equal(t, chunksNum, 1)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
@@ -218,7 +219,7 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 		Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(block)
 
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
