@@ -113,6 +113,11 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not insert receipts: %w", err)
 	}
 
+	// WARNING: THIS IS FOR REPORUDCEING SEALING SLOWNESS ISSUE
+	// SHOULD NOT GO TO MAINNET
+	insertableReceipts = []*flow.ExecutionReceipt{}
+	insertableSeals = []*flow.Seal{}
+
 	// assemble the block proposal
 	proposal, err := b.createProposal(parentID,
 		insertableGuarantees,
