@@ -39,9 +39,68 @@ type AssignerEngineTestSuite struct {
 	completeER utils.CompleteExecutionResult
 }
 
+// AssignerEngineTest encapsulates data structures for running unittests on assigner engine.
+type AssignerEngineTest struct {
+	// modules
+	me               *module.Local
+	state            *protocol.State
+	snapshot         *protocol.Snapshot
+	metrics          *module.VerificationMetrics
+	tracer           *trace.NoopTracer
+	headerStorage    *storage.Headers
+	assigner         *module.ChunkAssigner
+	chunksQueue      *storage.ChunksQueue
+	newChunkListener *module.NewJobListener
+
+	// identities
+	verIdentity *flow.Identity // verification node
+
+	// fixtures
+	completeER utils.CompleteExecutionResult
+}
+
 // TestFinderEngine executes all AssignerEngineTestSuite tests.
 func TestFinderEngine(t *testing.T) {
 	suite.Run(t, new(AssignerEngineTestSuite))
+}
+
+// SetupTest initiates the test setups prior to each test.
+func SetupTest() *AssignerEngineTest {
+	return &AssignerEngineTest{
+		me:               &module.Local{},
+		state:            &protocol.State{},
+		snapshot:         &protocol.Snapshot{},
+		metrics:          &module.VerificationMetrics{},
+		tracer:           trace.NewNoopTracer(),
+		headerStorage:    &storage.Headers{},
+		assigner:         &module.ChunkAssigner{},
+		chunksQueue:      &storage.ChunksQueue{},
+		newChunkListener: &module.NewJobListener{},
+		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
+		completeER:       utils.LightExecutionResultFixture(1),
+	}
+}
+
+// NewAssignerEngine returns an assigner engine for testing.
+func NewAssignerEngine(s *AssignerEngineTest, opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
+	//for _, apply := range opts {
+	//	apply(s)
+	//}
+
+	e := New(zerolog.Logger{},
+		s.metrics,
+		s.tracer,
+		s.me,
+		s.state,
+		s.headerStorage,
+		s.assigner,
+		s.chunksQueue,
+		s.newChunkListener)
+
+	// mocks identity of the verification node
+	s.me.On("NodeID").Return(s.verIdentity.NodeID)
+
+	return e
 }
 
 // SetupTest initiates the test setups prior to each test.
@@ -122,26 +181,27 @@ func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
 // a receipt with no assigned chunk for the verification node in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should not notify the job listener.
-func (suite *AssignerEngineTestSuite) TestNewBlock_NoChunk() {
-	e := suite.NewAssignerEngine()
+func TestNewBlock_NoChunk(t *testing.T) {
+	s := SetupTest()
+	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
-	suite.stakedAtBlock()
+	stakedAtBlock(s)
 
 	// assigns no chunk to this verification node
-	suite.assignNoChunk()
+	assignNoChunk(t, s)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
 
-	mock.AssertExpectationsForObjects(suite.T(),
-		suite.metrics,
-		suite.assigner)
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner)
 
 	// when there is no assigned chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
-	suite.chunksQueue.AssertNotCalled(suite.T(), "StoreChunkLocator")
-	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
+	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
+	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
 // TestChunkQueue_UnhappyPath_Error evaluates that if chunk queue returns an error upon submission of a
@@ -210,6 +270,13 @@ func (suite *AssignerEngineTestSuite) stakedAtBlock() {
 	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
 }
 
+// stakedAtBlock is a test helper that mocks the protocol state of test suite so that its verification identity is staked
+// at the reference block of its execution result.
+func stakedAtBlock(s *AssignerEngineTest) {
+	s.state.On("AtBlockID", s.completeER.Receipt.ExecutionResult.BlockID).Return(s.snapshot)
+	s.snapshot.On("Identity", s.verIdentity.NodeID).Return(s.verIdentity, nil)
+}
+
 // assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks
 // of the execution result of this test suite to verification identity of this test suite.
 // It returns number of chunks assigned to verification node.
@@ -228,8 +295,8 @@ func (suite *AssignerEngineTestSuite) assignAllChunks() int {
 
 // assignNoChunk is a test helper that mocks assigner of this test suite to assign no chunk
 // of the execution result of this test suite to verification identity of this test suite.
-func (suite *AssignerEngineTestSuite) assignNoChunk() {
-	suite.assigner.On("Assign",
-		&suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(chunks.NewAssignment(), nil).Once()
+func assignNoChunk(t *testing.T, s *AssignerEngineTest) {
+	s.assigner.On("Assign",
+		&s.completeER.Receipt.ExecutionResult,
+		s.completeER.Receipt.ExecutionResult.BlockID).Return(chunks.NewAssignment(), nil).Once()
 }
