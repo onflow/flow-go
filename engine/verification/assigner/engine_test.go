@@ -189,7 +189,7 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	stakedAtBlock(s)
 
 	// assigns no chunk to this verification node
-	assignNoChunk(t, s)
+	assignNoChunk(s)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
@@ -295,7 +295,7 @@ func (suite *AssignerEngineTestSuite) assignAllChunks() int {
 
 // assignNoChunk is a test helper that mocks assigner of this test suite to assign no chunk
 // of the execution result of this test suite to verification identity of this test suite.
-func assignNoChunk(t *testing.T, s *AssignerEngineTest) {
+func assignNoChunk(s *AssignerEngineTest) {
 	s.assigner.On("Assign",
 		&s.completeER.Receipt.ExecutionResult,
 		s.completeER.Receipt.ExecutionResult.BlockID).Return(chunks.NewAssignment(), nil).Once()
