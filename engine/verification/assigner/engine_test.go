@@ -26,7 +26,6 @@ type AssignerEngineTestSuite struct {
 	snapshot         *protocol.Snapshot
 	metrics          *module.VerificationMetrics
 	tracer           *trace.NoopTracer
-	headerStorage    *storage.Headers
 	assigner         *module.ChunkAssigner
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
@@ -69,7 +68,6 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		snapshot:         &protocol.Snapshot{},
 		metrics:          &module.VerificationMetrics{},
 		tracer:           trace.NewNoopTracer(),
-		headerStorage:    &storage.Headers{},
 		assigner:         &module.ChunkAssigner{},
 		chunksQueue:      &storage.ChunksQueue{},
 		newChunkListener: &module.NewJobListener{},
@@ -109,7 +107,6 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 		s.tracer,
 		s.me,
 		s.state,
-		s.headerStorage,
 		s.assigner,
 		s.chunksQueue,
 		s.newChunkListener)
