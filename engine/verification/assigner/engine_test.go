@@ -131,7 +131,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 1)
+	require.Equal(t, chunksNum, 1) // one chunk should be assigned
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
@@ -161,7 +161,7 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 0)
+	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -192,7 +192,7 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 0)
+	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -223,7 +223,7 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 3)
+	require.Equal(t, chunksNum, 3) // 3 chunks should be assigned
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
