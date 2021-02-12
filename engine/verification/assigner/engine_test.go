@@ -117,7 +117,7 @@ func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
 }
 
 // TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
-// a receipt results in the assigner engine passing all assigned chunks in the result of the receipt to the
+// a receipt  with one assigned chunk, results in the assigner engine passing the assigned chunk to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func TestNewBlock_HappyPath(t *testing.T) {
 	s := SetupTest()
@@ -184,11 +184,11 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	// creates a container block, with a single receipt, that contains 5 chunks, but
 	// none of them is assigned to this verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture())))
+		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
+			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
+			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
+			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
+			test.WithAssignee(unittest.IdentifierFixture()))) // assigned to others
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
@@ -203,6 +203,42 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	// job listener should not be notified.
 	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
 	s.newChunkListener.AssertNotCalled(t, "Check")
+}
+
+// TestNewBlock_MultipleAssignment evaluates that passing a new finalized block to assigner engine that contains
+// a receipt with multiple assigned chunk, results in the assigner engine passing all assigned chunks to the
+// chunks queue and notifying the job listener of the assigned chunks.
+func TestNewBlock_MultipleAssignment(t *testing.T) {
+	s := SetupTest()
+	e := NewAssignerEngine(s)
+
+	// creates a container block, with a single receipt, that contains 5 chunks, but
+	// only 3 of them is assigned to this verification node.
+	containerBlock, assignment := createContainerBlock(
+		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()), // assigned to me
+			test.WithAssignee(s.myID()),                     // assigned to me
+			test.WithAssignee(s.myID()),                     // assigned to me
+			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
+			test.WithAssignee(s.myID())))                    // assigned to me
+	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	s.mockStateAtBlockID(result.BlockID)
+	chunksNum := s.mockChunkAssigner(result, assignment)
+	require.Equal(t, chunksNum, 3)
+
+	// mocks processing assigned chunks
+	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
+	// invoked for it.
+	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
+	s.newChunkListener.On("Check").Return().Times(chunksNum)
+
+	// sends containerBlock containing receipt to assigner engine
+	e.ProcessFinalizedBlock(containerBlock)
+
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner,
+		s.chunksQueue,
+		s.newChunkListener)
 }
 
 // TestChunkQueue_UnhappyPath_Error evaluates that if chunk queue returns an error upon submission of a
