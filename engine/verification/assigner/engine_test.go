@@ -123,11 +123,12 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
-	block, assignment := createContainerBlock(
+	containerBlock, assignment := createContainerBlock(
 		test.WithChunks(
 			test.WithAssignee(s.myID())))
-	s.mockStateAtBlockID(block.ID())
-	chunksNum := s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	s.mockStateAtBlockID(result.BlockID)
+	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 1)
 
 	// mocks processing assigned chunks
@@ -136,8 +137,8 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 
-	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(block)
+	// sends containerBlock containing receipt to assigner engine
+	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
