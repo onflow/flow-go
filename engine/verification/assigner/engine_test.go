@@ -151,10 +151,34 @@ func TestNewBlock_HappyPath(t *testing.T) {
 		s.newChunkListener)
 }
 
+// TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
+// it drops the corresponding execution receipts for that block without performing any chunk assignment.
+// It also evaluates that the chunks queue is not called on any chunks of that receipt's result.
 func TestNewBlock_Unstaked(t *testing.T) {
+	// creates an assigner engine for an unstaked verification node.
 	s := SetupTest(WithIdentity(
 		unittest.IdentityFixture(unittest.WithStake(0))))
 	e := NewAssignerEngine(s)
+
+	// creates a container block, with a single receipt, that contains
+	// no assigned chunk to verification node.
+	containerBlock, _ := createContainerBlock(
+		test.WithChunks(
+			test.WithAssignee(unittest.IdentifierFixture())))
+	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	s.mockStateAtBlockID(result.BlockID)
+
+	// sends block containing receipt to assigner engine
+	e.ProcessFinalizedBlock(containerBlock)
+
+	// when the node is unstaked at reference block id, chunk assigner should not be called,
+	// and nothing should be passed to chunks queue, and
+	// job listener should not be notified.
+	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
+	s.newChunkListener.AssertNotCalled(t, "Check")
+	s.assigner.AssertCalled(t, "Assign")
+
+	mock.AssertExpectationsForObjects(t, s.metrics)
 }
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
