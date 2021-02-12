@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
@@ -92,7 +93,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	// mocks verification node staked at the block of its execution result.
 	stakedAtBlock(s)
 	// assigns all chunks to verification node
-	chunksNum := assignChunks(nil, s, 1)
+	chunksNum := assignChunks(t, s, 1)
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
@@ -149,7 +150,7 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 	stakedAtBlock(s)
 
 	// assigns all chunks to this verification node
-	chunksNum := assignChunks(nil, s, 1)
+	chunksNum := assignChunks(t, s, 1)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue results in an error
@@ -179,7 +180,7 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	stakedAtBlock(s)
 
 	// assigns all chunks to this verification node.
-	chunksNum := assignChunks(nil, s, 1)
+	chunksNum := assignChunks(t, s, 1)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
@@ -210,6 +211,10 @@ func stakedAtBlock(s *AssignerEngineTestSuite) {
 // of the execution result of the test suite to verification identity of the test suite.
 // It returns number of chunks assigned to verification node.
 func assignChunks(t *testing.T, s *AssignerEngineTestSuite, chunksNum int) int {
+	// number of assigned chunks should be less than or equal the number of chunks in
+	// execution result.
+	require.LessOrEqual(t, len(s.completeER.Receipt.ExecutionResult.Chunks), chunksNum)
+
 	a := chunks.NewAssignment()
 	chunks := s.completeER.Receipt.ExecutionResult.Chunks
 	for _, chunk := range chunks {
