@@ -126,15 +126,14 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	block, assignment := createContainerBlock(
 		test.WithChunks(
 			test.WithAssignee(s.myID())))
-	s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	chunksNum := s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	require.Equal(t, chunksNum, 1)
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
 	// invoked for it.
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
-		Return(true, nil).
-		Times(len(assignment.ByNodeID(s.myID())))
-	s.newChunkListener.On("Check").Return().Times(len(assignment.ByNodeID(s.myID())))
+	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
+	s.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(block)
@@ -150,7 +149,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 // a receipt with no assigned chunk for the verification node in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should not notify the job listener.
 func TestNewBlock_NoChunk(t *testing.T) {
-	s := SetupTest(1)
+	s := SetupTest()
 	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
