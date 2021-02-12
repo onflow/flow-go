@@ -163,14 +163,13 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 		if err != nil {
 			marshalled = []byte("json_marshalling_failed")
 		}
-
-		c.log.Fatal().Err(err).
+		c.log.Error().Err(err).
 			Hex("origin", logging.ID(originID)).
 			Hex("receipt_id", logging.Entity(receipt)).
 			Str("receipt", string(marshalled)).
 			Msg("internal error processing execution receipt")
 
-		return nil
+		return fmt.Errorf("internal error processing execution receipt %x: %w", receipt.ID(), err)
 	}
 
 	if !processed {
@@ -185,7 +184,10 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 		// recursively processing the child receipts, since onReceipt
 		// is logging error internal already, we could ignore the returned
 		// error here
-		_ = c.OnReceipt(childReceipt.ExecutorID, childReceipt)
+		err := c.OnReceipt(childReceipt.ExecutorID, childReceipt)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -203,7 +205,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}()
 
 	resultID := receipt.ExecutionResult.ID()
-
 	log := c.log.With().
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", resultID[:]).
@@ -277,15 +278,11 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 			log.Err(err).Msg("invalid execution receipt")
 			return false, nil
 		}
-
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
 	_, err = c.storeReceipt(receipt, head)
 	if err != nil {
-		if engine.IsDuplicatedEntryError(err) {
-			return true, nil
-		}
 		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
 
