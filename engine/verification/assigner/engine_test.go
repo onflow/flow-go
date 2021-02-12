@@ -53,9 +53,15 @@ func (s *AssignerEngineTestSuite) myID() flow.Identifier {
 	return s.verIdentity.NodeID
 }
 
+func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
+	return func(testSuite *AssignerEngineTestSuite) {
+		testSuite.verIdentity = identity
+	}
+}
+
 // SetupTest initiates the test setups prior to each test.
-func SetupTest() *AssignerEngineTestSuite {
-	return &AssignerEngineTestSuite{
+func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineTestSuite {
+	s := &AssignerEngineTestSuite{
 		me:               &module.Local{},
 		state:            &protocol.State{},
 		snapshot:         &protocol.Snapshot{},
@@ -67,6 +73,11 @@ func SetupTest() *AssignerEngineTestSuite {
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
+
+	for _, apply := range options {
+		apply(s)
+	}
+	return s
 }
 
 // createContainerBlock creates and returns a block that contains an execution receipt, with its corresponding chunks assignment based
@@ -108,12 +119,6 @@ func NewAssignerEngine(s *AssignerEngineTestSuite, opts ...func(testSuite *Assig
 	s.me.On("NodeID").Return(s.verIdentity.NodeID)
 
 	return e
-}
-
-func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
-	return func(testSuite *AssignerEngineTestSuite) {
-		testSuite.verIdentity = identity
-	}
 }
 
 // TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
