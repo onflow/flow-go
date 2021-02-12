@@ -6,7 +6,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
@@ -18,9 +17,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// AssignerEngineTestSuite contains the unit tests of Assigner engine.
+// AssignerEngineTestSuite encapsulates data structures for running unittests on assigner engine.
 type AssignerEngineTestSuite struct {
-	suite.Suite
 	// modules
 	me               *module.Local
 	state            *protocol.State
@@ -37,36 +35,11 @@ type AssignerEngineTestSuite struct {
 
 	// fixtures
 	completeER utils.CompleteExecutionResult
-}
-
-// AssignerEngineTest encapsulates data structures for running unittests on assigner engine.
-type AssignerEngineTest struct {
-	// modules
-	me               *module.Local
-	state            *protocol.State
-	snapshot         *protocol.Snapshot
-	metrics          *module.VerificationMetrics
-	tracer           *trace.NoopTracer
-	headerStorage    *storage.Headers
-	assigner         *module.ChunkAssigner
-	chunksQueue      *storage.ChunksQueue
-	newChunkListener *module.NewJobListener
-
-	// identities
-	verIdentity *flow.Identity // verification node
-
-	// fixtures
-	completeER utils.CompleteExecutionResult
-}
-
-// TestFinderEngine executes all AssignerEngineTestSuite tests.
-func TestFinderEngine(t *testing.T) {
-	suite.Run(t, new(AssignerEngineTestSuite))
 }
 
 // SetupTest initiates the test setups prior to each test.
-func SetupTest() *AssignerEngineTest {
-	return &AssignerEngineTest{
+func SetupTest() *AssignerEngineTestSuite {
+	return &AssignerEngineTestSuite{
 		me:               &module.Local{},
 		state:            &protocol.State{},
 		snapshot:         &protocol.Snapshot{},
@@ -82,7 +55,7 @@ func SetupTest() *AssignerEngineTest {
 }
 
 // NewAssignerEngine returns an assigner engine for testing.
-func NewAssignerEngine(s *AssignerEngineTest, opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
+func NewAssignerEngine(s *AssignerEngineTestSuite, opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
 	//for _, apply := range opts {
 	//	apply(s)
 	//}
@@ -101,23 +74,6 @@ func NewAssignerEngine(s *AssignerEngineTest, opts ...func(testSuite *AssignerEn
 	s.me.On("NodeID").Return(s.verIdentity.NodeID)
 
 	return e
-}
-
-// SetupTest initiates the test setups prior to each test.
-func (suite *AssignerEngineTestSuite) SetupTest() {
-	suite.me = &module.Local{}
-	suite.state = &protocol.State{}
-	suite.snapshot = &protocol.Snapshot{}
-	suite.metrics = &module.VerificationMetrics{}
-	suite.tracer = trace.NewNoopTracer()
-	suite.headerStorage = &storage.Headers{}
-	suite.assigner = &module.ChunkAssigner{}
-	suite.newChunkListener = &module.NewJobListener{}
-	suite.chunksQueue = &storage.ChunksQueue{}
-
-	// generates an execution result with a single collection, chunk, and transaction.
-	suite.completeER = utils.LightExecutionResultFixture(1)
-	suite.verIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 }
 
 func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
@@ -267,38 +223,15 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 
 // stakedAtBlock is a test helper that mocks the protocol state of test suite so that its verification identity is staked
 // at the reference block of its execution result.
-func (suite *AssignerEngineTestSuite) stakedAtBlock() {
-	suite.state.On("AtBlockID", suite.completeER.Receipt.ExecutionResult.BlockID).Return(suite.snapshot)
-	suite.snapshot.On("Identity", suite.verIdentity.NodeID).Return(suite.verIdentity, nil)
-}
-
-// stakedAtBlock is a test helper that mocks the protocol state of test suite so that its verification identity is staked
-// at the reference block of its execution result.
-func stakedAtBlock(s *AssignerEngineTest) {
+func stakedAtBlock(s *AssignerEngineTestSuite) {
 	s.state.On("AtBlockID", s.completeER.Receipt.ExecutionResult.BlockID).Return(s.snapshot)
 	s.snapshot.On("Identity", s.verIdentity.NodeID).Return(s.verIdentity, nil)
 }
 
 // assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks
-// of the execution result of this test suite to verification identity of this test suite.
-// It returns number of chunks assigned to verification node.
-func (suite *AssignerEngineTestSuite) assignAllChunks() int {
-	a := chunks.NewAssignment()
-	chunks := suite.completeER.Receipt.ExecutionResult.Chunks
-	for _, chunk := range chunks {
-		a.Add(chunk, flow.IdentifierList{suite.verIdentity.NodeID})
-	}
-	suite.assigner.On("Assign",
-		&suite.completeER.Receipt.ExecutionResult,
-		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
-
-	return len(chunks)
-}
-
-// assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks
 // of the execution result of the test suite to verification identity of the test suite.
 // It returns number of chunks assigned to verification node.
-func assignAllChunks(s *AssignerEngineTest) int {
+func assignAllChunks(s *AssignerEngineTestSuite) int {
 	a := chunks.NewAssignment()
 	chunks := s.completeER.Receipt.ExecutionResult.Chunks
 	for _, chunk := range chunks {
@@ -313,7 +246,7 @@ func assignAllChunks(s *AssignerEngineTest) int {
 
 // assignNoChunk is a test helper that mocks assigner of this test suite to assign no chunk
 // of the execution result of this test suite to verification identity of this test suite.
-func assignNoChunk(s *AssignerEngineTest) {
+func assignNoChunk(s *AssignerEngineTestSuite) {
 	s.assigner.On("Assign",
 		&s.completeER.Receipt.ExecutionResult,
 		s.completeER.Receipt.ExecutionResult.BlockID).Return(chunks.NewAssignment(), nil).Once()
