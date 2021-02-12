@@ -100,10 +100,7 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 }
 
 // NewAssignerEngine returns an assigner engine for testing.
-func NewAssignerEngine(s *AssignerEngineTestSuite, opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
-	for _, apply := range opts {
-		apply(s)
-	}
+func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 
 	e := New(zerolog.Logger{},
 		s.metrics,
@@ -152,6 +149,12 @@ func TestNewBlock_HappyPath(t *testing.T) {
 		s.assigner,
 		s.chunksQueue,
 		s.newChunkListener)
+}
+
+func TestNewBlock_Unstaked(t *testing.T) {
+	s := SetupTest(WithIdentity(
+		unittest.IdentityFixture(unittest.WithStake(0))))
+	e := NewAssignerEngine(s)
 }
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
