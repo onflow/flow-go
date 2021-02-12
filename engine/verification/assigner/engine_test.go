@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -53,6 +54,25 @@ func SetupTest(chunksNum int) *AssignerEngineTestSuite {
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 		completeER:       utils.LightExecutionResultFixture(chunksNum),
 	}
+}
+
+// createContainerBlock creates and returns a block that contains an execution receipt, with its corresponding chunks assignment based
+// on the input options.
+func createContainerBlock(options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.Block, *chunks.Assignment) {
+	result, assignment := test.CreateExecutionResult(unittest.IdentifierFixture(), options...)
+	receipt := &flow.ExecutionReceipt{
+		ExecutorID:      unittest.IdentifierFixture(),
+		ExecutionResult: *result,
+	}
+	// container block
+	header := unittest.BlockHeaderFixture()
+	block := &flow.Block{
+		Header: &header,
+		Payload: &flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{receipt},
+		},
+	}
+	return block, assignment
 }
 
 // NewAssignerEngine returns an assigner engine for testing.
