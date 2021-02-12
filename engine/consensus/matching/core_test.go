@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -138,28 +139,6 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-// Test that we drop receipts that are already pooled
-func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
-	receipt := unittest.ExecutionReceiptFixture(
-		unittest.WithExecutorID(ms.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
-	)
-
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
-
-	// setup the receipts mempool to check if we attempted to add the receipt to
-	// the mempool, and return false as we are testing the case where it was already in the mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(false, nil).Once()
-
-	// onReceipt should return immediately after realizing the receipt is already in the mempool
-	// but without throwing any errors
-	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should ignore already pending receipt")
-
-	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
 // Test that we store different receipts for the same result
 func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	originID := ms.ExeID
@@ -182,6 +161,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should not error for different receipt for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
@@ -198,13 +178,18 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
-
+	// The result should be added to the IncorporatedReceipts mempool (shortcut sealing Phase 2b):
+	// TODO: remove for later sealing phases
+	ms.ResultsPL.
+		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
+		Return(true, nil).Once()
 	// The receipt should be added to the receipts mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should not error for different receipt for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
@@ -221,12 +206,18 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	// we expect that receipt is added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
+	// setup the results mempool to check if we attempted to add the incorporated result
+	ms.ResultsPL.
+		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
+		Return(true, nil).Once()
+
 	// onReceipt should run to completion without throwing an error
 	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
 // TestOnReceiptInvalid tests that we reject receipts that don't pass the ReceiptValidator
@@ -238,14 +229,20 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 
+	// check that _expected_ failure case of invalid receipt is handled without error
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
-	ms.Assert().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "should handle error internally")
+
+	// check that _unexpected_ failure case causes the error to be escalated
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(fmt.Errorf("")).Once()
+	_, err = ms.matching.processReceipt(receipt)
+	ms.Require().Error(err, "should fail with exception")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
 // try to submit an approval where the message origin is inconsistent with the message creator
@@ -255,16 +252,14 @@ func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
 	err := ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
 
 	// approval from random origin but with valid ApproverID (i.e. a verification node)
 	originID = unittest.IdentifierFixture() // random origin
 	approval = unittest.ResultApprovalFixture(unittest.WithApproverID(ms.VerID))
 
 	err = ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "approval from unknown origin should be dropped but not error")
 
 	// In both cases, we expect the approval to be rejected without hitting the mempools
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -299,10 +294,15 @@ func (ms *MatchingSuite) TestOnApprovalInvalid() {
 		unittest.WithApproverID(originID),
 	)
 
+	// check that _expected_ failure case of invalid approval is handled without error
 	ms.approvalValidator.On("Validate", approval).Return(engine.NewInvalidInputError("")).Once()
-
 	err := ms.matching.OnApproval(approval.Body.ApproverID, approval)
-	ms.Require().Nil(err, "should report error if invalid")
+	ms.Require().NoError(err, "should handle error internally")
+
+	// check that unknown failure case is escalated
+	ms.approvalValidator.On("Validate", approval).Return(fmt.Errorf("")).Once()
+	err = ms.matching.OnApproval(approval.Body.ApproverID, approval)
+	ms.Require().Error(err, "should fail with exception")
 
 	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
