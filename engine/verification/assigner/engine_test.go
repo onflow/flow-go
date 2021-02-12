@@ -92,7 +92,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	// mocks verification node staked at the block of its execution result.
 	stakedAtBlock(s)
 	// assigns all chunks to verification node
-	chunksNum := assignAllChunks(s)
+	chunksNum := assignChunks(s)
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
@@ -149,7 +149,7 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 	stakedAtBlock(s)
 
 	// assigns all chunks to this verification node
-	chunksNum := assignAllChunks(s)
+	chunksNum := assignChunks(s)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue results in an error
@@ -179,7 +179,7 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	stakedAtBlock(s)
 
 	// assigns all chunks to this verification node.
-	chunksNum := assignAllChunks(s)
+	chunksNum := assignChunks(s)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
@@ -206,10 +206,10 @@ func stakedAtBlock(s *AssignerEngineTestSuite) {
 	s.snapshot.On("Identity", s.verIdentity.NodeID).Return(s.verIdentity, nil)
 }
 
-// assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks
+// assignChunks is a test helper that mocks assigner of this test suite to assign all chunks
 // of the execution result of the test suite to verification identity of the test suite.
 // It returns number of chunks assigned to verification node.
-func assignAllChunks(s *AssignerEngineTestSuite) int {
+func assignChunks(s *AssignerEngineTestSuite) int {
 	a := chunks.NewAssignment()
 	chunks := s.completeER.Receipt.ExecutionResult.Chunks
 	for _, chunk := range chunks {
