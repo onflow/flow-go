@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/verification/test"
-	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	module "github.com/onflow/flow-go/module/mock"
@@ -34,9 +33,6 @@ type AssignerEngineTestSuite struct {
 
 	// identities
 	verIdentity *flow.Identity // verification node
-
-	// fixtures
-	completeER utils.CompleteExecutionResult
 }
 
 func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) {
@@ -50,8 +46,13 @@ func (s *AssignerEngineTestSuite) mockStateAtBlockID(blockID flow.Identifier) {
 	s.snapshot.On("Identity", s.verIdentity.NodeID).Return(s.verIdentity, nil)
 }
 
+// myID is a test helper that returns identifier of verification identity.
+func (s *AssignerEngineTestSuite) myID() flow.Identifier {
+	return s.verIdentity.NodeID
+}
+
 // SetupTest initiates the test setups prior to each test.
-func SetupTest(chunksNum int) *AssignerEngineTestSuite {
+func SetupTest() *AssignerEngineTestSuite {
 	return &AssignerEngineTestSuite{
 		me:               &module.Local{},
 		state:            &protocol.State{},
@@ -63,7 +64,6 @@ func SetupTest(chunksNum int) *AssignerEngineTestSuite {
 		chunksQueue:      &storage.ChunksQueue{},
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		completeER:       utils.LightExecutionResultFixture(chunksNum),
 	}
 }
 
@@ -118,13 +118,14 @@ func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
 // a receipt results in the assigner engine passing all assigned chunks in the result of the receipt to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func TestNewBlock_HappyPath(t *testing.T) {
-	s := SetupTest(1)
+	s := SetupTest()
 	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
-	stakedAtBlock(s)
+	s.mockStateAtBlockID()
 	// assigns all chunks to verification node
 	chunksNum := assignChunks(t, s, 1)
+	createContainerBlock(test.WithChunks(test.WithAssignee(s.myID())))
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
