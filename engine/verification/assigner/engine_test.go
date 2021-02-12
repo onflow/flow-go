@@ -151,31 +151,31 @@ func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *
 // TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
 // a receipt results in the assigner engine passing all assigned chunks in the result of the receipt to the
 // chunks queue and notifying the job listener of the assigned chunks.
-func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
+func TestNewBlock_HappyPath(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
 	stakedAtBlock(s)
 	// assigns all chunks to verification node
-	chunksNum := suite.assignAllChunks()
+	chunksNum := assignAllChunks(s)
 
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
 	// invoked for it.
-	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
+	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(true, nil).
 		Times(chunksNum)
-	suite.newChunkListener.On("Check").Return().Times(chunksNum)
+	s.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
 
-	mock.AssertExpectationsForObjects(suite.T(),
-		suite.metrics,
-		suite.assigner,
-		suite.chunksQueue,
-		suite.newChunkListener)
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner,
+		s.chunksQueue,
+		s.newChunkListener)
 }
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
