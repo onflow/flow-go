@@ -32,15 +32,18 @@ type (
 	EventSink chan *Event // Channel to push pending events
 )
 
-// defaultApprovalQueueCapacity maximum capacity of approvals queue
+// defaultBlockQueueCapacity maximum capacity of block proposals queue
 const defaultBlockQueueCapacity = 10000
 
-// defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
+// defaultVoteQueueCapacity maximum capacity of block votes queue
 const defaultVoteQueueCapacity = 10000
 
+// Engine is a wrapper struct for `Core` which implements consensus algorithm.
+// Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
 	unit             *engine.Unit
 	log              zerolog.Logger
+	mempool          module.MempoolMetrics
 	metrics          module.EngineMetrics
 	me               module.Local
 	headers          storage.Headers
@@ -66,6 +69,7 @@ func NewEngine(
 		unit:             engine.NewUnit(),
 		log:              core.log,
 		me:               me,
+		mempool:          core.mempool,
 		metrics:          core.metrics,
 		headers:          core.headers,
 		payloads:         core.payloads,
@@ -85,18 +89,19 @@ func NewEngine(
 		return nil, fmt.Errorf("could not register core: %w", err)
 	}
 
+	// FIFO queue for block proposals
 	e.pendingBlocks, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
-		//fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceReceiptQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { e.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
 
-	// FIFO queue for broadcasted approvals
+	// FIFO queue for block votes
 	e.pendingVotes, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-		//fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { e.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)

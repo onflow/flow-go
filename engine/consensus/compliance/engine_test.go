@@ -2,6 +2,7 @@ package compliance
 
 import (
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -40,6 +41,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	<-cs.engine.Ready()
 }
 
+// TestSendVote tests that single vote can be send and properly processed
 func (cs *ComplianceSuite) TestSendVote() {
 	// create parameters to send a vote
 	blockID := unittest.IdentifierFixture()
@@ -72,6 +74,8 @@ func (cs *ComplianceSuite) TestSendVote() {
 	cs.con.AssertCalled(cs.T(), "Unicast", &vote, recipientID)
 }
 
+// TestBroadcastProposalWithDelay tests broadcasting proposals with different
+// inputs
 func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 
 	// add execution node to participants to make sure we exclude them from broadcast
@@ -141,24 +145,46 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	header.View--
 }
 
-func (cs *ComplianceSuite) TestSubmitingMultipleVotes() {
+// TestSubmittingMultipleVotes tests that we can send multiple votes and they
+// are queued and processed in expected way
+func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
-	for i := 0; i < voteCount; i++ {
-		vote := messages.BlockVote{
-			BlockID: unittest.IdentifierFixture(),
-			View:    rand.Uint64(),
-			SigData: unittest.SignatureFixture(),
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for i := 0; i < voteCount; i++ {
+			vote := messages.BlockVote{
+				BlockID: unittest.IdentifierFixture(),
+				View:    rand.Uint64(),
+				SigData: unittest.SignatureFixture(),
+			}
+			cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+			// execute the vote submission
+			_ = cs.engine.Process(originID, &vote)
 		}
-		cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
-		// execute the vote submission
-		_ = cs.engine.Process(originID, &vote)
-	}
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		// create a proposal that directly descends from the latest finalized header
+		originID := cs.participants[1].NodeID
+		block := unittest.BlockWithParentFixture(cs.head)
+		proposal := unittest.ProposalFromBlock(&block)
+
+		// store the data for retrieval
+		cs.headerDB[block.Header.ParentID] = cs.head
+		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+		_ = cs.engine.Process(originID, proposal)
+		wg.Done()
+	}()
+
+	wg.Wait()
 
 	time.Sleep(time.Second)
 
 	// check the submit vote was called with correct parameters
-	//cs.hotstuff.AssertCalled(cs.T(), "SubmitVote", originID, vote.BlockID, vote.View, vote.SigData)
 	cs.hotstuff.AssertExpectations(cs.T())
 }
