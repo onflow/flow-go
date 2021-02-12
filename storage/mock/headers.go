@@ -81,6 +81,29 @@ func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) 
 	return r0, r1
 }
 
+// IDByCollectionID provides a mock function with given fields: collectionID
+func (_m *Headers) IDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error) {
+	ret := _m.Called(collectionID)
+
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
+		r0 = rf(collectionID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collectionID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Store provides a mock function with given fields: header
 func (_m *Headers) Store(header *flow.Header) error {
 	ret := _m.Called(header)

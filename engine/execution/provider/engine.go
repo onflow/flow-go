@@ -149,16 +149,6 @@ func (e *Engine) onChunkDataRequest(
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
-	origin, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
-	}
-
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
 	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
@@ -168,7 +158,26 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	if err != nil {
-		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
+		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
+	}
+
+	blockID, err := e.execState.GetBlockIDByCollectionID(cdp.CollectionID)
+	if err != nil {
+		return fmt.Errorf("cannot find blockID corresponding to chunk collection ID (%s): %w", cdp.CollectionID, err)
+	}
+
+	origin, err := e.state.AtBlockID(blockID).Identity(originID)
+	if err != nil {
+		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
+	}
+
+	// only verifier nodes are allowed to request chunk data packs
+	if origin.Role != flow.RoleVerification {
+		return engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
+	}
+
+	if origin.Stake == 0 {
+		return engine.NewInvalidInputErrorf("node %s is not staked for the epoch corresponding to the requested chunk data pack", origin.NodeID)
 	}
 
 	var collection flow.Collection

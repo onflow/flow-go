@@ -214,6 +214,7 @@ func main() {
 				chunkDataPacks,
 				results,
 				receipts,
+				node.Storage.Headers,
 				node.DB,
 				node.Tracer,
 			)

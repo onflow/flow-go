@@ -130,3 +130,9 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 	err := h.db.View(operation.FindHeaders(filter, &blocks))
 	return blocks, err
 }
+
+func (h *Headers) IDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error) {
+	var blockID flow.Identifier
+	err := h.db.View(operation.LookupCollectionBlock(collectionID, &blockID))
+	return blockID, err
+}

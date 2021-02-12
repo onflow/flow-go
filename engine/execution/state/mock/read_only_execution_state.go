@@ -41,6 +41,29 @@ func (_m *ReadOnlyExecutionState) ChunkDataPackByChunkID(_a0 context.Context, _a
 	return r0, r1
 }
 
+// GetBlockIDByCollectionID provides a mock function with given fields: collectionID
+func (_m *ReadOnlyExecutionState) GetBlockIDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error) {
+	ret := _m.Called(collectionID)
+
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
+		r0 = rf(collectionID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.Identifier)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collectionID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetCollection provides a mock function with given fields: identifier
 func (_m *ReadOnlyExecutionState) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
 	ret := _m.Called(identifier)

@@ -49,6 +49,8 @@ type ReadOnlyExecutionState interface {
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
 	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
+
+	GetBlockIDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error)
 }
 
 // IsBlockExecuted returns whether the block has been executed.
@@ -110,6 +112,7 @@ type state struct {
 	chunkDataPacks storage.ChunkDataPacks
 	results        storage.ExecutionResults
 	receipts       storage.ExecutionReceipts
+	headers        storage.Headers
 	db             *badger.DB
 }
 
@@ -144,6 +147,7 @@ func NewExecutionState(
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
+	headers storage.Headers,
 	db *badger.DB,
 	tracer module.Tracer,
 ) ExecutionState {
@@ -156,6 +160,7 @@ func NewExecutionState(
 		chunkDataPacks: chunkDataPacks,
 		results:        results,
 		receipts:       receipts,
+		headers:        headers,
 		db:             db,
 	}
 
@@ -458,6 +463,10 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 
 func (s *state) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
 	return s.collections.ByID(identifier)
+}
+
+func (s *state) GetBlockIDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error) {
+	return s.headers.IDByCollectionID(collectionID)
 }
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {
