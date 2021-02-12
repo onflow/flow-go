@@ -329,7 +329,7 @@ type TransactionMetrics interface {
 }
 
 type PingMetrics interface {
-	// NodeReachable tracks the node availability of the node and reports it as 1 if the node was successfully pinged, 0
-	// otherwise. The nodeInfo provides additional information about the node such as the name of the node operator
-	NodeReachable(node *flow.Identity, nodeInfo string, reachable bool)
+	// NodeReachable tracks the round trip time in milliseconds taken to ping a node
+	// The nodeInfo provides additional information about the node such as the name of the node operator
+	NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration)
 }
