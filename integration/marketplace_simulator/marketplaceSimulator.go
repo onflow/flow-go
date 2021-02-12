@@ -161,6 +161,25 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		}
 	}
 
+	// add extra keys to accounts
+	wg := sync.WaitGroup{}
+	for i := 0; i < len(m.marketAccounts); i++ {
+		j := i
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
+			m.log.Info().Msg("adding keys to accounts")
+			// mint a lot of moments
+			err = m.marketAccounts[j].Account().AddKeys(m.log, m.txTracker, m.flowClient, 20)
+			if err != nil {
+				m.log.Error().Msgf("adding a play to a set has been failed: %w", err)
+			}
+		}()
+		// totalMinted += batchSize
+		time.Sleep(time.Millisecond * 400)
+	}
+	wg.Wait()
+
 	// numBuckets := 32
 	// // setup nba account to use sharded collections
 	// script := nbaTemplates.GenerateSetupShardedCollectionScript(*nbaAddress, *nbaAddress, numBuckets)
@@ -225,8 +244,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	totalMinted := 0
 	momentsPerAccount := 5000
 	steps := len(m.marketAccounts)
-	wg := sync.WaitGroup{}
 
+	wg = sync.WaitGroup{}
 	for p := 0; p < momentsPerAccount/batchSize; p++ {
 
 		blockRef, err = m.flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -328,7 +347,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 				tx := flowsdk.NewTransaction().
 					SetReferenceBlockID(blockRef.ID).
 					SetScript(script)
-				result, err := ma.sendTxAndWait(tx, ma.Account())
+				result, err := ma.sendTxAndWait(tx, ma.Account(), 0)
 				if err != nil || result.Error != nil {
 					m.log.Error().Msgf("setting up marketplace accounts failed: %w , %w", result, err)
 				}
@@ -725,11 +744,6 @@ func (m *marketPlaceAccount) Act() error {
 			continue
 		}
 
-		transferSize := 10
-		// // TODO txScript for assetToMove
-		// Transfer moment to a friend
-		friend := m.friends[rand.Intn(len(m.friends))]
-
 		moments, err := m.GetMoments()
 		if err != nil {
 			time.Sleep(time.Second)
@@ -739,96 +753,119 @@ func (m *marketPlaceAccount) Act() error {
 			time.Sleep(time.Second)
 			continue
 		}
+
+		transferSize := 100
 		r := rand.Intn(len(moments) - transferSize - 1)
 		selected := moments[r : r+transferSize]
 
+		numberOfTx := 10
+		f := rand.Intn(len(m.friends) - numberOfTx - 1)
+		friends := m.friends[f : f+numberOfTx]
+
+		// subsetSize := transferSize / numberOfTx
+
+		wg := sync.WaitGroup{}
+
+		for j := 0; j < len(friends); j++ {
+			p := j
+			go func() {
+				wg.Add(1)
+				defer wg.Done()
+
+				txScript := generateBatchTransferMomentfromShardedCollectionScript(m.simulatorConfig.NBATopshotAddress,
+					m.simulatorConfig.NBATopshotAddress,
+					m.simulatorConfig.NBATopshotAddress,
+					friends[p].Address,
+					selected[p*10:p*10+10]) // TODO change me to params
+
+				tx := flowsdk.NewTransaction().
+					SetReferenceBlockID(blockRef.ID).
+					SetScript(txScript)
+
+				result, err := m.sendTxAndWait(tx, m.Account(), p)
+				if err != nil || result.Error != nil {
+					m.log.Error().Msgf("marketplace tx failed: %w , %w", result, err)
+				}
+			}()
+		}
+		wg.Wait()
 		// TODO ramtin fix the fetch
 		// txScript := generateBatchTransferMomentScript(m.simulatorConfig.NBATopshotAddress,
 		// 	m.simulatorConfig.NBATopshotAddress,
 		// 	friend.Address,
 		// 	[]uint64{moment})
 
-		txScript := generateBatchTransferMomentfromShardedCollectionScript(m.simulatorConfig.NBATopshotAddress,
-			m.simulatorConfig.NBATopshotAddress,
-			m.simulatorConfig.NBATopshotAddress,
-			friend.Address,
-			selected)
+		// 	err = m.Account().PrepareAndSignTx(tx, 0)
+		// 	if err != nil {
+		// 		return fmt.Errorf("error preparing and signing the transaction: %w", err)
+		// 	}
 
-		tx := flowsdk.NewTransaction().
-			SetReferenceBlockID(blockRef.ID).
-			SetScript(txScript)
+		// 	m.log.Debug().Msgf("transfering moments (%d) from account %s to account %s (proposer %s, seq number %d)  :",
+		// 		moments, m.Account().Address, friend.Address,
+		// 		tx.ProposalKey.Address, tx.ProposalKey.SequenceNumber,
+		// 	)
 
-		err = m.Account().PrepareAndSignTx(tx, 0)
-		if err != nil {
-			return fmt.Errorf("error preparing and signing the transaction: %w", err)
-		}
+		// 	// wait till success and then update the list
+		// 	// send tx
+		// 	err = m.flowClient.SendTransaction(context.Background(), *tx)
+		// 	if err != nil {
+		// 		return fmt.Errorf("error sending transaction: %w", err)
+		// 	}
 
-		m.log.Debug().Msgf("transfering moments (%d) from account %s to account %s (proposer %s, seq number %d)  :",
-			moments, m.Account().Address, friend.Address,
-			tx.ProposalKey.Address, tx.ProposalKey.SequenceNumber,
-		)
+		// 	// tracking
+		// 	stopped := false
+		// 	wg := sync.WaitGroup{}
+		// 	wg.Add(1)
+		// 	m.txTracker.AddTx(tx.ID(),
+		// 		nil,
+		// 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+		// 			defer wg.Done()
 
-		// wait till success and then update the list
-		// send tx
-		err = m.flowClient.SendTransaction(context.Background(), *tx)
-		if err != nil {
-			return fmt.Errorf("error sending transaction: %w", err)
-		}
+		// 			m.log.Debug().
+		// 				Str("status", res.Status.String()).
+		// 				Msg("marketplace tx executed")
 
-		// tracking
-		stopped := false
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		m.txTracker.AddTx(tx.ID(),
-			nil,
-			func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-				defer wg.Done()
-
-				m.log.Debug().
-					Str("status", res.Status.String()).
-					Msg("marketplace tx executed")
-
-				if res.Error != nil {
-					m.log.Error().
-						Err(res.Error).
-						Msg("marketplace tx failed")
-				}
-			},
-			nil, // on sealed
-			func(_ flowsdk.Identifier) {
-				m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
-				if !stopped {
-					stopped = true
-					wg.Done()
-				}
-			}, // on expired
-			func(_ flowsdk.Identifier) {
-				m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
-				if !stopped {
-					stopped = true
-					wg.Done()
-				}
-			}, // on timout
-			func(_ flowsdk.Identifier, err error) {
-				m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
-				if !stopped {
-					stopped = true
-					wg.Done()
-				}
-			}, // on error
-			120)
-		wg.Wait()
+		// 			if res.Error != nil {
+		// 				m.log.Error().
+		// 					Err(res.Error).
+		// 					Msg("marketplace tx failed")
+		// 			}
+		// 		},
+		// 		nil, // on sealed
+		// 		func(_ flowsdk.Identifier) {
+		// 			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+		// 			if !stopped {
+		// 				stopped = true
+		// 				wg.Done()
+		// 			}
+		// 		}, // on expired
+		// 		func(_ flowsdk.Identifier) {
+		// 			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+		// 			if !stopped {
+		// 				stopped = true
+		// 				wg.Done()
+		// 			}
+		// 		}, // on timout
+		// 		func(_ flowsdk.Identifier, err error) {
+		// 			m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
+		// 			if !stopped {
+		// 				stopped = true
+		// 				wg.Done()
+		// 			}
+		// 		}, // on error
+		// 		120)
+		// 	wg.Wait()
 	}
 
 	return nil
 }
 
-func (m *marketPlaceAccount) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount) (*flowsdk.TransactionResult, error) {
+func (m *marketPlaceAccount) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount, keyIndex int) (*flowsdk.TransactionResult, error) {
 
 	var result *flowsdk.TransactionResult
 	var err error
 
-	err = sender.PrepareAndSignTx(tx, 0)
+	err = sender.PrepareAndSignTx(tx, keyIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error preparing and signing the transaction: %w", err)
 	}
