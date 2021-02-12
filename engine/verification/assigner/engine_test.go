@@ -245,11 +245,13 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
-	block, assignment := createContainerBlock(
-		test.WithChunks(
-			test.WithAssignee(s.myID())))
-	s.mockStateAtBlockID(block.ID())
-	chunksNum := s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	// creates a container block, with a single receipt, that contains a single chunk assigned
+	// to verification node.
+	containerBlock, assignment := createContainerBlock(
+		test.WithChunks(test.WithAssignee(s.myID())))
+	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	s.mockStateAtBlockID(result.BlockID)
+	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 1)
 
 	// mocks processing assigned chunks
@@ -259,7 +261,7 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 		Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(block)
+	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
