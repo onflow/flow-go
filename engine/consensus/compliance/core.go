@@ -23,6 +23,8 @@ import (
 
 // Core is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
+// NOTE: Core is designed to be non-thread safe and cannot be used in concurrent environment
+// user of this object needs to ensure single thread access.
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
 	metrics           module.EngineMetrics
