@@ -323,6 +323,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 
 		wg := sync.WaitGroup{}
 
+		fmt.Println("len of group -->", len(group))
 		for _, acc := range group {
 			c := acc
 			ma := newMarketPlaceAccount(&c, group, m.log, txTracker, flowClient, m.simulatorConfig, accessNode)
@@ -759,6 +760,7 @@ func (m *marketPlaceAccount) Act() error {
 		selected := moments[r : r+transferSize]
 
 		numberOfTx := 10
+		fmt.Println("-->", len(m.friends))
 		f := rand.Intn(len(m.friends) - numberOfTx - 1)
 		friends := m.friends[f : f+numberOfTx]
 
