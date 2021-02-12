@@ -150,7 +150,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 }
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
-// a receipt with no assigned chunk for the verification node in its result. Assigner engine should
+// a receipt with no chunk in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should not notify the job listener.
 func TestNewBlock_NoChunk(t *testing.T) {
 	s := SetupTest()
@@ -169,6 +169,37 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
 
 	// when there is no chunk, nothing should be passed to chunks queue, and
+	// job listener should not be notified.
+	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
+	s.newChunkListener.AssertNotCalled(t, "Check")
+}
+
+// TestNewBlock_NoAssignedChunk evaluates passing a new finalized block to assigner engine that contains
+// a receipt with no assigned chunk for the verification node in its result. Assigner engine should
+// not pass any chunk to the chunks queue, and should not notify the job listener.
+func TestNewBlock_NoAssignedChunk(t *testing.T) {
+	s := SetupTest()
+	e := NewAssignerEngine(s)
+
+	// creates a container block, with a single receipt, that contains 5 chunks, but
+	// none of them is assigned to this verification node.
+	containerBlock, assignment := createContainerBlock(
+		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()),
+			test.WithAssignee(unittest.IdentifierFixture()),
+			test.WithAssignee(unittest.IdentifierFixture()),
+			test.WithAssignee(unittest.IdentifierFixture()),
+			test.WithAssignee(unittest.IdentifierFixture())))
+	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	s.mockStateAtBlockID(result.BlockID)
+	chunksNum := s.mockChunkAssigner(result, assignment)
+	require.Equal(t, chunksNum, 0)
+
+	// sends block containing receipt to assigner engine
+	e.ProcessFinalizedBlock(containerBlock)
+
+	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
+
+	// when there is no assigned chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
 	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
 	s.newChunkListener.AssertNotCalled(t, "Check")
