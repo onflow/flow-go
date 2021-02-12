@@ -39,8 +39,15 @@ type AssignerEngineTestSuite struct {
 	completeER utils.CompleteExecutionResult
 }
 
-func (s *AssignerEngineTestSuite) MockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) {
+func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) {
 	s.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
+}
+
+// mockStateAtBlockID is a test helper that mocks the protocol state of test suite at the given block id. This is the
+// underlying protocol state of the verification node of the test suite.
+func (s *AssignerEngineTestSuite) mockStateAtBlockID(blockID flow.Identifier) {
+	s.state.On("AtBlockID", blockID).Return(s.snapshot)
+	s.snapshot.On("Identity", s.verIdentity.NodeID).Return(s.verIdentity, nil)
 }
 
 // SetupTest initiates the test setups prior to each test.
@@ -149,7 +156,7 @@ func TestNewBlock_NoChunk(t *testing.T) {
 
 	// assigns no chunk to this verification node
 	block, assignment := createContainerBlock()
-	s.MockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(block)
@@ -221,13 +228,6 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
-// stakedAtBlock is a test helper that mocks the protocol state of test suite so that its verification identity is staked
-// at the reference block of its execution result.
-func stakedAtBlock(s *AssignerEngineTestSuite) {
-	s.state.On("AtBlockID", s.completeER.Receipt.ExecutionResult.BlockID).Return(s.snapshot)
-	s.snapshot.On("Identity", s.verIdentity.NodeID).Return(s.verIdentity, nil)
 }
 
 // assignChunks is a test helper that mocks assigner of this test suite to assign all chunks
