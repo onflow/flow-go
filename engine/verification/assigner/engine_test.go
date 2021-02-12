@@ -152,11 +152,11 @@ func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *
 // a receipt results in the assigner engine passing all assigned chunks in the result of the receipt to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func (suite *AssignerEngineTestSuite) TestNewBlock_HappyPath() {
-	e := suite.NewAssignerEngine()
+	s := SetupTest()
+	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
-	suite.stakedAtBlock()
-
+	stakedAtBlock(s)
 	// assigns all chunks to verification node
 	chunksNum := suite.assignAllChunks()
 
@@ -289,6 +289,22 @@ func (suite *AssignerEngineTestSuite) assignAllChunks() int {
 	suite.assigner.On("Assign",
 		&suite.completeER.Receipt.ExecutionResult,
 		suite.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
+
+	return len(chunks)
+}
+
+// assignAllChunks is a test helper that mocks assigner of this test suite to assign all chunks
+// of the execution result of the test suite to verification identity of the test suite.
+// It returns number of chunks assigned to verification node.
+func assignAllChunks(s *AssignerEngineTest) int {
+	a := chunks.NewAssignment()
+	chunks := s.completeER.Receipt.ExecutionResult.Chunks
+	for _, chunk := range chunks {
+		a.Add(chunk, flow.IdentifierList{s.verIdentity.NodeID})
+	}
+	s.assigner.On("Assign",
+		&s.completeER.Receipt.ExecutionResult,
+		s.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
 
 	return len(chunks)
 }
