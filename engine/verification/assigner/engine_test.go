@@ -35,6 +35,8 @@ type AssignerEngineTestSuite struct {
 	verIdentity *flow.Identity // verification node
 }
 
+// mockChunkAssigner mocks the chunk assigner of this test suite to assign the chunks based on the input assignment.
+// It returns number of chunks assigned to verification node of this test suite.
 func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) int {
 	s.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 	assignedChunks := assignment.ByNodeID(s.myID())
