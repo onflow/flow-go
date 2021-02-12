@@ -56,9 +56,9 @@ func SetupTest(chunksNum int) *AssignerEngineTestSuite {
 
 // NewAssignerEngine returns an assigner engine for testing.
 func NewAssignerEngine(s *AssignerEngineTestSuite, opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
-	//for _, apply := range opts {
-	//	apply(s)
-	//}
+	for _, apply := range opts {
+		apply(s)
+	}
 
 	e := New(zerolog.Logger{},
 		s.metrics,
@@ -80,28 +80,6 @@ func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
 	return func(testSuite *AssignerEngineTestSuite) {
 		testSuite.verIdentity = identity
 	}
-}
-
-// NewAssignerEngine returns an assigner engine for testing.
-func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *AssignerEngineTestSuite)) *Engine {
-	for _, apply := range opts {
-		apply(suite)
-	}
-
-	e := New(zerolog.Logger{},
-		suite.metrics,
-		suite.tracer,
-		suite.me,
-		suite.state,
-		suite.headerStorage,
-		suite.assigner,
-		suite.chunksQueue,
-		suite.newChunkListener)
-
-	// mocks identity of the verification node
-	suite.me.On("NodeID").Return(suite.verIdentity.NodeID)
-
-	return e
 }
 
 // TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
