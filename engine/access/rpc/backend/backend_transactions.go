@@ -211,8 +211,7 @@ func (b *backendTransactions) GetTransactionResult(
 				// and return status as unknown
 				status := flow.TransactionStatusUnknown
 				return &access.TransactionResult{
-					Status:     status,
-					StatusCode: uint(status),
+					Status: status,
 				}, nil
 			}
 			return historicalTxResult, nil
@@ -230,13 +229,12 @@ func (b *backendTransactions) GetTransactionResult(
 	// since if the transaction is still not finalized, then it would definitely not be sealed
 	if status < flow.TransactionStatusFinalized {
 		return &access.TransactionResult{
-			Status:     status,
-			StatusCode: uint(status),
+			Status: status,
 		}, nil
 	}
 
 	// get events for the transaction
-	executed, events, _, txError, err := b.lookupTransactionResult(ctx, txID)
+	executed, events, statusCode, txError, err := b.lookupTransactionResult(ctx, txID)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -244,8 +242,7 @@ func (b *backendTransactions) GetTransactionResult(
 	// if not yet executed, then return the status derived previously
 	if !executed {
 		return &access.TransactionResult{
-			Status:     status,
-			StatusCode: uint(status),
+			Status: status,
 		}, nil
 	}
 
@@ -259,7 +256,7 @@ func (b *backendTransactions) GetTransactionResult(
 
 	return &access.TransactionResult{
 		Status:       status,
-		StatusCode:   uint(status),
+		StatusCode:   uint(statusCode),
 		Events:       events,
 		ErrorMessage: txError,
 	}, nil
