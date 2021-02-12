@@ -323,6 +323,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 
 		wg := sync.WaitGroup{}
 
+		fmt.Println("len of group -->", len(group))
 		for _, acc := range group {
 			c := acc
 			ma := newMarketPlaceAccount(&c, group, m.log, txTracker, flowClient, m.simulatorConfig, accessNode)
