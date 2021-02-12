@@ -126,6 +126,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	block, assignment := createContainerBlock(
 		test.WithChunks(
 			test.WithAssignee(s.myID())))
+	s.mockStateAtBlockID(block.ID())
 	chunksNum := s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
 	require.Equal(t, chunksNum, 1)
 
@@ -152,10 +153,6 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
-	// mocks verification node staked at the block of its execution result.
-	stakedAtBlock(s)
-
-	// assigns no chunk to this verification node
 	block, assignment := createContainerBlock()
 	s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
 
@@ -164,7 +161,7 @@ func TestNewBlock_NoChunk(t *testing.T) {
 
 	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
 
-	// when there is no assigned chunk, nothing should be passed to chunks queue, and
+	// when there is no chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
 	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
 	s.newChunkListener.AssertNotCalled(t, "Check")
@@ -174,14 +171,15 @@ func TestNewBlock_NoChunk(t *testing.T) {
 // chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
 // added to the chunks queue, the consumer should not be notified.
 func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
-	s := SetupTest(1)
+	s := SetupTest()
 	e := NewAssignerEngine(s)
 
-	// mocks verification node staked at the block of its execution result.
-	stakedAtBlock(s)
-
-	// assigns all chunks to this verification node
-	chunksNum := assignChunks(t, s, 1)
+	block, assignment := createContainerBlock(
+		test.WithChunks(
+			test.WithAssignee(s.myID())))
+	s.mockStateAtBlockID(block.ID())
+	chunksNum := s.mockChunkAssigner(&block.Payload.Receipts[0].ExecutionResult, assignment)
+	require.Equal(t, chunksNum, 1)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue results in an error
@@ -190,7 +188,7 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 		Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(block)
 
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
@@ -229,24 +227,4 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
-// assignChunks is a test helper that mocks assigner of this test suite to assign all chunks
-// of the execution result of the test suite to verification identity of the test suite.
-// It returns number of chunks assigned to verification node.
-func assignChunks(t *testing.T, s *AssignerEngineTestSuite, chunksNum int) int {
-	// number of assigned chunks should be less than or equal the number of chunks in
-	// execution result.
-	require.LessOrEqual(t, len(s.completeER.Receipt.ExecutionResult.Chunks), chunksNum)
-
-	a := chunks.NewAssignment()
-	chunks := s.completeER.Receipt.ExecutionResult.Chunks
-	for _, chunk := range chunks {
-		a.Add(chunk, flow.IdentifierList{s.verIdentity.NodeID})
-	}
-	s.assigner.On("Assign",
-		&s.completeER.Receipt.ExecutionResult,
-		s.completeER.Receipt.ExecutionResult.BlockID).Return(a, nil).Once()
-
-	return len(chunks)
 }
