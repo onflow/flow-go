@@ -288,7 +288,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// break accounts into batches of 10
 	// TODO not share the same client
 
-	groupSize := 10
+	groupSize := 100
 	// momentCounter := uint64(1)
 	// numBuckets := 10
 	// totalMinted := 0
@@ -323,7 +323,6 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 
 		wg := sync.WaitGroup{}
 
-		fmt.Println("len of group -->", len(group))
 		for _, acc := range group {
 			c := acc
 			ma := newMarketPlaceAccount(&c, group, m.log, txTracker, flowClient, m.simulatorConfig, accessNode)
