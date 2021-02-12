@@ -207,31 +207,32 @@ func TestNewBlock_NoChunk(t *testing.T) {
 // TestChunkQueue_UnhappyPath_Error evaluates that if chunk queue returns an error upon submission of a
 // chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
 // added to the chunks queue, the consumer should not be notified.
-func (suite *AssignerEngineTestSuite) TestChunkQueue_UnhappyPath_Error() {
-	e := suite.NewAssignerEngine()
+func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
+	s := SetupTest()
+	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
-	suite.stakedAtBlock()
+	stakedAtBlock(s)
 
 	// assigns all chunks to this verification node
-	chunksNum := suite.assignAllChunks()
+	chunksNum := assignAllChunks(s)
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue results in an error
-	suite.chunksQueue.On("StoreChunkLocator", mock.Anything).
+	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
 		Return(false, fmt.Errorf("error")).
 		Times(chunksNum)
 
 	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(suite.completeER.ContainerBlock)
+	e.ProcessFinalizedBlock(s.completeER.ContainerBlock)
 
-	mock.AssertExpectationsForObjects(suite.T(),
-		suite.metrics,
-		suite.assigner,
-		suite.chunksQueue)
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner,
+		s.chunksQueue)
 
 	// job listener should not be notified as no new chunk is added.
-	suite.newChunkListener.AssertNotCalled(suite.T(), "Check")
+	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
 // TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
