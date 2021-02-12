@@ -176,7 +176,7 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	// job listener should not be notified.
 	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
 	s.newChunkListener.AssertNotCalled(t, "Check")
-	s.assigner.AssertCalled(t, "Assign")
+	s.assigner.AssertNotCalled(t, "Assign")
 
 	mock.AssertExpectationsForObjects(t, s.metrics)
 }
