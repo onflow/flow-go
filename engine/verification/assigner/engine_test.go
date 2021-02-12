@@ -38,7 +38,7 @@ type AssignerEngineTestSuite struct {
 }
 
 // SetupTest initiates the test setups prior to each test.
-func SetupTest() *AssignerEngineTestSuite {
+func SetupTest(chunksNum int) *AssignerEngineTestSuite {
 	return &AssignerEngineTestSuite{
 		me:               &module.Local{},
 		state:            &protocol.State{},
@@ -50,7 +50,7 @@ func SetupTest() *AssignerEngineTestSuite {
 		chunksQueue:      &storage.ChunksQueue{},
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		completeER:       utils.LightExecutionResultFixture(1),
+		completeER:       utils.LightExecutionResultFixture(chunksNum),
 	}
 }
 
@@ -108,7 +108,7 @@ func (suite *AssignerEngineTestSuite) NewAssignerEngine(opts ...func(testSuite *
 // a receipt results in the assigner engine passing all assigned chunks in the result of the receipt to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func TestNewBlock_HappyPath(t *testing.T) {
-	s := SetupTest()
+	s := SetupTest(1)
 	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
@@ -138,7 +138,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 // a receipt with no assigned chunk for the verification node in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should not notify the job listener.
 func TestNewBlock_NoChunk(t *testing.T) {
-	s := SetupTest()
+	s := SetupTest(1)
 	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
@@ -164,7 +164,7 @@ func TestNewBlock_NoChunk(t *testing.T) {
 // chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
 // added to the chunks queue, the consumer should not be notified.
 func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
-	s := SetupTest()
+	s := SetupTest(1)
 	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
@@ -194,7 +194,7 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 // TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
 // This is important as without a new chunk successfully added to the chunks queue, the consumer should not be notified.
 func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
-	s := SetupTest()
+	s := SetupTest(1)
 	e := NewAssignerEngine(s)
 
 	// mocks verification node staked at the block of its execution result.
