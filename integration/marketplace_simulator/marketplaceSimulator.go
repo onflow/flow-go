@@ -242,7 +242,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	batchSize := 100
 	// steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
-	momentsPerAccount := 5000
+	momentsPerAccount := 2000
 	steps := len(m.marketAccounts)
 
 	wg = sync.WaitGroup{}
@@ -288,7 +288,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// break accounts into batches of 10
 	// TODO not share the same client
 
-	groupSize := 100
+	groupSize := 10
 	// momentCounter := uint64(1)
 	// numBuckets := 10
 	// totalMinted := 0
@@ -758,16 +758,17 @@ func (m *marketPlaceAccount) Act() error {
 		r := rand.Intn(len(moments) - transferSize - 1)
 		selected := moments[r : r+transferSize]
 
-		numberOfTx := 10
-		fmt.Println("-->", len(m.friends))
-		f := rand.Intn(len(m.friends) - numberOfTx - 1)
-		friends := m.friends[f : f+numberOfTx]
+		// send to all friends
+		// numberOfTx := 10
+		// fmt.Println("-->", len(m.friends))
+		// f := rand.Intn(len(m.friends) - numberOfTx - 1)
+		// friends := m.friends[f : f+numberOfTx]
 
 		// subsetSize := transferSize / numberOfTx
 
 		wg := sync.WaitGroup{}
 
-		for j := 0; j < len(friends); j++ {
+		for j := 0; j < len(m.friends); j++ {
 			p := j
 			go func() {
 				wg.Add(1)
@@ -776,7 +777,7 @@ func (m *marketPlaceAccount) Act() error {
 				txScript := generateBatchTransferMomentfromShardedCollectionScript(m.simulatorConfig.NBATopshotAddress,
 					m.simulatorConfig.NBATopshotAddress,
 					m.simulatorConfig.NBATopshotAddress,
-					friends[p].Address,
+					m.friends[p].Address,
 					selected[p*10:p*10+10]) // TODO change me to params
 
 				tx := flowsdk.NewTransaction().
