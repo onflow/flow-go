@@ -639,6 +639,8 @@ func (m *MarketPlaceSimulator) Run() error {
 			fmt.Println("err: ", err)
 			// TODO handle the retuned error
 		}()
+		// TODO RAMTIN temporary
+		break
 	}
 
 	return nil
@@ -770,6 +772,7 @@ func (m *marketPlaceAccount) Act() error {
 
 		share := len(selected) / len(m.friends)
 
+		fmt.Println(moments)
 		fmt.Println("---|--->", share, len(selected), len(m.friends))
 		for j := 0; j < len(m.friends); j++ {
 			p := j
@@ -783,6 +786,7 @@ func (m *marketPlaceAccount) Act() error {
 					m.friends[p].Address,
 					selected[p*share:p*share+share]) // TODO change me to params
 
+				fmt.Println(selected[p*share : p*share+share])
 				tx := flowsdk.NewTransaction().
 					SetReferenceBlockID(blockRef.ID).
 					SetScript(txScript)
