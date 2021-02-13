@@ -768,6 +768,9 @@ func (m *marketPlaceAccount) Act() error {
 
 		wg := sync.WaitGroup{}
 
+		share := len(selected) / len(m.friends)
+
+		fmt.Println("---|--->", share, len(selected), len(m.friends))
 		for j := 0; j < len(m.friends); j++ {
 			p := j
 			go func() {
@@ -778,7 +781,7 @@ func (m *marketPlaceAccount) Act() error {
 					m.simulatorConfig.NBATopshotAddress,
 					m.simulatorConfig.NBATopshotAddress,
 					m.friends[p].Address,
-					selected[p*10:p*10+10]) // TODO change me to params
+					selected[p*share:p*share+share]) // TODO change me to params
 
 				tx := flowsdk.NewTransaction().
 					SetReferenceBlockID(blockRef.ID).
