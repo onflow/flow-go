@@ -864,6 +864,7 @@ func (m *marketPlaceAccount) Act() error {
 		// 		}, // on error
 		// 		120)
 		// 	wg.Wait()
+		time.Sleep(time.Millisecond * 400)
 	}
 
 	return nil
@@ -926,7 +927,7 @@ func (m *marketPlaceAccount) sendTxAndWait(tx *flowsdk.Transaction, sender *flow
 		360)
 	wg.Wait()
 
-	return result, nil
+	return result, err
 }
 
 func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
