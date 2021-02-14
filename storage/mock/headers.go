@@ -81,13 +81,13 @@ func (_m *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) 
 	return r0, r1
 }
 
-// IDByCollectionID provides a mock function with given fields: collectionID
-func (_m *Headers) IDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error) {
-	ret := _m.Called(collectionID)
+// IDByChunkID provides a mock function with given fields: chunkID
+func (_m *Headers) IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
+	ret := _m.Called(chunkID)
 
 	var r0 flow.Identifier
 	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
-		r0 = rf(collectionID)
+		r0 = rf(chunkID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
@@ -96,12 +96,26 @@ func (_m *Headers) IDByCollectionID(collectionID flow.Identifier) (flow.Identifi
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(collectionID)
+		r1 = rf(chunkID)
 	} else {
 		r1 = ret.Error(1)
 	}
 
 	return r0, r1
+}
+
+// IndexByChunkID provides a mock function with given fields: headerID, chunkID
+func (_m *Headers) IndexByChunkID(headerID flow.Identifier, chunkID flow.Identifier) error {
+	ret := _m.Called(headerID, chunkID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
+		r0 = rf(headerID, chunkID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Store provides a mock function with given fields: header

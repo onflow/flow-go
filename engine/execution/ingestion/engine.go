@@ -1108,7 +1108,7 @@ func (e *Engine) saveExecutionResults(
 
 		chdp := generateChunkDataPack(chunk, collectionID, proof)
 
-		err = e.execState.PersistChunkDataPack(childCtx, chdp)
+		err = e.execState.PersistChunkDataPack(childCtx, chdp, blockID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
 		}

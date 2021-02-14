@@ -64,13 +64,13 @@ func (_m *ExecutionState) CommitDelta(_a0 context.Context, _a1 delta.Delta, _a2 
 	return r0, r1
 }
 
-// GetBlockIDByCollectionID provides a mock function with given fields: collectionID
-func (_m *ExecutionState) GetBlockIDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error) {
-	ret := _m.Called(collectionID)
+// GetBlockIDByChunkID provides a mock function with given fields: chunkID
+func (_m *ExecutionState) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
+	ret := _m.Called(chunkID)
 
 	var r0 flow.Identifier
 	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
-		r0 = rf(collectionID)
+		r0 = rf(chunkID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(flow.Identifier)
@@ -79,7 +79,7 @@ func (_m *ExecutionState) GetBlockIDByCollectionID(collectionID flow.Identifier)
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(collectionID)
+		r1 = rf(chunkID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -225,13 +225,13 @@ func (_m *ExecutionState) NewView(_a0 []byte) *delta.View {
 	return r0
 }
 
-// PersistChunkDataPack provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) PersistChunkDataPack(_a0 context.Context, _a1 *flow.ChunkDataPack) error {
-	ret := _m.Called(_a0, _a1)
+// PersistChunkDataPack provides a mock function with given fields: _a0, _a1, _a2
+func (_m *ExecutionState) PersistChunkDataPack(_a0 context.Context, _a1 *flow.ChunkDataPack, _a2 flow.Identifier) error {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ChunkDataPack) error); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.ChunkDataPack, flow.Identifier) error); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		r0 = ret.Error(0)
 	}

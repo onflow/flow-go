@@ -161,9 +161,9 @@ func (e *Engine) onChunkDataRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
 	}
 
-	blockID, err := e.execState.GetBlockIDByCollectionID(cdp.CollectionID)
+	blockID, err := e.execState.GetBlockIDByChunkID(cdp.ChunkID)
 	if err != nil {
-		return fmt.Errorf("cannot find blockID corresponding to chunk collection ID (%s): %w", cdp.CollectionID, err)
+		return fmt.Errorf("cannot find blockID corresponding to chunk data pack ID (%s): %w", cdp.ID(), err)
 	}
 
 	origin, err := e.state.AtBlockID(blockID).Identity(originID)

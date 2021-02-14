@@ -41,7 +41,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(&flow.ChunkDataPack{CollectionID: collectionID}, nil)
 		execState.
-			On("GetBlockIDByCollectionID", collectionID).
+			On("GetBlockIDByChunkID", collectionID).
 			Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -77,7 +77,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(&flow.ChunkDataPack{CollectionID: collectionID}, nil)
 		execState.
-			On("GetBlockIDByCollectionID", collectionID).
+			On("GetBlockIDByChunkID", collectionID).
 			Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -113,7 +113,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(&flow.ChunkDataPack{CollectionID: collectionID}, nil)
 		execState.
-			On("GetBlockIDByCollectionID", collectionID).
+			On("GetBlockIDByChunkID", collectionID).
 			Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -187,7 +187,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(nil)
 
 		execState.
-			On("GetBlockIDByCollectionID", collectionID).
+			On("GetBlockIDByChunkID", collectionID).
 			Return(blockID, nil)
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).

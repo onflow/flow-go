@@ -25,6 +25,9 @@ type Headers interface {
 	// be unfinalized.
 	ByParentID(parentID flow.Identifier) ([]*flow.Header, error)
 
+	// Indexes block ID by chunk ID
+	IndexByChunkID(headerID, chunkID flow.Identifier) error
+
 	// Finds the ID of the block containing given collection
-	IDByCollectionID(collectionID flow.Identifier) (flow.Identifier, error)
+	IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
