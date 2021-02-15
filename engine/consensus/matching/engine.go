@@ -313,10 +313,11 @@ func (e *Engine) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) 
 		receiptSpan.Finish()
 	}()
 
+	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 
 	log := e.log.With().
-		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("receipt_id", receiptID[:]).
 		Hex("result_id", resultID[:]).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
@@ -359,6 +360,14 @@ func (e *Engine) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) 
 		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
 		return false, nil
 	}
+
+	_, err = e.receiptsDB.ByID(receiptID)
+	if err == nil {
+		// it's a known receipt, skip processing
+		return false, nil
+	}
+
+	// TODO: skip if it's already in mempool
 
 	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
 	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
