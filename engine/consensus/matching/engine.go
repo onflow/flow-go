@@ -313,10 +313,11 @@ func (e *Engine) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) 
 		receiptSpan.Finish()
 	}()
 
+	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 
 	log := e.log.With().
-		Hex("receipt_id", logging.Entity(receipt)).
+		Hex("receipt_id", receiptID[:]).
 		Hex("result_id", resultID[:]).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
@@ -360,27 +361,35 @@ func (e *Engine) onCurrentReceipt(receipt *flow.ExecutionReceipt) (bool, error) 
 		return false, nil
 	}
 
-	childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
-	err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
-	childSpan.Finish()
+	// we don't want to validate the same receipt more than once,
+	// if this receipt has been stored in receipts database, it must have been
+	// validated, either by ourselve or the consensus committee, so we could skip
+	// validating it.
+	_, err = e.receiptsDB.ByID(receiptID)
+	if err != nil {
+		// it's a known receipt, skip processing
+		childSpan := e.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
+		err = e.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
+		childSpan.Finish()
 
-	if validation.IsMissingPreviousResultError(err) {
-		// If previous result is missing, we can't validate this receipt.
-		// althrough we will request its previous (potentially multiple receipts),
-		// We don't want to drop it now, because when the missing previous arrive
-		// in a wrong order, they will still be dropped, and causing the catch up
-		// to be inefficient.
-		// Instead, we could cache the receipt in case it arrives earlier than its
-		// previous receipt.
-		// for instance, given blocks A <- B <- C <- D <- E, if we receive their receipts
-		// in the order of [E,C,D,B,A], then:
-		// if we drop the missing previous receipts, then only A will be processed;
-		// if we cache the missing previous receipts, then all of them will be processed, because
-		// once A is processed, we will check if there is a child receipt pending,
-		// if yes, then process it.
-		e.pendingReceipts.Add(receipt)
-		log.Info().Msg("receipt is cached because its previous result is missing")
-		return false, nil
+		if validation.IsMissingPreviousResultError(err) {
+			// If previous result is missing, we can't validate this receipt.
+			// althrough we will request its previous (potentially multiple receipts),
+			// We don't want to drop it now, because when the missing previous arrive
+			// in a wrong order, they will still be dropped, and causing the catch up
+			// to be inefficient.
+			// Instead, we could cache the receipt in case it arrives earlier than its
+			// previous receipt.
+			// for instance, given blocks A <- B <- C <- D <- E, if we receive their receipts
+			// in the order of [E,C,D,B,A], then:
+			// if we drop the missing previous receipts, then only A will be processed;
+			// if we cache the missing previous receipts, then all of them will be processed, because
+			// once A is processed, we will check if there is a child receipt pending,
+			// if yes, then process it.
+			e.pendingReceipts.Add(receipt)
+			log.Info().Msg("receipt is cached because its previous result is missing")
+			return false, nil
+		}
 	}
 
 	if err != nil {
