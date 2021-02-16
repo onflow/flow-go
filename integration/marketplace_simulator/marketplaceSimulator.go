@@ -761,20 +761,21 @@ func (m *marketPlaceAccount) Act() error {
 		selected := moments[r : r+transferSize]
 
 		// send to all friends
-		// numberOfTx := 10
-		// fmt.Println("-->", len(m.friends))
-		// f := rand.Intn(len(m.friends) - numberOfTx - 1)
-		// friends := m.friends[f : f+numberOfTx]
+		numberOfTx := 10
+		f := rand.Intn(len(m.friends) - numberOfTx - 1)
+		friends := m.friends[f : f+numberOfTx]
+
+		fmt.Println("-->", len(m.friends), len(friends))
 
 		// subsetSize := transferSize / numberOfTx
 
 		wg := sync.WaitGroup{}
 
-		share := len(selected) / len(m.friends)
+		share := len(selected) / len(friends)
 
 		fmt.Println(moments)
-		fmt.Println("---|--->", share, len(selected), len(m.friends))
-		for j := 0; j < len(m.friends); j++ {
+		fmt.Println("---|--->", share, len(selected), len(friends))
+		for j := 0; j < len(friends); j++ {
 			p := j
 			go func() {
 				wg.Add(1)
@@ -783,7 +784,7 @@ func (m *marketPlaceAccount) Act() error {
 				txScript := generateBatchTransferMomentfromShardedCollectionScript(m.simulatorConfig.NBATopshotAddress,
 					m.simulatorConfig.NBATopshotAddress,
 					m.simulatorConfig.NBATopshotAddress,
-					m.friends[p].Address,
+					friends[p].Address,
 					selected[p*share:p*share+share]) // TODO change me to params
 
 				fmt.Println(selected[p*share : p*share+share])
