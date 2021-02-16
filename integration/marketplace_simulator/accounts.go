@@ -133,14 +133,14 @@ func (acc *flowAccount) sendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 		nil,
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+		}, // on finalized
+		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
 			if !stopped {
 				stopped = true
 				result = res
 				wg.Done()
 			}
-		}, // on finalized
-		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
 		}, // on sealed
 		func(_ flowsdk.Identifier) {
 			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
