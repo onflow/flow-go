@@ -9,14 +9,13 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	"google.golang.org/grpc"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // TransactionSubmissionTimeout is the time after which we return an error.
@@ -26,24 +25,17 @@ const TransactionSubmissionTimeout = 5 * time.Minute
 // functionality to submit a vote and check if collection node has voted already.
 type QCContractClient struct {
 	nodeID            flow.Identifier  // flow identifier of the collection node
-	accessAddress     string           // address of the access node
 	qcContractAddress string           // QuorumCertificate contract address
 	accountKeyIndex   uint             // account key index
 	signer            sdkcrypto.Signer // signer used to sign vote transaction
 
-	account *sdk.Account   // account belonging to the collection node
-	client  *client.Client // flow-go-sdk client to access node
+	account *sdk.Account // account belonging to the collection node
+	client  module.SDKClientWrapper
 }
 
 // NewQCContractClient returns a new client to the Quorum Certificate contract
-func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
-	accountKeyIndex uint, accessAddress, qcContractAddress string, signer sdkcrypto.Signer) (*QCContractClient, error) {
-
-	// create a new instance of flow-go-sdk client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
-	if err != nil {
-		return nil, fmt.Errorf("could not create flow client: %w", err)
-	}
+func NewQCContractClient(flowClient module.SDKClientWrapper, nodeID flow.Identifier, accountAddress string,
+	accountKeyIndex uint, qcContractAddress string, signer sdkcrypto.Signer) (*QCContractClient, error) {
 
 	// get account for given address
 	account, err := flowClient.GetAccount(context.Background(), sdk.HexToAddress(accountAddress))
@@ -57,7 +49,6 @@ func NewQCContractClient(nodeID flow.Identifier, accountAddress string,
 	}
 
 	return &QCContractClient{
-		accessAddress:     accessAddress,
 		qcContractAddress: qcContractAddress,
 		client:            flowClient,
 		accountKeyIndex:   accountKeyIndex,
