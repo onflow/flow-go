@@ -288,7 +288,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// break accounts into batches of 10
 	// TODO not share the same client
 
-	groupSize := 10
+	groupSize := 100
 	// momentCounter := uint64(1)
 	// numBuckets := 10
 	// totalMinted := 0
@@ -762,6 +762,7 @@ func (m *marketPlaceAccount) Act() error {
 
 		// send to all friends
 		numberOfTx := 10
+		fmt.Println("-->", len(m.friends), numberOfTx)
 		f := rand.Intn(len(m.friends) - numberOfTx)
 		friends := m.friends[f : f+numberOfTx]
 
