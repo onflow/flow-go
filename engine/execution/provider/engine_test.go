@@ -39,9 +39,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&flow.ChunkDataPack{CollectionID: collectionID}, nil)
+			Return(&flow.ChunkDataPack{CollectionID: collectionID, ChunkID: chunkID}, nil)
 		execState.
-			On("GetBlockIDByChunkID", collectionID).
+			On("GetBlockIDByChunkID", chunkID).
 			Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -75,9 +75,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStake(0)), nil)
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&flow.ChunkDataPack{CollectionID: collectionID}, nil)
+			Return(&flow.ChunkDataPack{CollectionID: collectionID, ChunkID: chunkID}, nil)
 		execState.
-			On("GetBlockIDByChunkID", collectionID).
+			On("GetBlockIDByChunkID", chunkID).
 			Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -111,9 +111,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(nil, protocol2.IdentityNotFoundError{})
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&flow.ChunkDataPack{CollectionID: collectionID}, nil)
+			Return(&flow.ChunkDataPack{CollectionID: collectionID, ChunkID: chunkID}, nil)
 		execState.
-			On("GetBlockIDByChunkID", collectionID).
+			On("GetBlockIDByChunkID", chunkID).
 			Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
@@ -187,7 +187,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(nil)
 
 		execState.
-			On("GetBlockIDByChunkID", collectionID).
+			On("GetBlockIDByChunkID", chunkID).
 			Return(blockID, nil)
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
