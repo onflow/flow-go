@@ -131,10 +131,10 @@ func (acc *flowAccount) sendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 	wg.Add(1)
 	acc.txTracker.AddTx(tx.ID(),
 		nil,
-		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
+		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
 			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
 		}, // on finalized
-		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
 			if !stopped {
 				stopped = true
