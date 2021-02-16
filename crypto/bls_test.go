@@ -404,6 +404,7 @@ func TestBatchVerify(t *testing.T) {
 	// hasher
 	kmac := NewBLSKMAC("test tag")
 	// number of signatures to aggregate
+	// TODO: add a test for 1 signature
 	sigsNum := mrand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)

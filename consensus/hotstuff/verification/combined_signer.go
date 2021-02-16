@@ -90,6 +90,7 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 
 	// check the consistency of the votes
+	// TODO: why do we check for message consistency here? (single votes are supposed to be already checked)
 	err := checkVotesValidity(votes)
 	if err != nil {
 		return nil, fmt.Errorf("votes are not valid: %w", err)
@@ -153,7 +154,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	}
 
 	// construct the threshold signature from the shares
-	beaconThresSig, err := c.beacon.Combine(dkg.Size(), beaconShares, dkgIndices)
+	beaconThresSig, err := c.beacon.Reconstruct(dkg.Size(), beaconShares, dkgIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate second signatures: %w", err)
 	}

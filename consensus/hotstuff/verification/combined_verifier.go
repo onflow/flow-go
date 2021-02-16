@@ -84,6 +84,7 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	}
 
 	// verify each signature against the message
+	// TODO: check if faster using batch verification (should be yes)
 	stakingValid, err := c.staking.Verify(msg, stakingSig, signer.StakingPubKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify staking signature: %w", err)
@@ -104,9 +105,11 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	if err != nil {
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
-	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner)
+	if len(signers) != len(voterIDs) { // check we have valid consensus member Identities for all signers
+		return false, fmt.Errorf("some signers are not valid consensus participants, or some signers are duplicate, at block %x: %w. signers are %d, voters are %d",
+			block.BlockID, model.ErrInvalidSigner, len(signers), len(voterIDs))
 	}
+	// TODO: to delete : not needed if signature is aggregated
 	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
 	dkg, err := c.committee.DKG(block.BlockID)
@@ -129,16 +132,21 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	stakingAggSig := splitSigs[0]
 	beaconThresSig := splitSigs[1]
 
-	// verify the aggregated staking signature first
 	msg := makeVoteMessage(block.View, block.BlockID)
-	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
-	if err != nil {
-		return false, fmt.Errorf("could not verify staking signature: %w", err)
-	}
+	// TODO: verify if batch verification is faster
+
+	// verify the beacon signature first
 	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkg.GroupKey())
 	if err != nil {
 		return false, fmt.Errorf("could not verify beacon signature: %w", err)
 	}
-
-	return stakingValid && beaconValid, nil
+	if !beaconValid {
+		return false, nil
+	}
+	// verify the aggregated staking signature next (more costly)
+	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
+	if err != nil {
+		return false, fmt.Errorf("could not verify staking signature: %w", err)
+	}
+	return stakingValid, nil
 }

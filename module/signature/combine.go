@@ -25,6 +25,9 @@ func NewCombiner() *Combiner {
 // Join will concatenate the provided signatures into a common byte slice, with
 // added length information. It will never fail.
 func (c *Combiner) Join(sigs ...crypto.Signature) ([]byte, error) {
+	// TODO: will only be used when the signatures are 2
+	// TODO: Optimize for bandwith and performance
+
 	var combined []byte
 	for _, sig := range sigs {
 		length := make([]byte, 4)
@@ -39,6 +42,8 @@ func (c *Combiner) Join(sigs ...crypto.Signature) ([]byte, error) {
 // embedded length information. If any length is invalid, it will fail.
 func (c *Combiner) Split(combined []byte) ([]crypto.Signature, error) {
 
+	// TODO: will only be used when the signatures are 2
+	// TODO: Optimize for bandwith and performance
 	var sigs []crypto.Signature
 	for next := 0; next < len(combined); {
 
