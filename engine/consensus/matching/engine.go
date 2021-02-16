@@ -278,10 +278,15 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 	// therefore, if a receipt is processed, we will check if it is the previous results of
 	// some pending receipts, if there are, then processing them one after another, as onReceipt
 	// is behind a lock
+	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.ID()
+
 	processed, err := e.onCurrentReceipt(receipt)
 	if err != nil {
 		e.log.Error().
 			Err(err).
+			Hex("receipt_id", receiptID[:]).
+			Hex("result_id", resultID[:]).
 			Hex("origin_id", originID[:]).
 			Msg("could not process receipt")
 		return nil
@@ -291,9 +296,8 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return nil
 	}
 
-	previousResultID := receipt.ExecutionResult.PreviousResultID
-	childReceipts := e.pendingReceipts.ByPreviousResultID(previousResultID)
-	e.pendingReceipts.Rem(receipt.ID())
+	childReceipts := e.pendingReceipts.ByPreviousResultID(resultID)
+	e.pendingReceipts.Rem(receiptID)
 
 	for _, childReceipt := range childReceipts {
 		// recursively processing the child receipts, since onReceipt
