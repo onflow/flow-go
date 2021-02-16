@@ -66,16 +66,19 @@ func (acc *flowAccount) SyncAccountKey(flowClient *client.Client) error {
 
 func (acc *flowAccount) AddKeys(numberOfKeysToAdd int) error {
 
-	// add keys in batch of 50
-	steps := numberOfKeysToAdd / 50
+	acc.logger.Info().Msgf("adding %d keys to account %s", numberOfKeysToAdd, acc.Address.String())
+
+	// add keys in batches
+	batchSize := 50
+	steps := numberOfKeysToAdd / batchSize
 	for i := 0; i < steps; i++ {
 		blockRef, err := acc.flowClient.GetLatestBlockHeader(context.Background(), false)
 		if err != nil {
 			return err
 		}
 
-		cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
-		for i := 0; i < numberOfKeysToAdd; i++ {
+		cadenceKeys := make([]cadence.Value, batchSize)
+		for i := 0; i < batchSize; i++ {
 			cadenceKeys[i] = bytesToCadenceArray(acc.accountKeys[0].Encode())
 		}
 		cadenceKeysArray := cadence.NewArray(cadenceKeys)
