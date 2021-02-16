@@ -157,6 +157,9 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	// mempool, and process it later when its parent result has been received and processed.
 	// Therefore, if a receipt is processed, we will check if it is the previous results of
 	// some pending receipts and process them one after another.
+	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.ID()
+
 	processed, err := c.processReceipt(receipt)
 	if err != nil {
 		marshalled, err := json.Marshal(receipt)
@@ -166,7 +169,8 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 
 		c.log.Fatal().Err(err).
 			Hex("origin", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", receiptID[:]).
+			Hex("result_id", resultID[:]).
 			Str("receipt", string(marshalled)).
 			Msg("internal error processing execution receipt")
 
@@ -177,8 +181,7 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 		return nil
 	}
 
-	previousResultID := receipt.ExecutionResult.PreviousResultID
-	childReceipts := c.pendingReceipts.ByPreviousResultID(previousResultID)
+	childReceipts := c.pendingReceipts.ByPreviousResultID(resultID)
 	c.pendingReceipts.Rem(receipt.ID())
 
 	for _, childReceipt := range childReceipts {
@@ -253,7 +256,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	err = c.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 	childSpan.Finish()
 
-	if validation.IsMissingPreviousResultError(err) {
+	if validation.IsUnverifiableError(err) {
 		// If previous result is missing, we can't validate this receipt.
 		// Although we will request its previous receipt(s),
 		// we don't want to drop it now, because when the missing previous arrive
@@ -317,6 +320,8 @@ func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (
 	if !added {
 		return false, nil
 	}
+	// TODO: we'd better wraps the `receipts` with the metrics method to avoid the metrics
+	// getting out of sync
 	c.mempool.MempoolEntries(metrics.ResourceReceipt, c.receipts.Size())
 
 	// persist receipt in database. Even if the receipt is already in persistent storage,
