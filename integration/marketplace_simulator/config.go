@@ -15,10 +15,10 @@ type NetworkConfig struct {
 }
 
 type SimulatorConfig struct {
-	NumberOfAccounts  int
-	NumberOfMoments   int
-	Delay             time.Duration
-	NBATopshotAddress *flowsdk.Address
+	NumberOfAccounts          int
+	NumberOfMomentsPerAccount int
+	Delay                     time.Duration
+	NBATopshotAddress         *flowsdk.Address
 	// DoSetup              bool
 	// AccountsJSONFilePath string // if not provided will creates and prints the private key hex
 }
