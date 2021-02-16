@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -102,6 +101,8 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 
 	// get the full Identities of the signers
 	signers, err := c.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...))
+	// TODO: only the aggregated public key is needed
+	// TODO: avoid computing the agg public key each time (store the public key delta in CombinedVerifier or c.staking)
 	if err != nil {
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
@@ -109,8 +110,6 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 		return false, fmt.Errorf("some signers are not valid consensus participants, or some signers are duplicate, at block %x: %w. signers are %d, voters are %d",
 			block.BlockID, model.ErrInvalidSigner, len(signers), len(voterIDs))
 	}
-	// TODO: to delete : not needed if signature is aggregated
-	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -144,6 +143,8 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 		return false, nil
 	}
 	// verify the aggregated staking signature next (more costly)
+	// TODO: eventually VerifyMany will be repalced by Verify from Verifier
+	// TODO: the agg public key would be computed outside verify() based on the delta
 	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
 	if err != nil {
 		return false, fmt.Errorf("could not verify staking signature: %w", err)

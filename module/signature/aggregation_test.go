@@ -104,15 +104,15 @@ func TestAggregationAggregateVerifyMany(t *testing.T) {
 	require.True(t, valid)
 
 	// signature should fail with one key missing
-	_, err = agg.VerifyMany(msg, aggSig, keys[1:])
-	require.Error(t, err)
+	valid, err = agg.VerifyMany(msg, aggSig, keys[1:])
+	require.NoError(t, err)
+	require.False(t, valid)
 
-	// signature should be invalid with one key swapped
+	// signature should be valid with one key swapped
 	keys[0], keys[1] = keys[1], keys[0]
 	valid, err = agg.VerifyMany(msg, aggSig, keys)
 	require.NoError(t, err)
-	require.False(t, valid)
-	keys[1], keys[0] = keys[0], keys[1]
+	require.True(t, valid)
 
 	// signature should be invalid with one byte changed
 	msg[0]++

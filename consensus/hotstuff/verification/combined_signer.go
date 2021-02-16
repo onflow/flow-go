@@ -90,7 +90,7 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 
 	// check the consistency of the votes
-	// TODO: why do we check for message consistency here? (single votes are supposed to be already checked)
+	// TODO: why do we check for message consistency here? (votes are supposed to be already checked before createQC)
 	err := checkVotesValidity(votes)
 	if err != nil {
 		return nil, fmt.Errorf("votes are not valid: %w", err)
@@ -158,10 +158,6 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate second signatures: %w", err)
 	}
-
-	// TODO: once true BLS signature aggregation has been implemented, the performance
-	// impact of verifying the aggregated signature and the threshold signature should
-	// be minor and we can consider adding a sanity check
 
 	// combine the aggregated staking signature with the threshold beacon signature
 	combinedMultiSig, err := c.merger.Join(stakingAggSig, beaconThresSig)

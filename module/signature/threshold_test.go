@@ -156,7 +156,7 @@ func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
 	return signers
 }
 
-func BenchmarkThresholdCombination(b *testing.B) {
+func BenchmarkThresholdReconstruction(b *testing.B) {
 
 	// stop timer and reset to zero
 	b.StopTimer()
