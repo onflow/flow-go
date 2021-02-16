@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -18,19 +20,23 @@ func NewPingCollector() *PingCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
-		}, []string{LabelNodeID, LabelNodeRole, LabelNodeInfo}),
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
 	}
 	return pc
 }
 
-func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, reachable bool) {
-	var val float64
-	if reachable {
-		val = 1
+func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration) {
+	var rttValue float64
+	if rtt > 0 {
+		rttValue = float64(rtt.Milliseconds())
+	} else {
+		rttValue = -1
 	}
+
 	pc.reachable.With(prometheus.Labels{
-		LabelNodeID:   node.String(),
-		LabelNodeRole: node.Role.String(),
-		LabelNodeInfo: nodeInfo}).
-		Set(val)
+		LabelNodeID:      node.NodeID.String(),
+		LabelNodeAddress: node.Address,
+		LabelNodeRole:    node.Role.String(),
+		LabelNodeInfo:    nodeInfo}).
+		Set(rttValue)
 }
