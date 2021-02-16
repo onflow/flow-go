@@ -4,11 +4,11 @@ import (
 	"encoding/hex"
 	"flag"
 	"os"
+	"runtime"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
-	"runtime"
-	"runtime/pprof"
 
 	flowsdk "github.com/onflow/flow-go-sdk"
 	"github.com/rs/zerolog"
@@ -19,7 +19,6 @@ import (
 )
 
 func main() {
-
 
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	logLvl := flag.String("log-level", "info", "set log level")
@@ -35,6 +34,9 @@ func main() {
 	// profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 
 	numberOfAccounts := flag.Int("account-count", 60, "number of accounts")
+
+	numberOfMomentsPerAccount := flag.Int("moment-count-per-account", 1000, "number of initial moments per account")
+
 	// maxTxInFlight := flag.Int("max-tx-in-flight", 8000, "maximum number of transactions in flight (txTracker)")
 	// workerDelayAfterEachFetch := flag.Duration("worker-fetch-delay", time.Second, "duration of worker sleep after each tx status fetch (prevents too much requests)")
 
@@ -95,11 +97,10 @@ func main() {
 	}
 
 	simulatorConfig := &marketplace.SimulatorConfig{
-		NumberOfAccounts: *numberOfAccounts,
-		NumberOfMoments:  2000,
-		Delay:            time.Second,
+		NumberOfAccounts:          *numberOfAccounts,
+		NumberOfMomentsPerAccount: *numberOfMomentsPerAccount,
+		Delay:                     time.Second,
 	}
-
 
 	// accessNodeAddrs
 	go func() {
@@ -108,19 +109,19 @@ func main() {
 			log,
 			networkConfig,
 			simulatorConfig)
-			m.Run()
+		m.Run()
 	}()
 
 	f, err := os.Create("mem.prof")
 
 	if err != nil {
-            log.Fatal().Msgf("could not create memory profile: %w", err)
-        }
-        defer f.Close() // error handling omitted for example
-        runtime.GC() // get up-to-date statistics
-        if err := pprof.WriteHeapProfile(f); err != nil {
-            log.Fatal().Msgf("could not write memory profile: %w", err)
-        }
+		log.Fatal().Msgf("could not create memory profile: %w", err)
+	}
+	defer f.Close() // error handling omitted for example
+	runtime.GC()    // get up-to-date statistics
+	if err := pprof.WriteHeapProfile(f); err != nil {
+		log.Fatal().Msgf("could not write memory profile: %w", err)
+	}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

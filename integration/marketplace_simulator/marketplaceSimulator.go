@@ -240,9 +240,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	m.log.Info().Msgf("play added to a set")
 
 	batchSize := 100
-	// steps := m.simulatorConfig.NumberOfMoments / batchSize
 	totalMinted := 0
-	momentsPerAccount := 2000
+	momentsPerAccount := m.simulatorConfig.NumberOfMomentsPerAccount
 	steps := len(m.marketAccounts)
 
 	wg = sync.WaitGroup{}

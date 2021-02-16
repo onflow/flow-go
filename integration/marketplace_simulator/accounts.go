@@ -14,8 +14,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TODO move toward accountKeys instead of only one
-
 type flowAccount struct {
 	Address              *flowsdk.Address
 	AccountPrivateKeyHex string // TODO change me to an slice
