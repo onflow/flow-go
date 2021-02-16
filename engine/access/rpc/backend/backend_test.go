@@ -347,6 +347,13 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
 
+	// set up GetLastFullBlockHeight mock
+	fullHeight := headBlock.Header.Height
+	suite.blocks.On("GetLastFullBlockHeight").Return(
+		func() uint64 { return fullHeight },
+		func() error { return nil },
+	)
+
 	suite.snapshot.
 		On("Head").
 		Return(headBlock.Header, nil)
@@ -387,22 +394,93 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		suite.log,
 	)
 
-	// first call - referenced block isn't known yet, so should return pending status
+	// should return pending status when we have not observed an expiry block
+	suite.Run("pending", func() {
+		// referenced block isn't known yet, so should return pending status
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
+
+		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+	})
+
+	// should return pending status when we have observed an expiry block but
+	// have not observed all intermediary collections
+	suite.Run("expiry un-confirmed", func() {
+
+		suite.Run("ONLY finalized expiry block", func() {
+			// we have finalized an expiry block
+			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+			// we have NOT observed all intermediary collections
+			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry/2
+
+			result, err := backend.GetTransactionResult(ctx, txID)
+			suite.checkResponse(result, err)
+			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+		})
+		suite.Run("ONLY observed intermediary collections", func() {
+			// we have NOT finalized an expiry block
+			headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry/2
+			// we have observed all intermediary collections
+			fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+			result, err := backend.GetTransactionResult(ctx, txID)
+			suite.checkResponse(result, err)
+			suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+		})
+
+	})
+
+	// should return expired status only when we have observed an expiry block
+	// and have observed all intermediary collections
+	suite.Run("expired", func() {
+		// we have finalized an expiry block
+		headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
+		// we have observed all intermediary collections
+		fullHeight = block.Header.Height + flow.DefaultTransactionExpiry + 1
+
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
+		suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
+	})
+
+	suite.assertAllExpectations()
+}
+
+// TestTransactionResultUnknown tests that the status of transaction is reported as unknown when it is not found in the
+// local storage
+func (suite *Suite) TestTransactionResultUnknown() {
+
+	ctx := context.Background()
+	txID := unittest.IdentifierFixture()
+
+	// transaction storage returns an error
+	suite.transactions.
+		On("ByID", txID).
+		Return(nil, storage.ErrNotFound)
+
+	backend := New(
+		suite.state,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		suite.transactions,
+		nil,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		suite.log,
+	)
+
+	// first call - when block under test is greater height than the sealed head, but execution node does not know about Tx
 	result, err := backend.GetTransactionResult(ctx, txID)
 	suite.checkResponse(result, err)
 
-	suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
-
-	// now go far into the future
-	headBlock.Header.Height = block.Header.Height + flow.DefaultTransactionExpiry + 1
-
-	// second call - reference block is now very far behind, and should be considered expired
-	result, err = backend.GetTransactionResult(ctx, txID)
-	suite.checkResponse(result, err)
-
-	suite.Assert().Equal(flow.TransactionStatusExpired, result.Status)
-
-	suite.assertAllExpectations()
+	// status should be reported as unknown
+	suite.Assert().Equal(flow.TransactionStatusUnknown, result.Status)
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
@@ -754,6 +832,35 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		suite.assertAllExpectations()
 		suite.Require().Equal(expectedResp, actualResp)
+	})
+
+	suite.Run("invalid request last_sealed_block_height < min height", func() {
+
+		// set sealed height to one less than the request start height
+		headHeight = minHeight - 1
+
+		// setup mocks
+		setupHeadHeight(headHeight)
+		blockHeaders = setupStorage(minHeight, maxHeight)
+
+		// create handler
+		backend := New(
+			suite.state,
+			suite.execClient,
+			nil, nil,
+			suite.blocks,
+			suite.headers,
+			nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			suite.log,
+		)
+
+		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, maxHeight)
+		suite.Require().Error(err)
 	})
 
 }

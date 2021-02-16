@@ -1,15 +1,16 @@
 package metrics
 
 const (
-	LabelChannel  = "topic"
-	LabelChain    = "chain"
-	EngineLabel   = "engine"
-	LabelResource = "resource"
-	LabelMessage  = "message"
-	LabelNodeID   = "nodeid"
-	LabelNodeRole = "noderole"
-	LabelNodeInfo = "nodeinfo"
-	LabelPriority = "priority"
+	LabelChannel     = "topic"
+	LabelChain       = "chain"
+	EngineLabel      = "engine"
+	LabelResource    = "resource"
+	LabelMessage     = "message"
+	LabelNodeID      = "nodeid"
+	LabelNodeAddress = "nodeaddress"
+	LabelNodeRole    = "noderole"
+	LabelNodeInfo    = "nodeinfo"
+	LabelPriority    = "priority"
 )
 
 const (
@@ -64,6 +65,9 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
+	ResourceApprovalQueue            = "matching_approval_queue"          // consensus node, matching engine
+	ResourceReceiptQueue             = "matching_receipt_queue"           // consensus node, matching engine
+	ResourceApprovalResponseQueue    = "matching_approval_response_queue" // consensus node, matching engine
 )
 
 const (
