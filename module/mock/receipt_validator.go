@@ -25,3 +25,17 @@ func (_m *ReceiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 
 	return r0
 }
+
+// ValidatePayload provides a mock function with given fields: candidate
+func (_m *ReceiptValidator) ValidatePayload(candidate *flow.Block) error {
+	ret := _m.Called(candidate)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+		r0 = rf(candidate)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

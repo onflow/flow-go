@@ -27,7 +27,7 @@ type ReceiptValidationSuite struct {
 func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.verifier = &mock2.Verifier{}
-	s.receiptValidator = NewReceiptValidator(s.State, s.IndexDB, s.ResultsDB, s.verifier)
+	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB, s.verifier)
 }
 
 // TestReceiptValid try submitting valid receipt
@@ -326,6 +326,59 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	receiptsInNewBlock := []*flow.ExecutionReceipt{receipts[2], receipts[3]}
 	err := s.receiptValidator.Validate(receiptsInNewBlock)
 	s.Require().Error(err)
+}
+
+func (s *ReceiptValidationSuite) TestValidatePayloadWithInvalidIncorporatedReceipt() {
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// insert 2 valid blocks
+	blockA := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
+	blockA.SetPayload(flow.Payload{})
+	s.Extend(&blockA)
+
+	blockAresult := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&blockA),
+	)
+	blockAreceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(blockAresult),
+		unittest.WithExecutorID(s.ExeID))
+
+	blockB := unittest.BlockWithParentFixture(blockA.Header)
+	blockB.SetPayload(flow.Payload{Receipts: one(blockAreceipt)})
+	s.Extend(&blockB)
+
+	blockC := unittest.BlockWithParentFixture(blockB.Header)
+	blockC.SetPayload(flow.Payload{})
+	s.Extend(&blockC)
+
+	blockD := unittest.BlockWithParentFixture(blockA.Header)
+	blockD.SetPayload(flow.Payload{Receipts: one(blockAreceipt)})
+	s.Extend(&blockD)
+
+	blockBresult := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&blockB),
+		unittest.WithPreviousResult(*blockAresult),
+	)
+	blockBreceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(blockBresult),
+		unittest.WithExecutorID(s.ExeID))
+
+	blockE := unittest.BlockWithParentFixture(blockD.Header)
+	blockE.SetPayload(flow.Payload{Receipts: one(blockBreceipt)})
+	s.Extend(&blockE)
+
+	blockCresult := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&blockC),
+		unittest.WithPreviousResult(*blockBresult),
+	)
+	blockCreceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(blockCresult),
+		unittest.WithExecutorID(s.ExeID))
+
+	blockX := unittest.BlockWithParentFixture(blockC.Header)
+	blockX.SetPayload(flow.Payload{Receipts: one(blockCreceipt)})
+	s.Extend(&blockX)
+
+	err := s.receiptValidator.ValidatePayload(&blockX)
+	s.Require().Errorf(err, "invalid payload because of wrong receipt fork")
+
 }
 
 func one(receipt *flow.ExecutionReceipt) []*flow.ExecutionReceipt {

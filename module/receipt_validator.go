@@ -11,5 +11,6 @@ import "github.com/onflow/flow-go/model/flow"
 // there is not enough data to validate state.
 // * exception in case of any other error, usually this is not expected.
 type ReceiptValidator interface {
+	ValidatePayload(candidate *flow.Block) error
 	Validate(receipts []*flow.ExecutionReceipt) error
 }

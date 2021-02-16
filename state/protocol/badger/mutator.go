@@ -5,10 +5,10 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine"
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
@@ -338,77 +338,7 @@ func (m *MutableState) receiptExtend(candidate *flow.Block) error {
 	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
 	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
 
-	header := candidate.Header
-	payload := candidate.Payload
-
-	// Get the latest sealed block on this fork, ie the highest block for which
-	// there is a seal in this fork. This block is not necessarily finalized.
-	last, err := m.seals.ByBlockID(header.ParentID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
-	}
-	sealed, err := m.headers.ByBlockID(last.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
-	}
-	sealedHeight := sealed.Height
-
-	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
-	// use it to identify receipts that are for blocks not in the fork.
-	forkBlocks := make(map[flow.Identifier]*flow.Header)
-
-	// Create a lookup table of all the receipts that are already included in
-	// blocks on the fork.
-	forkLookup := make(map[flow.Identifier]struct{})
-
-	// loop through the fork backwards, from parent to last sealed, and keep
-	// track of blocks and receipts visited on the way.
-	ancestorID := header.ParentID
-	for {
-
-		ancestor, err := m.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
-		}
-
-		// break out when we reach the sealed height
-		if ancestor.Height <= sealedHeight {
-			break
-		}
-
-		// keep track of blocks we iterate over
-		forkBlocks[ancestorID] = ancestor
-
-		// keep track of all receipts in ancestors
-		index, err := m.index.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
-		}
-		for _, recID := range index.ReceiptIDs {
-			forkLookup[recID] = struct{}{}
-		}
-
-		ancestorID = ancestor.ParentID
-	}
-
-	// check each receipt included in the payload for duplication
-	for _, receipt := range payload.Receipts {
-
-		// error if the receipt was already included in an other block on the
-		// fork
-		_, duplicated := forkLookup[receipt.ID()]
-		if duplicated {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
-		}
-		forkLookup[receipt.ID()] = struct{}{}
-
-		// if the receipt is not for a block on this fork, error
-		if _, forBlockOnFork := forkBlocks[receipt.ExecutionResult.BlockID]; !forBlockOnFork {
-			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
-		}
-	}
-
-	err = m.receiptValidator.Validate(payload.Receipts)
+	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
 		// TODO: this might be not an error, potentially it can be solved by requesting more data and processing this receipt again
 		if errors.Is(err, storage.ErrNotFound) {

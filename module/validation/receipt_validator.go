@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,16 +20,21 @@ type GetPreviousResult func(*flow.ExecutionResult) (*flow.ExecutionResult, error
 // receipt validity against current protocol state.
 type receiptValidator struct {
 	state    protocol.State
+	headers  storage.Headers
 	index    storage.Index
 	results  storage.ExecutionResults
+	seals    storage.Seals
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state protocol.State, index storage.Index, results storage.ExecutionResults, verifier module.Verifier) *receiptValidator {
+func NewReceiptValidator(state protocol.State, headers storage.Headers, index storage.Index,
+	results storage.ExecutionResults, seals storage.Seals, verifier module.Verifier) *receiptValidator {
 	rv := &receiptValidator{
 		state:    state,
+		headers:  headers,
 		index:    index,
 		results:  results,
+		seals:    seals,
 		verifier: verifier,
 	}
 
@@ -134,6 +140,84 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 	if !bytes.Equal(initialState, finalState) {
 		return engine.NewInvalidInputErrorf("execution results do not form chain: expecting init state %x, but got %x",
 			finalState, initialState)
+	}
+	return nil
+}
+
+func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
+	header := candidate.Header
+	payload := candidate.Payload
+
+	// Get the latest sealed block on this fork, ie the highest block for which
+	// there is a seal in this fork. This block is not necessarily finalized.
+	last, err := v.seals.ByBlockID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
+	}
+	sealed, err := v.headers.ByBlockID(last.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+	}
+	sealedHeight := sealed.Height
+
+	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
+	// use it to identify receipts that are for blocks not in the fork.
+	forkBlocks := make(map[flow.Identifier]*flow.Header)
+
+	// Create a lookup table of all the receipts that are already included in
+	// blocks on the fork.
+	forkLookup := make(map[flow.Identifier]struct{})
+
+	// loop through the fork backwards, from parent to last sealed, and keep
+	// track of blocks and receipts visited on the way.
+	ancestorID := header.ParentID
+	for {
+
+		ancestor, err := v.headers.ByBlockID(ancestorID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
+		}
+
+		// break out when we reach the sealed height
+		if ancestor.Height <= sealedHeight {
+			break
+		}
+
+		// keep track of blocks we iterate over
+		forkBlocks[ancestorID] = ancestor
+
+		// keep track of all receipts in ancestors
+		index, err := v.index.ByBlockID(ancestorID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
+		}
+		for _, recID := range index.ReceiptIDs {
+			forkLookup[recID] = struct{}{}
+		}
+
+		ancestorID = ancestor.ParentID
+	}
+
+	// check each receipt included in the payload for duplication
+	for _, receipt := range payload.Receipts {
+
+		// error if the receipt was already included in an other block on the
+		// fork
+		_, duplicated := forkLookup[receipt.ID()]
+		if duplicated {
+			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
+		}
+		forkLookup[receipt.ID()] = struct{}{}
+
+		// if the receipt is not for a block on this fork, error
+		if _, forBlockOnFork := forkBlocks[receipt.ExecutionResult.BlockID]; !forBlockOnFork {
+			return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
+		}
+	}
+
+	err = v.Validate(payload.Receipts)
+	if err != nil {
+		return err
 	}
 	return nil
 }
