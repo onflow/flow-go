@@ -24,7 +24,7 @@ var (
 	PathNodeInfoPub               = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
 	PathRootBlock                 = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootQC                    = filepath.Join(DirnamePublicBootstrap, "root-qc.json")
-	PathRootProtocolStateSnapshot = filepath.Join(DirnameExecutionState, "root-protocol-state-snapshot.json")
+	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
 	PathRootResult                = filepath.Join(DirnamePublicBootstrap, "root-execution-result.json")
 	PathRootSeal                  = filepath.Join(DirnamePublicBootstrap, "root-block-seal.json")
 	PathRootCheckpoint            = filepath.Join(DirnameExecutionState, wal.RootCheckpointFilename) // only available on an execution node
