@@ -757,12 +757,12 @@ func (m *marketPlaceAccount) Act() error {
 		}
 
 		transferSize := 100
-		r := rand.Intn(len(moments) - transferSize - 1)
+		r := rand.Intn(len(moments) - transferSize)
 		selected := moments[r : r+transferSize]
 
 		// send to all friends
 		numberOfTx := 10
-		f := rand.Intn(len(m.friends) - numberOfTx - 1)
+		f := rand.Intn(len(m.friends) - numberOfTx)
 		friends := m.friends[f : f+numberOfTx]
 
 		fmt.Println("-->", len(m.friends), len(friends))
