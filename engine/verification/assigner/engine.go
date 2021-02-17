@@ -221,6 +221,9 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	for _, receipt := range block.Payload.Receipts {
 		e.handleExecutionReceipt(receipt, blockID)
 	}
+
+	// tells block consumer that it is done with this block
+	e.finishProcessing.FinishProcessing(blockID)
 }
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
