@@ -992,10 +992,21 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 			continue
 		}
 
-		// since the index is only added when the block which includes the receipts
+		// Without the logic below, the matching engine would produce IncorporatedResults
+		// only from receipts received directly by EN. It would be possible for a receipt
+		// to come unnoticed by the matching engine if it was incorporated in a block by
+		// another node and never received directly from the EN. Or the receipt might
+		// have been lost from the mempool during a node crash.
+		// Hence we check also if we have the receipts in storage (as would have been
+		// populated when the block was added to the chain).
+		// Currently, the index is only added when the block which includes the receipts
 		// get finalized, so the returned receipts must be from finalized blocks.
-		// Therefore, the return receipts must be incoporated receipts, which
+		// Therefore, the return receipts must be incorporated receipts, which
 		// are safe to be added to the mempool
+		// ToDo: this logic should eventually be moved in the engine's
+		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
+		// and that the IncorporatedResult's IncorporatedBlockID should be set
+		// correctly.
 		receipts, err := c.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
 		if err != nil {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
