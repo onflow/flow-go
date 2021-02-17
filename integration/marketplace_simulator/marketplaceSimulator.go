@@ -273,6 +273,8 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 				}
 				if result != nil && result.Error != nil {
+					// TEMP panic on error
+					panic(result.Error)
 					m.log.Error().Msgf("minting tx was unsuccessful: %w", result.Error)
 				}
 
