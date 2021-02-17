@@ -33,6 +33,10 @@ type MarketPlaceSimulator struct {
 	txTracker         *TxTracker
 }
 
+// TODO
+// separate account creation and add accounts to the constructor
+// inject a runnable (setup, setup accounts, run)
+
 func NewMarketPlaceSimulator(
 	log zerolog.Logger,
 	networkConfig *NetworkConfig,
@@ -143,22 +147,18 @@ func (m *MarketPlaceSimulator) setupContracts() error {
 }
 
 func (m *MarketPlaceSimulator) mintMoments() error {
-	blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
-	if err != nil {
-		return err
-	}
 
 	nbaAddress := m.nbaTopshotAccount.Address
 
-	m.log.Info().Msgf("adding keys")
-	// add keys first
-
-	err = m.nbaTopshotAccount.AddKeys(600)
+	// adding keys to nba account
+	m.log.Info().Msgf("adding keys to the nba account %s", nbaAddress)
+	err := m.nbaTopshotAccount.AddKeys(600)
 	if err != nil {
 		return err
 	}
 
 	// add extra keys to accounts
+	// TODO move this to account setup
 	wg := sync.WaitGroup{}
 	for i := 0; i < len(m.marketAccounts); i++ {
 		j := i
@@ -167,7 +167,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 			defer wg.Done()
 			m.log.Info().Msg("adding keys to accounts")
 			// mint a lot of moments
-			err = m.marketAccounts[j].Account().AddKeys(50)
+			err := m.marketAccounts[j].Account().AddKeys(50)
 			if err != nil {
 				m.log.Error().Msgf("adding a play to a set has been failed: %w", err)
 			}
@@ -176,6 +176,11 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		time.Sleep(time.Millisecond * 400)
 	}
 	wg.Wait()
+
+	blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
+	if err != nil {
+		return err
+	}
 
 	// numBuckets := 32
 	// // setup nba account to use sharded collections
@@ -289,11 +294,6 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// TODO not share the same client
 
 	groupSize := 100
-	// momentCounter := uint64(1)
-	// numBuckets := 10
-	// totalMinted := 0
-	// batchSize := 100
-
 	for i := 0; i < len(accounts); i += groupSize {
 
 		blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -580,8 +580,6 @@ func (m *MarketPlaceSimulator) Run() error {
 			fmt.Println("err: ", err)
 			// TODO handle the retuned error
 		}()
-		// TODO RAMTIN temporary
-		break
 	}
 
 	return nil
