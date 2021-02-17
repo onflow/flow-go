@@ -146,3 +146,28 @@ func LogErrorWithMsg(log zerolog.Logger, msg string, err error) {
 	// all other errors should just be logged as usual
 	log.Error().Str("error_type", "internal_error").Err(err).Msg(msg)
 }
+
+// Return the error type and whether the error is internal error
+func ErrorType(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+
+	if IsInvalidInputError(err) {
+		return "invalid_input", false
+	}
+
+	if IsOutdatedInputError(err) {
+		return "outdated_input", false
+	}
+
+	if IsUnverifiableInputError(err) {
+		return "unverifiable_input", false
+	}
+
+	if IsDuplicatedEntryError(err) {
+		return "duplicated_entry", false
+	}
+
+	return "internal_error", true
+}

@@ -156,23 +156,11 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	// mempool, and process it later when its parent result has been received and processed.
 	// Therefore, if a receipt is processed, we will check if it is the previous results of
 	// some pending receipts and process them one after another.
-	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 
 	processed, err := c.processReceipt(receipt)
 	if err != nil {
-		marshalled, err := json.Marshal(receipt)
-		if err != nil {
-			marshalled = []byte("json_marshalling_failed")
-		}
-		c.log.Error().Err(err).
-			Hex("origin", logging.ID(originID)).
-			Hex("receipt_id", receiptID[:]).
-			Hex("result_id", resultID[:]).
-			Str("receipt", string(marshalled)).
-			Msg("internal error processing execution receipt")
-
-		return fmt.Errorf("internal error processing execution receipt %x: %w", receipt.ID(), err)
+		return fmt.Errorf("internal error processing execution receipt: %w", err)
 	}
 
 	if !processed {
@@ -188,6 +176,7 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 		if err != nil {
 			// we don't want to wrap the error with any info from its parent receipt,
 			// because the error has nothing to do with its parent receipt.
+			// we let the source error to be bubbled up
 			return err
 		}
 	}

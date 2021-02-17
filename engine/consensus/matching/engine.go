@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/fifoqueue"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Event struct {
@@ -234,28 +236,55 @@ func (e *Engine) consumeEvents() {
 	}, 2*time.Second, 120*time.Second)
 
 	for {
-		var err error
 		select {
 		case event := <-e.receiptSink:
-			err = e.core.OnReceipt(event.OriginID, event.Msg.(*flow.ExecutionReceipt))
+			receipt := event.Msg.(*flow.ExecutionReceipt)
+			err := e.core.OnReceipt(event.OriginID, receipt)
+			if err != nil {
+				handleError(err, receipt, e.log.With().Str("event_type", "receipt").
+					Hex("receipt_id", logging.Entity(receipt)).Logger())
+			}
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
 		case event := <-e.approvalSink:
-			err = e.core.OnApproval(event.OriginID, event.Msg.(*flow.ResultApproval))
+			approval := event.Msg.(*flow.ResultApproval)
+			err := e.core.OnApproval(event.OriginID, approval)
+			if err != nil {
+				handleError(err, approval, e.log.With().Str("event_type", "approval").
+					Hex("approval_id", logging.Entity(approval)).Logger())
+			}
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		case event := <-e.requestedApprovalSink:
-			err = e.core.OnApproval(event.OriginID, &event.Msg.(*messages.ApprovalResponse).Approval)
+			requestedApproval := &event.Msg.(*messages.ApprovalResponse).Approval
+			err := e.core.OnApproval(event.OriginID, requestedApproval)
+			if err != nil {
+				handleError(err, requestedApproval, e.log.With().Str("event_type", "requestedapproval").
+					Hex("approval_id", logging.Entity(requestedApproval)).Logger())
+			}
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		case <-checkSealingTicker:
-			err = e.core.CheckSealing()
+			err := e.core.CheckSealing()
+			if err != nil {
+				handleError(err, nil, e.log.With().Str("event_type", "checksealing").Logger())
+			}
 		case <-e.unit.Quit():
 			return
 		}
-		if err != nil {
-			// Public methods of `Core` are supposed to handle all errors internally.
-			// Here if error happens it means that internal state is corrupted or we have caught
-			// exception while processing. In such case best just to abort the node.
-			e.log.Fatal().Err(err).Msgf("fatal internal error in matching core logic")
+	}
+
+}
+
+func handleError(err error, msg interface{}, lg zerolog.Logger) {
+	errType, isInternalError := engine.ErrorType(err)
+
+	if isInternalError {
+		marshalled, marshalErr := json.Marshal(msg)
+		if marshalErr != nil {
+			marshalled = []byte("json_marshalling_failed")
 		}
+
+		lg.Fatal().Str("error_type", errType).Str("full_msg", string(marshalled)).Msgf("fatal internal error in matching core logic")
+	} else {
+		lg.Error().Str("error_type", errType).Msg("can not process message")
 	}
 }
 
