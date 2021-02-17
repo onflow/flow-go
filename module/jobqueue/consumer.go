@@ -26,12 +26,6 @@ type Consumer struct {
 
 	// Config
 	maxProcessing int64 // max number of jobs to be processed concurrently
-	maxFinished   int64 // if a job is done but it's not the next unprocessed job, then it's a finished job.
-	// for instance, job 3 is the last processed job, job 4 is being processed, job 5 is
-	// done, then we say job 5 is finished, because job 4 hasn't
-	// been processed. Once job 4 is done, both job 4 and 5 will become processed.
-	// maxFinished is the max number of finished jobs to have before stopping working
-	// on any new jobs.
 
 	// State Variables
 	running bool // a signal to control whether to start processing more jobs. Useful for waiting
@@ -51,7 +45,7 @@ func NewConsumer(
 	progress storage.ConsumerProgress,
 	worker Worker,
 	maxProcessing int64,
-	maxFinished int64) *Consumer {
+) *Consumer {
 	return &Consumer{
 		log: log,
 
@@ -62,7 +56,6 @@ func NewConsumer(
 
 		// update config
 		maxProcessing: maxProcessing,
-		maxFinished:   maxFinished,
 
 		// init state variables
 		running:          false,
@@ -221,7 +214,6 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, int64, error) {
 		c.jobs,
 		c.processings,
 		c.maxProcessing,
-		c.maxFinished,
 		c.processedIndex,
 	)
 }
@@ -229,16 +221,15 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, int64, error) {
 // processableJobs check the worker's capacity and if sufficient, read
 // jobs from the storage, return the processable jobs, and the processed
 // index
-func processableJobs(jobs storage.Jobs, processings map[int64]*jobStatus, maxProcessing int64, maxFinished int64, processedIndex int64) ([]*jobAtIndex, int64, error) {
+func processableJobs(jobs storage.Jobs, processings map[int64]*jobStatus, maxProcessing int64, processedIndex int64) ([]*jobAtIndex, int64, error) {
 	processables := make([]*jobAtIndex, 0)
 
 	// count how many jobs are still processing,
 	// in order to decide whether to process a new job
 	processing := int64(0)
-	finished := int64(0)
 
 	// if still have processing capacity, find the next processable job
-	for i := processedIndex + 1; processing < maxProcessing && finished < maxFinished; i++ {
+	for i := processedIndex + 1; processing < maxProcessing; i++ {
 		status, ok := processings[i]
 
 		// if no worker is processing the next job, try to read it and process
@@ -274,8 +265,6 @@ func processableJobs(jobs storage.Jobs, processings map[int64]*jobStatus, maxPro
 
 		if i == processedIndex+1 {
 			processedIndex++
-		} else {
-			finished++
 		}
 	}
 
