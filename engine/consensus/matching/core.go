@@ -183,11 +183,11 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	c.pendingReceipts.Rem(receipt.ID())
 
 	for _, childReceipt := range childReceipts {
-		// recursively processing the child receipts, since onReceipt
-		// is logging error internal already, we could ignore the returned
-		// error here
+		// recursively processing the child receipts
 		err := c.OnReceipt(childReceipt.ExecutorID, childReceipt)
 		if err != nil {
+			// we don't want to wrap the error with any info from its parent receipt, because the error
+			// has nothing to do with its parent receipt. 
 			return err
 		}
 	}
