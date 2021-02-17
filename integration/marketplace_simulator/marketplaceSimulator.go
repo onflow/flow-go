@@ -580,6 +580,8 @@ func (m *MarketPlaceSimulator) Run() error {
 			fmt.Println("err: ", err)
 			// TODO handle the retuned error
 		}()
+		// for better distribution of load
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	return nil
