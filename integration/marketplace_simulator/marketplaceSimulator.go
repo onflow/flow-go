@@ -700,9 +700,9 @@ func (m *marketPlaceAccount) Act() error {
 		transferSize := numberOfTx * m.simulatorConfig.MomentsToTransferPerTx
 		r := rand.Intn(len(moments) - transferSize)
 		selected := moments[r : r+transferSize]
+		share := m.simulatorConfig.MomentsToTransferPerTx
 
 		wg := sync.WaitGroup{}
-		share := len(selected) / len(friends)
 		for j := 0; j < len(friends); j++ {
 			p := j
 			go func() {
@@ -713,7 +713,7 @@ func (m *marketPlaceAccount) Act() error {
 					m.simulatorConfig.NBATopshotAddress,
 					m.simulatorConfig.NBATopshotAddress,
 					friends[p].Address,
-					selected[p*share:p*share+share]) // TODO change me to params
+					selected[p*share:p*share+share])
 
 				tx := flowsdk.NewTransaction().
 					SetReferenceBlockID(blockRef.ID).
