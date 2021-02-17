@@ -104,8 +104,6 @@ func NewChunkConsumer(
 	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
 	engine EngineWorker, // to process jobs (chunks)
 	maxProcessing int64, // max number of jobs to be processed in parallel
-	maxFinished int64, // when the next unprocessed job is not finished,
-	// the max number of finished subsequent jobs before stopping processing more jobs
 ) *ChunkConsumer {
 	worker := NewWorker(engine)
 	engine.WithFinishProcessing(worker)
@@ -114,7 +112,7 @@ func NewChunkConsumer(
 
 	// TODO: adding meta to logger
 	consumer := jobqueue.NewConsumer(
-		log, jobs, processedIndex, worker, maxProcessing, maxFinished,
+		log, jobs, processedIndex, worker, maxProcessing,
 	)
 
 	chunkConsumer := &ChunkConsumer{consumer}

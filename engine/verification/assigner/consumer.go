@@ -102,7 +102,6 @@ func NewBlockConsumer(
 	state protocol.State,
 	engine *Engine,
 	maxProcessing int64,
-	maxFinished int64,
 ) (*BlockConsumer, error) {
 	worker := &Worker{engine: engine}
 	engine.withFinishProcessing(worker)
@@ -110,7 +109,7 @@ func NewBlockConsumer(
 	jobs := &FinalizedBlockReader{state: state}
 
 	consumer := jobqueue.NewConsumer(
-		log, jobs, processedHeight, worker, maxProcessing, maxFinished,
+		log, jobs, processedHeight, worker, maxProcessing,
 	)
 
 	defaultIndex, err := defaultProcessedIndex(state)
