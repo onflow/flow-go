@@ -243,10 +243,13 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
+	// once assigner engine is done processing the block, it should notify the processing notifier.
+	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
-	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
+	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner, s.notifier)
 
 	// when there is no assigned chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
