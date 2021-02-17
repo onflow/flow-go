@@ -203,7 +203,6 @@ func (e *blockComputer) executeCollection(
 			)
 			colSpan.Finish()
 		}()
-
 	}
 
 	var (
@@ -215,7 +214,7 @@ func (e *blockComputer) executeCollection(
 
 	txMetrics := fvm.NewMetricsCollector()
 
-	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
+	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics), fvm.WithTracer(e.tracer))
 
 	for _, txBody := range collection.Transactions {
 

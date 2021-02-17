@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
@@ -14,6 +15,7 @@ type Context struct {
 	ASTCache                         ASTCache
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
+	Tracer                           module.Tracer
 	GasLimit                         uint64
 	MaxStateKeySize                  uint64
 	MaxStateValueSize                uint64
@@ -66,6 +68,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
+		Tracer:                           nil,
 		GasLimit:                         DefaultGasLimit,
 		MaxStateKeySize:                  state.DefaultMaxKeySize,
 		MaxStateValueSize:                state.DefaultMaxValueSize,
@@ -180,6 +183,14 @@ func WithBlocks(blocks Blocks) Option {
 func WithMetricsCollector(mc *MetricsCollector) Option {
 	return func(ctx Context) Context {
 		ctx.Metrics = mc
+		return ctx
+	}
+}
+
+// WithTracer sets the tracer for a virtual machine context.
+func WithTracer(tr module.Tracer) Option {
+	return func(ctx Context) Context {
+		ctx.Tracer = tr
 		return ctx
 	}
 }

@@ -76,6 +76,11 @@ func (i *TransactionInvocator) Process(
 	}
 	env.setTransaction(proc.Transaction, proc.TxIndex)
 
+	if env.transactionEnv != nil {
+		env.transactionEnv.StartTracing()
+		defer env.transactionEnv.StopTracing()
+	}
+
 	location := common.TransactionLocation(proc.ID[:])
 
 	err = vm.Runtime.ExecuteTransaction(
