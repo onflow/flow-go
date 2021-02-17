@@ -315,12 +315,16 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 		Return(false, fmt.Errorf("error")).
 		Times(chunksNum)
 
+	// once assigner engine is done processing the block, it should notify the processing notifier.
+	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
+		s.notifier,
 		s.chunksQueue)
 
 	// job listener should not be notified as no new chunk is added.
