@@ -159,7 +159,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should not error for different receipt for already pending result")
+	ms.Require().NoError(err, "should handle different receipts for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
@@ -187,7 +187,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should not error for different receipt for already pending result")
+	ms.Require().NoError(err, "should process receipts, even if it is already in storage")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
@@ -213,7 +213,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 
 	// onReceipt should run to completion without throwing an error
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
+	ms.Require().NoError(err, "should add receipt and result to mempools if valid")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
