@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/verification/match"
+	
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -14,7 +14,7 @@ import (
 func TestCanTry(t *testing.T) {
 	t.Run("maxAttempt=3", func(t *testing.T) {
 		maxAttempt := 3
-		chunks := match.NewChunks(10)
+		chunks := NewChunks(10)
 		c := ChunkWithIndex(flow.Identifier{0x11}, 0)
 		chunk := match.NewChunkStatus(c, flow.Identifier{0xaa}, flow.Identifier{0xbb})
 		chunks.Add(chunk)

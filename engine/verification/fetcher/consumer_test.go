@@ -55,7 +55,8 @@ func TestProduceConsume(t *testing.T) {
 
 			<-consumer.Done()
 
-			// expect the mock engine receives 3 calls
+			// expect the mock engine receive only the first 3 calls (since it is blocked on those, hence no
+			// new job is fetched to process). 
 			require.Equal(t, locators[:3], called)
 		})
 	})

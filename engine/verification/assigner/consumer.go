@@ -19,7 +19,7 @@ type BlockJob struct {
 }
 
 // ID converts block id into job id, which guarantees uniqueness
-func (j *BlockJob) ID() module.JobID {
+func (j BlockJob) ID() module.JobID {
 	return blockIDToJobID(j.Block.ID())
 }
 
@@ -36,7 +36,7 @@ func jobToBlock(job storage.Job) *flow.Block {
 	return blockJob.Block
 }
 
-// FinalizedBlockReader provide an abstraction for consumers to read blocks
+// FinalizedBlockReader provides an abstraction for consumers to read blocks
 // as job
 type FinalizedBlockReader struct {
 	state protocol.State
@@ -55,7 +55,7 @@ type Worker struct {
 	consumer *BlockConsumer
 }
 
-// BlockWorker takes the job which contains a block header, and work on it.
+// BlockWorker takes the job which contains a block header, and works on it, i.e.,
 // it checks whether it needs to be processed.
 // it should not work on a sealed block, it should not work on a block that is not staked.
 // then, it reads all the receipts from the block payload. For each receipt, it checks if

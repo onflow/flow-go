@@ -27,7 +27,6 @@ func (cp *ConsumeProgress) ProcessedIndex() (int64, error) {
 	err := cp.db.View(operation.RetrieveProcessedIndex(cp.consumer, &processed))
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve processed index: %w", err)
-		// return 0, err
 	}
 	return processed, nil
 }

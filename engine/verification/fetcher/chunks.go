@@ -18,11 +18,11 @@ type ChunkStatus struct {
 	Attempt           int
 }
 
-func (s *ChunkStatus) ID() flow.Identifier {
+func (s ChunkStatus) ID() flow.Identifier {
 	return s.Chunk.ID()
 }
 
-func (s *ChunkStatus) Checksum() flow.Identifier {
+func (s ChunkStatus) Checksum() flow.Identifier {
 	return s.Chunk.ID()
 }
 
