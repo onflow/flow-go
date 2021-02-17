@@ -22,6 +22,14 @@ import (
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 2
 
+var validENIDs = []string{"9686399a8a5418a12e762cfaeff2ea348c2137f554560917760e0d47acf2cda4",
+	"160241f88cbfaa0f361cf64adb0a1c9fc19dec1daf4b96550cd67b7a9fb26cd9",
+	"4ab025ab974e7ad7f344fbd16e5fbcb17fb8769fc8849b9d241ae518787695bd",
+	"0ca407c1da940952ebcc02283b60cd97c9a008e111a48ea6cf1ce8f36f1e0153",
+}
+
+var validENMap map[flow.Identifier]bool
+
 // Backends implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
@@ -48,6 +56,7 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
+	validENs          map[flow.Identifier]struct{}
 }
 
 func New(
@@ -127,6 +136,15 @@ func New(
 	}
 
 	retry.SetBackend(b)
+
+	validENMap = make(map[flow.Identifier]bool, len(validENIDs))
+	for _, idStr := range validENIDs {
+		id, err := flow.HexStringToIdentifier(idStr)
+		if err != nil {
+			panic(err)
+		}
+		validENMap[id] = true
+	}
 
 	return b
 }
@@ -216,18 +234,35 @@ func executionNodesForBlockID(
 		executorIDs = append(executorIDs, receipt.ExecutorID)
 	}
 
+	// for now only query Dapperlabs ENs
 	if len(executorIDs) == 0 {
 		return flow.IdentityList{}, nil
 	}
 
-	// find the node identities of these execution nodes
-	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executorIDs...))
+	allENs, err := validENs(state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
+
+	// find the node identities of these execution nodes
+	executionIdentities := allENs.Filter(filter.HasNodeID(executorIDs...))
 
 	// randomly choose upto maxExecutionNodesCnt identities
 	executionIdentitiesRandom := executionIdentities.Sample(maxExecutionNodesCnt)
 
 	return executionIdentitiesRandom, nil
+}
+
+func validENs(state protocol.State) (flow.IdentityList, error) {
+	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
+	}
+
+	filterFn := func(identity *flow.Identity) bool {
+		return validENMap[identity.ID()]
+	}
+
+	ens := allENs.Filter(filterFn)
+	return ens, nil
 }
