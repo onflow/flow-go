@@ -36,15 +36,15 @@ func (_m *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.Execution
 }
 
 // ByBlockIDAllExecutionReceipts provides a mock function with given fields: blockID
-func (_m *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]flow.ExecutionReceipt, error) {
+func (_m *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
 	ret := _m.Called(blockID)
 
-	var r0 []flow.ExecutionReceipt
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []flow.ExecutionReceipt); ok {
+	var r0 []*flow.ExecutionReceipt
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.ExecutionReceipt); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.ExecutionReceipt)
+			r0 = ret.Get(0).([]*flow.ExecutionReceipt)
 		}
 	}
 
@@ -95,13 +95,13 @@ func (_m *ExecutionReceipts) Index(blockID flow.Identifier, resultID flow.Identi
 	return r0
 }
 
-// IndexByBlockIDAndExecutionID provides a mock function with given fields: blockID, executorID, resultID
-func (_m *ExecutionReceipts) IndexByBlockIDAndExecutionID(blockID flow.Identifier, executorID flow.Identifier, resultID flow.Identifier) error {
-	ret := _m.Called(blockID, executorID, resultID)
+// IndexByExecutor provides a mock function with given fields: receipt
+func (_m *ExecutionReceipts) IndexByExecutor(receipt *flow.ExecutionReceipt) error {
+	ret := _m.Called(receipt)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier, flow.Identifier) error); ok {
-		r0 = rf(blockID, executorID, resultID)
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) error); ok {
+		r0 = rf(receipt)
 	} else {
 		r0 = ret.Error(0)
 	}

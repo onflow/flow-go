@@ -261,7 +261,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 		return fmt.Errorf("failed to store execution receipt: %w", err)
 	}
 	// index the receipt with the receipt block ID and the execution ID
-	err = e.executionReceipts.IndexByBlockIDAndExecutionID(r.ExecutionResult.BlockID, r.ExecutorID, r.ID())
+	err = e.executionReceipts.IndexByExecutor(r)
 	if err != nil {
 		return fmt.Errorf("failed to index execution receipt: %w", err)
 	}
