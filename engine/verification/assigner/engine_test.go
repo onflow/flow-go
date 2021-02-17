@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,7 +30,7 @@ type AssignerEngineTestSuite struct {
 	assigner         *module.ChunkAssigner
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
-	notifier         ProcessingNotifier
+	notifier         *mockassigner.ProcessingNotifier
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -73,7 +74,7 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		chunksQueue:      &storage.ChunksQueue{},
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		notifier:         &mockassigner.finishProcessing{},
+		notifier:         &mockassigner.ProcessingNotifier{},
 	}
 
 	for _, apply := range options {
@@ -113,6 +114,8 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 		s.chunksQueue,
 		s.newChunkListener)
 
+	e.withBlockProcessingNotifier(s.notifier)
+
 	// mocks identity of the verification node
 	s.me.On("NodeID").Return(s.verIdentity.NodeID)
 
@@ -143,6 +146,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	// it is done with processing this chunk.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
+	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -151,7 +155,8 @@ func TestNewBlock_HappyPath(t *testing.T) {
 		s.metrics,
 		s.assigner,
 		s.chunksQueue,
-		s.newChunkListener)
+		s.newChunkListener,
+		s.notifier)
 }
 
 // TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
