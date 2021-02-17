@@ -694,8 +694,9 @@ func (m *marketPlaceAccount) Act() error {
 		// send to all friends for now
 		// TODO set a ratio
 		numberOfTx := m.simulatorConfig.AccountGroupSize
-		f := rand.Intn(len(m.friends) - numberOfTx)
-		friends := m.friends[f : f+numberOfTx]
+		// f := rand.Intn(len(m.friends) - numberOfTx)
+		// friends := m.friends[f : f+numberOfTx]
+		friends := m.friends[:]
 
 		transferSize := numberOfTx * m.simulatorConfig.MomentsToTransferPerTx
 		r := rand.Intn(len(moments) - transferSize)
