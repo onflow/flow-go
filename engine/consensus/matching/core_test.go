@@ -233,12 +233,12 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	// check that _expected_ failure case of invalid receipt is handled without error
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should handle error internally")
+	ms.Require().NoError(err, "invalid receipt should be dropped but not error")
 
 	// check that _unexpected_ failure case causes the error to be escalated
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(fmt.Errorf("")).Once()
 	_, err = ms.matching.processReceipt(receipt)
-	ms.Require().Error(err, "should fail with exception")
+	ms.Require().Error(err, "unexpected errors should be escalated")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
@@ -297,12 +297,12 @@ func (ms *MatchingSuite) TestOnApprovalInvalid() {
 	// check that _expected_ failure case of invalid approval is handled without error
 	ms.approvalValidator.On("Validate", approval).Return(engine.NewInvalidInputError("")).Once()
 	err := ms.matching.OnApproval(approval.Body.ApproverID, approval)
-	ms.Require().NoError(err, "should handle error internally")
+	ms.Require().NoError(err, "invalid approval should be dropped but not error")
 
 	// check that unknown failure case is escalated
 	ms.approvalValidator.On("Validate", approval).Return(fmt.Errorf("")).Once()
 	err = ms.matching.OnApproval(approval.Body.ApproverID, approval)
-	ms.Require().Error(err, "should fail with exception")
+	ms.Require().Error(err, "unexpected errors should be escalated")
 
 	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)

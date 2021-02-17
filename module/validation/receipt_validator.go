@@ -87,7 +87,7 @@ func (v *receiptValidator) previousResult(result *flow.ExecutionResult) (*flow.E
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, NewMissingPreviousResultError(result.PreviousResultID)
+			return nil, NewUnverifiableError(result.PreviousResultID)
 		}
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // Returns nil if all checks passed successfully.
 // Expected errors during normal operations:
 // * engine.InvalidInputError
-// * validation.MissingPreviousResultError
+// * validation.UnverifiableError
 func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 	// lookup cache to avoid linear search when checking for previous result that is
 	// part of payload

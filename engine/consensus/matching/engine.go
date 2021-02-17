@@ -7,8 +7,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -43,8 +41,6 @@ type (
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
-	notifications.NoopConsumer
-
 	unit                                 *engine.Unit
 	log                                  zerolog.Logger
 	me                                   module.Local
@@ -59,8 +55,6 @@ type Engine struct {
 	pendingRequestedApprovals            *fifoqueue.FifoQueue
 	pendingEventSink                     EventSink
 	requiredApprovalsForSealConstruction uint
-	receiptsDB                           storage.ExecutionReceipts
-	payloadsDB                           storage.Payloads
 }
 
 // NewEngine constructs new `EngineEngine` which runs on it's own unit.
@@ -76,7 +70,6 @@ func NewEngine(log zerolog.Logger,
 	receiptsDB storage.ExecutionReceipts,
 	headersDB storage.Headers,
 	indexDB storage.Index,
-	payloadsDB storage.Payloads,
 	incorporatedResults mempool.IncorporatedResults,
 	receipts mempool.ExecutionTree,
 	approvals mempool.Approvals,
@@ -99,8 +92,6 @@ func NewEngine(log zerolog.Logger,
 		requestedApprovalSink:                make(EventSink),
 		pendingEventSink:                     make(EventSink),
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		receiptsDB:                           receiptsDB,
-		payloadsDB:                           payloadsDB,
 	}
 
 	// FIFO queue for inbound receipts
@@ -321,36 +312,4 @@ func (e *Engine) Ready() <-chan struct{} {
 
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
-}
-
-// TODO: move into a different component, as indexing receipts for finalized block
-// could be done in a different component, and we can keep the Engine simple
-// OnFinalizedBlock implements the callback from the protocol state to notify a block
-// is finalized, it guarantees every finalized block will be called at least once.
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	// we index the execution receipts by the executed block ID only for all finalized blocks
-	// that guarantees if we could retrieve the receipt by the index, then the receipts
-	// must be for a finalized blocks.
-	err := e.indexReceipts(block.BlockID)
-	if err != nil {
-		e.log.Fatal().Err(err).Hex("block_id", block.BlockID[:]).
-			Msg("could not index receipts for block")
-	}
-}
-
-func (e *Engine) indexReceipts(blockID flow.Identifier) error {
-	payload, err := e.payloadsDB.ByBlockID(blockID)
-
-	if err != nil {
-		return fmt.Errorf("could not get block payload: %w", err)
-	}
-
-	for _, receipt := range payload.Receipts {
-		err := e.receiptsDB.IndexByExecutor(receipt)
-		if err != nil {
-			return fmt.Errorf("could not index receipt by executor, receipt id: %v: %w", receipt.ID(), err)
-		}
-	}
-
-	return nil
 }

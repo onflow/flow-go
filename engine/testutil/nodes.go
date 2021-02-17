@@ -264,7 +264,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		receiptsDB,
 		node.Headers,
 		node.Index,
-		node.Payloads,
 		results,
 		receipts,
 		approvals,
