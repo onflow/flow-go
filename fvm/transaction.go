@@ -76,8 +76,9 @@ func (i *TransactionInvocator) Process(
 	}
 	env.setTransaction(proc.Transaction, proc.TxIndex)
 
+	var traceID string
 	if env.transactionEnv != nil {
-		env.transactionEnv.StartTracing()
+		traceID = env.transactionEnv.StartTracing()
 		defer env.transactionEnv.StopTracing()
 	}
 
@@ -101,7 +102,9 @@ func (i *TransactionInvocator) Process(
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
-		Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
+		Str("traceID", traceID).
+		Uint64("ledger_interactions", st.InteractionUsed()).
+		Msg("transaction executed")
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

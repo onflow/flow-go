@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
+	"github.com/uber/jaeger-client-go"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
@@ -662,15 +663,22 @@ func newTransactionEnv(
 	}
 }
 
-func (e *transactionEnv) StartTracing() {
+func (e *transactionEnv) StartTracing() string {
 	var span opentracing.Span
+	var traceID string
 	if e.ctx.Tracer != nil {
 		span, _ = e.ctx.Tracer.StartSpanFromContext(context.Background(), "exe.fvm.executeTransaction")
 		span.LogFields(
 			log.String("transaction.hash", e.txID.String()),
 		)
+
+		if sc, ok := span.Context().(jaeger.SpanContext); ok {
+			traceID = sc.TraceID().String()
+		}
+
 	}
 	e.traceSpan = span
+	return traceID
 }
 
 func (e *transactionEnv) StopTracing() {
