@@ -57,7 +57,7 @@ const DefaultEmergencySealingActive = false
 // user of this object needs to ensure single thread access.
 type Core struct {
 	log                                  zerolog.Logger                  // used to log relevant actions with context
-	engineMetrics                        module.EngineMetrics            // used to track sent and received messages
+	coreMetrics                          module.EngineMetrics            // used to track sent and received messages
 	tracer                               module.Tracer                   // used to trace execution
 	mempool                              module.MempoolMetrics           // used to track mempool size
 	metrics                              module.ConsensusMetrics         // used to track consensus metrics
@@ -87,7 +87,7 @@ type Core struct {
 
 func NewCore(
 	log zerolog.Logger,
-	engineMetrics module.EngineMetrics,
+	coreMetrics module.EngineMetrics,
 	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	conMetrics module.ConsensusMetrics,
@@ -109,10 +109,9 @@ func NewCore(
 	emergencySealingActive bool,
 	approvalConduit network.Conduit,
 ) (*Core, error) {
-	// initialize the propagation engine with its dependencies
 	c := &Core{
-		log:                                  log.With().Str("engine", "matching-core").Logger(),
-		engineMetrics:                        engineMetrics,
+		log:                                  log.With().Str("engine", "matching.Core").Logger(),
+		coreMetrics:                          coreMetrics,
 		tracer:                               tracer,
 		mempool:                              mempool,
 		metrics:                              conMetrics,
@@ -637,7 +636,7 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 		// is wrong and should _not_ be sealed. While it is fundamentally the ReceiptValidator's
 		// responsibility to filter out results without chunks, there is no harm in also in enforcing
 		// the same condition here as well. It simplifies the code, because otherwise the
-		// matching engine must enforce equality of start and end state for a result with zero chunks,
+		// matching core must enforce equality of start and end state for a result with zero chunks,
 		// in the absence of anyone else doing do.
 		matched := false
 		unmatchedIndex := -1

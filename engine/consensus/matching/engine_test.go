@@ -57,7 +57,7 @@ func (ms *EngineContextSuite) SetupTest() {
 		core: &Core{
 			tracer:                               tracer,
 			log:                                  log,
-			engineMetrics:                        metrics,
+			coreMetrics:                          metrics,
 			mempool:                              metrics,
 			metrics:                              metrics,
 			state:                                ms.State,
