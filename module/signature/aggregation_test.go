@@ -15,7 +15,7 @@ import (
 )
 
 const NUM_AGG_TEST = 7
-const NUM_AGG_BENCH = 1000
+const NUM_AGG_BENCH = 100
 
 func createAggregationT(t *testing.T) (*AggregationProvider, crypto.PrivateKey) {
 	agg, priv, err := createAggregation()
@@ -145,6 +145,42 @@ func BenchmarkAggregationProviderAggregation(b *testing.B) {
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
 		_, err := signer.Aggregate(sigs)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkVerifyMany(b *testing.B) {
+
+	// stop timer and reset to zero
+	b.StopTimer()
+	b.ResetTimer()
+
+	// create the desired number of signers
+	var signer *AggregationProvider
+	var priv crypto.PrivateKey
+	msg := createMSGB(b)
+	sigs := make([]crypto.Signature, 0, NUM_AGG_BENCH)
+	keys := make([]crypto.PublicKey, 0, NUM_AGG_BENCH)
+	for i := 0; i < NUM_AGG_BENCH; i++ {
+		signer, priv = createAggregationB(b)
+		sig, err := signer.Sign(msg)
+		if err != nil {
+			b.Fatal(err)
+		}
+		sigs = append(sigs, sig)
+		keys = append(keys, priv.PublicKey())
+	}
+	sig, err := signer.Aggregate(sigs)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	// start the timer and benchmark the aggregation
+	b.StartTimer()
+	for n := 0; n < b.N; n++ {
+		_, err := signer.VerifyMany(msg, sig, keys)
 		if err != nil {
 			b.Fatal(err)
 		}

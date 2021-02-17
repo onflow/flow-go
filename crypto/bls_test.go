@@ -705,3 +705,54 @@ func BenchmarkVerifySignatureManyMessages(b *testing.B) {
 	}
 	b.StopTimer()
 }
+
+// Bench of all aggregation functions
+func BenchmarkAggregate(b *testing.B) {
+	// random message
+	input := make([]byte, 100)
+	_, _ = mrand.Read(input)
+	// hasher
+	kmac := NewBLSKMAC("bench tag")
+	sigsNum := 1000
+	sigs := make([]Signature, 0, sigsNum)
+	sks := make([]PrivateKey, 0, sigsNum)
+	pks := make([]PublicKey, 0, sigsNum)
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+
+	// create the signatures
+	for i := 0; i < sigsNum; i++ {
+		_, _ = mrand.Read(seed)
+		sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
+		s, _ := sk.Sign(input, kmac)
+		sigs = append(sigs, s)
+		sks = append(sks, sk)
+		pks = append(pks, sk.PublicKey())
+	}
+
+	// private keys
+	b.Run("PrivateKeys", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, _ = AggregateBLSPrivateKeys(sks)
+		}
+		b.StopTimer()
+	})
+
+	// public keys
+	b.Run("PublicKeys", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, _ = AggregateBLSPublicKeys(pks)
+		}
+		b.StopTimer()
+	})
+
+	// signatures
+	b.Run("Signatures", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, _ = AggregateBLSSignatures(sigs)
+		}
+		b.StopTimer()
+	})
+}
