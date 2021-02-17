@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/ratelimit"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
@@ -77,11 +78,27 @@ func New(log zerolog.Logger,
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
+
+	rateLimiter := &rateLimiter{
+		log: log,
+	}
+
+	rateLimitInterceptor := ratelimit.UnaryServerInterceptor(rateLimiter)
+
 	if rpcMetricsEnabled {
+
+		unaryInterceptors := grpc.ChainUnaryInterceptor(grpc_prometheus.UnaryServerInterceptor,
+			rateLimitInterceptor)
+
 		grpcOpts = append(
 			grpcOpts,
 			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-			grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+			unaryInterceptors,
+		)
+	} else {
+		grpcOpts = append(
+			grpcOpts,
+			grpc.UnaryInterceptor(rateLimitInterceptor),
 		)
 	}
 
