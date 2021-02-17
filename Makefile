@@ -373,7 +373,7 @@ docker-run-ghost:
 	docker run -p 9000:9000 -p 3569:3569 "$(CONTAINER_REGISTRY)/ghost:latest" --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 PHONY: docker-all-tools
-docker-all-tools:tool-util tool-read-badger tool-read-protocol-state tool-remove-execution-fork
+docker-all-tools: tool-util tool-read-badger tool-read-protocol-state tool-remove-execution-fork
 
 PHONY: docker-build-util
 docker-build-util:
