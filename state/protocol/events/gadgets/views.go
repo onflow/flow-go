@@ -43,12 +43,7 @@ func (v *Views) BlockFinalized(block *flow.Header) {
 
 	v.currentView = block.View
 
-	callbacks, ok := v.views[block.View]
-	if !ok {
-		return
-	}
-
-	for _, callback := range callbacks {
+	for _, callback := range v.views[block.View] {
 		callback(block)
 	}
 

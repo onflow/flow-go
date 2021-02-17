@@ -3,6 +3,7 @@ package dkg
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -16,6 +17,7 @@ import (
 // be used in conjuction with the DKG MessagingEngine for private messages, and
 // with the DKG smart-contract for broadcast messages.
 type Broker struct {
+	sync.Mutex
 	log               zerolog.Logger
 	dkgInstanceID     string                   // unique identifier of the current dkg run (prevent replay attacks)
 	committee         flow.IdentifierList      // IDs of DKG members
@@ -78,23 +80,23 @@ func (b *Broker) Broadcast(data []byte) {
 	)
 	err := b.dkgContractClient.Broadcast(dkgMessage)
 	if err != nil {
-		if err != nil {
-			b.log.Error().
-				Err(err).
-				Msg("could not broadcast message")
-		}
+		b.log.Error().Err(err).Msg("could not broadcast message")
 	}
 }
 
 // Disqualify flags that a node is misbehaving and got disqualified
-func (b *Broker) Disqualify(node int, log string) {}
+func (b *Broker) Disqualify(node int, log string) {
+	b.log.Warn().Msgf("participant %d is disqualifying participant %d because: %s", b.myIndex, node, log)
+}
 
 // FlagMisbehavior warns that a node is misbehaving.
-func (b *Broker) FlagMisbehavior(node int, log string) {}
+func (b *Broker) FlagMisbehavior(node int, log string) {
+	b.log.Warn().Msgf("participant %d is flagging participant %d because: %s", b.myIndex, node, log)
+}
 
 // GetMsgCh returns the channel through which consumers can receive incoming
 // DKG messages.
-func (b *Broker) GetMsgCh() chan messages.DKGMessage {
+func (b *Broker) GetMsgCh() <-chan messages.DKGMessage {
 	return b.msgCh
 }
 
@@ -102,6 +104,8 @@ func (b *Broker) GetMsgCh() chan messages.DKGMessage {
 // epoch, and forwards them to the msgCh. It should be called with the ID of
 // block whose seal is finalized.
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
+	b.Lock()
+	defer b.Unlock()
 	msgs, err := b.dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
 	if err != nil {
 		return fmt.Errorf("could not read broadcast messages: %w", err)

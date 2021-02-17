@@ -28,7 +28,7 @@ The controller is always in one of 6 states:
 
 The controller exposes the following functions to trigger transitions:
 
-Run(): Triggers transition from Init to Phase0. Starts the DKG protocol instance
+Run(): Triggers transition from Init to Phase1. Starts the DKG protocol instance
        and background communication routines.
 
 EndPhase1(): Triggers transition from Phase 1 to Phase 2.

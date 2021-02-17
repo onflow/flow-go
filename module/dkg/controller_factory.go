@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // ControllerFactory is a factory object that creates new Controllers with the
@@ -49,7 +50,8 @@ func (f *ControllerFactory) Create(
 	)
 
 	n := len(participants)
-	dkg, err := crypto.NewJointFeldman(n, optimalThreshold(n), myIndex, broker)
+	threshold := signature.RandomBeaconThreshold(n)
+	dkg, err := crypto.NewJointFeldman(n, threshold, myIndex, broker)
 	if err != nil {
 		return nil, err
 	}
@@ -63,12 +65,4 @@ func (f *ControllerFactory) Create(
 	)
 
 	return controller, nil
-}
-
-// optimal threshold (t) to allow the largest number of malicious nodes (m)
-// assuming the protocol requires:
-//   m<=t for unforgeability
-//   n-m>=t+1 for robustness
-func optimalThreshold(size int) int {
-	return (size - 1) / 2
 }

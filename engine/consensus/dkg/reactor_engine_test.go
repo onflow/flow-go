@@ -12,10 +12,10 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	module "github.com/onflow/flow-go/module/mock"
-	events "github.com/onflow/flow-go/state/protocol/events"
-	mockEvents "github.com/onflow/flow-go/state/protocol/events/mock"
-	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
 // TestEpochSetup ensures that, upon receiving an EpochSetup event, the engine
@@ -37,10 +37,11 @@ import (
 // Phase3Final: 250
 // final      : 300
 func TestEpochSetup(t *testing.T) {
-
+	rand.Seed(time.Now().UnixNano())
+	currentCounter := rand.Uint64()
+	nextCounter := currentCounter + 1
 	committee := unittest.IdentityListFixture(10)
 	myIndex := 5
-
 	me := new(module.Local)
 	me.On("NodeID").Return(committee[myIndex].NodeID)
 
@@ -50,9 +51,11 @@ func TestEpochSetup(t *testing.T) {
 	for view = 100; view <= 250; view += DefaultPollStep {
 		blocks[view] = &flow.Header{View: view}
 	}
+	firstBlock := blocks[100]
 
+	// insert epoch setup in mock state
 	epochSetup := flow.EpochSetup{
-		Counter:            rand.Uint64(),
+		Counter:            nextCounter,
 		DKGPhase1FinalView: 150,
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
@@ -60,18 +63,19 @@ func TestEpochSetup(t *testing.T) {
 		Participants:       committee,
 		RandomSource:       []byte("random bytes"),
 	}
-
-	setups := new(storage.EpochSetups)
-	setups.On("ByID", epochSetup.ID()).Return(&epochSetup, nil)
-
-	firstBlock := blocks[100]
-	statuses := new(storage.EpochStatuses)
-	statuses.On("ByBlockID", firstBlock.ID()).Return(
-		&flow.EpochStatus{
-			CurrentEpoch: flow.EventIDs{SetupID: epochSetup.ID()},
-		},
-		nil,
-	)
+	epoch := new(protocol.Epoch)
+	epoch.On("Counter").Return(epochSetup.Counter, nil)
+	epoch.On("InitialIdentities").Return(epochSetup.Participants, nil)
+	epoch.On("DKGPhase1FinalView").Return(epochSetup.DKGPhase1FinalView, nil)
+	epoch.On("DKGPhase2FinalView").Return(epochSetup.DKGPhase2FinalView, nil)
+	epoch.On("DKGPhase3FinalView").Return(epochSetup.DKGPhase3FinalView, nil)
+	epoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(epochSetup.RandomSource, nil)
+	epochQuery := mocks.NewEpochQuery(t, currentCounter)
+	epochQuery.Add(epoch)
+	snapshot := new(protocol.Snapshot)
+	snapshot.On("Epochs").Return(epochQuery)
+	state := new(protocol.State)
+	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
 
 	// we will ensure that the controller state transitions get called
 	// appropriately
@@ -89,58 +93,22 @@ func TestEpochSetup(t *testing.T) {
 		myIndex,
 		epochSetup.RandomSource).Return(controller, nil)
 
-	// record all the callback methods that get registered with OnView
-	viewEvents := new(mockEvents.Views)
-	transitionCallbacks := make(map[uint64]events.OnViewCallback)
-	pollCallbacks := make(map[uint64]events.OnViewCallback)
-	viewEvents.On("OnView", mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			view := args.Get(0).(uint64)
-			callback := args.Get(1).(events.OnViewCallback)
-			_, recordedTransition := transitionCallbacks[view]
-			// record the callback in the appropriate category. this is
-			// necessary because views corresponding to phase transitions have
-			// two callbacks, one for the actual phase transition and one for
-			// calling the smart-contract.
-			if (view == epochSetup.DKGPhase1FinalView ||
-				view == epochSetup.DKGPhase2FinalView ||
-				view == epochSetup.DKGPhase3FinalView) &&
-				!recordedTransition {
-				// if the view corresponds to a phase transition, and we haven't
-				// already recorded one, record this callback as a phase
-				// transition
-				transitionCallbacks[view] = callback
-			} else {
-				pollCallbacks[view] = callback
-			}
-		}).
-		Times(18) // a total of 18 calls to OnView must be made
-
+	viewEvents := gadgets.NewViews()
 	engine := NewReactorEngine(
 		zerolog.New(ioutil.Discard),
 		me,
-		setups,
-		statuses,
+		state,
 		factory,
 		viewEvents,
 	)
 
 	engine.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
 
-	// check that enough calls to OnView were made
-	viewEvents.AssertExpectations(t)
-
-	// trigger callbacks as if new views were finalized
-	for view, callback := range transitionCallbacks {
-		header := blocks[view]
-		callback(header)
-	}
-	for view, callback := range pollCallbacks {
-		header := blocks[view]
-		callback(header)
+	for view = 100; view <= 250; view += DefaultPollStep {
+		viewEvents.BlockFinalized(blocks[view])
 	}
 
 	// check that the appropriate callbacks were registered
-	time.Sleep(1 * time.Second)
+	time.Sleep(50 * time.Millisecond)
 	controller.AssertExpectations(t)
 }

@@ -88,7 +88,7 @@ type DKGBroker interface {
 
 	// GetMsgCh returns the channel through which a user of the DKGBroker (ex
 	// DKGController) can receive incoming DKGMessages (private and broadcast).
-	GetMsgCh() chan messages.DKGMessage
+	GetMsgCh() <-chan messages.DKGMessage
 
 	// Poll instructs the broker to actively fetch broadcast messages (ex. read
 	// from DKG smart contract). The messages will be forwarded through the

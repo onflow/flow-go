@@ -58,16 +58,15 @@ func TestPrivateSend_Valid(t *testing.T) {
 	// and require that the expected message is sent withing 1 second.
 	doneCh := make(chan struct{})
 	go func() {
-		for {
-			msg := <-sender.tunnel.MsgChOut
-			require.Equal(t, expectedMsg, msg)
-			close(doneCh)
-		}
+		msg := <-sender.tunnel.MsgChOut
+		require.Equal(t, expectedMsg, msg)
+		close(doneCh)
+
 	}()
 
 	sender.PrivateSend(dest, msgb)
 
-	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not sent")
+	unittest.RequireCloseBefore(t, doneCh, 50*time.Millisecond, "message not sent")
 }
 
 // TestPrivateSend_IndexOutOfRange checks that PrivateSend discards messages if
@@ -99,7 +98,7 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 	sender.PrivateSend(2, msgb)
 	sender.PrivateSend(-1, msgb)
 
-	unittest.RequireNeverClosedWithin(t, doneCh, time.Second, "no invalid message should be sent")
+	unittest.RequireNeverClosedWithin(t, doneCh, 50*time.Millisecond, "no invalid message should be sent")
 }
 
 // TestReceiveMessage_Valid checks that a valid incoming DKG message is
@@ -143,7 +142,7 @@ func TestReceiveMessage_Valid(t *testing.T) {
 		},
 	)
 
-	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")
+	unittest.RequireCloseBefore(t, doneCh, 50*time.Millisecond, "message not received")
 }
 
 // TestReceiveMessage_InvalidOrigin checks that incoming DKG messages are
@@ -206,7 +205,7 @@ func TestProcessMessage_InvalidOrigin(t *testing.T) {
 		},
 	)
 
-	unittest.RequireNeverClosedWithin(t, doneCh, time.Second, "no invalid incoming message should be forwarded")
+	unittest.RequireNeverClosedWithin(t, doneCh, 50*time.Millisecond, "no invalid incoming message should be forwarded")
 }
 
 // TestBroadcastMessage checks that the broker correctly wraps the message

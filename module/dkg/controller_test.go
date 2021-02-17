@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"crypto/rand"
 	"fmt"
 	"os"
 	"testing"
@@ -13,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	msg "github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // node is a test object that simulates a running instance of the DKG protocol
@@ -129,7 +130,7 @@ func (b *broker) FlagMisbehavior(node int, logData string) {
 }
 
 // GetMsgCh implements the DKGBroker interface.
-func (b *broker) GetMsgCh() chan msg.DKGMessage {
+func (b *broker) GetMsgCh() <-chan msg.DKGMessage {
 	return b.channels[b.id]
 }
 
@@ -182,7 +183,7 @@ func TestDKGThreshold(t *testing.T) {
 	for _, tc := range testCases {
 		// gn is the minimum number of good nodes required for the DKG protocol
 		// to go well
-		gn := tc.totalNodes - optimalThreshold(tc.totalNodes)
+		gn := tc.totalNodes - signature.RandomBeaconThreshold(tc.totalNodes)
 
 		t.Run(fmt.Sprintf("%d/%d nodes", gn, tc.totalNodes), func(t *testing.T) {
 			testDKG(t, tc.totalNodes, gn, tc.phase1Duration, tc.phase2Duration, tc.phase3Duration)
@@ -229,10 +230,9 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 			logger:   logger,
 		}
 
-		seed := make([]byte, 20)
-		_, _ = rand.Read(seed)
+		seed := unittest.SeedFixture(20)
 
-		dkg, err := crypto.NewJointFeldman(n, optimalThreshold(n), i, broker)
+		dkg, err := crypto.NewJointFeldman(n, signature.RandomBeaconThreshold(n), i, broker)
 		require.NoError(t, err)
 
 		controller := NewController(
