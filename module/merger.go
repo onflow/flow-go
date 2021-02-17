@@ -8,6 +8,6 @@ import (
 // in a cryptographically unaware way (agnostic of the byte structure of the
 // signatures).
 type Merger interface {
-	Join(sigs ...crypto.Signature) ([]byte, error)
-	Split(combined []byte) ([]crypto.Signature, error)
+	Join(sig1, sig2 crypto.Signature) []byte
+	Split(combined []byte) (crypto.Signature, crypto.Signature, error)
 }

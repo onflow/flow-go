@@ -12,54 +12,50 @@ type Merger struct {
 	mock.Mock
 }
 
-// Join provides a mock function with given fields: sigs
-func (_m *Merger) Join(sigs ...crypto.Signature) ([]byte, error) {
-	_va := make([]interface{}, len(sigs))
-	for _i := range sigs {
-		_va[_i] = sigs[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+// Join provides a mock function with given fields: sig1, sig2
+func (_m *Merger) Join(sig1 crypto.Signature, sig2 crypto.Signature) []byte {
+	ret := _m.Called(sig1, sig2)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(...crypto.Signature) []byte); ok {
-		r0 = rf(sigs...)
+	if rf, ok := ret.Get(0).(func(crypto.Signature, crypto.Signature) []byte); ok {
+		r0 = rf(sig1, sig2)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]byte)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(...crypto.Signature) error); ok {
-		r1 = rf(sigs...)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // Split provides a mock function with given fields: combined
-func (_m *Merger) Split(combined []byte) ([]crypto.Signature, error) {
+func (_m *Merger) Split(combined []byte) (crypto.Signature, crypto.Signature, error) {
 	ret := _m.Called(combined)
 
-	var r0 []crypto.Signature
-	if rf, ok := ret.Get(0).(func([]byte) []crypto.Signature); ok {
+	var r0 crypto.Signature
+	if rf, ok := ret.Get(0).(func([]byte) crypto.Signature); ok {
 		r0 = rf(combined)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]crypto.Signature)
+			r0 = ret.Get(0).(crypto.Signature)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+	var r1 crypto.Signature
+	if rf, ok := ret.Get(1).(func([]byte) crypto.Signature); ok {
 		r1 = rf(combined)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(crypto.Signature)
+		}
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func([]byte) error); ok {
+		r2 = rf(combined)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }

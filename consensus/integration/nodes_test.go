@@ -82,9 +82,8 @@ func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Nod
 	rand.Read(sig1[:])
 	sig2 := make([]byte, 32)
 	rand.Read(sig2[:])
-	c := &signature.Combiner{}
-	combined, err := c.Join(sig1, sig2)
-	require.NoError(t, err)
+	c := signature.NewCombiner(32, 32)
+	combined := c.Join(sig1, sig2)
 
 	// all participants will sign the rootBlock block
 	signerIDs := make([]flow.Identifier, 0)

@@ -92,7 +92,6 @@ func (s *SingleSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 func (s *SingleSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 
 	// check the consistency of the votes
-	// TODO: why do we check for message consistency here? (single votes are supposed to be already checked)
 	err := checkVotesValidity(votes)
 	if err != nil {
 		return nil, fmt.Errorf("votes are not valid: %w", err)

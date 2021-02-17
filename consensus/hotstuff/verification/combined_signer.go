@@ -90,7 +90,6 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 
 	// check the consistency of the votes
-	// TODO: why do we check for message consistency here? (votes are supposed to be already checked before createQC)
 	err := checkVotesValidity(votes)
 	if err != nil {
 		return nil, fmt.Errorf("votes are not valid: %w", err)
@@ -120,19 +119,10 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	for _, vote := range votes {
 
 		// split the vote signature into its parts
-		splitSigs, err := c.merger.Split(vote.SigData)
+		stakingSig, beaconShare, err := c.merger.Split(vote.SigData)
 		if err != nil {
 			return nil, fmt.Errorf("could not split signature (voter: %x): %w", vote.SignerID, err)
 		}
-
-		// check that we have two parts (staking & beacon)
-		if len(splitSigs) != 2 {
-			return nil, fmt.Errorf("wrong amount of split signatures (voter: %x, count: %d, expected: 2)", vote.SignerID, len(splitSigs))
-		}
-
-		// assign the respective parts to meaningful names
-		stakingSig := splitSigs[0]
-		beaconShare := splitSigs[1]
 
 		// get the dkg index from the dkg state
 		dkgIndex, err := dkg.Index(vote.SignerID)
@@ -160,10 +150,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	}
 
 	// combine the aggregated staking signature with the threshold beacon signature
-	combinedMultiSig, err := c.merger.Join(stakingAggSig, beaconThresSig)
-	if err != nil {
-		return nil, fmt.Errorf("could not combine the aggregated signatures: %w", err)
-	}
+	combinedMultiSig := c.merger.Join(stakingAggSig, beaconThresSig)
 
 	// create the QC
 	qc := &flow.QuorumCertificate{
@@ -191,10 +178,7 @@ func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 	}
 
 	// combine the two signatures into one byte slice
-	combinedSig, err := c.merger.Join(stakingSig, beaconShare)
-	if err != nil {
-		return nil, fmt.Errorf("could not combine signatures: %w", err)
-	}
+	combinedSig := c.merger.Join(stakingSig, beaconShare)
 
 	return combinedSig, nil
 }

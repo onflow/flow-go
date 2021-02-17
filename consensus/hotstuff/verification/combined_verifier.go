@@ -57,19 +57,10 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	}
 
 	// split the two signatures from the vote
-	splitSigs, err := c.merger.Split(sigData)
+	stakingSig, beaconShare, err := c.merger.Split(sigData)
 	if err != nil {
 		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
 	}
-
-	// check if we have two signature
-	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("wrong number of combined signatures: %w", ErrInvalidFormat)
-	}
-
-	// assign the signtures
-	stakingSig := splitSigs[0]
-	beaconShare := splitSigs[1]
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -117,19 +108,10 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	}
 
 	// split the aggregated staking & beacon signatures
-	splitSigs, err := c.merger.Split(sigData)
+	stakingAggSig, beaconThresSig, err := c.merger.Split(sigData)
 	if err != nil {
 		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
 	}
-
-	// check we have the right amount of split sigs
-	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("invalid number of split signatures: %w", ErrInvalidFormat)
-	}
-
-	// assign the signatures
-	stakingAggSig := splitSigs[0]
-	beaconThresSig := splitSigs[1]
 
 	msg := makeVoteMessage(block.View, block.BlockID)
 	// TODO: verify if batch verification is faster

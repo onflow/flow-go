@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/module/signature"
 )
 
@@ -14,16 +15,13 @@ import (
 // generate task-specific seeds from the same signature.
 func FromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
 	// split the parent voter sig into staking & beacon parts
-	combiner := signature.NewCombiner()
-	sigs, err := combiner.Split(combinedSig)
+	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
+	_, randomBeaconSig, err := combiner.Split(combinedSig)
 	if err != nil {
 		return nil, fmt.Errorf("could not split block signature: %w", err)
 	}
-	if len(sigs) != 2 {
-		return nil, fmt.Errorf("invalid block signature split")
-	}
 
-	return FromRandomSource(indices, sigs[1])
+	return FromRandomSource(indices, randomBeaconSig)
 }
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).
