@@ -290,7 +290,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 	// break accounts into batches of 10
 	// TODO not share the same client
 
-	groupSize := 100
+	groupSize := m.simulatorConfig.AccountGroupSize
+
 	for i := 0; i < len(accounts); i += groupSize {
 
 		blockRef, err := m.flowClient.GetLatestBlockHeader(context.Background(), false)
@@ -690,19 +691,17 @@ func (m *marketPlaceAccount) Act() error {
 			continue
 		}
 
-		transferSize := 100
-		r := rand.Intn(len(moments) - transferSize)
-		selected := moments[r : r+transferSize]
-
-		// send to all friends
-		numberOfTx := 10
+		// send to all friends for now
+		// TODO set a ratio
+		numberOfTx := m.simulatorConfig.AccountGroupSize
 		f := rand.Intn(len(m.friends) - numberOfTx)
 		friends := m.friends[f : f+numberOfTx]
 
-		// subsetSize := transferSize / numberOfTx
+		transferSize := numberOfTx * m.simulatorConfig.MomentsToTransferPerTx
+		r := rand.Intn(len(moments) - transferSize)
+		selected := moments[r : r+transferSize]
 
 		wg := sync.WaitGroup{}
-
 		share := len(selected) / len(friends)
 		for j := 0; j < len(friends); j++ {
 			p := j
@@ -727,7 +726,7 @@ func (m *marketPlaceAccount) Act() error {
 			}()
 		}
 		wg.Wait()
-		time.Sleep(time.Millisecond * 200)
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	return nil

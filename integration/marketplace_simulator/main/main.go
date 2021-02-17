@@ -35,8 +35,9 @@ func main() {
 
 	// for a tps of 6 we need about 60 accounts
 	numberOfAccounts := flag.Int("account-count", 100, "number of accounts")
-
 	numberOfMomentsPerAccount := flag.Int("moment-count-per-account", 1000, "number of initial moments per account")
+	accountGroupSize := flag.Int("account-group-size", 10, "number accounts in a group")
+	momentsToTransferPerTx := flag.Int("moments-to-transfer-per-tx", 10, "number moments to be transferred for each tx")
 
 	// maxTxInFlight := flag.Int("max-tx-in-flight", 8000, "maximum number of transactions in flight (txTracker)")
 	// workerDelayAfterEachFetch := flag.Duration("worker-fetch-delay", time.Second, "duration of worker sleep after each tx status fetch (prevents too much requests)")
@@ -100,6 +101,8 @@ func main() {
 	simulatorConfig := &marketplace.SimulatorConfig{
 		NumberOfAccounts:          *numberOfAccounts,
 		NumberOfMomentsPerAccount: *numberOfMomentsPerAccount,
+		AccountGroupSize:          *accountGroupSize,
+		MomentsToTransferPerTx:    *momentsToTransferPerTx,
 		Delay:                     time.Second,
 	}
 

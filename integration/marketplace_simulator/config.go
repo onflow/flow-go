@@ -17,6 +17,8 @@ type NetworkConfig struct {
 type SimulatorConfig struct {
 	NumberOfAccounts          int
 	NumberOfMomentsPerAccount int
+	AccountGroupSize          int
+	MomentsToTransferPerTx    int
 	Delay                     time.Duration
 	NBATopshotAddress         *flowsdk.Address
 	// DoSetup              bool

@@ -52,11 +52,11 @@ func (acc *flowAccount) PrepareAndSignTx(tx *flowsdk.Transaction, keyID int) err
 	return nil
 }
 
-func (acc *flowAccount) SyncAccountKey(flowClient *client.Client) error {
+func (acc *flowAccount) SyncAccountKey() error {
 	acc.signerLock.Lock()
 	defer acc.signerLock.Unlock()
 
-	account, err := flowClient.GetAccount(context.Background(), *acc.Address)
+	account, err := acc.flowClient.GetAccount(context.Background(), *acc.Address)
 	if err != nil {
 		return fmt.Errorf("error while calling get account: %w", err)
 	}
@@ -104,12 +104,7 @@ func (acc *flowAccount) AddKeys(numberOfKeysToAdd int) error {
 		}
 	}
 	// resync
-	account, err := acc.flowClient.GetAccount(context.Background(), *acc.Address)
-	if err != nil {
-		return fmt.Errorf("error while calling get account: %w", err)
-	}
-	acc.accountKeys = account.Keys
-
+	acc.SyncAccountKey()
 	return nil
 }
 
