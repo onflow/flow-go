@@ -31,8 +31,8 @@ func main() {
 	// profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 
 	// for a tps of 6 we need about 60 accounts
-	numberOfAccounts := flag.Int("account-count", 10, "number of accounts")
-	numberOfMomentsPerAccount := flag.Int("moment-count-per-account", 5000, "number of initial moments per account")
+	numberOfAccounts := flag.Int("account-count", 20, "number of accounts")
+	numberOfMomentsPerAccount := flag.Int("moment-count-per-account", 10000, "number of initial moments per account")
 	accountGroupSize := flag.Int("account-group-size", 10, "number accounts in a group")
 	momentsToTransferPerTx := flag.Int("moments-to-transfer-per-tx", 10, "number moments to be transferred for each tx")
 
