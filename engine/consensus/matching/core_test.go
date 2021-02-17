@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// 1. Matching engine should validate the incoming receipt (aka ExecutionReceipt):
+// 1. Matching Core should validate the incoming receipt (aka ExecutionReceipt):
 //     1. it should stores it to the mempool if valid
 //     2. it should ignore it when:
 //         1. the origin is invalid [Condition removed for now -> will be replaced by valid EN signature in future]
@@ -33,17 +34,17 @@ import (
 //         3. the result (a receipt has one result, multiple receipts might have the same result) has been sealed already
 //         4. the receipt has been received before
 //         5. the result has been received before
-// 2. Matching engine should validate the incoming approval (aka ResultApproval):
+// 2. Matching Core should validate the incoming approval (aka ResultApproval):
 //     1. it should store it to the mempool if valid
 //     2. it should ignore it when:
 //         1. the origin is invalid
 //         2. the role is invalid
 //         3. the result has been sealed already
-// 3. Matching engine should be able to find matched results:
+// 3. Matching Core should be able to find matched results:
 //     1. It should find no matched result if there is no result and no approval
 //     2. it should find 1 matched result if we received a receipt, and the block has no payload (impossible now, system every block will have at least one chunk to verify)
 //     3. It should find no matched result if there is only result, but no approval (skip for now, because we seal results without approvals)
-// 4. Matching engine should be able to seal a matched result:
+// 4. Matching Core should be able to seal a matched result:
 //     1. It should not seal a matched result if:
 //         1. the block is missing (consensus hasn’t received this executed block yet)
 //         2. the approvals for a certain chunk are insufficient (skip for now, because we seal results without approvals)
@@ -51,7 +52,7 @@ import (
 //         4. the previous result is not known
 //         5. the previous result references the wrong block
 //     2. It should seal a matched result if the approvals are sufficient
-// 5. Matching engine should request results from execution nodes:
+// 5. Matching Core should request results from execution nodes:
 //     1. If there are unsealed and finalized blocks, it should request the execution receipts from the execution nodes.
 func TestMatchingCore(t *testing.T) {
 	suite.Run(t, new(MatchingSuite))
@@ -64,7 +65,7 @@ type MatchingSuite struct {
 	receiptValidator  *mockmodule.ReceiptValidator
 	approvalValidator *mockmodule.ApprovalValidator
 
-	// MATCHING ENGINE
+	// MATCHING CORE
 	matching *Core
 }
 
@@ -76,7 +77,7 @@ func (ms *MatchingSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
+	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING CORE ~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.requester = new(mockmodule.Requester)
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
 	ms.approvalValidator = &mockmodule.ApprovalValidator{}
@@ -84,7 +85,7 @@ func (ms *MatchingSuite) SetupTest() {
 	ms.matching = &Core{
 		log:                                  log,
 		tracer:                               tracer,
-		engineMetrics:                        metrics,
+		coreMetrics:                          metrics,
 		mempool:                              metrics,
 		metrics:                              metrics,
 		state:                                ms.State,
@@ -111,7 +112,7 @@ func (ms *MatchingSuite) SetupTest() {
 
 // Test that we reject receipts for unknown blocks without generating an error
 func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
-	// This receipt has a random block ID, so the matching engine won't find it.
+	// This receipt has a random block ID, so the matching Core won't find it.
 	receipt := unittest.ExecutionReceiptFixture()
 
 	// onReceipt should reject the receipt without throwing an error
@@ -122,7 +123,7 @@ func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
-// matching engine should drop Result for known block that is already sealed
+// matching Core should drop Result for known block that is already sealed
 // without trying to store anything
 func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 	originID := ms.ExeID
@@ -136,28 +137,6 @@ func (ms *MatchingSuite) TestOnReceiptSealedResult() {
 
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-}
-
-// Test that we drop receipts that are already pooled
-func (ms *MatchingSuite) TestOnReceiptPendingReceipt() {
-	receipt := unittest.ExecutionReceiptFixture(
-		unittest.WithExecutorID(ms.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
-	)
-
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
-
-	// setup the receipts mempool to check if we attempted to add the receipt to
-	// the mempool, and return false as we are testing the case where it was already in the mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(false, nil).Once()
-
-	// onReceipt should return immediately after realizing the receipt is already in the mempool
-	// but without throwing any errors
-	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should ignore already pending receipt")
-
-	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
 // Test that we store different receipts for the same result
@@ -180,8 +159,9 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should not error for different receipt for already pending result")
+	ms.Require().NoError(err, "should handle different receipts for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
@@ -198,13 +178,19 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
-
 	// The receipt should be added to the receipts mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
+	// The result should be added to the IncorporatedReceipts mempool (shortcut sealing Phase 2b):
+	// TODO: remove for later sealing phases
+	ms.ResultsPL.
+		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
+		Return(true, nil).Once()
+
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should not error for different receipt for already pending result")
+	ms.Require().NoError(err, "should process receipts, even if it is already in storage")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
@@ -221,31 +207,43 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	// we expect that receipt is added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
+	// setup the results mempool to check if we attempted to add the incorporated result
+	ms.ResultsPL.
+		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
+		Return(true, nil).Once()
+
 	// onReceipt should run to completion without throwing an error
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
+	ms.Require().NoError(err, "should add receipt and result to mempools if valid")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
 // TestOnReceiptInvalid tests that we reject receipts that don't pass the ReceiptValidator
 func (ms *MatchingSuite) TestOnReceiptInvalid() {
-	// we use the same Receipt as in TestOnReceiptValid to ensure that the matching engine is not
+	// we use the same Receipt as in TestOnReceiptValid to ensure that the matching Core is not
 	// rejecting the receipt for any other reason
 	originID := ms.ExeID
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 
+	// check that _expected_ failure case of invalid receipt is handled without error
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
 	_, err := ms.matching.processReceipt(receipt)
-	ms.Require().Error(err, "should reject receipt that does not pass ReceiptValidator")
-	ms.Assert().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "invalid receipt should be dropped but not error")
+
+	// check that _unexpected_ failure case causes the error to be escalated
+	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(fmt.Errorf("")).Once()
+	_, err = ms.matching.processReceipt(receipt)
+	ms.Require().Error(err, "unexpected errors should be escalated")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
 // try to submit an approval where the message origin is inconsistent with the message creator
@@ -255,16 +253,14 @@ func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
 	err := ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
 
 	// approval from random origin but with valid ApproverID (i.e. a verification node)
 	originID = unittest.IdentifierFixture() // random origin
 	approval = unittest.ResultApprovalFixture(unittest.WithApproverID(ms.VerID))
 
 	err = ms.matching.OnApproval(originID, approval)
-	ms.Require().Error(err, "should reject approval with mismatching origin and executor")
-	ms.Require().True(engine.IsInvalidInputError(err))
+	ms.Require().NoError(err, "approval from unknown origin should be dropped but not error")
 
 	// In both cases, we expect the approval to be rejected without hitting the mempools
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -299,10 +295,15 @@ func (ms *MatchingSuite) TestOnApprovalInvalid() {
 		unittest.WithApproverID(originID),
 	)
 
+	// check that _expected_ failure case of invalid approval is handled without error
 	ms.approvalValidator.On("Validate", approval).Return(engine.NewInvalidInputError("")).Once()
-
 	err := ms.matching.OnApproval(approval.Body.ApproverID, approval)
-	ms.Require().Nil(err, "should report error if invalid")
+	ms.Require().NoError(err, "invalid approval should be dropped but not error")
+
+	// check that unknown failure case is escalated
+	ms.approvalValidator.On("Validate", approval).Return(fmt.Errorf("")).Once()
+	err = ms.matching.OnApproval(approval.Body.ApproverID, approval)
+	ms.Require().Error(err, "unexpected errors should be escalated")
 
 	ms.approvalValidator.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
@@ -370,7 +371,7 @@ func (ms *MatchingSuite) TestSealableResultsValid() {
 }
 
 // Try to seal a result for which we don't have the block.
-// This tests verifies that Matching engine is performing self-consistency checking:
+// This tests verifies that Matching Core is performing self-consistency checking:
 // Not finding the block for an incorporated result is a fatal
 // implementation bug, as we only add results to the IncorporatedResults
 // mempool, where _both_ the block that incorporates the result as well
@@ -596,7 +597,7 @@ func (ms *MatchingSuite) TestRequestPendingApprovals() {
 	// we will assume that all chunks are assigned to the same two verifiers.
 	verifiers := unittest.IdentifierListFixture(2)
 
-	// the matching engine requires approvals from both verifiers for each chunk
+	// the matching Core requires approvals from both verifiers for each chunk
 	ms.matching.requiredApprovalsForSealConstruction = 2
 
 	// expectedRequests collects the set of ApprovalRequests that should be sent

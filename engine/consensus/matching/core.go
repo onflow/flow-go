@@ -57,7 +57,7 @@ const DefaultEmergencySealingActive = false
 // user of this object needs to ensure single thread access.
 type Core struct {
 	log                                  zerolog.Logger                  // used to log relevant actions with context
-	engineMetrics                        module.EngineMetrics            // used to track sent and received messages
+	coreMetrics                          module.EngineMetrics            // used to track sent and received messages
 	tracer                               module.Tracer                   // used to trace execution
 	mempool                              module.MempoolMetrics           // used to track mempool size
 	metrics                              module.ConsensusMetrics         // used to track consensus metrics
@@ -87,7 +87,7 @@ type Core struct {
 
 func NewCore(
 	log zerolog.Logger,
-	engineMetrics module.EngineMetrics,
+	coreMetrics module.EngineMetrics,
 	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	conMetrics module.ConsensusMetrics,
@@ -109,10 +109,9 @@ func NewCore(
 	emergencySealingActive bool,
 	approvalConduit network.Conduit,
 ) (*Core, error) {
-	// initialize the propagation engine with its dependencies
 	c := &Core{
-		log:                                  log.With().Str("engine", "matching-core").Logger(),
-		engineMetrics:                        engineMetrics,
+		log:                                  log.With().Str("engine", "matching.Core").Logger(),
+		coreMetrics:                          coreMetrics,
 		tracer:                               tracer,
 		mempool:                              mempool,
 		metrics:                              conMetrics,
@@ -166,15 +165,14 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 		if err != nil {
 			marshalled = []byte("json_marshalling_failed")
 		}
-
-		c.log.Fatal().Err(err).
+		c.log.Error().Err(err).
 			Hex("origin", logging.ID(originID)).
 			Hex("receipt_id", receiptID[:]).
 			Hex("result_id", resultID[:]).
 			Str("receipt", string(marshalled)).
 			Msg("internal error processing execution receipt")
 
-		return nil
+		return fmt.Errorf("internal error processing execution receipt %x: %w", receipt.ID(), err)
 	}
 
 	if !processed {
@@ -185,10 +183,13 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	c.pendingReceipts.Rem(receipt.ID())
 
 	for _, childReceipt := range childReceipts {
-		// recursively processing the child receipts, since onReceipt
-		// is logging error internal already, we could ignore the returned
-		// error here
-		_ = c.OnReceipt(childReceipt.ExecutorID, childReceipt)
+		// recursively processing the child receipts
+		err := c.OnReceipt(childReceipt.ExecutorID, childReceipt)
+		if err != nil {
+			// we don't want to wrap the error with any info from its parent receipt,
+			// because the error has nothing to do with its parent receipt.
+			return err
+		}
 	}
 
 	return nil
@@ -206,7 +207,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}()
 
 	resultID := receipt.ExecutionResult.ID()
-
 	log := c.log.With().
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", resultID[:]).
@@ -280,7 +280,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 			log.Err(err).Msg("invalid execution receipt")
 			return false, nil
 		}
-
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
@@ -320,7 +319,7 @@ func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (
 	if !added {
 		return false, nil
 	}
-	// TODO: we'd better wraps the `receipts` with the metrics method to avoid the metrics
+	// TODO: we'd better wrap the `receipts` with the metrics method to avoid the metrics
 	// getting out of sync
 	c.mempool.MempoolEntries(metrics.ResourceReceipt, c.receipts.Size())
 
@@ -637,7 +636,7 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 		// is wrong and should _not_ be sealed. While it is fundamentally the ReceiptValidator's
 		// responsibility to filter out results without chunks, there is no harm in also in enforcing
 		// the same condition here as well. It simplifies the code, because otherwise the
-		// matching engine must enforce equality of start and end state for a result with zero chunks,
+		// matching core must enforce equality of start and end state for a result with zero chunks,
 		// in the absence of anyone else doing do.
 		matched := false
 		unmatchedIndex := -1
@@ -993,10 +992,21 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 			continue
 		}
 
-		// since the index is only added when the block which includes the receipts
+		// Without the logic below, the matching engine would produce IncorporatedResults
+		// only from receipts received directly by EN. It would be possible for a receipt
+		// to come unnoticed by the matching engine if it was incorporated in a block by
+		// another node and never received directly from the EN. Or the receipt might
+		// have been lost from the mempool during a node crash.
+		// Hence we check also if we have the receipts in storage (as would have been
+		// populated when the block was added to the chain).
+		// Currently, the index is only added when the block which includes the receipts
 		// get finalized, so the returned receipts must be from finalized blocks.
-		// Therefore, the return receipts must be incoporated receipts, which
+		// Therefore, the return receipts must be incorporated receipts, which
 		// are safe to be added to the mempool
+		// ToDo: this logic should eventually be moved in the engine's
+		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
+		// and that the IncorporatedResult's IncorporatedBlockID should be set
+		// correctly.
 		receipts, err := c.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
 		if err != nil {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)

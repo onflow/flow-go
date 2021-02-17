@@ -23,7 +23,7 @@ type Indexer struct {
 
 func NewIndexer(log zerolog.Logger, receiptsDB storage.ExecutionReceipts, payloadsDB storage.Payloads) *Indexer {
 	return &Indexer{
-		log:        log.With().Str("engine", "indexer").Logger(),
+		log:        log.With().Str("engine", "matching.Indexer").Logger(),
 		receiptsDB: receiptsDB,
 		payloadsDB: payloadsDB,
 	}
@@ -44,7 +44,6 @@ func (i *Indexer) OnFinalizedBlock(block *model.Block) {
 
 func (i *Indexer) indexReceipts(blockID flow.Identifier) error {
 	payload, err := i.payloadsDB.ByBlockID(blockID)
-
 	if err != nil {
 		return fmt.Errorf("could not get block payload: %w", err)
 	}
@@ -52,7 +51,7 @@ func (i *Indexer) indexReceipts(blockID flow.Identifier) error {
 	for _, receipt := range payload.Receipts {
 		err := i.receiptsDB.IndexByExecutor(receipt)
 		if err != nil {
-			return fmt.Errorf("could not index receipt by executor, receipt id: %v: %w", receipt.ID(), err)
+			return fmt.Errorf("could not index receipt %v by executor: %w", receipt.ID(), err)
 		}
 	}
 
