@@ -726,7 +726,7 @@ func (m *marketPlaceAccount) Act() error {
 			}()
 		}
 		wg.Wait()
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 	}
 
 	return nil
