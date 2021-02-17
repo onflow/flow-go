@@ -32,7 +32,7 @@ type Engine struct {
 	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify
 	chunksQueue      storage.ChunksQueue   // to store chunks to be verified
 	newChunkListener module.NewJobListener // to notify about a new chunk
-	finishProcessing finishProcessing      // to report a block has been processed
+	finishProcessing ProcessingNotifier    // to report a block has been processed
 }
 
 func New(
@@ -153,7 +153,7 @@ func (e *Engine) preprocess(receipt *flow.ExecutionReceipt) (bool, error) {
 	return true, nil
 }
 
-func (e *Engine) withFinishProcessing(finishProcessing finishProcessing) {
+func (e *Engine) withFinishProcessing(finishProcessing ProcessingNotifier) {
 	e.finishProcessing = finishProcessing
 }
 

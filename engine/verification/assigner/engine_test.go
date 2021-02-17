@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,14 +22,15 @@ import (
 // AssignerEngineTestSuite encapsulates data structures for running unittests on assigner engine.
 type AssignerEngineTestSuite struct {
 	// modules
-	me               *module.Local
-	state            *protocol.State
-	snapshot         *protocol.Snapshot
-	metrics          *module.VerificationMetrics
-	tracer           *trace.NoopTracer
-	assigner         *module.ChunkAssigner
-	chunksQueue      *storage.ChunksQueue
-	newChunkListener *module.NewJobListener
+	me                   *module.Local
+	state                *protocol.State
+	snapshot             *protocol.Snapshot
+	metrics              *module.VerificationMetrics
+	tracer               *trace.NoopTracer
+	assigner             *module.ChunkAssigner
+	chunksQueue          *storage.ChunksQueue
+	newChunkListener     *module.NewJobListener
+	blockProcessNotifier ProcessingNotifier
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -63,15 +65,16 @@ func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
 // SetupTest initiates the test setups prior to each test.
 func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineTestSuite {
 	s := &AssignerEngineTestSuite{
-		me:               &module.Local{},
-		state:            &protocol.State{},
-		snapshot:         &protocol.Snapshot{},
-		metrics:          &module.VerificationMetrics{},
-		tracer:           trace.NewNoopTracer(),
-		assigner:         &module.ChunkAssigner{},
-		chunksQueue:      &storage.ChunksQueue{},
-		newChunkListener: &module.NewJobListener{},
-		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
+		me:                   &module.Local{},
+		state:                &protocol.State{},
+		snapshot:             &protocol.Snapshot{},
+		metrics:              &module.VerificationMetrics{},
+		tracer:               trace.NewNoopTracer(),
+		assigner:             &module.ChunkAssigner{},
+		chunksQueue:          &storage.ChunksQueue{},
+		newChunkListener:     &module.NewJobListener{},
+		verIdentity:          unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
+		blockProcessNotifier: &mockassigner.finishProcessing{},
 	}
 
 	for _, apply := range options {
@@ -137,6 +140,8 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
 	// invoked for it.
+	// Also, once all receipts of the block processed, engine should notify the block consumer once, that
+	// it is done with processing this chunk.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 

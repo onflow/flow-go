@@ -70,13 +70,13 @@ func (w *Worker) FinishProcessing(blockID flow.Identifier) {
 	w.consumer.FinishJob(jobID)
 }
 
-// finishProcessing is for the worker's underneath engine to report an entity
+// ProcessingNotifier is for the worker's underneath engine to report an entity
 // has been processed without knowing the job queue.
 // It is a callback so that the worker can convert the entity id into a job
 // id, and notify the consumer about a finished job.
 //
 // At the current version, entities used in this interface are chunks and blocks ids.
-type finishProcessing interface {
+type ProcessingNotifier interface {
 	FinishProcessing(entityID flow.Identifier)
 }
 
