@@ -97,7 +97,7 @@ func (acc *flowAccount) AddKeys(numberOfKeysToAdd int) error {
 			return errors.New("error constructing add keys to account transaction")
 		}
 
-		_, err = acc.sendTxAndWait(tx, 0)
+		_, err = acc.SendTxAndWait(tx, 0)
 		// TODO handler result
 		if err != nil {
 			return fmt.Errorf("error adding account keys: %w", err)
@@ -113,7 +113,9 @@ func (acc *flowAccount) AddKeys(numberOfKeysToAdd int) error {
 	return nil
 }
 
-func (acc *flowAccount) sendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*flowsdk.TransactionResult, error) {
+// TODO add batch send and share the same waiting group
+
+func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*flowsdk.TransactionResult, error) {
 
 	var result *flowsdk.TransactionResult
 	var err error

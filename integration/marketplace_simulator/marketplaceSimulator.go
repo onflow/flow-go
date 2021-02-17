@@ -189,7 +189,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	// 	SetReferenceBlockID(blockRef.ID).
 	// 	SetScript(script)
 
-	// result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
+	// result, err := m.SendTxAndWait(tx, m.nbaTopshotAccount)
 
 	// if err != nil || result.Error != nil {
 	// 	m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
@@ -203,7 +203,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	result, err := m.nbaTopshotAccount.sendTxAndWait(tx, 0)
+	result, err := m.nbaTopshotAccount.SendTxAndWait(tx, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a play failed: %w , %w", result, err)
@@ -218,8 +218,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	// result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
-	result, err = m.nbaTopshotAccount.sendTxAndWait(tx, 0)
+	result, err = m.nbaTopshotAccount.SendTxAndWait(tx, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("minting a set failed: %w , %w", result, err)
@@ -233,8 +232,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	// result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, 0)
-	result, err = m.nbaTopshotAccount.sendTxAndWait(tx, 0)
+	result, err = m.nbaTopshotAccount.SendTxAndWait(tx, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result, err)
@@ -269,8 +267,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 					SetReferenceBlockID(blockRef.ID).
 					SetScript(script)
 
-				// result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount, j)
-				result, err = m.nbaTopshotAccount.sendTxAndWait(tx, j)
+				result, err = m.nbaTopshotAccount.SendTxAndWait(tx, j)
 
 				if err != nil || result.Error != nil {
 					m.log.Error().Msgf("adding a play to a set has been failed: %w , %w", result, err)
@@ -347,8 +344,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 				tx := flowsdk.NewTransaction().
 					SetReferenceBlockID(blockRef.ID).
 					SetScript(script)
-				// result, err := ma.sendTxAndWait(tx, ma.Account(), 0)
-				result, err := ma.Account().sendTxAndWait(tx, 0)
+
+				result, err := ma.Account().SendTxAndWait(tx, 0)
 
 				if err != nil || result.Error != nil {
 					m.log.Error().Msgf("setting up marketplace accounts failed: %w , %w", result, err)
@@ -367,7 +364,7 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 			// 	SetReferenceBlockID(blockRef.ID).
 			// 	SetScript(script)
 
-			// result, err = m.sendTxAndWait(tx, m.nbaTopshotAccount)
+			// result, err = m.SendTxAndWait(tx, m.nbaTopshotAccount)
 			// if err != nil || result.Error != nil {
 			// 	m.log.Error().Msgf("transfering initial moments to a marketplace account failed: %s , %w", result, err)
 			// 	return err
@@ -409,7 +406,7 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 		SetReferenceBlockID(blockRef.ID).
 		SetScript(script)
 
-	result, err := m.nbaTopshotAccount.sendTxAndWait(deploymentTx, 0)
+	result, err := m.nbaTopshotAccount.SendTxAndWait(deploymentTx, 0)
 
 	if err != nil || result.Error != nil {
 		m.log.Error().Msgf("contract %s deployment is failed : %w , %w", name, result, err)
@@ -723,8 +720,7 @@ func (m *marketPlaceAccount) Act() error {
 					SetReferenceBlockID(blockRef.ID).
 					SetScript(txScript)
 
-				// result, err := m.sendTxAndWait(tx, m.Account(), p)
-				result, err := m.Account().sendTxAndWait(tx, p)
+				result, err := m.Account().SendTxAndWait(tx, p)
 				if err != nil || result.Error != nil {
 					m.log.Error().Msgf("marketplace tx failed: %w , %w", result.Error, err)
 				}
