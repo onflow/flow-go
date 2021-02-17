@@ -283,6 +283,9 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 
+	// once assigner engine is done processing the block, it should notify the processing notifier.
+	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -290,6 +293,7 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 		s.metrics,
 		s.assigner,
 		s.chunksQueue,
+		s.notifier,
 		s.newChunkListener)
 }
 
