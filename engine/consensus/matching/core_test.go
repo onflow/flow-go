@@ -178,13 +178,14 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
+	// The receipt should be added to the receipts mempool
+	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+
 	// The result should be added to the IncorporatedReceipts mempool (shortcut sealing Phase 2b):
 	// TODO: remove for later sealing phases
 	ms.ResultsPL.
 		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
 		Return(true, nil).Once()
-	// The receipt should be added to the receipts mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
 	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should process receipts, even if it is already in storage")

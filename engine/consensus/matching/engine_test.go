@@ -123,6 +123,7 @@ func (ms *EngineContextSuite) TestProcessValidReceipt() {
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
 // TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
@@ -185,5 +186,6 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ResultsPL.AssertExpectations(ms.T())
 	ms.ApprovalsPL.AssertExpectations(ms.T())
 }
