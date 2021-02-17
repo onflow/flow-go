@@ -176,6 +176,9 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
 
+	// once assigner engine is done processing the block, it should notify the processing notifier.
+	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -186,7 +189,7 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 	s.assigner.AssertNotCalled(t, "Assign")
 
-	mock.AssertExpectationsForObjects(t, s.metrics)
+	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
 }
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
@@ -206,7 +209,10 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
-	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner,
+		s.notifier)
 
 	// when there is no chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
