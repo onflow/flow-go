@@ -68,7 +68,7 @@ func (m *MarketPlaceSimulator) Setup() error {
 	}
 
 	// setup tracker (TODO simplify this by using default values and empty txStatsTracker)
-	m.txTracker, err = NewTxTracker(m.log, 1000, 5, m.networkConfig.AccessNodeAddresses[0], time.Second)
+	m.txTracker, err = NewTxTracker(m.log, 10000, 10, m.networkConfig.AccessNodeAddresses[0], time.Second)
 	if err != nil {
 		return nil
 	}
@@ -310,8 +310,8 @@ func (m *MarketPlaceSimulator) setupMarketplaceAccounts(accounts []flowAccount) 
 		}
 
 		txTracker, err := NewTxTracker(m.log,
-			1000, // max in flight transactions
-			10,   // number of workers
+			10000, // max in flight transactions
+			50,    // number of workers
 			accessNode,
 			time.Second,
 		)
