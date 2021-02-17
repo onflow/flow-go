@@ -121,6 +121,8 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 	var result *flowsdk.TransactionResult
 	var err error
 
+	acc.logger.Info().Msgf("tx sent from account %s and key %d", acc.Address, keyIndex)
+
 	err = acc.PrepareAndSignTx(tx, keyIndex)
 	if err != nil {
 		return nil, fmt.Errorf("error preparing and signing the transaction: %w", err)
