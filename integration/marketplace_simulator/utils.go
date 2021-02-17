@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 
 	nbaData "github.com/dapperlabs/nba-smart-contracts/lib/go/templates/data"
@@ -141,4 +142,82 @@ func makeMomentRange(min, max uint64) []uint64 {
 		a[i] = min + uint64(i)
 	}
 	return a
+}
+
+func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
+	template := `
+		import NonFungibleToken from 0x%s
+		import TopShot from 0x%s
+		transaction {
+			let transferTokens: @NonFungibleToken.Collection
+			
+			prepare(acct: AuthAccount) {
+				let momentIDs = [%s]
+		
+				self.transferTokens <- acct.borrow<&TopShot.Collection>(from: /storage/MomentCollection)!.batchWithdraw(ids: momentIDs)
+			}
+		
+			execute {
+				// get the recipient's public account object
+				let recipient = getAccount(0x%s)
+		
+				// get the Collection reference for the receiver
+				let receiverRef = recipient.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
+		
+				// deposit the NFT in the receivers collection
+				receiverRef.batchDeposit(tokens: <-self.transferTokens)
+			}
+		}`
+
+	// Stringify moment IDs
+	momentIDList := ""
+	for _, momentID := range momentIDs {
+		id := strconv.Itoa(int(momentID))
+		momentIDList = momentIDList + `UInt64(` + id + `), `
+	}
+	// Remove comma and space from last entry
+	if idListLen := len(momentIDList); idListLen > 2 {
+		momentIDList = momentIDList[:len(momentIDList)-2]
+	}
+	script := []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
+	return script
+}
+
+func generateBatchTransferMomentfromShardedCollectionScript(nftAddr, tokenCodeAddr, shardedAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
+	template := `
+		import NonFungibleToken from 0x%s
+		import TopShot from 0x%s
+		import TopShotShardedCollection from 0x%s
+		transaction {
+			let transferTokens: @NonFungibleToken.Collection
+			
+			prepare(acct: AuthAccount) {
+				let momentIDs = [%s]
+		
+				self.transferTokens <- acct.borrow<&TopShotShardedCollection.ShardedCollection>(from: /storage/ShardedMomentCollection)!.batchWithdraw(ids: momentIDs)
+			}
+		
+			execute {
+				// get the recipient's public account object
+				let recipient = getAccount(0x%s)
+		
+				// get the Collection reference for the receiver
+				let receiverRef = recipient.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
+		
+				// deposit the NFT in the receivers collection
+				receiverRef.batchDeposit(tokens: <-self.transferTokens)
+			}
+		}`
+
+	// Stringify moment IDs
+	momentIDList := ""
+	for _, momentID := range momentIDs {
+		id := strconv.Itoa(int(momentID))
+		momentIDList = momentIDList + `UInt64(` + id + `), `
+	}
+	// Remove comma and space from last entry
+	if idListLen := len(momentIDList); idListLen > 2 {
+		momentIDList = momentIDList[:len(momentIDList)-2]
+	}
+	return []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), shardedAddr, momentIDList, recipientAddr))
 }

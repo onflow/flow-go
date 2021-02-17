@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 
@@ -186,7 +185,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	// 	SetScript(script)
 
 	// result, err := m.sendTxAndWait(tx, m.nbaTopshotAccount)
-	
+
 	// if err != nil || result.Error != nil {
 	// 	m.log.Error().Msgf("error setting up the nba account to us sharded collections: %w , %w", result.Error, err)
 	// 	return err
@@ -420,67 +419,6 @@ func (m *MarketPlaceSimulator) deployContract(name string, contract []byte) erro
 	return err
 }
 
-// TODO update this to support multiple tx submissions
-// func (m *MarketPlaceSimulator) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount, keyIndex int) (*flowsdk.TransactionResult, error) {
-
-// 	var result *flowsdk.TransactionResult
-// 	var err error
-
-// 	err = sender.PrepareAndSignTx(tx, keyIndex)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error preparing and signing the transaction: %w", err)
-// 	}
-
-// 	err = m.flowClient.SendTransaction(context.Background(), *tx)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error sending the transaction: %w", err)
-
-// 	}
-
-// 	stopped := false
-// 	wg := sync.WaitGroup{}
-// 	wg.Add(1)
-// 	m.txTracker.AddTx(tx.ID(),
-// 		nil,
-// 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-// 			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
-// 			if !stopped {
-// 				stopped = true
-// 				result = res
-// 				wg.Done()
-// 			}
-// 		}, // on finalized
-// 		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-// 			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
-// 		}, // on sealed
-// 		func(_ flowsdk.Identifier) {
-// 			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
-// 			if !stopped {
-// 				stopped = true
-// 				wg.Done()
-// 			}
-// 		}, // on expired
-// 		func(_ flowsdk.Identifier) {
-// 			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
-// 			if !stopped {
-// 				stopped = true
-// 				wg.Done()
-// 			}
-// 		}, // on timout
-// 		func(_ flowsdk.Identifier, e error) {
-// 			m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
-// 			if !stopped {
-// 				stopped = true
-// 				err = e
-// 				wg.Done()
-// 			}
-// 		}, // on error
-// 		360)
-// 	wg.Wait()
-
-// 	return result, nil
-// }
-
 func (m *MarketPlaceSimulator) createAccounts(serviceAcc *flowAccount, num int) ([]flowAccount, error) {
 	m.log.Info().Msgf("creating and funding %d accounts...", num)
 
@@ -705,7 +643,6 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 	script := []byte(fmt.Sprintf(template, m.simulatorConfig.NBATopshotAddress.String(), m.account.Address.String()))
 
 	res, err := m.flowClient.ExecuteScriptAtBlockID(context.Background(), blockRef.ID, script, nil)
-	// res, err := m.flowClient.ExecuteScriptAtLatestBlock(context.Background(), script, nil)
 
 	if err != nil {
 		return nil, err
@@ -715,9 +652,6 @@ func (m *marketPlaceAccount) GetMoments() ([]uint64, error) {
 	for _, i := range v {
 		result = append(result, i.(uint64))
 	}
-	// fmt.Println(">>>", string(script))
-	// fmt.Println(">>>>>", result)
-	// fmt.Println(">>>>>", err)
 
 	return result, err
 }
@@ -801,142 +735,4 @@ func (m *marketPlaceAccount) Act() error {
 	}
 
 	return nil
-}
-
-// func (m *marketPlaceAccount) sendTxAndWait(tx *flowsdk.Transaction, sender *flowAccount, keyIndex int) (*flowsdk.TransactionResult, error) {
-
-// 	var result *flowsdk.TransactionResult
-// 	var err error
-
-// 	err = sender.PrepareAndSignTx(tx, keyIndex)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error preparing and signing the transaction: %w", err)
-// 	}
-
-// 	err = m.flowClient.SendTransaction(context.Background(), *tx)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error sending the transaction: %w", err)
-
-// 	}
-
-// 	stopped := false
-// 	wg := sync.WaitGroup{}
-// 	wg.Add(1)
-// 	m.txTracker.AddTx(tx.ID(),
-// 		nil,
-// 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-// 			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
-// 			if !stopped {
-// 				stopped = true
-// 				result = res
-// 				wg.Done()
-// 			}
-// 		}, // on finalized
-// 		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
-// 			m.log.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
-// 		}, // on sealed
-// 		func(_ flowsdk.Identifier) {
-// 			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
-// 			if !stopped {
-// 				stopped = true
-// 				wg.Done()
-// 			}
-// 		}, // on expired
-// 		func(_ flowsdk.Identifier) {
-// 			m.log.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
-// 			if !stopped {
-// 				stopped = true
-// 				wg.Done()
-// 			}
-// 		}, // on timout
-// 		func(_ flowsdk.Identifier, e error) {
-// 			m.log.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
-// 			if !stopped {
-// 				stopped = true
-// 				err = e
-// 				wg.Done()
-// 			}
-// 		}, // on error
-// 		360)
-// 	wg.Wait()
-
-// 	return result, err
-// }
-
-func generateBatchTransferMomentScript(nftAddr, tokenCodeAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
-	template := `
-		import NonFungibleToken from 0x%s
-		import TopShot from 0x%s
-		transaction {
-			let transferTokens: @NonFungibleToken.Collection
-			
-			prepare(acct: AuthAccount) {
-				let momentIDs = [%s]
-		
-				self.transferTokens <- acct.borrow<&TopShot.Collection>(from: /storage/MomentCollection)!.batchWithdraw(ids: momentIDs)
-			}
-		
-			execute {
-				// get the recipient's public account object
-				let recipient = getAccount(0x%s)
-		
-				// get the Collection reference for the receiver
-				let receiverRef = recipient.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
-		
-				// deposit the NFT in the receivers collection
-				receiverRef.batchDeposit(tokens: <-self.transferTokens)
-			}
-		}`
-
-	// Stringify moment IDs
-	momentIDList := ""
-	for _, momentID := range momentIDs {
-		id := strconv.Itoa(int(momentID))
-		momentIDList = momentIDList + `UInt64(` + id + `), `
-	}
-	// Remove comma and space from last entry
-	if idListLen := len(momentIDList); idListLen > 2 {
-		momentIDList = momentIDList[:len(momentIDList)-2]
-	}
-	script := []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), momentIDList, recipientAddr))
-	return script
-}
-
-func generateBatchTransferMomentfromShardedCollectionScript(nftAddr, tokenCodeAddr, shardedAddr, recipientAddr *flowsdk.Address, momentIDs []uint64) []byte {
-	template := `
-		import NonFungibleToken from 0x%s
-		import TopShot from 0x%s
-		import TopShotShardedCollection from 0x%s
-		transaction {
-			let transferTokens: @NonFungibleToken.Collection
-			
-			prepare(acct: AuthAccount) {
-				let momentIDs = [%s]
-		
-				self.transferTokens <- acct.borrow<&TopShotShardedCollection.ShardedCollection>(from: /storage/ShardedMomentCollection)!.batchWithdraw(ids: momentIDs)
-			}
-		
-			execute {
-				// get the recipient's public account object
-				let recipient = getAccount(0x%s)
-		
-				// get the Collection reference for the receiver
-				let receiverRef = recipient.getCapability(/public/MomentCollection).borrow<&{TopShot.MomentCollectionPublic}>()!
-		
-				// deposit the NFT in the receivers collection
-				receiverRef.batchDeposit(tokens: <-self.transferTokens)
-			}
-		}`
-
-	// Stringify moment IDs
-	momentIDList := ""
-	for _, momentID := range momentIDs {
-		id := strconv.Itoa(int(momentID))
-		momentIDList = momentIDList + `UInt64(` + id + `), `
-	}
-	// Remove comma and space from last entry
-	if idListLen := len(momentIDList); idListLen > 2 {
-		momentIDList = momentIDList[:len(momentIDList)-2]
-	}
-	return []byte(fmt.Sprintf(template, nftAddr, tokenCodeAddr.String(), shardedAddr, momentIDList, recipientAddr))
 }
