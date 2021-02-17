@@ -75,10 +75,6 @@ func TestConsumer(t *testing.T) {
 	// when job queue crashed and restarted, the queue can be resumed
 	t.Run("testWorkOnNextAfterFastforward", testWorkOnNextAfterFastforward)
 
-	// [+1, +2, +3, ... +12, +13, +14, 1*, 2*, 3*, 5*, 6*, ...12*] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
-	// when there are too many finished jobs, it will stop processing more but wait for job 4 to finish
-	t.Run("testTooManyFinished", testTooManyFinished)
-
 	// [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 	// when Stop is called, it won't work on any job any more
 	t.Run("testStopRunning", testStopRunning)
@@ -369,41 +365,6 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 	})
 }
 
-// [+1, +2, +3, ... +12 , 1*, 2*, 3*, 5*, 6*, ...12*, +13, +14] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
-// when there are too many finished (8) jobs, it will stop processing more but wait for job 4 to finish
-// 5* - 12* has 8 finished in total
-func testTooManyFinished(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
-		for i := 1; i <= 12; i++ {
-			// +1, +2, ... +12
-			require.NoError(t, j.PushOne())
-			c.Check()
-		}
-
-		for i := 1; i <= 12; i++ {
-			// job 1 - 12 are all finished, except 4
-			// 5, 6, 7, 8, 9, 10, 11, 12 are finished, which have reached max finished (8)
-			if i == 4 {
-				continue
-			}
-			c.FinishJob(jobqueue.JobIDAtIndex(i))
-		}
-
-		require.NoError(t, j.PushOne()) // +13
-		c.Check()
-
-		require.NoError(t, j.PushOne()) // + 14
-		c.Check()
-
-		time.Sleep(1 * time.Millisecond)
-
-		// max finished reached, will not work on job 13
-		w.AssertCalled(t, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
-		assertProcessed(t, cp, 3)
-	})
-}
-
 // [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 // when Stop is called, it won't work on any job any more
 func testStopRunning(t *testing.T) {
@@ -482,8 +443,7 @@ func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed 
 func newTestConsumer(cp storage.ConsumerProgress, jobs storage.Jobs, worker jobqueue.Worker) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := int64(3)
-	maxFinished := int64(8)
-	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxFinished)
+	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing)
 	return c
 }
 
