@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,15 +21,15 @@ import (
 // AssignerEngineTestSuite encapsulates data structures for running unittests on assigner engine.
 type AssignerEngineTestSuite struct {
 	// modules
-	me                   *module.Local
-	state                *protocol.State
-	snapshot             *protocol.Snapshot
-	metrics              *module.VerificationMetrics
-	tracer               *trace.NoopTracer
-	assigner             *module.ChunkAssigner
-	chunksQueue          *storage.ChunksQueue
-	newChunkListener     *module.NewJobListener
-	blockProcessNotifier ProcessingNotifier
+	me               *module.Local
+	state            *protocol.State
+	snapshot         *protocol.Snapshot
+	metrics          *module.VerificationMetrics
+	tracer           *trace.NoopTracer
+	assigner         *module.ChunkAssigner
+	chunksQueue      *storage.ChunksQueue
+	newChunkListener *module.NewJobListener
+	notifier         ProcessingNotifier
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -65,16 +64,16 @@ func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
 // SetupTest initiates the test setups prior to each test.
 func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineTestSuite {
 	s := &AssignerEngineTestSuite{
-		me:                   &module.Local{},
-		state:                &protocol.State{},
-		snapshot:             &protocol.Snapshot{},
-		metrics:              &module.VerificationMetrics{},
-		tracer:               trace.NewNoopTracer(),
-		assigner:             &module.ChunkAssigner{},
-		chunksQueue:          &storage.ChunksQueue{},
-		newChunkListener:     &module.NewJobListener{},
-		verIdentity:          unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		blockProcessNotifier: &mockassigner.finishProcessing{},
+		me:               &module.Local{},
+		state:            &protocol.State{},
+		snapshot:         &protocol.Snapshot{},
+		metrics:          &module.VerificationMetrics{},
+		tracer:           trace.NewNoopTracer(),
+		assigner:         &module.ChunkAssigner{},
+		chunksQueue:      &storage.ChunksQueue{},
+		newChunkListener: &module.NewJobListener{},
+		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
+		notifier:         &mockassigner.finishProcessing{},
 	}
 
 	for _, apply := range options {
