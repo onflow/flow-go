@@ -219,8 +219,11 @@ func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifie
 	return receipts, nil
 }
 
+// RemoveByBlockID will only remove the index on the executed block,
+// we don't remove the receipt or result itself, because the receipt might be
+// included in the payload of other blocks.
 func (r *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
-	receipt, err := r.ByBlockID(blockID)
+	_, err := r.ByBlockID(blockID)
 	if errors.Is(err, badger.ErrKeyNotFound) {
 		return nil
 	}
@@ -233,5 +236,5 @@ func (r *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
 		return fmt.Errorf("could not find receipt: %w", err)
 	}
 
-	return r.db.Update(operation.RemoveExecutionReceipt(blockID, receipt))
+	return r.db.Update(operation.RemoveIndexExecutionReceipt(blockID))
 }

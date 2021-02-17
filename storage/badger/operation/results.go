@@ -26,6 +26,10 @@ func LookupExecutionResult(blockID flow.Identifier, resultID *flow.Identifier) f
 	return retrieve(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
+func RemoveIndexExecutionResult(blockID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeIndexExecutionResultByBlock, blockID))
+}
+
 func RemoveExecutionResult(blockID flow.Identifier, result *flow.ExecutionResult) func(*badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		// remove index

@@ -26,6 +26,11 @@ func LookupExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifier)
 	return retrieve(makePrefix(codeBlockExecutionReceipt, blockID), receiptID)
 }
 
+// RemoveIndexExecutionReceipt removes the index of receipt on its executed block
+func RemoveIndexExecutionReceipt(blockID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeBlockExecutionReceipt, blockID))
+}
+
 // IndexExecutionReceipt inserts an execution receipt ID keyed by block ID and execution ID
 func IndexExecutionReceiptByBlockIDExecutionID(blockID, executorID, receiptID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeExecutionIDExecutionReceipt, blockID, executorID), receiptID)

@@ -126,7 +126,7 @@ func (r *ExecutionResults) ByBlockID(blockID flow.Identifier) (*flow.ExecutionRe
 
 func (r *ExecutionResults) RemoveByBlockID(blockID flow.Identifier) error {
 
-	result, err := r.ByBlockID(blockID)
+	_, err := r.ByBlockID(blockID)
 	if errors.Is(err, badger.ErrKeyNotFound) {
 		return nil
 	}
@@ -139,5 +139,5 @@ func (r *ExecutionResults) RemoveByBlockID(blockID flow.Identifier) error {
 		return err
 	}
 
-	return r.db.Update(operation.RemoveExecutionResult(blockID, result))
+	return r.db.Update(operation.RemoveIndexExecutionResult(blockID))
 }
