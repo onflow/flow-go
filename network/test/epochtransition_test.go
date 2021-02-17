@@ -127,6 +127,7 @@ func (t *testNodeList) networks() []*p2p.Network {
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
+	t.Skip("flaky")
 	suite.Run(t, new(MutableIdentityTableSuite))
 }
 
