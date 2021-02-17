@@ -52,6 +52,12 @@ func (acc *flowAccount) PrepareAndSignTx(tx *flowsdk.Transaction, keyID int) err
 	return nil
 }
 
+func (acc *flowAccount) RevertSeq(keyID int) {
+	acc.signerLock.Lock()
+	defer acc.signerLock.Unlock()
+	acc.accountKeys[keyID].SequenceNumber--
+}
+
 func (acc *flowAccount) SyncAccountKey() error {
 	acc.signerLock.Lock()
 	defer acc.signerLock.Unlock()
@@ -146,6 +152,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
 			if !stopped {
 				stopped = true
+				acc.RevertSeq(keyIndex)
 				wg.Done()
 			}
 		}, // on expired
@@ -153,6 +160,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
 			if !stopped {
 				stopped = true
+				acc.RevertSeq(keyIndex)
 				wg.Done()
 			}
 		}, // on timout
@@ -160,6 +168,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			acc.logger.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
 			if !stopped {
 				stopped = true
+				acc.RevertSeq(keyIndex)
 				err = e
 				wg.Done()
 			}

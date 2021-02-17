@@ -23,9 +23,6 @@ func main() {
 	sleep := flag.Duration("sleep", 0, "duration to sleep before benchmarking starts")
 	logLvl := flag.String("log-level", "info", "set log level")
 
-	// loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\")")
-	// tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
-	// tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
 	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
 
 	access := flag.String("access", "35.230.98.90:9000", "access node address")
@@ -38,9 +35,6 @@ func main() {
 	numberOfMomentsPerAccount := flag.Int("moment-count-per-account", 5000, "number of initial moments per account")
 	accountGroupSize := flag.Int("account-group-size", 10, "number accounts in a group")
 	momentsToTransferPerTx := flag.Int("moments-to-transfer-per-tx", 10, "number moments to be transferred for each tx")
-
-	// maxTxInFlight := flag.Int("max-tx-in-flight", 8000, "maximum number of transactions in flight (txTracker)")
-	// workerDelayAfterEachFetch := flag.Duration("worker-fetch-delay", time.Second, "duration of worker sleep after each tx status fetch (prevents too much requests)")
 
 	flag.Parse()
 
