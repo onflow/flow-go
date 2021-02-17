@@ -242,7 +242,6 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 	m.log.Info().Msgf("play added to a set")
 
 	batchSize := 100
-	totalMinted := 0
 	momentsPerAccount := m.simulatorConfig.NumberOfMomentsPerAccount
 	steps := len(m.marketAccounts)
 
@@ -277,11 +276,11 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 			// totalMinted += batchSize
 			time.Sleep(time.Millisecond * 400)
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 1)
 	}
 	wg.Wait()
 
-	m.log.Info().Msgf("%d moment has been minted", totalMinted)
+	m.log.Info().Msg("minting moments are complete")
 	return nil
 }
 
