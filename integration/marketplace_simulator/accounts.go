@@ -167,7 +167,7 @@ func (acc *flowAccount) sendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 				wg.Done()
 			}
 		}, // on error
-		360)
+		600)
 	wg.Wait()
 
 	return result, err
