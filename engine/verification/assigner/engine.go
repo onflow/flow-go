@@ -97,10 +97,6 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 	log.Info().
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
-	if chunkList.Empty() {
-		// no chunk is assigned to this verification node
-		return
-	}
 
 	// pushes assigned chunks to
 	e.processChunks(chunkList, resultID)
