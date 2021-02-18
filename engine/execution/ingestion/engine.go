@@ -1279,12 +1279,17 @@ func (e *Engine) generateExecutionReceipt(
 
 	spocks := make([]crypto.Signature, len(stateInteractions))
 
+	// TODO: Currently we're ignoring spocks due to an issue with incorrectly producing non-deterministic
+	// spocks. This causes receipt ids to be inconsistent. We're adding logging for now, better understand
+	// if the problem is coming from the stateInteractions.SpockSecret, or from the spockHasher/SPOCKProve
+	// crypto functions.
 	for _, stateInteraction := range stateInteractions {
 		e.log.Debug().
 			Hex("spock_secret", stateInteraction.SpockSecret).
 			Hex("block_id", result.BlockID[:]).
 			Str("result_id", result.ID().String()).
 			Msg("spock secret")
+
 		// spock, err := e.me.SignFunc(stateInteraction.SpockSecret, e.spockHasher, crypto.SPOCKProve)
 
 		// if err != nil {
