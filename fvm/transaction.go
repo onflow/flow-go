@@ -75,9 +75,9 @@ func (i *TransactionInvocator) Process(
 	var env *hostEnv
 
 	// TODO move me outside
-	numberOfTries := 0
+	numberOfRetries := 0
 	maxNumberOfRetries := 2
-	for numberOfTries = 0; numberOfTries < maxNumberOfRetries; numberOfTries++ {
+	for numberOfRetries = 0; numberOfRetries < maxNumberOfRetries; numberOfRetries++ {
 		env, err = newEnvironment(ctx, vm, st)
 		// env construction error is fatal
 		if err != nil {
@@ -105,6 +105,7 @@ func (i *TransactionInvocator) Process(
 
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
+			Int("retries_count", numberOfRetries).
 			Uint64("ledger_interaction_used", st.InteractionUsed()).
 			Msg("retrying transaction execution")
 
