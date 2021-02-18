@@ -803,7 +803,23 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 
 		if matched || emergencySealed {
 			// add the result to the results that should be sealed
-			results = append(results, incorporatedResult)
+
+			// HOTFIX: the following will only consider a block sealable if we have _more_ than 1 receipt committing to the same result
+			receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(incorporatedResult.Result.BlockID)
+			if err != nil {
+				log.Error().Err(err).
+					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+					Msg("could not get receipts by block ID")
+				continue
+			}
+			block2ResultsCounter := make(map[flow.Identifier]uint)
+			for _, rcpt := range receipts {
+				resultID := rcpt.ExecutionResult.ID()
+				block2ResultsCounter[resultID] += 1
+				if block2ResultsCounter[resultID] >= 2 {
+					results = append(results, incorporatedResult)
+				}
+			}
 		}
 
 		if nextUnsealedIsFinalized {
