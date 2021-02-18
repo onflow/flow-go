@@ -217,7 +217,7 @@ func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.
 
 	receipts := make([]*flow.ExecutionReceipt, len(receiptsData))
 	for i, receipt := range receiptsData {
-		receipts[i] = &receipt
+		receipts[i] = receipt
 	}
 
 	agrees, disagrees := executorsOf(receipts, resultID)
