@@ -157,6 +157,9 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		return err
 	}
 
+	// wait for the adding keys to be executed
+	time.Sleep(time.Second * 10)
+
 	// add extra keys to accounts
 	// TODO move this to account setup
 	wg := sync.WaitGroup{}
