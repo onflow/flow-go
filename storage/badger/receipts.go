@@ -198,12 +198,12 @@ func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifie
 			return fmt.Errorf("could not find receipt index for block: %w", err)
 		}
 
-		// map to keep track of receipts by their result id
+		// execution result ID to execution receipt map to keep track of receipts by their result id
 		var identicalReceipts = make(map[flow.Identifier][]*flow.ExecutionReceipt)
 
 		// highest number of matching receipts seen so far
 		maxMatchedReceiptCnt := 0
-		// result id of the highest number of matching receipts
+		// execution result id key for the highest number of matching receipts in the identicalReceipts map
 		var maxMatchedReceiptResultID flow.Identifier
 
 		// find the largest list of receipts which have the same result ID
