@@ -199,8 +199,8 @@ func TestSafetyCheck(t *testing.T) {
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
+		require.Equal(t, proc.Retried, int(context.MaxNumOfTxRetries))
 	})
-
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {
