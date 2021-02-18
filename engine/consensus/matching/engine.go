@@ -818,6 +818,7 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 				block2ResultsCounter[resultID] += 1
 				if block2ResultsCounter[resultID] >= 2 {
 					results = append(results, incorporatedResult)
+					break
 				}
 			}
 		}
