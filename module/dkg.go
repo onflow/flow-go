@@ -100,4 +100,7 @@ type DKGBroker interface {
 	// SubmitResult instructs the broker to publish the results of the DKG run
 	// (ex. publish to DKG smart contract).
 	SubmitResult([]crypto.PublicKey) error
+
+	// Shutdown causes the broker to stop listening and forwarding messages.
+	Shutdown()
 }

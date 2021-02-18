@@ -140,6 +140,9 @@ func (b *broker) Poll(referenceBlock flow.Identifier) error { return nil }
 // SubmitResult implements the DKGBroker interface.
 func (b *broker) SubmitResult([]crypto.PublicKey) error { return nil }
 
+// Shutdown implements the DKGBroker interface.
+func (b *broker) Shutdown() {}
+
 type testCase struct {
 	totalNodes     int
 	phase1Duration time.Duration

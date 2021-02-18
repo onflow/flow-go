@@ -181,6 +181,7 @@ func (c *Controller) End() error {
 
 // Shutdown stops the controller regardless of the current state.
 func (c *Controller) Shutdown() {
+	c.broker.Shutdown()
 	c.SetState(Shutdown)
 	close(c.shutdownCh)
 }

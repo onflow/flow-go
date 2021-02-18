@@ -26,6 +26,7 @@ type Broker struct {
 	tunnel            *BrokerTunnel            // channels through which the broker communicates with the network engine
 	msgCh             chan messages.DKGMessage // channel to forward incoming messages to consumers
 	messageOffset     uint                     // offset for next broadcast messages to fetch
+	shutdownCh        chan struct{}            // channel to stop the broker from listening
 }
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating
@@ -46,6 +47,7 @@ func NewBroker(
 		dkgContractClient: dkgContractClient,
 		tunnel:            tunnel,
 		msgCh:             make(chan messages.DKGMessage),
+		shutdownCh:        make(chan struct{}),
 	}
 
 	go b.listen()
@@ -129,14 +131,23 @@ func (b *Broker) SubmitResult(res []crypto.PublicKey) error {
 	return b.dkgContractClient.SubmitResult(res)
 }
 
+// Shutdown stop the goroutine that listens to incoming private messages.
+func (b *Broker) Shutdown() {
+	close(b.shutdownCh)
+}
+
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 // listen is a blocking call that processes incoming messages from the network
 // engine.
 func (b *Broker) listen() {
 	for {
-		msg := <-b.tunnel.MsgChIn
-		b.onPrivateMessage(msg.OriginID, msg.DKGMessage)
+		select {
+		case msg := <-b.tunnel.MsgChIn:
+			b.onPrivateMessage(msg.OriginID, msg.DKGMessage)
+		case <-b.shutdownCh:
+			return
+		}
 	}
 }
 
