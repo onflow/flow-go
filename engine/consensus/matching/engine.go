@@ -279,7 +279,7 @@ func handleError(err error, msg interface{}, lg zerolog.Logger) {
 	if isInternalError {
 		marshalled, marshalErr := json.Marshal(msg)
 		if marshalErr != nil {
-			marshalled = []byte("json_marshalling_failed")
+			marshalled = []byte("json_marshalling_failed: " + marshalErr.Error())
 		}
 
 		lg.Fatal().Str("error_type", errType).Str("full_msg", string(marshalled)).Msgf("fatal internal error in matching core logic")
