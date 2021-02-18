@@ -59,18 +59,19 @@ var (
 
 func main() {
 
-	var bootDir, keyDir, wrapID, role string
+	var bootDir, keyDir, wrapID, role, accessAddress string
 	var version, pull, push, prepare, downloadSnapshot bool
 
 	flag.BoolVar(&version, "v", false, "View version and commit information")
 	flag.StringVar(&bootDir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
 	flag.StringVar(&keyDir, "t", "", "Token provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
-	flag.BoolVar(&downloadSnapshot, "dlsnapshot", false, "Download the latest protocol state snapshot from an access node and write to disk")
+	flag.BoolVar(&downloadSnapshot, "download-snapshot", false, "Download the latest protocol state snapshot from an access node and write to disk")
 	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
 	flag.BoolVar(&prepare, "prepare", false, "Generate transit keys for push step")
 	flag.StringVar(&role, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	flag.StringVar(&wrapID, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
+	flag.StringVar(&accessAddress, "access-address", "", "The address of an access node")
 	flag.StringVar(&flowBucket, "flow-bucket", "flow-genesis-bootstrap", "Storage for the transit server")
 
 	//
@@ -107,12 +108,17 @@ func main() {
 
 	if optionsSelected(pull, push, prepare, downloadSnapshot) != 1 {
 		flag.Usage()
-		log.Fatal("Exactly one of -pull, -push, -dlsnapshot, or -prepare must be specified\n")
+		log.Fatal("Exactly one of -pull, -push, -download-snapshot, or -prepare must be specified\n")
 	}
 
 	if (push || pull) && keyDir == "" {
 		flag.Usage()
 		log.Fatal("Access key, '-t', required for push and pull commands")
+	}
+
+	if downloadSnapshot && accessAddress == "" {
+		flag.Usage()
+		log.Fatal("Access address, '-access-address', required to download latest protocl snapshot")
 	}
 
 	nodeID, err := fetchNodeID(bootDir)
@@ -141,7 +147,6 @@ func main() {
 	}
 
 	if prepare {
-		// TODO: require an access address through flags
 		runDownloadSnapshot(ctx, bootDir, nodeID, "")
 		return
 	}
