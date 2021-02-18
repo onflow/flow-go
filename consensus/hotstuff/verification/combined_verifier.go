@@ -74,17 +74,20 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	}
 
 	// verify each signature against the message
-	// TODO: check if faster using batch verification (should be yes)
+	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := c.staking.Verify(msg, stakingSig, signer.StakingPubKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify staking signature: %w", err)
+	}
+	if !stakingValid {
+		return false, nil
 	}
 	beaconValid, err := c.beacon.Verify(msg, beaconShare, beaconPubKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify beacon signature: %w", err)
 	}
 
-	return stakingValid && beaconValid, nil
+	return beaconValid, nil
 }
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
