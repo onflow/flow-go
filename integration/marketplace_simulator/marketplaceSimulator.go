@@ -205,9 +205,14 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 	result, err := m.nbaTopshotAccount.SendTxAndWait(tx, 0)
 
-	if err != nil || result.Error != nil {
-		m.log.Error().Msgf("minting a play failed: %w , %w", result, err)
+	if err != nil {
+		m.log.Error().Msgf("minting a play failed: %w", err)
 		return err
+
+	}
+	if result != nil && result.Error != nil {
+		m.log.Error().Msgf("minting a play failed: %w", result.Error)
+		return result.Error
 	}
 
 	m.log.Info().Msgf("a play has been minted")
