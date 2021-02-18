@@ -78,9 +78,9 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		Logger()
 
 	// verification node should be staked at the reference block id.
-	ok, err := e.stakedAtBlockID(receipt.ExecutionResult.BlockID)
+	ok, err := e.stakedAtBlockID(referenceBlockID)
 	if err != nil {
-		log.Error().Err(err).Msg("could not verify stake of verification node for result")
+		log.Error().Err(err).Msg("could not verify stake of verification node for result at reference block id")
 		return
 	}
 	if !ok {
@@ -91,7 +91,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 	// chunk assignment
 	chunkList, err := e.chunkAssignments(context.Background(), &receipt.ExecutionResult)
 	if err != nil {
-		log.Debug().Err(err).Msg("could not determine chunk assignment")
+		log.Error().Err(err).Msg("could not determine chunk assignment")
 		return
 	}
 	log.Info().
