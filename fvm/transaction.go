@@ -77,7 +77,7 @@ func (i *TransactionInvocator) Process(
 	// TODO move me outside
 	numberOfTries := 0
 	maxNumberOfRetries := 2
-	for numberOfTries := 0; numberOfTries < maxNumberOfRetries; numberOfTries++ {
+	for numberOfTries = 0; numberOfTries < maxNumberOfRetries; numberOfTries++ {
 		env, err = newEnvironment(ctx, vm, st)
 		// env construction error is fatal
 		if err != nil {
@@ -103,15 +103,19 @@ func (i *TransactionInvocator) Process(
 			break
 		}
 
+		i.logger.Info().
+			Str("txHash", proc.ID.String()).
+			Uint64("ledger_interaction_used", st.InteractionUsed()).
+			Msg("retrying transaction execution")
+
 		// reset error part of proc
 		proc.Err = nil
 	}
 
-	// Note: not sure if this is what we want
-	// panic if we tried several times and still failing
-	if numberOfTries == maxNumberOfRetries {
-		panic(err)
-	}
+	// (for future) panic if we tried several times and still failing
+	// if numberOfTries == maxNumberOfRetries {
+	// 	panic(err)
+	// }
 
 	if err != nil {
 		return err
