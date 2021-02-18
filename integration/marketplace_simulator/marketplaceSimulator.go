@@ -273,8 +273,6 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 				}
 				if result != nil && result.Error != nil {
-					// TEMP panic on error
-					panic(result.Error)
 					m.log.Error().Msgf("minting tx was unsuccessful: %w", result.Error)
 				}
 
@@ -284,7 +282,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 		}
 		// this delay is needed to prevent seq number collision,
 		// some how sendTxandWait doesn't wait for all transactions
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 11)
 	}
 	wg.Wait()
 
