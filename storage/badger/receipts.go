@@ -188,28 +188,55 @@ func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.ExecutionR
 }
 
 func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
-	var receipts []*flow.ExecutionReceipt
+	var resultReceipts []*flow.ExecutionReceipt
 	err := r.db.View(func(btx *badger.Txn) error {
 		var receiptIDs []flow.Identifier
 
+		// lookup all the receipts for the given blockID received from different execution nodes
 		err := operation.LookupExecutionReceiptByBlockIDAllExecutionIDs(blockID, &receiptIDs)(btx)
 		if err != nil {
 			return fmt.Errorf("could not find receipt index for block: %w", err)
 		}
 
+		// map to keep track of receipts by their result id
+		var identicalReceipts = make(map[flow.Identifier][]*flow.ExecutionReceipt)
+
+		// highest number of matching receipts seen so far
+		maxMatchedReceiptCnt := 0
+		// result id of the highest number of matching receipts
+		var maxMatchedReceiptResultID flow.Identifier
+
+		// find the largest list of receipts which have the same result ID
 		for _, id := range receiptIDs {
 			receipt, err := r.byID(id)(btx)
 			if err != nil {
 				return fmt.Errorf("could not find receipt by id: %v, %w", id, err)
 			}
-			receipts = append(receipts, receipt)
+
+			resultID := receipt.ExecutionResult.ID()
+			receipts, ok := identicalReceipts[resultID]
+
+			if ok {
+				receipts = append(receipts, receipt)
+			} else {
+				receipts = []*flow.ExecutionReceipt{receipt}
+				identicalReceipts[resultID] = receipts
+			}
+
+			currentMatchedReceiptCnt := len(receipts)
+			if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
+				maxMatchedReceiptCnt = currentMatchedReceiptCnt
+				maxMatchedReceiptResultID = resultID
+			}
 		}
 
+		// return the largest list of receipts
+		resultReceipts = identicalReceipts[maxMatchedReceiptResultID]
 		return nil
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("could not get receipts for block: %v, %w", blockID, err)
 	}
-	return receipts, nil
+	return resultReceipts, nil
 }

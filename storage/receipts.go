@@ -23,6 +23,7 @@ type ExecutionReceipts interface {
 	// ByBlockID retrieves an execution receipt by block ID.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
 
-	// ByBlockIDAllExecutionReceipts retrieves all execution receipts for a block ID
+	// ByBlockIDAllExecutionReceipts retrieves the largest list of execution receipts for the given block ID
+	// which have the same execution result
 	ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error)
 }
