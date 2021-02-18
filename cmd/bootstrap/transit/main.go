@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -17,11 +18,14 @@ import (
 	"golang.org/x/crypto/nacl/box"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/cmd/bootstrap/build"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
@@ -56,17 +60,22 @@ var (
 func main() {
 
 	var bootDir, keyDir, wrapID, role string
-	var version, pull, push, prepare bool
+	var version, pull, push, prepare, downloadSnapshot bool
 
 	flag.BoolVar(&version, "v", false, "View version and commit information")
 	flag.StringVar(&bootDir, "d", "~/bootstrap", "The bootstrap directory containing your node-info files")
 	flag.StringVar(&keyDir, "t", "", "Token provided by the Flow team to access the transit server")
 	flag.BoolVar(&pull, "pull", false, "Fetch keys and metadata from the transit server")
+	flag.BoolVar(&downloadSnapshot, "dlsnapshot", false, "Download the latest protocol state snapshot from an access node and write to disk")
 	flag.BoolVar(&push, "push", false, "Upload public keys to the transit server")
 	flag.BoolVar(&prepare, "prepare", false, "Generate transit keys for push step")
 	flag.StringVar(&role, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	flag.StringVar(&wrapID, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
 	flag.StringVar(&flowBucket, "flow-bucket", "flow-genesis-bootstrap", "Storage for the transit server")
+
+	//
+	flag.StringVar(&flowBucket, "flow-bucket", "flow-genesis-bootstrap", "Storage for the transit server")
+
 	flag.Parse()
 
 	// always print version information
@@ -96,12 +105,12 @@ func main() {
 		return
 	}
 
-	if optionsSelected(pull, push, prepare) != 1 {
+	if optionsSelected(pull, push, prepare, downloadSnapshot) != 1 {
 		flag.Usage()
-		log.Fatal("Exactly one of -pull, -push, or -prepare must be specified\n")
+		log.Fatal("Exactly one of -pull, -push, -dlsnapshot, or -prepare must be specified\n")
 	}
 
-	if !prepare && keyDir == "" {
+	if (push || pull) && keyDir == "" {
 		flag.Usage()
 		log.Fatal("Access key, '-t', required for push and pull commands")
 	}
@@ -128,6 +137,12 @@ func main() {
 
 	if prepare {
 		runPrepare(bootDir, nodeID, flowRole)
+		return
+	}
+
+	if prepare {
+		// TODO: require an access address through flags
+		runDownloadSnapshot(ctx, bootDir, nodeID, "")
 		return
 	}
 }
@@ -161,11 +176,11 @@ func printVersion() {
 // Run the push process
 // - create transit keypair (if the role type is Consensus)
 // - upload files to GCS bucket
-func runPush(ctx context.Context, bootDir, token, nodeId string, role flow.Role) {
+func runPush(ctx context.Context, bootDir, token, nodeID string, role flow.Role) {
 	log.Println("Running push")
 
 	if role == flow.RoleConsensus {
-		err := generateKeys(bootDir, nodeId)
+		err := generateKeys(bootDir, nodeID)
 		if err != nil {
 			log.Fatalf("Failed to push: %s", err)
 		}
@@ -174,18 +189,18 @@ func runPush(ctx context.Context, bootDir, token, nodeId string, role flow.Role)
 	files := getFilesToUpload(role)
 
 	for _, file := range files {
-		err := bucketUpload(ctx, bootDir, fmt.Sprintf(file, nodeId), token)
+		err := bucketUpload(ctx, bootDir, fmt.Sprintf(file, nodeID), token)
 		if err != nil {
 			log.Fatalf("Failed to push: %s", err)
 		}
 	}
 }
 
-func runPull(ctx context.Context, bootDir, token, nodeId string, role flow.Role) {
+func runPull(ctx context.Context, bootDir, token, nodeID string, role flow.Role) {
 
 	log.Println("Running pull")
 
-	extraFiles := getAdditionalFilesToDownload(role, nodeId)
+	extraFiles := getAdditionalFilesToDownload(role, nodeID)
 
 	var err error
 
@@ -213,7 +228,7 @@ func runPull(ctx context.Context, bootDir, token, nodeId string, role flow.Role)
 	}
 
 	if role == flow.RoleConsensus {
-		err = unwrapFile(bootDir, nodeId)
+		err = unwrapFile(bootDir, nodeID)
 		if err != nil {
 			log.Fatalf("Failed to pull: %s", err)
 		}
@@ -229,10 +244,10 @@ func runPull(ctx context.Context, bootDir, token, nodeId string, role flow.Role)
 
 // Run the prepare process
 // - create transit keypair (if the role type is Consensus)
-func runPrepare(bootdir, nodeId string, role flow.Role) {
+func runPrepare(bootdir, nodeID string, role flow.Role) {
 	if role == flow.RoleConsensus {
 		log.Println("creating transit-keys")
-		err := generateKeys(bootdir, nodeId)
+		err := generateKeys(bootdir, nodeID)
 		if err != nil {
 			log.Fatalf("Failed to prepare: %s", err)
 		}
@@ -241,11 +256,63 @@ func runPrepare(bootdir, nodeId string, role flow.Role) {
 	log.Printf("no preparation needed for role: %s", role.String())
 }
 
-// generateKeys creates the transit keypair and writes them to disk for later
-func generateKeys(bootDir, nodeId string) error {
+// runDownloadSnapshot fetches the latest protocol snapshot from an access node and
+// writes it to the `root-protocol-snapshot.json` file
+func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress string) {
 
-	privPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
-	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
+	// convert the nodeID string to `flow.Identifier`
+	nodeID, err := flow.HexStringToIdentifier(nodeIDHex)
+	if err != nil {
+		log.Fatal("could not convert node id to identifier")
+	}
+
+	// create a flow client with given access address
+	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("could not create flow client: %v", err)
+	}
+
+	// get latest snapshot bytes encoded as JSON
+	bytes, err := flowClient.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		log.Fatal("could not get latest protocol snapshot from access node")
+	}
+
+	// unmarshal bytes to snapshot object
+	var snapshot inmem.Snapshot
+	err = json.Unmarshal(bytes, &snapshot)
+	if err != nil {
+		log.Fatal("could not unmarshal snapshot data retreived from access node")
+	}
+
+	// check if given NodeID is part of the current or next epoch
+	currentIdentities, err := snapshot.Epochs().Current().InitialIdentities()
+	if err != nil {
+		log.Fatal("could not get initial identities from current epoch")
+	}
+	if _, exists := currentIdentities.ByNodeID(nodeID); exists {
+		writeText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		return
+	}
+
+	nextIdentities, err := snapshot.Epochs().Next().InitialIdentities()
+	if err != nil {
+		log.Fatal("could not get initial identities from next epoch")
+	}
+
+	if _, exists := nextIdentities.ByNodeID(nodeID); exists {
+		writeText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		return
+	}
+
+	log.Fatalf("could not write snapshot, given node ID does not belong to current or next epoch: %v", nodeID)
+}
+
+// generateKeys creates the transit keypair and writes them to disk for later
+func generateKeys(bootDir, nodeID string) error {
+
+	privPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
+	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
 
 	if utilsio.FileExists(privPath) && utilsio.FileExists(pubPath) {
 		log.Print("transit-key-path priv & pub both exist, exiting")
@@ -275,14 +342,14 @@ func generateKeys(bootDir, nodeId string) error {
 	return nil
 }
 
-func unwrapFile(bootDir, nodeId string) error {
+func unwrapFile(bootDir, nodeID string) error {
 
 	log.Print("Decrypting Random Beacon key")
 
-	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
-	privKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeId))
-	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
-	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
+	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
+	privKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
+	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
+	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
 
 	ciphertext, err := utilsio.ReadFile(ciphertextPath)
 	if err != nil {
@@ -318,10 +385,10 @@ func unwrapFile(bootDir, nodeId string) error {
 	return nil
 }
 
-func wrapFile(bootDir, nodeId string) error {
-	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeId))
-	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeId))
-	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeId))
+func wrapFile(bootDir, nodeID string) error {
+	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
+	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
 
 	plaintext, err := utilsio.ReadFile(plaintextPath)
 	if err != nil {
@@ -461,10 +528,10 @@ func getFilesToUpload(role flow.Role) []string {
 	}
 }
 
-func getAdditionalFilesToDownload(role flow.Role, nodeId string) []string {
+func getAdditionalFilesToDownload(role flow.Role, nodeID string) []string {
 	switch role {
 	case flow.RoleConsensus:
-		return []string{fmt.Sprintf(filesToDownloadConsensus, nodeId)}
+		return []string{fmt.Sprintf(filesToDownloadConsensus, nodeID)}
 	}
 	return make([]string, 0)
 }
@@ -572,4 +639,18 @@ func moveFile(src, dst string) error {
 	}
 
 	return nil
+}
+
+func writeText(path string, data []byte) {
+	err := os.MkdirAll(filepath.Dir(path), 0755)
+	if err != nil {
+		log.Fatalf("could not create output dir: %v", err)
+	}
+
+	err = ioutil.WriteFile(path, data, 0644)
+	if err != nil {
+		log.Fatalf("could not write file: %v", err)
+	}
+
+	log.Printf("wrote file %v", path)
 }
