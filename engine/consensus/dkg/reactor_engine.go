@@ -131,6 +131,18 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 		}
 	})
 
+	// NOTE:
+	// We register two callbacks For views that mark a state transition: one for
+	// polling broadcast messages, and one for triggering the phase transition.
+	// It is essential that all polled broadcast messages are processed before
+	// starting the phase transition. Here we register the polling callback
+	// before the phase transition, which guarantees that it will be called
+	// before because callbacks for the same views are executed on a FIFO basis.
+	// Moreover, the poll calback does not return until all received messages
+	// are processed by the underlying DKG controller (as guaranteed by the
+	// specifications and implementations of the DKGBroker and DKGController
+	// interfaces).
+
 	for view := epochInfo.phase1FinalView; view > first.View; view -= e.pollStep {
 		e.registerPoll(view)
 	}

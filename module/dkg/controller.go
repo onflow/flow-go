@@ -194,7 +194,8 @@ func (c *Controller) GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []cryp
 }
 
 // Poll instructs the broker to read new broadcast messages, which will be
-// relayed through the message channel.
+// relayed through the message channel. The function does not return until the
+// received messages are processed.
 func (c *Controller) Poll(blockReference flow.Identifier) error {
 	return c.broker.Poll(blockReference)
 }

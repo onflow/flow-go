@@ -65,7 +65,8 @@ type DKGController interface {
 	GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey)
 
 	// Poll instructs the controller to actively fetch broadcast messages (ex.
-	// read from DKG smart contract).
+	// read from DKG smart contract). The method does not return until all
+	// received messages are processed.
 	Poll(blockReference flow.Identifier) error
 
 	// SubmitResult instructs the broker to publish the results of the DKG run
@@ -92,7 +93,8 @@ type DKGBroker interface {
 
 	// Poll instructs the broker to actively fetch broadcast messages (ex. read
 	// from DKG smart contract). The messages will be forwarded through the
-	// broker's message channel (cf. GetMsgCh).
+	// broker's message channel (cf. GetMsgCh). The method does not return until
+	// all received messages are processed by the consumer.
 	Poll(referenceBlock flow.Identifier) error
 
 	// SubmitResult instructs the broker to publish the results of the DKG run

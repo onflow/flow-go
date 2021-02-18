@@ -102,7 +102,8 @@ func (b *Broker) GetMsgCh() <-chan messages.DKGMessage {
 
 // Poll calls the DKG smart contract to get missing DKG messages for the current
 // epoch, and forwards them to the msgCh. It should be called with the ID of
-// block whose seal is finalized.
+// block whose seal is finalized. The function doesn't return until the received
+// messages are processed by the consumer because b.msgCh is not buffered.
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	b.Lock()
 	defer b.Unlock()
