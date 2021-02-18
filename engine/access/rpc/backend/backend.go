@@ -226,14 +226,50 @@ func executionNodesForBlockID(
 	state protocol.State) (flow.IdentityList, error) {
 
 	// lookup the receipts storage with the block ID
-	receipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
+	allReceipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}
 
+	// execution result ID to execution receipt map to keep track of receipts by their result id
+	var identicalReceipts = make(map[flow.Identifier][]*flow.ExecutionReceipt)
+
+	// maximum number of matching receipts found so far for any execution result id
+	maxMatchedReceiptCnt := 0
+	// execution result id key for the highest number of matching receipts in the identicalReceipts map
+	var maxMatchedReceiptResultID flow.Identifier
+
+	// find the largest list of receipts which have the same result ID
+	for _, receipt := range allReceipts {
+
+		resultID := receipt.ExecutionResult.ID()
+		receipts, found := identicalReceipts[resultID]
+
+		if !found {
+			// first of its kind
+			receipts = []*flow.ExecutionReceipt{receipt}
+			identicalReceipts[resultID] = receipts
+			// keep looking for at least one more receipt with the same result
+			// since we need at least two execution receipt which have the same result
+			continue
+		}
+
+		// append receipt to the list of all receipts for this resultID
+		receipts = append(receipts, receipt)
+
+		currentMatchedReceiptCnt := len(receipts)
+		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
+			maxMatchedReceiptCnt = currentMatchedReceiptCnt
+			maxMatchedReceiptResultID = resultID
+		}
+	}
+
+	// pick the largest list of matching receipts
+	matchingReceipts := identicalReceipts[maxMatchedReceiptResultID]
+
 	// collect the execution node id in each of the receipts
 	var executorIDs flow.IdentifierList
-	for _, receipt := range receipts {
+	for _, receipt := range matchingReceipts {
 		executorIDs = append(executorIDs, receipt.ExecutorID)
 	}
 
