@@ -29,10 +29,11 @@ type Engine struct {
 	tracer           module.Tracer
 	me               module.Local
 	state            protocol.State
-	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify
-	chunksQueue      storage.ChunksQueue   // to store chunks to be verified
-	newChunkListener module.NewJobListener // to notify about a new chunk
-	notifier         ProcessingNotifier    // to report a block has been processed
+	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify.
+	chunksQueue      storage.ChunksQueue   // to store chunks to be verified.
+	newChunkListener module.NewJobListener // to notify about a new chunk.
+	notifier         ProcessingNotifier    // to report a block has been processed.
+	indexer          storage.Indexer       // to index receipts of a block based on their executor.
 }
 
 func New(
@@ -44,6 +45,7 @@ func New(
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	newChunkListener module.NewJobListener,
+	indexer storage.Indexer,
 ) *Engine {
 	e := &Engine{
 		unit:             engine.NewUnit(),
@@ -55,6 +57,7 @@ func New(
 		assigner:         assigner,
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,
+		indexer:          indexer,
 	}
 
 	return e

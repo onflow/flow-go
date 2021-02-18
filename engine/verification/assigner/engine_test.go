@@ -31,6 +31,7 @@ type AssignerEngineTestSuite struct {
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
 	notifier         *mockassigner.ProcessingNotifier
+	indexer          *storage.Indexer
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -75,6 +76,7 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 		notifier:         &mockassigner.ProcessingNotifier{},
+		indexer:          &storage.Indexer{},
 	}
 
 	for _, apply := range options {
@@ -112,7 +114,8 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 		s.state,
 		s.assigner,
 		s.chunksQueue,
-		s.newChunkListener)
+		s.newChunkListener,
+		s.indexer)
 
 	e.withBlockProcessingNotifier(s.notifier)
 
