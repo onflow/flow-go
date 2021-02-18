@@ -187,6 +187,10 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
+	// mocks indexer module
+	// on receiving a new finalized block, indexer indexes all its receipts
+	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
