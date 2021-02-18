@@ -75,8 +75,9 @@ func (i *TransactionInvocator) Process(
 	var env *hostEnv
 
 	// TODO move me outside
+	numberOfTries := 0
 	maxNumberOfRetries := 2
-	for j := 0; j < maxNumberOfRetries; j++ {
+	for numberOfTries := 0; numberOfTries < maxNumberOfRetries; numberOfTries++ {
 		env, err = newEnvironment(ctx, vm, st)
 		// env construction error is fatal
 		if err != nil {
@@ -104,6 +105,12 @@ func (i *TransactionInvocator) Process(
 
 		// reset error part of proc
 		proc.Err = nil
+	}
+
+	// Note: not sure if this is what we want
+	// panic if we tried several times and still failing
+	if numberOfTries == maxNumberOfRetries {
+		panic(err)
 	}
 
 	if err != nil {
