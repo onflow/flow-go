@@ -192,7 +192,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	return nil
+	return fmt.Errorf("assigner engine is not supposed to invoked by process method")
 }
 
 // stakedAtBlockID checks whether this instance of verification node has staked at specified block ID.
