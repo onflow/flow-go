@@ -296,7 +296,10 @@ func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress 
 		log.Fatal("could not get initial identities from current epoch")
 	}
 	if _, exists := currentIdentities.ByNodeID(nodeID); exists {
-		writeText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		err := utilsio.WriteText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		if err != nil {
+			log.Fatalf("could not write snapshot to disk: %v", err)
+		}
 		return
 	}
 
@@ -304,9 +307,11 @@ func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress 
 	if err != nil {
 		log.Fatal("could not get initial identities from next epoch")
 	}
-
 	if _, exists := nextIdentities.ByNodeID(nodeID); exists {
-		writeText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		err := utilsio.WriteText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		if err != nil {
+			log.Fatalf("could not write snapshot to disk: %v", err)
+		}
 		return
 	}
 
@@ -644,18 +649,4 @@ func moveFile(src, dst string) error {
 	}
 
 	return nil
-}
-
-func writeText(path string, data []byte) {
-	err := os.MkdirAll(filepath.Dir(path), 0755)
-	if err != nil {
-		log.Fatalf("could not create output dir: %v", err)
-	}
-
-	err = ioutil.WriteFile(path, data, 0644)
-	if err != nil {
-		log.Fatalf("could not write file: %v", err)
-	}
-
-	log.Printf("wrote file %v", path)
 }
