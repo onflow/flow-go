@@ -47,7 +47,7 @@ func New(
 	newChunkListener module.NewJobListener,
 	indexer storage.Indexer,
 ) *Engine {
-	e := &Engine{
+	return &Engine{
 		unit:             engine.NewUnit(),
 		log:              log.With().Str("engine", "assigner").Logger(),
 		metrics:          metrics,
@@ -59,8 +59,6 @@ func New(
 		newChunkListener: newChunkListener,
 		indexer:          indexer,
 	}
-
-	return e
 }
 
 func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
