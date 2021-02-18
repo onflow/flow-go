@@ -201,7 +201,10 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 	s.assigner.AssertNotCalled(t, "Assign")
 
-	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner)
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner,
+		s.indexer)
 }
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
@@ -221,13 +224,18 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
+	// mocks indexer module
+	// on receiving a new finalized block, indexer indexes all its receipts
+	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
-		s.notifier)
+		s.notifier,
+		s.indexer)
 
 	// when there is no chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
