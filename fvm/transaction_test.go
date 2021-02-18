@@ -137,6 +137,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		require.Contains(t, buffer.String(), "programs")
 		require.Contains(t, buffer.String(), "codes")
+		require.Equal(t, int(context.MaxNumOfTxRetries), proc.Retried)
 	})
 
 	t.Run("parsing error in transaction", func(t *testing.T) {
@@ -199,7 +200,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
-		require.Equal(t, proc.Retried, int(context.MaxNumOfTxRetries))
+		require.Equal(t, 0, proc.Retried)
 	})
 }
 
