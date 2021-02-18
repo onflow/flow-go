@@ -1328,7 +1328,9 @@ func (e *Engine) OnFinalizedBlock(block *model.Block) {
 	// must be for a finalized blocks.
 	err := e.indexReceipts(block.BlockID)
 	if err != nil {
-		e.log.Fatal().Err(err).Hex("block_id", block.BlockID[:]).
+		// the receipt index is only being used by pending receipts component,
+		// which is not critical, no need to crash.
+		e.log.Error().Err(err).Hex("block_id", block.BlockID[:]).
 			Msg("could not index receipts for block")
 	}
 }
