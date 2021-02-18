@@ -159,7 +159,6 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msg("tx expired")
 			if !stopped {
 				stopped = true
-				acc.RevertSeq(keyIndex)
 				wg.Done()
 			}
 		}, // on expired
@@ -167,7 +166,6 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msg("tx timed out")
 			if !stopped {
 				stopped = true
-				acc.RevertSeq(keyIndex)
 				wg.Done()
 			}
 		}, // on timout
