@@ -14,9 +14,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/crypto"
 	engineCommon "github.com/onflow/flow-go/engine"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
+	executionmocks "github.com/onflow/flow-go/engine/execution/mocks"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	state "github.com/onflow/flow-go/engine/execution/state/mock"
@@ -63,6 +65,11 @@ type testingContext struct {
 	executionState     *state.ExecutionState
 	snapshot           *protocol.Snapshot
 	identity           *flow.Identity
+}
+
+type CheckerMock struct {
+	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
+	executionmocks.Checker
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -141,6 +148,9 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
 
+	checkerEngine := &CheckerMock{}
+	checkerEngine.On("CheckExecutionConsistencyWithBlock", mock.Anything, mock.Anything).Return()
+
 	engine, err = New(
 		log,
 		net,
@@ -154,6 +164,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		txResults,
 		computationManager,
 		providerEngine,
+		checkerEngine,
 		executionState,
 		metrics,
 		tracer,
@@ -615,6 +626,9 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	deltas, err := NewDeltas(10)
 	require.NoError(t, err)
 
+	checkerEngine := &CheckerMock{}
+	checkerEngine.On("CheckExecutionConsistencyWithBlock", mock.Anything, mock.Anything).Return()
+
 	engine, err = New(
 		log,
 		net,
@@ -628,6 +642,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		txResults,
 		computationManager,
 		providerEngine,
+		checkerEngine,
 		es,
 		metrics,
 		tracer,

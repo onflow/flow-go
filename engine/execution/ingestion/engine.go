@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -37,8 +36,7 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	psEvents.Noop              // satisfy protocol events consumer interface
-	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
+	psEvents.Noop // satisfy protocol events consumer interface
 
 	unit               *engine.Unit
 	log                zerolog.Logger
@@ -53,6 +51,7 @@ type Engine struct {
 	transactionResults storage.TransactionResults
 	computationManager computation.ComputationManager
 	providerEngine     provider.ProviderEngine
+	checkerEngine      execution.Checker
 	mempool            *Mempool
 	execState          state.ExecutionState
 	metrics            module.ExecutionMetrics
@@ -79,6 +78,7 @@ func New(
 	transactionResults storage.TransactionResults,
 	executionEngine computation.ComputationManager,
 	providerEngine provider.ProviderEngine,
+	checkerEngine execution.Checker,
 	execState state.ExecutionState,
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
@@ -107,6 +107,7 @@ func New(
 		transactionResults: transactionResults,
 		computationManager: executionEngine,
 		providerEngine:     providerEngine,
+		checkerEngine:      checkerEngine,
 		mempool:            mempool,
 		execState:          execState,
 		metrics:            metrics,
@@ -671,6 +672,8 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			Hex("block", logging.Entity(executed)).
 			Msg("error while requeueing blocks after execution")
 	}
+
+	e.checkerEngine.CheckExecutionConsistencyWithBlock(executed.Block, finalState)
 
 	return nil
 }
