@@ -9,13 +9,13 @@ import (
 type ExecutionReceipts interface {
 
 	// Store stores an execution receipt.
-	Store(result *flow.ExecutionReceipt) error
+	Store(receipt *flow.ExecutionReceipt) error
 
 	// ByID retrieves an execution receipt by its ID.
-	ByID(resultID flow.Identifier) (*flow.ExecutionReceipt, error)
+	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
 
 	// Index indexes an execution receipt by block ID.
-	Index(blockID flow.Identifier, resultID flow.Identifier) error
+	Index(blockID flow.Identifier, receipt flow.Identifier) error
 
 	// ByBlockID retrieves an execution receipt by block ID.
 	ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
