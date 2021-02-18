@@ -139,8 +139,13 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 	wg.Add(1)
 	acc.txTracker.AddTx(tx.ID(),
 		nil,
-		func(_ flowsdk.Identifier, _ *flowsdk.TransactionResult) {
+		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+			if !stopped {
+				stopped = true
+				result = res
+				wg.Done()
+			}
 		}, // on finalized
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
 			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
