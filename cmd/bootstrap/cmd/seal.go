@@ -16,7 +16,7 @@ func constructRootResultAndSeal(
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData model.DKGData,
-) {
+) (*flow.ExecutionResult, *flow.Seal) {
 
 	stateCommit, err := hex.DecodeString(rootCommit)
 	if err != nil {
@@ -47,6 +47,8 @@ func constructRootResultAndSeal(
 	result := run.GenerateRootResult(block, stateCommit)
 	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
 
-	writeJSON(model.PathRootResult, result)
-	writeJSON(model.PathRootSeal, seal)
+	// writeJSON(model.PathRootResult, result)
+	// writeJSON(model.PathRootSeal, seal)
+
+	return result, seal
 }
