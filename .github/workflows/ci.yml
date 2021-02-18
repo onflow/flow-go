@@ -4,9 +4,11 @@ on:
   push:
     branches: 
       - master
+      - v0.14
   pull_request:
     branches:
       - master
+      - v0.14
 
 jobs:
   golangci:
