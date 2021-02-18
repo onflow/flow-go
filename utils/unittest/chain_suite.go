@@ -232,7 +232,7 @@ func (bc *BaseChainSuite) SetupChain() {
 			bc.PersistedReceiptsIndex[blockID] = receiptID
 			return nil
 		},
-	)
+	).Maybe()
 	bc.ReceiptsDB.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.ExecutionReceipt {
 			receiptID, found := bc.PersistedReceiptsIndex[blockID]
