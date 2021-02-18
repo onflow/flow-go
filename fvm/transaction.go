@@ -40,6 +40,7 @@ type TransactionProcedure struct {
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
+	Retried int
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
@@ -60,7 +61,8 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 }
 
 type TransactionInvocator struct {
-	logger zerolog.Logger
+	logger             zerolog.Logger
+	maxNumberOfRetries int
 }
 
 func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
@@ -79,10 +81,8 @@ func (i *TransactionInvocator) Process(
 	var err error
 	var env *hostEnv
 
-	// TODO move me outside
 	numberOfRetries := 0
-	maxNumberOfRetries := 2
-	for numberOfRetries = 0; numberOfRetries < maxNumberOfRetries; numberOfRetries++ {
+	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		env, err = newEnvironment(ctx, vm, st)
 		// env construction error is fatal
 		if err != nil {
@@ -116,6 +116,7 @@ func (i *TransactionInvocator) Process(
 
 		// reset error part of proc
 		proc.Err = nil
+		proc.Retried++
 	}
 
 	// (for future) panic if we tried several times and still failing
