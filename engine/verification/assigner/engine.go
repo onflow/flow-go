@@ -23,17 +23,17 @@ import (
 // to me to verify, and then save it to the chunks job queue for the
 // fetcher engine to process.
 type Engine struct {
-	unit             *engine.Unit
-	log              zerolog.Logger
-	metrics          module.VerificationMetrics
-	tracer           module.Tracer
-	me               module.Local
-	state            protocol.State
-	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify.
-	chunksQueue      storage.ChunksQueue   // to store chunks to be verified.
-	newChunkListener module.NewJobListener // to notify about a new chunk.
-	notifier         ProcessingNotifier    // to report a block has been processed.
-	indexer          storage.Indexer       // to index receipts of a block based on their executor.
+	unit               *engine.Unit
+	log                zerolog.Logger
+	metrics            module.VerificationMetrics
+	tracer             module.Tracer
+	me                 module.Local
+	state              protocol.State
+	assigner           module.ChunkAssigner  // used to determine chunks this node needs to verify.
+	chunksQueue        storage.ChunksQueue   // to store chunks to be verified.
+	newChunkListener   module.NewJobListener // to notify about a new chunk.
+	processingNotifier ProcessingNotifier    // to report a block has been processed.
+	indexer            storage.Indexer       // to index receipts of a block based on their executor.
 }
 
 func New(
@@ -157,7 +157,7 @@ func (e *Engine) preprocess(receipt *flow.ExecutionReceipt) (bool, error) {
 }
 
 func (e *Engine) withBlockProcessingNotifier(notifier ProcessingNotifier) {
-	e.notifier = notifier
+	e.processingNotifier = notifier
 }
 
 func (e *Engine) Ready() <-chan struct{} {
@@ -217,16 +217,25 @@ func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 // assigned to me, and store it to the chunks job queue.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
-	e.log.Debug().
+	log := e.log.With().
 		Hex("block_id", logging.ID(blockID)).
-		Int("receipt_num", len(block.Payload.Receipts)).
-		Msg("new finalized block arrived")
+		Int("receipt_num", len(block.Payload.Receipts)).Logger()
+
+	log.Debug().Msg("new finalized block arrived")
+
+	err := e.indexer.IndexReceipts(blockID)
+	if err != nil {
+		// TODO: consider aborting the process
+		log.Error().Err(err).Msg("could not index receipts for block")
+	}
+
 	for _, receipt := range block.Payload.Receipts {
 		e.handleExecutionReceipt(receipt, blockID)
 	}
 
 	// tells block consumer that it is done with this block
-	e.notifier.Notify(blockID)
+	e.processingNotifier.Notify(blockID)
+	log.Debug().Msg("finished processing finalized block")
 }
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
