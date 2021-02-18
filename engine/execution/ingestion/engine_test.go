@@ -524,6 +524,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 }
 
 func Test_SPOCKGeneration(t *testing.T) {
+	t.Skipf("Spocks is being skipped for now")
 	runWithEngine(t, func(ctx testingContext) {
 
 		snapshots := []*delta.SpockSnapshot{
