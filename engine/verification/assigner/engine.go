@@ -29,7 +29,7 @@ type Engine struct {
 	tracer             module.Tracer
 	me                 module.Local
 	state              protocol.State
-	assigner           module.ChunkAssigner  // used to determine chunks this node needs to verify.
+	assigner           module.ChunkAssigner  // to determine chunks this node should verify.
 	chunksQueue        storage.ChunksQueue   // to store chunks to be verified.
 	newChunkListener   module.NewJobListener // to notify about a new chunk.
 	processingNotifier ProcessingNotifier    // to report a block has been processed.
