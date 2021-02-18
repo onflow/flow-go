@@ -69,7 +69,7 @@ func TestProduceConsume(t *testing.T) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			go finishProcessing.FinishProcessing(locator.ID())
+			go finishProcessing.Notify(locator.ID())
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
@@ -98,7 +98,7 @@ func TestProduceConsume(t *testing.T) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			go finishProcessing.FinishProcessing(locator.ID())
+			go finishProcessing.Notify(locator.ID())
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()

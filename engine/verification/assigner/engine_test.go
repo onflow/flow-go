@@ -149,7 +149,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	// it is done with processing this chunk.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
-	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -180,7 +180,7 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	s.mockStateAtBlockID(result.BlockID)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -210,7 +210,7 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -247,7 +247,7 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -287,7 +287,7 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -323,7 +323,7 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 		Times(chunksNum)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -360,7 +360,7 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 		Times(chunksNum)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("FinishProcessing", containerBlock.ID()).Return().Once()
+	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)

@@ -13,6 +13,6 @@ type ProcessingNotifier struct {
 }
 
 // FinishProcessing provides a mock function with given fields: entityID
-func (_m *ProcessingNotifier) FinishProcessing(entityID flow.Identifier) {
+func (_m *ProcessingNotifier) Notify(entityID flow.Identifier) {
 	_m.Called(entityID)
 }

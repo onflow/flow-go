@@ -65,7 +65,7 @@ func (w *Worker) Run(job storage.Job) {
 	w.engine.ProcessFinalizedBlock(block)
 }
 
-func (w *Worker) FinishProcessing(blockID flow.Identifier) {
+func (w *Worker) Notify(blockID flow.Identifier) {
 	jobID := blockIDToJobID(blockID)
 	w.consumer.FinishJob(jobID)
 }
@@ -77,7 +77,7 @@ func (w *Worker) FinishProcessing(blockID flow.Identifier) {
 //
 // At the current version, entities used in this interface are chunks and blocks ids.
 type ProcessingNotifier interface {
-	FinishProcessing(entityID flow.Identifier)
+	Notify(entityID flow.Identifier)
 }
 
 // BlockConsumer listens to the OnFinalizedBlock event

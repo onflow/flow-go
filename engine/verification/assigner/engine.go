@@ -226,7 +226,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	}
 
 	// tells block consumer that it is done with this block
-	e.notifier.FinishProcessing(blockID)
+	e.notifier.Notify(blockID)
 }
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
