@@ -61,6 +61,10 @@ func New(
 	}
 }
 
+// handleExecutionReceipt receives a receipt that appears in a finalized container block. In case this verification node
+// is staked at the reference block of this execution receipt's result, chunk assignment is done on the execution result, and
+// the assigned chunks' locators are pushed to the chunks queue, which are made available for the chunk queue consumer (i.e., the
+// fetcher engine).
 func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
 	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
