@@ -173,7 +173,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			acc.logger.Error().Err(err).Str("tx_id", tx.ID().String()).Msgf("tx error")
 			if !stopped {
 				stopped = true
-				acc.RevertSeq(keyIndex)
+				// acc.RevertSeq(keyIndex)
 				err = e
 				wg.Done()
 			}
