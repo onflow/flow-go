@@ -61,8 +61,7 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 }
 
 type TransactionInvocator struct {
-	logger             zerolog.Logger
-	maxNumberOfRetries int
+	logger zerolog.Logger
 }
 
 func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
