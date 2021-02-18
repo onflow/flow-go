@@ -151,6 +151,10 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
+	// mocks indexer module
+	// on receiving a new finalized block, indexer indexes all its receipts
+	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -159,7 +163,8 @@ func TestNewBlock_HappyPath(t *testing.T) {
 		s.assigner,
 		s.chunksQueue,
 		s.newChunkListener,
-		s.notifier)
+		s.notifier,
+		s.indexer)
 }
 
 // TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
