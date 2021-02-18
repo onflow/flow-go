@@ -278,7 +278,7 @@ func (m *MarketPlaceSimulator) mintMoments() error {
 
 			}()
 			// totalMinted += batchSize
-			time.Sleep(time.Millisecond * 400)
+			time.Sleep(time.Millisecond * 300)
 		}
 		// this delay is needed to prevent seq number collision,
 		// some how sendTxandWait doesn't wait for all transactions
