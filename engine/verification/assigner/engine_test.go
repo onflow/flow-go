@@ -384,6 +384,10 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
+	// mocks indexer module
+	// on receiving a new finalized block, indexer indexes all its receipts
+	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -391,7 +395,8 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 		s.metrics,
 		s.assigner,
 		s.chunksQueue,
-		s.notifier)
+		s.notifier,
+		s.indexer)
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
