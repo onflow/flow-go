@@ -31,9 +31,9 @@ type Engine struct {
 	state              protocol.State
 	assigner           module.ChunkAssigner  // to determine chunks this node should verify.
 	chunksQueue        storage.ChunksQueue   // to store chunks to be verified.
-	newChunkListener   module.NewJobListener // to notify about a new chunk.
+	newChunkListener   module.NewJobListener // to notify chunk queue consumer about a new chunk.
 	processingNotifier ProcessingNotifier    // to report a block has been processed.
-	indexer            storage.Indexer       // to index receipts of a block based on their executor.
+	indexer            storage.Indexer       // to index receipts of a block based on their executor identifier.
 }
 
 func New(
