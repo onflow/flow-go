@@ -306,6 +306,10 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
+	// mocks indexer module
+	// on receiving a new finalized block, indexer indexes all its receipts
+	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -314,7 +318,8 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 		s.assigner,
 		s.chunksQueue,
 		s.notifier,
-		s.newChunkListener)
+		s.newChunkListener,
+		s.indexer)
 }
 
 // TestChunkQueue_UnhappyPath_Error evaluates that if chunk queue returns an error upon submission of a
