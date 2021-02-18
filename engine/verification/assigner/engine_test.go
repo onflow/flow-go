@@ -266,10 +266,18 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
+	// mocks indexer module
+	// on receiving a new finalized block, indexer indexes all its receipts
+	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
-	mock.AssertExpectationsForObjects(t, s.metrics, s.assigner, s.notifier)
+	mock.AssertExpectationsForObjects(t,
+		s.metrics,
+		s.assigner,
+		s.notifier,
+		s.indexer)
 
 	// when there is no assigned chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
@@ -347,6 +355,10 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
+	// mocks indexer module
+	// on receiving a new finalized block, indexer indexes all its receipts
+	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -354,7 +366,8 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 		s.metrics,
 		s.assigner,
 		s.notifier,
-		s.chunksQueue)
+		s.chunksQueue,
+		s.indexer)
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
