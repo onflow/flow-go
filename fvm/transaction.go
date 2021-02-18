@@ -3,12 +3,17 @@ package fvm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"path"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -99,7 +104,7 @@ func (i *TransactionInvocator) Process(
 		)
 
 		// break the loop
-		if !i.requiresRetry(err) {
+		if !i.requiresRetry(err, proc) {
 			break
 		}
 
@@ -134,7 +139,7 @@ func (i *TransactionInvocator) Process(
 // to help chase erroneous execution results which caused an unexpected network fork.
 // Parsing and checking of deployed contracts should normally succeed.
 // This is a temporary measure.
-func (i *TransactionInvocator) requiresRetry(err error) bool {
+func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedure) bool {
 	// if no error no retry
 	if err == nil {
 		return false
@@ -178,16 +183,37 @@ func (i *TransactionInvocator) requiresRetry(err error) bool {
 		return false
 	}
 
-	i.dumpRuntimeError(runtimeErr)
+	i.dumpRuntimeError(runtimeErr, proc)
 	return true
 }
 
 // logRuntimeError logs run time errors into a file
 // This is a temporary measure.
-func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error) {
-	// TODO add to file
-	codesJSON, _ := json.Marshal(runtimeErr.Codes)
-	programsJSON, _ := json.Marshal(runtimeErr.Programs)
+func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error, procedure *TransactionProcedure) {
+
+	codesJSON, err := json.Marshal(runtimeErr.Codes)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot marshal codes JSON")
+	}
+	programsJSON, err := json.Marshal(runtimeErr.Programs)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot marshal programs JSON")
+	}
+
+	t := time.Now().UnixNano()
+
+	codesPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-codes-%d", procedure.ID.String(), t))
+	programsPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-programs-%d", procedure.ID.String(), t))
+
+	err = ioutil.WriteFile(codesPath, codesJSON, 0700)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot write codes json")
+	}
+
+	err = ioutil.WriteFile(programsPath, programsJSON, 0700)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot write programs json")
+	}
 
 	i.logger.Error().
 		Str("codes", string(codesJSON)).
