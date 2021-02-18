@@ -109,6 +109,7 @@ func (i *TransactionInvocator) Process(
 
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", ctx.BlockHeader.Height).
 			Int("retries_count", numberOfRetries).
 			Uint64("ledger_interaction_used", st.InteractionUsed()).
 			Msg("retrying transaction execution")
@@ -134,7 +135,8 @@ func (i *TransactionInvocator) Process(
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
-		Uint64("ledger_interaction_used", st.InteractionUsed()).
+		Uint64("blockHeight", ctx.BlockHeader.Height).
+		Uint64("ledgerInteractionUsed", st.InteractionUsed()).
 		Msg("transaction executed with no error")
 	return nil
 }
@@ -221,6 +223,7 @@ func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error, proced
 	}
 
 	i.logger.Error().
+		Str("txHash", procedure.ID.String()).
 		Str("codes", string(codesJSON)).
 		Str("programs", string(programsJSON)).
 		Msg("checking failed")
