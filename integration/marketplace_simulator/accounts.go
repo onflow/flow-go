@@ -140,7 +140,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 	acc.txTracker.AddTx(tx.ID(),
 		nil,
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("finalized tx")
+			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msg("finalized tx")
 			if !stopped {
 				stopped = true
 				result = res
@@ -148,7 +148,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			}
 		}, // on finalized
 		func(_ flowsdk.Identifier, res *flowsdk.TransactionResult) {
-			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msgf("sealed tx")
+			acc.logger.Trace().Str("tx_id", tx.ID().String()).Msg("sealed tx")
 			if !stopped {
 				stopped = true
 				result = res
@@ -156,7 +156,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			}
 		}, // on sealed
 		func(_ flowsdk.Identifier) {
-			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msgf("tx expired")
+			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msg("tx expired")
 			if !stopped {
 				stopped = true
 				acc.RevertSeq(keyIndex)
@@ -164,7 +164,7 @@ func (acc *flowAccount) SendTxAndWait(tx *flowsdk.Transaction, keyIndex int) (*f
 			}
 		}, // on expired
 		func(_ flowsdk.Identifier) {
-			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msgf("tx timed out")
+			acc.logger.Warn().Str("tx_id", tx.ID().String()).Msg("tx timed out")
 			if !stopped {
 				stopped = true
 				acc.RevertSeq(keyIndex)
