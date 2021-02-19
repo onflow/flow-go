@@ -194,8 +194,8 @@ func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 	return staked, nil
 }
 
-// ProcessFinalizedBlock process each finalized block, and find the chunks that
-// assigned to me, and store it to the chunks job queue.
+// ProcessFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
+// Once it is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
 	log := e.log.With().
@@ -230,7 +230,7 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 		return nil, err
 	}
 
-	mine, err := myChunks(e.me.NodeID(), assignment, result.Chunks)
+	mine, err := assignedChunks(e.me.NodeID(), assignment, result.Chunks)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine my assignments: %w", err)
 	}
@@ -238,9 +238,10 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 	return mine, nil
 }
 
-func myChunks(myID flow.Identifier, assignment *chunks.Assignment, chunks flow.ChunkList) (flow.ChunkList, error) {
+// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
+func assignedChunks(assignee flow.Identifier, assignment *chunks.Assignment, chunks flow.ChunkList) (flow.ChunkList, error) {
 	// indices of chunks assigned to verifier
-	chunkIndices := assignment.ByNodeID(myID)
+	chunkIndices := assignment.ByNodeID(assignee)
 
 	// chunks keeps the list of chunks assigned to the verifier
 	myChunks := make(flow.ChunkList, 0, len(chunkIndices))
