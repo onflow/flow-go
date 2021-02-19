@@ -281,13 +281,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
-
-		require.Equal(t, 1, execCtx.Programs.Length())
-
-		require.Same(t,
-			contractProgram,
-			execCtx.Programs.Get(contractLocation),
-		)
 	})
 
 	t.Run("failing transactions do not store programs", func(t *testing.T) {
@@ -350,8 +343,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
-
-		require.Equal(t, 0, execCtx.Programs.Length())
 	})
 }
 

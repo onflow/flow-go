@@ -225,7 +225,7 @@ func migrateContractValue(p ledger.Payload) ([]ledger.Payload, *contractValueMap
 	if len(storedData) == 0 {
 		return []ledger.Payload{}, nil, nil
 	}
-	storedValue, err := interpreter.DecodeValue(storedData, &address, []string{"contract"}, version)
+	storedValue, err := interpreter.DecodeValue(storedData, &address, []string{"contract"}, version, nil)
 	if err != nil {
 		log.Error().
 			Err(err).

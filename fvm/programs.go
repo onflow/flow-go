@@ -44,4 +44,3 @@ func (p *Programs) Set(location common.Location, program *interpreter.Program) {
 		Program:  program,
 	}
 }
-

@@ -139,7 +139,5 @@ func TestExecuteScript(t *testing.T) {
 
 		_, err = engine.ExecuteScript(script, nil, nil, scriptView)
 		require.NoError(t, err)
-
-		require.Equal(t, 0, execCtx.Programs.Length())
 	})
 }
