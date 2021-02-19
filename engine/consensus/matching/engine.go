@@ -812,49 +812,49 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 			// add the result to the results that should be sealed
 
 			// HOTFIX: the following will only consider a block sealable if we have _more_ than 1 receipt committing to the same result
-			receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(incorporatedResult.Result.BlockID)
-			if err != nil {
-				log.Error().Err(err).
-					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-					Msg("could not get receipts by block ID")
-				continue
-			}
-			receiptForResult := make(map[flow.Identifier]*flow.ExecutionReceipt)
-			for _, rcpt := range receipts {
-				resultID := rcpt.ExecutionResult.ID()
-				r1, found := receiptForResult[resultID]
-				if !found {
-					receiptForResult[resultID] = rcpt
-					continue
-				}
-				if r1.ID() == rcpt.ID() {
-					log.Error().
-						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-						Hex("receipt_id", logging.ID(rcpt.ID())).
-						Msg("duplicated receipts in blockID -> executor -> receipt ID storage")
-					continue
-				}
-				if r1.ExecutorID == rcpt.ExecutorID {
-					log.Error().
-						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-						Hex("receipt_id", logging.ID(rcpt.ID())).
-						Msg("duplicated receipts from SAME EXECUTOR in blockID -> executor -> receipt ID storage")
-					continue
-				}
-				// we only reach the code below, if we already had a receipt in the map receiptForResult
-				// that is from DIFFERENT executor
-				log.Info().
-					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-					Str("receipt_1_id", r1.ID().String()).
-					Str("result_1_id", r1.ExecutionResult.ID().String()).
-					Str("receipt_1_executor", r1.ExecutorID.String()).
-					Str("receipt_2_id", rcpt.ID().String()).
-					Str("result_2_id", rcpt.ExecutionResult.ID().String()).
-					Str("receipt_2_executor", rcpt.ExecutorID.String()).
-					Msg("producing candidate seal")
-				results = append(results, incorporatedResult)
-				break
-			}
+			// receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(incorporatedResult.Result.BlockID)
+			// if err != nil {
+			// 	log.Error().Err(err).
+			// 		Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+			// 		Msg("could not get receipts by block ID")
+			// 	continue
+			// }
+			// receiptForResult := make(map[flow.Identifier]*flow.ExecutionReceipt)
+			// for _, rcpt := range receipts {
+			// 	resultID := rcpt.ExecutionResult.ID()
+			// 	r1, found := receiptForResult[resultID]
+			// 	if !found {
+			// 		receiptForResult[resultID] = rcpt
+			// 		continue
+			// 	}
+			// 	if r1.ID() == rcpt.ID() {
+			// 		log.Error().
+			// 			Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+			// 			Hex("receipt_id", logging.ID(rcpt.ID())).
+			// 			Msg("duplicated receipts in blockID -> executor -> receipt ID storage")
+			// 		continue
+			// 	}
+			// 	if r1.ExecutorID == rcpt.ExecutorID {
+			// 		log.Error().
+			// 			Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+			// 			Hex("receipt_id", logging.ID(rcpt.ID())).
+			// 			Msg("duplicated receipts from SAME EXECUTOR in blockID -> executor -> receipt ID storage")
+			// 		continue
+			// 	}
+			// 	// we only reach the code below, if we already had a receipt in the map receiptForResult
+			// 	// that is from DIFFERENT executor
+			// 	log.Info().
+			// 		Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+			// 		Str("receipt_1_id", r1.ID().String()).
+			// 		Str("result_1_id", r1.ExecutionResult.ID().String()).
+			// 		Str("receipt_1_executor", r1.ExecutorID.String()).
+			// 		Str("receipt_2_id", rcpt.ID().String()).
+			// 		Str("result_2_id", rcpt.ExecutionResult.ID().String()).
+			// 		Str("receipt_2_executor", rcpt.ExecutorID.String()).
+			// 		Msg("producing candidate seal")
+			// 	break
+			// }
+			results = append(results, incorporatedResult)
 		}
 
 		if nextUnsealedIsFinalized {
