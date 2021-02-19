@@ -56,7 +56,6 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
-	validENs          map[flow.Identifier]struct{}
 }
 
 func New(
@@ -256,6 +255,7 @@ func executionNodesForBlockID(
 
 		// append receipt to the list of all receipts for this resultID
 		receipts = append(receipts, receipt)
+		identicalReceipts[resultID] = receipts
 
 		currentMatchedReceiptCnt := len(receipts)
 		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {

@@ -1043,16 +1043,25 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		blockIDExecNodeMap[block.ID()] = ids
 		allExecutionIDs = append(allExecutionIDs, ids...)
 
-		receipts := make([]flow.ExecutionReceipt, receiptPerBlock)
+		executionResult := unittest.ExecutionResultFixture()
+		receipts := make([]*flow.ExecutionReceipt, receiptPerBlock)
 		for j := 0; j < receiptPerBlock; j++ {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = ids[j].NodeID
-			receipts[j] = *r
+			er := *executionResult
+			r.ExecutionResult = er
+			receipts[j] = r
 		}
 		suite.receipts.
 			On("ByBlockIDAllExecutionReceipts", block.ID()).
 			Return(receipts, nil).Once()
 	}
+
+	validENMap = make(map[flow.Identifier]bool, len(allExecutionIDs))
+	for _, id := range allExecutionIDs {
+		validENMap[id.ID()] = true
+	}
+	suite.snapshot.On("Identities", mock.Anything).Return(allExecutionIDs, nil)
 
 	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
