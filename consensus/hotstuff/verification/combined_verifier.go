@@ -91,22 +91,10 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 }
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
-func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-	// TODO: The lookup votersID to identities is done in ValidatQC just before calling
-	// VerifyQC. Why not passing Identities to VerifyQC?
+func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 
-	// get the full Identities of the signers
-	signers, err := c.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...))
 	// TODO: only the aggregated public key is needed
 	// TODO: avoid computing the agg public key each time (store the public key delta in CombinedVerifier or c.staking)
-	if err != nil {
-		return false, fmt.Errorf("could not get signer identities: %w", err)
-	}
-	if len(signers) != len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("some signers are not valid consensus participants, or some signers are duplicate, at block %x: %w. signers are %d, voters are %d",
-			block.BlockID, model.ErrInvalidSigner, len(signers), len(voterIDs))
-	}
-
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
 		return false, fmt.Errorf("could not get dkg: %w", err)

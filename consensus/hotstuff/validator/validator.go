@@ -57,7 +57,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
-	valid, err := v.verifier.VerifyQC(qc.SignerIDs, qc.SigData, block)
+	valid, err := v.verifier.VerifyQC(signers, qc.SigData, block)
 	if errors.Is(err, verification.ErrInvalidFormat) {
 		return newInvalidBlockError(block, fmt.Errorf("QC signature has bad format: %w", err))
 	}

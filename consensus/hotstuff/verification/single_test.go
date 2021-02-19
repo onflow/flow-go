@@ -78,8 +78,7 @@ func TestSingleProposalIsVote(t *testing.T) {
 func TestSingleQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	voterIDs := identities.NodeIDs()
-	minShares := (len(voterIDs)-1)/2 + 1
+	minShares := (len(identities)-1)/2 + 1
 	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
@@ -109,12 +108,12 @@ func TestSingleQC(t *testing.T) {
 	votes[0].BlockID[0]--
 
 	// should be able to verify valid QC
-	valid, err := signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err := signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.True(t, valid, "original QC should be valid")
 
 	// verification with missing identity should be invalid
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares-1], qc.SigData, block)
+	valid, err = signers[0].VerifyQC(identities[:minShares-1], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "verification with missing voter ID should not work")
 
@@ -122,21 +121,21 @@ func TestSingleQC(t *testing.T) {
 	// TODO: change error handling so split failure and invalid signature are
 	// treated the same
 	qc.SigData[4]++
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err = signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed signature data should be invalid")
 	qc.SigData[4]--
 
 	// verification with changed block ID should fail
 	block.BlockID[0]++
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err = signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed block ID data should be invalid")
 	block.BlockID[0]--
 
 	// verification with changed view should fail
 	block.View++
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err = signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed block view data should be invalid")
 	block.View--

@@ -85,18 +85,18 @@ func (_m *SignerVerifier) CreateVote(block *model.Block) (*model.Vote, error) {
 }
 
 // VerifyQC provides a mock function with given fields: voterIDs, sigData, block
-func (_m *SignerVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+func (_m *SignerVerifier) VerifyQC(voterIDs flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 	ret := _m.Called(voterIDs, sigData, block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func([]flow.Identifier, []byte, *model.Block) bool); ok {
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte, *model.Block) bool); ok {
 		r0 = rf(voterIDs, sigData, block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]flow.Identifier, []byte, *model.Block) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.IdentityList, []byte, *model.Block) error); ok {
 		r1 = rf(voterIDs, sigData, block)
 	} else {
 		r1 = ret.Error(1)
