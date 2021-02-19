@@ -87,7 +87,7 @@ func (v *receiptValidator) previousResult(result *flow.ExecutionResult) (*flow.E
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, engine.NewInvalidInputErrorf("receipt's previous result (%x) is unknown", result.PreviousResultID)
+			return nil, NewUnverifiableError(result.PreviousResultID)
 		}
 		return nil, err
 	}
@@ -138,13 +138,16 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 	return nil
 }
 
-// Validate performs checks for ExecutionReceipt being valid or no.
-// Checks performed:
-// 	* can find stake and stake is positive
-//	* signature is correct
+// Validate performs verifies that the ExecutionReceipt satisfies
+// the following conditions:
+// 	* is from Execution node with positive weight
+//	* has valid signature
 //	* chunks are in correct format
-// 	* execution result has a valid parent
-// Returns nil if all checks passed successfully
+// 	* execution result has a valid parent and satisfies the subgraph check
+// Returns nil if all checks passed successfully.
+// Expected errors during normal operations:
+// * engine.InvalidInputError
+// * validation.UnverifiableError
 func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 	// lookup cache to avoid linear search when checking for previous result that is
 	// part of payload
@@ -192,6 +195,11 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 		return fmt.Errorf("staked node invalid: %w", err)
 	}
 
+	prevResult, err := getPreviousResult(&receipt.ExecutionResult)
+	if err != nil {
+		return err
+	}
+
 	err = v.verifySignature(receipt, identity)
 	if err != nil {
 		return fmt.Errorf("invalid receipt signature: %w", err)
@@ -200,11 +208,6 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 	err = v.verifyChunksFormat(&receipt.ExecutionResult)
 	if err != nil {
 		return fmt.Errorf("invalid chunks format for result %v: %w", receipt.ExecutionResult.ID(), err)
-	}
-
-	prevResult, err := getPreviousResult(&receipt.ExecutionResult)
-	if err != nil {
-		return err
 	}
 
 	err = v.subgraphCheck(&receipt.ExecutionResult, prevResult)
