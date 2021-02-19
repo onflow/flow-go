@@ -11,7 +11,6 @@ import (
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain                            flow.Chain
-	Programs                         *Programs
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
@@ -42,9 +41,7 @@ func NewContext(logger zerolog.Logger, opts ...Option) Context {
 
 // NewContextFromParent spawns a child execution context with the provided options.
 func NewContextFromParent(parent Context, opts ...Option) Context {
-	child := newContext(parent, opts...)
-	child.Programs = NewPrograms(parent.Programs)
-	return child
+	return newContext(parent, opts...)
 }
 
 func newContext(ctx Context, opts ...Option) Context {
@@ -65,7 +62,6 @@ const (
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
-		Programs:                         NewPrograms(nil),
 		Blocks:                           nil,
 		Metrics:                          nil,
 		GasLimit:                         DefaultGasLimit,

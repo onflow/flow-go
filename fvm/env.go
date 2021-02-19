@@ -39,6 +39,7 @@ type hostEnv struct {
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
+	programs           *Programs
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -69,6 +70,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
+		programs:           NewPrograms(),
 	}
 
 	if ctx.BlockHeader != nil {
@@ -275,7 +277,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 
-	program := e.ctx.Programs.Get(location)
+	program := e.programs.Get(location)
 	if program != nil {
 		// Program was found, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
@@ -291,7 +293,7 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 }
 
 func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
-	e.ctx.Programs.Set(location, program)
+	e.programs.Set(location, program)
 
 	return nil
 }

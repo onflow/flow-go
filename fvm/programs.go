@@ -14,13 +14,11 @@ type ProgramEntry struct {
 
 type Programs struct {
 	lock     sync.RWMutex
-	parent   *Programs
 	programs map[common.LocationID]ProgramEntry
 }
 
-func NewPrograms(parent *Programs) *Programs {
+func NewPrograms() *Programs {
 	return &Programs{
-		parent:   parent,
 		programs: map[common.LocationID]ProgramEntry{},
 	}
 }
@@ -29,20 +27,12 @@ func (p *Programs) Get(location common.Location) *interpreter.Program {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	// First check if the program is available here
-	if programEntry, ok := p.programs[location.ID()]; ok {
-		return programEntry.Program
+	programEntry, ok := p.programs[location.ID()]
+	if !ok {
+		return nil
 	}
 
-	// Second, check if the program is available in the parent (if any)
-
-	if p.parent != nil {
-		return p.parent.Get(location)
-	}
-
-	// The program is neither available here nor in the parent
-
-	return nil
+	return programEntry.Program
 }
 
 func (p *Programs) Set(location common.Location, program *interpreter.Program) {
@@ -55,38 +45,3 @@ func (p *Programs) Set(location common.Location, program *interpreter.Program) {
 	}
 }
 
-// Commit sets all programs into the parent (if any)
-//
-func (p *Programs) Commit() {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
-	parent := p.parent
-
-	if parent == nil {
-		return
-	}
-
-	for _, programEntry := range p.programs {
-
-		// Only commit programs with address locations,
-		// i.e. programs for contracts,
-		// and not programs for transactions or scripts
-
-		if _, ok := programEntry.Location.(common.AddressLocation); !ok {
-			continue
-		}
-
-		parent.Set(
-			programEntry.Location,
-			programEntry.Program,
-		)
-	}
-}
-
-func (p *Programs) Length() int {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	return len(p.programs)
-}

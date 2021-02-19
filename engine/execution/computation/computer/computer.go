@@ -168,7 +168,6 @@ func (e *blockComputer) executeBlock(
 	interactions[len(interactions)-1] = systemChunkView.Interactions()
 
 	stateView.MergeView(systemChunkView)
-	blockCtx.Programs.Commit()
 
 	return &execution.ComputationResult{
 		ExecutableBlock:   block,
@@ -211,10 +210,9 @@ func (e *blockComputer) executeCollection(
 
 	txMetrics := fvm.NewMetricsCollector()
 
-	collectionCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
+	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
 
 	for _, txBody := range collection.Transactions {
-		txCtx := fvm.NewContextFromParent(collectionCtx)
 
 		txEvents, txServiceEvents, txResult, txGasUsed, err :=
 			e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
@@ -229,8 +227,6 @@ func (e *blockComputer) executeCollection(
 			return nil, nil, nil, txIndex, 0, err
 		}
 	}
-
-	collectionCtx.Programs.Commit()
 
 	return events, serviceEvents, txResults, txIndex, gasUsed, nil
 }
@@ -306,7 +302,6 @@ func (e *blockComputer) executeTransaction(
 
 	if tx.Err == nil {
 		collectionView.MergeView(txView)
-		ctx.Programs.Commit()
 	}
 
 	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil

@@ -128,8 +128,6 @@ func TestPrograms(t *testing.T) {
 
 					require.NoError(t, tx.Err)
 				}
-
-				require.Greater(t, txCtx.Programs.Length(), 0)
 			},
 		),
 	)
@@ -152,8 +150,6 @@ func TestPrograms(t *testing.T) {
 				err := vm.Run(scriptCtx, script, ledger)
 				require.NoError(t, err)
 				require.NoError(t, script.Err)
-
-				require.Equal(t, 0, ctx.Programs.Length())
 			},
 		),
 	)
