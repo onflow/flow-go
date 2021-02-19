@@ -102,6 +102,13 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 	e.processChunks(chunkList, resultID)
 }
 
+// processChunks receives a list of chunks all belong to the same execution result. It creates a chunk locator
+// for each of those chunks and stores the chunk locator in the chunks queue.
+//
+// Note that all chunks in the input chunk list are assume to be legitimately assigned to this verification node
+// (through the chunk assigner), and all belong to the same execution result.
+//
+// Deduplication of chunk locators is delegated to the chunks queue.
 func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifier) {
 	for _, chunk := range chunkList {
 		log := e.log.With().
@@ -122,7 +129,7 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 		}
 
 		if !ok {
-			log.Debug().Msg("could not push chunk to chunks queue")
+			log.Debug().Msg("could not push duplicate chunk to chunks queue")
 			continue
 		}
 
