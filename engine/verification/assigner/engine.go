@@ -179,12 +179,11 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 
 // stakedAtBlockID checks whether this instance of verification node has staked at specified block ID.
 // It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
-// It returns false and error if it could not extract the stake of node at as a verification node at the specified block.
+// It returns false and error if it could not extract the stake of node as a verification node at the specified block.
 func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
-	// extracts identity of verification node at block height of result
 	identity, err := protocol.StakedIdentity(e.state, blockID, e.me.NodeID())
 	if err != nil {
-		return false, fmt.Errorf("could not check if node is staked at block %v: %w", blockID, err)
+		return false, fmt.Errorf("could not extract staked identify of node at block %v: %w", blockID, err)
 	}
 
 	if identity.Role != flow.RoleVerification {
