@@ -396,8 +396,9 @@ func (e *Engine) requestMissingCollectionsAtStartup(ctx context.Context) error {
 		lastFullHeight = fixedLastFullBlkHeight
 		err := e.blocks.UpdateLastFullBlockHeight(lastFullHeight)
 		if err != nil {
-			return fmt.Errorf("failed to set start height to %d: %w", fixedLastFullBlkHeight, err)
+			return fmt.Errorf("failed to set last full block height to %d: %w", fixedLastFullBlkHeight, err)
 		}
+
 	}
 
 	// start from the next block
