@@ -4,7 +4,6 @@ package matching
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -845,19 +844,12 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 
 				// we only reach the code below, if we already had a receipt in the map receiptForResult
 				// that is from DIFFERENT executor
-				marshalledR1, err := json.Marshal(r1)
-				if err != nil {
-					marshalledR1 = []byte("json_marshalling_failed")
-				}
-				marshalledR2, err := json.Marshal(rcpt)
-				if err != nil {
-					marshalledR2 = []byte("json_marshalling_failed")
-				}
-
 				log.Info().
 					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-					Str("receipt_1", string(marshalledR1)).
-					Str("receipt_2", string(marshalledR2)).
+					Str("receipt_1_id", r1.ID().String()).
+					Str("receipt_1_executor", r1.ExecutorID.String()).
+					Str("receipt_2_id", rcpt.ID().String()).
+					Str("receipt_2_executor", rcpt.ExecutorID.String()).
 					Msg("producing candidate seal")
 				results = append(results, incorporatedResult)
 				break
