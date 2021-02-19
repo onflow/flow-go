@@ -1043,6 +1043,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		blockIDExecNodeMap[block.ID()] = ids
 		allExecutionIDs = append(allExecutionIDs, ids...)
 
+		// same execution result for all receipts for this block
 		executionResult := unittest.ExecutionResultFixture()
 		receipts := make([]*flow.ExecutionReceipt, receiptPerBlock)
 		for j := 0; j < receiptPerBlock; j++ {
