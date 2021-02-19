@@ -131,7 +131,6 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
 	}
 
-	// TODO: this lookup is duplicated in Verifier
 	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
 	if errors.Is(err, model.ErrInvalidSigner) {
 		return nil, newInvalidVoteError(vote, err)
@@ -141,7 +140,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
-	valid, err := v.verifier.VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err := v.verifier.VerifyVote(voter, vote.SigData, block)
 	if err != nil {
 		switch {
 		case errors.Is(err, verification.ErrInvalidFormat):

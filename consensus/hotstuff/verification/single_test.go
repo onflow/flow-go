@@ -22,36 +22,37 @@ func TestSingleVote(t *testing.T) {
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
 	vote, err := signers[0].CreateVote(block)
 	require.NoError(t, err)
+	voter := identities[0]
 
 	// vote should be valid
-	valid, err := signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err := signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.True(t, valid, "original vote should be valid")
 
 	// vote on different block should be invalid
 	block.BlockID[0]++
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed block ID should be invalid")
 	block.BlockID[0]--
 
 	// vote with changed view should be invalid
 	block.View++
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed view should be invalid")
 	block.View--
 
 	// vote by different signer should be invalid
-	vote.SignerID = identities[1].NodeID
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	voter = identities[1]
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed identity should be invalid")
-	vote.SignerID = identities[0].NodeID
+	voter = identities[0]
 
 	// vote with changed signature should be invalid
 	vote.SigData[0]++
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed signature should be invalid")
 	vote.SigData[0]--

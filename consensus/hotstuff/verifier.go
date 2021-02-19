@@ -10,8 +10,8 @@ import (
 type Verifier interface {
 
 	// VerifyVote checks the validity of a vote for the given block.
-	VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error)
+	VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error)
 
 	// VerifyQC checks the validity of a QC for the given block.
-	VerifyQC(voterIDs flow.IdentityList, sigData []byte, block *model.Block) (bool, error)
+	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error)
 }

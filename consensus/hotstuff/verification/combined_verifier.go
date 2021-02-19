@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -39,22 +38,10 @@ func NewCombinedVerifier(committee hotstuff.Committee, staking module.Aggregatin
 }
 
 // VerifyVote verifies the validity of a combined signature on a vote.
-func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the to-be-signed message
 	msg := makeVoteMessage(block.View, block.BlockID)
-
-	// get the set of signing participants
-	participants, err := c.committee.Identities(block.BlockID, filter.Any)
-	if err != nil {
-		return false, fmt.Errorf("could not get participants: %w", err)
-	}
-
-	// get the specific identity
-	signer, ok := participants.ByNodeID(voterID)
-	if !ok {
-		return false, fmt.Errorf("voter %x is not a valid consensus participant at block %x: %w", voterID, block.BlockID, model.ErrInvalidSigner)
-	}
 
 	// split the two signatures from the vote
 	stakingSig, beaconShare, err := c.merger.Split(sigData)
@@ -68,9 +55,9 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	}
 
 	// get the signer dkg key share
-	beaconPubKey, err := dkg.KeyShare(voterID)
+	beaconPubKey, err := dkg.KeyShare(signer.NodeID)
 	if err != nil {
-		return false, fmt.Errorf("could not get random beacon key share for %x: %w", voterID, err)
+		return false, fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
 	}
 
 	// verify each signature against the message

@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -29,19 +28,7 @@ func NewSingleVerifier(committee hotstuff.Committee, verifier module.Aggregating
 }
 
 // VerifyVote verifies a vote with a single signature as signature data.
-func (s *SingleVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-
-	// get the participants from the selector set
-	participants, err := s.committee.Identities(block.BlockID, filter.Any)
-	if err != nil {
-		return false, fmt.Errorf("error retrieving consensus participants for block %x: %w", block.BlockID, err)
-	}
-
-	// get the identity of the voter
-	voter, ok := participants.ByNodeID(voterID)
-	if !ok {
-		return false, fmt.Errorf("voter %x is not a valid consensus participant at block %x: %w", voterID, block.BlockID, model.ErrInvalidSigner)
-	}
+func (s *SingleVerifier) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the message we verify against and check signature
 	msg := makeVoteMessage(block.View, block.BlockID)
