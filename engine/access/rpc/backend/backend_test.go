@@ -221,6 +221,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	validTestENMap := map[flow.Identifier]bool{}
 
 	suite.snapshot.
 		On("Head").
@@ -246,12 +247,13 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	txID := transactionBody.ID()
 	blockID := block.ID()
 
-	ids := unittest.IdentityListFixture(1)
+	ids := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = ids[0].NodeID
+	validTestENMap[receipt.ExecutorID] = true
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]flow.ExecutionReceipt{*receipt}, nil)
+		Return([]*flow.ExecutionReceipt{receipt}, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
@@ -283,6 +285,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		false,
 		suite.log,
 	)
+
+	validENMap = validTestENMap
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -526,9 +530,12 @@ func (mc *mockCloser) Close() error { return nil }
 
 func (suite *Suite) TestGetEventsForBlockIDs() {
 	events := getEvents(10)
+	validTestENMap := map[flow.Identifier]bool{}
+	ids := flow.IdentityList{}
 
 	setupStorage := func(n int) []*flow.Header {
 		headers := make([]*flow.Header, n)
+		ids = unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleExecution))
 
 		for i := 0; i < n; i++ {
 			b := unittest.BlockFixture()
@@ -539,16 +546,19 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			headers[i] = b.Header
 
 			r := unittest.ReceiptForBlockFixture(&b)
+			r.ExecutorID = ids[i].NodeID
+			// mark as valid EN
+			validTestENMap[r.ExecutorID] = true
 			suite.receipts.
 				On("ByBlockIDAllExecutionReceipts", b.ID()).
-				Return([]flow.ExecutionReceipt{*r}, nil).Once()
+				Return([]*flow.ExecutionReceipt{r}, nil).Once()
 		}
 
 		return headers
 	}
 	blockHeaders := setupStorage(5)
 
-	suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Once()
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil).Once()
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -603,7 +613,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		receipts := new(storagemock.ExecutionReceipts)
 		receipts.
 			On("ByBlockIDAllExecutionReceipts", mock.Anything).
-			Return([]flow.ExecutionReceipt{}, nil).Once()
+			Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 		// create the handler
 		backend := New(
@@ -644,6 +654,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.log,
 		)
 
+		validENMap = validTestENMap
+
 		// execute request
 		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
 		suite.checkResponse(actual, err)
@@ -667,6 +679,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			false,
 			suite.log,
 		)
+
+		validENMap = validTestENMap
 
 		// execute request with an empty block id list and expect an error (not a panic)
 		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
@@ -709,7 +723,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	// use the static execution node
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]flow.ExecutionReceipt{}, nil)
+		Return([]*flow.ExecutionReceipt{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -904,12 +918,13 @@ func (suite *Suite) TestGetAccount() {
 		Return(exeResp, nil).
 		Once()
 
-	ids := unittest.IdentityListFixture(1)
+	ids := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = ids[0].NodeID
+
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", blockID).
-		Return([]flow.ExecutionReceipt{*receipt}, nil).Once()
+		Return([]*flow.ExecutionReceipt{receipt}, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
@@ -932,6 +947,7 @@ func (suite *Suite) TestGetAccount() {
 	)
 
 	suite.Run("happy path - valid request and valid response", func() {
+		validENMap = map[flow.Identifier]bool{receipt.ExecutorID: true}
 		account, err := backend.GetAccountAtLatestBlock(ctx, address)
 		suite.checkResponse(account, err)
 
@@ -960,7 +976,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]flow.ExecutionReceipt{}, nil).Once()
+		Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -1026,7 +1042,9 @@ func (suite *Suite) TestGetNetworkParameters() {
 // TestExecutionNodesForBlockID tests the common method backend.executionNodesForBlockID used for serving all API calls
 // that need to talk to an execution node.
 func (suite *Suite) TestExecutionNodesForBlockID() {
-
+	if validENMap == nil {
+		validENMap = map[flow.Identifier]bool{}
+	}
 	totalBlocks := 3
 	receiptPerBlock := 2
 	totalReceipts := receiptPerBlock * totalBlocks
@@ -1034,12 +1052,12 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	blocks := unittest.BlockFixtures(totalBlocks)
 	blockIDExecNodeMap := make(map[flow.Identifier]flow.IdentityList, totalReceipts)
 	allExecutionIDs := make(flow.IdentityList, 0, totalReceipts) // assume each ER is generated by a unique exec node
-
+	// validENMap = map[flow.Identifier]bool{}
 	// generate identitylist and receipts for each block and mark each receipt with a unique execution ID
 	for i := 0; i < totalBlocks; i++ {
 
 		block := blocks[i]
-		ids := unittest.IdentityListFixture(receiptPerBlock)
+		ids := unittest.IdentityListFixture(receiptPerBlock, unittest.WithRole(flow.RoleExecution))
 		blockIDExecNodeMap[block.ID()] = ids
 		allExecutionIDs = append(allExecutionIDs, ids...)
 
