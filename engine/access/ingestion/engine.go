@@ -418,6 +418,17 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 			return fmt.Errorf("failed to retreive missing collections by height %d during collection catchup: %w", i, err)
 		}
 
+		missingCollsString := ""
+		for _, missingColl := range missingColls {
+			missingCollString := fmt.Sprintf("CollID: %s, Signers: %v",
+				missingColl.CollectionID.String(), flow.IdentifierList(missingColl.SignerIDs).Strings())
+			missingCollsString = missingCollsString + " " + missingCollString
+		}
+
+		e.log.Info().
+			Str("missing_collections", missingCollsString).
+			Msg("requesting missing collections")
+
 		// request the missing collections
 		e.requestCollections(missingColls)
 
