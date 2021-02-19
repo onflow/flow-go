@@ -92,6 +92,8 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
 func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+	// TODO: The lookup votersID to identities is done in ValidatQC just before calling
+	// VerifyQC. Why not passing Identities to VerifyQC?
 
 	// get the full Identities of the signers
 	signers, err := c.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...))
