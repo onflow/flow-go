@@ -24,7 +24,8 @@ type Broker struct {
 	myIndex           int                      // index of this instance in the committee
 	dkgContractClient module.DKGContractClient // client to communicate with the DKG smart contract
 	tunnel            *BrokerTunnel            // channels through which the broker communicates with the network engine
-	msgCh             chan messages.DKGMessage // channel to forward incoming messages to consumers
+	privateMsgCh      chan messages.DKGMessage // channel to forward incoming private messages to consumers
+	broadcastMsgCh    chan messages.DKGMessage // channel to forward incoming broadcast messages to consumers
 	messageOffset     uint                     // offset for next broadcast messages to fetch
 	shutdownCh        chan struct{}            // channel to stop the broker from listening
 }
@@ -46,7 +47,8 @@ func NewBroker(
 		myIndex:           myIndex,
 		dkgContractClient: dkgContractClient,
 		tunnel:            tunnel,
-		msgCh:             make(chan messages.DKGMessage),
+		privateMsgCh:      make(chan messages.DKGMessage),
+		broadcastMsgCh:    make(chan messages.DKGMessage),
 		shutdownCh:        make(chan struct{}),
 	}
 
@@ -96,10 +98,16 @@ func (b *Broker) FlagMisbehavior(node int, log string) {
 	b.log.Warn().Msgf("participant %d is flagging participant %d because: %s", b.myIndex, node, log)
 }
 
-// GetMsgCh returns the channel through which consumers can receive incoming
-// DKG messages.
-func (b *Broker) GetMsgCh() <-chan messages.DKGMessage {
-	return b.msgCh
+// GetPrivateMsgCh returns the channel through which consumers can receive
+// incoming private DKG messages.
+func (b *Broker) GetPrivateMsgCh() <-chan messages.DKGMessage {
+	return b.privateMsgCh
+}
+
+// GetBroadcastMsgCh returns the channel through which consumers can receive
+// incoming broadcast DKG messages.
+func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
+	return b.broadcastMsgCh
 }
 
 // Poll calls the DKG smart contract to get missing DKG messages for the current
@@ -120,7 +128,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 			continue
 		}
 		b.log.Debug().Msgf("forwarding broadcast message to controller")
-		b.msgCh <- msg
+		b.broadcastMsgCh <- msg
 	}
 	b.messageOffset += uint(len(msgs))
 	return nil
@@ -165,7 +173,7 @@ func (b *Broker) onPrivateMessage(originID flow.Identifier, msg messages.DKGMess
 		b.log.Error().Msgf("bad message: OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 		return
 	}
-	b.msgCh <- msg
+	b.privateMsgCh <- msg
 }
 
 // checkMessageInstanceAndOrigin returns an error if the message's dkgInstanceID

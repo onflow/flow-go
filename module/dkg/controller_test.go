@@ -88,18 +88,16 @@ func (n *node) run() error {
 // broker is a test implementation of DKGBroker that enables nodes to exchange
 // private and public messages through a shared set of channels.
 type broker struct {
-	id            int
-	channels      []chan msg.DKGMessage
-	logger        zerolog.Logger
-	dkgInstanceID string
+	id                int
+	privateChannels   []chan msg.DKGMessage
+	broadcastChannels []chan msg.DKGMessage
+	logger            zerolog.Logger
+	dkgInstanceID     string
 }
 
 // PrivateSend implements the crypto.DKGProcessor interface.
 func (b *broker) PrivateSend(dest int, data []byte) {
-	b.channels[dest] <- msg.NewDKGMessage(
-		b.id,
-		data,
-		b.dkgInstanceID)
+	b.privateChannels[dest] <- msg.NewDKGMessage(b.id, data, b.dkgInstanceID)
 }
 
 // Broadcast implements the crypto.DKGProcessor interface.
@@ -110,16 +108,16 @@ func (b *broker) PrivateSend(dest int, data []byte) {
 // 3, all nodes are guaranteed to see everyone's messages. So it is important
 // to set timeouts carefully in the tests.
 func (b *broker) Broadcast(data []byte) {
-	for i := 0; i < len(b.channels); i++ {
+	for i := 0; i < len(b.broadcastChannels); i++ {
 		if i == b.id {
 			continue
 		}
 		// epoch and phase are not relevant at the controller level
-		b.channels[i] <- msg.NewDKGMessage(b.id, data, b.dkgInstanceID)
+		b.broadcastChannels[i] <- msg.NewDKGMessage(b.id, data, b.dkgInstanceID)
 	}
 }
 
-// Disqulify implements the crypto.DKGProcessor interface.
+// Disqualify implements the crypto.DKGProcessor interface.
 func (b *broker) Disqualify(node int, log string) {
 	b.logger.Debug().Msgf("node %d disqualified node %d: %s", b.id, node, log)
 }
@@ -129,9 +127,14 @@ func (b *broker) FlagMisbehavior(node int, logData string) {
 	b.logger.Debug().Msgf("node %d flagged node %d: %s", b.id, node, logData)
 }
 
-// GetMsgCh implements the DKGBroker interface.
-func (b *broker) GetMsgCh() <-chan msg.DKGMessage {
-	return b.channels[b.id]
+// GetPrivateMsgCh implements the DKGBroker interface.
+func (b *broker) GetPrivateMsgCh() <-chan msg.DKGMessage {
+	return b.privateChannels[b.id]
+}
+
+// GetBroadcastMsgCh implements the DKGBroker interface.
+func (b *broker) GetBroadcastMsgCh() <-chan msg.DKGMessage {
+	return b.broadcastChannels[b.id]
 }
 
 // Poll implements the DKGBroker interface.
@@ -150,17 +153,17 @@ type testCase struct {
 	phase3Duration time.Duration
 }
 
-// TestDKGHappyPath tests the controller in optimal conditions, when all nodes are
-// working correctly.
+// TestDKGHappyPath tests the controller in optimal conditions, when all nodes
+// are working correctly.
 func TestDKGHappyPath(t *testing.T) {
 	// Define different test cases with varying number of nodes, and phase
 	// durations. Since these are all happy path cases, there are no messages
 	// sent during phase 2 and 3; all messaging is done in phase 1. So we can
 	// can set shorter durations for phases 2 and 3.
 	testCases := []testCase{
-		{totalNodes: 5, phase1Duration: time.Second, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
-		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
-		{totalNodes: 15, phase1Duration: 5 * time.Second, phase2Duration: 2 * time.Second, phase3Duration: 2 * time.Second},
+		{totalNodes: 5, phase1Duration: 100 * time.Millisecond, phase2Duration: 10 * time.Millisecond, phase3Duration: 10 * time.Millisecond},
+		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: 10 * time.Millisecond, phase3Duration: 10 * time.Millisecond},
+		{totalNodes: 15, phase1Duration: 3 * time.Second, phase2Duration: 10 * time.Millisecond, phase3Duration: 10 * time.Millisecond},
 	}
 
 	// run each test case
@@ -177,9 +180,9 @@ func TestDKGThreshold(t *testing.T) {
 	// define different test cases with varying number of nodes, and phase
 	// durations
 	testCases := []testCase{
-		{totalNodes: 5, phase1Duration: time.Second, phase2Duration: time.Second, phase3Duration: time.Second},
-		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: time.Second, phase3Duration: time.Second},
-		{totalNodes: 15, phase1Duration: 5 * time.Second, phase2Duration: 2 * time.Second, phase3Duration: 2 * time.Second},
+		{totalNodes: 5, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
+		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: 500 * time.Millisecond, phase3Duration: 500 * time.Millisecond},
+		{totalNodes: 15, phase1Duration: 3 * time.Second, phase2Duration: time.Second, phase3Duration: time.Second},
 	}
 
 	// run each test case
@@ -216,9 +219,11 @@ func testDKG(t *testing.T, totalNodes int, goodNodes int, phase1Duration, phase2
 // Initialise nodes and communication channels.
 func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Duration time.Duration) []*node {
 	// Create the channels through which the nodes will communicate
-	channels := make([]chan msg.DKGMessage, 0, n)
+	privateChannels := make([]chan msg.DKGMessage, 0, n)
+	broadcastChannels := make([]chan msg.DKGMessage, 0, n)
 	for i := 0; i < n; i++ {
-		channels = append(channels, make(chan msg.DKGMessage, 5*n*n))
+		privateChannels = append(privateChannels, make(chan msg.DKGMessage, 5*n*n))
+		broadcastChannels = append(broadcastChannels, make(chan msg.DKGMessage, 5*n*n))
 	}
 
 	nodes := make([]*node, 0, n)
@@ -228,9 +233,10 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 		logger := zerolog.New(os.Stderr).With().Int("id", i).Logger()
 
 		broker := &broker{
-			id:       i,
-			channels: channels,
-			logger:   logger,
+			id:                i,
+			privateChannels:   privateChannels,
+			broadcastChannels: broadcastChannels,
+			logger:            logger,
 		}
 
 		seed := unittest.SeedFixture(20)
@@ -255,9 +261,7 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 
 // Wait for all the nodes to reach the SHUTDOWN state, or timeout.
 func wait(t *testing.T, nodes []*node, timeout time.Duration) {
-
 	timer := time.After(timeout)
-
 	for {
 		select {
 		case <-timer:
@@ -273,7 +277,7 @@ func wait(t *testing.T, nodes []*node, timeout time.Duration) {
 			if done {
 				return
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(50 * time.Millisecond)
 		}
 	}
 }

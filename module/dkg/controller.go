@@ -162,7 +162,6 @@ func (c *Controller) End() error {
 	c.dkgLock.Lock()
 	privateShare, groupPublicKey, publicKeys, err := c.dkg.End()
 	c.dkgLock.Unlock()
-
 	if err != nil {
 		return err
 	}
@@ -214,18 +213,23 @@ WORKERS
 *******************************************************************************/
 
 func (c *Controller) doBackgroundWork() {
-	// msgCh is the channel through which the broker forwards incoming messages
-	// (private and broadcast). Integrity checks are performed upstream by the
-	// broker.
-	msgCh := c.broker.GetMsgCh()
+	privateMsgCh := c.broker.GetPrivateMsgCh()
+	broadcastMsgCh := c.broker.GetBroadcastMsgCh()
 	for {
 		select {
-		case msg := <-msgCh:
+		case msg := <-privateMsgCh:
 			c.dkgLock.Lock()
-			err := c.dkg.HandleMsg(msg.Orig, msg.Data)
+			err := c.dkg.HandlePrivateMsg(msg.Orig, msg.Data)
 			c.dkgLock.Unlock()
 			if err != nil {
-				c.log.Err(err).Msg("Error processing DKG message")
+				c.log.Err(err).Msg("error processing DKG private message")
+			}
+		case msg := <-broadcastMsgCh:
+			c.dkgLock.Lock()
+			err := c.dkg.HandleBroadcastMsg(msg.Orig, msg.Data)
+			c.dkgLock.Unlock()
+			if err != nil {
+				c.log.Err(err).Msg("error processing DKG broadcast message")
 			}
 		case <-c.shutdownCh:
 			return

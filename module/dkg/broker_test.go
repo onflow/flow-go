@@ -101,10 +101,10 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 	unittest.RequireNeverClosedWithin(t, doneCh, 50*time.Millisecond, "no invalid message should be sent")
 }
 
-// TestReceiveMessage_Valid checks that a valid incoming DKG message is
+// TestReceivePrivateMessage_Valid checks that a valid incoming DKG message is
 // correctly matched with origin's Identifier, and that the message is forwarded
 // to the message channel.
-func TestReceiveMessage_Valid(t *testing.T) {
+func TestReceivePrivateMessage_Valid(t *testing.T) {
 
 	// receiving broker
 	receiver := NewBroker(
@@ -122,11 +122,11 @@ func TestReceiveMessage_Valid(t *testing.T) {
 		dkgInstanceID,
 	)
 
-	// launch a background routine to capture messages forwared to the msgCh,
-	// and require that the expected message is sent withing 1 second.
+	// launch a background routine to capture messages forwared to the private
+	// message channel
 	doneCh := make(chan struct{})
 	go func() {
-		msgCh := receiver.GetMsgCh()
+		msgCh := receiver.GetPrivateMsgCh()
 		for {
 			msg := <-msgCh
 			require.Equal(t, expectedMsg, msg)
@@ -145,11 +145,11 @@ func TestReceiveMessage_Valid(t *testing.T) {
 	unittest.RequireCloseBefore(t, doneCh, 50*time.Millisecond, "message not received")
 }
 
-// TestReceiveMessage_InvalidOrigin checks that incoming DKG messages are
+// TestProcessPrivateMessage_InvalidOrigin checks that incoming DKG messages are
 // discarded if their origin is invalid, or if there is a discrepancy between
 // the origin defined in the message, and the network identifier of the origin
 // (as provided by the network utilities).
-func TestProcessMessage_InvalidOrigin(t *testing.T) {
+func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 
 	// receiving broker
 	receiver := NewBroker(
@@ -161,11 +161,12 @@ func TestProcessMessage_InvalidOrigin(t *testing.T) {
 		NewBrokerTunnel(),
 	)
 
-	// launch a background routine to capture messages forwared to the msgCh.
-	// No messages should be received because we are only sending invalid ones.
+	// Launch a background routine to capture messages forwared to the private
+	// message channel. No messages should be received because we are only
+	// sending invalid ones.
 	doneCh := make(chan struct{})
 	go func() {
-		msgCh := receiver.GetMsgCh()
+		msgCh := receiver.GetPrivateMsgCh()
 		for {
 			<-msgCh
 			close(doneCh)
@@ -241,7 +242,7 @@ func TestBroadcastMessage(t *testing.T) {
 }
 
 // TestPoll checks that the broker correctly calls the smart contract to fetch
-// broadcast messages, and forwards the messages to the msgCh.
+// broadcast messages, and forwards the messages to the broadcast channel.
 func TestPoll(t *testing.T) {
 
 	broker := NewBroker(
@@ -283,7 +284,7 @@ func TestPoll(t *testing.T) {
 	receivedMsgs := []msg.DKGMessage{}
 	doneCh := make(chan struct{})
 	go func() {
-		msgCh := broker.GetMsgCh()
+		msgCh := broker.GetBroadcastMsgCh()
 		for {
 			msg := <-msgCh
 			receivedMsgs = append(receivedMsgs, msg)
