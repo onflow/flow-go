@@ -107,9 +107,14 @@ func (i *TransactionInvocator) Process(
 			break
 		}
 
+		var blockHeight uint64
+		if ctx.BlockHeader != nil {
+			blockHeight = ctx.BlockHeader.Height
+		}
+
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
-			Uint64("blockHeight", ctx.BlockHeader.Height).
+			Uint64("blockHeight", blockHeight).
 			Int("retries_count", numberOfRetries).
 			Uint64("ledger_interaction_used", st.InteractionUsed()).
 			Msg("retrying transaction execution")
@@ -127,14 +132,15 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
-	i.logger.Info().
-		Str("txHash", proc.ID.String()).
-		Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
-
 	if err != nil {
+		var blockHeight uint64
+		if ctx.BlockHeader != nil {
+			blockHeight = ctx.BlockHeader.Height
+		}
+
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
-			Uint64("blockHeight", ctx.BlockHeader.Height).
+			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", st.InteractionUsed()).
 			Msg("transaction executed with error")
 		return err
@@ -144,9 +150,14 @@ func (i *TransactionInvocator) Process(
 	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
 
+	var blockHeight uint64
+	if ctx.BlockHeader != nil {
+		blockHeight = ctx.BlockHeader.Height
+	}
+
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
-		Uint64("blockHeight", ctx.BlockHeader.Height).
+		Uint64("blockHeight", blockHeight).
 		Uint64("ledgerInteractionUsed", st.InteractionUsed()).
 		Msg("transaction executed with no error")
 
