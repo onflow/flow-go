@@ -222,7 +222,8 @@ func convertStorageError(err error) error {
 func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
-	state protocol.State) (flow.IdentityList, error) {
+	state protocol.State,
+	log zerolog.Logger) (flow.IdentityList, error) {
 
 	// lookup the receipts storage with the block ID
 	allReceipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
@@ -244,27 +245,49 @@ func executionNodesForBlockID(
 		resultID := receipt.ExecutionResult.ID()
 		identicalReceipts[resultID] = append(identicalReceipts[resultID], receipt)
 
-		currentMatchedReceiptCnt := len(receipts)
+		currentMatchedReceiptCnt := len(identicalReceipts[resultID])
 		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
 			maxMatchedReceiptCnt = currentMatchedReceiptCnt
 			maxMatchedReceiptResultID = resultID
 		}
 	}
 
+	mismatchReceiptCnt := len(identicalReceipts)
+	// if there are more than one execution result for the same block ID, log as error
+	if mismatchReceiptCnt > 1 {
+		erString := ""
+		for _, ers := range identicalReceipts {
+			for _, er := range ers {
+				erString = erString + " " + er.ID().String()
+			}
+		}
+		log.Error().
+			Str("block_id", blockID.String()).
+			Str("execution_receipts", erString).
+			Msg("execution receipt mismatch")
+	}
+
 	// pick the largest list of matching receipts
 	matchingReceipts := identicalReceipts[maxMatchedReceiptResultID]
 
-	// collect the execution node id in each of the receipts
+	// collect all unique execution node ids from the receipts
 	var executorIDs flow.IdentifierList
+	executorIDMap := make(map[flow.Identifier]bool)
 	for _, receipt := range matchingReceipts {
+		if executorIDMap[receipt.ExecutorID] {
+			continue
+		}
 		executorIDs = append(executorIDs, receipt.ExecutorID)
+		executorIDMap[receipt.ExecutorID] = true
 	}
 
-	// for now only query Dapperlabs ENs
-	if len(executorIDs) == 0 {
+	// return if less than 2 unique execution node ids were found
+	// since we want matching receipts from at least 2 ENs
+	if len(executorIDs) < 2 {
 		return flow.IdentityList{}, nil
 	}
 
+	// for now only query Dapperlabs ENs
 	allENs, err := validENs(state)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)

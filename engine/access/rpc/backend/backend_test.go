@@ -1073,7 +1073,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 
 	testBlock := blocks[0]
 	expectedList := blockIDExecNodeMap[testBlock.ID()]
-	actualList, err := executionNodesForBlockID(testBlock.ID(), suite.receipts, suite.state)
+	actualList, err := executionNodesForBlockID(testBlock.ID(), suite.receipts, suite.state, suite.log)
 	require.NoError(suite.T(), err)
 	require.ElementsMatch(suite.T(), actualList, expectedList)
 }
