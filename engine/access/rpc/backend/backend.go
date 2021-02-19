@@ -56,7 +56,6 @@ type Backend struct {
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
 	connFactory       ConnectionFactory
-	validENs          map[flow.Identifier]struct{}
 }
 
 func New(

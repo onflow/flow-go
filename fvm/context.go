@@ -19,6 +19,7 @@ type Context struct {
 	MaxStateValueSize                uint64
 	MaxStateInteractionSize          uint64
 	EventCollectionByteSizeLimit     uint64
+	MaxNumOfTxRetries                uint8
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
@@ -58,6 +59,7 @@ const AccountKeyWeightThreshold = 1000
 const (
 	DefaultGasLimit                     = 100_000 // 100K
 	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+	DefaultMaxNumOfTxRetries            = 2
 )
 
 func defaultContext(logger zerolog.Logger) Context {
@@ -71,6 +73,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxStateValueSize:                state.DefaultMaxValueSize,
 		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
 		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:                DefaultMaxNumOfTxRetries,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,

@@ -1279,13 +1279,24 @@ func (e *Engine) generateExecutionReceipt(
 
 	spocks := make([]crypto.Signature, len(stateInteractions))
 
-	for i, stateInteraction := range stateInteractions {
-		spock, err := e.me.SignFunc(stateInteraction.SpockSecret, e.spockHasher, crypto.SPOCKProve)
+	// TODO: Currently we're ignoring spocks due to an issue with incorrectly producing non-deterministic
+	// spocks. This causes receipt ids to be inconsistent. We're adding logging for now, better understand
+	// if the problem is coming from the stateInteractions.SpockSecret, or from the spockHasher/SPOCKProve
+	// crypto functions.
+	for _, stateInteraction := range stateInteractions {
+		e.log.Debug().
+			Hex("spock_secret", stateInteraction.SpockSecret).
+			Hex("block_id", result.BlockID[:]).
+			Str("result_id", result.ID().String()).
+			Msg("spock secret")
 
-		if err != nil {
-			return nil, fmt.Errorf("error while generating SPoCK: %w", err)
-		}
-		spocks[i] = spock
+		// spock, err := e.me.SignFunc(stateInteraction.SpockSecret, e.spockHasher, crypto.SPOCKProve)
+
+		// if err != nil {
+		// 	return nil, fmt.Errorf("error while generating SPoCK: %w", err)
+		// }
+
+		// spocks[i] = spock
 	}
 
 	receipt := &flow.ExecutionReceipt{
