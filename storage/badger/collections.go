@@ -120,16 +120,18 @@ func (c *Collections) Remove(colID flow.Identifier) error {
 }
 
 func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightCollection) error {
-	return operation.RetryOnConflict(c.db.Update, func(tx *badger.Txn) error {
-		err := operation.InsertCollection(collection)(tx)
+	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
+		collectionID := collection.ID()
+
+		err := operation.InsertCollection(collection)(btx)
 		if err != nil {
-			return fmt.Errorf("could not insert collection: %w", err)
+			return fmt.Errorf("could not insert collection (id=%x): %w", collectionID, err)
 		}
 
-		for _, t := range collection.Transactions {
-			err = operation.IndexCollectionByTransaction(t, collection.ID())(tx)
+		for _, txID := range collection.Transactions {
+			err = operation.IndexCollectionByTransaction(txID, collection.ID())(btx)
 			if err != nil {
-				return fmt.Errorf("could not insert transaction ID: %w", err)
+				return fmt.Errorf("could not index collection (id=%x) by transaction (id=%x): %w", collectionID, txID, err)
 			}
 		}
 

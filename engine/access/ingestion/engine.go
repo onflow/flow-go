@@ -342,6 +342,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, entity flow.Entity) 
 		// ignore collection if already seen
 		if errors.Is(err, storage.ErrAlreadyExists) {
 			e.log.Debug().
+				Err(err).
 				Hex("collection_id", logging.Entity(light)).
 				Msg("collection is already seen")
 			return nil
