@@ -10,6 +10,7 @@ require (
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
+	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
 	github.com/gogo/protobuf v1.3.1
@@ -33,8 +34,7 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1
-	// TODO: merge and release https://github.com/onflow/cadence/pull/576 first
-	github.com/onflow/cadence v0.12.7-0.20210203220809-94ca1be5c6d9
+	github.com/onflow/cadence v0.12.12-0.20210219145521-6b3a0023586f
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
 	github.com/onflow/flow-go-sdk v0.14.3
 	github.com/onflow/flow-go/crypto v0.12.0

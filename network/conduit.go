@@ -53,16 +53,6 @@ func (cl ChannelList) ID() flow.Identifier {
 // engines with the same ID over a shared bus, accessible through the conduit.
 type Conduit interface {
 
-	// Submit will submit an event to the network layer. The network layer will
-	// ensure that the event is delivered to the same engine on the desired target
-	// nodes. It's possible that the event traverses other nodes than the target
-	// nodes on its path across the network. The network codec needs to be aware
-	// of how to encode the given event type, otherwise the send will fail.
-	//
-	// Note: Submit method is planned for deprecation soon.
-	// Alternative methods are recommended, e.g., Publish, Unicast, and Multicast.
-	Submit(event interface{}, targetIDs ...flow.Identifier) error
-
 	// Publish submits an event to the network layer for unreliable delivery
 	// to subscribers of the given event on the network layer. It uses a
 	// publish-subscribe layer and can thus not guarantee that the specified
