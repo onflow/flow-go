@@ -26,13 +26,17 @@ import (
 const collectionCatchupTimeout = 30 * time.Second
 
 // time to poll the storage to check if missing collections have been received
-const collectionCatchupDBPollInterval = 10 * time.Millisecond
+const collectionCatchupDBPollInterval = 100 * time.Millisecond
 
 // time to update the FullBlockHeight index
 const fullBlockUpdateInterval = 1 * time.Minute
 
 // a threshold of number of blocks with missing collections beyond which collections should be re-requested
-const missingCollsForBlkThreshold = 100
+const missingCollsForBlkThreshold = 5 //100
+
+// collection at blk height 12023468 and 12021794 are missing
+// hard coding start height for now
+const fixedStartHeight = 12023469
 
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
@@ -379,6 +383,11 @@ func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 // requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
 func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
+	err := e.blocks.UpdateLastFullBlockHeight(fixedStartHeight)
+	if err != nil {
+		return fmt.Errorf("failed to set start height to %d:%w", fixedStartHeight, err)
+	}
+
 	var startHeight, endHeight uint64
 
 	// get the height of the last block for which all collections were received
@@ -427,7 +436,7 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 		e.log.Info().
 			Str("missing_collections", missingCollsString).
-			Msg("requesting missing collections")
+			Msg("requesting missing collections at startup")
 
 		// request the missing collections
 		e.requestCollections(missingColls)
@@ -549,6 +558,18 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 			// collect the missing collections for requesting later
 			allMissingColls = append(allMissingColls, missingColls...)
 
+			missingCollsString := ""
+			for _, missingColl := range missingColls {
+				missingCollString := fmt.Sprintf("CollID: %s",
+					missingColl.CollectionID.String())
+				missingCollsString = missingCollsString + " " + missingCollString
+			}
+
+			e.log.Info().
+				Str("missing_collections", missingCollsString).
+				Uint64("block_height", i).
+				Msg("requesting missing collections")
+
 			continue
 		}
 
@@ -568,15 +589,16 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 	}
 
 	// additionally, if more than threshold blocks have missing collection, re-request those collections
-	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold {
-		// warn log since this should generally not happen
-		e.log.Warn().
-			Int("missing_collection_blk_count", incompleteBlksCnt).
-			Int("threshold", defaultMissingCollsForBlkThreshold).
-			Uint64("last_full_blk_height", latestFullHeight).
-			Msg("re-requesting missing collections")
-		e.requestCollections(allMissingColls)
-	}
+	//if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold {
+	// warn log since this should generally not happen
+	e.log.Warn().
+		Int("missing_collection_blk_count", incompleteBlksCnt).
+		Int("threshold", defaultMissingCollsForBlkThreshold).
+		Uint64("last_full_blk_height", latestFullHeight).
+		Msg("re-requesting missing collections")
+
+	e.requestCollections(allMissingColls)
+	//}
 
 	e.log.Debug().Uint64("last_full_blk_height", latestFullHeight).Msg("updated LastFullBlockReceived index")
 }
