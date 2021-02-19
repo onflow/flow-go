@@ -4,6 +4,7 @@ package matching
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -819,14 +820,47 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 					Msg("could not get receipts by block ID")
 				continue
 			}
-			block2ResultsCounter := make(map[flow.Identifier]uint)
+			receiptForResult := make(map[flow.Identifier]*flow.ExecutionReceipt)
 			for _, rcpt := range receipts {
 				resultID := rcpt.ExecutionResult.ID()
-				block2ResultsCounter[resultID] += 1
-				if block2ResultsCounter[resultID] >= 2 {
-					results = append(results, incorporatedResult)
-					break
+				r1, found := receiptForResult[resultID]
+				if !found {
+					receiptForResult[resultID] = rcpt
+					continue
 				}
+				if r1.ID() == rcpt.ID() {
+					log.Error().
+						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+						Hex("receipt_id", logging.ID(rcpt.ID())).
+						Msg("duplicated receipts in blockID -> executor -> receipt ID storage")
+					continue
+				}
+				if r1.ExecutorID == rcpt.ExecutorID {
+					log.Error().
+						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+						Hex("receipt_id", logging.ID(rcpt.ID())).
+						Msg("duplicated receipts from SAME EXECUTOR in blockID -> executor -> receipt ID storage")
+					continue
+				}
+
+				// we only reach the code below, if we already had a receipt in the map receiptForResult
+				// that is from DIFFERENT executor
+				marshalledR1, err := json.Marshal(r1)
+				if err != nil {
+					marshalledR1 = []byte("json_marshalling_failed")
+				}
+				marshalledR2, err := json.Marshal(rcpt)
+				if err != nil {
+					marshalledR2 = []byte("json_marshalling_failed")
+				}
+
+				log.Info().
+					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+					Str("receipt_1", string(marshalledR1)).
+					Str("receipt_2", string(marshalledR2)).
+					Msg("producing candidate seal")
+				results = append(results, incorporatedResult)
+				break
 			}
 		}
 
