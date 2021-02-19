@@ -124,7 +124,7 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 		// pushes chunk locator to the chunks queue
 		ok, err := e.chunksQueue.StoreChunkLocator(locator)
 		if err != nil {
-			log.Debug().Err(err).Msg("could not push chunk locator to chunks queue")
+			log.Error().Err(err).Msg("could not push chunk locator to chunks queue")
 			continue
 		}
 		if !ok {
