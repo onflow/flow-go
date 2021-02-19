@@ -238,7 +238,7 @@ func (suite *Suite) TestOnCollectionDuplicate() {
 	suite.transactions.AssertNotCalled(suite.T(), "Store", "should not store any transactions")
 }
 
-// TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollections
+// TestRequestMissingCollections tests that the all missing collections are requested on the call to requestMissingCollectionsAtStartup
 func (suite *Suite) TestRequestMissingCollections() {
 
 	blkCnt := 3
@@ -328,7 +328,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*defaultCollectionCatchupDBPollInterval)
 		defer cancel()
 
-		err := suite.eng.requestMissingCollections(ctx)
+		err := suite.eng.requestMissingCollectionsAtStartup(ctx)
 
 		require.Error(suite.T(), err)
 		require.Contains(suite.T(), err.Error(), "context deadline exceeded")
@@ -344,7 +344,7 @@ func (suite *Suite) TestRequestMissingCollections() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
 
-		err := suite.eng.requestMissingCollections(ctx)
+		err := suite.eng.requestMissingCollectionsAtStartup(ctx)
 
 		require.NoError(suite.T(), err)
 		require.Len(suite.T(), rcvdColl, len(collIDs))

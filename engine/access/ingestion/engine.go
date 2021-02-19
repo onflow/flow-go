@@ -124,7 +124,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	readyChan := e.unit.Ready(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultCollectionCatchupTimeout)
 		defer cancel()
-		err := e.requestMissingCollections(ctx)
+		err := e.requestMissingCollectionsAtStartup(ctx)
 		if err != nil {
 			e.log.Error().Err(err).Msg("requesting missing collections failed")
 		}
@@ -380,13 +380,8 @@ func (e *Engine) OnBlockIncorporated(*model.Block) {
 func (e *Engine) OnDoubleProposeDetected(*model.Block, *model.Block) {
 }
 
-// requestMissingCollections requests missing collections for all blocks in the local db storage once at startup
-func (e *Engine) requestMissingCollections(ctx context.Context) error {
-
-	err := e.blocks.UpdateLastFullBlockHeight(fixedStartHeight)
-	if err != nil {
-		return fmt.Errorf("failed to set start height to %d:%w", fixedStartHeight, err)
-	}
+// requestMissingCollectionsAtStartup requests missing collections for all blocks in the local db storage once at startup
+func (e *Engine) requestMissingCollectionsAtStartup(ctx context.Context) error {
 
 	var startHeight, endHeight uint64
 
@@ -398,6 +393,14 @@ func (e *Engine) requestMissingCollections(ctx context.Context) error {
 
 	// start from the next block
 	startHeight = lastFullHeight + 1
+
+	if startHeight < fixedStartHeight {
+		startHeight = fixedStartHeight
+		err := e.blocks.UpdateLastFullBlockHeight(fixedStartHeight)
+		if err != nil {
+			return fmt.Errorf("failed to set start height to %d:%w", fixedStartHeight, err)
+		}
+	}
 
 	// end at the finalized block
 	finalBlk, err := e.state.Final().Head()
