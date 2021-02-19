@@ -242,20 +242,7 @@ func executionNodesForBlockID(
 	for _, receipt := range allReceipts {
 
 		resultID := receipt.ExecutionResult.ID()
-		receipts, found := identicalReceipts[resultID]
-
-		if !found {
-			// first of its kind
-			receipts = []*flow.ExecutionReceipt{receipt}
-			identicalReceipts[resultID] = receipts
-			// keep looking for at least one more receipt with the same result
-			// since we need at least two execution receipt which have the same result
-			continue
-		}
-
-		// append receipt to the list of all receipts for this resultID
-		receipts = append(receipts, receipt)
-		identicalReceipts[resultID] = receipts
+		identicalReceipts[resultID] = append(identicalReceipts[resultID], receipt)
 
 		currentMatchedReceiptCnt := len(receipts)
 		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
