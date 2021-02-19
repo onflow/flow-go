@@ -118,8 +118,11 @@ func (i *TransactionInvocator) Process(
 			Uint64("ledger_interaction_used", st.InteractionUsed()).
 			Msg("retrying transaction execution")
 
-		// reset error part of proc
+		// reset proc in case
 		proc.Err = nil
+		proc.Logs = make([]string, 0)
+		proc.Events = make([]flow.Event, 0)
+		proc.ServiceEvents = make([]flow.Event, 0)
 		proc.Retried++
 	}
 
