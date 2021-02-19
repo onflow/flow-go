@@ -524,7 +524,10 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 }
 
 func Test_SPOCKGeneration(t *testing.T) {
+
+	// skipping this for now since we commented the spock storage
 	t.Skipf("Spocks is being skipped for now")
+
 	runWithEngine(t, func(ctx testingContext) {
 
 		snapshots := []*delta.SpockSnapshot{
