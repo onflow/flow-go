@@ -205,8 +205,8 @@ func (c *Controller) Poll(blockReference flow.Identifier) error {
 // caller to ensure that this method is called after a succesfull run of the
 // protocol.
 func (c *Controller) SubmitResult() error {
-	_, _, res := c.GetArtifacts()
-	return c.broker.SubmitResult(res)
+	_, pubKey, groupKeys := c.GetArtifacts()
+	return c.broker.SubmitResult(pubKey, groupKeys)
 }
 
 /*******************************************************************************

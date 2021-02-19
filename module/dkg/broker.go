@@ -127,8 +127,8 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 }
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
-func (b *Broker) SubmitResult(res []crypto.PublicKey) error {
-	return b.dkgContractClient.SubmitResult(res)
+func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
+	return b.dkgContractClient.SubmitResult(pubKey, groupKeys)
 }
 
 // Shutdown stop the goroutine that listens to incoming private messages.

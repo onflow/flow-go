@@ -32,15 +32,15 @@ func (_m *DKGBroker) FlagMisbehavior(node int, log string) {
 }
 
 // GetMsgCh provides a mock function with given fields:
-func (_m *DKGBroker) GetMsgCh() chan messages.DKGMessage {
+func (_m *DKGBroker) GetMsgCh() <-chan messages.DKGMessage {
 	ret := _m.Called()
 
-	var r0 chan messages.DKGMessage
-	if rf, ok := ret.Get(0).(func() chan messages.DKGMessage); ok {
+	var r0 <-chan messages.DKGMessage
+	if rf, ok := ret.Get(0).(func() <-chan messages.DKGMessage); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(chan messages.DKGMessage)
+			r0 = ret.Get(0).(<-chan messages.DKGMessage)
 		}
 	}
 
@@ -66,13 +66,18 @@ func (_m *DKGBroker) PrivateSend(dest int, data []byte) {
 	_m.Called(dest, data)
 }
 
-// SubmitResult provides a mock function with given fields: _a0
-func (_m *DKGBroker) SubmitResult(_a0 []crypto.PublicKey) error {
-	ret := _m.Called(_a0)
+// Shutdown provides a mock function with given fields:
+func (_m *DKGBroker) Shutdown() {
+	_m.Called()
+}
+
+// SubmitResult provides a mock function with given fields: _a0, _a1
+func (_m *DKGBroker) SubmitResult(_a0 crypto.PublicKey, _a1 []crypto.PublicKey) error {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]crypto.PublicKey) error); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(crypto.PublicKey, []crypto.PublicKey) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -15,8 +15,9 @@ type DKGContractClient interface {
 
 	// Broadcast broadcasts a message to all other nodes participating in the
 	// DKG. The message is broadcast by submitting a transaction to the DKG
-	// smart contract. An error is returned if the transaction has failed and
-	// should be re-submitted.
+	// smart contract. An error is returned if the transaction has failed has
+	// failed.
+	// TBD: retry logic
 	Broadcast(msg messages.DKGMessage) error
 
 	// ReadBroadcast reads the broadcast messages from the smart contract.
@@ -33,11 +34,11 @@ type DKGContractClient interface {
 	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.DKGMessage, error)
 
 	// SubmitResult submits the final public result of the DKG protocol. This
-	// represents the node's local computation of the public keys for each
-	// DKG participant and the group public key.
+	// represents the group public key and the node's local computation of the
+	// public keys for each DKG participant.
 	//
 	// SubmitResult must be called strictly after the final phase has ended.
-	SubmitResult([]crypto.PublicKey) error
+	SubmitResult(crypto.PublicKey, []crypto.PublicKey) error
 }
 
 // DKGController controls the execution of a Joint Feldman DKG instance.
@@ -99,7 +100,7 @@ type DKGBroker interface {
 
 	// SubmitResult instructs the broker to publish the results of the DKG run
 	// (ex. publish to DKG smart contract).
-	SubmitResult([]crypto.PublicKey) error
+	SubmitResult(crypto.PublicKey, []crypto.PublicKey) error
 
 	// Shutdown causes the broker to stop listening and forwarding messages.
 	Shutdown()
