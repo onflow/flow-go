@@ -121,18 +121,18 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 			Index:    chunk.Index,
 		}
 
+		// pushes chunk locator to the chunks queue
 		ok, err := e.chunksQueue.StoreChunkLocator(locator)
-
 		if err != nil {
 			log.Debug().Err(err).Msg("could not push chunk to chunks queue")
 			continue
 		}
-
 		if !ok {
 			log.Debug().Msg("could not push duplicate chunk to chunks queue")
 			continue
 		}
 
+		// notifies chunk queue consumer of a new chunk
 		e.newChunkListener.Check()
 		log.Debug().Msg("chunk successfully pushed to chunks queue")
 	}
