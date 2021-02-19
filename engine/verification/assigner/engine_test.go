@@ -117,7 +117,7 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 		s.newChunkListener,
 		s.indexer)
 
-	e.withBlockProcessingNotifier(s.notifier)
+	e.withBlockConsumerNotifier(s.notifier)
 
 	// mocks identity of the verification node
 	s.me.On("NodeID").Return(s.verIdentity.NodeID)

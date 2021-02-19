@@ -23,17 +23,17 @@ import (
 // to me to verify, and then save it to the chunks job queue for the
 // fetcher engine to process.
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	metrics            module.VerificationMetrics
-	tracer             module.Tracer
-	me                 module.Local
-	state              protocol.State
-	assigner           module.ChunkAssigner  // to determine chunks this node should verify.
-	chunksQueue        storage.ChunksQueue   // to store chunks to be verified.
-	newChunkListener   module.NewJobListener // to notify chunk queue consumer about a new chunk.
-	processingNotifier ProcessingNotifier    // to report a block has been processed.
-	indexer            storage.Indexer       // to index receipts of a block based on their executor identifier.
+	unit                  *engine.Unit
+	log                   zerolog.Logger
+	metrics               module.VerificationMetrics
+	tracer                module.Tracer
+	me                    module.Local
+	state                 protocol.State
+	assigner              module.ChunkAssigner  // to determine chunks this node should verify.
+	chunksQueue           storage.ChunksQueue   // to store chunks to be verified.
+	newChunkListener      module.NewJobListener // to notify chunk queue consumer about a new chunk.
+	blockConsumerNotifier ProcessingNotifier    // to report a block has been processed.
+	indexer               storage.Indexer       // to index receipts of a block based on their executor identifier.
 }
 
 func New(
@@ -61,8 +61,8 @@ func New(
 	}
 }
 
-func (e *Engine) withBlockProcessingNotifier(notifier ProcessingNotifier) {
-	e.processingNotifier = notifier
+func (e *Engine) withBlockConsumerNotifier(notifier ProcessingNotifier) {
+	e.blockConsumerNotifier = notifier
 }
 
 func (e *Engine) Ready() <-chan struct{} {
@@ -215,7 +215,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	}
 
 	// tells block consumer that it is done with this block
-	e.processingNotifier.Notify(blockID)
+	e.blockConsumerNotifier.Notify(blockID)
 	log.Debug().Msg("finished processing finalized block")
 }
 

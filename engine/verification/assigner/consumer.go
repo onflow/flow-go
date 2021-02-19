@@ -107,7 +107,7 @@ func NewBlockConsumer(
 	maxFinished int64,
 ) (*BlockConsumer, error) {
 	worker := &Worker{engine: engine}
-	engine.withBlockProcessingNotifier(worker)
+	engine.withBlockConsumerNotifier(worker)
 
 	jobs := &FinalizedBlockReader{state: state}
 
