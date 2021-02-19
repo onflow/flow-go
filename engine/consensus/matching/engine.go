@@ -1182,24 +1182,40 @@ func (e *Engine) requestPendingReceipts() (int, uint64, error) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}
 
-		if len(receipts) > 0 {
-			for _, receipt := range receipts {
-				_, err = e.receipts.AddReceipt(receipt, header)
-				if err != nil {
-					return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
-				}
+		enoughReceipts := false
+		prevResults := make(map[flow.Identifier]int)
 
-				_, err = e.incorporatedResults.Add(
-					flow.NewIncorporatedResult(
-						receipt.ExecutionResult.BlockID,
-						&receipt.ExecutionResult,
-					),
-				)
+		for _, receipt := range receipts {
+			_, err = e.receipts.AddReceipt(receipt, header)
+			if err != nil {
+				return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
+			}
 
-				if err != nil {
-					return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
+			_, err = e.incorporatedResults.Add(
+				flow.NewIncorporatedResult(
+					receipt.ExecutionResult.BlockID,
+					&receipt.ExecutionResult,
+				),
+			)
+
+			if err != nil {
+				return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
+			}
+
+			if !enoughReceipts {
+				resultID := receipt.ExecutionResult.ID()
+				prevResults[resultID]++
+
+				// at least 2 receipts having the same result
+				if prevResults[resultID] >= 2 {
+					enoughReceipts = true
 				}
 			}
+		}
+
+		// we require at least 2 receipts having the same result to seal a block,
+		// if we haven't seen as many receipt, we will keep fetching receipts .
+		if enoughReceipts {
 			continue
 		}
 
