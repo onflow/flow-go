@@ -27,6 +27,12 @@ func TestSafetyCheck(t *testing.T) {
 
 		unittest.RunWithTempDir(t, func(tmpDir string) {
 
+			defer func() {
+				if r := recover(); r == nil {
+					t.Errorf("expected panic but didn't happen")
+				}
+			}()
+
 			extralog.ExtraLogDumpPath = tmpDir
 
 			rt := runtime.NewInterpreterRuntime()
@@ -98,6 +104,12 @@ func TestSafetyCheck(t *testing.T) {
 	})
 
 	t.Run("checking error in imported contract", func(t *testing.T) {
+
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("expected panic but didn't happen")
+			}
+		}()
 
 		rt := runtime.NewInterpreterRuntime()
 
