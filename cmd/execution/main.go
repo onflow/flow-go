@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/extralog"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	wal "github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
@@ -115,6 +117,14 @@ func main() {
 			return err
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
+			extraLogPath := path.Join(triedir, "extralogs")
+			err := os.MkdirAll(extraLogPath, 0777)
+			if err != nil {
+				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
+			}
+
+			extralog.ExtraLogDumpPath = extraLogPath
+
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
