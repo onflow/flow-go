@@ -114,8 +114,8 @@ func (i *TransactionInvocator) Process(
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
-			Int("retries_count", numberOfRetries).
-			Uint64("ledger_interaction_used", st.InteractionUsed()).
+			Int("retriesCount", numberOfRetries).
+			Uint64("ledgerInteractionUsed", st.InteractionUsed()).
 			Msg("retrying transaction execution")
 
 		// reset proc in case
@@ -126,10 +126,21 @@ func (i *TransactionInvocator) Process(
 		proc.Retried++
 	}
 
-	// (for future) panic if we tried several times and still failing
-	// if numberOfTries == maxNumberOfRetries {
-	// 	panic(err)
-	// }
+	// panic if we have tried several times and still failing (
+	// only the ones which requires retries
+	if numberOfRetries == int(ctx.MaxNumOfTxRetries) {
+		var blockHeight uint64
+		if ctx.BlockHeader != nil {
+			blockHeight = ctx.BlockHeader.Height
+		}
+		i.logger.Error().
+			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", blockHeight).
+			Int("retriesCount", numberOfRetries).
+			Uint64("ledgerInteractionUsed", st.InteractionUsed()).
+			Msg("retrying didn't work")
+		panic(err)
+	}
 
 	if err != nil {
 		return err
