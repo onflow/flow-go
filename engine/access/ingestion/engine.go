@@ -35,8 +35,8 @@ const fullBlockUpdateInterval = 1 * time.Minute
 const missingCollsForBlkThreshold = 5 //100
 
 // collection at blk height 12023468 and 12021794 are missing
-// hard coding start height for now
-const fixedStartHeight = 12023469
+// hard coding last full block height
+const fixedLastFullBlkHeight = 12023468
 
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
@@ -391,16 +391,17 @@ func (e *Engine) requestMissingCollectionsAtStartup(ctx context.Context) error {
 		return fmt.Errorf("failed to complete requests for missing collections: %w", err)
 	}
 
-	// start from the next block
-	startHeight = lastFullHeight + 1
-
-	if startHeight < fixedStartHeight {
-		startHeight = fixedStartHeight
-		err := e.blocks.UpdateLastFullBlockHeight(fixedStartHeight)
+	// update last full block height in db to the fixed value if less
+	if lastFullHeight < fixedLastFullBlkHeight {
+		lastFullHeight = fixedLastFullBlkHeight
+		err := e.blocks.UpdateLastFullBlockHeight(lastFullHeight)
 		if err != nil {
-			return fmt.Errorf("failed to set start height to %d:%w", fixedStartHeight, err)
+			return fmt.Errorf("failed to set start height to %d: %w", fixedLastFullBlkHeight, err)
 		}
 	}
+
+	// start from the next block
+	startHeight = lastFullHeight + 1
 
 	// end at the finalized block
 	finalBlk, err := e.state.Final().Head()
