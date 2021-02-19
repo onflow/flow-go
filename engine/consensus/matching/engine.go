@@ -4,6 +4,7 @@ package matching
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -447,6 +448,13 @@ func (e *Engine) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header)
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 		return false, fmt.Errorf("could not persist receipt: %w", err)
 	}
+
+	// index receipt by executor
+	err = e.indexReceipt(receipt)
+	if err != nil {
+		return false, fmt.Errorf("could not add receipt to index: %w", err)
+	}
+
 	return true, nil
 }
 
@@ -812,14 +820,47 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 					Msg("could not get receipts by block ID")
 				continue
 			}
-			block2ResultsCounter := make(map[flow.Identifier]uint)
+			receiptForResult := make(map[flow.Identifier]*flow.ExecutionReceipt)
 			for _, rcpt := range receipts {
 				resultID := rcpt.ExecutionResult.ID()
-				block2ResultsCounter[resultID] += 1
-				if block2ResultsCounter[resultID] >= 2 {
-					results = append(results, incorporatedResult)
-					break
+				r1, found := receiptForResult[resultID]
+				if !found {
+					receiptForResult[resultID] = rcpt
+					continue
 				}
+				if r1.ID() == rcpt.ID() {
+					log.Error().
+						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+						Hex("receipt_id", logging.ID(rcpt.ID())).
+						Msg("duplicated receipts in blockID -> executor -> receipt ID storage")
+					continue
+				}
+				if r1.ExecutorID == rcpt.ExecutorID {
+					log.Error().
+						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+						Hex("receipt_id", logging.ID(rcpt.ID())).
+						Msg("duplicated receipts from SAME EXECUTOR in blockID -> executor -> receipt ID storage")
+					continue
+				}
+
+				// we only reach the code below, if we already had a receipt in the map receiptForResult
+				// that is from DIFFERENT executor
+				marshalledR1, err := json.Marshal(r1)
+				if err != nil {
+					marshalledR1 = []byte("json_marshalling_failed")
+				}
+				marshalledR2, err := json.Marshal(rcpt)
+				if err != nil {
+					marshalledR2 = []byte("json_marshalling_failed")
+				}
+
+				log.Info().
+					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
+					Str("receipt_1", string(marshalledR1)).
+					Str("receipt_2", string(marshalledR2)).
+					Msg("producing candidate seal")
+				results = append(results, incorporatedResult)
+				break
 			}
 		}
 
@@ -883,7 +924,8 @@ func (e *Engine) matchChunk(incorporatedResult *flow.IncorporatedResult, block *
 		validApprovals++
 	}
 
-	return validApprovals >= e.requiredApprovalsForSealConstruction, nil
+	matched := validApprovals >= e.requiredApprovalsForSealConstruction
+	return matched, nil
 }
 
 // TODO: to be extracted as a common function in state/protocol/state.go
@@ -1337,34 +1379,56 @@ func (e *Engine) requestPendingApprovals() (int, error) {
 	return requestCount, nil
 }
 
-// OnFinalizedBlock implements the callback from the protocol state to notify a block
-// is finalized, it guarantees every finalized block will be called at least once.
-func (e *Engine) OnFinalizedBlock(block *model.Block) {
-	// we index the execution receipts by the executed block ID only for all finalized blocks
-	// that guarantees if we could retrieve the receipt by the index, then the receipts
-	// must be for a finalized blocks.
-	err := e.indexReceipts(block.BlockID)
+// OnBlockIncorporated implements the callback, which HotStuff executes when a block is incorporated
+func (e *Engine) OnBlockIncorporated(block *model.Block) {
+	payload, err := e.payloadsDB.ByBlockID(block.BlockID)
 	if err != nil {
-		// the receipt index is only being used by pending receipts component,
-		// which is not critical, no need to crash.
-		e.log.Error().Err(err).Hex("block_id", block.BlockID[:]).
-			Msg("could not index receipts for block")
-	}
-}
-
-func (e *Engine) indexReceipts(blockID flow.Identifier) error {
-	payload, err := e.payloadsDB.ByBlockID(blockID)
-
-	if err != nil {
-		return fmt.Errorf("could not get block payload: %w", err)
+		e.log.Fatal().Err(err).
+			Hex("block_id", logging.ID(block.BlockID)).
+			Msg("could not get payload for block")
 	}
 
 	for _, receipt := range payload.Receipts {
-		err := e.receiptsDB.IndexByExecutor(receipt)
+		err := e.indexReceipt(receipt)
 		if err != nil {
-			return fmt.Errorf("could not index receipt by executor, receipt id: %v: %w", receipt.ID(), err)
+			e.log.Fatal().Err(err).
+				Hex("receipt_id", logging.Entity(receipt)).
+				Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+				Msg("internal error indexing receipts in incorporated block")
 		}
 	}
+}
 
+// indexReceipts populates the index:
+//     executed blockID -> ExecutorID -> ReceiptID
+// CAUTION TEMPORARY FIX:
+// * We currently rely on this index to determine whether we have seen
+//   consistent receipts from _at least two_ Execution Nodes.
+//   Hence, this logic is critical for sealing liveness.
+// * Therefore, we must guarantee that receipts from honest executors
+//   _eventually_ end up in the index. We consider executors as honest,
+//   if and only if they produce a single receipt for each block
+//   (Caution: this is disregarding some protocol edge cases of the
+//   mature protocol; but we don't have these edge cases supported
+//   anyway at the moment, so there is no problem)
+// Error return:
+// * we do _not_ error when receiving multiple receipts from the
+//   same executor for the same block
+// * all returned errors are unexpected internal errors, which probably should be fatal
+func (e *Engine) indexReceipt(receipt *flow.ExecutionReceipt) error {
+	err := e.receiptsDB.IndexByExecutor(receipt)
+	if err != nil {
+		if errors.Is(err, storage.ErrDataMismatch) {
+			// This happens if the EN produces different receipts.
+			// In this case, we consider the EN as dishonest. We only index the first
+			// receipt and do _not_ add subsequent receipts from the same EN to the index.
+			// This should not be a liveness problem, as we TEMPORARELTY assume
+			// that there are at least two honest ENs.
+			e.log.Warn().Err(err).
+				Hex("executor", logging.ID(receipt.ExecutorID)).
+				Msg("execution node produced different receipts for the same block")
+		}
+		return fmt.Errorf("internal error indexing receipt by executor: %w", err)
+	}
 	return nil
 }

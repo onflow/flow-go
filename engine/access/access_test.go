@@ -492,7 +492,7 @@ func (suite *Suite) TestExecuteScript() {
 		results := storage.NewExecutionResults(suite.metrics, db)
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
 
-		identities := unittest.IdentityListFixture(1)
+		identities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
 		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
 		executionNodeIdentity := identities[0]
 
@@ -502,7 +502,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.backend = backend.New(
 			suite.state,
-			nil,
+			suite.execClient,
 			suite.collClient,
 			nil,
 			blocks,
