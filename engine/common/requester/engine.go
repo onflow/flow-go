@@ -336,6 +336,11 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		return true, fmt.Errorf("could not send request: %w", err)
 	}
 	e.requests[req.Nonce] = req
+	e.log.Info().
+		Uint64("req_nonce", req.Nonce).
+		Str("provider", providerID.String()).
+		Str("entity_ids", fmt.Sprintf("%v", req.EntityIDs)).
+		Msg("submitted entity request")
 
 	// NOTE: we forget about requests after the expiry of the shortest retry time
 	// from the entities in the list; this means that we purge requests aggressively.
@@ -385,6 +390,12 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 	if len(providers) == 0 {
 		return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
 	}
+
+	e.log.Debug().
+		Str("origin_id", originID.String()).
+		Uint64("res_nonce", res.Nonce).
+		Str("entity_ids", fmt.Sprintf("%v", res.EntityIDs)).
+		Msg("received entity response")
 
 	// build a list of needed entities; if not available, process anyway,
 	// but in that case we can't re-queue missing items

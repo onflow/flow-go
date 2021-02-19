@@ -29,10 +29,10 @@ const collectionCatchupTimeout = 30 * time.Second
 const collectionCatchupDBPollInterval = 10 * time.Millisecond
 
 // time to update the FullBlockHeight index
-const fullBlockUpdateInterval = 1 * time.Minute
+const fullBlockUpdateInterval = 30 * time.Second // 1 * time.Minute
 
 // a threshold of number of blocks with missing collections beyond which collections should be re-requested
-const missingCollsForBlkThreshold = 100
+const missingCollsForBlkThreshold = 5 // 100
 
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
@@ -557,15 +557,16 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 	}
 
 	// additionally, if more than threshold blocks have missing collection, re-request those collections
-	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold {
-		// warn log since this should generally not happen
-		e.log.Warn().
-			Int("missing_collection_blk_count", incompleteBlksCnt).
-			Int("threshold", defaultMissingCollsForBlkThreshold).
-			Uint64("last_full_blk_height", latestFullHeight).
-			Msg("re-requesting missing collections")
-		e.requestCollections(allMissingColls)
-	}
+	//if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold {
+	// warn log since this should generally not happen
+	e.log.Warn().
+		Int("missing_collection_blk_count", incompleteBlksCnt).
+		Str("missing_collection_ids", fmt.Sprintf("%v", flow.GetIDs(allMissingColls))).
+		Int("threshold", defaultMissingCollsForBlkThreshold).
+		Uint64("last_full_blk_height", latestFullHeight).
+		Msg("re-requesting missing collections")
+	e.requestCollections(allMissingColls)
+	//}
 
 	e.log.Debug().Uint64("last_full_blk_height", latestFullHeight).Msg("updated LastFullBlockReceived index")
 }
