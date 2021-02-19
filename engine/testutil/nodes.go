@@ -234,6 +234,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
+	pendingReceipts := stdmap.NewPendingReceipts(1000)
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
@@ -247,10 +248,10 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	signatureVerifier := signature.NewAggregationVerifier(encoding.ExecutionReceiptTag)
-	validator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signatureVerifier)
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
-	matchingEngine, err := matching.New(
+	matchingEngine, err := matching.NewEngine(
 		node.Log,
 		node.Metrics,
 		node.Tracer,
@@ -267,8 +268,10 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		receipts,
 		approvals,
 		seals,
+		pendingReceipts,
 		assigner,
-		validator,
+		receiptValidator,
+		approvalValidator,
 		validation.DefaultRequiredApprovalsForSealValidation,
 		matching.DefaultEmergencySealingActive)
 	require.Nil(t, err)
