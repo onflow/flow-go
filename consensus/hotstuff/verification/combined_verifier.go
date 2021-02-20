@@ -15,10 +15,11 @@ import (
 // a signature from a threshold signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifier struct {
-	committee hotstuff.Committee
-	staking   module.AggregatingVerifier
-	beacon    module.ThresholdVerifier
-	merger    module.Merger
+	committee      hotstuff.Committee
+	staking        module.AggregatingVerifier
+	keysAggregator *stakingKeysAggregator
+	beacon         module.ThresholdVerifier
+	merger         module.Merger
 }
 
 // NewCombinedVerifier creates a new combined verifier with the given dependencies.
@@ -29,10 +30,11 @@ type CombinedVerifier struct {
 // - the merger is used to combined & split staking & random beacon signatures; and
 func NewCombinedVerifier(committee hotstuff.Committee, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifier {
 	c := &CombinedVerifier{
-		committee: committee,
-		staking:   staking,
-		beacon:    beacon,
-		merger:    merger,
+		committee:      committee,
+		staking:        staking,
+		keysAggregator: newStakingKeysAggregator(),
+		beacon:         beacon,
+		merger:         merger,
 	}
 	return c
 }
@@ -105,9 +107,17 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 		return false, nil
 	}
 	// verify the aggregated staking signature next (more costly)
-	// TODO: eventually VerifyMany will be repalced by Verify from Verifier
-	// TODO: the agg public key would be computed outside verify() based on the delta
-	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
+	// TODO: eventually VerifyMany will be a method of a stateful struct. The struct would
+	// hold the message, all the participants keys, the latest verification aggregated public key,
+	// as well as the latest list of signers (preferably a bit vector, using indices).
+	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
+	// as inputs. A new struct needs to be used for each epoch since the list of participants is upadted.
+
+	aggrgetaedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
+	if err != nil {
+		return false, fmt.Errorf("could not compute aggregated key: %w", err)
+	}
+	stakingValid, err := c.staking.Verify(msg, stakingAggSig, aggrgetaedKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify staking signature: %w", err)
 	}

@@ -12,8 +12,9 @@ import (
 // SingleVerifier is a verifier capable of verifying a single signature in the
 // signature data for its validity. It is used with an aggregating signature scheme.
 type SingleVerifier struct {
-	committee hotstuff.Committee
-	verifier  module.AggregatingVerifier
+	committee      hotstuff.Committee
+	verifier       module.AggregatingVerifier
+	keysAggregator *stakingKeysAggregator
 }
 
 // NewSingleVerifier creates a new single verifier with the given dependencies:
@@ -21,8 +22,9 @@ type SingleVerifier struct {
 // - the verifier is used to verify the signatures against the message;
 func NewSingleVerifier(committee hotstuff.Committee, verifier module.AggregatingVerifier) *SingleVerifier {
 	s := &SingleVerifier{
-		committee: committee,
-		verifier:  verifier,
+		committee:      committee,
+		verifier:       verifier,
+		keysAggregator: newStakingKeysAggregator(),
 	}
 	return s
 }
@@ -45,7 +47,14 @@ func (s *SingleVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, blo
 
 	// create the message we verify against and check signature
 	msg := makeVoteMessage(block.View, block.BlockID)
-	valid, err := s.verifier.VerifyMany(msg, sigData, signers.StakingKeys())
+
+	// compute the aggregated key of signers
+	aggrgetaedKey, err := s.keysAggregator.aggregatedStakingKey(signers)
+	if err != nil {
+		return false, fmt.Errorf("could not compute aggregated key: %w", err)
+	}
+
+	valid, err := s.verifier.Verify(msg, sigData, aggrgetaedKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
 	}

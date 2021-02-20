@@ -92,7 +92,7 @@ func TestSingleQC(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	// should be able to create QC from 4 votes and verify
+	// should be able to create QC from votes and verify
 	qc, err := signers[0].CreateQC(votes[:minShares])
 	require.NoError(t, err, "should be able to create QC from valid votes")
 
@@ -112,6 +112,22 @@ func TestSingleQC(t *testing.T) {
 	valid, err := signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.True(t, valid, "original QC should be valid")
+
+	// Verify QC with a totally different set of signers (to test the staking key aggregation)
+	qc_bis, err := signers[0].CreateQC(votes[len(votes)-minShares:])
+	require.NoError(t, err, "should be able to create QC from valid votes")
+	valid, err = signers[0].VerifyQC(identities[len(identities)-minShares:], qc_bis.SigData, block)
+	require.NoError(t, err)
+	assert.True(t, valid, "QC should be valid")
+
+	// Verify QC with a slightly different set of signers (to test the staking key aggregation)
+	for i := 0; i <= len(votes)-minShares; i++ {
+		qc_bis, err = signers[0].CreateQC(votes[i : i+minShares])
+		require.NoError(t, err, "should be able to create QC from valid votes")
+		valid, err = signers[0].VerifyQC(identities[i:i+minShares], qc_bis.SigData, block)
+		require.NoError(t, err)
+		assert.True(t, valid, "QC should be valid")
+	}
 
 	// verification with missing identity should be invalid
 	valid, err = signers[0].VerifyQC(identities[:minShares-1], qc.SigData, block)

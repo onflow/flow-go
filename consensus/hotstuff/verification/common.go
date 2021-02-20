@@ -2,8 +2,10 @@ package verification
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -65,4 +67,78 @@ func checkVotesValidity(votes []*model.Vote) error {
 	}
 
 	return nil
+}
+
+// stakingKeysAggregator is a structure that aggregates the staking
+// public keys for QC verifications.
+type stakingKeysAggregator struct {
+	lastStakingSigners map[*flow.Identity]struct{}
+	lastStakingKey     crypto.PublicKey
+	lock               sync.Mutex
+}
+
+// creates a new staking keys aggregator
+func newStakingKeysAggregator() *stakingKeysAggregator {
+	aggregator := &stakingKeysAggregator{
+		lastStakingSigners: map[*flow.Identity]struct{}{},
+		lastStakingKey:     crypto.NeutralBLSPublicKey(),
+		lock:               sync.Mutex{},
+	}
+	return aggregator
+}
+
+// aggregatedStakingKey returns the aggregated public of the input signers.
+func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) (crypto.PublicKey, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// this greedy algorithm assumes the signers set does not vary much from one call
+	// to aggregatedStakingKey to another. It computes the delta of signers compared to the
+	// latest list of signers and adjust the latest aggregated public key. This is faster
+	// than aggregating the public keys from scratch at each call.
+	//
+
+	// get the signers delta and update the last list for the next comparison
+	newSigners, missingSigners := s.identitiesDelta(signers)
+	// add the new keys
+	var err error
+	s.lastStakingKey, err = crypto.AggregateBLSPublicKeys(
+		append(newSigners.StakingKeys(), s.lastStakingKey))
+	if err != nil {
+		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
+	}
+	// remove the missing keys
+	s.lastStakingKey, err = crypto.RemoveBLSPublicKeys(s.lastStakingKey, missingSigners.StakingKeys())
+	if err != nil {
+		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
+	}
+	return s.lastStakingKey, nil
+}
+
+// identitiesDelta computes the delta between the reference s.lastStakingKey
+// and the input identity list
+func (s *stakingKeysAggregator) identitiesDelta(signers flow.IdentityList) (flow.IdentityList, flow.IdentityList) {
+	var newSigners, missingSigners flow.IdentityList
+
+	// create a map of the input list,
+	// and check the new signers
+	signersMap := map[*flow.Identity]struct{}{}
+	for _, signer := range signers {
+		signersMap[signer] = struct{}{}
+		_, ok := s.lastStakingSigners[signer]
+		if !ok {
+			newSigners = append(newSigners, signer)
+		}
+	}
+
+	// look for missing signers
+	for signer := range s.lastStakingSigners {
+		_, ok := signersMap[signer]
+		if !ok {
+			missingSigners = append(missingSigners, signer)
+		}
+	}
+	// update the last signers for the next delta check
+	s.lastStakingSigners = signersMap
+	return newSigners, missingSigners
 }
