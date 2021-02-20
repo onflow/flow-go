@@ -17,6 +17,4 @@ type PendingReceipts interface {
 	// ByPreviousResultID returns all the pending receipts whose previous result id
 	// matches the given result id
 	ByPreviousResultID(previousReusltID flow.Identifier) []*flow.ExecutionReceipt
-
-	Size() uint
 }

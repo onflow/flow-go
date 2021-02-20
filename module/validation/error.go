@@ -7,26 +7,26 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type MissingPreviousResultError struct {
+type UnverifiableError struct {
 	err error
 }
 
-func NewMissingPreviousResultError(previousResultID flow.Identifier) error {
-	return MissingPreviousResultError{
+func NewUnverifiableError(previousResultID flow.Identifier) error {
+	return UnverifiableError{
 		err: fmt.Errorf("receipt's previous result is missing: %v", previousResultID),
 	}
 }
 
-func (e MissingPreviousResultError) Unwrap() error {
+func (e UnverifiableError) Unwrap() error {
 	return e.err
 }
 
-func (e MissingPreviousResultError) Error() string {
+func (e UnverifiableError) Error() string {
 	return e.err.Error()
 }
 
-// IsMissingPreviousResultError returns whether the given error is an MissingPreviousResultError error
-func IsMissingPreviousResultError(err error) bool {
-	var errMissingPreviousResultError MissingPreviousResultError
-	return errors.As(err, &errMissingPreviousResultError)
+// IsUnverifiableError returns whether the given error is an UnverifiableError error
+func IsUnverifiableError(err error) bool {
+	var errUnverifiableError UnverifiableError
+	return errors.As(err, &errUnverifiableError)
 }

@@ -103,7 +103,7 @@ func (i *TransactionInvocator) Process(
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
 		Str("traceID", traceID).
-		Uint64("ledger_interactions", st.InteractionUsed()).
+		Uint64("ledgerInteractions", st.InteractionUsed()).
 		Msg("transaction executed")
 
 	proc.Events = env.getEvents()

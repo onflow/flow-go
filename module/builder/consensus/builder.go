@@ -332,9 +332,9 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// block
 	nextSealHeight := sealed.Height + 1
 	nextSeal, ok := filteredSeals[nextSealHeight]
+
 	var count uint = 0
 	for ok {
-
 		// don't include more than maxSealCount seals
 		if count >= b.cfg.maxSealCount {
 			break

@@ -35,29 +35,6 @@ func NewReceiptValidator(state protocol.State, index storage.Index, results stor
 	return rv
 }
 
-// checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
-//   * has _positive_ weight
-//   * and has the expected role
-// Returns the following errors:
-//   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
-// Note: the method receives the identity as proof of its existence.
-// Therefore, we consider the case where the respective identity is unknown to the
-// protocol state as a symptom of a fatal implementation bug.
-func (v *receiptValidator) ensureStakedNodeWithRole(identity *flow.Identity, expectedRole flow.Role) error {
-	// check that the origin is an expected node
-	if identity.Role != expectedRole {
-		return engine.NewInvalidInputErrorf("expected node %x to have identity %v but got %v", identity.NodeID, expectedRole, identity.Role)
-	}
-
-	// check if the identity has a stake
-	if identity.Stake == 0 {
-		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
-	}
-
-	// TODO: check if node was ejected
-	return nil
-}
-
 func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceipt, nodeIdentity *flow.Identity) error {
 	id := receipt.ID()
 	valid, err := v.verifier.Verify(id[:], receipt.ExecutorSignature, nodeIdentity.StakingPubKey)
@@ -66,7 +43,7 @@ func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceipt, nodeI
 	}
 
 	if !valid {
-		return engine.NewInvalidInputErrorf("Invalid signature for (%x)", nodeIdentity.NodeID)
+		return engine.NewInvalidInputErrorf("invalid signature for (%x)", nodeIdentity.NodeID)
 	}
 
 	return nil
@@ -110,7 +87,7 @@ func (v *receiptValidator) previousResult(result *flow.ExecutionResult) (*flow.E
 	prevResult, err := v.results.ByID(result.PreviousResultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, NewMissingPreviousResultError(result.PreviousResultID)
+			return nil, NewUnverifiableError(result.PreviousResultID)
 		}
 		return nil, err
 	}
@@ -161,13 +138,16 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 	return nil
 }
 
-// Validate performs checks for ExecutionReceipt being valid or no.
-// Checks performed:
-// 	* can find stake and stake is positive
-//	* signature is correct
+// Validate performs verifies that the ExecutionReceipt satisfies
+// the following conditions:
+// 	* is from Execution node with positive weight
+//	* has valid signature
 //	* chunks are in correct format
-// 	* execution result has a valid parent
-// Returns nil if all checks passed successfully
+// 	* execution result has a valid parent and satisfies the subgraph check
+// Returns nil if all checks passed successfully.
+// Expected errors during normal operations:
+// * engine.InvalidInputError
+// * validation.UnverifiableError
 func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 	// lookup cache to avoid linear search when checking for previous result that is
 	// part of payload
@@ -210,7 +190,7 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 			err)
 	}
 
-	err = v.ensureStakedNodeWithRole(identity, flow.RoleExecution)
+	err = ensureStakedNodeWithRole(identity, flow.RoleExecution)
 	if err != nil {
 		return fmt.Errorf("staked node invalid: %w", err)
 	}

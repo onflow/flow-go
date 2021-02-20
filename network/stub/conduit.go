@@ -13,18 +13,10 @@ type Conduit struct {
 	channel   network.Channel
 	ctx       context.Context
 	cancel    context.CancelFunc
-	submit    p2p.SubmitFunc
 	publish   p2p.PublishFunc
 	unicast   p2p.UnicastFunc
 	multicast p2p.MulticastFunc
 	close     p2p.CloseFunc
-}
-
-func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
-	if c.ctx.Err() != nil {
-		return fmt.Errorf("conduit for channel %s closed", c.channel)
-	}
-	return c.submit(c.channel, event, targetIDs...)
 }
 
 func (c *Conduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
