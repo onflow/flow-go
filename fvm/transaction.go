@@ -79,6 +79,10 @@ func (i *TransactionInvocator) Process(
 
 	var err error
 	var env *hostEnv
+	var blockHeight uint64
+	if ctx.BlockHeader != nil {
+		blockHeight = ctx.BlockHeader.Height
+	}
 
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
@@ -107,11 +111,6 @@ func (i *TransactionInvocator) Process(
 			break
 		}
 
-		var blockHeight uint64
-		if ctx.BlockHeader != nil {
-			blockHeight = ctx.BlockHeader.Height
-		}
-
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
@@ -136,11 +135,6 @@ func (i *TransactionInvocator) Process(
 	// }
 
 	if err != nil {
-		var blockHeight uint64
-		if ctx.BlockHeader != nil {
-			blockHeight = ctx.BlockHeader.Height
-		}
-
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
@@ -152,11 +146,6 @@ func (i *TransactionInvocator) Process(
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
-
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
-	}
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
