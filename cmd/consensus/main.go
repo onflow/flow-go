@@ -249,7 +249,6 @@ func main() {
 				node.Storage.Receipts,
 				node.Storage.Headers,
 				node.Storage.Index,
-				node.Storage.Payloads,
 				results,
 				receipts,
 				approvals,

@@ -18,7 +18,7 @@ import (
 // DefaultChunkAssignmentAlpha is the default number of verifiers that should be
 // assigned to each chunk.
 // DISCLAIMER: the current value is not necessarily suitable for production
-const DefaultChunkAssignmentAlpha = 1
+const DefaultChunkAssignmentAlpha = 20
 
 // ChunkAssigner implements an instance of the Public Chunk Assignment
 // algorithm for assigning chunks to verifier nodes in a deterministic but
