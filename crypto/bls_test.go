@@ -294,7 +294,7 @@ func TestAggregatePubKeys(t *testing.T) {
 				aggPk, expectedPk, pks))
 	})
 
-	// aggregate an empty list
+	// aggregate with the neutral key
 	t.Run("empty list", func(t *testing.T) {
 		// private keys
 		_, err := AggregateBLSPrivateKeys(sks[:0])
@@ -302,6 +302,17 @@ func TestAggregatePubKeys(t *testing.T) {
 		// public keys
 		_, err = AggregateBLSPublicKeys(pks[:0])
 		assert.Error(t, err)
+	})
+
+	// aggregate an empty list
+	t.Run("neutral list", func(t *testing.T) {
+		// aggregate the neutral key with a non neutral key
+		keys := []PublicKey{pks[0], NeutralBLSPublicKey()}
+		aggPkWithNeutral, err := AggregateBLSPublicKeys(keys)
+		assert.NoError(t, err)
+		assert.True(t, aggPkWithNeutral.Equals(pks[0]),
+			fmt.Sprintf("incorrect public key %s, should be %s",
+				aggPkWithNeutral, pks[0]))
 	})
 }
 

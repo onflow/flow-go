@@ -169,11 +169,11 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 func NeutralBLSPublicKey() PublicKey {
 	// set BLS context
 	blsInstance.reInit()
-	// TODO: to update and add tests
-	seed := make([]byte, 48)
-	sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
-	neutralPk, _ := RemoveBLSPublicKeys(sk.PublicKey(), []PublicKey{sk.PublicKey()})
-	return neutralPk
+
+	var neutralPk PubKeyBLSBLS12381
+	// set the point to infinity
+	C.ep2_set_infty((*C.ep2_st)(&neutralPk.point))
+	return &neutralPk
 }
 
 // RemoveBLSPublicKeys removes multiple BLS public keys from a given (aggregated) public key.
