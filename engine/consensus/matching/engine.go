@@ -1163,15 +1163,6 @@ func (e *Engine) requestPendingReceipts() (int, uint64, error) {
 	// heights would stop the sealing.
 	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxResultsToRequest)
 
-	// turn mempool into Lookup table: BlockID -> Result
-	knownResultForBlock := make(map[flow.Identifier]struct{})
-	for _, r := range e.incorporatedResults.All() {
-		knownResultForBlock[r.Result.BlockID] = struct{}{}
-	}
-	for _, s := range e.seals.All() {
-		knownResultForBlock[s.Seal.BlockID] = struct{}{}
-	}
-
 	var firstMissingHeight uint64 = math.MaxUint64
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
