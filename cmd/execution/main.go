@@ -237,6 +237,7 @@ func main() {
 				node.Logger,
 				node.State,
 				executionState,
+				node.Storage.Seals,
 			)
 			return checkerEng, nil
 		}).
