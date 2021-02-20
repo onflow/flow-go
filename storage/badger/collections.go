@@ -131,7 +131,11 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 		for _, txID := range collection.Transactions {
 			err = operation.IndexCollectionByTransaction(txID, collection.ID())(btx)
 			if err != nil {
-				return fmt.Errorf("could not index collection (id=%x) by transaction (id=%x): %w", collectionID, txID, err)
+				var existingCollectionID flow.Identifier
+				_ = operation.RetrieveCollectionID(txID, &existingCollectionID)(btx)
+				return fmt.Errorf(
+					"could not index collection (id=%x) by transaction (id=%x) [already indexed collection: %x]: %w",
+					collectionID, txID, existingCollectionID, err)
 			}
 		}
 
