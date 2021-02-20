@@ -35,19 +35,28 @@ type metricsCollector struct {
 
 func (m metricsCollector) ProgramParsed(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
-		m.parsed += duration
+		// only capture tx parsing time
+		if _, ok := location.(common.TransactionLocation); ok {
+			m.parsed = duration
+		}
 	}
 }
 
 func (m metricsCollector) ProgramChecked(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
-		m.checked += duration
+		// only capture tx checking time
+		if _, ok := location.(common.TransactionLocation); ok {
+			m.checked = duration
+		}
 	}
 }
 
 func (m metricsCollector) ProgramInterpreted(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
-		m.interpreted += duration
+		// only capture tx interpreting time
+		if _, ok := location.(common.TransactionLocation); ok {
+			m.interpreted = duration
+		}
 	}
 }
 
