@@ -172,7 +172,7 @@ func New(
 	// of conditions, which only change with new blocks or new receipts.
 	// TEMPORARY FIX: to avoid sealing checks to monopolize the engine and delay processing
 	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
-	e.unit.LaunchPeriodically(e.checkSealing, 2*time.Second, 120*time.Second)
+	e.unit.LaunchPeriodically(e.checkSealing, 2*time.Second, 10*time.Second)
 
 	return e, nil
 }
