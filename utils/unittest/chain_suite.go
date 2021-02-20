@@ -423,6 +423,15 @@ func (bc *BaseChainSuite) SetupChain() {
 			return found
 		},
 	).Maybe()
+	bc.SealsPL.On("All").Return(
+		func() []*flow.IncorporatedResultSeal {
+			seals := make([]*flow.IncorporatedResultSeal, 0, len(bc.PendingSeals))
+			for _, seal := range bc.PendingSeals {
+				seals = append(seals, seal)
+			}
+			return seals
+		},
+	).Maybe()
 
 	bc.Assigner = &module.ChunkAssigner{}
 	bc.Assignments = make(map[flow.Identifier]*chunks.Assignment)
