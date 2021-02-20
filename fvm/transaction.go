@@ -102,6 +102,7 @@ func (i *TransactionInvocator) Process(
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
+		Str("traceID", traceID).
 		Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
 	proc.Events = env.getEvents()
