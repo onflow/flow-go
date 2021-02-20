@@ -19,6 +19,7 @@ import (
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -122,13 +123,18 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
+func (e *hostEnv) isTraceable() bool {
+	return e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil
+}
+
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.getValue")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetValue)
 		defer func() {
 			sp.Finish()
 		}()
 	}
+
 	v, _ := e.accounts.GetValue(
 		flow.BytesToAddress(owner),
 		string(key),
@@ -137,8 +143,8 @@ func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 }
 
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.setValue")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvSetValue)
 		defer func() {
 			sp.Finish()
 		}()
@@ -152,8 +158,8 @@ func (e *hostEnv) SetValue(owner, key, value []byte) error {
 }
 
 func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.valueExists")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvValueExists)
 		defer func() {
 			sp.Finish()
 		}()
@@ -168,10 +174,24 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 }
 
 func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetStorageUsed)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
 }
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetStorageCapacity)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
 
 	err = e.vm.Run(
@@ -199,8 +219,8 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 }
 
 func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.getAccountBalance")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetAccountBalance)
 		defer func() {
 			sp.Finish()
 		}()
@@ -232,8 +252,8 @@ func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.resolveLocation")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvResolveLocation)
 		defer func() {
 			sp.Finish()
 		}()
@@ -298,8 +318,8 @@ func (e *hostEnv) ResolveLocation(
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.getCode")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCode)
 		defer func() {
 			sp.Finish()
 		}()
@@ -321,6 +341,13 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 }
 
 func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCachedProgram)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.ctx.ASTCache == nil {
 		return nil, nil
 	}
@@ -339,6 +366,13 @@ func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, erro
 }
 
 func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvCacheProgram)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.ctx.ASTCache == nil {
 		return nil
 	}
@@ -348,6 +382,13 @@ func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) e
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvProgramLog)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.ctx.CadenceLoggingEnabled {
 		e.logs = append(e.logs, message)
 	}
@@ -355,8 +396,8 @@ func (e *hostEnv) ProgramLog(message string) error {
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.emitEvent")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvEmitEvent)
 		defer func() {
 			sp.Finish()
 		}()
@@ -400,12 +441,13 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 }
 
 func (e *hostEnv) GenerateUUID() (uint64, error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.generateUUID")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGenerateUUID)
 		defer func() {
 			sp.Finish()
 		}()
 	}
+
 	// TODO add not supported
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	return uuid, err
@@ -425,6 +467,13 @@ func (e *hostEnv) SetComputationUsed(used uint64) error {
 }
 
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvDecodeArgument)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	return jsoncdc.Decode(b)
 }
 
@@ -444,8 +493,8 @@ func (e *hostEnv) VerifySignature(
 	rawSigAlgo string,
 	rawHashAlgo string,
 ) (bool, error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.verifySignature")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvVerifySignature)
 		defer func() {
 			sp.Finish()
 		}()
@@ -480,6 +529,13 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 
 // GetCurrentBlockHeight returns the current block height.
 func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.ctx.BlockHeader == nil {
 		return 0, errors.New("getting the current block height is not supported")
 	}
@@ -489,6 +545,13 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
 func (e *hostEnv) UnsafeRandom() (uint64, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvUnsafeRandom)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.rng == nil {
 		return 0, errors.New("unsafe random is not supported")
 	}
@@ -508,6 +571,13 @@ func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetBlockAtHeight)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.ctx.Blocks == nil {
 		return runtime.Block{}, false, errors.New("getting block information is not supported")
 	}
@@ -532,8 +602,8 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 // Transaction Environment Functions
 
 func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.createAccount")
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvCreateAccount)
 		defer func() {
 			sp.Finish()
 		}()
@@ -548,6 +618,13 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 }
 
 func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvAddAccountKey)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.transactionEnv == nil {
 		return errors.New("adding account keys is not supported")
 	}
@@ -557,6 +634,13 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 }
 
 func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvRemoveAccountKey)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.transactionEnv == nil {
 		return nil, errors.New("removing account keys is not supported")
 	}
@@ -566,6 +650,13 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 }
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvUpdateAccountContractCode)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.transactionEnv == nil {
 		return errors.New("updating account contract code is not supported")
 	}
@@ -575,6 +666,13 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetAccountContractCode)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	return e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
@@ -582,6 +680,13 @@ func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (
 }
 
 func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvRemoveAccountContractCode)
+		defer func() {
+			sp.Finish()
+		}()
+	}
+
 	if e.transactionEnv == nil {
 		return errors.New("removing account contracts is not supported")
 	}
@@ -615,6 +720,12 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 }
 
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetSigningAccounts)
+		defer func() {
+			sp.Finish()
+		}()
+	}
 	if e.transactionEnv == nil {
 		return nil, errors.New("getting signer accounts is not supported")
 	}
@@ -667,7 +778,7 @@ func (e *transactionEnv) StartTracing() string {
 	var span opentracing.Span
 	var traceID string
 	if e.ctx.Tracer != nil {
-		span, _ = e.ctx.Tracer.StartSpanFromContext(context.Background(), "exe.fvm.executeTransaction")
+		span, _ = e.ctx.Tracer.StartSpanFromContext(context.Background(), trace.FVMEnvExecuteTransaction)
 		span.LogFields(
 			log.String("transaction.hash", e.txID.String()),
 		)
