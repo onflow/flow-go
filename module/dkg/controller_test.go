@@ -158,15 +158,14 @@ type testCase struct {
 func TestDKGHappyPath(t *testing.T) {
 	// Define different test cases with varying number of nodes, and phase
 	// durations. Since these are all happy path cases, there are no messages
-	// sent during phase 2 and 3; all messaging is done in phase 1. So we can
+	// sent during phases 2 and 3; all messaging is done in phase 1. So we can
 	// can set shorter durations for phases 2 and 3.
 	testCases := []testCase{
-		{totalNodes: 5, phase1Duration: 100 * time.Millisecond, phase2Duration: 10 * time.Millisecond, phase3Duration: 10 * time.Millisecond},
-		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: 10 * time.Millisecond, phase3Duration: 10 * time.Millisecond},
-		{totalNodes: 15, phase1Duration: 3 * time.Second, phase2Duration: 10 * time.Millisecond, phase3Duration: 10 * time.Millisecond},
+		{totalNodes: 5, phase1Duration: 1 * time.Second, phase2Duration: 10 * time.Millisecond, phase3Duration: 10 * time.Millisecond},
+		{totalNodes: 10, phase1Duration: 2 * time.Second, phase2Duration: 50 * time.Millisecond, phase3Duration: 50 * time.Millisecond},
+		{totalNodes: 15, phase1Duration: 5 * time.Second, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
 	}
 
-	// run each test case
 	for _, tc := range testCases {
 		t.Run(fmt.Sprintf("%d nodes", tc.totalNodes), func(t *testing.T) {
 			testDKG(t, tc.totalNodes, tc.totalNodes, tc.phase1Duration, tc.phase2Duration, tc.phase3Duration)
@@ -180,17 +179,15 @@ func TestDKGThreshold(t *testing.T) {
 	// define different test cases with varying number of nodes, and phase
 	// durations
 	testCases := []testCase{
-		{totalNodes: 5, phase1Duration: 100 * time.Millisecond, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
-		{totalNodes: 10, phase1Duration: time.Second, phase2Duration: 500 * time.Millisecond, phase3Duration: 500 * time.Millisecond},
-		{totalNodes: 15, phase1Duration: 3 * time.Second, phase2Duration: time.Second, phase3Duration: time.Second},
+		{totalNodes: 5, phase1Duration: 1 * time.Second, phase2Duration: 100 * time.Millisecond, phase3Duration: 100 * time.Millisecond},
+		{totalNodes: 10, phase1Duration: 2 * time.Second, phase2Duration: 500 * time.Millisecond, phase3Duration: 500 * time.Millisecond},
+		{totalNodes: 15, phase1Duration: 5 * time.Second, phase2Duration: time.Second, phase3Duration: time.Second},
 	}
 
-	// run each test case
 	for _, tc := range testCases {
 		// gn is the minimum number of good nodes required for the DKG protocol
 		// to go well
 		gn := tc.totalNodes - signature.RandomBeaconThreshold(tc.totalNodes)
-
 		t.Run(fmt.Sprintf("%d/%d nodes", gn, tc.totalNodes), func(t *testing.T) {
 			testDKG(t, tc.totalNodes, gn, tc.phase1Duration, tc.phase2Duration, tc.phase3Duration)
 		})

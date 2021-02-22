@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -19,6 +20,8 @@ const (
 // String returns the string representation of a State
 func (s State) String() string {
 	switch s {
+	case Init:
+		return "Init"
 	case Phase1:
 		return "Phase1"
 	case Phase2:
@@ -30,7 +33,7 @@ func (s State) String() string {
 	case Shutdown:
 		return "Shutdown"
 	default:
-		return "Unknown"
+		return fmt.Sprintf("Unknown %d", s)
 	}
 }
 
