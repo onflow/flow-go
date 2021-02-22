@@ -2,17 +2,16 @@ package migrations
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"os"
 	"path"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // reports on which contracts are deployed
@@ -49,6 +48,10 @@ func (r ContractReporter) Report(payload []ledger.Payload) error {
 		}
 	}()
 
+	l := newLed(payload)
+	st := state.NewState(l)
+	accounts := state.NewAccounts(st)
+
 	for _, p := range payload {
 		id, err := keyToRegisterID(p.Key)
 		if err != nil {
@@ -58,11 +61,11 @@ func (r ContractReporter) Report(payload []ledger.Payload) error {
 			// not an address
 			continue
 		}
-		if id.Key != "contract_names" {
+		if id.Key != state.KeyContractNames {
 			continue
 		}
 		address := flow.BytesToAddress([]byte(id.Owner))
-		contracts, err := r.decodeContracts(p.Value)
+		contracts, err := accounts.GetContractNames(address)
 		if err != nil {
 			return err
 		}
@@ -81,17 +84,4 @@ func (r ContractReporter) Report(payload []ledger.Payload) error {
 	r.Log.Info().Msg("Contract Reporter Done.")
 
 	return nil
-}
-
-func (r ContractReporter) decodeContracts(value ledger.Value) ([]string, error) {
-	contracts := make([]string, 0)
-	if len(value) == 0 {
-		return contracts, nil
-	}
-	cborDecoder := cbor.NewDecoder(bytes.NewReader(value))
-	err := cborDecoder.Decode(&contracts)
-	if err != nil {
-		return nil, err
-	}
-	return contracts, nil
 }
