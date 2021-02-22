@@ -72,6 +72,13 @@ func (t *NoopTracer) StartSpanFromParent(
 	return &NoopSpan{t}
 }
 
+func (t *NoopTracer) WithSpanFromContext(ctx context.Context,
+	operationName SpanName,
+	f func(),
+	opts ...opentracing.StartSpanOption) {
+	f()
+}
+
 type InternalTracer struct {
 	tracer *NoopTracer
 }

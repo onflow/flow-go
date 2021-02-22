@@ -227,7 +227,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 		Dur("delay", delay).
 		Logger()
 
-	log.Info().Msg("processing proposal broadcast request from hotstuff")
+	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
 	for _, g := range payload.Guarantees {
 		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
