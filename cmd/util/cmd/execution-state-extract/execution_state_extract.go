@@ -33,7 +33,10 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 
 	newState, err := led.ExportCheckpointAt(targetHash,
 		[]ledger.Migration{},
-		[]ledger.Reporter{migrations.ContractReporter{Log: log, OutputDir: outputDir}, migrations.StorageReporter{Log: log, OutputDir: outputDir}},
+		[]ledger.Reporter{
+			migrations.ContractReporter{Log: log, OutputDir: outputDir},
+			migrations.StorageReporter{Log: log, OutputDir: outputDir},
+		},
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		wal.RootCheckpointFilename)
