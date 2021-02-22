@@ -255,7 +255,7 @@ func executionNodesForBlockID(
 	mismatchReceiptCnt := len(identicalReceipts)
 	// if there are more than one execution result for the same block ID, log as error
 	if mismatchReceiptCnt > 1 {
-		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(identicalReceipts))
+		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
 		log.Error().
 			Str("block_id", blockID.String()).
 			Str("execution_receipts", identicalReceiptsStr).
