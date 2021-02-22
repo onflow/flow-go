@@ -55,8 +55,9 @@ const (
 	codeExecutionIDExecutionReceipt = 58 // index mapping block ID, execution ID to execution receipt ID
 
 	// codes related to epoch information
-	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID
-	codeEpochCommit = 61 // EpochCommit service event, keyed by ID
+	codeEpochSetup     = 60 // EpochSetup service event, keyed by ID
+	codeEpochCommit    = 61 // EpochCommit service event, keyed by ID
+	codeDKGPrivateInfo = 62 // DKGPrivateInfo, keyed by epoch counter
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

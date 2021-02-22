@@ -31,8 +31,24 @@ func (_m *DKGBroker) FlagMisbehavior(node int, log string) {
 	_m.Called(node, log)
 }
 
-// GetMsgCh provides a mock function with given fields:
-func (_m *DKGBroker) GetMsgCh() <-chan messages.DKGMessage {
+// GetBroadcastMsgCh provides a mock function with given fields:
+func (_m *DKGBroker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
+	ret := _m.Called()
+
+	var r0 <-chan messages.DKGMessage
+	if rf, ok := ret.Get(0).(func() <-chan messages.DKGMessage); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan messages.DKGMessage)
+		}
+	}
+
+	return r0
+}
+
+// GetPrivateMsgCh provides a mock function with given fields:
+func (_m *DKGBroker) GetPrivateMsgCh() <-chan messages.DKGMessage {
 	ret := _m.Called()
 
 	var r0 <-chan messages.DKGMessage

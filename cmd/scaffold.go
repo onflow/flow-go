@@ -83,6 +83,7 @@ type Storage struct {
 	Setups       storage.EpochSetups
 	Commits      storage.EpochCommits
 	Statuses     storage.EpochStatuses
+	DKGKeys      storage.DKGKeys
 }
 
 type namedModuleFunc struct {
@@ -391,6 +392,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
+	dkgKeys := bstorage.NewDKGKeys(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
@@ -406,6 +408,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Setups:       setups,
 		Commits:      commits,
 		Statuses:     statuses,
+		DKGKeys:      dkgKeys,
 	}
 }
 

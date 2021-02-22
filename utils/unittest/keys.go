@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
 func NetworkingKey() (crypto.PrivateKey, error) {
@@ -54,4 +56,15 @@ func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 	}
 
 	return keys, nil
+}
+
+func DKGParticipantPriv() *dkg.DKGParticipantPriv {
+	privKey, _ := NetworkingKey()
+	randBeaconKey := encodable.RandomBeaconPrivKey{
+		PrivateKey: privKey,
+	}
+	return &dkg.DKGParticipantPriv{
+		NodeID:              IdentifierFixture(),
+		RandomBeaconPrivKey: randBeaconKey,
+	}
 }

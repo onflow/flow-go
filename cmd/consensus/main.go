@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -45,6 +47,7 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -74,7 +77,7 @@ func main() {
 
 		err               error
 		mutableState      protocol.MutableState
-		privateDKGData    *bootstrap.DKGParticipantPriv
+		privateDKGData    *dkg.DKGParticipantPriv
 		guarantees        mempool.Guarantees
 		results           mempool.IncorporatedResults
 		receipts          mempool.ExecutionTree
@@ -173,7 +176,21 @@ func main() {
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
-			return err
+			if err != nil {
+				return err
+			}
+			// save the DKG private key data to database for the current epoch
+			// w.r.t the rootblock
+			epoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			epochCounter, err := epoch.Counter()
+			if err != nil {
+				return err
+			}
+			err = node.Storage.DKGKeys.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return err
+			}
+			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
@@ -463,14 +480,14 @@ func main() {
 		Run()
 }
 
-func loadDKGPrivateData(dir string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
+func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPriv, error) {
 	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
 	data, err := io.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}
 
-	var priv bootstrap.DKGParticipantPriv
+	var priv dkg.DKGParticipantPriv
 	err = json.Unmarshal(data, &priv)
 	if err != nil {
 		return nil, err

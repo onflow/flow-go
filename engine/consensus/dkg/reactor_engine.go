@@ -6,12 +6,15 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	dkgmodel "github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	dkgmod "github.com/onflow/flow-go/module/dkg"
+	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/storage"
 )
 
 // DefaultPollStep specifies the default number of views that separate two calls
@@ -38,6 +41,7 @@ type ReactorEngine struct {
 	log               zerolog.Logger
 	me                module.Local
 	state             protocol.State
+	keyStorage        storage.DKGKeys
 	controller        module.DKGController
 	controllerFactory module.DKGControllerFactory
 	viewEvents        events.Views
@@ -49,6 +53,7 @@ func NewReactorEngine(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
+	keyStorage storage.DKGKeys,
 	controllerFactory module.DKGControllerFactory,
 	viewEvents events.Views,
 ) *ReactorEngine {
@@ -58,6 +63,7 @@ func NewReactorEngine(
 		log:               log,
 		me:                me,
 		state:             state,
+		keyStorage:        keyStorage,
 		controllerFactory: controllerFactory,
 		viewEvents:        viewEvents,
 		pollStep:          DefaultPollStep,
@@ -132,7 +138,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	})
 
 	// NOTE:
-	// We register two callbacks For views that mark a state transition: one for
+	// We register two callbacks for views that mark a state transition: one for
 	// polling broadcast messages, and one for triggering the phase transition.
 	// It is essential that all polled broadcast messages are processed before
 	// starting the phase transition. Here we register the polling callback
@@ -146,17 +152,17 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	for view := epochInfo.phase1FinalView; view > first.View; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase1FinalView, dkgmod.Phase1, e.controller.EndPhase1)
+	e.registerPhaseTransition(epochInfo.phase1FinalView, dkgmodule.Phase1, e.controller.EndPhase1)
 
 	for view := epochInfo.phase2FinalView; view > epochInfo.phase1FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase2FinalView, dkgmod.Phase2, e.controller.EndPhase2)
+	e.registerPhaseTransition(epochInfo.phase2FinalView, dkgmodule.Phase2, e.controller.EndPhase2)
 
 	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmod.Phase3, e.controller.End)
+	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter, index))
 }
 
 func (e *ReactorEngine) getEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
@@ -218,7 +224,7 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 
 // registerPhaseTransition instructs the engine to change phases at the
 // specified view.
-func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmod.State, callback func() error) {
+func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule.State, callback func() error) {
 	e.viewEvents.OnView(view, func(header *flow.Header) {
 		e.unit.Launch(func() {
 			e.unit.Lock()
@@ -239,4 +245,37 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmod.St
 			log.Info().Msgf("ended %s successfully", fromState)
 		})
 	})
+}
+
+// end returns a callback that is used to end the DKG protocol, save the
+// resulting private key to storage, and publish the other results to the DKG
+// smart-contract.
+func (e *ReactorEngine) end(epochCounter uint64, myIndex int) func() error {
+	return func() error {
+		err := e.controller.End()
+		if err != nil {
+			return err
+		}
+
+		privateShare, _, _ := e.controller.GetArtifacts()
+
+		privKeyInfo := dkgmodel.DKGParticipantPriv{
+			NodeID: e.me.NodeID(),
+			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
+				PrivateKey: privateShare,
+			},
+			GroupIndex: myIndex,
+		}
+		err = e.keyStorage.InsertMyDKGPrivateInfo(epochCounter, &privKeyInfo)
+		if err != nil {
+			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
+		}
+
+		err = e.controller.SubmitResult()
+		if err != nil {
+			return fmt.Errorf("couldn't publish DKG results: %w", err)
+		}
+
+		return nil
+	}
 }
