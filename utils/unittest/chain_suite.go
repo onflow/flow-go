@@ -549,7 +549,10 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	bc.Blocks[block.ID()] = block
 	bc.SealsIndex[block.ID()] = bc.SealsIndex[block.Header.ParentID]
 
+	resultsByID := block.Payload.ResultsById()
+
 	for _, receipt := range block.Payload.Receipts {
+		result, _ := resultsByID[receipt.ResultID]
 		// Exec Receipt for block with valid subgraph
 		// ATTENTION:
 		// Here, IncorporatedBlockID (the first argument) should be set
@@ -557,8 +560,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		// ExecutionResult. However, in phase 2 of the sealing roadmap,
 		// we are still using a temporary sealing logic where the
 		// IncorporatedBlockID is expected to be the result's block ID.
-		incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(&receipt.ExecutionResult),
-			IncorporatedResult.WithIncorporatedBlockID(receipt.ExecutionResult.BlockID))
+		incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(result),
+			IncorporatedResult.WithIncorporatedBlockID(result.BlockID))
 
 		// assign each chunk to 50% of validation Nodes and generate respective approvals
 		assignment := chunks.NewAssignment()
@@ -580,7 +583,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.PendingApprovals[incorporatedResult.Result.ID()] = approvals
 		bc.PendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 		bc.Assignments[incorporatedResult.Result.ID()] = assignment
-		bc.PersistedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+		bc.PersistedResults[result.ID()] = result
 		// TODO: adding receipt
 	}
 }

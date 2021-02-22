@@ -287,10 +287,14 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			return nil, fmt.Errorf("could not get ancestor (%x): %w", ancestorID, err)
 		}
 
+		resultsByID := ancestor.Payload.ResultsById()
+
 		// For each receipt in the block's payload, we recompose the
 		// corresponding IncorporatedResult an check if we have a matching seal
 		// in the mempool.
 		for _, receipt := range ancestor.Payload.Receipts {
+
+			result, _ := resultsByID[receipt.ResultID]
 
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
@@ -301,8 +305,8 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// are still using a temporary sealing logic where the
 			// IncorporatedBlockID is expected to be the result's block ID.
 			incorporatedResult := flow.NewIncorporatedResult(
-				receipt.ExecutionResult.BlockID,
-				&receipt.ExecutionResult,
+				result.BlockID,
+				result,
 			)
 
 			// look for a seal that corresponds to this specific incorporated
@@ -364,6 +368,11 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	return chain, nil
 }
 
+type InsertableReceipts struct {
+	receipts []*flow.ExecutionReceiptMeta
+	results  []*flow.ExecutionResult
+}
+
 // getInsertableReceipts returns the list of ExecutionReceipts that should be
 // inserted in the next payload. It looks in the receipts mempool and applies
 // the following filter:
@@ -375,7 +384,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 // 3) Otherwise, this receipt can be included in the payload.
 //
 // Receipts have to be ordered by block height.
-func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableReceipts, error) {
 	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 
@@ -401,6 +410,9 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	// includedReceipts is a set of all receipts that are contained in unsealed blocks along the fork.
 	includedReceipts := make(map[flow.Identifier]struct{})
 
+	// includedResults is a set of all results for all unsealed that were incorporated into fork.
+	includedResults := make(map[flow.Identifier]struct{})
+
 	// loop through the fork backwards, from parent to last sealed (including),
 	// and keep track of blocks and receipts visited on the way.
 	sealedBlockID := sealed.ID()
@@ -418,6 +430,9 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		}
 		for _, recID := range index.ReceiptIDs {
 			includedReceipts[recID] = struct{}{}
+		}
+		for _, resID := range index.ResultIDs {
+			includedResults[resID] = struct{}{}
 		}
 
 		if ancestorID == sealedBlockID {
@@ -445,12 +460,27 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
 
+	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, len(receipts))
+	results := make([]*flow.ExecutionResult, 0)
+	for _, receipt := range receipts {
+		resultID := receipt.ExecutionResult.ID()
+		if _, inserted := includedResults[resultID]; !inserted {
+			results = append(results, &receipt.ExecutionResult)
+			includedResults[resultID] = struct{}{}
+		}
+
+		filteredReceipts = append(filteredReceipts, receipt.Meta())
+	}
+
 	// don't collect more than maxReceiptCount receipts
 	if uint(len(receipts)) > b.cfg.maxReceiptCount {
 		receipts = receipts[:b.cfg.maxReceiptCount]
 	}
 
-	return receipts, nil
+	return &InsertableReceipts{
+		receipts: filteredReceipts,
+		results:  results,
+	}, nil
 }
 
 // createProposal assembles a block with the provided header and payload
@@ -458,7 +488,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 func (b *Builder) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
-	receipts []*flow.ExecutionReceipt,
+	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error) (*flow.Block, error) {
 
 	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
@@ -468,7 +498,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	payload := &flow.Payload{
 		Guarantees: guarantees,
 		Seals:      seals,
-		Receipts:   receipts,
+		Receipts:   insertableReceipts.receipts,
+		Results:    insertableReceipts.results,
 	}
 
 	parent, err := b.headers.ByBlockID(parentID)

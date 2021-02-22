@@ -109,9 +109,13 @@ func FullBlockFixture() flow.Block {
 	block := BlockFixture()
 	payload := block.Payload
 	payload.Seals = Seal.Fixtures(10)
-	payload.Receipts = []*flow.ExecutionReceipt{
-		ExecutionReceiptFixture(),
-		ExecutionReceiptFixture(),
+	payload.Results = []*flow.ExecutionResult{
+		ExecutionResultFixture(),
+		ExecutionResultFixture(),
+	}
+	payload.Receipts = []*flow.ExecutionReceiptMeta{
+		ExecutionReceiptFixture(WithResult(payload.Results[0])).Meta(),
+		ExecutionReceiptFixture(WithResult(payload.Results[1])).Meta(),
 	}
 
 	header := block.Header

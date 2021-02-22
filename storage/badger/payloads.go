@@ -49,8 +49,11 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 			}
 		}
 
+		resultsById := payload.ResultsById()
+
 		// store all payload receipts
-		for _, receipt := range payload.Receipts {
+		for _, meta := range payload.Receipts {
+			receipt := flow.ExecutionReceiptFromMeta(*meta, *resultsById[meta.ResultID])
 			err := p.receipts.store(receipt)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)

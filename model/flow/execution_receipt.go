@@ -44,16 +44,25 @@ func (er *ExecutionReceipt) Meta() *ExecutionReceiptMeta {
 
 // ID returns the canonical ID of the execution receipt.
 func (er *ExecutionReceipt) ID() Identifier {
+	return er.Meta().ID()
+}
+
+func (er *ExecutionReceiptMeta) ID() Identifier {
 	body := struct {
-		ExecutorID      Identifier
-		ExecutionResult ExecutionResult
-		Spocks          []crypto.Signature
+		ExecutorID Identifier
+		ResultID   Identifier
+		Spocks     []crypto.Signature
 	}{
-		ExecutorID:      er.ExecutorID,
-		ExecutionResult: er.ExecutionResult,
-		Spocks:          er.Spocks,
+		ExecutorID: er.ExecutorID,
+		ResultID:   er.ResultID,
+		Spocks:     er.Spocks,
 	}
 	return MakeID(body)
+}
+
+// Checksum returns a checksum for the execution receipt including the signatures.
+func (er *ExecutionReceiptMeta) Checksum() Identifier {
+	return MakeID(er)
 }
 
 // Checksum returns a checksum for the execution receipt including the signatures.

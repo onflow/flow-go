@@ -4,7 +4,8 @@ package flow
 type Payload struct {
 	Guarantees []*CollectionGuarantee
 	Seals      []*Seal
-	Receipts   []*ExecutionReceipt
+	Receipts   []*ExecutionReceiptMeta
+	Results    []*ExecutionResult
 }
 
 // EmptyPayload returns an empty block payload.
@@ -26,6 +27,16 @@ func (p Payload) Index() *Index {
 		CollectionIDs: GetIDs(p.Guarantees),
 		SealIDs:       GetIDs(p.Seals),
 		ReceiptIDs:    GetIDs(p.Receipts),
+		ResultIDs:     GetIDs(p.Results),
 	}
 	return idx
+}
+
+// ResultsById generates a lookup map for accesing execution results by ID.
+func (p Payload) ResultsById() map[Identifier]*ExecutionResult {
+	resultsByID := make(map[Identifier]*ExecutionResult)
+	for _, result := range p.Results {
+		resultsByID[result.ID()] = result
+	}
+	return resultsByID
 }
