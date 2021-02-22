@@ -1,10 +1,13 @@
 package fvm
 
 import (
+	"context"
 	"errors"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/opentracing/opentracing-go/log"
 )
 
 type TransactionSignatureVerifier struct {
@@ -25,14 +28,21 @@ func (v *TransactionSignatureVerifier) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	return v.verifyTransactionSignatures(proc.Transaction, st)
+	return v.verifyTransactionSignatures(proc.Transaction, ctx, st)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx *flow.TransactionBody,
+	ctx Context,
 	st *state.State,
 ) (err error) {
-
+	if ctx.Tracer != nil {
+		span, _ := ctx.Tracer.StartSpanFromContext(context.Background(), trace.FVMEnvVerifyTransaction)
+		span.LogFields(
+			log.String("transaction.hash", tx.ID().String()),
+		)
+		defer span.Finish()
+	}
 	accounts := state.NewAccounts(st)
 
 	if tx.Payer == flow.EmptyAddress {
