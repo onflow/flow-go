@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"github.com/opentracing/opentracing-go/log"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/opentracing/opentracing-go/log"
 )
 
 type TransactionSequenceNumberChecker struct{}
