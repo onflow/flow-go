@@ -110,42 +110,154 @@ func TestReceiptStoreTwoDifferentReceiptsShouldOKIfResultAreSame(t *testing.T) {
 }
 
 func TestReceiptLookupWithBlockIDAllExecutionID(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		metrics := metrics.NewNoopCollector()
-		results := bstorage.NewExecutionResults(metrics, db)
-		store := bstorage.NewExecutionReceipts(metrics, db, results)
+	withStore := func(t *testing.T, f func(store *bstorage.ExecutionReceipts)) {
+		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+			metrics := metrics.NewNoopCollector()
+			results := bstorage.NewExecutionResults(metrics, db)
+			store := bstorage.NewExecutionReceipts(metrics, db, results)
+			f(store)
+		})
+	}
 
-		// common block ID for the two ER
-		blockID := unittest.IdentifierFixture()
+	var empty []*flow.ExecutionReceipt
 
-		// two ERs with the same result body, block ID but different execution IDs
-		receipt1 := unittest.ExecutionReceiptFixture()
-		err := store.Store(receipt1)
-		require.NoError(t, err)
+	t.Run("get empty", func(t *testing.T) {
+		withStore(t, func(store *bstorage.ExecutionReceipts) {
+			block := unittest.BlockFixture()
+			receipts, err := store.ByBlockIDAllExecutionReceipts(block.ID())
+			require.NoError(t, err)
+			require.Equal(t, empty, receipts)
+		})
+	})
 
-		err = store.IndexByBlockIDAndExecutionID(blockID, receipt1.ExecutorID, receipt1.ID())
-		require.NoError(t, err)
+	t.Run("store one get one", func(t *testing.T) {
+		withStore(t, func(store *bstorage.ExecutionReceipts) {
+			block := unittest.BlockFixture()
+			receipt1 := unittest.ReceiptForBlockFixture(&block)
 
-		receipt2 := unittest.ExecutionReceiptFixture()
-		receipt2.ExecutionResult.BlockID = blockID
-		receipt2.ExecutionResult = receipt1.ExecutionResult
-		err = store.Store(receipt2)
-		require.NoError(t, err)
+			err := store.Store(receipt1)
+			require.NoError(t, err)
 
-		err = store.IndexByBlockIDAndExecutionID(blockID, receipt2.ExecutorID, receipt2.ID())
-		require.NoError(t, err)
+			err = store.IndexByExecutor(receipt1)
+			require.NoError(t, err)
 
-		receipts, err := store.ByBlockIDAllExecutionReceipts(blockID)
-		require.NoError(t, err)
+			receipts, err := store.ByBlockIDAllExecutionReceipts(block.ID())
+			require.NoError(t, err)
 
-		require.Len(t, receipts, 2)
+			require.Equal(t, []*flow.ExecutionReceipt{receipt1}, receipts)
+		})
+	})
 
-		var expectedIDs = make(map[flow.Identifier]struct{}, 2)
-		expectedIDs[receipt1.ID()] = struct{}{}
-		expectedIDs[receipt2.ID()] = struct{}{}
-		for _, r := range receipts {
-			actualID := r.ID()
-			require.Contains(t, expectedIDs, actualID)
-		}
+	t.Run("store two for the same block", func(t *testing.T) {
+		withStore(t, func(store *bstorage.ExecutionReceipts) {
+			block := unittest.BlockFixture()
+
+			executor1 := unittest.IdentifierFixture()
+			executor2 := unittest.IdentifierFixture()
+
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
+
+			err := store.Store(receipt1)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt1)
+			require.NoError(t, err)
+
+			err = store.Store(receipt2)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt2)
+			require.NoError(t, err)
+
+			receipts, err := store.ByBlockIDAllExecutionReceipts(block.ID())
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1, receipt2}, receipts)
+		})
+	})
+
+	t.Run("store two for different blocks", func(t *testing.T) {
+		withStore(t, func(store *bstorage.ExecutionReceipts) {
+			block1 := unittest.BlockFixture()
+			block2 := unittest.BlockFixture()
+
+			executor1 := unittest.IdentifierFixture()
+			executor2 := unittest.IdentifierFixture()
+
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block2, executor2)
+
+			err := store.Store(receipt1)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt1)
+			require.NoError(t, err)
+
+			err = store.Store(receipt2)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt2)
+			require.NoError(t, err)
+
+			receipts, err := store.ByBlockIDAllExecutionReceipts(block1.ID())
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1}, receipts)
+		})
+	})
+
+	t.Run("indexing duplicated receipts should be ok", func(t *testing.T) {
+		withStore(t, func(store *bstorage.ExecutionReceipts) {
+			block1 := unittest.BlockFixture()
+
+			executor1 := unittest.IdentifierFixture()
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
+
+			err := store.Store(receipt1)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt1)
+			require.NoError(t, err)
+
+			err = store.Store(receipt1)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt1)
+			require.NoError(t, err)
+
+			receipts, err := store.ByBlockIDAllExecutionReceipts(block1.ID())
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1}, receipts)
+		})
+	})
+
+	t.Run("indexing receipt from the same executor but different result should fail", func(t *testing.T) {
+		withStore(t, func(store *bstorage.ExecutionReceipts) {
+			block1 := unittest.BlockFixture()
+
+			executor1 := unittest.IdentifierFixture()
+
+			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
+			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block1, executor1)
+
+			err := store.Store(receipt1)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt1)
+			require.NoError(t, err)
+
+			err = store.Store(receipt2)
+			require.NoError(t, err)
+
+			err = store.IndexByExecutor(receipt2)
+			require.Error(t, err)
+
+			receipts, err := store.ByBlockIDAllExecutionReceipts(block1.ID())
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, []*flow.ExecutionReceipt{receipt1}, receipts)
+		})
 	})
 }
