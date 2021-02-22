@@ -35,6 +35,11 @@ func (h *Handler) Ping(ctx context.Context, _ *access.PingRequest) (*access.Ping
 	return &access.PingResponse{}, nil
 }
 
+func (h *Handler) GetLatestProtocolStateSnapshot(_ context.Context,
+	_ *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	panic("not yet implemented")
+}
+
 func (h *Handler) GetNetworkParameters(
 	ctx context.Context,
 	_ *access.GetNetworkParametersRequest,

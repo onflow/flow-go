@@ -38,7 +38,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
 	github.com/onflow/flow-go-sdk v0.14.3
 	github.com/onflow/flow-go/crypto v0.12.0
-	github.com/onflow/flow/protobuf/go/flow v0.1.8
+	github.com/onflow/flow/protobuf/go/flow v0.1.9
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
