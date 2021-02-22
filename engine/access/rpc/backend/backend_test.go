@@ -210,9 +210,9 @@ func (suite *Suite) TestGetCollection() {
 	suite.assertAllExpectations()
 }
 
-// TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
+// TestTransactionFinalizedToSealedStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol state is updated
-func (suite *Suite) TestTransactionStatusTransition() {
+func (suite *Suite) TestTransactionFinalizedToSealedStatusTransition() {
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -251,7 +251,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]flow.ExecutionReceipt{*receipt}, nil)
+		Return([]*flow.ExecutionReceipt{receipt}, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
@@ -333,9 +333,9 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.assertAllExpectations()
 }
 
-// TestTransactionExpiredStatusTransition tests that the status of transaction changes from Unknown to Expired
+// TestTransactionPendingToExpiredStatusTransition tests that the status of transaction changes from Pending to Expired
 // when enough blocks pass
-func (suite *Suite) TestTransactionExpiredStatusTransition() {
+func (suite *Suite) TestTransactionPendingToExpiredStatusTransition() {
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -446,6 +446,130 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.assertAllExpectations()
 }
 
+// TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
+func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
+
+	ctx := context.Background()
+	collection := unittest.CollectionFixture(1)
+	transactionBody := collection.Transactions[0]
+	// block which will eventually contain the transaction
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	// reference block to which the transaction points to
+	refBlock := unittest.BlockFixture()
+	refBlockID := refBlock.ID()
+	refBlock.Header.Height = 2
+	transactionBody.SetReferenceBlockID(refBlockID)
+	txID := transactionBody.ID()
+
+	headBlock := unittest.BlockFixture()
+	headBlock.Header.Height = refBlock.Header.Height - 1 // head is behind the current refBlock
+
+	suite.snapshot.
+		On("Head").
+		Return(headBlock.Header, nil)
+
+	snapshotAtBlock := new(protocol.Snapshot)
+	snapshotAtBlock.On("Head").Return(refBlock.Header, nil)
+
+	suite.state.
+		On("AtBlockID", refBlockID).
+		Return(snapshotAtBlock, nil)
+
+	// transaction storage returns the corresponding transaction
+	suite.transactions.
+		On("ByID", txID).
+		Return(transactionBody, nil)
+
+	currentState := flow.TransactionStatusPending // marker for the current state
+	// collection storage returns a not found error if tx is pending, else it returns the collection light reference
+	suite.collections.
+		On("LightByTransactionID", txID).
+		Return(func(txID flow.Identifier) *flow.LightCollection {
+			if currentState == flow.TransactionStatusPending {
+				return nil
+			}
+			collLight := collection.Light()
+			return &collLight
+		},
+			func(txID flow.Identifier) error {
+				if currentState == flow.TransactionStatusPending {
+					return storage.ErrNotFound
+				}
+				return nil
+			})
+
+	// refBlock storage returns the corresponding refBlock
+	suite.blocks.
+		On("ByCollectionID", collection.ID()).
+		Return(&block, nil)
+
+	ids := unittest.IdentityListFixture(1)
+	receipt := unittest.ReceiptForBlockFixture(&block)
+	receipt.ExecutorID = ids[0].NodeID
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]flow.ExecutionReceipt{*receipt}, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+
+	exeEventReq := execproto.GetTransactionResultRequest{
+		BlockId:       blockID[:],
+		TransactionId: txID[:],
+	}
+
+	exeEventResp := execproto.GetTransactionResultResponse{
+		Events: nil,
+	}
+
+	// simulate that the execution node has not yet executed the transaction
+	suite.execClient.
+		On("GetTransactionResult", ctx, &exeEventReq).
+		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
+		Once()
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	backend := New(
+		suite.state,
+		suite.execClient,
+		nil,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory,
+		false,
+		suite.log,
+	)
+
+	// should return pending status when we have not observed collection for the transaction
+	suite.Run("pending", func() {
+		currentState = flow.TransactionStatusPending
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
+		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+		// assert that no call to an execution node is made
+		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
+	})
+
+	// should return finalized status when we have have observed collection for the transaction (after observing the
+	// a preceding sealed refBlock)
+	suite.Run("finalized", func() {
+		currentState = flow.TransactionStatusFinalized
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
+		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
+	})
+
+	suite.assertAllExpectations()
+}
+
 // TestTransactionResultUnknown tests that the status of transaction is reported as unknown when it is not found in the
 // local storage
 func (suite *Suite) TestTransactionResultUnknown() {
@@ -541,7 +665,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			r := unittest.ReceiptForBlockFixture(&b)
 			suite.receipts.
 				On("ByBlockIDAllExecutionReceipts", b.ID()).
-				Return([]flow.ExecutionReceipt{*r}, nil).Once()
+				Return([]*flow.ExecutionReceipt{r}, nil).Once()
 		}
 
 		return headers
@@ -603,7 +727,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		receipts := new(storagemock.ExecutionReceipts)
 		receipts.
 			On("ByBlockIDAllExecutionReceipts", mock.Anything).
-			Return([]flow.ExecutionReceipt{}, nil).Once()
+			Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 		// create the handler
 		backend := New(
@@ -709,7 +833,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	// use the static execution node
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]flow.ExecutionReceipt{}, nil)
+		Return([]*flow.ExecutionReceipt{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -909,7 +1033,7 @@ func (suite *Suite) TestGetAccount() {
 	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", blockID).
-		Return([]flow.ExecutionReceipt{*receipt}, nil).Once()
+		Return([]*flow.ExecutionReceipt{receipt}, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
@@ -960,7 +1084,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	suite.receipts.
 		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]flow.ExecutionReceipt{}, nil).Once()
+		Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -1043,11 +1167,11 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		blockIDExecNodeMap[block.ID()] = ids
 		allExecutionIDs = append(allExecutionIDs, ids...)
 
-		receipts := make([]flow.ExecutionReceipt, receiptPerBlock)
+		receipts := make([]*flow.ExecutionReceipt, receiptPerBlock)
 		for j := 0; j < receiptPerBlock; j++ {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = ids[j].NodeID
-			receipts[j] = *r
+			receipts[j] = r
 		}
 		suite.receipts.
 			On("ByBlockIDAllExecutionReceipts", block.ID()).
