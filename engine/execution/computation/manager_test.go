@@ -107,37 +107,35 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 func TestExecuteScript(t *testing.T) {
 
-	t.Run("scripts do not store programs", func(t *testing.T) {
+	logger := zerolog.Nop()
 
-		logger := zerolog.Nop()
+	execCtx := fvm.NewContext(logger)
 
-		execCtx := fvm.NewContext(logger)
+	me := new(module.Local)
+	me.On("NodeID").Return(flow.ZeroID)
 
-		me := new(module.Local)
-		me.On("NodeID").Return(flow.ZeroID)
+	rt := runtime.NewInterpreterRuntime()
 
-		rt := runtime.NewInterpreterRuntime()
+	vm := fvm.New(rt)
 
-		vm := fvm.New(rt)
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 
-		ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+	view := delta.NewView(ledger.Get)
 
-		view := delta.NewView(ledger.Get)
+	scriptView := view.NewChild()
 
-		scriptView := view.NewChild()
+	script := []byte(fmt.Sprintf(
+		`
+			import FungibleToken from %s
 
-		script := []byte(fmt.Sprintf(`
-				import FungibleToken from %s
+			pub fun main() {}
+		`,
+		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+	))
 
-				pub fun main() {}
-			`,
-			fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
-		))
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx)
+	require.NoError(t, err)
 
-		engine, err := New(logger, nil, nil, me, nil, vm, execCtx)
-		require.NoError(t, err)
-
-		_, err = engine.ExecuteScript(script, nil, nil, scriptView)
-		require.NoError(t, err)
-	})
+	_, err = engine.ExecuteScript(script, nil, nil, scriptView)
+	require.NoError(t, err)
 }
