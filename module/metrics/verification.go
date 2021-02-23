@@ -35,6 +35,12 @@ type VerificationCollector struct {
 
 func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
 	// Assigner Engine
+	rcvBlocks := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "finalized_block_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "total number of finalized blocks received by assigner engine",
+	})
 
 	// Finder Engine
 	rcvReceiptsTotals := promauto.NewCounter(prometheus.CounterOpts{
