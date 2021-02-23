@@ -90,7 +90,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 		Logger()
 	log.Info().Msg("EpochSetup received")
 
-	epochInfo, err := e.getEpochInfo(firstID)
+	epochInfo, err := e.getNextEpochInfo(firstID)
 	if err != nil {
 		e.log.Err(err).Msg("could not retrieve epoch info")
 		panic(err)
@@ -159,7 +159,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmod.Phase3, e.controller.End)
 }
 
-func (e *ReactorEngine) getEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
+func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
 	epoch := e.state.AtBlockID(firstBlockID).Epochs().Next()
 	identities, err := epoch.InitialIdentities()
 	if err != nil {
