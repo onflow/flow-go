@@ -1,8 +1,6 @@
 package common
 
 import (
-	"golang.org/x/crypto/sha3"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
@@ -11,8 +9,9 @@ import (
 var emptySlice []byte
 var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
 
-const hashLen = 256
-const defaultHashLen = hashLen + 1
+const hashBitLen = 256
+const hashByteLen = hashBitLen >> 3
+const defaultHashLen = hashBitLen + 1
 
 // we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [defaultHashLen][]byte
@@ -44,18 +43,30 @@ func GetDefaultHashForHeight(height int) []byte {
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 // note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
-	hasher := sha3.New256()
+	/*hasher := sha3.New256()
 	_, _ = hasher.Write(path)
 	_, _ = hasher.Write(value)
-	return hasher.Sum(nil)
+	return hasher.Sum(nil)*/
+	hasher := new256()
+	hasher.write(path)
+	hasher.write(value)
+	h := make([]byte, hashByteLen)
+	hasher.read(h)
+	return h
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	hasher := sha3.New256()
+	/*hasher := sha3.New256()
 	_, _ = hasher.Write(hash1)
 	_, _ = hasher.Write(hash2)
-	return hasher.Sum(nil)
+	return hasher.Sum(nil)*/
+	hasher := new256()
+	hasher.write256(hash1)
+	hasher.write256(hash2)
+	h := make([]byte, hashByteLen)
+	hasher.readInto256(h)
+	return h
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
