@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -22,7 +23,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := mtrie.NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	mForest, err := mtrie.NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
@@ -53,7 +54,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	forestSequencing, err := flattener.FlattenForest(mForest)
 	require.NoError(t, err)
 
-	newForest, err := mtrie.NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	newForest, err := mtrie.NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	//forests are different
