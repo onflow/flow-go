@@ -12,7 +12,7 @@ type ProcessingNotifier struct {
 	mock.Mock
 }
 
-// FinishProcessing provides a mock function with given fields: entityID
+// Notify provides a mock function with given fields: entityID
 func (_m *ProcessingNotifier) Notify(entityID flow.Identifier) {
 	_m.Called(entityID)
 }

@@ -9,11 +9,6 @@ type VerificationMetrics struct {
 	mock.Mock
 }
 
-// LogVerifiableChunkSize provides a mock function with given fields: size
-func (_m *VerificationMetrics) LogVerifiableChunkSize(size float64) {
-	_m.Called(size)
-}
-
 // OnChunkDataPackReceived provides a mock function with given fields:
 func (_m *VerificationMetrics) OnChunkDataPackReceived() {
 	_m.Called()

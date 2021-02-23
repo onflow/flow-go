@@ -188,13 +188,6 @@ type VerificationMetrics interface {
 	// OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
 	// It increases the total number of result approvals.
 	OnResultApproval()
-
-	// LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific
-	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
-	// to capture all the resources needed to verify a chunk.
-	// The purpose of this function is to track the overall chunk resources size on disk.
-	// Todo wire this up to do monitoring (3183)
-	LogVerifiableChunkSize(size float64)
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.

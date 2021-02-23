@@ -236,10 +236,6 @@ func demo() {
 			if rand.Int()%2 == 0 {
 				verificationCollector.OnResultApproval()
 			}
-
-			// storage tests
-			// making randomized verifiable chunks that capture all storage per chunk
-			verificationCollector.LogVerifiableChunkSize(rand.Float64() * 10000.0)
 		}
 	})
 }
