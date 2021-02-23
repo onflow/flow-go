@@ -473,8 +473,8 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	}
 
 	// don't collect more than maxReceiptCount receipts
-	if uint(len(receipts)) > b.cfg.maxReceiptCount {
-		receipts = receipts[:b.cfg.maxReceiptCount]
+	if uint(len(filteredReceipts)) > b.cfg.maxReceiptCount {
+		filteredReceipts = filteredReceipts[:b.cfg.maxReceiptCount]
 	}
 
 	return &InsertableReceipts{

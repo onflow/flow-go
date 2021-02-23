@@ -32,7 +32,7 @@ func (p Payload) Index() *Index {
 	return idx
 }
 
-// ResultsById generates a lookup map for accesing execution results by ID.
+// ResultsById generates a lookup map for accessing execution results by ID.
 func (p Payload) ResultsById() map[Identifier]*ExecutionResult {
 	resultsByID := make(map[Identifier]*ExecutionResult)
 	for _, result := range p.Results {

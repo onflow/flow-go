@@ -55,6 +55,7 @@ require (
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/tools v0.0.0-20201020161133-226fd2f889ca
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
 	gotest.tools v2.2.0+incompatible
