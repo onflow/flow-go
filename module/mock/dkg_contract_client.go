@@ -53,13 +53,13 @@ func (_m *DKGContractClient) ReadBroadcast(fromIndex uint, referenceBlock flow.I
 	return r0, r1
 }
 
-// SubmitResult provides a mock function with given fields: _a0
-func (_m *DKGContractClient) SubmitResult(_a0 []crypto.PublicKey) error {
-	ret := _m.Called(_a0)
+// SubmitResult provides a mock function with given fields: _a0, _a1
+func (_m *DKGContractClient) SubmitResult(_a0 crypto.PublicKey, _a1 []crypto.PublicKey) error {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]crypto.PublicKey) error); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(crypto.PublicKey, []crypto.PublicKey) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}

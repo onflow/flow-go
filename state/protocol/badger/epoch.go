@@ -29,6 +29,18 @@ func (es *SetupEpoch) FirstView() (uint64, error) {
 	return es.setupEvent.FirstView, nil
 }
 
+func (es *SetupEpoch) DKGPhase1FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase1FinalView, nil
+}
+
+func (es *SetupEpoch) DKGPhase2FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase2FinalView, nil
+}
+
+func (es *SetupEpoch) DKGPhase3FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase3FinalView, nil
+}
+
 func (es *SetupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }
@@ -137,6 +149,18 @@ func (u *InvalidEpoch) Counter() (uint64, error) {
 }
 
 func (u *InvalidEpoch) FirstView() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *InvalidEpoch) DKGPhase1FinalView() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *InvalidEpoch) DKGPhase2FinalView() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *InvalidEpoch) DKGPhase3FinalView() (uint64, error) {
 	return 0, u.err
 }
 

@@ -42,11 +42,14 @@ func (p EpochPhase) String() string {
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
-	Counter      uint64         // the number of the epoch
-	FinalView    uint64         // the final view of the epoch
-	Participants IdentityList   // all participants of the epoch
-	Assignments  AssignmentList // cluster assignment for the epoch
-	RandomSource []byte         // source of randomness for epoch-specific setup tasks
+	Counter            uint64         // the number of the epoch
+	DKGPhase1FinalView uint64         // the final view of DKG phase 1
+	DKGPhase2FinalView uint64         // the final view of DKG phase 2
+	DKGPhase3FinalView uint64         // the final view of DKG phase 3
+	FinalView          uint64         // the final view of the epoch
+	Participants       IdentityList   // all participants of the epoch
+	Assignments        AssignmentList // cluster assignment for the epoch
+	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
 
 	// FirstView is the first view of the epoch. It is NOT included in the service
 	// event, but is cached here when stored to simplify epoch queries.
@@ -58,17 +61,23 @@ type EpochSetup struct {
 // the FirstView which is a computed property).
 func (setup *EpochSetup) Body() interface{} {
 	return struct {
-		Counter      uint64
-		FinalView    uint64
-		Participants IdentityList
-		Assignments  AssignmentList
-		RandomSource []byte
+		Counter            uint64
+		DKGPhase1FinalView uint64
+		DKGPhase2FinalView uint64
+		DKGPhase3FinalView uint64
+		FinalView          uint64
+		Participants       IdentityList
+		Assignments        AssignmentList
+		RandomSource       []byte
 	}{
-		Counter:      setup.Counter,
-		FinalView:    setup.FinalView,
-		Participants: setup.Participants,
-		Assignments:  setup.Assignments,
-		RandomSource: setup.RandomSource,
+		Counter:            setup.Counter,
+		DKGPhase1FinalView: setup.DKGPhase1FinalView,
+		DKGPhase2FinalView: setup.DKGPhase2FinalView,
+		DKGPhase3FinalView: setup.DKGPhase3FinalView,
+		FinalView:          setup.FinalView,
+		Participants:       setup.Participants,
+		Assignments:        setup.Assignments,
+		RandomSource:       setup.RandomSource,
 	}
 }
 

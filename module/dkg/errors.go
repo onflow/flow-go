@@ -1,15 +1,19 @@
-package controller
+package dkg
 
 import (
 	"errors"
 	"fmt"
 )
 
+// InvalidStateTransitionError happens when an invalid DKG state transition is
+// attempted.
 type InvalidStateTransitionError struct {
 	From State
 	To   State
 }
 
+// NewInvalidStateTransitionError creates a new InvalidStateTransitionError
+// between the specified states.
 func NewInvalidStateTransitionError(from State, to State) InvalidStateTransitionError {
 	return InvalidStateTransitionError{
 		From: from,

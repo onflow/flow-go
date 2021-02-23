@@ -1,4 +1,4 @@
-package controller
+package dkg
 
 import (
 	"sync"
@@ -9,9 +9,9 @@ type State uint32
 
 const (
 	Init State = iota
-	Phase0
 	Phase1
 	Phase2
+	Phase3
 	End
 	Shutdown
 )
@@ -19,12 +19,12 @@ const (
 // String returns the string representation of a State
 func (s State) String() string {
 	switch s {
-	case Phase0:
-		return "Phase0"
 	case Phase1:
 		return "Phase1"
 	case Phase2:
 		return "Phase2"
+	case Phase3:
+		return "Phase3"
 	case End:
 		return "End"
 	case Shutdown:
