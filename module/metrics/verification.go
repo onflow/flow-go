@@ -37,10 +37,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemFinderEngine,
 		Help:      "total number of execution receipts received by finder engine",
 	})
-	err := registerer.Register(rcvReceiptsTotals)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvReceiptsTotals metric")
-	}
 
 	sntExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_sent_total",
@@ -48,10 +44,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemFinderEngine,
 		Help:      "total number of execution results sent by finder engine to match engine",
 	})
-	err = registerer.Register(sntExecutionResultsTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntExecutionResultsTotal metric")
-	}
 
 	// Match Engine
 	rcvExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
@@ -60,10 +52,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of execution results received by match engine from finder engine",
 	})
-	err = registerer.Register(rcvExecutionResultsTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvExecutionResultsTotal) metric")
-	}
 
 	sntVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_sent_total",
@@ -71,10 +59,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of verifiable chunks sent by match engine to verifier engine",
 	})
-	err = registerer.Register(sntVerifiableChunksTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntVerifiableChunksTotal metric")
-	}
 
 	rcvChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_received_total",
@@ -82,10 +66,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of chunk data packs received by match engine",
 	})
-	err = registerer.Register(rcvChunkDataPackTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvChunkDataPackTotal metric")
-	}
 
 	reqChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_requested_total",
@@ -93,10 +73,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of chunk data packs requested by match engine",
 	})
-	err = registerer.Register(reqChunkDataPackTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register reqChunkDataPackTotal metric")
-	}
 
 	// Verifier Engine
 	rcvVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
@@ -105,10 +81,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemVerifierEngine,
 		Help:      "total number verifiable chunks received by verifier engine from match engine",
 	})
-	err = registerer.Register(rcvVerifiableChunksTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvVerifiableChunksTotal metric")
-	}
 
 	sntResultApprovalTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "result_approvals_total",
@@ -116,10 +88,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Subsystem: subsystemVerifierEngine,
 		Help:      "total number of emitted result approvals by verifier engine",
 	})
-	err = registerer.Register(sntResultApprovalTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntResultApprovalTotal metric")
-	}
 
 	// Storage
 	storagePerChunk := promauto.NewGauge(prometheus.GaugeOpts{
@@ -127,10 +95,16 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Namespace: namespaceVerification,
 		Help:      "latest ingested chunk resources storage (bytes)",
 	})
-	err = registerer.Register(storagePerChunk)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register storagePerChunk metric")
-	}
+
+	// registers all metrics and panics if any fails.
+	registerer.MustRegister(rcvReceiptsTotals,
+		sntExecutionResultsTotal,
+		rcvExecutionResultsTotal,
+		sntVerifiableChunksTotal,
+		rcvChunkDataPackTotal,
+		reqChunkDataPackTotal,
+		rcvVerifiableChunksTotal,
+		sntResultApprovalTotal)
 
 	vc := &VerificationCollector{
 		tracer:                   tracer,
