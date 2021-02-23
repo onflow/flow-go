@@ -32,7 +32,7 @@ var lightCollectionsCmd = &cobra.Command{
 		log.Info().Msgf("getting collection by id: %v", collectionID)
 		collection, err := storages.Collections.LightByID(collectionID)
 		if err != nil {
-			log.Error().Err(err).Msgf("could not get transaction with id: %v", collectionID)
+			log.Error().Err(err).Msgf("could not get collection with id: %v", collectionID)
 			return
 		}
 
