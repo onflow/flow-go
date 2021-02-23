@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,7 +20,7 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	// TODO change hasher.DefaultHasherVersion-1 to hasher.DefaultHasherVersion when the migration is over
+	// TODO change complete.DefaultHasherVersion-1 to complete.DefaultHasherVersion when the migration is over
 	led, err := complete.NewLedger(
 		dir,
 		complete.DefaultCacheSize,
@@ -29,7 +28,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		log,
 		nil,
 		complete.DefaultPathFinderVersion,
-		hasher.DefaultHasherVersion-1)
+		complete.DefaultHasherVersion-1)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
@@ -38,7 +37,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		[]ledger.Migration{},
 		[]ledger.Reporter{migrations.StorageReporter{Log: log, OutputDir: outputDir}},
 		complete.DefaultPathFinderVersion,
-		hasher.DefaultHasherVersion,
+		complete.DefaultHasherVersion,
 		outputDir,
 		wal.RootCheckpointFilename)
 	if err != nil {

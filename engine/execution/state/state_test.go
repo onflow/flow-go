@@ -24,7 +24,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			unittest.RunWithTempDir(t, func(dbDir string) {
 				metricsCollector := &metrics.NoopCollector{}
-				ls, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, ledger.DefaultPathFinderVersion)
+				ls, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, ledger.DefaultPathFinderVersion, ledger.DefaultHasherVersion)
 				//ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 				require.NoError(t, err)
 

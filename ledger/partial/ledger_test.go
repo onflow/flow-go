@@ -18,7 +18,7 @@ import (
 func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	unittest.RunWithTempDir(t, func(dbDir string) {
 
-		l, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+		l, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion, complete.DefaultHasherVersion)
 		require.NoError(t, err)
 
 		// create empty update
@@ -36,7 +36,7 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 		proof, err := l.Prove(query)
 		require.NoError(t, err)
 
-		pled, err := partial.NewLedger(proof, newState, partial.DefaultPathFinderVersion, hasher.DefaultHasherVersion)
+		pled, err := partial.NewLedger(proof, newState, partial.DefaultPathFinderVersion, partial.DefaultHasherVersion)
 		assert.NoError(t, err)
 		assert.Equal(t, pled.InitialState(), newState)
 

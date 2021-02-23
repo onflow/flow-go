@@ -71,7 +71,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	header := unittest.BlockHeaderWithParentFixture(root)
 
 	unittest.RunWithTempDir(t, func(dir string) {
-		led, err := completeLedger.NewLedger(dir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
+		led, err := completeLedger.NewLedger(dir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion, completeLedger.DefaultHasherVersion)
 		require.NoError(t, err)
 		defer led.Done()
 

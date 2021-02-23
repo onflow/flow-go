@@ -11,11 +11,13 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
 
+const hasherVersion = 1
+
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
 	path := utils.TwoBytesPath(56809)
 	payload := utils.LightPayload(56810, 59656)
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 	n := node.NewLeaf(path, payload, 0, lh)
 	expectedRootHashHex := "aa7693d498e9a087b1cadf5bfe9a1ff07829badc1915c210e482f369f9a00a70"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(n.Hash()))
@@ -29,7 +31,7 @@ func Test_ProperLeaf(t *testing.T) {
 func Test_CompactifiedLeaf(t *testing.T) {
 	path := utils.TwoBytesPath(56809)
 	payload := utils.LightPayload(56810, 59656)
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	n := node.NewLeaf(path, payload, 1, lh)
 	expectedRootHashHex := "34ee03b8ca7d5cc8638d28b7cf2d70641efd5dfa428333863904a0fd19930700"
@@ -48,7 +50,7 @@ func Test_CompactifiedLeaf(t *testing.T) {
 // We test the hash at the lowest-possible height (0), at an interim height (9) and the max possible height (16)
 func Test_InterimNodeWithoutChildren(t *testing.T) {
 
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	n := node.NewInterimNode(0, nil, nil, lh)
 	expectedRootHashHex := "18373b4b038cbbf37456c33941a7e346e752acd8fafa896933d4859002b62619"
@@ -68,7 +70,7 @@ func Test_InterimNodeWithoutChildren(t *testing.T) {
 func Test_InterimNodeWithOneChild(t *testing.T) {
 	path := utils.TwoBytesPath(56809)
 	payload := utils.LightPayload(56810, 59656)
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	c := node.NewLeaf(path, payload, 0, lh)
 
@@ -84,7 +86,7 @@ func Test_InterimNodeWithOneChild(t *testing.T) {
 // Test_InterimNodeWithBothChildren verifies that the hash value of an interim node with
 // both children (left and right) is computed correctly.
 func Test_InterimNodeWithBothChildren(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	leftPath := utils.TwoBytesPath(56809)
 	leftPayload := utils.LightPayload(56810, 59656)

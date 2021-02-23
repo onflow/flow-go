@@ -89,6 +89,6 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, pack2.ChunkDataPack.StartState, partial.DefaultPathFinderVersion)
+	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, pack2.ChunkDataPack.StartState, partial.DefaultPathFinderVersion, partial.DefaultHasherVersion)
 	require.NoError(gs.T(), err, "error building PSMT")
 }

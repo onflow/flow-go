@@ -27,7 +27,7 @@ func withForest(
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := mtrie.NewForest(pathByteSize, dir, numberOfActiveTries, &metrics.NoopCollector{}, nil)
+	forest, err := mtrie.NewForest(pathByteSize, partial.DefaultHasherVersion, dir, numberOfActiveTries, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	f(t, forest)
@@ -36,7 +36,7 @@ func withForest(
 func TestPartialTrieEmptyTrie(t *testing.T) {
 
 	pathByteSize := 2
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(partial.DefaultHasherVersion)
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
 		// add path1 to the empty trie
@@ -110,7 +110,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting batch proof")
 
-		lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+		lh := hasher.NewLedgerHasher(partial.DefaultHasherVersion)
 		psmt, err := NewPSMT(rootHash, pathByteSize, bp, lh)
 		require.NoError(t, err, "error building partial trie")
 
@@ -156,7 +156,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+		lh := hasher.NewLedgerHasher(partial.DefaultHasherVersion)
 		psmt, err := NewPSMT(rootHash, pathByteSize, bp, lh)
 		require.NoError(t, err, "error building partial trie")
 
@@ -209,7 +209,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+		lh := hasher.NewLedgerHasher(partial.DefaultHasherVersion)
 		psmt, err := NewPSMT(rootHash, pathByteSize, bp, lh)
 		require.NoError(t, err, "error building partial trie")
 
@@ -266,7 +266,7 @@ func TestMixProof(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+		lh := hasher.NewLedgerHasher(partial.DefaultHasherVersion)
 		psmt, err := NewPSMT(rootHash, pathByteSize, bp, lh)
 		require.NoError(t, err, "error building partial trie")
 
@@ -321,7 +321,7 @@ func TestRandomProofs(t *testing.T) {
 			bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 			require.NoError(t, err, "error getting batch proof")
 
-			lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+			lh := hasher.NewLedgerHasher(partial.DefaultHasherVersion)
 			psmt, err := NewPSMT(rootHash, pathByteSize, bp, lh)
 			require.NoError(t, err, "error building partial trie")
 

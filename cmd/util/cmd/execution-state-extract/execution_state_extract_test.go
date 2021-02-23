@@ -76,7 +76,7 @@ func TestExtractExecutionState(t *testing.T) {
 			keyMaxByteSize := 64
 			valueMaxByteSize := 1024
 
-			f, err := complete.NewLedger(execdir, size*10, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion)
+			f, err := complete.NewLedger(execdir, size*10, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion, complete.DefaultHasherVersion)
 			//f, err := oldLedger.NewMTrieStorage(execdir, size*10, metr, nil)
 			require.NoError(t, err)
 
@@ -138,7 +138,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 					require.FileExists(t, path.Join(outdir, wal.RootCheckpointFilename)) //make sure we have root checkpoint file
 
-					storage, err := complete.NewLedger(outdir, 1000, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion)
+					storage, err := complete.NewLedger(outdir, 1000, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion, complete.DefaultHasherVersion)
 					//storage, err := oldLedger.NewMTrieStorage(outdir, 1000, metr, nil)
 					require.NoError(t, err)
 

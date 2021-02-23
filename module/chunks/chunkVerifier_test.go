@@ -194,7 +194,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	metricsCollector := &metrics.NoopCollector{}
 
 	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := completeLedger.NewLedger(dbDir, 1000, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
+		f, _ := completeLedger.NewLedger(dbDir, 1000, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion, completeLedger.DefaultHasherVersion)
 
 		keys := executionState.RegisterIDSToKeys(ids)
 		update, err := ledger.NewUpdate(
