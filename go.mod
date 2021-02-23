@@ -13,6 +13,7 @@ require (
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
+	github.com/go-delve/delve v1.6.0 // indirect
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.2
@@ -33,6 +34,9 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
+	github.com/magefile/mage v1.11.0 // indirect
+	github.com/mattn/go-colorable v0.1.8 // indirect
+	github.com/mattn/go-runewidth v0.0.10 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.12.11
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
@@ -40,21 +44,29 @@ require (
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.8
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/peterh/liner v1.2.1 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
+	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/zerolog v1.19.0
-	github.com/spf13/cobra v0.0.6
-	github.com/spf13/pflag v1.0.3
-	github.com/spf13/viper v1.4.0
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/sirupsen/logrus v1.8.0 // indirect
+	github.com/spf13/cobra v1.1.3 // indirect
+	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.7.0
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.3.0+incompatible // indirect
+	github.com/ugorji/go v1.1.4 // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
+	go.starlark.net v0.0.0-20210223155950-e043a3d3c984 // indirect
 	go.uber.org/atomic v1.6.0
+	golang.org/x/arch v0.0.0-20210222215009-a3652b17bebe // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/sys v0.0.0-20210223095934-7937bea0104d // indirect
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
 	gotest.tools v2.2.0+incompatible

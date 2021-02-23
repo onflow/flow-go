@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/ledger/common/hasher"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,13 +39,14 @@ var (
 	segmentSize        = 32 * 1024
 	pathByteSize       = 32
 	pathFinderVersion  = uint8(complete.DefaultPathFinderVersion)
+	hasherVersion      = complete.DefaultHasherVersion
 )
 
 func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		led, err := complete.NewLedger(dir, size*10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion, complete.DefaultHasherVersion)
+		led, err := complete.NewLedger(dir, size*10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion, hasherVersion)
 		require.NoError(t, err)
 
 		var state = led.InitialState()
@@ -79,7 +78,7 @@ func Test_WAL(t *testing.T) {
 
 		<-led.Done()
 
-		led2, err := complete.NewLedger(dir, (size*10)+10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion, complete.DefaultHasherVersion)
+		led2, err := complete.NewLedger(dir, (size*10)+10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion, hasherVersion)
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here
@@ -113,7 +112,7 @@ func Test_Checkpointing(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(pathByteSize, hasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -123,7 +122,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("create WAL and initial trie", func(t *testing.T) {
 
-			wal, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasher.DefaultHasherVersion)
+			wal, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasherVersion)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -164,14 +163,14 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		// create a new forest and reply WAL
-		f2, err := mtrie.NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(pathByteSize, hasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay WAL and create checkpoint", func(t *testing.T) {
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000010"))
 
-			wal2, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasher.DefaultHasherVersion)
+			wal2, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasherVersion)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -202,11 +201,11 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		f3, err := mtrie.NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f3, err := mtrie.NewForest(pathByteSize, hasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
-			wal3, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasher.DefaultHasherVersion)
+			wal3, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasherVersion)
 			require.NoError(t, err)
 
 			err = wal3.Replay(
@@ -264,7 +263,7 @@ func Test_Checkpointing(t *testing.T) {
 			unittest.RequireFileEmpty(t, path.Join(dir, "00000011"))
 
 			//generate one more segment
-			wal4, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasher.DefaultHasherVersion)
+			wal4, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasherVersion)
 			require.NoError(t, err)
 
 			update, err := ledger.NewUpdate(rootHash, keys2, values2)
@@ -285,11 +284,11 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
 		})
 
-		f5, err := mtrie.NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f5, err := mtrie.NewForest(pathByteSize, hasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
-			wal5, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasher.DefaultHasherVersion)
+			wal5, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasherVersion)
 			require.NoError(t, err)
 
 			updatesLeft := 1 // there should be only one update
@@ -337,10 +336,10 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
 
-			f6, err := mtrie.NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+			f6, err := mtrie.NewForest(pathByteSize, hasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 			require.NoError(t, err)
 
-			wal6, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasher.DefaultHasherVersion)
+			wal6, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize, hasherVersion)
 			require.NoError(t, err)
 
 			// make sure no earlier checkpoints exist
