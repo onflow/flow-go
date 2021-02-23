@@ -12,10 +12,9 @@ type VerificationCollector struct {
 	tracer *trace.OpenTracer
 
 	// Assigner Engine
-	rcvBlocks            prometheus.Counter // total finalized blocks received by assigner engine
-	rcvExecutionReceipts prometheus.Counter // total execution receipts received by assigner engine
-	assignedChunks       prometheus.Counter // total chunks assigned to this verification node
-	processedChunks      prometheus.Counter // total chunks processed by assigner engine
+	rcvBlockTotal      prometheus.Counter // total finalized blocks received by assigner engine
+	assignedChunkTotal prometheus.Counter // total chunks assigned to this verification node
+	sntChunkTotal      prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
 
 	// Finder Engine
 	rcvReceiptsTotal         prometheus.Counter // total execution receipts arrived at finder engine
@@ -35,14 +34,32 @@ type VerificationCollector struct {
 
 func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
 	// Assigner Engine
-	rcvBlocks := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "finalized_block_total",
+	rcvBlockTotal := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "finalized_block_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number of finalized blocks received by assigner engine",
 	})
 
-	// Finder Engine
+	assignedChunkTotal := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "assigned_chunk_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "total number of chunks assigned to verification node",
+	})
+
+	processedChunkTotal := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "processed_chunk_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "total number of processed chunks by assigner engine",
+	})
+
+	// till new pipeline of assigner-fetcher-verifier is in place, we need to keep these metrics
+	// as they are. Though assigner and finder share this rcvReceiptsTotal, which should be refactored
+	// later.
+	// TODO rename name space to assigner
+	// Finder (and Assigner) Engine
 	rcvReceiptsTotals := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_receipt_received_total",
 		Namespace: namespaceVerification,
