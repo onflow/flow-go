@@ -78,6 +78,5 @@ var collectionsCmd = &cobra.Command{
 		}
 
 		log.Error().Msg("must specify exactly one of --collection-id or --transaction-id")
-		return
 	},
 }
