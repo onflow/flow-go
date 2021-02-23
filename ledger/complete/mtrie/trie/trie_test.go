@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
@@ -20,8 +21,10 @@ const (
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_EmptyTrie(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	expectedRootHashHex := "6e24e2397f130d9d17bef32b19a77b8f5bcf03fb7e9e75fd89b8a455675d574a"
@@ -32,13 +35,15 @@ func Test_EmptyTrie(t *testing.T) {
 // register populated matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithLeftRegister(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	path := utils.TwoBytesPath(0)
 	payload := utils.LightPayload(11, 12345)
-	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
+	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, lh)
 	require.NoError(t, err)
 	expectedRootHashHex := "ff472d38a97b3b1786c4dfffa0005370aa3c16805d342ed7618876df7101f760"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
@@ -48,13 +53,15 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 // register populated matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithRightRegister(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	path := utils.TwoBytesPath(65535)
 	payload := utils.LightPayload(12346, 54321)
-	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
+	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, lh)
 	require.NoError(t, err)
 	expectedRootHashHex := "d1fb1c7c84bcd02205fbc7bdf73ee8e943b8bb4b7db6bcc26ae7af67e507fb8d"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
@@ -64,13 +71,15 @@ func Test_TrieWithRightRegister(t *testing.T) {
 // // allocated register somewhere in the middle.
 // // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	path := utils.TwoBytesPath(56809)
 	payload := utils.LightPayload(12346, 59656)
-	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
+	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, lh)
 	require.NoError(t, err)
 	expectedRootHashHex := "b44a9a00c182ba2203fca6886c4c99b854f9f8279a9978b180ad10e82362e412"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
@@ -80,14 +89,16 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 // matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithManyRegisters(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
 	paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, 12001))
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, lh)
 	require.NoError(t, err)
 	expectedRootHashHex := "18a7c33a0ecf148274f860246f23dffdc6d15dc846e0ae34f6887a43ec67124c"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
@@ -97,8 +108,10 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 // matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	// allocate single random register
@@ -112,7 +125,7 @@ func Test_FullTrie(t *testing.T) {
 		payload := utils.LightPayload(temp, temp)
 		payloads = append(payloads, *payload)
 	}
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, lh)
 	require.NoError(t, err)
 	expectedRootHashHex := "0a1e74e7a4dfcc916dcafbd3f1c826280f047cd5608295f01a32c9af5949898f"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
@@ -121,6 +134,8 @@ func Test_FullTrie(t *testing.T) {
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
 // The expected root hashes are coming from a reference implementation in python and is hard-coded here.
 func Test_UpdateTrie(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	expectedRootHashes := []string{
 		"a8dc0574fdeeaab4b5d3b2a798c19bee5746337a9aea735ebc4dfd97311503c5",
 		"6fb27c151f44ba50128c2a6b5ecec19343edf7b68b7b733b64cb5df3c0de4a8b",
@@ -145,7 +160,7 @@ func Test_UpdateTrie(t *testing.T) {
 	}
 
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	// allocate single random register
@@ -153,14 +168,14 @@ func Test_UpdateTrie(t *testing.T) {
 	path := utils.TwoBytesPath(rng.next())
 	temp := rng.next()
 	payload := utils.LightPayload(temp, temp)
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload}, lh)
 	require.NoError(t, err)
 	expectedRootHashHex := "a8dc0574fdeeaab4b5d3b2a798c19bee5746337a9aea735ebc4dfd97311503c5"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 
 	for r := 0; r < 20; r++ {
 		paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
-		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
+		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads, lh)
 		require.NoError(t, err)
 		require.Equal(t, expectedRootHashes[r], hex.EncodeToString(updatedTrie.RootHash()))
 	}
@@ -170,28 +185,29 @@ func Test_UpdateTrie(t *testing.T) {
 // Unallocating here means, to set the stored register value to an empty byte slice
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_UnallocateRegisters(t *testing.T) {
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
 	rng := &LinearCongruentialGenerator{seed: 0}
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
 
 	// we first draw 99 random key-value pairs that will be first allocated and later unallocated:
 	paths1, payloads1 := deduplicateWrites(sampleRandomRegisterWrites(rng, 99))
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths1, payloads1)
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths1, payloads1, lh)
 	require.NoError(t, err)
 
 	// we then write an additional 117 registers
 	paths2, payloads2 := deduplicateWrites(sampleRandomRegisterWrites(rng, 117))
-	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths2, payloads2)
+	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths2, payloads2, lh)
 	require.NoError(t, err)
 
 	// and now we override the first 99 registers with default values, i.e. unallocate them
 	payloads0 := make([]ledger.Payload, len(payloads1))
-	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths1, payloads0)
+	updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths1, payloads0, lh)
 	require.NoError(t, err)
 
 	// this should be identical to the first 99 registers never been written
 	expectedRootHashHex := "ce4883f826deaec46317901b7a274a2f9706bc1d1b2cf6869ca1447afb23b2d5"
-	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
+	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2, lh)
 	require.NoError(t, err)
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisionTrie.RootHash()))
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))

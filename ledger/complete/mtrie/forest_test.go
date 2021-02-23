@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
@@ -31,13 +32,15 @@ func TestTrieOperations(t *testing.T) {
 	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// Make new Trie (independently of MForest):
-	nt, err := trie.NewEmptyMTrie(pathByteSize)
+	nt, err := trie.NewEmptyMTrie(pathByteSize, lh)
 	require.NoError(t, err)
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1})
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1}, lh)
 	require.NoError(t, err)
 
 	// Add trie
@@ -965,7 +968,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
 
-		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, batchProof)
+		lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, batchProof, lh)
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.RootHash(), activeRoot))
 

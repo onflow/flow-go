@@ -12,7 +12,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
@@ -43,13 +43,13 @@ type MTrie struct {
 }
 
 // NewEmptyMTrie returns an empty Mtrie (root is an empty node)
-func NewEmptyMTrie(pathByteSize int) (*MTrie, error) {
+func NewEmptyMTrie(pathByteSize int, lh *hasher.LedgerHasher) (*MTrie, error) {
 	if pathByteSize < 1 {
 		return nil, errors.New("trie's path size [in bytes] must be positive")
 	}
 	height := pathByteSize * 8
 	return &MTrie{
-		root:         node.NewEmptyTreeRoot(height),
+		root:         node.NewEmptyTreeRoot(height, lh),
 		pathByteSize: pathByteSize,
 		height:       height,
 	}, nil
@@ -163,9 +163,9 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]*ledger.Payload, 
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * keys are NOT duplicated
 // TODO: move consistency checks from MForest to here, to make API is safe and self-contained
-func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
+func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload, lh *hasher.LedgerHasher) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	updatedRoot, err := update(parentTrie.height, parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads)
+	updatedRoot, err := update(parentTrie.height, parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, lh)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -183,9 +183,9 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 //     (excluding the bit at index headHeight)
 //   * keys are NOT duplicated
 // TODO: remove error return
-func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) (*node.Node, error) {
+func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload, lh *hasher.LedgerHasher) (*node.Node, error) {
 	if parentNode == nil { // parent Trie has no sub-trie for the set of paths => construct entire subtree
-		return constructSubtrie(treeHeight, nodeHeight, paths, payloads)
+		return constructSubtrie(treeHeight, nodeHeight, paths, payloads, lh)
 	}
 
 	if len(paths) == 0 { // We are not changing any values in this sub-trie => return parent trie
@@ -207,7 +207,7 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 			paths = append(paths, parentNode.Path())
 			payloads = append(payloads, *parentNode.Payload())
 		}
-		return constructSubtrie(treeHeight, nodeHeight, paths, payloads)
+		return constructSubtrie(treeHeight, nodeHeight, paths, payloads, lh)
 	}
 
 	// Split payloads so we can update the trie in parallel
@@ -223,9 +223,9 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		lChild, lErr = update(treeHeight, nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
+		lChild, lErr = update(treeHeight, nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads, lh)
 	}()
-	rChild, rErr = update(treeHeight, nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
+	rChild, rErr = update(treeHeight, nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads, lh)
 	wg.Wait()
 	if lErr != nil || rErr != nil {
 		var merr *multierror.Error
@@ -240,7 +240,7 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 		}
 	}
 
-	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
+	return node.NewInterimNode(nodeHeight, lChild, rChild, lh), nil
 }
 
 // constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs.
@@ -251,14 +251,14 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 //   * paths contains at least one element
 //   * paths are NOT duplicated
 // TODO: remove error return
-func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, payloads []ledger.Payload) (*node.Node, error) {
+func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, payloads []ledger.Payload, lh *hasher.LedgerHasher) (*node.Node, error) {
 	// no inserts => default value, represented by nil node
 	if len(paths) == 0 {
 		return nil, nil
 	}
 	// If we are at a leaf node, we create the node
 	if len(paths) == 1 {
-		return node.NewLeaf(paths[0], &payloads[0], nodeHeight), nil
+		return node.NewLeaf(paths[0], &payloads[0], nodeHeight, lh), nil
 	}
 	// from here on, we have: len(paths) > 1
 
@@ -279,9 +279,9 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		lChild, lErr = constructSubtrie(treeHeight, nodeHeight-1, lpaths, lpayloads)
+		lChild, lErr = constructSubtrie(treeHeight, nodeHeight-1, lpaths, lpayloads, lh)
 	}()
-	rChild, rErr = constructSubtrie(treeHeight, nodeHeight-1, rpaths, rpayloads)
+	rChild, rErr = constructSubtrie(treeHeight, nodeHeight-1, rpaths, rpayloads, lh)
 	wg.Wait()
 	if lErr != nil || rErr != nil {
 		var merr *multierror.Error
@@ -296,16 +296,16 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 		}
 	}
 
-	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
+	return node.NewInterimNode(nodeHeight, lChild, rChild, lh), nil
 }
 
 // UnsafeProofs provides proofs for the given paths, this is called unsafe as
 // it requires the input paths to be sorted in advance.
-func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) error {
-	return mt.proofs(mt.root, paths, proofs)
+func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof, lh *hasher.LedgerHasher) error {
+	return mt.proofs(mt.root, paths, proofs, lh)
 }
 
-func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) error {
+func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof, lh *hasher.LedgerHasher) error {
 	// we've reached the end of a trie
 	// and path is not found (noninclusion proof)
 	if head == nil {
@@ -337,7 +337,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	if len(lpaths) > 0 {
 		if rChild := head.RightChild(); rChild != nil {
 			nodeHash := rChild.Hash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
+			isDef := bytes.Equal(nodeHash, lh.GetDefaultHashForHeight(rChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range lproofs {
 					err := utils.SetBit(p.Flags, mt.height-head.Height())
@@ -348,7 +348,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 				}
 			}
 		}
-		err := mt.proofs(head.LeftChild(), lpaths, lproofs)
+		err := mt.proofs(head.LeftChild(), lpaths, lproofs, lh)
 		if err != nil {
 			return err
 		}
@@ -357,7 +357,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	if len(rpaths) > 0 {
 		if lChild := head.LeftChild(); lChild != nil {
 			nodeHash := lChild.Hash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
+			isDef := bytes.Equal(nodeHash, lh.GetDefaultHashForHeight(lChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range rproofs {
 					err := utils.SetBit(p.Flags, mt.height-head.Height())
@@ -368,7 +368,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 				}
 			}
 		}
-		err := mt.proofs(head.RightChild(), rpaths, rproofs)
+		err := mt.proofs(head.RightChild(), rpaths, rproofs, lh)
 		if err != nil {
 			return err
 		}
@@ -425,8 +425,8 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 }
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
-func EmptyTrieRootHash(pathByteSize int) []byte {
-	return node.NewEmptyTreeRoot(8 * pathByteSize).Hash()
+func EmptyTrieRootHash(pathByteSize int, lh *hasher.LedgerHasher) []byte {
+	return node.NewEmptyTreeRoot(8*pathByteSize, lh).Hash()
 }
 
 // AllPayloads returns all payloads
@@ -435,7 +435,7 @@ func (mt *MTrie) AllPayloads() []ledger.Payload {
 }
 
 // IsAValidTrie verifies the content of the trie for potential issues
-func (mt *MTrie) IsAValidTrie() bool {
+func (mt *MTrie) IsAValidTrie(lh *hasher.LedgerHasher) bool {
 	// TODO add checks on the health of node max height ...
-	return mt.root.VerifyCachedHash()
+	return mt.root.VerifyCachedHash(lh)
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 )
@@ -33,8 +34,10 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
 
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	// decode proof
-	psmt, err := ptrie.NewPSMT(s, pathfinder.PathByteSize, batchProof)
+	psmt, err := ptrie.NewPSMT(s, pathfinder.PathByteSize, batchProof, lh)
 
 	if err != nil {
 		// TODO provide more details based on the error type

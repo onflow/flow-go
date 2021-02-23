@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
@@ -262,6 +263,7 @@ func TestLedgerFunctionality(t *testing.T) {
 	experimentRep := 2
 	metricsCollector := &metrics.NoopCollector{}
 	logger := zerolog.Logger{}
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
 
 	for e := 0; e < experimentRep; e++ {
 		numInsPerStep := 100
@@ -317,7 +319,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptrie.NewPSMT(newState, pathByteSize, bProof)
+				_, err = ptrie.NewPSMT(newState, pathByteSize, bProof, lh)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)

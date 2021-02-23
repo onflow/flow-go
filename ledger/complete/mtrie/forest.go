@@ -10,6 +10,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/io"
@@ -36,6 +37,7 @@ type Forest struct {
 	onTreeEvicted  func(tree *trie.MTrie) error
 	pathByteSize   int // length [bytes] of register path
 	metrics        module.LedgerMetrics
+	ledgerHasher   *hasher.LedgerHasher
 }
 
 // NewForest returns a new instance of memory forest.
@@ -46,6 +48,7 @@ type Forest struct {
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
 func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
+	// TODO add hasher.DefaultHashMethod to params
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -75,10 +78,11 @@ func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metr
 		onTreeEvicted:  onTreeEvicted,
 		pathByteSize:   pathByteSize,
 		metrics:        metrics,
+		ledgerHasher:   hasher.NewLedgerHasher(hasher.DefaultHashMethod),
 	}
 
 	// add empty roothash
-	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize, forest.ledgerHasher)
 	if err != nil {
 		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
 	}
@@ -193,7 +197,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		sortedPayloads = append(sortedPayloads, payloadMap[string(path)])
 	}
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedPaths, sortedPayloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedPaths, sortedPayloads, f.ledgerHasher)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -263,7 +267,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 			return bytes.Compare(notFoundPaths[i], notFoundPaths[j]) < 0
 		})
 
-		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads)
+		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, f.ledgerHasher)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +290,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		p.Inclusion = false
 	}
 
-	err = stateTrie.UnsafeProofs(sortedPaths, bp.Proofs)
+	err = stateTrie.UnsafeProofs(sortedPaths, bp.Proofs, f.ledgerHasher)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +384,7 @@ func (f *Forest) RemoveTrie(rootHash []byte) {
 
 // GetEmptyRootHash returns the rootHash of empty Trie
 func (f *Forest) GetEmptyRootHash() []byte {
-	return trie.EmptyTrieRootHash(f.pathByteSize)
+	return trie.EmptyTrieRootHash(f.pathByteSize, f.ledgerHasher)
 }
 
 // Size returns the number of active tries in this store

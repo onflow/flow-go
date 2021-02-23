@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
@@ -13,7 +14,7 @@ import (
 // hash from the leaf to the root and comparing the rootHash
 func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 
-	h := hasher.newLedgerHasher(hasher.defaultHashMethod)
+	ledgerHasher := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
 
 	treeHeight := 8 * len(p.Path)
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
@@ -21,9 +22,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		return false
 	}
 	// We start with the leaf and hash our way upwards towards the root
-	proofIndex := len(p.Interims) - 1                                // the index of the last non-default value furthest down the tree (-1 if there is none)
-	computed := h.ComputeCompactValue(p.Path, p.Payload, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
-	for h := leafHeight + 1; h <= treeHeight; h++ {                  // then, we hash our way upwards until we hit the root (at height `treeHeight`)
+	proofIndex := len(p.Interims) - 1                                           // the index of the last non-default value furthest down the tree (-1 if there is none)
+	computed := ledgerHasher.ComputeCompactValue(p.Path, p.Payload, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
+	for h := leafHeight + 1; h <= treeHeight; h++ {                             // then, we hash our way upwards until we hit the root (at height `treeHeight`)
 		// we are currently at a node n (initially the leaf). In this iteration, we want to compute the
 		// parent's hash. Here, h is the height of the parent, whose hash want to compute.
 		// The parent has two children: child n, whose hash we have already computed (aka `computed`);
@@ -41,7 +42,7 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 			siblingHash = p.Interims[proofIndex]
 			proofIndex--
 		} else { // otherwise, siblingHash is a default hash
-			siblingHash = h.GetDefaultHashForHeight(h - 1)
+			siblingHash = ledgerHasher.GetDefaultHashForHeight(h - 1)
 		}
 
 		bitIsSet, err := utils.IsBitSet(p.Path, treeHeight-h)
@@ -50,9 +51,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		}
 		// hashing is order dependant
 		if bitIsSet { // we hash our way up to the parent along the parent's right branch
-			computed = h.HashInterNode(siblingHash, computed)
+			computed = ledgerHasher.HashInterNode(siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
-			computed = h.HashInterNode(computed, siblingHash)
+			computed = ledgerHasher.HashInterNode(computed, siblingHash)
 		}
 	}
 	return bytes.Equal(computed, expectedState) == p.Inclusion

@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -264,6 +265,9 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string) (ledger.State, error) {
 
+	// TODO expose target hashMethod
+	ledgerHasher := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
 
 	// get trie
@@ -314,12 +318,12 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
 
-	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize, ledgerHasher)
 	if err != nil {
 		return nil, fmt.Errorf("constructing empty trie failed: %w", err)
 	}
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, ledgerHasher)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}

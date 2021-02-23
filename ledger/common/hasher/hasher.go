@@ -8,7 +8,7 @@ import (
 
 // hash method 1 mean using sha3-256
 // hash method 2 means using blake2s
-const defaultHashMethod = 1
+const DefaultHashMethod = 1
 
 type LedgerHasher struct {
 	hashMethod      int
@@ -17,7 +17,7 @@ type LedgerHasher struct {
 	defaultHashes [257][]byte
 }
 
-func newLedgerHasher(hashMethod int) *LedgerHasher {
+func NewLedgerHasher(hashMethod int) *LedgerHasher {
 	lh := &LedgerHasher{
 		hashMethod: hashMethod,
 	}

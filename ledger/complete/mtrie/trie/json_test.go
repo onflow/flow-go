@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
@@ -19,7 +20,9 @@ import (
 
 func Test_DumpJSON_Empty(t *testing.T) {
 
-	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
+	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize, lh)
 	require.NoError(t, err)
 
 	var buffer bytes.Buffer

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -16,12 +17,14 @@ import (
 
 func TestTrieStoreAndLoad(t *testing.T) {
 
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+
 	pathByteSize := 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize)
+	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize, lh)
 	require.NoError(t, err)
 
 	p1 := utils.OneBytePath(1)
@@ -38,7 +41,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	paths := []ledger.Path{p1, p2, p3, p4, p5}
 	payloads := []ledger.Payload{*v1, *v2, *v3, *v4, *v5}
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, lh)
 	require.NoError(t, err)
 
 	flattedTrie, err := flattener.FlattenTrie(newTrie)

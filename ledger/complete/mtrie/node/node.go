@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
@@ -74,7 +74,7 @@ func NewNode(height int,
 
 // NewEmptyTreeRoot creates a compact leaf Node
 // UNCHECKED requirement: height must be non-negative
-func NewEmptyTreeRoot(height int) *Node {
+func NewEmptyTreeRoot(height int, lh *hasher.LedgerHasher) *Node {
 	n := &Node{
 		lChild:    nil,
 		rChild:    nil,
@@ -85,7 +85,7 @@ func NewEmptyTreeRoot(height int) *Node {
 		maxDepth:  0,
 		regCount:  0,
 	}
-	n.hashValue = n.computeHash()
+	n.hashValue = n.computeHash(lh)
 	return n
 }
 
@@ -93,7 +93,8 @@ func NewEmptyTreeRoot(height int) *Node {
 // UNCHECKED requirement: height must be non-negative
 func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
-	height int) *Node {
+	height int,
+	lh *hasher.LedgerHasher) *Node {
 
 	regCount := uint64(0)
 	if path != nil {
@@ -109,13 +110,13 @@ func NewLeaf(path ledger.Path,
 		maxDepth: 0,
 		regCount: regCount,
 	}
-	n.hashValue = n.computeHash()
+	n.hashValue = n.computeHash(lh)
 	return n
 }
 
 // NewInterimNode creates a new Node with the provided value and no children.
 // UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
-func NewInterimNode(height int, lchild, rchild *Node) *Node {
+func NewInterimNode(height int, lchild, rchild *Node, lh *hasher.LedgerHasher) *Node {
 	var lMaxDepth, rMaxDepth uint16
 	var lRegCount, rRegCount uint64
 	if lchild != nil {
@@ -136,48 +137,48 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
 		regCount: lRegCount + rRegCount,
 	}
-	n.hashValue = n.computeHash()
+	n.hashValue = n.computeHash(lh)
 	return n
 }
 
 // computeHash computes the hashValue for the given Node
 // we kept it this way to stay compatible with the previous versions
-func (n *Node) computeHash() []byte {
+func (n *Node) computeHash(lh *hasher.LedgerHasher) []byte {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
 			// LEAF node: defined by key-value pair
-			return common.ComputeCompactValue(n.path, n.payload, n.height)
+			return lh.ComputeCompactValue(n.path, n.payload, n.height)
 		}
 		// ROOT NODE: no children, no key-value pair
-		return common.GetDefaultHashForHeight(n.height)
+		return lh.GetDefaultHashForHeight(n.height)
 	}
 
 	// this is an INTERIOR node at least one of lChild or rChild is not nil.
-	h1 := common.GetDefaultHashForHeight(n.height - 1)
+	h1 := lh.GetDefaultHashForHeight(n.height - 1)
 	if n.lChild != nil {
 		h1 = n.lChild.Hash()
 	}
-	h2 := common.GetDefaultHashForHeight(n.height - 1)
+	h2 := lh.GetDefaultHashForHeight(n.height - 1)
 	if n.rChild != nil {
 		h2 = n.rChild.Hash()
 	}
-	return common.HashInterNode(h1, h2)
+	return lh.HashInterNode(h1, h2)
 }
 
-func (n *Node) VerifyCachedHash() bool {
+func (n *Node) VerifyCachedHash(lh *hasher.LedgerHasher) bool {
 	if n.lChild != nil {
-		if !n.lChild.VerifyCachedHash() {
+		if !n.lChild.VerifyCachedHash(lh) {
 			return false
 		}
 	}
 	if n.rChild != nil {
-		if !n.rChild.VerifyCachedHash() {
+		if !n.rChild.VerifyCachedHash(lh) {
 			return false
 		}
 	}
 	if n.hashValue != nil {
-		return bytes.Equal(n.hashValue, n.computeHash())
+		return bytes.Equal(n.hashValue, n.computeHash(lh))
 	}
 	return true
 }

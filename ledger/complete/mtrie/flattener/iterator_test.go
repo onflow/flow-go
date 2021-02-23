@@ -7,13 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
 func TestEmptyTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(1)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	emptyTrie, err := trie.NewEmptyMTrie(1, lh)
 	require.NoError(t, err)
 
 	itr := flattener.NewNodeIterator(emptyTrie)
@@ -27,7 +29,8 @@ func TestEmptyTrie(t *testing.T) {
 }
 
 func TestPopulatedTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(1)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	emptyTrie, err := trie.NewEmptyMTrie(1, lh)
 	require.NoError(t, err)
 
 	// key: 0000...
@@ -41,7 +44,7 @@ func TestPopulatedTrie(t *testing.T) {
 	paths := []ledger.Path{p1, p2}
 	payloads := []ledger.Payload{*v1, *v2}
 
-	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, lh)
 	require.NoError(t, err)
 
 	for itr := flattener.NewNodeIterator(testTrie); itr.Next(); {

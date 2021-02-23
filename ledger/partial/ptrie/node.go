@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 )
 
 type Root []byte
@@ -36,24 +36,24 @@ func newNode(hashValue []byte, height int) *node {
 }
 
 // ComputeValue recomputes value for this node in recursive manner
-func (n *node) HashValue() []byte {
+func (n *node) HashValue(lh *hasher.LedgerHasher) []byte {
 	// leaf node
 	if n.lChild == nil && n.rChild == nil {
 		if n.hashValue != nil {
 			return n.hashValue
 		}
-		return common.GetDefaultHashForHeight(n.height)
+		return lh.GetDefaultHashForHeight(n.height)
 	}
 	// otherwise compute
-	h1 := common.GetDefaultHashForHeight(n.height - 1)
+	h1 := lh.GetDefaultHashForHeight(n.height - 1)
 	if n.lChild != nil {
-		h1 = n.lChild.HashValue()
+		h1 = n.lChild.HashValue(lh)
 	}
-	h2 := common.GetDefaultHashForHeight(n.height - 1)
+	h2 := lh.GetDefaultHashForHeight(n.height - 1)
 	if n.rChild != nil {
-		h2 = n.rChild.HashValue()
+		h2 = n.rChild.HashValue(lh)
 	}
 	// For debugging purpose uncomment this
 	// n.value = HashInterNode(h1, h2)
-	return common.HashInterNode(h1, h2)
+	return lh.HashInterNode(h1, h2)
 }
