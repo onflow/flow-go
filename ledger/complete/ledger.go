@@ -263,10 +263,8 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
+	targetLedgerHasherMethod int,
 	outputDir, outputFile string) (ledger.State, error) {
-
-	// TODO expose target hashMethod
-	ledgerHasher := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
 
 	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
 
@@ -317,6 +315,8 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	if err != nil {
 		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
+
+	ledgerHasher := hasher.NewLedgerHasher(targetLedgerHasherMethod)
 
 	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize, ledgerHasher)
 	if err != nil {

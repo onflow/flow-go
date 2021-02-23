@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,6 +36,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		[]ledger.Migration{},
 		[]ledger.Reporter{migrations.StorageReporter{Log: log, OutputDir: outputDir}},
 		complete.DefaultPathFinderVersion,
+		hasher.DefaultHashMethod,
 		outputDir,
 		wal.RootCheckpointFilename)
 	if err != nil {
