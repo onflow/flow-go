@@ -12,11 +12,11 @@ import (
 // Test_ProofVerify tests proof verification
 func Test_TrieProofVerify(t *testing.T) {
 	p, sc := utils.TrieProofFixture()
-	require.True(t, common.VerifyTrieProof(p, sc, 1))
+	require.True(t, common.VerifyTrieProof(p, sc, 0))
 }
 
 // Test_BatchProofVerify tests batch proof verification
 func Test_TrieBatchProofVerify(t *testing.T) {
 	bp, sc := utils.TrieBatchProofFixture()
-	require.True(t, common.VerifyTrieBatchProof(bp, sc, 1))
+	require.True(t, common.VerifyTrieBatchProof(bp, sc, 0))
 }
