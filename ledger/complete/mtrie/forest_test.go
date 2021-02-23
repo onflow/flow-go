@@ -966,7 +966,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		read = &ledger.TrieRead{RootHash: activeRoot, Paths: proofPaths}
 		batchProof, err := forest.Proofs(read)
 		require.NoError(t, err, "error generating proofs")
-		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
+		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot, hasher.DefaultHasherVersion))
 
 		lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, batchProof, lh)
@@ -1020,7 +1020,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	proof, err := forest.Proofs(read)
 
 	require.NoError(t, err)
-	require.True(t, common.VerifyTrieBatchProof(proof, ledger.State(updatedRoot)))
+	require.True(t, common.VerifyTrieBatchProof(proof, ledger.State(updatedRoot), hasher.DefaultHasherVersion))
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
