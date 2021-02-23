@@ -129,6 +129,8 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 // a receipt  with one assigned chunk, results in the assigner engine passing the assigned chunk to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func TestNewBlock_HappyPath(t *testing.T) {
+	t.Parallel()
+
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -171,6 +173,8 @@ func TestNewBlock_HappyPath(t *testing.T) {
 // it drops the corresponding execution receipts for that block without performing any chunk assignment.
 // It also evaluates that the chunks queue is not called on any chunks of that receipt's result.
 func TestNewBlock_Unstaked(t *testing.T) {
+	t.Parallel()
+
 	// creates an assigner engine for an unstaked verification node.
 	s := SetupTest(WithIdentity(
 		unittest.IdentityFixture(unittest.WithStake(0))))
@@ -211,6 +215,8 @@ func TestNewBlock_Unstaked(t *testing.T) {
 // a receipt with no chunk in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should not notify the job listener.
 func TestNewBlock_NoChunk(t *testing.T) {
+	t.Parallel()
+
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -247,6 +253,8 @@ func TestNewBlock_NoChunk(t *testing.T) {
 // a receipt with no assigned chunk for the verification node in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should not notify the job listener.
 func TestNewBlock_NoAssignedChunk(t *testing.T) {
+	t.Parallel()
+
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -289,6 +297,8 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 // a receipt with multiple assigned chunk, results in the assigner engine passing all assigned chunks to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func TestNewBlock_MultipleAssignment(t *testing.T) {
+	t.Parallel()
+
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -334,6 +344,8 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 // chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
 // added to the chunks queue, the consumer should not be notified.
 func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
+	t.Parallel()
+
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -376,6 +388,8 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 // TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
 // This is important as without a new chunk successfully added to the chunks queue, the consumer should not be notified.
 func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
+	t.Parallel()
+
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
