@@ -9,8 +9,7 @@ import (
 )
 
 type VerificationCollector struct {
-	tracer          *trace.OpenTracer
-	storagePerChunk prometheus.Gauge // storage per chunk
+	tracer *trace.OpenTracer
 
 	// Finder Engine
 	rcvReceiptsTotal         prometheus.Counter // total execution receipts arrived at finder engine
@@ -89,13 +88,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Help:      "total number of emitted result approvals by verifier engine",
 	})
 
-	// Storage
-	storagePerChunk := promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "storage_latest_chunk_size_bytes",
-		Namespace: namespaceVerification,
-		Help:      "latest ingested chunk resources storage (bytes)",
-	})
-
 	// registers all metrics and panics if any fails.
 	registerer.MustRegister(rcvReceiptsTotals,
 		sntExecutionResultsTotal,
@@ -114,7 +106,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		sntVerifiableChunksTotal: sntVerifiableChunksTotal,
 		rcvVerifiableChunksTotal: rcvVerifiableChunksTotal,
 		resultApprovalsTotal:     sntResultApprovalTotal,
-		storagePerChunk:          storagePerChunk,
 		rcvChunkDataPackTotal:    rcvChunkDataPackTotal,
 		reqChunkDataPackTotal:    reqChunkDataPackTotal,
 	}
