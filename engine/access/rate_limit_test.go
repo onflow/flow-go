@@ -51,6 +51,8 @@ type RateLimitTestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+
+
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
@@ -88,7 +90,8 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	config := rpc.Config{
 		GRPCListenAddr: "127.0.0.1:0",
 	}
-	suite.rpcEng = rpc.New(suite.log, suite.state, config, nil, nil, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
+
+	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.execClient, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
 		nil, suite.chainID, suite.metrics, 0, 0, false, false)
 	<-suite.rpcEng.Ready()
 
@@ -114,7 +117,9 @@ func TestRateLimit(t *testing.T) {
 }
 
 func (suite *RateLimitTestSuite) TestBasicRatelimiting() {
-	assert.True(suite.T(), true)
+
+	suite.execClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Once()
+	suite.collClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Once()
 	req := &accessproto.PingRequest{}
 	ctx := context.Background()
 	resp, err := suite.client.Ping(ctx, req)
@@ -131,7 +136,6 @@ func accessAPIClient(address string) (accessproto.AccessAPIClient, io.Closer, er
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
 	}
-
 	client := accessproto.NewAccessAPIClient(conn)
 	closer := io.Closer(conn)
 	return client, closer, nil

@@ -80,9 +80,7 @@ func New(log zerolog.Logger,
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
-	rateLimiter := &rateLimiter{
-		log: log,
-	}
+	rateLimiter := NewRateLimiterInterceptor(log)
 
 	rateLimitInterceptor := ratelimit.UnaryServerInterceptor(rateLimiter)
 

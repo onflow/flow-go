@@ -2,33 +2,93 @@ package rpc
 
 import (
 	"context"
-	"time"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
+	"golang.org/x/time/rate"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
-type rateLimiter struct {
+var APILimit = map[string]uint{
+	"Ping": 10,
+}
+
+const defaultRateLimit = 10 // 10 calls per second
+const defaultBurst = 3      // at most 3 call that are made at the same time
+
+type rateLimiterInterceptor struct {
 	log zerolog.Logger
+	ml  *methodLimiter
 }
 
-func (interceptor *rateLimiter) Limit() bool {
-	return true
+func NewRateLimiterInterceptor(log zerolog.Logger) *rateLimiterInterceptor {
+
+	return &rateLimiterInterceptor{
+		ml:  newMethodLimiter(log),
+		log: log,
+	}
 }
 
-// TODO: not used currently. May use it later if we want to refine the error message
-func (interceptor *rateLimiter) unaryServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-	start := time.Now()
+func (interceptor *rateLimiterInterceptor) unaryServerInterceptor(ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler) (resp interface{}, err error) {
+
+	if !interceptor.ml.allow(info.FullMethod) {
+
+		// log the limit violation
+		interceptor.log.Info().
+			Str("method", info.FullMethod).
+			Interface("request", req).
+			Msg("rate limit exceeded")
+
+		// reject the request
+		return nil, status.Errorf(codes.ResourceExhausted, "%s rate limit reached, please retry later.",
+			info.FullMethod)
+	}
 
 	// call the handler
 	h, err := handler(ctx, req)
 
-	interceptor.log.Debug().
-		Str("method", info.FullMethod).
-		Interface("request", req).
-		Interface("response", resp).
-		Err(err).
-		Dur("request_duration", time.Since(start))
-
 	return h, err
+}
+
+type methodLimiter struct {
+	log              zerolog.Logger
+	defaultLimiter   *rate.Limiter            // a limiter applied to all unknown method names
+	methodLimiterMap map[string]*rate.Limiter // map of method name to its corresponding limiter
+}
+
+func newMethodLimiter(log zerolog.Logger) *methodLimiter {
+
+	defaultLimiter := rate.NewLimiter(defaultRateLimit, defaultBurst)
+
+	methodLimiterMap := make(map[string]*rate.Limiter, len(APILimit))
+	for api, limit := range APILimit {
+		methodLimiterMap[api] = rate.NewLimiter(rate.Limit(limit), defaultBurst)
+	}
+
+	ml := &methodLimiter{
+		log:              log,
+		defaultLimiter:   defaultLimiter,
+		methodLimiterMap: methodLimiterMap,
+	}
+	return ml
+}
+
+func (ml *methodLimiter) allow(fullMethodName string) bool {
+
+	// remove the package name
+	methodName := filepath.Base(fullMethodName)
+
+	// look up the limiter
+	if limiter, ok := ml.methodLimiterMap[methodName]; ok {
+		// query the limiter
+		return limiter.Allow()
+	}
+
+	ml.log.Error().Str("method", methodName).Msg("rate limited not defined, using default limit")
+	return ml.defaultLimiter.Allow()
 }
