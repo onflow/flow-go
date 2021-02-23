@@ -20,13 +20,9 @@ import (
 )
 
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
-const maxExecutionNodesCnt = 2
+const maxExecutionNodesCnt = 1
 
-var validENIDs = []string{"9686399a8a5418a12e762cfaeff2ea348c2137f554560917760e0d47acf2cda4",
-	"160241f88cbfaa0f361cf64adb0a1c9fc19dec1daf4b96550cd67b7a9fb26cd9",
-	"4ab025ab974e7ad7f344fbd16e5fbcb17fb8769fc8849b9d241ae518787695bd",
-	"0ca407c1da940952ebcc02283b60cd97c9a008e111a48ea6cf1ce8f36f1e0153",
-}
+var validENIDs = []string{"9686399a8a5418a12e762cfaeff2ea348c2137f554560917760e0d47acf2cda4"}
 
 var validENMap map[flow.Identifier]bool
 
