@@ -317,7 +317,7 @@ func main() {
 			}
 
 			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Network, node.Me, prov, core)
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}

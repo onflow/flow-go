@@ -36,7 +36,7 @@ type (
 const defaultBlockQueueCapacity = 10000
 
 // defaultVoteQueueCapacity maximum capacity of block votes queue
-const defaultVoteQueueCapacity = 10000
+const defaultVoteQueueCapacity = 1000
 
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
@@ -61,13 +61,14 @@ type Engine struct {
 }
 
 func NewEngine(
+	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
 	prov network.Engine,
 	core *Core) (*Engine, error) {
 	e := &Engine{
 		unit:             engine.NewUnit(),
-		log:              core.log,
+		log:              log.With().Str("compliance", "engine").Logger(),
 		me:               me,
 		mempool:          core.mempool,
 		metrics:          core.metrics,
