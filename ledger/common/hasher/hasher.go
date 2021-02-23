@@ -1,4 +1,4 @@
-package common
+package hasher
 
 import (
 	"github.com/onflow/flow-go/crypto/hash"
@@ -55,31 +55,44 @@ func (lh *LedgerHasher) GetDefaultHashForHeight(height int) []byte {
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 // note that we don't include the keys here as they are already included in the path
 func (lh *LedgerHasher) HashLeaf(path []byte, value []byte) []byte {
-	hasher := hash.NewSHA3_256()
-	_, err := hasher.Write(path)
-	if err != nil {
-		panic(err)
+	if lh.hashMethod == 1 {
+		hasher := hash.NewSHA3_256()
+		_, err := hasher.Write(path)
+		if err != nil {
+			panic(err)
+		}
+		_, err = hasher.Write(value)
+		if err != nil {
+			panic(err)
+		}
+
+		return hasher.SumHash()
 	}
-	_, err = hasher.Write(value)
-	if err != nil {
-		panic(err)
+	if lh.hashMethod == 2 {
+		// TODO add blake hashing
 	}
 
-	return hasher.SumHash()
+	return nil
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func (lh *LedgerHasher) HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	hasher := hash.NewSHA3_256()
-	_, err := hasher.Write(hash1)
-	if err != nil {
-		panic(err)
+	if lh.hashMethod == 1 {
+		hasher := hash.NewSHA3_256()
+		_, err := hasher.Write(hash1)
+		if err != nil {
+			panic(err)
+		}
+		_, err = hasher.Write(hash2)
+		if err != nil {
+			panic(err)
+		}
+		return hasher.SumHash()
 	}
-	_, err = hasher.Write(hash2)
-	if err != nil {
-		panic(err)
+	if lh.hashMethod == 2 {
+		// TODO add blake hashing
 	}
-	return hasher.SumHash()
+	return nil
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
