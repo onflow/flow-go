@@ -57,7 +57,7 @@ const DefaultEmergencySealingActive = false
 // user of this object needs to ensure single thread access.
 type Core struct {
 	log                                  zerolog.Logger                  // used to log relevant actions with context
-	engineMetrics                        module.EngineMetrics            // used to track sent and received messages
+	coreMetrics                          module.EngineMetrics            // used to track sent and received messages
 	tracer                               module.Tracer                   // used to trace execution
 	mempool                              module.MempoolMetrics           // used to track mempool size
 	metrics                              module.ConsensusMetrics         // used to track consensus metrics
@@ -68,10 +68,11 @@ type Core struct {
 	receiptsDB                           storage.ExecutionReceipts       // to persist received execution receipts
 	headersDB                            storage.Headers                 // used to check sealed headers
 	indexDB                              storage.Index                   // used to check payloads for results
-	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results in memory
-	receipts                             mempool.ExecutionTree           // holds execution receipts in memory
+	incorporatedResults                  mempool.IncorporatedResults     // holds incorporated results waiting to be sealed (the payload construction algorithm guarantees that such incorporated are connected to sealed results)
+	receipts                             mempool.ExecutionTree           // holds execution receipts; indexes them by height; can search all receipts derived from a given parent result
 	approvals                            mempool.Approvals               // holds result approvals in memory
-	seals                                mempool.IncorporatedResultSeals // holds the seals that were produced by the matching engine
+	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	pendingReceipts                      mempool.PendingReceipts         // buffer for receipts where an ancestor result is missing, so they can't be connected to the sealed results
 	missing                              map[flow.Identifier]uint        // track how often a block was missing
 	assigner                             module.ChunkAssigner            // chunk assignment object
 	sealingThreshold                     uint                            // how many blocks between sealed/finalized before we request execution receipts
@@ -79,15 +80,14 @@ type Core struct {
 	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
 	receiptValidator                     module.ReceiptValidator         // used to validate receipts
 	approvalValidator                    module.ApprovalValidator        // used to validate ResultApprovals
-	requestTracker                       *RequestTracker                 // tracks ongoing re-requests of missing result approvals, incl. blackout periods
-	approvalRequestsThreshold            uint64                          // lower threshold on height difference between <latest finalized block> and <block incorporating a result>, when re-requesting approvals starts
+	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
+	approvalRequestsThreshold            uint64                          // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
 	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 }
 
-// NewCore creates a new collection propagation engine.
 func NewCore(
 	log zerolog.Logger,
-	engineMetrics module.EngineMetrics,
+	coreMetrics module.EngineMetrics,
 	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	conMetrics module.ConsensusMetrics,
@@ -101,17 +101,17 @@ func NewCore(
 	receipts mempool.ExecutionTree,
 	approvals mempool.Approvals,
 	seals mempool.IncorporatedResultSeals,
+	pendingReceipts mempool.PendingReceipts,
 	assigner module.ChunkAssigner,
-	validator module.ReceiptValidator,
+	receiptValidator module.ReceiptValidator,
 	approvalValidator module.ApprovalValidator,
 	requiredApprovalsForSealConstruction uint,
 	emergencySealingActive bool,
 	approvalConduit network.Conduit,
 ) (*Core, error) {
-	// initialize the propagation engine with its dependencies
-	e := &Core{
-		log:                                  log.With().Str("engine", "matching-core").Logger(),
-		engineMetrics:                        engineMetrics,
+	c := &Core{
+		log:                                  log.With().Str("engine", "matching.Core").Logger(),
+		coreMetrics:                          coreMetrics,
 		tracer:                               tracer,
 		mempool:                              mempool,
 		metrics:                              conMetrics,
@@ -125,12 +125,13 @@ func NewCore(
 		receipts:                             receipts,
 		approvals:                            approvals,
 		seals:                                seals,
+		pendingReceipts:                      pendingReceipts,
 		missing:                              make(map[flow.Identifier]uint),
 		sealingThreshold:                     10,
-		maxResultsToRequest:                  200,
+		maxResultsToRequest:                  20,
 		assigner:                             assigner,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		receiptValidator:                     validator,
+		receiptValidator:                     receiptValidator,
 		approvalValidator:                    approvalValidator,
 		requestTracker:                       NewRequestTracker(10, 30),
 		approvalRequestsThreshold:            10,
@@ -138,17 +139,27 @@ func NewCore(
 		approvalConduit:                      approvalConduit,
 	}
 
-	e.mempool.MempoolEntries(metrics.ResourceResult, e.incorporatedResults.Size())
-	e.mempool.MempoolEntries(metrics.ResourceReceipt, e.receipts.Size())
-	e.mempool.MempoolEntries(metrics.ResourceApproval, e.approvals.Size())
-	e.mempool.MempoolEntries(metrics.ResourceSeal, e.seals.Size())
+	c.mempool.MempoolEntries(metrics.ResourceResult, c.incorporatedResults.Size())
+	c.mempool.MempoolEntries(metrics.ResourceReceipt, c.receipts.Size())
+	c.mempool.MempoolEntries(metrics.ResourceApproval, c.approvals.Size())
+	c.mempool.MempoolEntries(metrics.ResourceSeal, c.seals.Size())
 
-	return e, nil
+	return c, nil
 }
 
 // OnReceipt processes a new execution receipt.
+// Any error indicates an unexpected problem in the protocol logic. The node's
+// internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	err := c.onReceipt(originID, receipt)
+	// When receiving a receipt, we might not be able to verify it if its previous result
+	// is unknown.  In this case, instead of dropping it, we store it in the pending receipts
+	// mempool, and process it later when its parent result has been received and processed.
+	// Therefore, if a receipt is processed, we will check if it is the previous results of
+	// some pending receipts and process them one after another.
+	receiptID := receipt.ID()
+	resultID := receipt.ExecutionResult.ID()
+
+	processed, err := c.processReceipt(receipt)
 	if err != nil {
 		marshalled, err := json.Marshal(receipt)
 		if err != nil {
@@ -156,15 +167,38 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 		}
 		c.log.Error().Err(err).
 			Hex("origin", logging.ID(originID)).
-			Hex("receipt_id", logging.Entity(receipt)).
+			Hex("receipt_id", receiptID[:]).
+			Hex("result_id", resultID[:]).
 			Str("receipt", string(marshalled)).
-			Msgf("unexpected error processing execution receipt")
+			Msg("internal error processing execution receipt")
+
 		return fmt.Errorf("internal error processing execution receipt %x: %w", receipt.ID(), err)
 	}
+
+	if !processed {
+		return nil
+	}
+
+	childReceipts := c.pendingReceipts.ByPreviousResultID(resultID)
+	c.pendingReceipts.Rem(receipt.ID())
+
+	for _, childReceipt := range childReceipts {
+		// recursively processing the child receipts
+		err := c.OnReceipt(childReceipt.ExecutorID, childReceipt)
+		if err != nil {
+			// we don't want to wrap the error with any info from its parent receipt,
+			// because the error has nothing to do with its parent receipt.
+			return err
+		}
+	}
+
 	return nil
 }
 
-func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+// * bool: true if and only if the receipt is valid, which has not been processed before
+// error: any error indicates an unexpected problem in the protocol logic. The node's
+// internal state might be corrupted. Hence, returned errors should be treated as fatal.
+func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	startTime := time.Now()
 	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
 	defer func() {
@@ -172,10 +206,10 @@ func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 		receiptSpan.Finish()
 	}()
 
+	resultID := receipt.ExecutionResult.ID()
 	log := c.log.With().
-		Hex("origin_id", originID[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+		Hex("result_id", resultID[:]).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
@@ -183,8 +217,8 @@ func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 
 	initialState, finalState, err := validation.IntegrityCheck(receipt)
 	if err != nil {
-		log.Err(err).Msg("received execution receipt that didn't pass the integrity check")
-		return nil
+		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
+		return false, nil
 	}
 
 	log = log.With().
@@ -196,7 +230,7 @@ func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	head, err := c.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
-		return nil
+		return false, nil
 	}
 
 	log = log.With().
@@ -209,35 +243,49 @@ func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	//  => drop Receipt
 	sealed, err := c.state.Sealed().Head()
 	if err != nil {
-		return fmt.Errorf("could not find sealed block: %w", err)
+		return false, fmt.Errorf("could not find sealed block: %w", err)
 	}
 
 	isSealed := head.Height <= sealed.Height
 	if isSealed {
 		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
-		return nil
+		return false, nil
 	}
 
-	// if the receipt is not valid, because the parent result is unknown, we will drop this receipt.
-	// in the case where a child receipt is dropped because it is received before its parent receipt, we will
-	// eventually request the parent receipt with the `requestPending` function
 	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
 	err = c.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
 	childSpan.Finish()
+
+	if validation.IsUnverifiableError(err) {
+		// If previous result is missing, we can't validate this receipt.
+		// Although we will request its previous receipt(s),
+		// we don't want to drop it now, because when the missing previous arrive
+		// in a wrong order, they will still be dropped, and causing the catch up
+		// to be inefficient.
+		// Instead, we cache the receipt in case it arrives earlier than its
+		// previous receipt.
+		// For instance, given blocks A <- B <- C <- D <- E, if we receive their receipts
+		// in the order of [E,C,D,B,A], then:
+		// if we drop the missing previous receipts, then only A will be processed;
+		// if we cache the missing previous receipts, then all of them will be processed, because
+		// once A is processed, we will check if there is a child receipt pending,
+		// if yes, then process it.
+		c.pendingReceipts.Add(receipt)
+		log.Info().Msg("receipt is cached because its previous result is missing")
+		return false, nil
+	}
+
 	if err != nil {
 		if engine.IsInvalidInputError(err) {
 			log.Err(err).Msg("invalid execution receipt")
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("failed to validate execution receipt: %w", err)
+		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
-	err = c.storeReceipt(receipt, head, &log)
+	_, err = c.storeReceipt(receipt, head)
 	if err != nil {
-		if engine.IsDuplicatedEntryError(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to store receipt: %w", err)
+		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
 
 	// ATTENTION:
@@ -249,32 +297,30 @@ func (c *Core) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
 	// will be the ID of the first block on its fork that contains a receipt
 	// committing to this result.
-	err = c.storeIncorporatedResult(receipt, &log)
+	_, err = c.storeIncorporatedResult(receipt)
 	if err != nil {
-		if engine.IsDuplicatedEntryError(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to store incorporated result: %w", err)
+		return false, fmt.Errorf("failed to store incorporated result: %w", err)
 	}
+
 	log.Info().Msg("execution result processed and stored")
 
-	return nil
+	return true, nil
 }
 
 // storeReceipt adds the receipt to the receipts mempool as well as to the persistent storage layer.
 // Return values:
-// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool and we don't need to process this again
-//	* exception in case something went wrong
-// 	* nil in case of success
-func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, log *zerolog.Logger) error {
+//  * bool to indicate whether the receipt is stored.
+//  * exception in case something (unexpected) went wrong
+func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (bool, error) {
 	added, err := c.receipts.AddReceipt(receipt, head)
 	if err != nil {
-		return fmt.Errorf("adding receipt (%x) to mempool failed: %w", receipt.ID(), err)
+		return false, fmt.Errorf("adding receipt (%x) to mempool failed: %w", receipt.ID(), err)
 	}
 	if !added {
-		log.Debug().Msg("skipping receipt already in mempool")
-		return engine.NewDuplicatedEntryErrorf("")
+		return false, nil
 	}
+	// TODO: we'd better wrap the `receipts` with the metrics method to avoid the metrics
+	// getting out of sync
 	c.mempool.MempoolEntries(metrics.ResourceReceipt, c.receipts.Size())
 
 	// persist receipt in database. Even if the receipt is already in persistent storage,
@@ -282,17 +328,16 @@ func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header, l
 	// mempool was wiped during a node crash.
 	err = c.receiptsDB.Store(receipt) // internally de-duplicates
 	if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-		return fmt.Errorf("could not persist receipt: %w", err)
+		return false, fmt.Errorf("could not persist receipt: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 // storeIncorporatedResult creates an `IncorporatedResult` and adds it to incorporated results mempool
-// Error returns:
-// 	* `engine.DuplicatedEntryError` [sentinel error] if entry already present in mempool
-//	* exception in case something went wrong
-// 	* nil in case of success
-func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zerolog.Logger) error {
+// returns:
+//  * bool to indicate whether the receipt is stored.
+//  * exception in case something (unexpected) went wrong
+func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt) (bool, error) {
 	// Create an IncorporatedResult and add it to the mempool
 	added, err := c.incorporatedResults.Add(
 		flow.NewIncorporatedResult(
@@ -301,14 +346,13 @@ func (c *Core) storeIncorporatedResult(receipt *flow.ExecutionReceipt, log *zero
 		),
 	)
 	if err != nil {
-		return fmt.Errorf("error inserting incorporated result in mempool: %w", err)
+		return false, fmt.Errorf("error inserting incorporated result in mempool: %w", err)
 	}
 	if !added {
-		log.Debug().Msg("skipping result already in mempool")
-		return engine.NewDuplicatedEntryErrorf("")
+		return false, nil
 	}
 	c.mempool.MempoolEntries(metrics.ResourceResult, c.incorporatedResults.Size())
-	return nil
+	return true, nil
 }
 
 // OnApproval processes a new result approval.
@@ -351,7 +395,7 @@ func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 	// we rely on the networking layer for enforcing message integrity via the
 	// networking key.
 	if approval.Body.ApproverID != originID {
-		log.Error().Msgf("invalid origin ID for approval: %x", originID)
+		log.Debug().Msg("discarding approvals from invalid origin")
 		return nil
 	}
 
@@ -385,16 +429,8 @@ func (c *Core) onApproval(originID flow.Identifier, approval *flow.ResultApprova
 	return nil
 }
 
-// CheckSealing runs the sealing logic
+// CheckSealing checks if there is anything worth sealing at the moment.
 func (c *Core) CheckSealing() error {
-	err := c.checkSealing()
-	if err != nil {
-		return fmt.Errorf("internal error in sealing protocol")
-	}
-	return nil
-}
-
-func (c *Core) checkSealing() error {
 	startTime := time.Now()
 	sealingSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealing)
 	defer func() {
@@ -414,11 +450,6 @@ func (c *Core) checkSealing() error {
 		Int("sealable_results_count", len(sealableResults)).
 		Str("next_unsealed_results", nextUnsealeds.String()).
 		Logger()
-
-	if len(sealableResults) == 0 {
-		lg.Info().Msg("checking sealing finished. No results can be sealed yet")
-		return nil
-	}
 
 	// log warning if we are going to overflow the seals mempool
 	if space := c.seals.Limit() - c.seals.Size(); len(sealableResults) > int(space) {
@@ -495,8 +526,9 @@ func (c *Core) checkSealing() error {
 
 	// request execution receipts for unsealed finalized blocks
 	requestReceiptsSpan := c.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingRequestPendingReceipts)
-	pendingReceiptRequests, err := c.requestPendingReceipts()
+	pendingReceiptRequests, firstMissingHeight, err := c.requestPendingReceipts()
 	requestReceiptsSpan.Finish()
+
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
@@ -509,18 +541,25 @@ func (c *Core) checkSealing() error {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
 	}
 
-	// check if we end up created a seal in mempool for the next unsealed block
 	mempoolHasNextSeal := false
+
+	// check if we end up created a seal in mempool for the next unsealed block
 	for _, unsealed := range nextUnsealeds {
 		_, mempoolHasNextSeal = c.seals.ByID(unsealed.IncorporatedResultID)
 		if mempoolHasNextSeal {
 			break
 		}
 	}
+
 	lg.Info().
 		Int("sealable_incorporated_results", len(sealedBlockIDs)).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
-		Bool("mempool_has_next_seal", mempoolHasNextSeal).
+		Bool("mempool_has_seal_for_next_height", mempoolHasNextSeal).
+		Uint64("first_height_missing_result", firstMissingHeight).
+		Uint("seals_size", c.seals.Size()).
+		Uint("receipts_size", c.receipts.Size()).
+		Uint("incorporated_size", c.incorporatedResults.Size()).
+		Uint("approval_size", c.approvals.Size()).
 		Int("pending_receipt_requests", pendingReceiptRequests).
 		Int("pending_approval_requests", pendingApprovalRequests).
 		Msg("checking sealing finished successfully")
@@ -597,7 +636,7 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 		// is wrong and should _not_ be sealed. While it is fundamentally the ReceiptValidator's
 		// responsibility to filter out results without chunks, there is no harm in also in enforcing
 		// the same condition here as well. It simplifies the code, because otherwise the
-		// matching engine must enforce equality of start and end state for a result with zero chunks,
+		// matching core must enforce equality of start and end state for a result with zero chunks,
 		// in the absence of anyone else doing do.
 		matched := false
 		unmatchedIndex := -1
@@ -892,30 +931,25 @@ func (c *Core) clearPools(sealedIDs []flow.Identifier) error {
 
 // requestPendingReceipts requests the execution receipts of unsealed finalized
 // blocks.
-// it returns the number of pending receipts requests being created
-func (c *Core) requestPendingReceipts() (int, error) {
+// it returns the number of pending receipts requests being created, and
+// the first finalized height at which there is no receipt for the block
+func (c *Core) requestPendingReceipts() (int, uint64, error) {
 
 	// last sealed block
 	sealed, err := c.state.Sealed().Head()
 	if err != nil {
-		return 0, fmt.Errorf("could not get sealed height: %w", err)
+		return 0, 0, fmt.Errorf("could not get sealed height: %w", err)
 	}
 
 	// last finalized block
 	final, err := c.state.Final().Head()
 	if err != nil {
-		return 0, fmt.Errorf("could not get finalized height: %w", err)
+		return 0, 0, fmt.Errorf("could not get finalized height: %w", err)
 	}
 
 	// only request if number of unsealed finalized blocks exceeds the threshold
-	log := c.log.With().
-		Uint64("finalized_height", final.Height).
-		Uint64("sealed_height", sealed.Height).
-		Uint("sealing_threshold", c.sealingThreshold).
-		Logger()
 	if uint(final.Height-sealed.Height) < c.sealingThreshold {
-		log.Debug().Msg("skip requesting receipts as number of unsealed finalized blocks is below threshold")
-		return 0, nil
+		return 0, 0, nil
 	}
 
 	// order the missing blocks by height from low to high such that when
@@ -934,6 +968,7 @@ func (c *Core) requestPendingReceipts() (int, error) {
 		knownResultForBlock[s.Seal.BlockID] = struct{}{}
 	}
 
+	var firstMissingHeight uint64
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
 	// order to request them.
@@ -946,27 +981,71 @@ func (c *Core) requestPendingReceipts() (int, error) {
 		// get the block header at this height (should not error as heights are finalized)
 		header, err := c.headersDB.ByHeight(height)
 		if err != nil {
-			return 0, fmt.Errorf("could not get header (height=%d): %w", height, err)
+			return 0, 0, fmt.Errorf("could not get header (height=%d): %w", height, err)
 		}
 
 		// check if we have an result for the block at this height
 		blockID := header.ID()
-		if _, ok := knownResultForBlock[blockID]; !ok {
-			missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
+
+		_, ok := knownResultForBlock[blockID]
+		if ok {
+			continue
 		}
+
+		// Without the logic below, the matching engine would produce IncorporatedResults
+		// only from receipts received directly by EN. It would be possible for a receipt
+		// to come unnoticed by the matching engine if it was incorporated in a block by
+		// another node and never received directly from the EN. Or the receipt might
+		// have been lost from the mempool during a node crash.
+		// Hence we check also if we have the receipts in storage (as would have been
+		// populated when the block was added to the chain).
+		// Currently, the index is only added when the block which includes the receipts
+		// get finalized, so the returned receipts must be from finalized blocks.
+		// Therefore, the return receipts must be incorporated receipts, which
+		// are safe to be added to the mempool
+		// ToDo: this logic should eventually be moved in the engine's
+		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
+		// and that the IncorporatedResult's IncorporatedBlockID should be set
+		// correctly.
+		receipts, err := c.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+		if err != nil {
+			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
+		}
+
+		if len(receipts) > 0 {
+			for _, receipt := range receipts {
+				_, err = c.receipts.AddReceipt(receipt, header)
+				if err != nil {
+					return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
+				}
+
+				_, err = c.incorporatedResults.Add(
+					flow.NewIncorporatedResult(
+						receipt.ExecutionResult.BlockID,
+						&receipt.ExecutionResult,
+					),
+				)
+
+				if err != nil {
+					return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
+				}
+			}
+			continue
+		}
+
+		missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
+		if firstMissingHeight == 0 {
+			firstMissingHeight = height
+		}
+
 	}
 
 	// request missing execution results, if sealed height is low enough
-	if len(missingBlocksOrderedByHeight) > 0 {
-		log.Debug().
-			Int("finalized_blocks_without_result", len(missingBlocksOrderedByHeight)).
-			Msg("requesting receipts")
-		for _, blockID := range missingBlocksOrderedByHeight {
-			c.receiptRequester.Query(blockID, filter.Any)
-		}
+	for _, blockID := range missingBlocksOrderedByHeight {
+		c.receiptRequester.Query(blockID, filter.Any)
 	}
 
-	return len(missingBlocksOrderedByHeight), nil
+	return len(missingBlocksOrderedByHeight), firstMissingHeight, nil
 }
 
 // requestPendingApprovals requests approvals for chunks that haven't collected
@@ -995,13 +1074,7 @@ func (c *Core) requestPendingApprovals() (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("could not get finalized height: %w", err)
 	}
-	log := c.log.With().
-		Uint64("finalized_height", final.Height).
-		Uint64("sealed_height", sealed.Height).
-		Uint64("approval_requests_threshold", c.approvalRequestsThreshold).
-		Logger()
 	if sealed.Height+c.approvalRequestsThreshold >= final.Height {
-		log.Debug().Msg("skip requesting approvals as number of unsealed finalized blocks is below threshold")
 		return 0, nil
 	}
 
@@ -1124,10 +1197,6 @@ func (c *Core) requestPendingApprovals() (int, error) {
 					Msg("could not publish approval request for chunk")
 			}
 		}
-	}
-
-	if requestCount > 0 {
-		log.Debug().Msgf("requested %d approvals", requestCount)
 	}
 
 	return requestCount, nil

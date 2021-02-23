@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -56,7 +57,7 @@ func (ms *EngineContextSuite) SetupTest() {
 		core: &Core{
 			tracer:                               tracer,
 			log:                                  log,
-			engineMetrics:                        metrics,
+			coreMetrics:                          metrics,
 			mempool:                              metrics,
 			metrics:                              metrics,
 			state:                                ms.State,
@@ -68,6 +69,7 @@ func (ms *EngineContextSuite) SetupTest() {
 			receipts:                             ms.ReceiptsPL,
 			approvals:                            ms.ApprovalsPL,
 			seals:                                ms.SealsPL,
+			pendingReceipts:                      stdmap.NewPendingReceipts(100),
 			sealingThreshold:                     10,
 			maxResultsToRequest:                  200,
 			assigner:                             ms.Assigner,
