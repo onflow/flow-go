@@ -39,7 +39,7 @@ func Test_DumpJSON(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		forest, err := mtrie.NewForest(pathfinder.PathByteSize, dir, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
+		forest, err := mtrie.NewForest(pathfinder.PathByteSize, complete.DefaultHasherVersion, dir, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
 		require.NoError(t, err)
 
 		emptyRootHash := forest.GetEmptyRootHash()

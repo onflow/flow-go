@@ -150,7 +150,7 @@ func TestLedger_Proof(t *testing.T) {
 			proof, err := encoding.DecodeTrieBatchProof(retProof)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(proof.Proofs))
-			assert.True(t, common.VerifyTrieBatchProof(proof, curS))
+			assert.True(t, common.VerifyTrieBatchProof(proof, curS, hasher.DefaultHasherVersion))
 		})
 	})
 
@@ -177,7 +177,7 @@ func TestLedger_Proof(t *testing.T) {
 			proof, err := encoding.DecodeTrieBatchProof(retProof)
 			require.NoError(t, err)
 			assert.Equal(t, 2, len(proof.Proofs))
-			assert.True(t, common.VerifyTrieBatchProof(proof, newSc))
+			assert.True(t, common.VerifyTrieBatchProof(proof, newSc, hasher.DefaultHasherVersion))
 		})
 	})
 }
@@ -315,7 +315,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.NoError(t, err)
 
 				// validate batch proofs
-				isValid := common.VerifyTrieBatchProof(bProof, newState)
+				isValid := common.VerifyTrieBatchProof(bProof, newState, hasher.DefaultHasherVersion)
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
