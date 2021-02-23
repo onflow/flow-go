@@ -103,14 +103,14 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	}
 
 	committee := epochInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember).NodeIDs()
-	index := -1
+	myIndex := -1
 	for i, id := range committee {
 		if id == e.me.NodeID() {
-			index = i
+			myIndex = i
 			break
 		}
 	}
-	if index < 0 {
+	if myIndex < 0 {
 		err := fmt.Errorf("dkg-processor engine id does not belong to dkg committee")
 		e.log.Err(err).Msg("bad committee")
 		panic(err)
@@ -119,7 +119,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	controller, err := e.controllerFactory.Create(
 		fmt.Sprintf("dkg-%d", counter),
 		committee,
-		index,
+		myIndex,
 		epochInfo.seed,
 	)
 	if err != nil {
@@ -162,7 +162,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter, index))
+	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter, myIndex))
 }
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {

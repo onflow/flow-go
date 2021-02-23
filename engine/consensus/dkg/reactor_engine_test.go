@@ -137,4 +137,5 @@ func TestEpochSetup(t *testing.T) {
 	// check that the appropriate callbacks were registered
 	time.Sleep(50 * time.Millisecond)
 	controller.AssertExpectations(t)
+	keyStorage.AssertExpectations(t)
 }
