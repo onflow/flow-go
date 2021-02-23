@@ -16,12 +16,13 @@ const (
 	// ReferenceImplPathByteSize is the path length in reference implementation: 2 bytes.
 	// Please do NOT CHANGE.
 	ReferenceImplPathByteSize = 2
+	hasherVersion             = 0
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_EmptyTrie(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
@@ -35,7 +36,7 @@ func Test_EmptyTrie(t *testing.T) {
 // register populated matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithLeftRegister(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
@@ -53,7 +54,7 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 // register populated matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithRightRegister(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
@@ -71,7 +72,7 @@ func Test_TrieWithRightRegister(t *testing.T) {
 // // allocated register somewhere in the middle.
 // // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
@@ -89,7 +90,7 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 // matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithManyRegisters(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
@@ -108,7 +109,7 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 // matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
@@ -134,7 +135,7 @@ func Test_FullTrie(t *testing.T) {
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
 // The expected root hashes are coming from a reference implementation in python and is hard-coded here.
 func Test_UpdateTrie(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	expectedRootHashes := []string{
 		"a8dc0574fdeeaab4b5d3b2a798c19bee5746337a9aea735ebc4dfd97311503c5",
@@ -185,7 +186,7 @@ func Test_UpdateTrie(t *testing.T) {
 // Unallocating here means, to set the stored register value to an empty byte slice
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_UnallocateRegisters(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 	rng := &LinearCongruentialGenerator{seed: 0}
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize, lh)
 	require.NoError(t, err)
