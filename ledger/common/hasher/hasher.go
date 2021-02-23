@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
-// hash version 1 mean using sha3-256
-// hash version 2 means using blake2s
-const DefaultHasherVersion = uint8(0)
+// hash version 0 mean using sha3-256
+// hash version 1 means using blake2s
+const DefaultHasherVersion = uint8(1)
 
 type LedgerHasher struct {
 	hasherVersion   uint8

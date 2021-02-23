@@ -25,7 +25,7 @@ import (
 
 const DefaultCacheSize = 1000
 const DefaultPathFinderVersion = 1
-const DefaultHasherVersion = uint8(0)
+const DefaultHasherVersion = uint8(1)
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
