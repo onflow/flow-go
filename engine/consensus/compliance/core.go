@@ -55,9 +55,8 @@ func NewCore(
 	sync module.BlockRequester,
 ) (*Core, error) {
 
-	// initialize the propagation engine with its dependencies
 	e := &Core{
-		log:               log.With().Str("engine", "compliance").Logger(),
+		log:               log.With().Str("compliance", "core").Logger(),
 		metrics:           collector,
 		tracer:            tracer,
 		mempool:           mempool,
@@ -222,7 +221,20 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 
 	// process block itself
 	err := c.processBlockProposal(proposal)
+	// child is outdated by the time we started processing it
+	// => node was probably behind and is catching up. Log as warning
+	if engine.IsOutdatedInputError(err) {
+		c.log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+		return nil
+	}
+	// the block is invalid; log as error as we desire honest participation
+	// ToDo: potential slashing
+	if engine.IsInvalidInputError(err) {
+		c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		return nil
+	}
 	if err != nil {
+		// unexpected error: potentially corrupted internal state => abort processing and escalate error
 		return fmt.Errorf("failed to process block %x: %w", blockID, err)
 	}
 
@@ -240,19 +252,8 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 		}
 		cpr := c.processBlockAndDescendants(childProposal)
 		if cpr != nil {
-			// child is outdated by the time we started processing it
-			// => node was probably behind and is catching up. Log as warning
-			if engine.IsOutdatedInputError(cpr) {
-				c.log.Warn().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
-				continue
-			}
-			// the block is invalid; log as error as we desire honest participation
-			// ToDo: potential slashing
-			if engine.IsInvalidInputError(err) {
-				c.log.Error().Err(err).Msg("invalid block (potential slashing evidence?)")
-				continue
-			}
-			return fmt.Errorf("internal error processing block %x at height %d: %w", child.Header.ID(), child.Header.Height, err)
+			// unexpected error: potentially corrupted internal state => abort processing and escalate error
+			return cpr
 		}
 	}
 
@@ -262,7 +263,7 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 	return nil
 }
 
-// processBlockProposal processes blocks that are already known to connect to
+// processBlockProposal processes the given block proposal. The proposal must connect to
 // the finalized state.
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
@@ -304,7 +305,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
 			header.ID(), header.Height, err)
 	}
-	// of the protocol state aborted processing of block as it is on an abandoned fork, he is outdated
+	// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
 	if state.IsOutdatedExtensionError(err) {
 		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
 	}

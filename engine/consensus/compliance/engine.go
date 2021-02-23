@@ -161,7 +161,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	err := e.Process(originID, event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
