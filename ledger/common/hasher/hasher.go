@@ -1,25 +1,27 @@
 package hasher
 
 import (
+	"golang.org/x/crypto/blake2s"
+
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
-// hash method 1 mean using sha3-256
-// hash method 2 means using blake2s
-const DefaultHashMethod = 1
+// hash version 1 mean using sha3-256
+// hash version 2 means using blake2s
+const DefaultHasherVersion = uint8(2)
 
 type LedgerHasher struct {
-	hashMethod      int
+	hasherVersion   uint8
 	defaultLeafHash []byte
 	// we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 	defaultHashes [257][]byte
 }
 
-func NewLedgerHasher(hashMethod int) *LedgerHasher {
+func NewLedgerHasher(hasherVersion uint8) *LedgerHasher {
 	lh := &LedgerHasher{
-		hashMethod: hashMethod,
+		hasherVersion: hasherVersion,
 	}
 
 	// default value and default hash value for a default node
@@ -55,7 +57,7 @@ func (lh *LedgerHasher) GetDefaultHashForHeight(height int) []byte {
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 // note that we don't include the keys here as they are already included in the path
 func (lh *LedgerHasher) HashLeaf(path []byte, value []byte) []byte {
-	if lh.hashMethod == 1 {
+	if lh.hasherVersion == 1 {
 		hasher := hash.NewSHA3_256()
 		_, err := hasher.Write(path)
 		if err != nil {
@@ -68,8 +70,20 @@ func (lh *LedgerHasher) HashLeaf(path []byte, value []byte) []byte {
 
 		return hasher.SumHash()
 	}
-	if lh.hashMethod == 2 {
-		// TODO add blake hashing
+	if lh.hasherVersion == 2 {
+		hasher, err := blake2s.New256(nil)
+		if err != nil {
+			panic(err)
+		}
+		_, err = hasher.Write(path)
+		if err != nil {
+			panic(err)
+		}
+		_, err = hasher.Write(value)
+		if err != nil {
+			panic(err)
+		}
+		return hasher.Sum(nil)
 	}
 
 	return nil
@@ -77,7 +91,7 @@ func (lh *LedgerHasher) HashLeaf(path []byte, value []byte) []byte {
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func (lh *LedgerHasher) HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	if lh.hashMethod == 1 {
+	if lh.hasherVersion == 1 {
 		hasher := hash.NewSHA3_256()
 		_, err := hasher.Write(hash1)
 		if err != nil {
@@ -89,8 +103,20 @@ func (lh *LedgerHasher) HashInterNode(hash1 []byte, hash2 []byte) []byte {
 		}
 		return hasher.SumHash()
 	}
-	if lh.hashMethod == 2 {
-		// TODO add blake hashing
+	if lh.hasherVersion == 2 {
+		hasher, err := blake2s.New256(nil)
+		if err != nil {
+			panic(err)
+		}
+		_, err = hasher.Write(hash1)
+		if err != nil {
+			panic(err)
+		}
+		_, err = hasher.Write(hash2)
+		if err != nil {
+			panic(err)
+		}
+		return hasher.Sum(nil)
 	}
 	return nil
 }

@@ -36,7 +36,7 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 		proof, err := l.Prove(query)
 		require.NoError(t, err)
 
-		pled, err := partial.NewLedger(proof, newState, partial.DefaultPathFinderVersion)
+		pled, err := partial.NewLedger(proof, newState, partial.DefaultPathFinderVersion, hasher.DefaultHasherVersion)
 		assert.NoError(t, err)
 		assert.Equal(t, pled.InitialState(), newState)
 

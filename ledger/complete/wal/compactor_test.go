@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -32,7 +33,7 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(4, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(4, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -42,7 +43,7 @@ func Test_Compactor(t *testing.T) {
 
 		t.Run("Compactor creates checkpoints eventually", func(t *testing.T) {
 
-			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024)
+			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024, hasher.DefaultHasherVersion)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -127,11 +128,11 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewForest(4, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(4, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
-			wal2, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024)
+			wal2, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024, hasher.DefaultHasherVersion)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -202,14 +203,14 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(4, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(4, hasher.DefaultHasherVersion, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
 
 		t.Run("Compactor creates checkpoints", func(t *testing.T) {
 
-			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024)
+			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024, hasher.DefaultHasherVersion)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`

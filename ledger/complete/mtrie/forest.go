@@ -47,8 +47,12 @@ type Forest struct {
 // THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
-func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
-	// TODO add hasher.DefaultHashMethod to params
+func NewForest(pathByteSize int,
+	hasherVersion uint8,
+	trieStorageDir string,
+	forestCapacity int,
+	metrics module.LedgerMetrics,
+	onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -78,7 +82,7 @@ func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metr
 		onTreeEvicted:  onTreeEvicted,
 		pathByteSize:   pathByteSize,
 		metrics:        metrics,
-		ledgerHasher:   hasher.NewLedgerHasher(hasher.DefaultHashMethod),
+		ledgerHasher:   hasher.NewLedgerHasher(hasherVersion),
 	}
 
 	// add empty roothash

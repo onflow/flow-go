@@ -53,7 +53,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	totalProofSize := 0
 	totalPTrieConstTimeMS := 0
 
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 	state := led.InitialState()
 	for i := 0; i < steps; i++ {
 

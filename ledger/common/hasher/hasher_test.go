@@ -13,7 +13,7 @@ import (
 
 // Test_LedgerHasherGetDefaultHashForHeight tests getting default hash for given heights
 func Test_LedgerHasherGetDefaultHashForHeight(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 	defaultLeafHash := lh.HashLeaf([]byte("default:"), []byte{})
 	assert.Equal(t, defaultLeafHash, lh.GetDefaultHashForHeight(0))
 
@@ -26,7 +26,7 @@ func Test_LedgerHasherGetDefaultHashForHeight(t *testing.T) {
 
 func Test_ComputeCompactValue(t *testing.T) {
 
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 	kp1 := ledger.NewKeyPart(uint16(1), []byte("key part 1"))
 	k := ledger.NewKey([]ledger.KeyPart{kp1})
 

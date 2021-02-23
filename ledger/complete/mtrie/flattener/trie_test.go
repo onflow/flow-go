@@ -17,7 +17,7 @@ import (
 
 func TestTrieStoreAndLoad(t *testing.T) {
 
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 
 	pathByteSize := 1
 	dir, err := ioutil.TempDir("", "test-mtrie-")

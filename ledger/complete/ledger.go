@@ -45,6 +45,7 @@ type Ledger struct {
 	// disk size reading can be time consuming, so limit how often its read
 	diskUpdateLimiter *time.Ticker
 	pathFinderVersion uint8
+	hasherVersion     uint
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
@@ -53,14 +54,15 @@ func NewLedger(dbDir string,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
 	reg prometheus.Registerer,
-	pathFinderVer uint8) (*Ledger, error) {
+	pathFinderVer uint8,
+	hasherVersion uint8) (*Ledger, error) {
 
-	w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
+	w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize, hasherVersion)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, hasherVersion, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -263,7 +265,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
-	targetLedgerHasherMethod int,
+	targetHasherVersion uint8,
 	outputDir, outputFile string) (ledger.State, error) {
 
 	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
@@ -316,7 +318,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
 
-	ledgerHasher := hasher.NewLedgerHasher(targetLedgerHasherMethod)
+	ledgerHasher := hasher.NewLedgerHasher(targetHasherVersion)
 
 	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize, ledgerHasher)
 	if err != nil {

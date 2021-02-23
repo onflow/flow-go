@@ -14,7 +14,7 @@ import (
 // hash from the leaf to the root and comparing the rootHash
 func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 
-	ledgerHasher := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	ledgerHasher := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 
 	treeHeight := 8 * len(p.Path)
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.

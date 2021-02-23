@@ -14,7 +14,7 @@ import (
 )
 
 func TestEmptyTrie(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 	emptyTrie, err := trie.NewEmptyMTrie(1, lh)
 	require.NoError(t, err)
 
@@ -29,7 +29,7 @@ func TestEmptyTrie(t *testing.T) {
 }
 
 func TestPopulatedTrie(t *testing.T) {
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 	emptyTrie, err := trie.NewEmptyMTrie(1, lh)
 	require.NoError(t, err)
 

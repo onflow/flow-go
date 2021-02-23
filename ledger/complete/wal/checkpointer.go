@@ -36,14 +36,16 @@ type Checkpointer struct {
 	wal            *LedgerWAL
 	keyByteSize    int
 	forestCapacity int
+	hasherVersion  uint8
 }
 
-func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Checkpointer {
+func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int, hasherVersion uint8) *Checkpointer {
 	return &Checkpointer{
 		dir:            wal.wal.Dir(),
 		wal:            wal,
 		keyByteSize:    keyByteSize,
 		forestCapacity: forestCapacity,
+		hasherVersion:  hasherVersion,
 	}
 }
 
@@ -154,7 +156,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	forest, err := mtrie.NewForest(c.keyByteSize, c.dir, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(c.keyByteSize, c.hasherVersion, c.dir, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
 		return nil
 	})
 	if err != nil {

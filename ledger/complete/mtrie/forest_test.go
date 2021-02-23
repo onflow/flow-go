@@ -32,7 +32,7 @@ func TestTrieOperations(t *testing.T) {
 	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 
 	// Make new Trie (independently of MForest):
 	nt, err := trie.NewEmptyMTrie(pathByteSize, lh)
@@ -968,7 +968,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
 
-		lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+		lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, batchProof, lh)
 		require.NoError(t, err, "error building partial trie")
 		require.True(t, bytes.Equal(psmt.RootHash(), activeRoot))

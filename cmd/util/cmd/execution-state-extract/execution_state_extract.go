@@ -21,13 +21,15 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
+	// TODO change hasher.DefaultHasherVersion-1 to hasher.DefaultHasherVersion when the migration is over
 	led, err := complete.NewLedger(
 		dir,
 		complete.DefaultCacheSize,
 		&metrics.NoopCollector{},
 		log,
 		nil,
-		complete.DefaultPathFinderVersion)
+		complete.DefaultPathFinderVersion,
+		hasher.DefaultHasherVersion-1)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
@@ -36,7 +38,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		[]ledger.Migration{},
 		[]ledger.Reporter{migrations.StorageReporter{Log: log, OutputDir: outputDir}},
 		complete.DefaultPathFinderVersion,
-		hasher.DefaultHashMethod,
+		hasher.DefaultHasherVersion,
 		outputDir,
 		wal.RootCheckpointFilename)
 	if err != nil {

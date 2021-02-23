@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/ledger/common/hasher"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -27,7 +28,7 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		util.CreateFiles(t, dir, fileNames...)
 
-		wal, err := NewWAL(zerolog.Nop(), nil, dir, 10, pathByteSize, segmentSize)
+		wal, err := NewWAL(zerolog.Nop(), nil, dir, 10, pathByteSize, segmentSize, hasher.DefaultHasherVersion)
 		require.NoError(t, err)
 
 		checkpointer, err := wal.NewCheckpointer()

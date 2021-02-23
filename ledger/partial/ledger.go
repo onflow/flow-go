@@ -23,7 +23,7 @@ type Ledger struct {
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger, error) {
+func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8, hasherVersion uint8) (*Ledger, error) {
 
 	// Decode proof encodings
 	if len(proof) < 1 {
@@ -34,7 +34,7 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 		return nil, fmt.Errorf("decoding proof failed: %w", err)
 	}
 
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasherVersion)
 
 	// decode proof
 	psmt, err := ptrie.NewPSMT(s, pathfinder.PathByteSize, batchProof, lh)

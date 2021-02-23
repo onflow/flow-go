@@ -20,7 +20,7 @@ import (
 
 func Test_DumpJSON_Empty(t *testing.T) {
 
-	lh := hasher.NewLedgerHasher(hasher.DefaultHashMethod)
+	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
 
 	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize, lh)
 	require.NoError(t, err)

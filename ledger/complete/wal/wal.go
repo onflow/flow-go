@@ -20,11 +20,12 @@ type LedgerWAL struct {
 	paused         bool
 	forestCapacity int
 	pathByteSize   int
+	hasherVersion  uint8
 	log            zerolog.Logger
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
+func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int, hasherVersion uint8) (*LedgerWAL, error) {
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
 		return nil, err
@@ -284,7 +285,7 @@ func getPossibleCheckpoints(allCheckpoints []int, from, to int) []int {
 
 // NewCheckpointer returns a Checkpointer for this WAL
 func (w *LedgerWAL) NewCheckpointer() (*Checkpointer, error) {
-	return NewCheckpointer(w, w.pathByteSize, w.forestCapacity), nil
+	return NewCheckpointer(w, w.pathByteSize, w.forestCapacity, w.hasherVersion), nil
 }
 
 func (w *LedgerWAL) Close() error {
