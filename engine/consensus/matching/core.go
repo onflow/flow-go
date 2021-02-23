@@ -725,7 +725,7 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 		receiptByExecutor[receipt.ExecutorID] = receipt
 	}
 
-	// to few receipts
+	// too few receipts
 	if len(receiptByExecutor) < 2 {
 		return false
 	}
