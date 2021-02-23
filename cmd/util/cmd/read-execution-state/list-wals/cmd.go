@@ -41,6 +41,7 @@ func run(*cobra.Command, []string) {
 		complete.DefaultCacheSize,
 		pathfinder.PathByteSize,
 		wal.SegmentSize,
+		complete.DefaultHasherVersion,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")

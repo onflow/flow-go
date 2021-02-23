@@ -29,7 +29,7 @@ func TestTrieOperations(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	lh := hasher.NewLedgerHasher(hasher.DefaultHasherVersion)
@@ -68,7 +68,7 @@ func TestTrieUpdate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	forest, err := NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := forest.GetEmptyRootHash()
 
@@ -103,7 +103,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -179,7 +179,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 0000...
@@ -259,7 +259,7 @@ func TestExpansionInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 100000...
@@ -338,7 +338,7 @@ func TestFullHouseInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// paths p0 forms [~1]; p1 and p2 form [~2]
@@ -427,7 +427,7 @@ func TestLeafInsert(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 0000000100000000
@@ -474,7 +474,7 @@ func TestOverrideValue(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -517,7 +517,7 @@ func TestDuplicateOverride(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -553,7 +553,7 @@ func TestReadSafety(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -589,7 +589,7 @@ func TestUpdateWithWrongPathSize(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// short key
@@ -620,7 +620,7 @@ func TestReadOrder(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(116), uint8(74)}, pathByteSize)
@@ -656,7 +656,7 @@ func TestMixRead(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 01111101...
@@ -701,7 +701,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -733,7 +733,7 @@ func TestReadNonExistingPath(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -759,7 +759,7 @@ func TestReadWithWrongPathSize(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// setup
@@ -796,7 +796,7 @@ func TestForkingUpdates(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -861,7 +861,7 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -914,7 +914,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(dir) // clean up
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	activeRoot := forest.GetEmptyRootHash()
@@ -998,7 +998,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	forest, err := NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	forest, err := NewForest(pathByteSize, hasher.DefaultHasherVersion, dir, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	emptyRoot := forest.GetEmptyRootHash()
 

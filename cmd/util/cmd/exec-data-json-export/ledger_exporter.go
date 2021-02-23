@@ -14,7 +14,7 @@ import (
 // ExportLedger exports ledger key value pairs at the given blockID
 func ExportLedger(ledgerPath string, targetstate string, outputPath string) error {
 
-	led, err := complete.NewLedger(ledgerPath, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, nil, 0)
+	led, err := complete.NewLedger(ledgerPath, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, nil, complete.DefaultPathFinderVersion, complete.DefaultHasherVersion)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}

@@ -20,7 +20,7 @@ func TestBootstrapLedger(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion, completeLedger.DefaultHashVersion)
+		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion, completeLedger.DefaultHasherVersion)
 		require.NoError(t, err)
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
