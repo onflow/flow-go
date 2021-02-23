@@ -11,7 +11,7 @@ import (
 )
 
 const DefaultPathFinderVersion = 1
-const DefaultHasherVersion = uint8(1)
+const DefaultHasherVersion = uint8(0)
 
 // Ledger implements the ledger functionality for a limited subset of keys (partial ledger).
 // Partial ledgers are designed to be constructed and verified by a collection of proofs from a complete ledger.

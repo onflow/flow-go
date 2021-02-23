@@ -35,6 +35,7 @@ func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forest
 		paused:         false,
 		forestCapacity: forestCapacity,
 		pathByteSize:   pathByteSize,
+		hasherVersion:  hasherVersion,
 		log:            logger,
 	}, nil
 }

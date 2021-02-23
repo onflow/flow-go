@@ -10,7 +10,7 @@ import (
 
 // hash version 1 mean using sha3-256
 // hash version 2 means using blake2s
-const DefaultHasherVersion = uint8(1)
+const DefaultHasherVersion = uint8(0)
 
 type LedgerHasher struct {
 	hasherVersion   uint8
@@ -57,7 +57,7 @@ func (lh *LedgerHasher) GetDefaultHashForHeight(height int) []byte {
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 // note that we don't include the keys here as they are already included in the path
 func (lh *LedgerHasher) HashLeaf(path []byte, value []byte) []byte {
-	if lh.hasherVersion == 1 {
+	if lh.hasherVersion == 0 {
 		hasher := hash.NewSHA3_256()
 		_, err := hasher.Write(path)
 		if err != nil {
@@ -70,7 +70,7 @@ func (lh *LedgerHasher) HashLeaf(path []byte, value []byte) []byte {
 
 		return hasher.SumHash()
 	}
-	if lh.hasherVersion == 2 {
+	if lh.hasherVersion == 1 {
 		hasher, err := blake2s.New256(nil)
 		if err != nil {
 			panic(err)
@@ -91,7 +91,7 @@ func (lh *LedgerHasher) HashLeaf(path []byte, value []byte) []byte {
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func (lh *LedgerHasher) HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	if lh.hasherVersion == 1 {
+	if lh.hasherVersion == 0 {
 		hasher := hash.NewSHA3_256()
 		_, err := hasher.Write(hash1)
 		if err != nil {
@@ -103,7 +103,7 @@ func (lh *LedgerHasher) HashInterNode(hash1 []byte, hash2 []byte) []byte {
 		}
 		return hasher.SumHash()
 	}
-	if lh.hasherVersion == 2 {
+	if lh.hasherVersion == 1 {
 		hasher, err := blake2s.New256(nil)
 		if err != nil {
 			panic(err)
