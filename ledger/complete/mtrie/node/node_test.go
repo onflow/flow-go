@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
 
-const hasherVersion = 1
+const hasherVersion = 0
 
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
