@@ -11,6 +11,12 @@ import (
 type VerificationCollector struct {
 	tracer *trace.OpenTracer
 
+	// Assigner Engine
+	rcvBlocks            prometheus.Counter // total finalized blocks received by assigner engine
+	rcvExecutionReceipts prometheus.Counter // total execution receipts received by assigner engine
+	assignedChunks       prometheus.Counter // total chunks assigned to this verification node
+	processedChunks      prometheus.Counter // total chunks processed by assigner engine
+
 	// Finder Engine
 	rcvReceiptsTotal         prometheus.Counter // total execution receipts arrived at finder engine
 	sntExecutionResultsTotal prometheus.Counter // total execution results processed by finder engine
@@ -28,6 +34,7 @@ type VerificationCollector struct {
 }
 
 func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
+	// Assigner Engine
 
 	// Finder Engine
 	rcvReceiptsTotals := promauto.NewCounter(prometheus.CounterOpts{
