@@ -48,13 +48,6 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Help:      "total number of chunks assigned to verification node",
 	})
 
-	processedChunkTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "processed_chunk_total",
-		Namespace: namespaceVerification,
-		Subsystem: subsystemAssignerEngine,
-		Help:      "total number of processed chunks by assigner engine",
-	})
-
 	// till new pipeline of assigner-fetcher-verifier is in place, we need to keep these metrics
 	// as they are. Though assigner and finder share this rcvReceiptsTotal, which should be refactored
 	// later.
