@@ -258,15 +258,6 @@ func (bc *BaseChainSuite) SetupChain() {
 			return nil
 		},
 	).Maybe() // this call is optional
-	bc.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.ExecutionReceipt {
-			var receipts []*flow.ExecutionReceipt
-			return receipts
-		},
-		func(blockID flow.Identifier) error {
-			return nil
-		},
-	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~ SETUP BLOCK HEADER STORAGE ~~~~~~~~~~~~~~~~~~~~~ //
 	bc.HeadersDB = &storage.Headers{}
@@ -423,6 +414,15 @@ func (bc *BaseChainSuite) SetupChain() {
 		func(sealID flow.Identifier) bool {
 			_, found := bc.PendingSeals[sealID]
 			return found
+		},
+	).Maybe()
+	bc.SealsPL.On("All").Return(
+		func() []*flow.IncorporatedResultSeal {
+			seals := make([]*flow.IncorporatedResultSeal, 0, len(bc.PendingSeals))
+			for _, seal := range bc.PendingSeals {
+				seals = append(seals, seal)
+			}
+			return seals
 		},
 	).Maybe()
 

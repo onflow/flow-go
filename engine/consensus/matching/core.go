@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
@@ -672,8 +674,10 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 		}
 
 		if matched || emergencySealed {
-			// add the result to the results that should be sealed
-			results = append(results, incorporatedResult)
+			if c.resultHasMultipleReceipts(incorporatedResult) {
+				// add the result to the results that should be sealed
+				results = append(results, incorporatedResult)
+			}
 		}
 
 		if nextUnsealedIsFinalized {
@@ -693,6 +697,71 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 	}
 
 	return results, nextUnsealeds, nil
+}
+
+// resultHasMultipleReceipts implements an additional _temporary_ safety measure:
+// only consider incorporatedResult sealable if we have AT LEAST 2 receipts committing
+// to the respective result from _different_ ENs
+func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedResult) bool {
+	blockID := incorporatedResult.Result.BlockID // block the result pertains to
+	resultID := incorporatedResult.Result.ID()
+
+	// get all receipts that are known for the block
+	receipts, err := c.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	if err != nil {
+		log.Error().Err(err).
+			Hex("block_id", logging.ID(blockID)).
+			Msg("could not get receipts by block ID")
+		return false
+	}
+
+	// index receipts for given incorporatedResult by their executor
+	// in case there are multiple receipts from the same executor, we keep the last one
+	receiptByExecutor := make(map[flow.Identifier]*flow.ExecutionReceipt) //map: executorID -> receipt
+	for _, receipt := range receipts {
+		if resultID != receipt.ExecutionResult.ID() { // skip receipts that commit to _different_ results
+			continue
+		}
+		receiptByExecutor[receipt.ExecutorID] = receipt
+	}
+
+	// to few receipts
+	if len(receiptByExecutor) < 2 {
+		return false
+	}
+	// At this point, we have at least two receipts from different executors and should be able to
+	// generate a candidate seal. We log information about all receipts for the result as evidence.
+	// Note that this code is probably run many times (until the seal has been finalized).
+	// However, as soon as we have at least 2 receipts, the matching Engine will produce a candidate
+	// seal and put it in the mempool. To prevent spamming the logs, we log only when there is
+	// no seal in the IncorporatedResultSeals mempool:
+	_, sealAlreadyGenerated := c.seals.ByID(incorporatedResult.ID()) // IncorporatedResultSeal has the same ID as incorporatedResult
+	if !sealAlreadyGenerated {
+		header, err := c.headersDB.ByBlockID(blockID)
+		if err != nil {
+			log.Fatal().Err(err).
+				Hex("block_id", logging.ID(blockID)).
+				Msg("could not header for block")
+			return false
+		}
+
+		l := c.log.Info().
+			Str("block_id", incorporatedResult.Result.BlockID.String()).
+			Uint64("block_height", header.Height).
+			Str("result_id", resultID.String())
+
+		// add information about each receipt to log message
+		count := 0
+		for executorID, receipt := range receiptByExecutor {
+			keyPrefix := fmt.Sprintf("receipt_%d", count)
+			l = l.Str(keyPrefix+"_id", receipt.ID().String()).
+				Str(keyPrefix+"_executor", executorID.String())
+			count++
+		}
+
+		l.Msg("multiple-receipts sealing condition satisfied")
+	}
+	return true
 }
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
@@ -959,16 +1028,13 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 	// heights would stop the sealing.
 	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, c.maxResultsToRequest)
 
-	// turn mempool into Lookup table: BlockID -> Result
-	knownResultForBlock := make(map[flow.Identifier]struct{})
-	for _, r := range c.incorporatedResults.All() {
-		knownResultForBlock[r.Result.BlockID] = struct{}{}
-	}
+	// set of blocks for which we have a candidate seal:
+	blocksWithCandidateSeal := make(map[flow.Identifier]struct{})
 	for _, s := range c.seals.All() {
-		knownResultForBlock[s.Seal.BlockID] = struct{}{}
+		blocksWithCandidateSeal[s.Seal.BlockID] = struct{}{}
 	}
 
-	var firstMissingHeight uint64
+	var firstMissingHeight uint64 = math.MaxUint64
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
 	// order to request them.
@@ -983,22 +1049,23 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 		if err != nil {
 			return 0, 0, fmt.Errorf("could not get header (height=%d): %w", height, err)
 		}
-
-		// check if we have an result for the block at this height
 		blockID := header.ID()
 
-		_, ok := knownResultForBlock[blockID]
-		if ok {
+		// if we have already a candidate seal, we skip any further processing
+		// CAUTION: this is not BFT, as the existence of a candidate seal
+		//          does _not_ imply that all parent results are sealable.
+		// TODO: update for full BFT
+		if _, hasCandidateSeal := blocksWithCandidateSeal[blockID]; hasCandidateSeal {
 			continue
 		}
 
 		// Without the logic below, the matching engine would produce IncorporatedResults
-		// only from receipts received directly by EN. It would be possible for a receipt
-		// to come unnoticed by the matching engine if it was incorporated in a block by
-		// another node and never received directly from the EN. Or the receipt might
-		// have been lost from the mempool during a node crash.
-		// Hence we check also if we have the receipts in storage (as would have been
-		// populated when the block was added to the chain).
+		// only from receipts received directly from ENs. Matching Core would not know about
+		// Receipts that are incorporated by other nodes in their blocks blocks (but never
+		// received directly from the EN). Also, Receipt might have been lost from the
+		// mempool during a node crash. Hence we check also if we have the receipts in
+		// storage (which also persists receipts pre-crash or when received from other
+		// nodes as part of a block proposal).
 		// Currently, the index is only added when the block which includes the receipts
 		// get finalized, so the returned receipts must be from finalized blocks.
 		// Therefore, the return receipts must be incorporated receipts, which
@@ -1012,32 +1079,39 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}
 
-		if len(receipts) > 0 {
-			for _, receipt := range receipts {
-				_, err = c.receipts.AddReceipt(receipt, header)
-				if err != nil {
-					return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
-				}
+		enoughReceipts := false
+		receiptsForResult := make(map[flow.Identifier]int) // map: resultID -> number of receipts committing to this result
+		for _, receipt := range receipts {
 
-				_, err = c.incorporatedResults.Add(
-					flow.NewIncorporatedResult(
-						receipt.ExecutionResult.BlockID,
-						&receipt.ExecutionResult,
-					),
-				)
-
-				if err != nil {
-					return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
-				}
+			_, err = c.receipts.AddReceipt(receipt, header)
+			if err != nil {
+				return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
 			}
+
+			_, err = c.incorporatedResults.Add(
+				flow.NewIncorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult),
+			)
+			if err != nil {
+				return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
+			}
+
+			resultID := receipt.ExecutionResult.ID()
+			receiptsForResult[resultID] += 1
+			if receiptsForResult[resultID] >= 2 {
+				enoughReceipts = true
+			}
+		}
+
+		// we require at least 2 receipts having the same result to seal a block,
+		// if we haven't seen as many receipt, we will keep fetching receipts .
+		if enoughReceipts {
 			continue
 		}
 
 		missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-		if firstMissingHeight == 0 {
+		if height < firstMissingHeight {
 			firstMissingHeight = height
 		}
-
 	}
 
 	// request missing execution results, if sealed height is low enough
