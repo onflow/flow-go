@@ -74,7 +74,7 @@ func checkVotesValidity(votes []*model.Vote) error {
 type stakingKeysAggregator struct {
 	lastStakingSigners map[*flow.Identity]struct{}
 	lastStakingKey     crypto.PublicKey
-	lock               sync.Mutex
+	sync.RWMutex
 }
 
 // creates a new staking keys aggregator
@@ -82,42 +82,57 @@ func newStakingKeysAggregator() *stakingKeysAggregator {
 	aggregator := &stakingKeysAggregator{
 		lastStakingSigners: map[*flow.Identity]struct{}{},
 		lastStakingKey:     crypto.NeutralBLSPublicKey(),
-		lock:               sync.Mutex{},
+		RWMutex:            sync.RWMutex{},
 	}
 	return aggregator
 }
 
 // aggregatedStakingKey returns the aggregated public of the input signers.
 func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) (crypto.PublicKey, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
 	// this greedy algorithm assumes the signers set does not vary much from one call
 	// to aggregatedStakingKey to another. It computes the delta of signers compared to the
 	// latest list of signers and adjust the latest aggregated public key. This is faster
 	// than aggregating the public keys from scratch at each call.
-	//
+	// Considering votes have equal weights, aggregating keys from scratch takes n*2/3 key operations, where
+	// n is the number of Hotstuff participants. This corresponds to the worst case of the greedy
+	// algorithm. The worst case happens when the 2/3 latest signers and the 2/3 new signers only
+	// have 1/3 in common (the minimum common ratio).
+
+	s.RLock()
+	lastList := s.lastStakingSigners
+	lastKey := s.lastStakingKey
+	s.RUnlock()
 
 	// get the signers delta and update the last list for the next comparison
-	newSigners, missingSigners := s.identitiesDelta(signers)
+	newSigners, missingSigners, updatedList := identitiesDelta(signers, lastList)
 	// add the new keys
 	var err error
-	s.lastStakingKey, err = crypto.AggregateBLSPublicKeys(
-		append(newSigners.StakingKeys(), s.lastStakingKey))
+	updatedKey, err := crypto.AggregateBLSPublicKeys(
+		append(newSigners.StakingKeys(), lastKey))
 	if err != nil {
 		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
 	}
 	// remove the missing keys
-	s.lastStakingKey, err = crypto.RemoveBLSPublicKeys(s.lastStakingKey, missingSigners.StakingKeys())
+	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSigners.StakingKeys())
 	if err != nil {
 		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
 	}
-	return s.lastStakingKey, nil
+
+	// update the latest list and public key. The current thread might
+	s.Lock()
+	s.lastStakingSigners = updatedList
+	s.lastStakingKey = updatedKey
+	s.Unlock()
+	return updatedKey, nil
 }
 
-// identitiesDelta computes the delta between the reference s.lastStakingKey
-// and the input identity list
-func (s *stakingKeysAggregator) identitiesDelta(signers flow.IdentityList) (flow.IdentityList, flow.IdentityList) {
+// identitiesDelta computes the delta between the reference s.lastStakingSigners
+// and the input identity list.
+// it return the new signers, missing signers and the new map of signers.
+func identitiesDelta(signers flow.IdentityList, lastList map[*flow.Identity]struct{}) (
+	flow.IdentityList, flow.IdentityList, map[*flow.Identity]struct{}) {
+
 	var newSigners, missingSigners flow.IdentityList
 
 	// create a map of the input list,
@@ -125,20 +140,18 @@ func (s *stakingKeysAggregator) identitiesDelta(signers flow.IdentityList) (flow
 	signersMap := map[*flow.Identity]struct{}{}
 	for _, signer := range signers {
 		signersMap[signer] = struct{}{}
-		_, ok := s.lastStakingSigners[signer]
+		_, ok := lastList[signer]
 		if !ok {
 			newSigners = append(newSigners, signer)
 		}
 	}
 
 	// look for missing signers
-	for signer := range s.lastStakingSigners {
+	for signer := range lastList {
 		_, ok := signersMap[signer]
 		if !ok {
 			missingSigners = append(missingSigners, signer)
 		}
 	}
-	// update the last signers for the next delta check
-	s.lastStakingSigners = signersMap
-	return newSigners, missingSigners
+	return newSigners, missingSigners, signersMap
 }
