@@ -37,7 +37,7 @@ func (i *Indexer) OnFinalizedBlock(block *model.Block) {
 	// must be for a finalized blocks.
 	err := i.indexReceipts(block.BlockID)
 	if err != nil {
-		i.log.Fatal().Err(err).Hex("block_id", block.BlockID[:]).
+		i.log.Error().Err(err).Hex("block_id", block.BlockID[:]).
 			Msg("could not index receipts for block")
 	}
 }
