@@ -475,6 +475,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
 		Hex("collection_id", logging.ID(chunkDataPack.CollectionID)).
 		Hex("chunk_id", logging.ID(chunkID)).Logger()
+
 	log.Info().Msg("chunk data pack received")
 
 	// monitoring: increments number of received chunk data packs
