@@ -77,7 +77,7 @@ func TestConsumer(t *testing.T) {
 
 	// [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 	// when Stop is called, it won't work on any job any more
-	// t.Run("testStopRunning", testStopRunning)
+	t.Run("testStopRunning", testStopRunning)
 
 	t.Run("testConcurrency", testConcurrency)
 }
