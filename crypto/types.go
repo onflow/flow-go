@@ -39,13 +39,14 @@ const (
 	uncompressed = 0
 	compressed   = 1
 	// Points compression when serialized
-	serialization = compressed
+	serializationG1 = compressed
+	serializationG2 = compressed
 	//
 	// SignatureLenBLSBLS12381 is the size of G1 elements
-	SignatureLenBLSBLS12381 = fieldSize * (2 - serialization) // the length is divided by 2 if compression is on
+	SignatureLenBLSBLS12381 = fieldSize * (2 - serializationG1) // the length is divided by 2 if compression is on
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serialization) // the length is divided by 2 if compression is on
+	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serializationG2) // the length is divided by 2 if compression is on
 	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
 	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
 	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1

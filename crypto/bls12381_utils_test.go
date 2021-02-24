@@ -104,7 +104,7 @@ func TestOpSwuHashToG1(t *testing.T) {
 		"027c48089c1c93756b0820f7cec9fcd7d5c31c7c47825eb5e9d90ed9d82fdd31b4aeca2b94d48033a260aa4e0651820e",
 	}
 	var expected []string
-	if serialization == compressed {
+	if serializationG1 == compressed {
 		expected = []string{
 			"acb46e12d85fc2f7ac9dbb68c3d62d206a2f0a90d85d25c13e3c6fdf8f0b44096c3ba3ecdcd57d95c5ad0727d6025188",
 			"b6251e8d37663a78eed9ad6f1a0eb1915733a74acc2e1b4428d63aa78b765786f3ff56f6abace6ae88494f138acf8eca",
