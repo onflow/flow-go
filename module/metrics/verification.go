@@ -3,7 +3,6 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -32,7 +31,7 @@ type VerificationCollector struct {
 
 }
 
-func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
+func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *VerificationCollector {
 	// Assigner Engine
 	rcvBlocksTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "block_received_total",

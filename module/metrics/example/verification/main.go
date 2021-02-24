@@ -65,7 +65,7 @@ func demo() {
 			panic(err)
 		}
 
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
+		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
 		mempoolCollector := metrics.NewMempoolCollector(5 * time.Second)
 
 		// starts periodic launch of mempoolCollector
