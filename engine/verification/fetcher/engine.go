@@ -209,16 +209,13 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 
 func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.Identifier) error {
 	blockID := c.ChunkBody.BlockID
-	// TODO: let it return []*flow.ExecutionReceipt
 	receiptsData, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
 	}
 
-	receipts := make([]*flow.ExecutionReceipt, len(receiptsData))
-	for i, receipt := range receiptsData {
-		receipts[i] = &receipt
-	}
+	var receipts []*flow.ExecutionReceipt
+	copy(receipts, receiptsData)
 
 	agrees, disagrees := executorsOf(receipts, resultID)
 	// chunk data pack request will only be sent to executors who produced the same result,
