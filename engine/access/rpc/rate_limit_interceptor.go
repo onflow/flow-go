@@ -11,34 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TODO: read this map from an input file
-// TODO: fine-tune these numbers (currently just set to an arbitrary high value)
-// APILimit is the map of an API and it's rate limit (request per second)
-var APILimit = map[string]uint{
-	"Ping":                       300,
-	"GetLatestBlockHeader":       300,
-	"GetBlockHeaderByID":         300,
-	"GetBlockHeaderByHeight":     300,
-	"GetLatestBlock":             300,
-	"GetBlockByID":               300,
-	"GetBlockByHeight":           300,
-	"GetCollectionByID":          300,
-	"SendTransaction":            300,
-	"GetTransaction":             300,
-	"GetTransactionResult":       300,
-	"GetAccount":                 300,
-	"GetAccountAtLatestBlock":    300,
-	"GetAccountAtBlockHeight":    300,
-	"ExecuteScriptAtLatestBlock": 300,
-	"ExecuteScriptAtBlockID":     300,
-	"ExecuteScriptAtBlockHeight": 300,
-	"GetEventsForHeightRange":    300,
-	"GetEventsForBlockIDs":       300,
-	"GetNetworkParameters":       300,
-}
-
-var defaultRateLimit = 300 // 300 calls per second
-var DefaultBurst = 100     // at most 100 call that are made at the same time (burst)
+var defaultRateLimit = 1000 // aggregate default rate limit for all unspecified API calls
+var DefaultBurst = 100      // default burst limit (calls made at the same time) for an API
 
 // rateLimiterInterceptor rate limits the
 type rateLimiterInterceptor struct {
@@ -51,14 +25,18 @@ type rateLimiterInterceptor struct {
 	methodLimiterMap map[string]*rate.Limiter
 }
 
-func NewRateLimiterInterceptor(log zerolog.Logger) *rateLimiterInterceptor {
+func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int) *rateLimiterInterceptor {
 
 	defaultLimiter := rate.NewLimiter(rate.Limit(defaultRateLimit), DefaultBurst)
-	methodLimiterMap := make(map[string]*rate.Limiter, len(APILimit))
+	methodLimiterMap := make(map[string]*rate.Limiter, len(apiRateLimits))
 
 	// read rate limit values for each API and create a limiter for each
-	for api, limit := range APILimit {
+	for api, limit := range apiRateLimits {
 		methodLimiterMap[api] = rate.NewLimiter(rate.Limit(limit), DefaultBurst)
+	}
+
+	if len(methodLimiterMap) == 0 {
+		log.Info().Int("default_rate_limit", defaultRateLimit).Msg("no rate limits specified, using the default limit")
 	}
 
 	return &rateLimiterInterceptor{

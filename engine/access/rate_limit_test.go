@@ -97,11 +97,13 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.rateLimit = 2
 	// set the default burst
 	rpc.DefaultBurst = 2
-	// change the rate limit of the Ping API
-	rpc.APILimit["Ping"] = uint(suite.rateLimit)
+
+	apiRateLimt := map[string]int{
+		"Ping": suite.rateLimit,
+	}
 
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.execClient, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.chainID, suite.metrics, 0, 0, false, false)
+		nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup

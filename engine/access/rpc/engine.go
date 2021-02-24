@@ -65,6 +65,7 @@ func New(log zerolog.Logger,
 	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
+	apiRatelimits map[string]int,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -79,10 +80,26 @@ func New(log zerolog.Logger,
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
-	// collect all the interceptor chain
-	allInterceptors := interceptors(rpcMetricsEnabled, log)
+	interceptors := []grpc.UnaryServerInterceptor{}
+	// if rpc metrics is enabled, first create the grpc metrics interceptor
+	if rpcMetricsEnabled {
+		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
+	}
 
-	grpcOpts = append(grpcOpts, allInterceptors)
+	// create a rate limit interceptor
+	rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits).unaryServerInterceptor
+	// append the rate limit interceptor
+	interceptors = append(interceptors, rateLimitInterceptor)
+
+	var interceptorsAsServerOption grpc.ServerOption
+	if len(interceptors) > 1 {
+		// create a chained unary interceptor, if more than one interceptor are needed
+		interceptorsAsServerOption = grpc.ChainUnaryInterceptor(interceptors...)
+	} else {
+		interceptorsAsServerOption = grpc.UnaryInterceptor(interceptors[0])
+	}
+
+	grpcOpts = append(grpcOpts, interceptorsAsServerOption)
 
 	grpcServer := grpc.NewServer(grpcOpts...)
 
@@ -138,23 +155,6 @@ func New(log zerolog.Logger,
 	)
 
 	return eng
-}
-
-// interceptors creates all the GRPC server interceptors
-func interceptors(rpcMetricsEnabled bool, log zerolog.Logger) grpc.ServerOption {
-
-	rateLimitInterceptor := NewRateLimiterInterceptor(log).unaryServerInterceptor
-
-	if !rpcMetricsEnabled {
-		return grpc.UnaryInterceptor(rateLimitInterceptor)
-	}
-
-	// create a chained unary interceptor
-	// first add the grpc metrics interceptor, then add the rate limit interceptor
-	// grpc metrics will report grpc API metrics before being rate limited
-	unaryInterceptors := grpc.ChainUnaryInterceptor(grpc_prometheus.UnaryServerInterceptor,
-		rateLimitInterceptor)
-	return unaryInterceptors
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
