@@ -25,7 +25,7 @@ func (_m *VerificationMetrics) OnChunksAssigned(chunks int) {
 }
 
 // OnChunksProcessed provides a mock function with given fields:
-func (_m *VerificationMetrics) OnChunksProcessed() {
+func (_m *VerificationMetrics) OnChunkProcessed() {
 	_m.Called()
 }
 

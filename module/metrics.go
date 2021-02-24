@@ -198,9 +198,9 @@ type VerificationMetrics interface {
 	// It increases the total number of assigned chunks by the input.
 	OnChunksAssigned(chunks int)
 
-	// OnChunksProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
+	// OnChunkProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
 	// It increments the total number of sent chunks.
-	OnChunksProcessed()
+	OnChunkProcessed()
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.

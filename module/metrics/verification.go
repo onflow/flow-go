@@ -216,8 +216,8 @@ func (vc *VerificationCollector) OnChunksAssigned(chunks int) {
 	vc.assignedChunksTotal.Add(float64(chunks))
 }
 
-// OnChunksProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
+// OnChunkProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
 // It increments the total number of sent chunks.
-func (vc *VerificationCollector) OnChunksProcessed() {
+func (vc *VerificationCollector) OnChunkProcessed() {
 	vc.sntChunksTotal.Inc()
 }
