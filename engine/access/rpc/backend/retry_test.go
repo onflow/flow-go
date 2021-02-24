@@ -98,6 +98,10 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Events: nil,
 	}
 
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		Return([]*flow.ExecutionReceipt{}, nil)
+
 	// Setup Handler + Retry
 	backend := New(suite.state, suite.execClient, suite.colClient, nil, suite.blocks, suite.headers,
 		suite.collections, suite.transactions, suite.receipts, suite.chainID, metrics.NewNoopCollector(), nil,

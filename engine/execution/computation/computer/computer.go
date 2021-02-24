@@ -19,8 +19,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkASTCacheSize = 64
-
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.Ledger) error
 }
@@ -47,14 +45,9 @@ func NewBlockComputer(
 	tracer module.Tracer,
 	logger zerolog.Logger,
 ) (BlockComputer, error) {
-	systemChunkASTCache, err := fvm.NewLRUASTCache(SystemChunkASTCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create system chunk AST cache: %w", err)
-	}
 
 	systemChunkCtx := fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithASTCache(systemChunkASTCache),
 		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
@@ -122,7 +115,10 @@ func (e *blockComputer) executeBlock(
 
 		collectionView := stateView.NewChild()
 
-		e.log.Debug().Hex("block_id", logging.Entity(block)).Hex("collection_id", logging.Entity(collection.Guarantee)).Msg("executing collection")
+		e.log.Debug().
+			Hex("block_id", logging.Entity(block)).
+			Hex("collection_id", logging.Entity(collection.Guarantee)).
+			Msg("executing collection")
 
 		collEvents, collServiceEvents, txResults, nextIndex, gas, err := e.executeCollection(
 			ctx, txIndex, blockCtx, collectionView, collection,
@@ -141,6 +137,7 @@ func (e *blockComputer) executeBlock(
 		interactions[i] = collectionView.Interactions()
 
 		stateView.MergeView(collectionView)
+
 	}
 
 	// system chunk
@@ -169,6 +166,7 @@ func (e *blockComputer) executeBlock(
 	blockTxResults = append(blockTxResults, txResult)
 	gasUsed += txGas
 	interactions[len(interactions)-1] = systemChunkView.Interactions()
+
 	stateView.MergeView(systemChunkView)
 
 	return &execution.ComputationResult{
@@ -215,7 +213,9 @@ func (e *blockComputer) executeCollection(
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
 
 	for _, txBody := range collection.Transactions {
-		txEvents, txServiceEvents, txResult, txGasUsed, err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
+
+		txEvents, txServiceEvents, txResult, txGasUsed, err :=
+			e.executeTransaction(txBody, colSpan, txMetrics, collectionView, txCtx, txIndex)
 
 		txIndex++
 		events = append(events, txEvents...)
@@ -262,6 +262,10 @@ func (e *blockComputer) executeTransaction(
 			txSpan.Finish()
 		}()
 	}
+
+	e.log.Debug().
+		Hex("tx_id", logging.Entity(txBody)).
+		Msg("executing transaction")
 
 	txView := collectionView.NewChild()
 
