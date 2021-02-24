@@ -16,7 +16,7 @@ type Worker interface {
 }
 
 type Consumer struct {
-	sync.Mutex
+	mu  sync.Mutex
 	log zerolog.Logger
 
 	// Storage
@@ -68,8 +68,8 @@ func NewConsumer(
 
 // Start starts consuming the jobs from the job queue.
 func (c *Consumer) Start(defaultIndex int64) error {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.running {
 		return nil
@@ -110,8 +110,8 @@ func (c *Consumer) Start(defaultIndex int64) error {
 // Stop stops consuming jobs from the job queue.
 // Note, it won't stop the existing worker from finishing their job
 func (c *Consumer) Stop() {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	c.running = false
 	c.log.Info().Msg("consumer stopped")
@@ -120,8 +120,8 @@ func (c *Consumer) Stop() {
 // NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
 // the next job from the job queue if there are workers available
 func (c *Consumer) NotifyJobIsDone(jobID JobID) {
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
 
 	if c.doneJob(jobID) {
@@ -141,8 +141,8 @@ func (c *Consumer) Check() {
 	}
 
 	// still need to lock here, since checkProcessable might update the state vars.
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	c.checkProcessable()
 
