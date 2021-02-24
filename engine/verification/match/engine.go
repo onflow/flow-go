@@ -339,9 +339,10 @@ func (e *Engine) onTimer() {
 		chunkID := chunk.ID()
 
 		log := e.log.With().
-			Hex("chunk_id", logging.ID(chunkID)).
 			Hex("block_id", logging.ID(chunk.Chunk.BlockID)).
 			Hex("result_id", logging.ID(chunk.ExecutionResultID)).
+			Hex("chunk_id", logging.ID(chunkID)).
+			Uint64("chunk_index", chunk.Chunk.Index).
 			Logger()
 
 		header, err := e.headers.ByBlockID(chunk.Chunk.BlockID)
