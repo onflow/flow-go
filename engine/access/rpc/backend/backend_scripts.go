@@ -132,8 +132,6 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	err = errors.ErrorOrNil()
 	b.log.Error().
 		Err(err).
-		Hex("block_id", blockID[:]).
-		Str("script", string(script)).
 		Msg("failed to execute script")
 	return nil, err
 }
