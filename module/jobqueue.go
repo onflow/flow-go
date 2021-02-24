@@ -31,3 +31,19 @@ type JobConsumer interface {
 	// can check if there is new job could be read from storage and give to a worker for processing
 	NotifyJobIsDone(JobID)
 }
+
+type Job interface {
+	// each job has a unique ID for deduplication
+	ID() JobID
+}
+
+// Jobs is the reader for an ordered job queue. Job can be fetched by the index,
+// which start from 0
+type Jobs interface {
+	AtIndex(index int64) (Job, error)
+}
+
+type JobQueue interface {
+	// Add a job to the job queue
+	Add(job Job) error
+}

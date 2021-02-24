@@ -3,7 +3,7 @@
 package mock
 
 import (
-	storage "github.com/onflow/flow-go/storage"
+	module "github.com/onflow/flow-go/module"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,15 +13,15 @@ type Jobs struct {
 }
 
 // AtIndex provides a mock function with given fields: index
-func (_m *Jobs) AtIndex(index int64) (storage.Job, error) {
+func (_m *Jobs) AtIndex(index int64) (module.Job, error) {
 	ret := _m.Called(index)
 
-	var r0 storage.Job
-	if rf, ok := ret.Get(0).(func(int64) storage.Job); ok {
+	var r0 module.Job
+	if rf, ok := ret.Get(0).(func(int64) module.Job); ok {
 		r0 = rf(index)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(storage.Job)
+			r0 = ret.Get(0).(module.Job)
 		}
 	}
 
