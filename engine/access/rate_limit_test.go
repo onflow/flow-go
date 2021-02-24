@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
@@ -151,11 +153,11 @@ func (suite *RateLimitTestSuite) TestRatelimitingWithoutBurst() {
 
 	// request more than the limit should fail
 	_, err := suite.client.Ping(ctx, req)
-	assert.Error(suite.T(), err)
+	suite.assertRateLimitError(err)
 }
 
-// TestBasicRatelimitingWithBurst tests that burst limit is correctly applied to an Access API call
-func (suite *RateLimitTestSuite) TestBasicRatelimitingWithBurst() {
+// TestRatelimitingWithBurst tests that burst limit is correctly applied to an Access API call
+func (suite *RateLimitTestSuite) TestRatelimitingWithBurst() {
 
 	req := &accessproto.PingRequest{}
 	ctx := context.Background()
@@ -175,7 +177,14 @@ func (suite *RateLimitTestSuite) TestBasicRatelimitingWithBurst() {
 
 	// request more than the permissible burst and assert that it fails
 	_, err := suite.client.Ping(ctx, req)
+	suite.assertRateLimitError(err)
+}
+
+func (suite *RateLimitTestSuite) assertRateLimitError(err error) {
 	assert.Error(suite.T(), err)
+	status, ok := status.FromError(err)
+	assert.True(suite.T(), ok)
+	assert.Equal(suite.T(), codes.ResourceExhausted, status.Code())
 }
 
 func accessAPIClient(address string) (accessproto.AccessAPIClient, io.Closer, error) {
