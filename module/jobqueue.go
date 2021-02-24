@@ -19,9 +19,9 @@ type JobConsumer interface {
 	// the existing worker finishing their jobs
 	Stop()
 
-	// FinishJob let the workers notify consumer that a job has been finished, so that the consumer
+	// NotifyJobIsDone let the workers notify consumer that a job has been finished, so that the consumer
 	// can check if there is new job could be read from storage and give to a worker for processing
-	FinishJob(JobID)
+	NotifyJobIsDone(JobID)
 
 	// Check let the producer notify the consumer that a new job has been added, so that the consumer
 	// can check if there is worker available to process that job.

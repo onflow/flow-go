@@ -424,7 +424,7 @@ func testConcurrency(t *testing.T) {
 type JobID = module.JobID
 type Job = storage.Job
 
-func runWith(t *testing.T, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
+func runWith(t testing.TB, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
@@ -434,7 +434,7 @@ func runWith(t *testing.T, runTestWith func(module.JobConsumer, storage.Consumer
 	})
 }
 
-func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed int64) {
+func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed int64) {
 	processed, err := cp.ProcessedIndex()
 	require.NoError(t, err)
 	require.Equal(t, expectProcessed, processed)
@@ -488,4 +488,38 @@ func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int64) {
 		called64 = append(called64, int64(c))
 	}
 	require.Equal(t, expectCalled, called64)
+}
+
+// if a job can be finished as soon as it's consumed,
+// benchmark to see how fast it consume jobs.
+// the latest result is
+// 0.16 ms to push job
+// 0.22 ms to finish job
+func BenchmarkPushAndConsume(b *testing.B) {
+	b.StopTimer()
+	runWith(b, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		var wg sync.WaitGroup
+		wg.Add(b.N)
+
+		// Finish job as soon as it's consumed
+		w.fn = func(j Job) {
+			go func() {
+				c.NotifyJobIsDone(j.ID())
+				wg.Done()
+			}()
+		}
+
+		require.NoError(b, c.Start(DefaultIndex))
+
+		b.StartTimer()
+		for i := 0; i < b.N; i++ {
+			err := j.PushOne()
+			if err != nil {
+				b.Error(err)
+			}
+			c.Check()
+		}
+		wg.Wait()
+		b.StopTimer()
+	})
 }
