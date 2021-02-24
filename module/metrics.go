@@ -188,6 +188,19 @@ type VerificationMetrics interface {
 	// OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
 	// It increases the total number of result approvals.
 	OnResultApproval()
+
+	// OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
+	// It increments the total number of finalized blocks.
+	OnFinalizedBlockReceived()
+
+	// OnChunksAssigned is called whenever a chunks assigned to this verification node by applying chunk assignment on an
+	// execution result.
+	// It increases the total number of assigned chunks by the input.
+	OnChunksAssigned(chunks int)
+
+	// OnChunksProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
+	// It increments the total number of sent chunks.
+	OnChunksProcessed()
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
