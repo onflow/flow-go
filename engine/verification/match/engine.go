@@ -450,7 +450,7 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 		return
 	}
 
-	// attachs the chunk ID to its result ID for sake of memory cleanup tracking
+	// attaches the chunk ID to its result ID for sake of memory cleanup tracking
 	err := e.chunkIdsByResult.Append(resultID, chunkID)
 	if err != nil {
 		log.Debug().
