@@ -152,6 +152,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.metrics.On("OnChunkProcessed").Return().Once()
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
