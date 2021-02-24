@@ -120,7 +120,10 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	})
 
 	// registers all metrics and panics if any fails.
-	registerer.MustRegister(rcvReceiptsTotals,
+	registerer.MustRegister(rcvBlocksTotal,
+		assignedChunksTotal,
+		sntChunksTotal,
+		rcvReceiptsTotals,
 		sntExecutionResultsTotal,
 		rcvExecutionResultsTotal,
 		sntVerifiableChunksTotal,
@@ -131,6 +134,9 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 
 	vc := &VerificationCollector{
 		tracer:                   tracer,
+		rcvBlocksTotal:           rcvBlocksTotal,
+		assignedChunksTotal:      assignedChunksTotal,
+		sntChunksTotal:           sntChunksTotal,
 		rcvReceiptsTotal:         rcvReceiptsTotals,
 		sntExecutionResultsTotal: sntExecutionResultsTotal,
 		rcvExecutionResultsTotal: rcvExecutionResultsTotal,
