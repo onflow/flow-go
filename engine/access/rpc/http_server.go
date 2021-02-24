@@ -14,15 +14,15 @@ type HTTPHeader struct {
 
 var defaultHTTPHeaders = []HTTPHeader{
 	{
-		Key:   "Access-Control-allow-Origin",
+		Key:   "Access-Control-Allow-Origin",
 		Value: "*",
 	},
 	{
-		Key:   "Access-Control-allow-Methods",
+		Key:   "Access-Control-Allow-Methods",
 		Value: "POST, GET, OPTIONS, PUT, DELETE",
 	},
 	{
-		Key:   "Access-Control-allow-Headers",
+		Key:   "Access-Control-Allow-Headers",
 		Value: "*",
 	},
 }

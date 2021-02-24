@@ -212,7 +212,7 @@ func (e *Engine) serveGRPC() {
 
 	e.log.Info().Str("grpc_address", e.config.GRPCListenAddr).Msg("starting grpc server on address")
 
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the grpc server")
 		return
