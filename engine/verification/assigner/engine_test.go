@@ -423,6 +423,7 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
