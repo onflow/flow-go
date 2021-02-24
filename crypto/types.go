@@ -34,13 +34,18 @@ const (
 	// BLS12-381
 	// p size in bytes, where G1 is defined over the field Zp
 	fieldSize = 48
-	// Points compression when serialized: 1 for compressed, 0 for uncompressed
-	compression = 1
+	//
+	// 1 for compressed, 0 for uncompressed - values should not be changed
+	uncompressed = 0
+	compressed   = 1
+	// Points compression when serialized
+	serialization = compressed
+	//
 	// SignatureLenBLSBLS12381 is the size of G1 elements
-	SignatureLenBLSBLS12381 = fieldSize * (2 - compression) // the length is divided by 2 if compression is on
+	SignatureLenBLSBLS12381 = fieldSize * (2 - serialization) // the length is divided by 2 if compression is on
 	PrKeyLenBLSBLS12381     = 32
 	// PubKeyLenBLSBLS12381 is the size of G2 elements
-	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - compression) // the length is divided by 2 if compression is on
+	PubKeyLenBLSBLS12381        = 2 * fieldSize * (2 - serialization) // the length is divided by 2 if compression is on
 	KeyGenSeedMinLenBLSBLS12381 = PrKeyLenBLSBLS12381 + (securityBits / 8)
 	KeyGenSeedMaxLenBLSBLS12381 = maxScalarSize
 	// opSwUInputLenBLSBLS12381 is the input length of the optimized SwU map to G1
@@ -91,6 +96,8 @@ const (
 	// max relic PRG seed length in bytes
 	maxRelicPrgSeed = 1 << 32
 )
+
+const ()
 
 // Signature is a generic type, regardless of the signature scheme
 type Signature []byte

@@ -15,10 +15,10 @@ import (
 )
 
 func TestThresholdSignature(t *testing.T) {
-	t.Run("stateful_simple_keygen", testStatefulThresholdSignatureSimpleKeyGen)
-	t.Run("stateful_signature_feldmanVSS_keygen", testStatefulThresholdSignatureFeldmanVSS)
-	t.Run("stateful_signature_jointFeldman_keygen", testStatefulThresholdSignatureJointFeldman)
-	t.Run("stateless_simple_keygen", testStatelessThresholdSignatureSimpleKeyGen)
+	//t.Run("stateful_simple_keygen", testStatefulThresholdSignatureSimpleKeyGen)
+	//t.Run("stateful_signature_feldmanVSS_keygen", testStatefulThresholdSignatureFeldmanVSS)
+	//t.Run("stateful_signature_jointFeldman_keygen", testStatefulThresholdSignatureJointFeldman)
+	//t.Run("stateless_simple_keygen", testStatelessThresholdSignatureSimpleKeyGen)
 	t.Run("stateless_signature_feldmanVSS_keygen", testStatelessThresholdSignatureFeldmanVSS)
 }
 
@@ -111,6 +111,7 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 func testStatefulThresholdSignatureFeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
+	gt = t
 	// number of nodes to test
 	n := 5
 	lead := 0
@@ -169,6 +170,7 @@ func testStatefulThresholdSignatureFeldmanVSS(t *testing.T) {
 func testStatefulThresholdSignatureJointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
+	gt = t
 	// number of nodes to test
 	n := 5
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
@@ -238,6 +240,7 @@ func testStatefulThresholdSignatureJointFeldman(t *testing.T) {
 func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
+	gt = t
 	// number of nodes to test
 	n := 5
 	lead := 0
