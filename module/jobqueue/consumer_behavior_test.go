@@ -352,7 +352,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		// rebuild a consumer with the dependencies to simulate a restart
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
-		reProgress := badger.NewConsumeProgress(db, ConsumerTag)
+		reProgress := badger.NewConsumerProgress(db, ConsumerTag)
 		reConsumer := newTestConsumer(reProgress, j, reWorker)
 
 		err := reConsumer.Start(DefaultIndex)
@@ -422,13 +422,13 @@ func testConcurrency(t *testing.T) {
 }
 
 type JobID = module.JobID
-type Job = storage.Job
+type Job = module.Job
 
 func runWith(t testing.TB, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
-		progress := badger.NewConsumeProgress(db, ConsumerTag)
+		progress := badger.NewConsumerProgress(db, ConsumerTag)
 		consumer := newTestConsumer(progress, jobs, worker)
 		runTestWith(consumer, progress, worker, jobs, db)
 	})
@@ -440,7 +440,7 @@ func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed 
 	require.Equal(t, expectProcessed, processed)
 }
 
-func newTestConsumer(cp storage.ConsumerProgress, jobs storage.Jobs, worker jobqueue.Worker) module.JobConsumer {
+func newTestConsumer(cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := int64(3)
 	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing)

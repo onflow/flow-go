@@ -22,13 +22,13 @@ func (_m *JobConsumer) NotifyJobIsDone(_a0 module.JobID) {
 	_m.Called(_a0)
 }
 
-// Start provides a mock function with given fields:
-func (_m *JobConsumer) Start() error {
-	ret := _m.Called()
+// Start provides a mock function with given fields: defaultIndex
+func (_m *JobConsumer) Start(defaultIndex int64) error {
+	ret := _m.Called(defaultIndex)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(int64) error); ok {
+		r0 = rf(defaultIndex)
 	} else {
 		r0 = ret.Error(0)
 	}

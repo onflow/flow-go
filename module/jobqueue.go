@@ -27,3 +27,19 @@ type JobConsumer interface {
 	// can check if there is worker available to process that job.
 	Check()
 }
+
+type Job interface {
+	// each job has a unique ID for deduplication
+	ID() JobID
+}
+
+// Jobs is the reader for an ordered job queue. Job can be fetched by the index,
+// which start from 0
+type Jobs interface {
+	AtIndex(index int64) (Job, error)
+}
+
+type JobQueue interface {
+	// Add a job to the job queue
+	Add(job Job) error
+}

@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -138,8 +139,8 @@ type MockJobs struct {
 	sync.Mutex
 	log      zerolog.Logger
 	last     int
-	jobs     map[int]Job
-	index    map[JobID]int
+	jobs     map[int]module.Job
+	index    map[module.JobID]int
 	JobMaker *JobMaker
 }
 
@@ -147,15 +148,13 @@ func NewMockJobs() *MockJobs {
 	return &MockJobs{
 		log:      unittest.Logger().With().Str("module", "jobs").Logger(),
 		last:     0, // must be from 1
-		jobs:     make(map[int]Job),
-		index:    make(map[JobID]int),
+		jobs:     make(map[int]module.Job),
+		index:    make(map[module.JobID]int),
 		JobMaker: NewJobMaker(),
 	}
 }
 
-// var _ storage.Jobs = &MockJobs{}
-
-func (j *MockJobs) AtIndex(index int64) (storage.Job, error) {
+func (j *MockJobs) AtIndex(index int64) (module.Job, error) {
 	j.Lock()
 	defer j.Unlock()
 
@@ -170,7 +169,7 @@ func (j *MockJobs) AtIndex(index int64) (storage.Job, error) {
 	return job, nil
 }
 
-func (j *MockJobs) Add(job storage.Job) error {
+func (j *MockJobs) Add(job module.Job) error {
 	j.Lock()
 	defer j.Unlock()
 
@@ -211,8 +210,8 @@ func (j *MockJobs) PushN(n int64) error {
 }
 
 // deterministically compute the JobID from index
-func JobIDAtIndex(index int) JobID {
-	return JobID(fmt.Sprintf("%v", index))
+func JobIDAtIndex(index int) module.JobID {
+	return module.JobID(fmt.Sprintf("%v", index))
 }
 
 // JobMaker is a test helper.
@@ -232,12 +231,12 @@ type TestJob struct {
 	index int
 }
 
-func (tj TestJob) ID() JobID {
+func (tj TestJob) ID() module.JobID {
 	return JobIDAtIndex(tj.index)
 }
 
 // return next unique job
-func (j *JobMaker) Next() storage.Job {
+func (j *JobMaker) Next() module.Job {
 	j.Lock()
 	defer j.Unlock()
 
