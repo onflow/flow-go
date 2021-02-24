@@ -12,9 +12,9 @@ type VerificationCollector struct {
 	tracer *trace.OpenTracer
 
 	// Assigner Engine
-	rcvBlockTotal      prometheus.Counter // total finalized blocks received by assigner engine
-	assignedChunkTotal prometheus.Counter // total chunks assigned to this verification node
-	sntChunkTotal      prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
+	rcvBlocksTotal      prometheus.Counter // total finalized blocks received by assigner engine
+	assignedChunksTotal prometheus.Counter // total chunks assigned to this verification node
+	sntChunksTotal      prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
 
 	// Finder Engine
 	rcvReceiptsTotal         prometheus.Counter // total execution receipts arrived at finder engine
@@ -34,18 +34,25 @@ type VerificationCollector struct {
 
 func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
 	// Assigner Engine
-	rcvBlockTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "finalized_block_received_total",
+	rcvBlocksTotal := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "block_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number of finalized blocks received by assigner engine",
 	})
 
-	assignedChunkTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "assigned_chunk_total",
+	assignedChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "chunk_assigned_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number of chunks assigned to verification node",
+	})
+
+	sntChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+		Name:      "chunk_sent_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "total number chunks sent by assigner engine to chunk consumer",
 	})
 
 	// till new pipeline of assigner-fetcher-verifier is in place, we need to keep these metrics
