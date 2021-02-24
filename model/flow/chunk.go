@@ -76,7 +76,6 @@ func (cl ChunkList) Indices() []uint64 {
 		indices[i] = chunk.Index
 	}
 
-	sortkeys.Uint64s(indices)
 
 	return indices
 }
