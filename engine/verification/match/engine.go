@@ -254,8 +254,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		ExecutionResult: result,
 	}
 	if ok := e.results.Add(rdp); !ok {
-		log.Debug().
-			Msg("could not add result to results mempool")
+		log.Debug().Msg("could not add result to results mempool")
 		return nil
 	}
 
