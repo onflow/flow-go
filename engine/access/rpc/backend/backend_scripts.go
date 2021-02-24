@@ -86,24 +86,33 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 		Arguments: arguments,
 	}
 
+	logger := b.log.With().
+		Hex("block_id", blockID[:]).
+		Str("script", string(script)).
+		Logger()
+
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
 	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
 	if err != nil {
+		logger.Error().Err(err).Msg("failed to find execution nodes")
 		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
 	}
 
 	// if no execution nodes were found, fall back to the static execution node if provided
 	if len(execNodes) == 0 {
 		if b.staticExecutionRPC == nil {
+			logger.Error().Msg("no execution nodes found and no static execution node provided")
 			return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node")
 		}
 		// if an executionRPC is provided, send the script to that execution node
 		execResp, err := b.staticExecutionRPC.ExecuteScriptAtBlockID(ctx, &execReq)
 		if err != nil {
+			logger.Error().Err(err).Msg("failed to execute script on the static execution node")
 			return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
 		}
-		return execResp.GetValue(), nil
 
+		logger.Debug().Msg("successfully executed script on the static execution node")
+		return execResp.GetValue(), nil
 	}
 
 	// try each of the execution nodes found
@@ -112,16 +121,21 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	for _, execNode := range execNodes {
 		result, err := b.tryExecuteScript(ctx, execNode, execReq)
 		if err == nil {
-			b.log.Debug().
+			logger.Debug().
 				Str("execution_node", execNode.String()).
-				Hex("block_id", blockID[:]).
-				Str("script", string(script)).
-				Msg("Successfully executed script")
+				Msg("successfully executed script")
 			return result, nil
 		}
 		errors = multierror.Append(errors, err)
 	}
-	return nil, errors.ErrorOrNil()
+
+	err = errors.ErrorOrNil()
+	b.log.Error().
+		Err(err).
+		Hex("block_id", blockID[:]).
+		Str("script", string(script)).
+		Msg("failed to execute script")
+	return nil, err
 }
 
 func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Identity, req execproto.ExecuteScriptAtBlockIDRequest) ([]byte, error) {
