@@ -439,28 +439,27 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 	chunkID := chunk.ID()
 	status := NewChunkStatus(chunk, resultID, executorID)
 	added := e.pendingChunks.Add(status)
+	log := e.log.With().
+		Hex("result_id", logging.ID(status.ExecutionResultID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Uint64("chunk_index", chunk.Index).
+		Logger()
+
 	if !added {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
-			Msg("could not add chunk status to pendingChunks mempool")
+		log.Debug().Msg("could not add chunk status to pendingChunks mempool")
 		return
 	}
 
 	// attachs the chunk ID to its result ID for sake of memory cleanup tracking
 	err := e.chunkIdsByResult.Append(resultID, chunkID)
 	if err != nil {
-		e.log.Debug().
+		log.Debug().
 			Err(err).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
 			Msg("could not append chunk id to its result id")
 		return
 	}
 
 	e.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Hex("result_id", logging.ID(status.ExecutionResultID)).
 		Msg("chunk marked assigned to this verification node")
 }
 
