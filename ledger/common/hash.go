@@ -10,7 +10,6 @@ var emptySlice []byte
 var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
 
 const hashBitLen = 256
-const hashByteLen = hashBitLen >> 3
 const defaultHashLen = hashBitLen + 1
 
 // we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.

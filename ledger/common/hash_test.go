@@ -60,8 +60,8 @@ func TestHash(t *testing.T) {
 			h := common.HashLeaf(path, value)
 
 			hasher := hash.NewSHA3_256()
-			hasher.Write(path)
-			hasher.Write(value)
+			_, _ = hasher.Write(path)
+			_, _ = hasher.Write(value)
 			expected := hasher.SumHash()
 			assert.Equal(t, []byte(expected), []byte(h))
 		}
@@ -77,8 +77,8 @@ func TestHash(t *testing.T) {
 			h := common.HashInterNode(h1, h2)
 
 			hasher := hash.NewSHA3_256()
-			hasher.Write(h1)
-			hasher.Write(h2)
+			_, _ = hasher.Write(h1)
+			_, _ = hasher.Write(h2)
 			expected := hasher.SumHash()
 			assert.Equal(t, []byte(expected), []byte(h))
 		}
@@ -106,8 +106,8 @@ func BenchmarkHash(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			hasher := hash.NewSHA3_256()
-			hasher.Write(h1)
-			hasher.Write(h2)
+			_, _ = hasher.Write(h1)
+			_, _ = hasher.Write(h2)
 			_ = hasher.SumHash()
 		}
 		b.StopTimer()
