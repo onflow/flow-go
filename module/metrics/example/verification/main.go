@@ -50,7 +50,7 @@ func happyPathExample() {
 
 		// starts happy path
 		t := &testing.T{}
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
+		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
 		test.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
 		<-mempoolCollector.Done()
 	})
