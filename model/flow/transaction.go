@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/hex"
 	"fmt"
 	"sort"
 
@@ -235,7 +236,9 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 // This function returns an error if the signature cannot be generated.
 func (tb *TransactionBody) SignPayload(address Address, keyID uint64, privateKey crypto.PrivateKey, hasher hash.Hasher) error {
 
-	sig, err := privateKey.Sign(tb.PayloadMessage(), hasher)
+	payloadMessage := tb.PayloadMessage()
+	fmt.Printf("payload message: %s\n", hex.EncodeToString(payloadMessage))
+	sig, err := privateKey.Sign(payloadMessage, hasher)
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
 	}

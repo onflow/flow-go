@@ -11,6 +11,7 @@ import (
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -68,6 +69,7 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 		return nil, errors.New("Sign requires a Hasher")
 	}
 	h := alg.ComputeHash(data)
+	fmt.Printf("hash = %s\n", hex.EncodeToString(h))
 	return sk.signHash(h)
 }
 
@@ -180,6 +182,8 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	}
 	var d big.Int
 	d.SetBytes(der)
+
+	fmt.Printf("D = %s\n", d.String())
 
 	if d.Cmp(n) >= 0 {
 		return nil, fmt.Errorf("input is not a valid %s key", a.algo)
@@ -305,6 +309,10 @@ type PubKeyECDSA struct {
 	alg *ecdsaAlgo
 	// public key data
 	goPubKey *goecdsa.PublicKey
+}
+
+func (pk *PubKeyECDSA) PK() *goecdsa.PublicKey {
+	return pk.goPubKey
 }
 
 // Algorithm returns the the algo related to the private key
