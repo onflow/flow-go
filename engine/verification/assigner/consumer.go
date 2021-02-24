@@ -31,7 +31,7 @@ func blockToJob(block *flow.Block) *BlockJob {
 	return &BlockJob{Block: block}
 }
 
-func jobToBlock(job storage.Job) *flow.Block {
+func jobToBlock(job module.Job) *flow.Block {
 	blockJob, _ := job.(*BlockJob)
 	return blockJob.Block
 }
@@ -43,7 +43,7 @@ type FinalizedBlockReader struct {
 }
 
 // the job index would just be the finalized block height
-func (r *FinalizedBlockReader) AtIndex(index int64) (storage.Job, error) {
+func (r *FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
 	var finalBlock *flow.Block
 	return blockToJob(finalBlock), fmt.Errorf("to be implement")
 }
@@ -60,7 +60,7 @@ type Worker struct {
 // it should not work on a sealed block, it should not work on a block that is not staked.
 // then, it reads all the receipts from the block payload. For each receipt, it checks if
 // there is any chunk assigned to me, and store all these chunks in another chunk job queue
-func (w *Worker) Run(job storage.Job) {
+func (w *Worker) Run(job module.Job) {
 	block := jobToBlock(job)
 	w.engine.ProcessFinalizedBlock(block)
 }
@@ -111,9 +111,7 @@ func NewBlockConsumer(
 
 	jobs := &FinalizedBlockReader{state: state}
 
-	consumer := jobqueue.NewConsumer(
-		log, jobs, processedHeight, worker, maxProcessing, maxFinished,
-	)
+	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
@@ -131,7 +129,7 @@ func NewBlockConsumer(
 }
 
 func (c *BlockConsumer) FinishJob(jobID module.JobID) {
-	c.consumer.FinishJob(jobID)
+	c.consumer.NotifyJobIsDone(jobID)
 }
 
 func (c *BlockConsumer) OnFinalizedBlock(block *model.Block) {
