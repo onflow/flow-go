@@ -213,7 +213,7 @@ type LedgerMetrics interface {
 	// ForestNumberOfTrees current number of trees in a forest (in memory)
 	ForestNumberOfTrees(number uint64)
 
-	// LatestTrieRegCount records the number of unique register allocated (the lastest created trie)
+	// LatestTrieRegCount records the number of unique register allocated (the latest created trie)
 	LatestTrieRegCount(number uint64)
 
 	// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
