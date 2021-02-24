@@ -133,7 +133,6 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {
 	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
 
 	if c.doneJob(jobID) {
-		c.runningJobs.Done()
 		c.checkProcessable()
 	}
 }
@@ -181,10 +180,6 @@ func (c *Consumer) checkProcessable() {
 // this function is passive, it won't trigger itself, but can only be
 // triggered by either Start or NotifyJobIsDone
 func (c *Consumer) run() (int64, error) {
-	if !c.running {
-		return 0, nil
-	}
-
 	processedFrom := c.processedIndex
 	processables, processedTo, err := c.processableJobs()
 	if err != nil {
@@ -195,19 +190,23 @@ func (c *Consumer) run() (int64, error) {
 		Int64("processed_from", processedFrom).
 		Int64("processed_to", processedTo).
 		Int("processables", len(processables)).
+		Bool("running", c.running).
 		Msg("running")
 
-	for _, jobAtIndex := range processables {
-		jobID := jobAtIndex.job.ID()
+	for _, indexedJob := range processables {
+		jobID := indexedJob.job.ID()
 
-		c.processingsIndex[jobID] = jobAtIndex.index
-		c.processings[jobAtIndex.index] = &jobStatus{
+		c.processingsIndex[jobID] = indexedJob.index
+		c.processings[indexedJob.index] = &jobStatus{
 			jobID: jobID,
 			done:  false,
 		}
-		c.runningJobs.Add(1)
 
-		go c.worker.Run(jobAtIndex.job)
+		c.runningJobs.Add(1)
+		go func(j *jobAtIndex) {
+			c.worker.Run(j.job)
+			c.runningJobs.Done()
+		}(indexedJob)
 	}
 
 	err = c.progress.SetProcessedIndex(processedTo)
@@ -220,12 +219,24 @@ func (c *Consumer) run() (int64, error) {
 }
 
 func (c *Consumer) processableJobs() ([]*jobAtIndex, int64, error) {
-	return processableJobs(
+	processables, processedTo, err := processableJobs(
 		c.jobs,
 		c.processings,
 		c.maxProcessing,
 		c.processedIndex,
 	)
+
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// if the consumer has been stopped, we allow the existing worker to update the progressed index
+	// but won't return any new job for processing
+	if !c.running {
+		return nil, processedTo, nil
+	}
+
+	return processables, processedTo, nil
 }
 
 // processableJobs check the worker's capacity and if sufficient, read
