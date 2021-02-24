@@ -2,6 +2,7 @@ package computation
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -102,4 +103,39 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
+}
+
+func TestExecuteScript(t *testing.T) {
+
+	logger := zerolog.Nop()
+
+	execCtx := fvm.NewContext(logger)
+
+	me := new(module.Local)
+	me.On("NodeID").Return(flow.ZeroID)
+
+	rt := runtime.NewInterpreterRuntime()
+
+	vm := fvm.New(rt)
+
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+
+	view := delta.NewView(ledger.Get)
+
+	scriptView := view.NewChild()
+
+	script := []byte(fmt.Sprintf(
+		`
+			import FungibleToken from %s
+
+			pub fun main() {}
+		`,
+		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+	))
+
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx)
+	require.NoError(t, err)
+
+	_, err = engine.ExecuteScript(script, nil, nil, scriptView)
+	require.NoError(t, err)
 }

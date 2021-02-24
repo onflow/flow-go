@@ -10,12 +10,14 @@ import (
 
 var flagCollectionID string
 var flagTransactionID string
+var flagLightCollection bool
 
 func init() {
 	rootCmd.AddCommand(collectionsCmd)
 
 	collectionsCmd.Flags().StringVarP(&flagCollectionID, "id", "i", "", "the id of the collection")
-	collectionsCmd.Flags().StringVarP(&flagTransactionID, "transaction-id", "t", "", "the id of the transaction")
+	collectionsCmd.Flags().StringVarP(&flagTransactionID, "transaction-id", "t", "", "the id of the transaction (always retrieves a light collection regardless of the --light flag)")
+	collectionsCmd.Flags().BoolVarP(&flagLightCollection, "light", "l", false, "whether to return the light collection (only transaction IDs)")
 }
 
 var collectionsCmd = &cobra.Command{
@@ -34,19 +36,25 @@ var collectionsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting collection by id: %v", collectionID)
-			collection, err := storages.Collections.ByID(collectionID)
-			if err != nil {
-				log.Error().Err(err).Msgf("could not get collection with id: %v", collectionID)
+
+			// get only the light collection if specified
+			if flagLightCollection {
+				light, err := storages.Collections.LightByID(collectionID)
+				if err != nil {
+					log.Error().Err(err).Msgf("could not get collection with id: %v", collectionID)
+					return
+				}
+				common.PrettyPrintEntity(light)
 				return
 			}
 
-			common.PrettyPrintEntity(collection)
-			// print each transaction id
-
-			for i, tx := range collection.Transactions {
-				log.Info().Msgf("transaction at index %v's ID: %v", i, tx.ID())
+			// otherwise get the full collection
+			fullCollection, err := storages.Collections.ByID(collectionID)
+			if err != nil {
+				log.Error().Err(err).Msgf("could not get collection ")
+				return
 			}
-
+			common.PrettyPrintEntity(fullCollection)
 			return
 		}
 
@@ -59,16 +67,16 @@ var collectionsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting collections by transaction id: %v", transactionID)
-			collections, err := storages.Collections.LightByTransactionID(transactionID)
+			light, err := storages.Collections.LightByTransactionID(transactionID)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get collections for transaction id: %v", transactionID)
 				return
 			}
 
-			common.PrettyPrintEntity(collections)
+			common.PrettyPrintEntity(light)
 			return
 		}
 
-		log.Error().Msg("missing flags --collection-id or --transaction-id")
+		log.Error().Msg("must specify exactly one of --collection-id or --transaction-id")
 	},
 }
