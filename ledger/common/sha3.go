@@ -18,13 +18,6 @@ const (
 	// maxRate is the maximum size of the internal buffer. SHAKE-256
 	// currently needs the largest buffer.
 	maxRate = 168
-)
-
-type state struct {
-	// Generic sponge components.
-	a    [25]uint64 // main state of the hash
-	buf  []byte     // points into storage
-	rate int        // the number of bytes of state to use
 
 	// dsbyte contains the "domain separation" bits and the first bit of
 	// the padding. Sections 6.1 and 6.2 of [1] separate the outputs of the
@@ -38,17 +31,41 @@ type state struct {
 	// [1] http://csrc.nist.gov/publications/drafts/fips-202/fips_202_draft.pdf
 	//     "Draft FIPS 202: SHA-3 Standard: Permutation-Based Hash and
 	//      Extendable-Output Functions (May 2014)"
-	dsbyte byte
+	dsbyte = byte(0x06)
+
+	// output length
+	outputLength = 32
+)
+
+type state struct {
+	// Generic sponge components.
+	a    [25]uint64 // main state of the hash
+	buf  []byte     // points into storage
+	rate int        // the number of bytes of state to use
 
 	storage storageBuf
 
 	// Specific to SHA-3 and SHAKE.
-	outputLen int             // the default output size in bytes
-	state     spongeDirection // whether the sponge is absorbing or squeezing
+	state spongeDirection // whether the sponge is absorbing or squeezing
 }
 
 // A storageBuf is an aligned array of maxRate bytes.
 type storageBuf [maxRate]byte
+
+// New256 creates a new SHA3-256 hash.
+// Its generic security strength is 256 bits against preimage attacks,
+// and 128 bits against collision attacks.
+func new256() *state {
+	d := &state{
+		rate: 136,
+	}
+	d.buf = d.storage.asBytes()[:0]
+	return d
+}
+
+func (d *state) hashResult() []byte {
+	return d.buf[:outputLength]
+}
 
 func (b *storageBuf) asBytes() *[maxRate]byte {
 	return (*[maxRate]byte)(b)
@@ -67,19 +84,12 @@ func xorIn(d *state, buf []byte) {
 	}
 }
 
-// copyOutGeneric copies ulint64s to a byte buffer.
+// copyOut copies ulint64s to a byte buffer.
 func copyOut(d *state, b []byte) {
 	for i := 0; len(b) >= 8; i++ {
 		binary.LittleEndian.PutUint64(b, d.a[i])
 		b = b[8:]
 	}
-}
-
-// New256 creates a new SHA3-256 hash.
-// Its generic security strength is 256 bits against preimage attacks,
-// and 128 bits against collision attacks.
-func new256() *state {
-	return &state{rate: 136, outputLen: 32, dsbyte: 0x06}
 }
 
 // permute applies the KeccakF-1600 permutation. It handles
@@ -101,9 +111,9 @@ func (d *state) permute() {
 	}
 }
 
-// pads appends the domain separation bits in dsbyte, applies
+// finalize appends the domain separation bits in dsbyte, applies
 // the multi-bitrate 10..1 padding rule, and permutes the state.
-func (d *state) padAndPermute(dsbyte byte) {
+func (d *state) finalize() {
 	// Pad with this instance's domain-separator bits. We know that there's
 	// at least one byte of space in d.buf because, if it were full,
 	// permute would have been called to empty it. dsbyte also contains the
@@ -111,13 +121,35 @@ func (d *state) padAndPermute(dsbyte byte) {
 	d.buf = append(d.buf, dsbyte)
 	zerosStart := len(d.buf)
 	d.buf = d.storage.asBytes()[:d.rate]
-	for i := zerosStart; i < d.rate; i++ {
+	for i := zerosStart; i < d.rate-1; i++ {
 		d.buf[i] = 0
 	}
 	// This adds the final one bit for the padding. Because of the way that
 	// bits are numbered from the LSB upwards, the final bit is the MSB of
 	// the last byte.
-	d.buf[d.rate-1] ^= 0x80
+	d.buf[d.rate-1] = 0x80
+	// Apply the permutation
+	d.permute()
+	d.state = spongeSqueezing
+	d.buf = d.storage.asBytes()[:d.rate]
+	copyOut(d, d.buf)
+}
+
+// finalize512 is the padAndPermute function optimized for when the input written to
+// the state is 512 bits.
+func (d *state) finalize512() {
+	// Pad with this instance's domain-separator bits. We know that there's
+	// at least one byte of space in d.buf because, if it were full,
+	// permute would have been called to empty it. dsbyte also contains the
+	// first one bit for the padding. See the comment in the state struct.
+	d.buf = append(d.buf, dsbyte)
+	// This adds the final one bit for the padding. Because of the way that
+	// bits are numbered from the LSB upwards, the final bit is the MSB of
+	// the last byte.
+	d.buf = d.storage.asBytes()[:d.rate]
+	// There is no need to pad the bytes in between as the storage was initilized
+	// to zero un never overwritten
+	d.buf[d.rate-1] = 0x80
 	// Apply the permutation
 	d.permute()
 	d.state = spongeSqueezing
@@ -153,17 +185,7 @@ func (d *state) write(p []byte) {
 
 // write absorbs 256 bits more data into the hash's state.
 func (d *state) write256(p []byte) {
-	if d.buf == nil {
-		d.buf = d.storage.asBytes()[:0]
-	}
-
-	// The slow path; buffer the input until we can fill the sponge, and then xor it in.
 	d.buf = append(d.buf, p...)
-}
-
-func (d *state) finalize() {
-	// pad and apply the permutation.
-	d.padAndPermute(d.dsbyte)
 }
 
 // rc stores the round constants for use in the ι step.

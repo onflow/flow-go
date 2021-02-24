@@ -47,7 +47,7 @@ func HashLeaf(path []byte, value []byte) []byte {
 	hasher.write256(path) // path is always 256 bits
 	hasher.write(value)
 	hasher.finalize()
-	return hasher.buf[:hashByteLen]
+	return hasher.hashResult()
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
@@ -55,8 +55,8 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	hasher := new256()
 	hasher.write256(hash1) // hash1 and hash2 are 256 bits
 	hasher.write256(hash2)
-	hasher.finalize()
-	return hasher.buf[:hashByteLen]
+	hasher.finalize512()
+	return hasher.hashResult()
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
