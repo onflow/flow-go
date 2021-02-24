@@ -453,14 +453,11 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 	// attaches the chunk ID to its result ID for sake of memory cleanup tracking
 	err := e.chunkIdsByResult.Append(resultID, chunkID)
 	if err != nil {
-		log.Debug().
-			Err(err).
-			Msg("could not append chunk id to its result id")
+		log.Debug().Err(err).Msg("could not append chunk id to its result id")
 		return
 	}
 
-	e.log.Debug().
-		Msg("chunk marked assigned to this verification node")
+	e.log.Debug().Msg("chunk marked assigned to this verification node")
 }
 
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
@@ -573,33 +570,29 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 // If all assigned chunks of the corresponding result have been dropped, it also removes
 // the result from the memory.
 func (e *Engine) chunkMetaDataCleanup(chunkID, resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Logger()
 	err := e.chunkIdsByResult.RemIdFromKey(resultID, chunkID)
 	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("result_id", logging.ID(resultID)).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could not dropped chunk")
+		log.Debug().Err(err).Msg("could not dropped chunk")
 		return
 	}
 
 	if e.chunkIdsByResult.Has(resultID) {
 		// there are still un-matched chunks correspond to this result
-		// so the result should not be cleanned.
+		// so the result should not be cleaned.
 		return
 	}
 
 	// no pending chunk is attached to this result, hence removes it
 	if ok := e.results.Rem(resultID); !ok {
-		e.log.Debug().
-			Hex("result_id", logging.ID(resultID)).
-			Msg("could not remove result")
+		log.Debug().Msg("could not remove result")
 		return
 	}
 
-	e.log.Info().
-		Hex("result_id", logging.ID(resultID)).
-		Msg("result successfully removed")
+	e.log.Info().Msg("result successfully removed")
 }
 
 // matchChunk performs the last step in matching pipeline for a chunk.
