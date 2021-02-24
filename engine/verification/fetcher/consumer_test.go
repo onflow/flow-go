@@ -29,8 +29,6 @@ func TestChunkLocatorToJob(t *testing.T) {
 // TestProduceConsume evaluates different scenarios on passing jobs to chunk queue with 3 workers on the consumer side. It evaluates blocking and
 // none-blocking engines attached to the workers in sequential and concurrent scenarios.
 func TestProduceConsume(t *testing.T) {
-	t.Parallel()
-
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine blocking on the jobs,
 	// results in engine only receiving 3 jobs.
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
