@@ -17,6 +17,7 @@ type JobConsumer interface {
 
 	// Stop gracefully stops the consumer from reading new jobs from the job queue. It does not stop
 	// the existing worker finishing their jobs
+	// It blocks until the existing worker finish processing the job
 	Stop()
 
 	// NotifyJobIsDone let the workers notify consumer that a job has been finished, so that the consumer
