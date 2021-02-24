@@ -117,9 +117,9 @@ func (c *Consumer) Stop() {
 	c.log.Info().Msg("consumer stopped")
 }
 
-// FinishJob let the consumer know a job has been finished, so that consumer will take
+// NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
 // the next job from the job queue if there are workers available
-func (c *Consumer) FinishJob(jobID JobID) {
+func (c *Consumer) NotifyJobIsDone(jobID JobID) {
 	c.Lock()
 	defer c.Unlock()
 	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
@@ -170,7 +170,7 @@ func (c *Consumer) checkProcessable() {
 // run checks if there are processable jobs and process them by giving
 // them to the callback functions.
 // this function is passive, it won't trigger itself, but can only be
-// triggered by either Start or FinishJob
+// triggered by either Start or NotifyJobIsDone
 func (c *Consumer) run() (int64, error) {
 	if !c.running {
 		return 0, nil

@@ -113,7 +113,7 @@ func testOnJobFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +1
 
 		c.Check()
-		c.FinishJob(jobqueue.JobIDAtIndex(1))
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1))
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -133,8 +133,8 @@ func testOnJobsFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +2
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(1)) // 1*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -184,7 +184,7 @@ func testNonNextFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -209,8 +209,8 @@ func testTwoNonNextFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -236,8 +236,8 @@ func testProcessingWithNonNextFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
@@ -266,8 +266,8 @@ func testMaxWorkerWithFinishedNonNexts(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
@@ -299,13 +299,13 @@ func testFastforward(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(1)) // 1*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -331,13 +331,13 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(1)) // 1*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1*
 
 		require.NoError(t, j.PushOne()) // +6
 		c.Check()
@@ -345,7 +345,7 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +7
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(6)) // 6*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(6)) // 6*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -377,7 +377,7 @@ func testStopRunning(t *testing.T) {
 
 		c.Stop()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(2))
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2))
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -393,7 +393,7 @@ func testConcurrency(t *testing.T) {
 		// Finish job concurrently
 		w.fn = func(j Job) {
 			go func() {
-				c.FinishJob(j.ID())
+				c.NotifyJobIsDone(j.ID())
 			}()
 		}
 
