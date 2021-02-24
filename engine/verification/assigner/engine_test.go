@@ -335,6 +335,7 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
 
 	// sends containerBlock containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
