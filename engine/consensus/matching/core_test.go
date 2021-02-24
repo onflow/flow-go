@@ -492,7 +492,8 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 			unittest.WithExecutorID(ms.ExeID),
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))))
 		block.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 		})
 		// TODO: replace this with block.ID(), for now IncoroporatedBlockID == ExecutionResult.BlockID
 		emergencySealingCandidates[i] = receipt.ExecutionResult.BlockID
