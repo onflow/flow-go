@@ -60,6 +60,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 		Help:      "total number of execution receipts received by finder engine",
 	})
 
+	// TODO remove metric once finer removed
 	sntExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_sent_total",
 		Namespace: namespaceVerification,
