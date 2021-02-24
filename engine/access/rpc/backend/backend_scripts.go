@@ -130,9 +130,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	}
 
 	err = errors.ErrorOrNil()
-	b.log.Error().
-		Err(err).
-		Msg("failed to execute script")
+	logger.Err(err).Msg("failed to execute script")
 	return nil, err
 }
 
