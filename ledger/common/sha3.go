@@ -104,9 +104,6 @@ func (d *state) permute() {
 // pads appends the domain separation bits in dsbyte, applies
 // the multi-bitrate 10..1 padding rule, and permutes the state.
 func (d *state) padAndPermute(dsbyte byte) {
-	if d.buf == nil {
-		d.buf = d.storage.asBytes()[:0]
-	}
 	// Pad with this instance's domain-separator bits. We know that there's
 	// at least one byte of space in d.buf because, if it were full,
 	// permute would have been called to empty it. dsbyte also contains the
@@ -130,10 +127,6 @@ func (d *state) padAndPermute(dsbyte byte) {
 
 // Write absorbs more data into the hash's state.
 func (d *state) write(p []byte) {
-	if d.buf == nil {
-		d.buf = d.storage.asBytes()[:0]
-	}
-
 	for len(p) > 0 {
 		if len(d.buf) == 0 && len(p) >= d.rate {
 			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
@@ -168,11 +161,9 @@ func (d *state) write256(p []byte) {
 	d.buf = append(d.buf, p...)
 }
 
-// readInto256 squeezes 256 bits from the sponge.
-func (d *state) readInto256(out []byte) {
+func (d *state) finalize() {
 	// pad and apply the permutation.
 	d.padAndPermute(d.dsbyte)
-	copy(out, d.buf)
 }
 
 // rc stores the round constants for use in the ι step.

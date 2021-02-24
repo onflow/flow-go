@@ -54,30 +54,34 @@ func TestHash(t *testing.T) {
 		len := rand.Intn(1000)
 		value := make([]byte, len)
 
-		rand.Read(path)
-		rand.Read(value)
-		h := common.HashLeaf(path, value)
+		for i := 0; i < 100; i++ {
+			rand.Read(path)
+			rand.Read(value)
+			h := common.HashLeaf(path, value)
 
-		hasher := hash.NewSHA3_256()
-		hasher.Write(path)
-		hasher.Write(value)
-		expected := hasher.SumHash()
-		assert.Equal(t, []byte(expected), []byte(h))
+			hasher := hash.NewSHA3_256()
+			hasher.Write(path)
+			hasher.Write(value)
+			expected := hasher.SumHash()
+			assert.Equal(t, []byte(expected), []byte(h))
+		}
 	})
 
 	t.Run("HashInterNode", func(t *testing.T) {
 		h1 := make([]byte, 32)
 		h2 := make([]byte, 32)
 
-		rand.Read(h1)
-		rand.Read(h2)
-		h := common.HashInterNode(h1, h2)
+		for i := 0; i < 100; i++ {
+			rand.Read(h1)
+			rand.Read(h2)
+			h := common.HashInterNode(h1, h2)
 
-		hasher := hash.NewSHA3_256()
-		hasher.Write(h1)
-		hasher.Write(h2)
-		expected := hasher.SumHash()
-		assert.Equal(t, []byte(expected), []byte(h))
+			hasher := hash.NewSHA3_256()
+			hasher.Write(h1)
+			hasher.Write(h2)
+			expected := hasher.SumHash()
+			assert.Equal(t, []byte(expected), []byte(h))
+		}
 	})
 }
 
