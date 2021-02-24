@@ -17,7 +17,6 @@ import (
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -40,7 +39,6 @@ type RateLimitTestSuite struct {
 	me         *module.Local
 	chainID    flow.ChainID
 	metrics    *metrics.NoopCollector
-	backend    *backend.Backend
 	rpcEng     *rpc.Engine
 	client     accessproto.AccessAPIClient
 	closer     io.Closer
