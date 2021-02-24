@@ -120,7 +120,8 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	})
 
 	// registers all metrics and panics if any fails.
-	registerer.MustRegister(rcvBlocksTotal,
+	registerer.MustRegister(
+		rcvBlocksTotal,
 		assignedChunksTotal,
 		sntChunksTotal,
 		rcvReceiptsTotals,
@@ -201,5 +202,23 @@ func (vc *VerificationCollector) OnResultApproval() {
 	// fo by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine
 	vc.resultApprovalsTotal.Inc()
+}
 
+// OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
+// It increments the total number of finalized blocks.
+func (vc *VerificationCollector) OnFinalizedBlockReceived() {
+	vc.rcvBlocksTotal.Inc()
+}
+
+// OnChunksAssigned is called whenever a chunks assigned to this verification node by applying chunk assignment on an
+// execution result.
+// It increases the total number of assigned chunks by the input.
+func (vc *VerificationCollector) OnChunksAssigned(chunks int) {
+	vc.assignedChunksTotal.Add(float64(chunks))
+}
+
+// OnChunksProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
+// It increments the total number of sent chunks.
+func (vc *VerificationCollector) OnChunksProcessed() {
+	vc.sntChunksTotal.Inc()
 }
