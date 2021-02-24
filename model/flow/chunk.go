@@ -1,5 +1,9 @@
 package flow
 
+import (
+	"github.com/gogo/protobuf/sortkeys"
+)
+
 type ChunkBody struct {
 	CollectionIndex uint
 
@@ -71,6 +75,8 @@ func (cl ChunkList) Indices() []uint64 {
 	for i, chunk := range cl {
 		indices[i] = chunk.Index
 	}
+
+	sortkeys.Uint64s(indices)
 
 	return indices
 }
