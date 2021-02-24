@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
@@ -64,11 +63,16 @@ func TestProduceConsume(t *testing.T) {
 	t.Run("pushing 10 receive 10", func(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
+		var finishAll sync.WaitGroup
 		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			go finishProcessing.FinishProcessing(locator.ID())
+			finishAll.Add(1)
+			go func() {
+				finishProcessing.FinishProcessing(locator.ID())
+				finishAll.Done()
+			}()
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
@@ -83,6 +87,7 @@ func TestProduceConsume(t *testing.T) {
 			}
 
 			<-consumer.Done()
+			finishAll.Wait() // wait until all finished
 			// expect the mock engine receives all 10 calls
 			require.Equal(t, locators, called)
 		})
@@ -93,11 +98,16 @@ func TestProduceConsume(t *testing.T) {
 	t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
+		var finishAll sync.WaitGroup
+		finishAll.Add(100)
 		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			go finishProcessing.FinishProcessing(locator.ID())
+			go func() {
+				finishProcessing.FinishProcessing(locator.ID())
+				finishAll.Done()
+			}()
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
@@ -115,12 +125,11 @@ func TestProduceConsume(t *testing.T) {
 				}(i)
 			}
 
-			// expect the mock engine receives all 100 calls
-			require.Eventually(t, func() bool {
-				return int(total.Load()) == 100
-			}, time.Second*10, time.Millisecond*10)
-
+			finishAll.Wait()
 			<-consumer.Done()
+
+			// expect the mock engine receives all 100 calls
+			require.Equal(t, uint32(100), total.Load())
 		})
 	})
 }
