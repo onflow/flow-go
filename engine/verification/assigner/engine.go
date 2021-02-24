@@ -171,7 +171,7 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 			continue
 		}
 
-		e.metrics.OnChunksProcessed()
+		e.metrics.OnChunkProcessed()
 
 		// notifies chunk queue consumer of a new chunk
 		e.newChunkListener.Check()
