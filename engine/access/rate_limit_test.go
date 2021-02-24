@@ -52,7 +52,8 @@ type RateLimitTestSuite struct {
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
 
-
+	// test rate limit
+	rateLimit int
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
@@ -88,8 +89,16 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 
 	config := rpc.Config{
-		GRPCListenAddr: "127.0.0.1:0",
+		GRPCListenAddr: ":0", // :0 to let the OS pick a free port
+		HTTPListenAddr: ":0",
 	}
+
+	// set the rate limit to test with
+	suite.rateLimit = 2
+	// set the default burst
+	rpc.DefaultBurst = 2
+	// change the rate limit of the Ping API
+	rpc.APILimit["Ping"] = uint(suite.rateLimit)
 
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.execClient, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
 		nil, suite.chainID, suite.metrics, 0, 0, false, false)
@@ -107,8 +116,13 @@ func (suite *RateLimitTestSuite) SetupTest() {
 }
 
 func (suite *RateLimitTestSuite) TearDownTest() {
+	// close the client
 	if suite.closer != nil {
 		suite.closer.Close()
+	}
+	// close the server
+	if suite.rpcEng != nil {
+		unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Done(), 2*time.Second)
 	}
 }
 
@@ -116,16 +130,52 @@ func TestRateLimit(t *testing.T) {
 	suite.Run(t, new(RateLimitTestSuite))
 }
 
-func (suite *RateLimitTestSuite) TestBasicRatelimiting() {
+func (suite *RateLimitTestSuite) TestRatelimitingWithoutBurst() {
 
-	suite.execClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Once()
-	suite.collClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Once()
 	req := &accessproto.PingRequest{}
 	ctx := context.Background()
-	resp, err := suite.client.Ping(ctx, req)
-	assert.NoError(suite.T(), err)
-	assert.NotNil(suite.T(), resp)
 
+	// expect 2 upstream calls
+	suite.execClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(suite.rateLimit)
+	suite.collClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(suite.rateLimit)
+
+	requestCnt := 0
+	// requests within the burst should succeed
+	for requestCnt < suite.rateLimit {
+		resp, err := suite.client.Ping(ctx, req)
+		assert.NoError(suite.T(), err)
+		assert.NotNil(suite.T(), resp)
+		// sleep to prevent burst
+		time.Sleep(100 * time.Millisecond)
+		requestCnt++
+	}
+
+	// request more than the limit should fail
+	_, err := suite.client.Ping(ctx, req)
+	assert.Error(suite.T(), err)
+}
+
+func (suite *RateLimitTestSuite) TestBasicRatelimitingWithBurst() {
+
+	req := &accessproto.PingRequest{}
+	ctx := context.Background()
+
+	// expect rpc.DefaultBurst number of upstream calls
+	suite.execClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(rpc.DefaultBurst)
+	suite.collClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(rpc.DefaultBurst)
+
+	requestCnt := 0
+	// generate a permissible burst of request and assert that they succeed
+	for requestCnt < rpc.DefaultBurst {
+		resp, err := suite.client.Ping(ctx, req)
+		assert.NoError(suite.T(), err)
+		assert.NotNil(suite.T(), resp)
+		requestCnt++
+	}
+
+	// request more than the permissible burst and assert that it fails
+	_, err := suite.client.Ping(ctx, req)
+	assert.Error(suite.T(), err)
 }
 
 func accessAPIClient(address string) (accessproto.AccessAPIClient, io.Closer, error) {
