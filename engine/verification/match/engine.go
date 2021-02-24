@@ -244,7 +244,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		Msg("chunk assignment done")
 
 	if len(chunks) == 0 {
-		// no chunk is assigned to this verifiaction node
+		// no chunk is assigned to this verification node
 		return nil
 	}
 
