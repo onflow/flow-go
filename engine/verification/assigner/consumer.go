@@ -48,6 +48,11 @@ func (r *FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
 	return blockToJob(finalBlock), fmt.Errorf("to be implement")
 }
 
+// Head returns the last finalized height as job index
+func (r *FinalizedBlockReader) Head() (int64, error) {
+	return 0, fmt.Errorf("return the last finalized height")
+}
+
 // Worker receives job from job consumer and converts it back to Block
 // for engine to process
 // Worker is stateless, it acts as a middleman to convert the job into

@@ -42,6 +42,9 @@ type Job interface {
 // which start from 0
 type Jobs interface {
 	AtIndex(index int64) (Job, error)
+
+	// Head returns the index of the last job
+	Head() (int64, error)
 }
 
 type JobQueue interface {

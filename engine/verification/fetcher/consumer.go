@@ -44,12 +44,16 @@ type ChunkJobs struct {
 	locators storage.ChunksQueue
 }
 
-func (j ChunkJobs) AtIndex(index int64) (module.Job, error) {
+func (j *ChunkJobs) AtIndex(index int64) (module.Job, error) {
 	locator, err := j.locators.AtIndex(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
 	}
 	return ChunkLocatorToJob(locator), nil
+}
+
+func (j *ChunkJobs) Head() (int64, error) {
+	return j.locators.LatestIndex()
 }
 
 type EngineWorker interface {
