@@ -240,6 +240,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 
 	log.Info().
 		Int("total_assigned_chunks", len(chunks)).
+		Uints64("assigned_chunks_indices", chunks.Indices()).
 		Msg("chunk assignment done")
 
 	if len(chunks) == 0 {
