@@ -119,7 +119,8 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
 	}
 
-	// update the latest list and public key. The current thread might
+	// update the latest list and public key. The current thread may overwrite the result of another thread
+	// but the greedy algorithm remains valid.
 	s.Lock()
 	s.lastStakingSigners = updatedList
 	s.lastStakingKey = updatedKey
