@@ -71,6 +71,15 @@ func (cl ChunkList) Empty() bool {
 	return len(cl) == 0
 }
 
+func (cl ChunkList) Indices() []uint64 {
+	indices := make([]uint64, len(cl))
+	for i, chunk := range cl {
+		indices[i] = chunk.Index
+	}
+
+	return indices
+}
+
 // ByChecksum returns an entity from the list by entity fingerprint
 func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 	for _, ch := range cl {

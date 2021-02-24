@@ -10,24 +10,17 @@ type ConsumerProgress struct {
 }
 
 // InitProcessedIndex provides a mock function with given fields: defaultIndex
-func (_m *ConsumerProgress) InitProcessedIndex(defaultIndex int64) (bool, error) {
+func (_m *ConsumerProgress) InitProcessedIndex(defaultIndex int64) error {
 	ret := _m.Called(defaultIndex)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(int64) bool); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(int64) error); ok {
 		r0 = rf(defaultIndex)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(int64) error); ok {
-		r1 = rf(defaultIndex)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // ProcessedIndex provides a mock function with given fields:
