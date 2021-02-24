@@ -75,3 +75,15 @@ func TestDistinctChunkIDs_FullChunks(t *testing.T) {
 	// chunks with distinct block ids should have distinct chunk ids
 	require.NotEqual(t, chunkA.ID(), chunkB.ID())
 }
+
+func TestChunkList_Indices(t *testing.T) {
+	cl := unittest.ChunkListFixture(10, unittest.IdentifierFixture())
+	t.Run("single chunk subset indices", func(t *testing.T) {
+		// subset of chunk list that contains chunk index of zero, should
+		// return a uint64 slice that only contains chunk index of zero.
+		subset := cl[:1]
+		indices := subset.Indices()
+		require.Len(t, indices, 1)
+		require.Contains(t, indices, uint64(0))
+	})
+}
