@@ -58,6 +58,9 @@ const (
 	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID
 	codeEpochCommit = 61 // EpochCommit service event, keyed by ID
 
+	// job queue consumers
+	codeJobConsumerProcessed = 70
+
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100
 	codeCommit                       = 101
