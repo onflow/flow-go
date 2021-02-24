@@ -397,31 +397,37 @@ func testStopRunning(t *testing.T) {
 func testConcurrency(t *testing.T) {
 	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
 		require.NoError(t, c.Start(DefaultIndex))
+		var finishAll sync.WaitGroup
+		finishAll.Add(100)
 		// Finish job concurrently
 		w.fn = func(j Job) {
 			go func() {
 				c.NotifyJobIsDone(j.ID())
+				finishAll.Done()
 			}()
 		}
 
 		// Pushing job and checking job concurrently
-		var wg sync.WaitGroup
+		var pushAll sync.WaitGroup
 		for i := 0; i < 100; i++ {
-			wg.Add(1)
+			pushAll.Add(1)
 			go func() {
 				require.NoError(t, j.PushOne())
 				c.Check()
-				wg.Done()
+				pushAll.Done()
 			}()
 		}
-		wg.Wait()
+
+		// wait until pushed all
+		pushAll.Wait()
+
+		// wait until finished all
+		finishAll.Wait()
 
 		called := make([]int64, 0)
 		for i := 1; i <= 100; i++ {
 			called = append(called, int64(i))
 		}
-
-		time.Sleep(100 * time.Millisecond)
 
 		w.AssertCalled(t, called)
 		assertProcessed(t, cp, 100)

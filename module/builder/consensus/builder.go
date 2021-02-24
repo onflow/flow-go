@@ -101,16 +101,16 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not insert guarantees: %w", err)
 	}
 
-	// get the seals to insert in the payload
-	insertableSeals, err := b.getInsertableSeals(parentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not insert seals: %w", err)
-	}
-
 	// get the receipts to insert in the payload
 	insertableReceipts, err := b.getInsertableReceipts(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not insert receipts: %w", err)
+	}
+
+	// get the seals to insert in the payload
+	insertableSeals, err := b.getInsertableSeals(parentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not insert seals: %w", err)
 	}
 
 	// assemble the block proposal
@@ -332,9 +332,9 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	// block
 	nextSealHeight := sealed.Height + 1
 	nextSeal, ok := filteredSeals[nextSealHeight]
+
 	var count uint = 0
 	for ok {
-
 		// don't include more than maxSealCount seals
 		if count >= b.cfg.maxSealCount {
 			break
