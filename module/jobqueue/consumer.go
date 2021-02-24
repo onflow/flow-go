@@ -23,7 +23,9 @@ type Consumer struct {
 	// Storage
 	jobs     module.Jobs              // storage to read jobs from
 	progress storage.ConsumerProgress // storing the last processed job, so that we can resume after restarting
-	worker   Worker                   // defines how jobs will be processed
+
+	// dependency
+	worker Worker // defines how jobs will be processed
 
 	// Config
 	maxProcessing int64 // max number of jobs to be processed concurrently

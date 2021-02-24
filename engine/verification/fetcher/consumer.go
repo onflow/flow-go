@@ -34,7 +34,7 @@ func ChunkLocatorToJob(locator *chunks.Locator) *ChunkJob {
 	return &ChunkJob{ChunkLocator: locator}
 }
 
-func JobToChunkLocator(job storage.Job) *chunks.Locator {
+func JobToChunkLocator(job module.Job) *chunks.Locator {
 	chunkjob, _ := job.(*ChunkJob)
 	return chunkjob.ChunkLocator
 }
@@ -44,7 +44,7 @@ type ChunkJobs struct {
 	locators storage.ChunksQueue
 }
 
-func (j ChunkJobs) AtIndex(index int64) (storage.Job, error) {
+func (j ChunkJobs) AtIndex(index int64) (module.Job, error) {
 	locator, err := j.locators.AtIndex(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
@@ -72,7 +72,7 @@ func NewWorker(engine EngineWorker) *Worker {
 
 // Run converts the job to Chunk, it's guaranteed to work, because
 // ChunkJobs converted chunk into job symmetrically
-func (w *Worker) Run(job storage.Job) {
+func (w *Worker) Run(job module.Job) {
 	chunk := JobToChunkLocator(job)
 	w.engine.ProcessMyChunk(chunk)
 }

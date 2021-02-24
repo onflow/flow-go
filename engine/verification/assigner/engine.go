@@ -21,7 +21,6 @@ type Engine struct {
 	me      module.Local
 	state   protocol.State
 
-	headerStorage    storage.Headers       // used to check block existence before verifying
 	assigner         module.ChunkAssigner  // used to determine chunks this node needs to verify
 	chunksQueue      storage.ChunksQueue   // to store chunks to be verified
 	newChunkListener module.NewJobListener // to notify about a new chunk
@@ -34,7 +33,6 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	state protocol.State,
-	headerStorage storage.Headers,
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	newChunkListener module.NewJobListener,
@@ -45,7 +43,6 @@ func New(
 		metrics:          metrics,
 		me:               me,
 		state:            state,
-		headerStorage:    headerStorage,
 		assigner:         assigner,
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,

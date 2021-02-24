@@ -56,7 +56,7 @@ func TestProduceConsume(t *testing.T) {
 			<-consumer.Done()
 
 			// expect the mock engine receive only the first 3 calls (since it is blocked on those, hence no
-			// new job is fetched to process). 
+			// new job is fetched to process).
 			require.Equal(t, locators[:3], called)
 		})
 	})
@@ -135,7 +135,7 @@ func WithConsumer(
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
 
-		processedIndex := storage.NewConsumeProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		processedIndex := storage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := storage.NewChunkQueue(db)
 		ok, err := chunksQueue.Init(fetcher.DefaultJobIndex)
 		require.NoError(t, err)

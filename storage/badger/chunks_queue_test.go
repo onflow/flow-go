@@ -12,4 +12,5 @@ import "testing"
 // 8. should return init index after init
 // 9. storing chunk and updating the latest index should be atomic
 func TestStoreAndRead(t *testing.T) {
+	// TODO
 }

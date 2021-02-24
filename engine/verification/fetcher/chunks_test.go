@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -15,27 +14,15 @@ func TestCanTry(t *testing.T) {
 	t.Run("maxAttempt=3", func(t *testing.T) {
 		maxAttempt := 3
 		chunks := NewChunks(10)
-		c := ChunkWithIndex(flow.Identifier{0x11}, 0)
-		chunk := match.NewChunkStatus(c, flow.Identifier{0xaa}, flow.Identifier{0xbb})
+		c := unittest.ChunkFixture(flow.Identifier{0x11}, 0)
+		c.Index = 0
+		chunk := NewChunkStatus(c, flow.Identifier{0xaa}, 3, []flow.Identifier{}, []flow.Identifier{})
 		chunks.Add(chunk)
 		results := []bool{}
 		for i := 0; i < 5; i++ {
-			results = append(results, match.CanTry(maxAttempt, chunk))
+			results = append(results, CanTry(maxAttempt, chunk))
 			chunks.IncrementAttempt(chunk.ID())
 		}
 		require.Equal(t, []bool{true, true, true, false, false}, results)
 	})
-}
-
-func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
-	chunk := &flow.Chunk{
-		Index: uint64(index),
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(index),
-			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
-			BlockID:         blockID,
-		},
-		EndState: unittest.StateCommitmentFixture(),
-	}
-	return chunk
 }
