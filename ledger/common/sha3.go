@@ -54,17 +54,10 @@ func (b *storageBuf) asBytes() *[maxRate]byte {
 	return (*[maxRate]byte)(b)
 }
 
-var (
-	xorIn   = xorInGeneric
-	copyOut = copyOutGeneric
-)
-
-const xorImplementationUnaligned = "generic"
-
-// xorInGeneric xors the bytes in buf into the state; it
+// xorIn xors the bytes in buf into the state; it
 // makes no non-portable assumptions about memory layout
 // or alignment.
-func xorInGeneric(d *state, buf []byte) {
+func xorIn(d *state, buf []byte) {
 	n := len(buf) / 8
 
 	for i := 0; i < n; i++ {
@@ -75,7 +68,7 @@ func xorInGeneric(d *state, buf []byte) {
 }
 
 // copyOutGeneric copies ulint64s to a byte buffer.
-func copyOutGeneric(d *state, b []byte) {
+func copyOut(d *state, b []byte) {
 	for i := 0; len(b) >= 8; i++ {
 		binary.LittleEndian.PutUint64(b, d.a[i])
 		b = b[8:]
@@ -135,8 +128,7 @@ func (d *state) padAndPermute(dsbyte byte) {
 	copyOut(d, d.buf)
 }
 
-// Write absorbs more data into the hash's state. It produces an error
-// if more data is written to the ShakeHash after writing
+// Write absorbs more data into the hash's state.
 func (d *state) write(p []byte) {
 	if d.buf == nil {
 		d.buf = d.storage.asBytes()[:0]
@@ -163,12 +155,10 @@ func (d *state) write(p []byte) {
 			}
 		}
 	}
-
 	return
 }
 
-// Write absorbs more data into the hash's state. It produces an error
-// if more data is written to the ShakeHash after writing
+// write absorbs 256 bits more data into the hash's state.
 func (d *state) write256(p []byte) {
 	if d.buf == nil {
 		d.buf = d.storage.asBytes()[:0]
@@ -178,37 +168,11 @@ func (d *state) write256(p []byte) {
 	d.buf = append(d.buf, p...)
 }
 
-// read squeezes an arbitrary number of bytes from the sponge.
-func (d *state) read(out []byte) {
-	// If we're still absorbing, pad and apply the permutation.
-	if d.state == spongeAbsorbing {
-		d.padAndPermute(d.dsbyte)
-	}
-
-	// Now, do the squeezing.
-	//for len(out) > 0 {
-	n := copy(out, d.buf)
-	d.buf = d.buf[n:]
-	//	out = out[n:]
-
-	// Apply the permutation if we've squeezed the sponge dry.
-	if len(d.buf) == 0 {
-		d.permute()
-	}
-	//}
-	return
-}
-
-// read squeezes an arbitrary number of bytes from the sponge.
+// readInto256 squeezes 256 bits from the sponge.
 func (d *state) readInto256(out []byte) {
-	// If we're still absorbing, pad and apply the permutation.
-	if d.state == spongeAbsorbing {
-		d.padAndPermute(d.dsbyte)
-	}
-
-	// Now, do the squeezing.
-	n := copy(out, d.buf)
-	d.buf = d.buf[n:]
+	// pad and apply the permutation.
+	d.padAndPermute(d.dsbyte)
+	copy(out, d.buf)
 }
 
 // rc stores the round constants for use in the ι step.

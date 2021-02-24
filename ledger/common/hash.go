@@ -43,26 +43,18 @@ func GetDefaultHashForHeight(height int) []byte {
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 // note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
-	/*hasher := sha3.New256()
-	_, _ = hasher.Write(path)
-	_, _ = hasher.Write(value)
-	return hasher.Sum(nil)*/
 	hasher := new256()
-	hasher.write(path)
+	hasher.write256(path) // path is always 256 bits
 	hasher.write(value)
 	h := make([]byte, hashByteLen)
-	hasher.read(h)
+	hasher.readInto256(h)
 	return h
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	/*hasher := sha3.New256()
-	_, _ = hasher.Write(hash1)
-	_, _ = hasher.Write(hash2)
-	return hasher.Sum(nil)*/
 	hasher := new256()
-	hasher.write256(hash1)
+	hasher.write256(hash1) // hash1 and hash2 are 256 bits
 	hasher.write256(hash2)
 	h := make([]byte, hashByteLen)
 	hasher.readInto256(h)
