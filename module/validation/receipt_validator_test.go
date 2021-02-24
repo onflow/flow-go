@@ -265,9 +265,10 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 		receipts := unittest.ReceiptChainFor(blocks, result0)
 		blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
 		receiptA := receipts[1]
-		blockA.Payload.Receipts = []*flow.ExecutionReceipt{}
-		blockB.Payload.Receipts = []*flow.ExecutionReceipt{receiptA}
-		blockC.Payload.Receipts = []*flow.ExecutionReceipt{}
+		blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+		blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
+		blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
+		blockC.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
 		// update block header so that blocks are chained together
 		unittest.ReconnectBlocksAndReceipts(blocks, receipts)
 		// assuming all receipts are executed by the correct executor
@@ -302,9 +303,10 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 		receipts := unittest.ReceiptChainFor(blocks, result0)
 		blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
 		receiptA := receipts[1]
-		blockA.Payload.Receipts = []*flow.ExecutionReceipt{}
-		blockB.Payload.Receipts = []*flow.ExecutionReceipt{receiptA}
-		blockC.Payload.Receipts = []*flow.ExecutionReceipt{}
+		blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+		blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
+		blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
+		blockC.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
 		// update block header so that blocks are chained together
 		unittest.ReconnectBlocksAndReceipts(blocks, receipts)
 		// assuming all receipts are executed by the correct executor

@@ -18,13 +18,16 @@ type Indexer struct {
 
 	log        zerolog.Logger
 	receiptsDB storage.ExecutionReceipts
+	resultsDB  storage.ExecutionResults
 	payloadsDB storage.Payloads
 }
 
-func NewIndexer(log zerolog.Logger, receiptsDB storage.ExecutionReceipts, payloadsDB storage.Payloads) *Indexer {
+func NewIndexer(log zerolog.Logger, receiptsDB storage.ExecutionReceipts, resultsDB storage.ExecutionResults,
+	payloadsDB storage.Payloads) *Indexer {
 	return &Indexer{
 		log:        log.With().Str("engine", "matching.Indexer").Logger(),
 		receiptsDB: receiptsDB,
+		resultsDB:  resultsDB,
 		payloadsDB: payloadsDB,
 	}
 }
@@ -48,10 +51,15 @@ func (i *Indexer) indexReceipts(blockID flow.Identifier) error {
 		return fmt.Errorf("could not get block payload: %w", err)
 	}
 
-	for _, receipt := range payload.Receipts {
-		err := i.receiptsDB.IndexByExecutor(receipt)
+	for _, meta := range payload.Receipts {
+		result, err := i.resultsDB.ByID(meta.ResultID)
 		if err != nil {
-			return fmt.Errorf("could not index receipt %v by executor: %w", receipt.ID(), err)
+			return fmt.Errorf("could not retrieve result %v from storage: %w", meta.ResultID, err)
+		}
+		receipt := flow.ExecutionReceiptFromMeta(*meta, *result)
+		err = i.receiptsDB.IndexByExecutor(receipt)
+		if err != nil {
+			return fmt.Errorf("could not index meta %v by executor: %w", meta.ID(), err)
 		}
 	}
 

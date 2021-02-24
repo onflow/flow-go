@@ -101,18 +101,32 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 
 		// retrieve receipts
 		receipts := make([]*flow.ExecutionReceipt, 0, len(idx.ReceiptIDs))
+		resultsLookup := make(map[flow.Identifier]flow.ExecutionResult)
 		for _, recID := range idx.ReceiptIDs {
 			receipt, err := p.receipts.byID(recID)(tx)
 			if err != nil {
 				return nil, fmt.Errorf("could not retrieve receipt (%x): %w", recID, err)
 			}
 			receipts = append(receipts, receipt)
+			if _, ok := resultsLookup[receipt.ExecutionResult.ID()]; !ok {
+				resultsLookup[receipt.ExecutionResult.ID()] = receipt.ExecutionResult
+			}
+		}
+
+		metas := make([]*flow.ExecutionReceiptMeta, len(receipts))
+		for i, receipt := range receipts {
+			metas[i] = receipt.Meta()
+		}
+		results := make([]*flow.ExecutionResult, 0, len(resultsLookup))
+		for _, result := range resultsLookup {
+			results = append(results, &result)
 		}
 
 		payload := &flow.Payload{
 			Seals:      seals,
 			Guarantees: guarantees,
-			Receipts:   receipts,
+			Receipts:   metas,
+			Results:    results,
 		}
 
 		return payload, nil
