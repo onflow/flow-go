@@ -206,6 +206,8 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 
 	log.Debug().Msg("new finalized block arrived")
 
+	e.metrics.OnFinalizedBlockReceived()
+
 	err := e.indexer.IndexReceipts(blockID)
 	if err != nil {
 		// TODO: consider aborting the process
