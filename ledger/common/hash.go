@@ -9,8 +9,7 @@ import (
 var emptySlice []byte
 var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
 
-const hashBitLen = 256
-const defaultHashLen = hashBitLen + 1
+const defaultHashLen = 257
 
 // we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [defaultHashLen][]byte
@@ -40,6 +39,8 @@ func GetDefaultHashForHeight(height int) []byte {
 }
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
+//
+// path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
 	hasher := new256()
@@ -50,6 +51,8 @@ func HashLeaf(path []byte, value []byte) []byte {
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
+//
+// hash1 and hash2 must each be a 32 byte slice.
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	hasher := new256()
 	hasher.write256(hash1) // hash1 and hash2 are 256 bits
