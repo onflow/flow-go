@@ -79,24 +79,10 @@ func New(log zerolog.Logger,
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
-	rateLimitInterceptor := NewRateLimiterInterceptor(log)
+	// collect all the interceptor chain
+	allInterceptors := interceptors(rpcMetricsEnabled, log)
 
-	if rpcMetricsEnabled {
-
-		unaryInterceptors := grpc.ChainUnaryInterceptor(grpc_prometheus.UnaryServerInterceptor,
-			rateLimitInterceptor.unaryServerInterceptor)
-
-		grpcOpts = append(
-			grpcOpts,
-			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-			unaryInterceptors,
-		)
-	} else {
-		grpcOpts = append(
-			grpcOpts,
-			grpc.UnaryInterceptor(rateLimitInterceptor.unaryServerInterceptor),
-		)
-	}
+	grpcOpts = append(grpcOpts, allInterceptors)
 
 	grpcServer := grpc.NewServer(grpcOpts...)
 
@@ -152,6 +138,23 @@ func New(log zerolog.Logger,
 	)
 
 	return eng
+}
+
+// interceptors creates all the GRPC server interceptors
+func interceptors(rpcMetricsEnabled bool, log zerolog.Logger) grpc.ServerOption {
+
+	rateLimitInterceptor := NewRateLimiterInterceptor(log).unaryServerInterceptor
+
+	if !rpcMetricsEnabled {
+		return grpc.UnaryInterceptor(rateLimitInterceptor)
+	}
+
+	// create a chained unary interceptor
+	// first add the grpc metrics interceptor, then add the rate limit interceptor
+	// grpc metrics will report grpc API metrics before being rate limited
+	unaryInterceptors := grpc.ChainUnaryInterceptor(grpc_prometheus.UnaryServerInterceptor,
+		rateLimitInterceptor)
+	return unaryInterceptors
 }
 
 // Ready returns a ready channel that is closed once the engine has fully

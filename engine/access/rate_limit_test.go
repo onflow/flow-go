@@ -100,7 +100,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.execClient, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
 		nil, suite.chainID, suite.metrics, 0, 0, false, false)
-	<-suite.rpcEng.Ready()
+	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup
 	assert.Eventually(suite.T(), func() bool {
@@ -128,6 +128,7 @@ func TestRateLimit(t *testing.T) {
 	suite.Run(t, new(RateLimitTestSuite))
 }
 
+// TestRatelimitingWithoutBurst tests that rate limit is correctly applied to an Access API call
 func (suite *RateLimitTestSuite) TestRatelimitingWithoutBurst() {
 
 	req := &accessproto.PingRequest{}
@@ -153,6 +154,7 @@ func (suite *RateLimitTestSuite) TestRatelimitingWithoutBurst() {
 	assert.Error(suite.T(), err)
 }
 
+// TestBasicRatelimitingWithBurst tests that burst limit is correctly applied to an Access API call
 func (suite *RateLimitTestSuite) TestBasicRatelimitingWithBurst() {
 
 	req := &accessproto.PingRequest{}

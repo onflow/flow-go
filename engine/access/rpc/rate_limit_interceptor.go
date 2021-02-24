@@ -12,7 +12,7 @@ import (
 )
 
 // TODO: read this map from an input file
-// TODO: fine-tune these numbers
+// TODO: fine-tune these numbers (currently just set to an arbitrary high value)
 // APILimit is the map of an API and it's rate limit (request per second)
 var APILimit = map[string]uint{
 	"Ping":                       300,
@@ -37,8 +37,8 @@ var APILimit = map[string]uint{
 	"GetNetworkParameters":       300,
 }
 
-var defaultRateLimit = 10 // 10 calls per second
-var DefaultBurst = 3      // at most 3 call that are made at the same time
+var defaultRateLimit = 300 // 300 calls per second
+var DefaultBurst = 100     // at most 100 call that are made at the same time (burst)
 
 // rateLimiterInterceptor rate limits the
 type rateLimiterInterceptor struct {
