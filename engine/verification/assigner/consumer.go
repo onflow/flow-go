@@ -67,7 +67,7 @@ func (w *Worker) Run(job storage.Job) {
 
 func (w *Worker) FinishProcessing(blockID flow.Identifier) {
 	jobID := blockIDToJobID(blockID)
-	w.consumer.FinishJob(jobID)
+	w.consumer.NotifyJobIsDone(jobID)
 }
 
 // finishProcessing is for the worker's underneath engine to report a chunk
@@ -127,8 +127,8 @@ func NewBlockConsumer(
 	return blockConsumer, nil
 }
 
-func (c *BlockConsumer) FinishJob(jobID module.JobID) {
-	c.consumer.FinishJob(jobID)
+func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
+	c.consumer.NotifyJobIsDone(jobID)
 }
 
 func (c *BlockConsumer) OnFinalizedBlock(block *model.Block) {

@@ -79,7 +79,7 @@ func (w *Worker) Run(job storage.Job) {
 
 func (w *Worker) FinishProcessing(chunkID flow.Identifier) {
 	jobID := locatorIDToJobID(chunkID)
-	w.consumer.FinishJob(jobID)
+	w.consumer.NotifyJobIsDone(jobID)
 }
 
 // FinishProcessing is for the worker's underneath engine to report a chunk
@@ -122,8 +122,8 @@ func NewChunkConsumer(
 	return chunkConsumer
 }
 
-func (c *ChunkConsumer) FinishJob(jobID module.JobID) {
-	c.consumer.FinishJob(jobID)
+func (c *ChunkConsumer) NotifyJobIsDone(jobID module.JobID) {
+	c.consumer.NotifyJobIsDone(jobID)
 }
 
 func (c ChunkConsumer) Check() {
