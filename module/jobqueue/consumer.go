@@ -35,6 +35,7 @@ type Consumer struct {
 	// until the workers are ready
 	isChecking *atomic.Bool // allow only one process checking job processable
 	// are ready, and stop when shutting down.
+	runningJobs sync.WaitGroup // to wait for all existing jobs to finish for graceful shutdown
 
 	processedIndex   int64
 	processings      map[int64]*jobStatus   // keep track of the status of each on going job
@@ -111,12 +112,16 @@ func (c *Consumer) Start(defaultIndex int64) error {
 }
 
 // Stop stops consuming jobs from the job queue.
+// It blocks until the existing worker finish processing the job
 // Note, it won't stop the existing worker from finishing their job
 func (c *Consumer) Stop() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	c.running = false
+	// not to use `defer`, otherwise runningJobs.Wait will hold the lock and cause deadlock
+	c.mu.Unlock()
+
+	c.log.Info().Msg("stopping consumer")
+	c.runningJobs.Wait()
 	c.log.Info().Msg("consumer stopped")
 }
 
@@ -128,6 +133,7 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {
 	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
 
 	if c.doneJob(jobID) {
+		c.runningJobs.Done()
 		c.checkProcessable()
 	}
 }
@@ -199,6 +205,7 @@ func (c *Consumer) run() (int64, error) {
 			jobID: jobID,
 			done:  false,
 		}
+		c.runningJobs.Add(1)
 
 		go c.worker.Run(jobAtIndex.job)
 	}
