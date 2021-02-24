@@ -225,6 +225,8 @@ func main() {
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
 				// requester.WithBatchThreshold(100),
+				requester.WithRetryInitial(2*time.Second),
+				requester.WithRetryMaximum(30*time.Second),
 			)
 			if err != nil {
 				return nil, err
