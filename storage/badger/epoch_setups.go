@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -9,9 +11,15 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+type viewRange struct {
+	first uint64
+	last  uint64
+}
+
 type EpochSetups struct {
-	db    *badger.DB
-	cache *Cache
+	db     *badger.DB
+	cache  *Cache
+	lookup map[uint64]*viewRange // used to track the first and last view per epoch
 }
 
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
@@ -38,13 +46,21 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 			withStore(store),
 			withRetrieve(retrieve),
 			withResource(metrics.ResourceEpochSetup)),
+		lookup: make(map[uint64]*viewRange),
 	}
 
 	return es
 }
 
 func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *badger.Txn) error {
-	return es.cache.Put(setup.ID(), setup)
+	return func(tx *badger.Txn) error {
+		err := es.cache.Put(setup.ID(), setup)(tx)
+		if err != nil {
+			return err
+		}
+		es.lookup[setup.Counter] = &viewRange{first: setup.FirstView, last: setup.FinalView}
+		return nil
+	}
 }
 
 func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) (*flow.EpochSetup, error) {
@@ -61,4 +77,13 @@ func (es *EpochSetups) ByID(setupID flow.Identifier) (*flow.EpochSetup, error) {
 	tx := es.db.NewTransaction(false)
 	defer tx.Discard()
 	return es.retrieveTx(setupID)(tx)
+}
+
+func (es *EpochSetups) CounterByView(view uint64) (uint64, error) {
+	for c, vr := range es.lookup {
+		if view >= vr.first && view <= vr.last {
+			return c, nil
+		}
+	}
+	return 0, fmt.Errorf("no epoch found for view %d", view)
 }

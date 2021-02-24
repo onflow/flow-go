@@ -15,4 +15,7 @@ type EpochSetups interface {
 
 	// ByID will return the EpochSetup event by its ID.
 	ByID(flow.Identifier) (*flow.EpochSetup, error)
+
+	// CounterByView returns the epoch counter of a view.
+	CounterByView(uint64) (uint64, error)
 }

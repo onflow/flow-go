@@ -216,7 +216,6 @@ func main() {
 			// Given an epoch, checkEpochKey returns an error if we are a
 			// participant in the epoch and we don't have the corresponding DKG
 			// key in the database.
-			// TODO: move this to another component (dapperlabs/flow-go#5275)
 			checkEpochKey := func(protocol.Epoch) error {
 				identities, err := epoch.InitialIdentities()
 				if err != nil {
@@ -446,8 +445,8 @@ func main() {
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
 
-			// initialize the threshold signature module for random beacon signatures
-			beacon := signature.NewThresholdProvider(encoding.RandomBeaconTag, privateDKGData.RandomBeaconPrivKey)
+			// initialize the verifier used to verify aggregated signatures
+			verifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner()
@@ -460,13 +459,16 @@ func main() {
 			}
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
+			signerStore := signature.NewEpochAwareSignerStore(node.Storage.Setups, node.Storage.DKGKeys)
+
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
 			signer = verification.NewCombinedSigner(
 				committee,
 				staking,
-				beacon,
+				verifier,
 				merger,
+				signerStore,
 				node.NodeID,
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations

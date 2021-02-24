@@ -101,9 +101,11 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 
 		// create signer
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
+		verifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner()
-		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconSigner, merger, participant.NodeID)
+		signerStore := signature.NewSingleSignerStore(beaconSigner)
+		signer := verification.NewCombinedSigner(committee, stakingSigner, verifier, merger, signerStore, participant.NodeID)
 		signers[i] = signer
 
 		// create validator

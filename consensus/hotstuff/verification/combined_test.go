@@ -15,8 +15,8 @@ import (
 func TestCombinedVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
-	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
+	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true, epochCounter)
+	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys, epochCounter)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
@@ -62,10 +62,9 @@ func TestCombinedVote(t *testing.T) {
 func TestCombinedProposalIsVote(t *testing.T) {
 
 	// NOTE: I don't think this is true for every signature scheme
-
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
-	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
+	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true, epochCounter)
+	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys, epochCounter)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
@@ -82,8 +81,8 @@ func TestCombinedQC(t *testing.T) {
 	identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
 	voterIDs := identities.NodeIDs()
 	minShares := (len(voterIDs)-1)/2 + 1
-	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
-	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
+	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true, epochCounter)
+	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys, epochCounter)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
