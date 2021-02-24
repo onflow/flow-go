@@ -231,7 +231,7 @@ func (e *Engine) consumeEvents() {
 	defer close(checkSealingTicker)
 	e.unit.LaunchPeriodically(func() {
 		checkSealingTicker <- struct{}{}
-	}, 2*time.Second, 120*time.Second)
+	}, 2*time.Second, 10*time.Second)
 
 	for {
 		var err error
