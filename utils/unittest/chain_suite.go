@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"fmt"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -554,7 +555,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	resultsByID := block.Payload.ResultsById()
 
 	for _, receipt := range block.Payload.Receipts {
-		result, _ := resultsByID[receipt.ResultID]
+		result := resultsByID[receipt.ResultID]
 		// Exec Receipt for block with valid subgraph
 		// ATTENTION:
 		// Here, IncorporatedBlockID (the first argument) should be set

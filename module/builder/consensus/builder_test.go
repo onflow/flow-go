@@ -707,7 +707,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 			for _, block := range bs.blocks {
 				resultByID := block.Payload.ResultsById()
 				for _, meta := range block.Payload.Receipts {
-					result, _ := resultByID[meta.ResultID]
+					result := resultByID[meta.ResultID]
 					rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 					assert.False(bs.T(), receiptFilter(rcpt))
 				}
@@ -843,7 +843,7 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	for _, block := range bs.blocks {
 		resultByID := block.Payload.ResultsById()
 		for _, meta := range block.Payload.Receipts {
-			result, _ := resultByID[meta.ResultID]
+			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)
@@ -895,7 +895,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	for _, block := range bs.blocks {
 		resultByID := block.Payload.ResultsById()
 		for _, meta := range block.Payload.Receipts {
-			result, _ := resultByID[meta.ResultID]
+			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)
@@ -977,7 +977,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	for _, block := range bs.blocks {
 		resultByID := block.Payload.ResultsById()
 		for _, meta := range block.Payload.Receipts {
-			result, _ := resultByID[meta.ResultID]
+			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)
@@ -1031,7 +1031,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	for _, block := range bs.blocks {
 		resultByID := block.Payload.ResultsById()
 		for _, meta := range block.Payload.Receipts {
-			result, _ := resultByID[meta.ResultID]
+			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)

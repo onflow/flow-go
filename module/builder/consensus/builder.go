@@ -294,7 +294,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		// in the mempool.
 		for _, receipt := range ancestor.Payload.Receipts {
 
-			result, _ := resultsByID[receipt.ResultID]
+			result := resultsByID[receipt.ResultID]
 
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
