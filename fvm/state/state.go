@@ -10,9 +10,9 @@ import (
 // TODO we started with high numbers here and we might
 // tune (reduce) them when we have more data
 const (
-	DefaultMaxKeySize         = 16_000      // ~16KB
-	DefaultMaxValueSize       = 64_000_000  // ~64MB
-	DefaultMaxInteractionSize = 256_000_000 // ~256MB
+	DefaultMaxKeySize         = 16_000        // ~16KB
+	DefaultMaxValueSize       = 256_000_000   // ~256MB
+	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
 )
 
 type StateOption func(st *State) *State
