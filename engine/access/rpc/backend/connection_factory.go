@@ -14,7 +14,8 @@ import (
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
-const defaultClientTimeout = 2 * time.Second // the timeout used when connecting to a collection node or an execution node
+// the timeout used when making a GRPC request to a collection node or an execution node
+const defaultClientTimeout = 3 * time.Second
 
 var grcpClientTimeout = defaultClientTimeout
 
