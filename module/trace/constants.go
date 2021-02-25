@@ -109,9 +109,10 @@ const (
 	// assigner engine
 	VERProcessFinalizedBlock SpanName = "ver.processFinalizedBlock"
 	// children of VERProcessFinalizedBlock
-	VERAssignerProcessFinalizedBlock  SpanName = "ver.assigner.processFinalizedBlock"
+	VERAssignerHandleFinalizedBlock   SpanName = "ver.assigner.handleFinalizedBlock"
 	VERAssignerHandleExecutionReceipt SpanName = "ver.assigner.handleExecutionReceipt"
 	VERAssignerChunkAssignment        SpanName = "ver.assigner.chunkAssignment"
+	VERAssignerProcessChunk           SpanName = "ver.assigner.processChunk"
 
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
