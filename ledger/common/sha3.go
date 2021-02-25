@@ -34,16 +34,6 @@ import (
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// spongeDirection indicates the direction bytes are flowing through the sponge.
-type spongeDirection int
-
-const (
-	// spongeAbsorbing indicates that the sponge is absorbing input.
-	spongeAbsorbing spongeDirection = iota
-	// spongeSqueezing indicates that the sponge is being squeezed.
-	spongeSqueezing
-)
-
 const (
 	// maxRate is the maximum size of the internal buffer. SHAKE-256
 	// currently needs the largest buffer.
@@ -74,9 +64,6 @@ type state struct {
 	rate int        // the number of bytes of state to use
 
 	storage storageBuf
-
-	// Specific to SHA-3 and SHAKE.
-	state spongeDirection // whether the sponge is absorbing or squeezing
 }
 
 // A storageBuf is an aligned array of maxRate bytes.
@@ -125,20 +112,11 @@ func copyOut(d *state, b []byte) {
 // permute applies the KeccakF-1600 permutation. It handles
 // any input-output buffering.
 func (d *state) permute() {
-	switch d.state {
-	case spongeAbsorbing:
-		// If we're absorbing, we need to xor the input into the state
-		// before applying the permutation.
-		xorIn(d, d.buf)
-		d.buf = d.storage.asBytes()[:0]
-		keccakF1600(&d.a)
-	case spongeSqueezing:
-		// If we're squeezing, we need to apply the permutatin before
-		// copying more output.
-		keccakF1600(&d.a)
-		d.buf = d.storage.asBytes()[:d.rate]
-		copyOut(d, d.buf)
-	}
+	// If we're absorbing, we need to xor the input into the state
+	// before applying the permutation.
+	xorIn(d, d.buf)
+	d.buf = d.storage.asBytes()[:0]
+	keccakF1600(&d.a)
 }
 
 // finalize appends the domain separation bits in dsbyte, applies
@@ -160,7 +138,6 @@ func (d *state) finalize() {
 	d.buf[d.rate-1] = 0x80
 	// Apply the permutation
 	d.permute()
-	d.state = spongeSqueezing
 	d.buf = d.storage.asBytes()[:d.rate]
 	copyOut(d, d.buf)
 }
@@ -182,7 +159,6 @@ func (d *state) finalize512() {
 	d.buf[d.rate-1] = 0x80
 	// Apply the permutation
 	d.permute()
-	d.state = spongeSqueezing
 	d.buf = d.storage.asBytes()[:d.rate]
 	copyOut(d, d.buf)
 }
