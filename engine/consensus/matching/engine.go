@@ -32,10 +32,6 @@ const defaultApprovalQueueCapacity = 10000
 // defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
 const defaultApprovalResponseQueueCapacity = 10000
 
-type (
-	EventSink chan *Event // Channel to push pending events
-)
-
 // Engine is a wrapper for matching `Core` which implements logic for
 // queuing and filtering network messages which later will be processed by matching engine.
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
@@ -47,13 +43,9 @@ type Engine struct {
 	core                                 *Core
 	cacheMetrics                         module.MempoolMetrics
 	engineMetrics                        module.EngineMetrics
-	receiptSink                          EventSink
-	approvalSink                         EventSink
-	requestedApprovalSink                EventSink
 	pendingReceipts                      *fifoqueue.FifoQueue
 	pendingApprovals                     *fifoqueue.FifoQueue
 	pendingRequestedApprovals            *fifoqueue.FifoQueue
-	pendingEventSink                     EventSink
 	requiredApprovalsForSealConstruction uint
 }
 
@@ -87,10 +79,6 @@ func NewEngine(log zerolog.Logger,
 		core:                                 nil,
 		engineMetrics:                        engineMetrics,
 		cacheMetrics:                         mempool,
-		receiptSink:                          make(EventSink),
-		approvalSink:                         make(EventSink),
-		requestedApprovalSink:                make(EventSink),
-		pendingEventSink:                     make(EventSink),
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 
@@ -98,7 +86,7 @@ func NewEngine(log zerolog.Logger,
 	var err error
 	e.pendingReceipts, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultReceiptQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceReceiptQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len uint32) { mempool.MempoolEntries(metrics.ResourceReceiptQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
@@ -107,7 +95,7 @@ func NewEngine(log zerolog.Logger,
 	// FIFO queue for broadcasted approvals
 	e.pendingApprovals, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len uint32) { mempool.MempoolEntries(metrics.ResourceApprovalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
@@ -116,7 +104,7 @@ func NewEngine(log zerolog.Logger,
 	// FiFo queue for requested approvals
 	e.pendingRequestedApprovals, err = fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalResponseQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { mempool.MempoolEntries(metrics.ResourceApprovalResponseQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len uint32) { mempool.MempoolEntries(metrics.ResourceApprovalResponseQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for requested approvals: %w", err)
@@ -151,73 +139,35 @@ func NewEngine(log zerolog.Logger,
 }
 
 // Process sends event into channel with pending events. Generally speaking shouldn't lock for too long.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	e.pendingEventSink <- &Event{
-		OriginID: originID,
-		Msg:      event,
+func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
+	select {
+	case <-e.unit.Quit():
+		return nil
+	default: // fallthrough
+	}
+
+	switch event := message.(type) {
+	case *flow.ExecutionReceipt:
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		e.pendingReceipts.TailChannel() <- Event{originID, event}
+	case *flow.ResultApproval:
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
+			return nil // drop approvals, if we don't require them to construct seals
+		}
+		e.pendingApprovals.TailChannel() <- Event{originID, event}
+	case *messages.ApprovalResponse:
+		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		if e.requiredApprovalsForSealConstruction < 1 {
+			return nil // drop approvals, if we don't require them to construct seals
+		}
+		e.pendingRequestedApprovals.TailChannel() <- Event{originID, event.Approval}
 	}
 	return nil
 }
 
-// processEvents is processor of pending events which drives events from networking layer to business logic in `Core`.
-// Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
-// Should be run as a separate goroutine.
-func (e *Engine) processEvents() {
-	// takes pending event from one of the queues
-	// nil sink means nothing to send, this prevents blocking on select
-	fetchEvent := func() (*Event, EventSink, *fifoqueue.FifoQueue) {
-		if val, ok := e.pendingReceipts.Front(); ok {
-			return val.(*Event), e.receiptSink, e.pendingReceipts
-		}
-		if val, ok := e.pendingRequestedApprovals.Front(); ok {
-			return val.(*Event), e.requestedApprovalSink, e.pendingRequestedApprovals
-		}
-		if val, ok := e.pendingApprovals.Front(); ok {
-			return val.(*Event), e.approvalSink, e.pendingApprovals
-		}
-		return nil, nil, nil
-	}
-
-	for {
-		pendingEvent, sink, fifo := fetchEvent()
-		select {
-		case event := <-e.pendingEventSink:
-			e.processPendingEvent(event)
-		case sink <- pendingEvent:
-			fifo.Pop()
-			continue
-		case <-e.unit.Quit():
-			return
-		}
-	}
-}
-
-// processPendingEvent saves pending event in corresponding queue for further processing by `Core`.
-// While this function runs in separate goroutine it shouldn't do heavy processing to maintain efficient data polling/pushing.
-func (e *Engine) processPendingEvent(event *Event) {
-	switch event.Msg.(type) {
-	case *flow.ExecutionReceipt:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		e.pendingReceipts.Push(event)
-	case *flow.ResultApproval:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		if e.requiredApprovalsForSealConstruction < 1 {
-			// if we don't require approvals to construct a seal, don't even process approvals.
-			return
-		}
-		e.pendingApprovals.Push(event)
-	case *messages.ApprovalResponse:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
-		if e.requiredApprovalsForSealConstruction < 1 {
-			// if we don't require approvals to construct a seal, don't even process approvals.
-			return
-		}
-		e.pendingRequestedApprovals.Push(event)
-	}
-}
-
-// consumeEvents consumes events that are ready to be processed.
-func (e *Engine) consumeEvents() {
+// consumeQueuedEvents consumes events from the inbound queues
+func (e *Engine) consumeQueuedEvents() {
 	// Context:
 	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
 	// information only changes significantly with new blocks or new receipts.
@@ -234,16 +184,25 @@ func (e *Engine) consumeEvents() {
 	}, 2*time.Second, 10*time.Second)
 
 	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		default: // fallthrough
+		}
+
 		var err error
 		select {
-		case event := <-e.receiptSink:
-			err = e.core.OnReceipt(event.OriginID, event.Msg.(*flow.ExecutionReceipt))
+		case event := <-e.pendingReceipts.HeadChannel():
+			receiptEvent := event.(*Event)
+			err = e.core.OnReceipt(receiptEvent.OriginID, receiptEvent.Msg.(*flow.ExecutionReceipt))
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
-		case event := <-e.approvalSink:
-			err = e.core.OnApproval(event.OriginID, event.Msg.(*flow.ResultApproval))
+		case event := <-e.pendingApprovals.HeadChannel():
+			approvalEvent := event.(*Event)
+			err = e.core.OnApproval(approvalEvent.OriginID, approvalEvent.Msg.(*flow.ResultApproval))
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
-		case event := <-e.requestedApprovalSink:
-			err = e.core.OnApproval(event.OriginID, &event.Msg.(*messages.ApprovalResponse).Approval)
+		case event := <-e.pendingApprovals.HeadChannel():
+			approvalEvent := event.(*Event)
+			err = e.core.OnApproval(approvalEvent.OriginID, approvalEvent.Msg.(*flow.ResultApproval))
 			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
 		case <-checkSealingTicker:
 			err = e.core.CheckSealing()
@@ -296,14 +255,10 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(1)
 	e.unit.Launch(func() {
 		wg.Done()
-		e.processEvents()
-	})
-	e.unit.Launch(func() {
-		wg.Done()
-		e.consumeEvents()
+		e.consumeQueuedEvents()
 	})
 	return e.unit.Ready(func() {
 		wg.Wait()

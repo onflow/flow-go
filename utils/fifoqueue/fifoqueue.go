@@ -2,7 +2,8 @@ package fifoqueue
 
 import (
 	"fmt"
-	mathbits "math/bits"
+	"math"
+	"sync"
 
 	"github.com/ef-ds/deque"
 )
@@ -21,9 +22,12 @@ import (
 // * The queue is NOT concurrency safe.
 // * the QueueLengthObserver must be non-blocking
 type FifoQueue struct {
-	queue          deque.Deque
-	maxCapacity    int
+	maxCapacity    uint32
 	lengthObserver QueueLengthObserver
+
+	closeOnce   sync.Once
+	tailChannel chan interface{}
+	headChannel chan interface{}
 }
 
 // ConstructorOptions can are optional arguments for the `NewFifoQueue`
@@ -32,14 +36,15 @@ type ConstructorOption func(*FifoQueue) error
 
 // QueueLengthObserver is a callback that can optionally provided
 // to the `NewFifoQueue` constructor (via `WithLengthObserver` option).
-type QueueLengthObserver func(int)
+// Caution: implementation must be non-blocking and concurrency safe.
+type QueueLengthObserver func(uint32)
 
 // WithCapacity is a constructor option for NewFifoQueue. It specifies the
 // max number of elements the queue can hold. By default, the theoretical
 // capacity equals to the largest `int` value (platform dependent).
 // The WithCapacity option overrides the previous value (default value or
 // value specified by previous option).
-func WithCapacity(capacity int) ConstructorOption {
+func WithCapacity(capacity uint32) ConstructorOption {
 	return func(queue *FifoQueue) error {
 		if capacity < 1 {
 			return fmt.Errorf("capacity for Fifo queue must be positive")
@@ -52,7 +57,7 @@ func WithCapacity(capacity int) ConstructorOption {
 // WithLengthObserver is a constructor option for NewFifoQueue. Each time the
 // queue's length changes, the queue calls the provided callback with the new
 // length. By default, the QueueLengthObserver is a NoOp.
-// Caution: the QueueLengthObserver callback must be non-blocking
+// Caution: the QueueLengthObserver callback must be non-blocking and concurrency safe.
 func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 	return func(queue *FifoQueue) error {
 		if callback == nil {
@@ -65,12 +70,11 @@ func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 
 // Constructor for FifoQueue
 func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
-	// maximum value for platform-specific int: https://yourbasic.org/golang/max-min-int-uint/
-	maxInt := 1<<(mathbits.UintSize-1) - 1
-
 	queue := &FifoQueue{
-		maxCapacity:    maxInt,
-		lengthObserver: func(int) { /* noop */ },
+		maxCapacity:    math.MaxUint32,
+		lengthObserver: func(uint32) { /* noop */ },
+		tailChannel:    make(chan interface{}),
+		headChannel:    make(chan interface{}),
 	}
 	for _, opt := range options {
 		err := opt(queue)
@@ -78,35 +82,59 @@ func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
 			return nil, fmt.Errorf("failed to apply constructor option to fifoqueue queue: %w", err)
 		}
 	}
+
+	go queue.shovel()
 	return queue, nil
 }
 
-// Push appends the given value to the tail of the queue.
-// If queue capacity is reached, the message is silently dropped.
-func (q *FifoQueue) Push(element interface{}) {
-	if q.queue.Len() < q.maxCapacity {
-		q.queue.PushBack(element)
-		q.lengthObserver(q.queue.Len())
+// shovel() moves elements from the tail channel into an internal queue and then into the head channel.
+// Implementation is inspired by:
+// https://medium.com/capital-one-tech/building-an-unbounded-channel-in-go-789e175cd2cd
+func (q *FifoQueue) shovel() {
+	var queue deque.Deque
+	in := q.tailChannel
+	out := q.headChannel
+	maxCapacity := q.maxCapacity
+	lengthObserver := q.lengthObserver
+	var size uint32 = 0
+
+	push2Queue := func(element interface{}) {
+		if size >= maxCapacity {
+			return // drops element
+		}
+		size++
+		queue.PushBack(element)
+		lengthObserver(size)
 	}
-}
 
-// Front peeks message at the head of the queue (without removing the head).
-func (q *FifoQueue) Front() (interface{}, bool) {
-	return q.queue.Front()
-}
-
-// Pop removes and returns the queue's head element.
-// If the queue is empty, (nil, false) is returned.
-func (q *FifoQueue) Pop() (interface{}, bool) {
-	event, ok := q.queue.PopFront()
-	q.lengthObserver(q.queue.Len())
-	if !ok {
-		return nil, false
+	for queue.Len() > 0 || in != nil {
+		if queue.Len() == 0 {
+			element, ok := <-in
+			if !ok { // inbound channel was closed: terminate
+				break
+			}
+			push2Queue(element)
+		} else {
+			select {
+			case element, ok := <-in:
+				if !ok { // inbound channel was closed: terminate
+					break
+				}
+				push2Queue(element)
+			case out <- queue.Front():
+				size--
+				queue.PopFront()
+			}
+		}
 	}
-	return event, true
+
+	close(out)
 }
 
-// Len returns the current length of the queue.
-func (q *FifoQueue) Len() int {
-	return q.queue.Len()
+func (q *FifoQueue) TailChannel() chan<- interface{} {
+	return q.tailChannel
+}
+
+func (q *FifoQueue) HeadChannel() <-chan interface{} {
+	return q.headChannel
 }
