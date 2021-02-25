@@ -24,7 +24,7 @@ func TestDKGKeysInsertAndRetrieve(t *testing.T) {
 		rand.Seed(time.Now().UnixNano())
 		epochCounter := rand.Uint64()
 
-		// attempt to get a invalid commit
+		// attempt to get a non-existent key
 		_, err := store.RetrieveMyDKGPrivateInfo(epochCounter)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 

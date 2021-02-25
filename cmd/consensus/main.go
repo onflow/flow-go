@@ -175,13 +175,35 @@ func main() {
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
+			// If this node was a participant in a spork, their DKG key for the
+			// first epoch was generated during the bootstrapping process and is
+			// specified in a private bootstrapping file. We load their key and
+			// store it in the db for the initial post-spork epoch for use going
+			// forward.
+			// If this node was not a participant in a spork, they joined at an
+			// epoch boundary, so they have no DKG file (they will generate
+			// their first DKG private key through the procedure run during the
+			// current epoch setup phase), and we do not need to insert a key at
+			// startup.
+
+			// if the node is not part of the current epoch identities, we do
+			// not need to load the key
+			epoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			initialIdentities, err := epoch.InitialIdentities()
+			if err != nil {
+				return err
+			}
+			if _, ok := initialIdentities.ByNodeID(node.NodeID); !ok {
+				node.Logger.Info().Msg("node joined at epoch boundary, not reading DKG file")
+				return nil
+			}
+
+			// otherwise, load and save the key in DB for the current epoch (wrt
+			// root block)
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
 			if err != nil {
 				return err
 			}
-			// save the DKG private key data to database for the current epoch
-			// w.r.t the rootblock
-			epoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
 			epochCounter, err := epoch.Counter()
 			if err != nil {
 				return err
