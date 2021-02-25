@@ -3,10 +3,12 @@ package computer
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -188,6 +190,8 @@ func (e *blockComputer) executeCollection(
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 
+	startedAt := time.Now()
+
 	var colSpan opentracing.Span
 	if e.tracer != nil {
 		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
@@ -210,7 +214,7 @@ func (e *blockComputer) executeCollection(
 
 	txMetrics := fvm.NewMetricsCollector()
 
-	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics))
+	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics), fvm.WithTracer(e.tracer))
 
 	for _, txBody := range collection.Transactions {
 
@@ -228,6 +232,15 @@ func (e *blockComputer) executeCollection(
 		}
 	}
 
+	e.log.Info().Str("collectionID", collection.Guarantee.CollectionID.String()).
+		Str("blockID", collection.Guarantee.ReferenceBlockID.String()).
+		Int("numberOfTransactions", len(collection.Transactions)).
+		Int("numberOfEvents", len(events)).
+		Int("numberOfServiceEvents", len(serviceEvents)).
+		Uint64("totalGasUsed", gasUsed).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Msg("collection executed")
+
 	return events, serviceEvents, txResults, txIndex, gasUsed, nil
 }
 
@@ -239,8 +252,16 @@ func (e *blockComputer) executeTransaction(
 	ctx fvm.Context,
 	txIndex uint32,
 ) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {
+
+	var txSpan opentracing.Span
+	var traceID string
+
 	if e.tracer != nil {
-		txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+		txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+
+		if sc, ok := txSpan.Context().(jaeger.SpanContext); ok {
+			traceID = sc.TraceID().String()
+		}
 
 		defer func() {
 			// Attach runtime metrics to the transaction span.
@@ -270,6 +291,7 @@ func (e *blockComputer) executeTransaction(
 	txView := collectionView.NewChild()
 
 	tx := fvm.Transaction(txBody, txIndex)
+	tx.SetTraceSpan(txSpan)
 
 	err := e.vm.Run(ctx, tx, txView)
 
@@ -303,6 +325,11 @@ func (e *blockComputer) executeTransaction(
 	if tx.Err == nil {
 		collectionView.MergeView(txView)
 	}
+
+	e.log.Info().
+		Str("txHash", tx.ID.String()).
+		Str("traceID", traceID).
+		Msg("transaction executed")
 
 	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil
 }
