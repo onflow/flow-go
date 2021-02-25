@@ -106,6 +106,11 @@ const (
 
 	// Verification node
 	//
+	// assigner engine
+	VERProcessFinalizedBlock SpanName = "ver.processFinalizedBlock"
+	// children of VERProcessFinalizedBlock
+	VERAssignerProcessFinalizedBlock  SpanName = "ver.assigner.processFinalizedBlock"
+	VERAssignerHandleExecutionReceipt SpanName = "ver.assigner.handleExecutionReceipt"
 
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
