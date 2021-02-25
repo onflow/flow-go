@@ -21,8 +21,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkASTCacheSize = 64
-
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.Ledger) error
 }
@@ -49,14 +47,9 @@ func NewBlockComputer(
 	tracer module.Tracer,
 	logger zerolog.Logger,
 ) (BlockComputer, error) {
-	systemChunkASTCache, err := fvm.NewLRUASTCache(SystemChunkASTCacheSize)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create system chunk AST cache: %w", err)
-	}
 
 	systemChunkCtx := fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithASTCache(systemChunkASTCache),
 		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
@@ -146,6 +139,7 @@ func (e *blockComputer) executeBlock(
 		interactions[i] = collectionView.Interactions()
 
 		stateView.MergeView(collectionView)
+
 	}
 
 	// system chunk
@@ -174,6 +168,7 @@ func (e *blockComputer) executeBlock(
 	blockTxResults = append(blockTxResults, txResult)
 	gasUsed += txGas
 	interactions[len(interactions)-1] = systemChunkView.Interactions()
+
 	stateView.MergeView(systemChunkView)
 
 	return &execution.ComputationResult{

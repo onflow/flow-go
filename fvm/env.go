@@ -12,8 +12,8 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/log"
 	tracelog "github.com/opentracing/opentracing-go/log"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
@@ -43,6 +43,7 @@ type hostEnv struct {
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
+	programs           *Programs
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -76,6 +77,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
+		programs:           NewPrograms(),
 	}
 
 	if ctx.BlockHeader != nil {
@@ -326,41 +328,36 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	return code, nil
 }
 
-func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, error) {
+func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCachedProgram)
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetProgram)
 		defer sp.Finish()
 	}
 
-	if e.ctx.ASTCache == nil {
-		return nil, nil
-	}
-
-	program, err := e.ctx.ASTCache.GetProgram(location)
+	program := e.programs.Get(location)
 	if program != nil {
-		// Program was found within cache, do an explicit ledger register touch
+		// Program was found, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
 		if addressLocation, ok := location.(common.AddressLocation); ok {
-			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
+			e.accounts.TouchContract(
+				addressLocation.Name,
+				flow.BytesToAddress(addressLocation.Address.Bytes()),
+			)
 		}
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return program, err
+	return program, nil
 }
 
-func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) error {
+func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
 	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvCacheProgram)
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvSetProgram)
 		defer sp.Finish()
 	}
 
-	if e.ctx.ASTCache == nil {
-		return nil
-	}
+	e.programs.Set(location, program)
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.ctx.ASTCache.SetProgram(location, program)
+	return nil
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
