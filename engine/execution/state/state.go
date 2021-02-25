@@ -80,18 +80,6 @@ type ExecutionState interface {
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(context.Context, delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
 
-	//// PersistStateCommitment saves a state commitment by the given block ID.
-	//PersistStateCommitment(context.Context, flow.Identifier, flow.StateCommitment) error
-	//
-	//// PersistChunkDataPack stores a chunk data pack by chunk ID.
-	//PersistChunkDataPack(context.Context, *flow.ChunkDataPack) error
-	//
-	//PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error
-	//
-	//PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
-	//
-	//PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
-
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
 	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
@@ -416,16 +404,6 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
 
-	err = s.results.BatchStore(executionResult, batch)
-	if err != nil {
-		return fmt.Errorf("cannot store state commitment: %w", err)
-	}
-
-	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
-	if err != nil {
-		return fmt.Errorf("cannot index state commitment: %w", err)
-	}
-
 	err = s.events.BatchStore(blockID, events, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
@@ -439,6 +417,17 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	err = s.transactionResults.BatchStore(blockID, results, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
+	}
+
+	err = s.results.BatchStore(executionResult, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store execution result: %w", err)
+	}
+
+	// it overwrites the index if exists already
+	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+	if err != nil {
+		return fmt.Errorf("cannot index execution result: %w", err)
 	}
 
 	err = batch.Flush()
