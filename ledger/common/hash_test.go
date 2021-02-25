@@ -44,17 +44,16 @@ func Test_ComputeCompactValue(t *testing.T) {
 }
 
 func TestHash(t *testing.T) {
-
 	r := time.Now().UnixNano()
 	rand.Seed(r)
 	t.Logf("math rand seed is %d", r)
 
 	t.Run("HashLeaf", func(t *testing.T) {
 		path := make([]byte, 32)
-		len := rand.Intn(10000)
+		len := rand.Intn(100000)
 		value := make([]byte, len)
 
-		for i := 0; i < 50; i++ {
+		for i := 0; i < 1; i++ {
 			rand.Read(path)
 			rand.Read(value)
 			h := common.HashLeaf(path, value)
@@ -71,7 +70,7 @@ func TestHash(t *testing.T) {
 		h1 := make([]byte, 32)
 		h2 := make([]byte, 32)
 
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 1; i++ {
 			rand.Read(h1)
 			rand.Read(h2)
 			h := common.HashInterNode(h1, h2)
@@ -92,7 +91,7 @@ func BenchmarkHash(b *testing.B) {
 	rand.Read(h1)
 	rand.Read(h2)
 
-	// cusrtmized sha3 for ledger
+	// customized sha3 for ledger
 	b.Run("LedgerSha3", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

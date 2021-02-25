@@ -5,6 +5,8 @@ import (
 )
 
 // All functions are copied and modified from golang.org/x/crypto/sha3
+// This is a specific version of sha3 optimized only for the functions in
+// this package and must not be used elsewhere
 //
 // Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -136,25 +138,53 @@ func (d *state) finalize() {
 	copyOut(d, d.buf)
 }
 
+// write absorbs two 256 bits slices of data into the hash's state.
+func (d *state) write512(p1, p2 []byte) {
+	xorIn512(d, p1, p2)
+}
+
+// xorIn256 xors two 32 bytes slices into the state; it
+// makes no non-portable assumptions about memory layout
+// or alignment.
+func xorIn512(d *state, buf1, buf2 []byte) {
+	var i int
+	for ; i < 4; i++ {
+		a := binary.LittleEndian.Uint64(buf1)
+		d.a[i] ^= a
+		buf1 = buf1[8:]
+	}
+	for ; i < 8; i++ {
+		a := binary.LittleEndian.Uint64(buf2)
+		d.a[i] ^= a
+		buf2 = buf2[8:]
+	}
+}
+
+// xorInPaddingPost512 xors the padding bytes in buf into the state;
+// after absorbing 512 bits.
+// it makes no non-portable assumptions about memory layout
+// or alignment.
+func xorInPaddingPost512(d *state) {
+	// xor with the dsbyte
+	// dsbyte also contains the first one bit for the padding.
+	d.a[8] ^= 0x6
+	// xor the last padding bit
+	d.a[16] ^= 0x8000000000000000
+}
+
 // finalize512 is the padAndPermute function optimized for when the input written to
 // the state is 512 bits.
 func (d *state) finalize512() {
-	// Pad with this instance's domain-separator bits. We know that there's
-	// at least one byte of space in d.buf because, if it were full,
-	// permute would have been called to empty it. dsbyte also contains the
-	// first one bit for the padding. See the comment in the state struct.
-	d.buf = append(d.buf, dsbyte)
-	// This adds the final one bit for the padding. Because of the way that
-	// bits are numbered from the LSB upwards, the final bit is the MSB of
-	// the last byte.
-	d.buf = d.storage.asBytes()[:rate]
-	// There is no need to pad the bytes in between as the storage was initilized
-	// to zero un never overwritten
-	d.buf[rate-1] = 0x80
-	// Apply the permutation
-	d.permute()
+	// xor the input into the state and apply the permutation
+	xorInPaddingPost512(d)
+	keccakF1600(&d.a)
 	d.buf = d.storage.asBytes()[:rate]
 	copyOut(d, d.buf)
+}
+
+// write absorbs 256 bits more data into the hash's state.
+func (d *state) write256(p []byte) {
+	d.buf = append(d.buf, p...)
 }
 
 // Write absorbs more data into the hash's state.
@@ -180,11 +210,6 @@ func (d *state) write(p []byte) {
 			}
 		}
 	}
-}
-
-// write absorbs 256 bits more data into the hash's state.
-func (d *state) write256(p []byte) {
-	d.buf = append(d.buf, p...)
 }
 
 // rc stores the round constants for use in the ι step.

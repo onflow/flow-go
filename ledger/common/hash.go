@@ -55,8 +55,7 @@ func HashLeaf(path []byte, value []byte) []byte {
 // hash1 and hash2 must each be a 32 byte slice.
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	hasher := new256()
-	hasher.write256(hash1) // hash1 and hash2 are 256 bits
-	hasher.write256(hash2)
+	hasher.write512(hash1, hash2) // hash1 and hash2 are 256 bits
 	hasher.finalize512()
 	return hasher.hashResult()
 }
