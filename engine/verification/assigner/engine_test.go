@@ -126,7 +126,7 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 }
 
 // TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
-// a receipt  with one assigned chunk, results in the assigner engine passing the assigned chunk to the
+// a receipt with one assigned chunk, results in the assigner engine passing the assigned chunk to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func TestNewBlock_HappyPath(t *testing.T) {
 	t.Parallel()
