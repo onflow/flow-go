@@ -586,6 +586,9 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.PersistedResults[result.ID()] = result
 		// TODO: adding receipt
 	}
+	for _, seal := range block.Payload.Seals {
+		bc.SealsIndex[block.ID()] = seal
+	}
 }
 
 // addSubgraphFixtureToMempools adds add entities in subgraph to mempools and persistent storage mocks

@@ -1,6 +1,7 @@
 package validation
 
 import (
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -27,7 +28,7 @@ type ReceiptValidationSuite struct {
 func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.verifier = &mock2.Verifier{}
-	s.receiptValidator = NewReceiptValidator(s.State, s.IndexDB, s.ResultsDB, s.verifier)
+	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB, s.verifier)
 }
 
 // TestReceiptValid try submitting valid receipt
@@ -324,10 +325,71 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	receipts := prepareReceipts()
 	// make receipt B as bad
 	receipts[2].ExecutorID = s.VerID
-	// recieptB and receiptC
+	// receiptB and receiptC
 	receiptsInNewBlock := []*flow.ExecutionReceipt{receipts[2], receipts[3]}
 	err := s.receiptValidator.Validate(receiptsInNewBlock)
 	s.Require().Error(err)
+}
+
+// Test that `ValidatePayload` will refuse payloads that contain receipts for blocks that
+// are already sealed on the fork, but will accept receipts for blocks that are
+// sealed on another fork.
+func (s *ReceiptValidationSuite) TestValidatePayloadReceiptsForSealedBlock() {
+	// create block2
+	block2 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
+	block2.SetPayload(flow.Payload{})
+	s.Extend(&block2)
+
+	block2Receipt := unittest.ReceiptForBlockFixture(&block2)
+
+	// B1<--B2<--B3{R{B2)}<--B4{S(R(B2))}<--B5{R'(B2)}
+
+	// create block3 with a receipt for block2
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
+	})
+	s.Extend(&block3)
+
+	// create a seal for block2
+	seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
+
+	// create block4 containing a seal for block2
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+	block4.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal2},
+	})
+	s.Extend(&block4)
+	//s.LatestSealedBlock = block2
+
+	// insert another receipt for block 2, which is now the highest sealed
+	// block, and ensure that the receipt is rejected
+	receipt := unittest.ReceiptForBlockFixture(&block2)
+	block5 := unittest.BlockWithParentFixture(block4.Header)
+	block5.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+	})
+
+	err := s.receiptValidator.ValidatePayload(&block5)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err), err)
+
+	// B1<--B2<--B3{R{B2)}<--B4{S(R(B2))}<--B5{R'(B2)}
+	//       |
+	//       +---B6{R''(B2)}
+
+	// insert another receipt for B2 but in a separate fork. The fact that
+	// B2 is sealed on a separate fork should not cause the receipt to be
+	// rejected
+	block6 := unittest.BlockWithParentFixture(block2.Header)
+	block6.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+	})
+	err = s.receiptValidator.ValidatePayload(&block6)
+	require.Nil(s.T(), err)
 }
 
 func one(receipt *flow.ExecutionReceipt) []*flow.ExecutionReceipt {

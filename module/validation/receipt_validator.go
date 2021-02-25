@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -24,12 +22,14 @@ type receiptValidator struct {
 	verifier module.Verifier
 }
 
-func NewReceiptValidator(state protocol.State, index storage.Index, results storage.ExecutionResults, verifier module.Verifier) *receiptValidator {
+func NewReceiptValidator(state protocol.State, headers storage.Headers, index storage.Index, results storage.ExecutionResults, seals storage.Seals, verifier module.Verifier) *receiptValidator {
 	rv := &receiptValidator{
 		state:    state,
+		headers:  headers,
 		index:    index,
 		results:  results,
 		verifier: verifier,
+		seals:    seals,
 	}
 
 	return rv
@@ -256,30 +256,34 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		ancestorID = ancestor.ParentID
 	}
 
+	results := make(map[flow.Identifier]*flow.ExecutionResult)
 	// check each receipt included in the payload for duplication
 	for _, receipt := range payload.Receipts {
+		result, found := results[receipt.ResultID]
+		if !found {
+			result, err = fetchResult(receipt.ResultID)
+			if err != nil {
+				return err
+			}
+			results[receipt.ResultID] = result
+		}
 
 		// error if the receipt was already included in an other block on the
 		// fork
 		_, duplicated := forkLookup[receipt.ID()]
 		if duplicated {
-			return state.NewInvalidExtensionErrorf("payload includes duplicate receipt (%x)", receipt.ID())
+			return engine.NewInvalidInputErrorf("payload includes duplicate receipt (%x)", receipt.ID())
 		}
 		forkLookup[receipt.ID()] = struct{}{}
 
 		// if the receipt is not for a block on this fork, error
-		// WARNING: TODO: REVISIT THIS
-		//if _, forBlockOnFork := forkBlocks[receipt.ExecutionResult.BlockID]; !forBlockOnFork {
-		//	return state.NewInvalidExtensionErrorf("payload includes receipt for block not on fork (%x)", receipt.ExecutionResult.BlockID)
-		//}
+		if _, forBlockOnFork := forkBlocks[result.BlockID]; !forBlockOnFork {
+			return engine.NewInvalidInputErrorf("payload includes receipt for block not on fork (%x)", result.BlockID)
+		}
 	}
 
 	for i, r := range candidate.Payload.Receipts {
-		result, err := fetchResult(r.ResultID)
-		if err != nil {
-			return err
-		}
-
+		result := results[r.ResultID]
 		prevResult, err := fetchResult(result.PreviousResultID)
 		if err != nil {
 			return err
