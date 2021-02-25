@@ -210,6 +210,7 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
+		s.notifier,
 		s.indexer)
 }
 
