@@ -145,7 +145,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	require.Equal(t, chunksNum, 1) // one chunk should be assigned
 
 	// mocks processing assigned chunks
-	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
+	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
 	// invoked for it.
 	// Also, once all receipts of the block processed, engine should notify the block consumer once, that
 	// it is done with processing this chunk.
@@ -316,7 +316,7 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	require.Equal(t, chunksNum, 3) // 3 chunks should be assigned
 
 	// mocks processing assigned chunks
-	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
+	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
 	// invoked for it.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
