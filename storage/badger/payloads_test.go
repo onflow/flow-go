@@ -30,6 +30,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture()
 		expected.Receipts = make([]*flow.ExecutionReceiptMeta, 0)
+		expected.Results = make([]*flow.ExecutionResult, 0)
 
 		// store payload
 		err := store.Store(blockID, expected)

@@ -334,13 +334,18 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 // Test that `ValidatePayload` will refuse payloads that contain receipts for blocks that
 // are already sealed on the fork, but will accept receipts for blocks that are
 // sealed on another fork.
-func (s *ReceiptValidationSuite) TestValidatePayloadReceiptsForSealedBlock() {
+func (s *ReceiptValidationSuite) TestValidationReceiptsForSealedBlock() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
 	// create block2
 	block2 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
 	block2.SetPayload(flow.Payload{})
 	s.Extend(&block2)
 
-	block2Receipt := unittest.ReceiptForBlockFixture(&block2)
+	block2Receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(
+		unittest.ExecutionResultFixture(unittest.WithBlock(&block2),
+			unittest.WithPreviousResult(*s.LatestExecutionResult))))
 
 	// B1<--B2<--B3{R{B2)}<--B4{S(R(B2))}<--B5{R'(B2)}
 
@@ -361,11 +366,13 @@ func (s *ReceiptValidationSuite) TestValidatePayloadReceiptsForSealedBlock() {
 		Seals: []*flow.Seal{seal2},
 	})
 	s.Extend(&block4)
-	//s.LatestSealedBlock = block2
 
 	// insert another receipt for block 2, which is now the highest sealed
 	// block, and ensure that the receipt is rejected
-	receipt := unittest.ReceiptForBlockFixture(&block2)
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(
+		unittest.ExecutionResultFixture(unittest.WithBlock(&block2),
+			unittest.WithPreviousResult(*s.LatestExecutionResult))),
+		unittest.WithExecutorID(s.ExeID))
 	block5 := unittest.BlockWithParentFixture(block4.Header)
 	block5.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
@@ -390,6 +397,157 @@ func (s *ReceiptValidationSuite) TestValidatePayloadReceiptsForSealedBlock() {
 	})
 	err = s.receiptValidator.ValidatePayload(&block6)
 	require.Nil(s.T(), err)
+}
+
+// Test that validator will accept payloads with receipts that are referring execution results
+// which were incorporated in previous blocks of fork.
+func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// create block2
+	block2 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
+	block2.SetPayload(flow.Payload{})
+	s.Extend(&block2)
+
+	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block2),
+		unittest.WithPreviousResult(*s.LatestExecutionResult))
+	firstReceipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(executionResult),
+		unittest.WithExecutorID(s.ExeID))
+
+	// B1<--B2<--B3{R{B2)}<--B4{(R'(B2))}
+
+	// create block3 with a receipt for block2
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{firstReceipt.Meta()},
+		Results:  []*flow.ExecutionResult{&firstReceipt.ExecutionResult},
+	})
+	s.Extend(&block3)
+
+	exe := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	s.Identities[exe.NodeID] = exe
+
+	// insert another receipt for block 2, it's a receipt from another execution node
+	// for the same result
+	secondReceipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(executionResult),
+		unittest.WithExecutorID(exe.NodeID))
+	block5 := unittest.BlockWithParentFixture(block3.Header)
+	block5.SetPayload(flow.Payload{
+		// no results, only receipt
+		Receipts: []*flow.ExecutionReceiptMeta{secondReceipt.Meta()},
+	})
+
+	err := s.receiptValidator.ValidatePayload(&block5)
+	require.NoError(s.T(), err)
+}
+
+// Test that validator will refuse payloads that contain receipts that contain
+// execution result which wasn't incorporated into fork or present in payload.
+func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// create block2
+	block2 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
+	block2.SetPayload(flow.Payload{})
+	s.Extend(&block2)
+
+	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block2),
+		unittest.WithPreviousResult(*s.LatestExecutionResult))
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithResult(executionResult),
+		unittest.WithExecutorID(s.ExeID))
+
+	// B1<--B2<--B3{R{B2)}<--B4{(R'(B2))}
+
+	// create block3 with a receipt for block2
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+	})
+	err := s.receiptValidator.ValidatePayload(&block3)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsUnverifiableInputError(err), err)
+}
+
+// Test that validator will reject payloads that contain receipts for blocks that
+// are not on the fork
+//
+// B1<--B2<--B3
+//      |
+//      +----B4{R(B3)}
+func (s *ReceiptValidationSuite) TestValidationReceiptsBlockNotOnFork() {
+	// create block2
+	block2 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	block2.Payload.Guarantees = nil
+	block2.Header.PayloadHash = block2.Payload.Hash()
+	s.Extend(&block2)
+
+	// create block3
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(flow.Payload{})
+	s.Extend(&block3)
+
+	block3Receipt := unittest.ReceiptForBlockFixture(&block3)
+
+	block4 := unittest.BlockWithParentFixture(block2.Header)
+	block4.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{block3Receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&block3Receipt.ExecutionResult},
+	})
+	err := s.receiptValidator.ValidatePayload(&block4)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err), err)
+}
+
+// Test that Extend will refuse payloads that contain duplicate receipts, where
+// duplicates can be in another block on the fork, or within the payload.
+func (s *ReceiptValidationSuite) TestExtendReceiptsDuplicate() {
+
+	block2 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	block2.SetPayload(flow.Payload{})
+	s.Extend(&block2)
+
+	receipt := unittest.ReceiptForBlockFixture(&block2)
+
+	// B1 <- B2 <- B3{R(B2)} <- B4{R(B2)}
+	s.T().Run("duplicate receipt in different block", func(t *testing.T) {
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+		})
+		s.Extend(&block3)
+
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+		})
+		err := s.receiptValidator.ValidatePayload(&block4)
+		require.Error(t, err)
+		require.True(t, engine.IsInvalidInputError(err), err)
+	})
+
+	// B1 <- B2 <- B3{R(B2), R(B2)}
+	s.T().Run("duplicate receipt in same block", func(t *testing.T) {
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{
+				receipt.Meta(),
+				receipt.Meta(),
+			},
+			Results: []*flow.ExecutionResult{
+				&receipt.ExecutionResult,
+			},
+		})
+		err := s.receiptValidator.ValidatePayload(&block3)
+		require.Error(t, err)
+		require.True(t, engine.IsInvalidInputError(err), err)
+	})
 }
 
 func one(receipt *flow.ExecutionReceipt) []*flow.ExecutionReceipt {

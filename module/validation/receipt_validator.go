@@ -87,7 +87,7 @@ func (v *receiptValidator) fetchResult(resultID flow.Identifier) (*flow.Executio
 	prevResult, err := v.results.ByID(resultID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, NewUnverifiableError(resultID)
+			return nil, engine.NewUnverifiableInputError("cannot retrieve result: %v", resultID)
 		}
 		return nil, err
 	}

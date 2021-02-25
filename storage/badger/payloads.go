@@ -53,6 +53,10 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 
 		// store all payload receipts
 		for _, meta := range payload.Receipts {
+			// ATTENTION: this is broken from perspective if we have execution receipt which points an execution result
+			// which is not included in current payload but was incorporated in one of previous blocks.
+			// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
+			// and execution result is decoupled.
 			receipt := flow.ExecutionReceiptFromMeta(*meta, *resultsById[meta.ResultID])
 			err := p.receipts.store(receipt)(tx)
 			if err != nil {
@@ -101,7 +105,8 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 
 		// retrieve receipts
 		receipts := make([]*flow.ExecutionReceipt, 0, len(idx.ReceiptIDs))
-		resultsLookup := make(map[flow.Identifier]flow.ExecutionResult)
+		// multiple receipts can refer to one execution result, avoid duplicating by using map
+		resultsLookup := make(map[flow.Identifier]*flow.ExecutionResult)
 		for _, recID := range idx.ReceiptIDs {
 			receipt, err := p.receipts.byID(recID)(tx)
 			if err != nil {
@@ -109,17 +114,20 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 			}
 			receipts = append(receipts, receipt)
 			if _, ok := resultsLookup[receipt.ExecutionResult.ID()]; !ok {
-				resultsLookup[receipt.ExecutionResult.ID()] = receipt.ExecutionResult
+				resultsLookup[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
 			}
 		}
 
 		metas := make([]*flow.ExecutionReceiptMeta, len(receipts))
-		for i, receipt := range receipts {
-			metas[i] = receipt.Meta()
-		}
 		results := make([]*flow.ExecutionResult, 0, len(resultsLookup))
-		for _, result := range resultsLookup {
-			results = append(results, &result)
+		for i, receipt := range receipts {
+			meta := receipt.Meta()
+			metas[i] = meta
+			// we need to do this to preserve order of results in payload
+			if result, found := resultsLookup[meta.ResultID]; found {
+				results = append(results, result)
+				delete(resultsLookup, meta.ResultID)
+			}
 		}
 
 		payload := &flow.Payload{

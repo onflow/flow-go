@@ -141,8 +141,10 @@ func main() {
 
 			receiptValidator = validation.NewReceiptValidator(
 				node.State,
+				node.Storage.Headers,
 				node.Storage.Index,
 				node.Storage.Results,
+				node.Storage.Seals,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)

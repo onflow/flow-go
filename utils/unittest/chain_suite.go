@@ -2,7 +2,6 @@ package unittest
 
 import (
 	"fmt"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -28,11 +27,12 @@ type BaseChainSuite struct {
 	Approvers  flow.IdentityList
 
 	// BLOCKS
-	RootBlock            flow.Block
-	LatestSealedBlock    flow.Block
-	LatestFinalizedBlock *flow.Block
-	UnfinalizedBlock     flow.Block
-	Blocks               map[flow.Identifier]*flow.Block
+	RootBlock             flow.Block
+	LatestSealedBlock     flow.Block
+	LatestFinalizedBlock  *flow.Block
+	UnfinalizedBlock      flow.Block
+	LatestExecutionResult *flow.ExecutionResult
+	Blocks                map[flow.Identifier]*flow.Block
 
 	// PROTOCOL STATE
 	State          *protocol.State
@@ -185,6 +185,8 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RESULTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.PersistedResults = make(map[flow.Identifier]*flow.ExecutionResult)
+	bc.LatestExecutionResult = ExecutionResultFixture(WithBlock(&bc.LatestSealedBlock))
+	bc.PersistedResults[bc.LatestExecutionResult.ID()] = bc.LatestExecutionResult
 	bc.ResultsDB = &storage.ExecutionResults{}
 	bc.ResultsDB.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
