@@ -264,7 +264,8 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	// creates a container block, with a single receipt, that contains 5 chunks, but
 	// none of them is assigned to this verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
+		test.WithChunks(
+			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
@@ -308,7 +309,8 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	// creates a container block, with a single receipt, that contains 5 chunks, but
 	// only 3 of them is assigned to this verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()), // assigned to me
+		test.WithChunks(
+			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
 			test.WithAssignee(s.myID()),                     // assigned to me
 			test.WithAssignee(s.myID()),                     // assigned to me
 			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
