@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -85,6 +87,8 @@ func main() {
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
+			flags.UintVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout-seconds", 3, "grpc client timeout for a collection node")
+			flags.UintVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout-seconds", 3, "grpc client timeout for an execution node")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
@@ -123,7 +127,8 @@ func main() {
 			collectionRPCConn, err := grpc.Dial(
 				rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure())
+				grpc.WithInsecure(),
+				backend.WithClientUnaryInterceptor(time.Duration(rpcConf.CollectionClientTimeout)))
 			if err != nil {
 				return err
 			}
@@ -143,7 +148,8 @@ func main() {
 			executionRPCConn, err := grpc.Dial(
 				rpcConf.ExecutionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure())
+				grpc.WithInsecure(),
+				backend.WithClientUnaryInterceptor(time.Duration(rpcConf.ExecutionClientTimeout)))
 			if err != nil {
 				return err
 			}

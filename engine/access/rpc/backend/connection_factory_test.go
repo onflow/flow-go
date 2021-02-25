@@ -22,8 +22,7 @@ import (
 // TestExecutionNodeClientTimeout tests that the execution API client times out after the timeout duration
 func TestExecutionNodeClientTimeout(t *testing.T) {
 
-	// adjust the default client timeout
-	grcpClientTimeout = 10 * time.Millisecond
+	timeout := 10 * time.Millisecond
 
 	// create an execution node
 	en := new(executionNode)
@@ -33,12 +32,14 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &execution.PingRequest{}
 	resp := &execution.PingResponse{}
-	en.handler.On("Ping", mock2.Anything, req).After(grcpClientTimeout+time.Second).Return(resp, nil)
+	en.handler.On("Ping", mock2.Anything, req).After(timeout+time.Second).Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
 	// set the execution grpc port
 	connectionFactory.ExecutionGRPCPort = en.port
+	// set the execution grpc client timeout
+	connectionFactory.ExecutionNodeGRPCTimeout = timeout
 
 	// create the execution API client
 	client, closer, err := connectionFactory.GetExecutionAPIClient(en.listener.Addr().String())
@@ -56,8 +57,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 // TestCollectionNodeClientTimeout tests that the collection API client times out after the timeout duration
 func TestCollectionNodeClientTimeout(t *testing.T) {
 
-	// adjust the default client timeout
-	grcpClientTimeout = 10 * time.Millisecond
+	timeout := 10 * time.Millisecond
 
 	// create a collection node
 	cn := new(collectionNode)
@@ -67,12 +67,14 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &access.PingRequest{}
 	resp := &access.PingResponse{}
-	cn.handler.On("Ping", mock2.Anything, req).After(grcpClientTimeout+time.Second).Return(resp, nil)
+	cn.handler.On("Ping", mock2.Anything, req).After(timeout+time.Second).Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
-	// set the execution grpc port
+	// set the collection grpc port
 	connectionFactory.CollectionGRPCPort = cn.port
+	// set the collection grpc client timeout
+	connectionFactory.CollectionNodeGRPCTimeout = timeout
 
 	// create the collection API client
 	client, closer, err := connectionFactory.GetAccessAPIClient(cn.listener.Addr().String())
