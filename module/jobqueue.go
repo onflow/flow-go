@@ -17,6 +17,8 @@ type NewJobListener interface {
 // JobConsumer consumes jobs from a job queue, and it remembers which job it has processed, and is able
 // to resume processing from the next.
 type JobConsumer interface {
+	NewJobListener
+
 	// Start starts processing jobs from a job queue. If this is the first time, a processed index
 	// will be initialized in the storage. If it fails to initialize, an error will be returned
 	Start(defaultIndex int64) error
