@@ -82,7 +82,7 @@ func (i *TransactionInvocator) Process(
 	var span opentracing.Span
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
-		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
+		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
 		span.LogFields(
 			traceLog.String("transaction.hash", proc.ID.String()),
 		)
