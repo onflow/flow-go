@@ -10,7 +10,7 @@ import (
 
 type ConsumerProgress struct {
 	db       *badger.DB
-	consumer string
+	consumer string // to distinguish the consume progress between different consumers
 }
 
 func NewConsumerProgress(db *badger.DB, consumer string) *ConsumerProgress {
@@ -25,7 +25,6 @@ func (cp *ConsumerProgress) ProcessedIndex() (int64, error) {
 	err := cp.db.View(operation.RetrieveProcessedIndex(cp.consumer, &processed))
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve processed index: %w", err)
-		// return 0, err
 	}
 	return processed, nil
 }
