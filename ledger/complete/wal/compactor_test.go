@@ -193,7 +193,7 @@ func Test_Compactor(t *testing.T) {
 func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	numInsPerStep := 2
-	pathByteSize := 4
+	pathByteSize := 32
 	minPayloadByteSize := 100
 	maxPayloadByteSize := 2 << 16
 	size := 20
@@ -202,14 +202,14 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(4, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
 
 		t.Run("Compactor creates checkpoints", func(t *testing.T) {
 
-			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, 4, 32*1024)
+			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
