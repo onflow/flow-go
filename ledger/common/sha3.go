@@ -35,9 +35,8 @@ import (
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 const (
-	// maxRate is the maximum size of the internal buffer. SHAKE-256
-	// currently needs the largest buffer.
-	maxRate = 168
+	// rate is size of the internal buffer.
+	rate = 136
 
 	// dsbyte contains the "domain separation" bits and the first bit of
 	// the padding. Sections 6.1 and 6.2 of [1] separate the outputs of the
@@ -58,24 +57,19 @@ const (
 )
 
 type state struct {
-	// Generic sponge components.
-	a    [25]uint64 // main state of the hash
-	buf  []byte     // points into storage
-	rate int        // the number of bytes of state to use
-
+	a       [25]uint64 // main state of the hash
+	buf     []byte     // points into storage
 	storage storageBuf
 }
 
 // A storageBuf is an aligned array of maxRate bytes.
-type storageBuf [maxRate]byte
+type storageBuf [rate]byte
 
 // New256 creates a new SHA3-256 hash.
 // Its generic security strength is 256 bits against preimage attacks,
 // and 128 bits against collision attacks.
 func new256() *state {
-	d := &state{
-		rate: 136,
-	}
+	d := &state{}
 	d.buf = d.storage.asBytes()[:0]
 	return d
 }
@@ -84,8 +78,8 @@ func (d *state) hashResult() []byte {
 	return d.buf[:outputLength]
 }
 
-func (b *storageBuf) asBytes() *[maxRate]byte {
-	return (*[maxRate]byte)(b)
+func (b *storageBuf) asBytes() *[rate]byte {
+	return (*[rate]byte)(b)
 }
 
 // xorIn xors the bytes in buf into the state; it
@@ -128,17 +122,17 @@ func (d *state) finalize() {
 	// first one bit for the padding. See the comment in the state struct.
 	d.buf = append(d.buf, dsbyte)
 	zerosStart := len(d.buf)
-	d.buf = d.storage.asBytes()[:d.rate]
-	for i := zerosStart; i < d.rate-1; i++ {
+	d.buf = d.storage.asBytes()[:rate]
+	for i := zerosStart; i < rate-1; i++ {
 		d.buf[i] = 0
 	}
 	// This adds the final one bit for the padding. Because of the way that
 	// bits are numbered from the LSB upwards, the final bit is the MSB of
 	// the last byte.
-	d.buf[d.rate-1] = 0x80
+	d.buf[rate-1] = 0x80
 	// Apply the permutation
 	d.permute()
-	d.buf = d.storage.asBytes()[:d.rate]
+	d.buf = d.storage.asBytes()[:rate]
 	copyOut(d, d.buf)
 }
 
@@ -153,27 +147,27 @@ func (d *state) finalize512() {
 	// This adds the final one bit for the padding. Because of the way that
 	// bits are numbered from the LSB upwards, the final bit is the MSB of
 	// the last byte.
-	d.buf = d.storage.asBytes()[:d.rate]
+	d.buf = d.storage.asBytes()[:rate]
 	// There is no need to pad the bytes in between as the storage was initilized
 	// to zero un never overwritten
-	d.buf[d.rate-1] = 0x80
+	d.buf[rate-1] = 0x80
 	// Apply the permutation
 	d.permute()
-	d.buf = d.storage.asBytes()[:d.rate]
+	d.buf = d.storage.asBytes()[:rate]
 	copyOut(d, d.buf)
 }
 
 // Write absorbs more data into the hash's state.
 func (d *state) write(p []byte) {
 	for len(p) > 0 {
-		if len(d.buf) == 0 && len(p) >= d.rate {
+		if len(d.buf) == 0 && len(p) >= rate {
 			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
-			xorIn(d, p[:d.rate])
-			p = p[d.rate:]
+			xorIn(d, p[:rate])
+			p = p[rate:]
 			keccakF1600(&d.a)
 		} else {
 			// The slow path; buffer the input until we can fill the sponge, and then xor it in.
-			todo := d.rate - len(d.buf)
+			todo := rate - len(d.buf)
 			if todo > len(p) {
 				todo = len(p)
 			}
@@ -181,7 +175,7 @@ func (d *state) write(p []byte) {
 			p = p[todo:]
 
 			// If the sponge is full, apply the permutation.
-			if len(d.buf) == d.rate {
+			if len(d.buf) == rate {
 				d.permute()
 			}
 		}
