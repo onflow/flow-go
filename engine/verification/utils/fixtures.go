@@ -66,6 +66,10 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	chunks := make([]*flow.Chunk, 0)
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
+	var payload flow.Payload
+	var block flow.Block
+	header := unittest.BlockHeaderWithParentFixture(root)
+
 	unittest.RunWithTempDir(t, func(dir string) {
 		led, err := completeLedger.NewLedger(dir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
@@ -104,8 +108,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			Transactions: collection.Transactions,
 		}
 
-		header := unittest.BlockHeaderFixture()
-
 		for i := 1; i < chunkCount; i++ {
 			tx := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 			err = testutil.SignTransactionAsServiceAccount(tx, 3+uint64(i), chain)
@@ -122,15 +124,16 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			}
 		}
 
-		block := &flow.Block{
-			Header: &header,
-			Payload: &flow.Payload{
-				Guarantees: guarantees,
-			},
+		payload = flow.Payload{
+			Guarantees: guarantees,
 		}
+		block = flow.Block{
+			Header: &header,
+		}
+		block.SetPayload(payload)
 
 		executableBlock := &entity.ExecutableBlock{
-			Block:               block,
+			Block:               &block,
 			CompleteCollections: completeColls,
 			StartState:          startStateCommitment,
 		}
@@ -204,16 +207,22 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		}
 
 	})
+	//
+	//payload := flow.Payload{
+	//	Guarantees: guarantees,
+	//}
+	//header := unittest.BlockHeaderWithParentFixture(root)
+	//header.PayloadHash = payload.Hash()
+	//
+	//block := flow.Block{
+	//	Header:  &header,
+	//	Payload: &payload,
+	//}
 
-	payload := flow.Payload{
-		Guarantees: guarantees,
-	}
-	header := unittest.BlockHeaderWithParentFixture(root)
-	header.PayloadHash = payload.Hash()
-
-	block := flow.Block{
-		Header:  &header,
-		Payload: &payload,
+	// makes sure all chunks are referencing the correct block id.
+	blockID := block.ID()
+	for _, chunk := range chunks {
+		require.Equal(t, blockID, chunk.BlockID, "inconsistent block id in chunk fixture")
 	}
 
 	result := flow.ExecutionResult{
