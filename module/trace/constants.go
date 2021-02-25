@@ -127,9 +127,9 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMEnvVerifyTransaction         SpanName = "fvm.verifyTransaction"
-	FVMEnvSeqNumCheckTransaction    SpanName = "fvm.seqNumCheckTransaction"
-	FVMEnvExecuteTransaction        SpanName = "fvm.executeTransaction"
+	FVMVerifyTransaction            SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction       SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction           SpanName = "fvm.executeTransaction"
 	FVMEnvValueExists               SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                  SpanName = "fvm.env.getValue"
 	FVMEnvSetValue                  SpanName = "fvm.env.setValue"
@@ -155,6 +155,8 @@ const (
 	FVMEnvGetAccountContractCode    SpanName = "fvm.env.getAccountContractCode"
 	FVMEnvRemoveAccountContractCode SpanName = "fvm.env.removeAccountContractCode"
 	FVMEnvGetSigningAccounts        SpanName = "fvm.env.getSigningAccounts"
+
+	FVMCadenceTransaction SpanName = "fvm.executeTransaction"
 )
 
 // Tag names

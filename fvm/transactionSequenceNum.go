@@ -1,13 +1,11 @@
 package fvm
 
 import (
-	"context"
 	"errors"
 
 	"github.com/opentracing/opentracing-go/log"
 
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -24,25 +22,25 @@ func (c *TransactionSequenceNumberChecker) Process(
 	st *state.State,
 ) error {
 
-	return c.checkAndIncrementSequenceNumber(proc.Transaction, ctx, st)
+	return c.checkAndIncrementSequenceNumber(proc, ctx, st)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
-	tx *flow.TransactionBody,
+	proc *TransactionProcedure,
 	ctx Context,
 	st *state.State,
 ) error {
 
 	if ctx.Tracer != nil {
-		span, _ := ctx.Tracer.StartSpanFromContext(context.Background(), trace.FVMEnvSeqNumCheckTransaction)
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
 		span.LogFields(
-			log.String("transaction.hash", tx.ID().String()),
+			log.String("transaction.hash", proc.ID.String()),
 		)
 		defer span.Finish()
 	}
 
 	accounts := state.NewAccounts(st)
-	proposalKey := tx.ProposalKey
+	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {

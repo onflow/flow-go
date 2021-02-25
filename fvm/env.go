@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -13,8 +12,6 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/opentracing/opentracing-go"
-	"github.com/opentracing/opentracing-go/log"
-	"github.com/uber/jaeger-client-go"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
@@ -107,6 +104,10 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		tx,
 		txIndex,
 	)
+}
+
+func (e *hostEnv) setTraceSpan(span opentracing.Span) {
+	e.transactionEnv.traceSpan = span
 }
 
 func (e *hostEnv) getEvents() []flow.Event {
@@ -719,30 +720,6 @@ func newTransactionEnv(
 		tx:               tx,
 		txIndex:          txIndex,
 		txID:             tx.ID(),
-	}
-}
-
-func (e *transactionEnv) StartTracing() string {
-	var span opentracing.Span
-	var traceID string
-	if e.ctx.Tracer != nil {
-		span, _ = e.ctx.Tracer.StartSpanFromContext(context.Background(), trace.FVMEnvExecuteTransaction)
-		span.LogFields(
-			log.String("transaction.hash", e.txID.String()),
-		)
-
-		if sc, ok := span.Context().(jaeger.SpanContext); ok {
-			traceID = sc.TraceID().String()
-		}
-
-	}
-	e.traceSpan = span
-	return traceID
-}
-
-func (e *transactionEnv) StopTracing() {
-	if e.traceSpan != nil {
-		e.traceSpan.Finish()
 	}
 }
 

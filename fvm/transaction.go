@@ -7,10 +7,13 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
@@ -33,8 +36,13 @@ type TransactionProcedure struct {
 	Events        []flow.Event
 	ServiceEvents []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
-	GasUsed uint64
-	Err     Error
+	GasUsed   uint64
+	Err       Error
+	TraceSpan opentracing.Span
+}
+
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+	proc.TraceSpan = traceSpan
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
@@ -70,17 +78,24 @@ func (i *TransactionInvocator) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
+
+	var span opentracing.Span
+
+	if ctx.Tracer != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
+		span.LogFields(
+			traceLog.String("transaction.hash", proc.ID.String()),
+		)
+		defer span.Finish()
+	}
+
 	env, err := newEnvironment(ctx, vm, st)
 	if err != nil {
 		return err
 	}
-	env.setTransaction(proc.Transaction, proc.TxIndex)
 
-	var traceID string
-	if env.transactionEnv != nil {
-		traceID = env.transactionEnv.StartTracing()
-		defer env.transactionEnv.StopTracing()
-	}
+	env.setTransaction(proc.Transaction, proc.TxIndex)
+	env.setTraceSpan(span)
 
 	location := common.TransactionLocation(proc.ID[:])
 
@@ -99,11 +114,6 @@ func (i *TransactionInvocator) Process(
 		i.safetyErrorCheck(err)
 		return err
 	}
-
-	i.logger.Info().
-		Str("txHash", proc.ID.String()).
-		Str("traceID", traceID).
-		Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

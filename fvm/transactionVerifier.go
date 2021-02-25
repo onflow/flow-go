@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"context"
 	"errors"
 
 	"github.com/opentracing/opentracing-go/log"
@@ -29,21 +28,24 @@ func (v *TransactionSignatureVerifier) Process(
 	proc *TransactionProcedure,
 	st *state.State,
 ) error {
-	return v.verifyTransactionSignatures(proc.Transaction, ctx, st)
+	return v.verifyTransactionSignatures(proc, ctx, st)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
-	tx *flow.TransactionBody,
+	proc *TransactionProcedure,
 	ctx Context,
 	st *state.State,
 ) (err error) {
+
 	if ctx.Tracer != nil {
-		span, _ := ctx.Tracer.StartSpanFromContext(context.Background(), trace.FVMEnvVerifyTransaction)
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
 		span.LogFields(
-			log.String("transaction.hash", tx.ID().String()),
+			log.String("transaction.hash", proc.ID.String()),
 		)
 		defer span.Finish()
 	}
+
+	tx := proc.Transaction
 	accounts := state.NewAccounts(st)
 
 	if tx.Payer == flow.EmptyAddress {

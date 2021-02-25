@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -579,7 +580,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Bool("sealed", isExecutedBlockSealed).
 		Bool("broadcasted", broadcasted).
-		Int("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
 	err = e.onBlockExecuted(executableBlock, finalState)
