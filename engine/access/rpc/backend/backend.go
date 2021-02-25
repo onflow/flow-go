@@ -173,7 +173,7 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
 		// Collections are retrieved asynchronously as we finalize blocks, so
-		// it is possible for a client to request a finalized block from use
+		// it is possible for a client to request a finalized block from us
 		// containing some collection, then get a not found error when requesting
 		// that collection. These clients should retry.
 		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
