@@ -462,7 +462,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.RootChainID = rootBlock.ChainID
 
 		// load the root QC data from bootstrap files
-		// TODO get from protocol state
+		// TODO: get from protocol state
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root QC")
 
@@ -472,31 +472,11 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not get root seal")
 	} else {
 		// Bootstrap!
-
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
-		// load the root block from bootstrap files and set the chain ID based on it
-		fnb.RootBlock, err = loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root block")
-
-		// set the root chain ID based on the root block
-		fnb.RootChainID = fnb.RootBlock.Header.ChainID
-
-		// load the root QC data from bootstrap files
-		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root QC")
-
-		// load the root execution result from bootstrap files
-		fnb.RootResult, err = loadRootResult(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root execution result")
-
-		// load the root block seal from bootstrap files
-		fnb.RootSeal, err = loadRootSeal(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root seal")
-
-		// bootstrap the protocol state with the loaded data
-		rootSnapshot, err := inmem.SnapshotFromBootstrapState(fnb.RootBlock, fnb.RootResult, fnb.RootSeal, fnb.RootQC)
-		fnb.MustNot(err).Msg("failed to construct state root")
+		// load the root protocol state snapshot from disk
+		rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("failed to read protocol snapshot from disk")
 
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
@@ -797,24 +777,20 @@ func loadRootQC(dir string) (*flow.QuorumCertificate, error) {
 	return &qc, err
 }
 
-func loadRootResult(dir string) (*flow.ExecutionResult, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootResult))
+// loadRootProtocolSnapshot loads the root protocol snapshot from disk
+func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
+	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot))
 	if err != nil {
 		return nil, err
 	}
-	var result flow.ExecutionResult
-	err = json.Unmarshal(data, &result)
-	return &result, err
-}
 
-func loadRootSeal(dir string) (*flow.Seal, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootSeal))
+	var snapshot inmem.Snapshot
+	err = json.Unmarshal(data, &snapshot)
 	if err != nil {
 		return nil, err
 	}
-	var seal flow.Seal
-	err = json.Unmarshal(data, &seal)
-	return &seal, err
+
+	return &snapshot, nil
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
