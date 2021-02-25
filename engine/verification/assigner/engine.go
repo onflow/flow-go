@@ -116,6 +116,8 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		Hex("container_block_id", logging.ID(containerBlockID)).
 		Logger()
 
+	e.metrics.OnExecutionReceiptReceived()
+
 	// verification node should be staked at the reference block id.
 	ok, err := e.stakedAtBlockID(referenceBlockID)
 	if err != nil {
@@ -133,6 +135,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		log.Error().Err(err).Msg("could not determine chunk assignment")
 		return
 	}
+	e.metrics.OnChunksAssigned(len(chunkList))
 	log.Info().
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
