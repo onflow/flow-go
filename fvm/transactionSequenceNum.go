@@ -31,7 +31,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	st *state.State,
 ) error {
 
-	if ctx.Tracer != nil {
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
 		span.LogFields(
 			log.String("transaction.hash", proc.ID.String()),
