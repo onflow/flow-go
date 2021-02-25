@@ -183,7 +183,9 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	// creates a container block, with a single receipt, that contains
 	// no assigned chunk to verification node.
 	containerBlock, _ := createContainerBlock(
-		test.WithChunks(
+		test.WithChunks( // all chunks assigned to some (random) identifiers, but not this verification node
+			test.WithAssignee(unittest.IdentifierFixture()),
+			test.WithAssignee(unittest.IdentifierFixture()),
 			test.WithAssignee(unittest.IdentifierFixture())))
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
