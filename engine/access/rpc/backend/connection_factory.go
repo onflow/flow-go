@@ -1,9 +1,11 @@
 package backend
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
@@ -11,6 +13,8 @@ import (
 
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
+
+const grpcClientTimeout = 2 * time.Second // the timeout used when connecting to a collection node or an execution node
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
@@ -28,7 +32,8 @@ func (cf *ConnectionFactoryImpl) createConnection(address string) (*grpc.ClientC
 	conn, err := grpc.Dial(
 		address,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-		grpc.WithInsecure())
+		grpc.WithInsecure(),
+		withClientUnaryInterceptor())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to address %s: %w", address, err)
 	}
@@ -78,4 +83,29 @@ func getGRPCAddress(address string, grpcPort uint) (string, error) {
 	grpcAddress := fmt.Sprintf("%s:%d", hostnameOrIP, grpcPort)
 
 	return grpcAddress, nil
+}
+
+func withClientUnaryInterceptor() grpc.DialOption {
+	return grpc.WithUnaryInterceptor(clientTimeoutInterceptor)
+}
+
+func clientTimeoutInterceptor(
+	ctx context.Context,
+	method string,
+	req interface{},
+	reply interface{},
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
+
+	// create a context that expires after timeout
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, grpcClientTimeout)
+
+	defer cancel()
+
+	// call the remote GRPC using the short context
+	err := invoker(ctxWithTimeout, method, req, reply, cc, opts...)
+
+	return err
 }
