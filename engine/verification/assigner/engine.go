@@ -139,7 +139,7 @@ func (e *Engine) handleExecutionReceipt(ctx context.Context, receipt *flow.Execu
 	}
 
 	// chunk assignment
-	chunkList, err := e.chunkAssignments(context.Background(), &receipt.ExecutionResult)
+	chunkList, err := e.chunkAssignments(ctx, &receipt.ExecutionResult)
 	if err != nil {
 		log.Error().Err(err).Msg("could not determine chunk assignment")
 		return
@@ -256,7 +256,7 @@ func (e *Engine) handleFinalizedBlock(ctx context.Context, block *flow.Block) {
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
 func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
 	var span opentracing.Span
-	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
+	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERAssignerChunkAssignment)
 	defer span.Finish()
 
 	assignment, err := e.assigner.Assign(result, result.BlockID)
