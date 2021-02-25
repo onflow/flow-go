@@ -11,7 +11,6 @@ import (
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain                            flow.Chain
-	ASTCache                         ASTCache
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
 	GasLimit                         uint64
@@ -57,13 +56,12 @@ const AccountKeyWeightThreshold = 1000
 
 const (
 	DefaultGasLimit                     = 100_000 // 100K
-	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
+	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
 )
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
-		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
 		GasLimit:                         DefaultGasLimit,
@@ -99,14 +97,6 @@ type Option func(ctx Context) Context
 func WithChain(chain flow.Chain) Option {
 	return func(ctx Context) Context {
 		ctx.Chain = chain
-		return ctx
-	}
-}
-
-// WithASTCache sets the AST cache for a virtual machine context.
-func WithASTCache(cache ASTCache) Option {
-	return func(ctx Context) Context {
-		ctx.ASTCache = cache
 		return ctx
 	}
 }
