@@ -130,6 +130,7 @@ const (
 	FVMVerifyTransaction            SpanName = "fvm.verifyTransaction"
 	FVMSeqNumCheckTransaction       SpanName = "fvm.seqNumCheckTransaction"
 	FVMExecuteTransaction           SpanName = "fvm.executeTransaction"
+	FVMEnvHash                      SpanName = "fvm.env.Hash"
 	FVMEnvValueExists               SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                  SpanName = "fvm.env.getValue"
 	FVMEnvSetValue                  SpanName = "fvm.env.setValue"
@@ -156,7 +157,11 @@ const (
 	FVMEnvRemoveAccountContractCode SpanName = "fvm.env.removeAccountContractCode"
 	FVMEnvGetSigningAccounts        SpanName = "fvm.env.getSigningAccounts"
 
-	FVMCadenceTransaction SpanName = "fvm.executeTransaction"
+	FVMCadenceParseProgram     SpanName = "fvm.cadence.parseProgram"
+	FVMCadenceCheckProgram     SpanName = "fvm.cadence.checkProgram"
+	FVMCadenceInterpretProgram SpanName = "fvm.cadence.interpretProgram"
+	FVMCadenceEncodeValue      SpanName = "fvm.cadence.encodeValue"
+	FVMCadenceDecodeValue      SpanName = "fvm.cadence.decodeValue"
 )
 
 // Tag names

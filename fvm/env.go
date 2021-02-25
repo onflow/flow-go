@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -12,6 +13,8 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
+	tracelog "github.com/opentracing/opentracing-go/log"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
@@ -26,13 +29,13 @@ var _ runtime.Interface = &hostEnv{}
 var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx              Context
-	st               *state.State
-	vm               *VirtualMachine
-	accounts         *state.Accounts
-	addressGenerator flow.AddressGenerator
-	uuidGenerator    *UUIDGenerator
-	runtime.Metrics
+	ctx                Context
+	st                 *state.State
+	vm                 *VirtualMachine
+	accounts           *state.Accounts
+	addressGenerator   flow.AddressGenerator
+	uuidGenerator      *UUIDGenerator
+	metrics            runtime.Metrics
 	events             []flow.Event
 	serviceEvents      []flow.Event
 	totalEventByteSize uint64
@@ -44,7 +47,7 @@ type hostEnv struct {
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, "exe.fvm.Hash")
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
 		defer sp.Finish()
 	}
 	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
@@ -68,7 +71,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 		ctx:                ctx,
 		st:                 st,
 		vm:                 vm,
-		Metrics:            &noopMetricsCollector{},
+		metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
@@ -80,7 +83,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 	}
 
 	if ctx.Metrics != nil {
-		env.Metrics = &metricsCollector{ctx.Metrics}
+		env.metrics = &metricsCollector{ctx.Metrics}
 	}
 
 	return env, nil
@@ -685,6 +688,60 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 func (e *hostEnv) ImplementationDebugLog(message string) error {
 	e.ctx.Logger.Debug().Msgf("Cadence: %s", message)
 	return nil
+}
+
+func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration) {
+	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
+			[]opentracing.LogRecord{{Timestamp: time.Now(),
+				Fields: []log.Field{tracelog.String("location", location.String())},
+			},
+			},
+		)
+	}
+	e.metrics.ProgramParsed(location, duration)
+}
+
+func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duration) {
+	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
+			[]opentracing.LogRecord{{Timestamp: time.Now(),
+				Fields: []log.Field{tracelog.String("location", location.String())},
+			},
+			},
+		)
+	}
+	e.metrics.ProgramChecked(location, duration)
+}
+
+func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
+	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
+			[]opentracing.LogRecord{{Timestamp: time.Now(),
+				Fields: []log.Field{tracelog.String("location", location.String())},
+			},
+			},
+		)
+	}
+	e.metrics.ProgramInterpreted(location, duration)
+}
+
+func (e *hostEnv) ValueEncoded(duration time.Duration) {
+	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceEncodeValue, duration,
+			[]opentracing.LogRecord{},
+		)
+	}
+	e.metrics.ValueEncoded(duration)
+}
+
+func (e *hostEnv) ValueDecoded(duration time.Duration) {
+	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceDecodeValue, duration,
+			[]opentracing.LogRecord{},
+		)
+	}
+	e.metrics.ValueDecoded(duration)
 }
 
 // Transaction Environment
