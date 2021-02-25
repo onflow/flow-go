@@ -148,6 +148,11 @@ func demo() {
 		// This is done to stretch metrics and scatter their pattern
 		// for a clear visualization.
 		for i := 0; i < 100; i++ {
+			// assigner
+			if rand.Int()%2 == 0 {
+				verificationCollector.OnFinalizedBlockReceived()
+			}
+
 			// finder
 			if rand.Int()%2 == 0 {
 				verificationCollector.OnExecutionReceiptReceived()
@@ -238,4 +243,13 @@ func demo() {
 			}
 		}
 	})
+}
+
+// tryRandomCall executes function f with a probability of 1/2 that does not necessarily follow a uniform distribution.
+//
+// DISCLAIMER: this function should not be utilized for production code. Solely meant for testing and demo.
+func tryRandomCall(f func()) {
+	if rand.Int()%2 == 0 {
+		f()
+	}
 }
