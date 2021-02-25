@@ -502,7 +502,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.backend = backend.New(
 			suite.state,
-			nil,
+			suite.execClient,
 			suite.collClient,
 			nil,
 			blocks,
