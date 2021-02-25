@@ -94,13 +94,8 @@ func New(log zerolog.Logger,
 	}
 
 	var interceptorsAsServerOption grpc.ServerOption
-	switch len(interceptors) {
-	case 0: // run with no interceptors
-	case 1:
-		interceptorsAsServerOption = grpc.UnaryInterceptor(interceptors[0])
-		grpcOpts = append(grpcOpts, interceptorsAsServerOption)
-	default:
-		// create a chained unary interceptor, if more than one interceptor are needed
+	if len(interceptors) > 0 {
+		// create a chained unary interceptor
 		interceptorsAsServerOption = grpc.ChainUnaryInterceptor(interceptors...)
 		grpcOpts = append(grpcOpts, interceptorsAsServerOption)
 	}
