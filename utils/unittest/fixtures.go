@@ -451,8 +451,12 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 }
 
 func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
+	return ReceiptForBlockExecutorFixture(block, IdentifierFixture())
+}
+
+func ReceiptForBlockExecutorFixture(block *flow.Block, executor flow.Identifier) *flow.ExecutionReceipt {
 	result := ExecutionResultFixture(WithBlock(block))
-	receipt := ExecutionReceiptFixture(WithResult(result))
+	receipt := ExecutionReceiptFixture(WithResult(result), WithExecutorID(executor))
 	return receipt
 }
 
@@ -478,7 +482,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
-		result.Chunks = ChunksFixture(uint(chunks), block.ID())
+		result.Chunks = ChunkListFixture(uint(chunks), block.ID())
 		result.Chunks[0].StartState = startState // set start state to value before update
 		result.PreviousResultID = previousResultID
 	}
@@ -489,7 +493,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	result := &flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
-		Chunks:           ChunksFixture(2, blockID),
+		Chunks:           ChunkListFixture(2, blockID),
 	}
 
 	for _, apply := range opts {
@@ -726,7 +730,7 @@ func ChunkFixture(blockID flow.Identifier, collectionIndex uint) *flow.Chunk {
 	}
 }
 
-func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
+func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
 		chunk := ChunkFixture(blockID, uint(i))
@@ -734,6 +738,22 @@ func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
 		chunks = append(chunks, chunk)
 	}
 	return chunks
+}
+
+func ChunkLocatorListFixture(n uint) chunks.LocatorList {
+	locators := chunks.LocatorList{}
+	resultID := IdentifierFixture()
+	for i := uint64(0); i < uint64(n); i++ {
+		locators = append(locators, ChunkLocatorFixture(resultID, i))
+	}
+	return locators
+}
+
+func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator {
+	return &chunks.Locator{
+		ResultID: resultID,
+		Index:    index,
+	}
 }
 
 func SignatureFixture() crypto.Signature {

@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -55,6 +56,7 @@ func main() {
 		results               *storage.ExecutionResults
 		receipts              *storage.ExecutionReceipts
 		providerEngine        *exeprovider.Engine
+		checkerEng            *checker.Engine
 		syncCore              *chainsync.Core
 		pendingBlocks         *buffer.PendingBlocks // used in follower engine
 		deltas                *ingestion.Deltas
@@ -231,6 +233,15 @@ func main() {
 
 			return providerEngine, err
 		}).
+		Component("checker engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			checkerEng = checker.New(
+				node.Logger,
+				node.State,
+				executionState,
+				node.Storage.Seals,
+			)
+			return checkerEng, nil
+		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
@@ -316,7 +327,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, ingestionEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, checkerEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}

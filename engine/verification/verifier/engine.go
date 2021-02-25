@@ -158,7 +158,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	log := e.log.With().Timestamp().
 		Hex("origin", logging.ID(originID)).
 		Uint64("chunk_index", vc.Chunk.Index).
-		Hex("execution_result_id", logging.Entity(vc.Result)).
+		Hex("result_id", logging.Entity(vc.Result)).
 		Logger()
 
 	log.Info().Msg("verifiable chunk received by verifier engine")
@@ -315,19 +315,18 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 	// for sake of metrics
 	e.metrics.OnVerifiableChunkReceived()
 
-	e.log.Info().
-		Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+	log := e.log.With().
 		Hex("result_id", logging.ID(ch.Result.ID())).
-		Msg("verifiable chunk received")
+		Hex("chunk_id", logging.ID(ch.Chunk.ID())).
+		Uint64("chunk_index", ch.Chunk.Index).Logger()
+
+	log.Info().Msg("verifiable chunk received")
 
 	// starts verification of chunk
 	err := e.verify(ctx, originID, ch)
 
 	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("chunk_id", logging.ID(ch.Chunk.ID())).
-			Msg("could not verify chunk")
+		log.Info().Err(err).Msg("could not verify chunk")
 	}
 
 	// closes verification performance metrics trackers

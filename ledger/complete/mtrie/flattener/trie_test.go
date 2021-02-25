@@ -50,10 +50,8 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	//tries are the same now
 	assert.Equal(t, newTrie, rebuiltTrie)
 
-	retPayloads, err := newTrie.UnsafeRead(paths)
-	require.NoError(t, err)
-	newRetPayloads, err := rebuiltTrie.UnsafeRead(paths)
-	require.NoError(t, err)
+	retPayloads := newTrie.UnsafeRead(paths)
+	newRetPayloads := rebuiltTrie.UnsafeRead(paths)
 	for i := range paths {
 		require.True(t, retPayloads[i].Equals(newRetPayloads[i]))
 	}
