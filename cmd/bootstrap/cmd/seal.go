@@ -53,8 +53,5 @@ func constructRootResultAndSeal(
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
 	seal := run.GenerateRootSeal(result)
 
-	// writeJSON(model.PathRootResult, result)
-	// writeJSON(model.PathRootSeal, seal)
-
 	return result, seal
 }

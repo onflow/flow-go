@@ -17,8 +17,6 @@ func constructRootBlock(rootChain string, rootParent string, rootHeight uint64, 
 
 	block := run.GenerateRootBlock(chainID, parentID, height, timestamp)
 
-	// writeJSON(model.PathRootBlock, block)
-
 	return block
 }
 
