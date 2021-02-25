@@ -100,11 +100,20 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return fmt.Errorf("assigner engine is not supposed to invoked by process method")
 }
 
+// handleExecutionReceiptsWithTracing handles the receipts of a container block with tracing enabled.
+func (e *Engine) handleExecutionReceiptsWithTracing(ctx context.Context, receipts []*flow.ExecutionReceipt, containerBlockID flow.Identifier) {
+	for _, receipt := range receipts {
+		e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleExecutionReceipt, func() {
+			e.handleExecutionReceipt(ctx, receipt, containerBlockID)
+		})
+	}
+}
+
 // handleExecutionReceipt receives a receipt that appears in a finalized container block. In case this verification node
 // is staked at the reference block of this execution receipt's result, chunk assignment is done on the execution result, and
 // the assigned chunks' locators are pushed to the chunks queue, which are made available for the chunk queue consumer (i.e., the
 // fetcher engine).
-func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
+func (e *Engine) handleExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
 	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 	referenceBlockID := receipt.ExecutionResult.BlockID
@@ -202,6 +211,26 @@ func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 // ProcessFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
 // Once it is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
+
+}
+
+func (e *Engine) processFinalizedBlockWithTracing(block *flow.Block) {
+	blockID := block.ID()
+	span, ok := e.tracer.GetSpan(blockID, trace.VERProcessFinalizedBlock)
+	ctx := context.Background()
+	if !ok {
+		span = e.tracer.StartSpan(blockID, trace.VERProcessFinalizedBlock)
+		span.SetTag("block_id", blockID)
+		defer span.Finish()
+	}
+	ctx = opentracing.ContextWithSpan(ctx, span)
+
+	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerProcessFinalizedBlock, func() {
+		e.handleFinalizedBlock(ctx, block)
+	})
+}
+
+func (e *Engine) handleFinalizedBlock(ctx context.Context, block *flow.Block) {
 	blockID := block.ID()
 	log := e.log.With().
 		Hex("block_id", logging.ID(blockID)).
@@ -217,9 +246,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 		log.Error().Err(err).Msg("could not index receipts for block")
 	}
 
-	for _, receipt := range block.Payload.Receipts {
-		e.handleExecutionReceipt(receipt, blockID)
-	}
+	e.handleExecutionReceiptsWithTracing(ctx, block.Payload.Receipts, blockID)
 
 	// tells block consumer that it is done with this block
 	e.blockConsumerNotifier.Notify(blockID)
