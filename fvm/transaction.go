@@ -150,7 +150,9 @@ func (i *TransactionInvocator) Process(
 		return err
 	}
 
-	i.logger.Info().Str("txHash", proc.ID.String()).Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
+	i.logger.Info().
+		Str("txHash", proc.ID.String()).
+		Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

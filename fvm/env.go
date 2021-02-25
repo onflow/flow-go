@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/state"
@@ -38,6 +39,7 @@ type hostEnv struct {
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
+	programs           *Programs
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -68,6 +70,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
+		programs:           NewPrograms(),
 	}
 
 	if ctx.BlockHeader != nil {
@@ -283,14 +286,11 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 	return code, nil
 }
 
-func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, error) {
-	if e.ctx.ASTCache == nil {
-		return nil, nil
-	}
+func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 
-	program, err := e.ctx.ASTCache.GetProgram(location)
+	program := e.programs.Get(location)
 	if program != nil {
-		// Program was found within cache, do an explicit ledger register touch
+		// Program was found, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
 		if addressLocation, ok := location.(common.AddressLocation); ok {
 			address := flow.BytesToAddress(addressLocation.Address.Bytes())
@@ -305,20 +305,16 @@ func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, erro
 		}
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return program, err
+	return program, nil
 }
 
-func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) error {
-	if e.ctx.ASTCache == nil {
-		return nil
-	}
+func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
+	e.programs.Set(location, program)
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.ctx.ASTCache.SetProgram(location, program)
+	return nil
 }
 
-func (e *hostEnv) Log(message string) error {
+func (e *hostEnv) ProgramLog(message string) error {
 	if e.ctx.CadenceLoggingEnabled {
 		e.logs = append(e.logs, message)
 	}
@@ -604,6 +600,11 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
+}
+
+func (e *hostEnv) ImplementationDebugLog(message string) error {
+	e.ctx.Logger.Debug().Msgf("Cadence: %s", message)
+	return nil
 }
 
 // Transaction Environment
