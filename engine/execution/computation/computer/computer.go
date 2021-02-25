@@ -260,7 +260,7 @@ func (e *blockComputer) executeTransaction(
 	var traceID string
 
 	if e.tracer != nil {
-		txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+		txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
 
 		if sc, ok := txSpan.Context().(jaeger.SpanContext); ok {
 			traceID = sc.TraceID().String()
