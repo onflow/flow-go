@@ -5,6 +5,8 @@ import (
 	"github.com/onflow/flow-go/mqueue"
 )
 
+// Engine shows the structure of an engine using a real-time queue with channel
+// based interface for outbound (queue->engine) messages.
 type Engine struct {
 	// queue of inbound messages to process, populated by network worker thread
 	// calling ProcessMessageFromNetwork

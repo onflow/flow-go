@@ -40,16 +40,19 @@ func (q *queue) shovel() {
 	head := <-q.in
 
 	for {
-		// if the queue is non-empty wait on both input and output channels
 		select {
 		case tail := <-q.in:
+			// when a new item is added, re-enter this select with the same head
 			q.items.Push(tail)
 			continue
 		case q.out <- head:
+			// when the head of the queue is accepted, retrieve the next
+			// head before re-entering this select
 		}
 
 		next, ok := q.items.Pop()
 		if !ok {
+			// terminate this goroutine when the queue is empty
 			q.shovelling.Store(false)
 			return
 		}
