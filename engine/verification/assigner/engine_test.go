@@ -171,7 +171,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 
 // TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
 // it drops the corresponding execution receipts for that block without performing any chunk assignment.
-// It also evaluates that the chunks queue is not called on any chunks of that receipt's result.
+// It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
 func TestNewBlock_Unstaked(t *testing.T) {
 	t.Parallel()
 
