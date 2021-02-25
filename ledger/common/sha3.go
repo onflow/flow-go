@@ -52,7 +52,8 @@ const (
 	// [1] http://csrc.nist.gov/publications/drafts/fips-202/fips_202_draft.pdf
 	//     "Draft FIPS 202: SHA-3 Standard: Permutation-Based Hash and
 	//      Extendable-Output Functions (May 2014)"
-	dsbyte = byte(0x06)
+	dsbyte     = byte(0x06)
+	paddingEnd = uint64(1 << 63)
 
 	// output length
 	outputLength = 32
@@ -64,7 +65,7 @@ type state struct {
 	storage storageBuf
 }
 
-// A storageBuf is an aligned array of maxRate bytes.
+// A storageBuf is an aligned array of rate bytes.
 type storageBuf [rate]byte
 
 // New256 creates a new SHA3-256 hash.
@@ -84,15 +85,13 @@ func (b *storageBuf) asBytes() *[rate]byte {
 	return (*[rate]byte)(b)
 }
 
-// xorIn xors the bytes in buf into the state; it
-// makes no non-portable assumptions about memory layout
-// or alignment.
-func xorIn(d *state, buf []byte) {
-	n := len(buf) / 8
+func xorInAtIndex(d *state, buf []byte, index int) {
+	n := len(buf) >> 3
+	aAtIndex := d.a[index:]
 
 	for i := 0; i < n; i++ {
 		a := binary.LittleEndian.Uint64(buf)
-		d.a[i] ^= a
+		aAtIndex[i] ^= a
 		buf = buf[8:]
 	}
 }
@@ -105,38 +104,45 @@ func copyOut(d *state, b []byte) {
 	}
 }
 
-// permute applies the KeccakF-1600 permutation. It handles
-// any input-output buffering.
-func (d *state) permute() {
-	// If we're absorbing, we need to xor the input into the state
-	// before applying the permutation.
-	xorIn(d, d.buf)
-	d.buf = d.storage.asBytes()[:0]
-	keccakF1600(&d.a)
-}
-
-// finalize appends the domain separation bits in dsbyte, applies
-// the multi-bitrate 10..1 padding rule, and permutes the state.
-func (d *state) finalize() {
-	// Pad with this instance's domain-separator bits. We know that there's
-	// at least one byte of space in d.buf because, if it were full,
-	// permute would have been called to empty it. dsbyte also contains the
-	// first one bit for the padding. See the comment in the state struct.
-	d.buf = append(d.buf, dsbyte)
-	zerosStart := len(d.buf)
-	d.buf = d.storage.asBytes()[:rate]
-	for i := zerosStart; i < rate-1; i++ {
-		d.buf[i] = 0
-	}
-	// This adds the final one bit for the padding. Because of the way that
-	// bits are numbered from the LSB upwards, the final bit is the MSB of
-	// the last byte.
-	d.buf[rate-1] = 0x80
-	// Apply the permutation
-	d.permute()
+func (d *state) finalize256Plus() {
 	d.buf = d.storage.asBytes()[:rate]
 	copyOut(d, d.buf)
 }
+
+func (d *state) write256Plus(p1, p2 []byte) {
+	//xorIn since p1 length is a multiple of 8
+	xorInAtIndex(d, p1, 0)
+	written := 32 // written uint64s in the state
+
+	for len(p2)+written >= rate {
+		xorInAtIndex(d, p2[:rate-written], written>>3)
+		keccakF1600(&d.a)
+		p2 = p2[rate-written:]
+		written = 0 // to avoid
+	}
+
+	// xorIn the left over of p2, 64 bits at a time
+	for len(p2) >= 8 {
+		a := binary.LittleEndian.Uint64(p2[:8])
+		d.a[written>>3] ^= a
+		p2 = p2[8:]
+		written += 8
+	}
+
+	var tmp [8]byte
+	copy(tmp[:], p2)
+	tmp[len(p2)] = dsbyte
+	a := binary.LittleEndian.Uint64(tmp[:])
+	d.a[written>>3] ^= a
+
+	// the last padding
+	d.a[16] ^= paddingEnd
+
+	// permute
+	keccakF1600(&d.a)
+}
+
+// ----------------------------------------------------------------
 
 // write absorbs two 256 bits slices of data into the hash's state.
 func (d *state) write512(p1, p2 []byte) {
@@ -167,9 +173,9 @@ func xorIn512(d *state, buf1, buf2 []byte) {
 func xorInPaddingPost512(d *state) {
 	// xor with the dsbyte
 	// dsbyte also contains the first one bit for the padding.
-	d.a[8] ^= 0x6
+	d.a[8] = 0x6
 	// xor the last padding bit
-	d.a[16] ^= 0x8000000000000000
+	d.a[16] = paddingEnd
 }
 
 // finalize512 is the padAndPermute function optimized for when the input written to
@@ -180,36 +186,6 @@ func (d *state) finalize512() {
 	keccakF1600(&d.a)
 	d.buf = d.storage.asBytes()[:rate]
 	copyOut(d, d.buf)
-}
-
-// write absorbs 256 bits more data into the hash's state.
-func (d *state) write256(p []byte) {
-	d.buf = append(d.buf, p...)
-}
-
-// Write absorbs more data into the hash's state.
-func (d *state) write(p []byte) {
-	for len(p) > 0 {
-		if len(d.buf) == 0 && len(p) >= rate {
-			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
-			xorIn(d, p[:rate])
-			p = p[rate:]
-			keccakF1600(&d.a)
-		} else {
-			// The slow path; buffer the input until we can fill the sponge, and then xor it in.
-			todo := rate - len(d.buf)
-			if todo > len(p) {
-				todo = len(p)
-			}
-			d.buf = append(d.buf, p[:todo]...)
-			p = p[todo:]
-
-			// If the sponge is full, apply the permutation.
-			if len(d.buf) == rate {
-				d.permute()
-			}
-		}
-	}
 }
 
 // rc stores the round constants for use in the ι step.

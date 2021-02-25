@@ -44,9 +44,8 @@ func GetDefaultHashForHeight(height int) []byte {
 // note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
 	hasher := new256()
-	hasher.write256(path) // path is always 256 bits
-	hasher.write(value)
-	hasher.finalize()
+	hasher.write256Plus(path, value) // path is always 256 bits
+	hasher.finalize256Plus()
 	return hasher.hashResult()
 }
 

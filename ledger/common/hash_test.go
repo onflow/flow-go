@@ -50,10 +50,9 @@ func TestHash(t *testing.T) {
 
 	t.Run("HashLeaf", func(t *testing.T) {
 		path := make([]byte, 32)
-		len := rand.Intn(100000)
-		value := make([]byte, len)
 
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 5000; i++ {
+			value := make([]byte, i)
 			rand.Read(path)
 			rand.Read(value)
 			h := common.HashLeaf(path, value)
