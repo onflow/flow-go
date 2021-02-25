@@ -22,7 +22,7 @@ import (
 
 // TestTrieOperations tests adding removing and retrieving Trie from Forest
 func TestTrieOperations(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestTrieOperations(t *testing.T) {
 // TestTrieUpdate updates the empty trie with some values and verifies that the
 // written values can be retrieved from the updated trie.
 func TestTrieUpdate(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	//      /  \        //
 	//    (X)  [~]      //
 	//////////////////////
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -171,7 +171,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	//      /  \         //
 	//    [~]  (X)       //
 	///////////////////////
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -251,7 +251,7 @@ func TestExpansionInsert(t *testing.T) {
 	//         [~]        //
 	////////////////////////
 
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -330,7 +330,7 @@ func TestFullHouseInsert(t *testing.T) {
 	//    [~1]  [~2]     //
 	///////////////////////
 
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -419,7 +419,7 @@ func TestLeafInsert(t *testing.T) {
 	//          /  \     //
 	//         ()  ()    //
 	///////////////////////
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -466,7 +466,7 @@ func TestLeafInsert(t *testing.T) {
 // TestOverrideValue overrides an existing value in the trie (without any expansion)
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestOverrideValue(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -509,7 +509,7 @@ func TestOverrideValue(t *testing.T) {
 // same path. I.e. we update with (p0, v0) and (p0, v1)
 // We expect that the _last_ written value is persisted in the Trie
 func TestDuplicateOverride(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -545,7 +545,7 @@ func TestDuplicateOverride(t *testing.T) {
 // TestReadSafety check if payload returned from a forest are safe against modification - ie. copy of the data
 // is returned, instead of a slice
 func TestReadSafety(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 16 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -581,7 +581,7 @@ func TestReadSafety(t *testing.T) {
 
 // TestUpdateWithWrongPathSize verifies that attempting to update a trie with a wrong path size
 func TestUpdateWithWrongPathSize(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -612,7 +612,7 @@ func TestUpdateWithWrongPathSize(t *testing.T) {
 
 // TestReadOrder tests that payloads from reading a trie are delivered in the order as specified by the paths
 func TestReadOrder(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -648,7 +648,7 @@ func TestReadOrder(t *testing.T) {
 // TestMixRead tests reading a mixture of set and unset registers.
 // We expect the default payload (nil) to be returned for unset registers.
 func TestMixRead(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -693,7 +693,7 @@ func TestMixRead(t *testing.T) {
 // TestReadWithDuplicatedKeys reads a the values for two keys, where both keys have the same value.
 // We expect that we receive the respective value twice in the return.
 func TestReadWithDuplicatedKeys(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -725,7 +725,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 
 // TestReadNonExistingPath tests reading an unset path.
 func TestReadNonExistingPath(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -751,7 +751,7 @@ func TestReadNonExistingPath(t *testing.T) {
 
 // TestReadWithWrongPathSize verifies that attempting to read a trie with wrong path size
 func TestReadWithWrongPathSize(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -788,7 +788,7 @@ func TestReadWithWrongPathSize(t *testing.T) {
 // that for each update, a new trie is added to the forest preserving the
 // updated values independently of the other update.
 func TestForkingUpdates(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -853,7 +853,7 @@ func TestForkingUpdates(t *testing.T) {
 // Hence, the forest should de-duplicate the resulting two version of the identical trie
 // without an error.
 func TestIdenticalUpdateAppliedTwice(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -901,7 +901,7 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 // TestRandomUpdateReadProof repeats a sequence of actions update, read and proof random paths
 // this simulates the common patern of actions on flow
 func TestRandomUpdateReadProof(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	minPayloadByteSize := 2
 	maxPayloadByteSize := 10
 	rep := 10
@@ -988,7 +988,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 // TestProofGenerationInclusion tests that inclusion proofs generated by a Trie pass verification
 func TestProofGenerationInclusion(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)

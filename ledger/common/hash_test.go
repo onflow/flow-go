@@ -34,13 +34,18 @@ func Test_ComputeCompactValue(t *testing.T) {
 	v := ledger.Value([]byte{'A'})
 	p := ledger.NewPayload(k, v)
 
-	// 00000101
-	path := utils.OneBytePath(5)
-	nodeHeight := 3
-	l0 := common.HashLeaf(path, v)
-	l1 := common.HashInterNode(common.GetDefaultHashForHeight(0), l0)
-	l2 := common.HashInterNode(l1, common.GetDefaultHashForHeight(1))
-	l3 := common.HashInterNode(common.GetDefaultHashForHeight(2), l2)
+	// 00000101...00000000
+	path := utils.PathByUint8(5)
+	nodeHeight := 251
+	h := common.HashLeaf(path, v)
+	l := 0
+	// exclude last 3 level
+	for ; l < nodeHeight-3; l++ {
+		h = common.HashInterNode(h, common.GetDefaultHashForHeight(l))
+	}
+	l1 := common.HashInterNode(common.GetDefaultHashForHeight(l), h)
+	l2 := common.HashInterNode(l1, common.GetDefaultHashForHeight(l+1))
+	l3 := common.HashInterNode(common.GetDefaultHashForHeight(l+2), l2)
 	assert.Equal(t, l3, common.ComputeCompactValue(path, p, nodeHeight))
 }
 
