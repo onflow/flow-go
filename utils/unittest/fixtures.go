@@ -740,6 +740,22 @@ func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
 	return chunks
 }
 
+func ChunkLocatorListFixture(n uint) chunks.LocatorList {
+	locators := chunks.LocatorList{}
+	resultID := IdentifierFixture()
+	for i := uint64(0); i < uint64(n); i++ {
+		locators = append(locators, ChunkLocatorFixture(resultID, i))
+	}
+	return locators
+}
+
+func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator {
+	return &chunks.Locator{
+		ResultID: resultID,
+		Index:    index,
+	}
+}
+
 func SignatureFixture() crypto.Signature {
 	sig := make([]byte, 32)
 	_, _ = crand.Read(sig)

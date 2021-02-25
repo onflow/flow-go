@@ -7,23 +7,22 @@ import (
 	"math"
 )
 
-// IsBitSet returns if the bit at index `idx` in the byte array `b` is set to 1 (big endian)
-// TODO: remove error return to improve performance
-func IsBitSet(b []byte, idx int) (bool, error) {
-	if idx >= len(b)*8 {
-		return false, fmt.Errorf("input (%v) only has %d bits, can't look up bit %d", b, len(b)*8, idx)
-	}
-	return b[idx/8]&(1<<int(7-idx%8)) != 0, nil
+// Bit returns the bit at index `idx` in the byte array `b` (big endian)
+//
+// The function assumes b has at least idx bits. The caller must make sure this condition is met.
+func Bit(b []byte, idx int) int {
+	byteValue := int(b[idx>>3])
+	idx &= 7
+	return (byteValue >> (7 - idx)) & 1
 }
 
-// SetBit sets the bit at position i in the byte array b to 1
-// TODO: remove error return to improve performance
-func SetBit(b []byte, i int) error {
-	if i >= len(b)*8 {
-		return fmt.Errorf("input (%v) only has %d bits, can't set bit %d", b, len(b)*8, i)
-	}
-	b[i/8] |= 1 << int(7-i%8)
-	return nil
+// SetBit sets the bit at position i in the byte array b
+//
+// The function assumes b has at least i bits. The caller must make sure this condition is met.
+func SetBit(b []byte, i int) {
+	byteIndex := i >> 3
+	i &= 7
+	b[byteIndex] |= 1 << (7 - i)
 }
 
 // MaxUint16 returns the max value of two uint16

@@ -8,9 +8,17 @@ const (
 // JobID is a unique ID of the job.
 type JobID string
 
+type NewJobListener interface {
+	// Check let the producer notify the consumer that a new job has been added, so that the consumer
+	// can check if there is worker available to process that job.
+	Check()
+}
+
 // JobConsumer consumes jobs from a job queue, and it remembers which job it has processed, and is able
 // to resume processing from the next.
 type JobConsumer interface {
+	NewJobListener
+
 	// Start starts processing jobs from a job queue. If this is the first time, a processed index
 	// will be initialized in the storage. If it fails to initialize, an error will be returned
 	Start(defaultIndex int64) error
@@ -23,10 +31,6 @@ type JobConsumer interface {
 	// NotifyJobIsDone let the workers notify consumer that a job has been finished, so that the consumer
 	// can check if there is new job could be read from storage and give to a worker for processing
 	NotifyJobIsDone(JobID)
-
-	// Check let the producer notify the consumer that a new job has been added, so that the consumer
-	// can check if there is worker available to process that job.
-	Check()
 }
 
 type Job interface {
@@ -38,6 +42,9 @@ type Job interface {
 // which start from 0
 type Jobs interface {
 	AtIndex(index int64) (Job, error)
+
+	// Head returns the index of the last job
+	Head() (int64, error)
 }
 
 type JobQueue interface {
