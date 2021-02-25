@@ -69,10 +69,9 @@ func new256() *state {
 }
 
 // copyOut copies ulint64s to a byte buffer.
-func (d *state) copyOut(b []byte) {
+func (d *state) copyOut(out *[32]byte) {
 	for i := 0; i < 4; i++ {
-		binary.LittleEndian.PutUint64(b, d.a[i])
-		b = b[8:]
+		binary.LittleEndian.PutUint64((*out)[i<<3:], d.a[i])
 	}
 }
 
@@ -87,11 +86,7 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 	}
 }
 
-func (d *state) finalize256Plus(out []byte) {
-	d.copyOut(out)
-}
-
-func (d *state) write256Plus(p1, p2 []byte) {
+func (d *state) hash256Plus(out *[32]byte, p1, p2 []byte) {
 	//xorIn since p1 length is a multiple of 8
 	xorInAtIndex(d, p1, 0)
 	written := 32 // written uint64s in the state
@@ -122,11 +117,19 @@ func (d *state) write256Plus(p1, p2 []byte) {
 
 	// permute
 	finalKeccakF1600(&d.a)
+
+	// reverse and output
+	d.copyOut(out)
 }
 
-// write absorbs two 256 bits slices of data into the hash's state.
-func (d *state) write512(p1, p2 []byte) {
+// has256plus256 absorbs two 256 bits slices of data into the hash's state
+// applies the permutation, and outpute the result in out
+func (d *state) has256plus256(out *[32]byte, p1, p2 []byte) {
 	xorIn512(d, p1, p2)
+	// permute
+	finalKeccakF1600(&d.a)
+	// reverese the endianess to the output
+	d.copyOut(out)
 }
 
 // xorIn256 xors two 32 bytes slices into the state; it
@@ -135,36 +138,18 @@ func (d *state) write512(p1, p2 []byte) {
 func xorIn512(d *state, buf1, buf2 []byte) {
 	var i int
 	for ; i < 4; i++ {
-		a := binary.LittleEndian.Uint64(buf1)
-		d.a[i] ^= a
+		d.a[i] = binary.LittleEndian.Uint64(buf1)
 		buf1 = buf1[8:]
 	}
 	for ; i < 8; i++ {
-		a := binary.LittleEndian.Uint64(buf2)
-		d.a[i] ^= a
+		d.a[i] = binary.LittleEndian.Uint64(buf2)
 		buf2 = buf2[8:]
 	}
-}
-
-// xorInPaddingPost512 xors the padding bytes in buf into the state;
-// after absorbing 512 bits.
-// it makes no non-portable assumptions about memory layout
-// or alignment.
-func xorInPaddingPost512(d *state) {
 	// xor with the dsbyte
 	// dsbyte also contains the first one bit for the padding.
 	d.a[8] = 0x6
 	// xor the last padding bit
 	d.a[16] = paddingEnd
-}
-
-// finalize512 is the padAndPermute function optimized for when the input written to
-// the state is 512 bits.
-func (d *state) finalize512(out []byte) {
-	// xor the input into the state and apply the permutation
-	xorInPaddingPost512(d)
-	finalKeccakF1600(&d.a)
-	d.copyOut(out)
 }
 
 // rc stores the round constants for use in the ι step.

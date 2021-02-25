@@ -15,8 +15,9 @@ import (
 
 // Test_GetDefaultHashForHeight tests getting default hash for given heights
 func Test_GetDefaultHashForHeight(t *testing.T) {
-	defaultLeafHash := common.HashLeaf([]byte("default:"), []byte{})
-	assert.Equal(t, defaultLeafHash, common.GetDefaultHashForHeight(0))
+	hasher := hash.NewSHA3_256()
+	defaultLeafHash := hasher.ComputeHash([]byte("default:"))
+	assert.Equal(t, []byte(defaultLeafHash), common.GetDefaultHashForHeight(0))
 
 	l1 := common.HashInterNode(common.GetDefaultHashForHeight(0), common.GetDefaultHashForHeight(0))
 	assert.Equal(t, l1, common.GetDefaultHashForHeight(1))
@@ -69,7 +70,7 @@ func TestHash(t *testing.T) {
 		h1 := make([]byte, 32)
 		h2 := make([]byte, 32)
 
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 5000; i++ {
 			rand.Read(h1)
 			rand.Read(h2)
 			h := common.HashInterNode(h1, h2)

@@ -1,13 +1,15 @@
 package common
 
 import (
+	"fmt"
+
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // default value and default hash value for a default node
-var emptySlice []byte
-var defaultLeafHash = HashLeaf([]byte("default:"), emptySlice)
+var defaultLeafHash []byte
 
 const defaultHashLen = 257
 
@@ -15,6 +17,9 @@ const defaultHashLen = 257
 var defaultHashes [defaultHashLen][]byte
 
 func init() {
+	hasher := hash.NewSHA3_256()
+	defaultLeafHash = hasher.ComputeHash([]byte("default:"))
+
 	// Creates the Default hashes from base to level height
 	defaultHashes[0] = defaultLeafHash
 	for i := 1; i < defaultHashLen; i++ {
@@ -43,10 +48,18 @@ func GetDefaultHashForHeight(height int) []byte {
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
-	hasher := new256()
-	hasher.write256Plus(path, value) // path is always 256 bits
+	if len(path) != 32 {
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(path)
+		_, _ = hasher.Write(value)
+		return hasher.SumHash()
+	}
+	/*if len(path) != 32 {
+		panic(fmt.Sprintf("path input to HashInterNode must be 32 bytes, got %d", len(path))
+	}*/
 	var out [32]byte
-	hasher.finalize256Plus(out[:])
+	hasher := new256()
+	hasher.hash256Plus(&out, path, value) // path is always 256 bits
 	return out[:]
 }
 
@@ -54,10 +67,13 @@ func HashLeaf(path []byte, value []byte) []byte {
 //
 // hash1 and hash2 must each be a 32 byte slice.
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
-	hasher := new256()
-	hasher.write512(hash1, hash2) // hash1 and hash2 are 256 bits
+	if len(hash1) != 32 || len(hash2) != 32 {
+		panic(fmt.Sprintf("inputs to HashInterNode must be 32 bytes, got %d and %d",
+			len(hash1), len(hash2)))
+	}
 	var out [32]byte
-	hasher.finalize512(out[:])
+	hasher := new256()
+	hasher.has256plus256(&out, hash1, hash2) // hash1 and hash2 are 256 bits
 	return out[:]
 }
 
