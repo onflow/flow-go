@@ -18,6 +18,7 @@ type Engine struct {
 // the network->queue step processor just adds the item to the queue.
 func (e *Engine) ProcessMessageFromNetwork(message mqueue.Message) {
 	e.messages.Push(message)
+	e.poker.Poke()
 }
 
 func (e *Engine) ProcessMessagesFromQueue() {
