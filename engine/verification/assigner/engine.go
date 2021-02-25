@@ -149,45 +149,51 @@ func (e *Engine) handleExecutionReceipt(ctx context.Context, receipt *flow.Execu
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
 
-	// pushes assigned chunks to
-	e.processChunks(chunkList, resultID)
+	e.processChunksWithTracing(ctx, chunkList, resultID)
 }
 
-// processChunks receives a list of chunks all belong to the same execution result. It creates a chunk locator
-// for each of those chunks and stores the chunk locator in the chunks queue.
+// processChunk receives an assigned chunk to this verification node, creates a chunk
+// locator for it, and stores the chunk locator in the chunks queue.
+//
+// Deduplication of chunk locators is delegated to the chunks queue.
+func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Hex("chunk_id", logging.ID(chunk.ID())).
+		Uint64("chunk_index", chunk.Index).Logger()
+
+	locator := &chunks.Locator{
+		ResultID: resultID,
+		Index:    chunk.Index,
+	}
+
+	// pushes chunk locator to the chunks queue
+	ok, err := e.chunksQueue.StoreChunkLocator(locator)
+	if err != nil {
+		log.Error().Err(err).Msg("could not push chunk locator to chunks queue")
+		return
+	}
+	if !ok {
+		log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
+		return
+	}
+
+	e.metrics.OnChunkProcessed()
+
+	// notifies chunk queue consumer of a new chunk
+	e.newChunkListener.Check()
+	log.Debug().Msg("chunk locator successfully pushed to chunks queue")
+}
+
+// processChunksWithTracing receives a list of chunks all belong to the same execution result and processes them with tracing enabled.
 //
 // Note that all chunks in the input chunk list are assume to be legitimately assigned to this verification node
 // (through the chunk assigner), and all belong to the same execution result.
-//
-// Deduplication of chunk locators is delegated to the chunks queue.
-func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifier) {
+func (e *Engine) processChunksWithTracing(ctx context.Context, chunkList flow.ChunkList, resultID flow.Identifier) {
 	for _, chunk := range chunkList {
-		log := e.log.With().
-			Hex("result_id", logging.ID(resultID)).
-			Hex("chunk_id", logging.ID(chunk.ID())).
-			Uint64("chunk_index", chunk.Index).Logger()
-
-		locator := &chunks.Locator{
-			ResultID: resultID,
-			Index:    chunk.Index,
-		}
-
-		// pushes chunk locator to the chunks queue
-		ok, err := e.chunksQueue.StoreChunkLocator(locator)
-		if err != nil {
-			log.Error().Err(err).Msg("could not push chunk locator to chunks queue")
-			continue
-		}
-		if !ok {
-			log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
-			continue
-		}
-
-		e.metrics.OnChunkProcessed()
-
-		// notifies chunk queue consumer of a new chunk
-		e.newChunkListener.Check()
-		log.Debug().Msg("chunk locator successfully pushed to chunks queue")
+		e.tracer.WithSpanFromContext(ctx, trace.VERAssignerProcessChunk, func() {
+			e.processChunk(chunk, resultID)
+		})
 	}
 }
 
@@ -223,7 +229,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	}
 	ctx = opentracing.ContextWithSpan(ctx, span)
 
-	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerProcessFinalizedBlock, func() {
+	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleFinalizedBlock, func() {
 		e.handleFinalizedBlock(ctx, block)
 	})
 }
