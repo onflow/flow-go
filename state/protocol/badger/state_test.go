@@ -168,7 +168,6 @@ func TestBootstrapNonRoot(t *testing.T) {
 
 		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
-			assert.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})
 	})
