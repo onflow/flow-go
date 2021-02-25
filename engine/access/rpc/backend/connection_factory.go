@@ -91,6 +91,7 @@ func withClientUnaryInterceptor() grpc.DialOption {
 	return grpc.WithUnaryInterceptor(clientTimeoutInterceptor)
 }
 
+// clientTimeoutInterceptor sets the client timeout when making a GRPC request
 func clientTimeoutInterceptor(
 	ctx context.Context,
 	method string,
