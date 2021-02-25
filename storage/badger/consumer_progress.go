@@ -10,7 +10,7 @@ import (
 
 type ConsumerProgress struct {
 	db       *badger.DB
-	consumer string
+	consumer string // to distinguish the consume progress between different consumers
 }
 
 func NewConsumerProgress(db *badger.DB, consumer string) *ConsumerProgress {
