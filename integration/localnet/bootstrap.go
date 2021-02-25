@@ -173,13 +173,16 @@ func prepareNodes() []testnet.NodeConfig {
 	return nodes
 }
 
+// Network ...
 type Network struct {
 	Version  string
 	Services Services
 }
 
+// Services ...
 type Services map[string]Service
 
+// Service ...
 type Service struct {
 	Build       Build `yaml:"build,omitempty"`
 	Image       string
@@ -190,6 +193,7 @@ type Service struct {
 	Ports       []string `yaml:"ports,omitempty"`
 }
 
+// Build ...
 type Build struct {
 	Context    string
 	Dockerfile string
@@ -402,8 +406,10 @@ func writeDockerComposeConfig(services Services) error {
 	return nil
 }
 
+// PrometheusServiceDiscovery ...
 type PrometheusServiceDiscovery []PromtheusTargetList
 
+// PromtheusTargetList ...
 type PromtheusTargetList struct {
 	Targets []string          `json:"targets"`
 	Labels  map[string]string `json:"labels"`

@@ -370,7 +370,7 @@ func SnapshotToBytes(snapshot protocol.Snapshot) ([]byte, error) {
 		return nil, err
 	}
 
-	data, err := json.Marshal(serializable)
+	data, err := json.Marshal(serializable.Encodable())
 	if err != nil {
 		return nil, err
 	}

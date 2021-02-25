@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -629,22 +630,12 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	result := run.GenerateRootResult(root, commit)
 	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootBlock), root)
+	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		return nil, nil, nil, err
+		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootQC), qc)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootResult), result)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootSeal), seal)
+	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot)
 	if err != nil {
 		return nil, nil, nil, err
 	}
