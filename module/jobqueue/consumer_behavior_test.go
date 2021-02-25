@@ -375,22 +375,17 @@ func testStopRunning(t *testing.T) {
 			c.Check()
 		}
 
-		// simulating running jobs takes some time to finish
-		go func() {
-			time.Sleep(1 * time.Millisecond)
-			c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1))
-			c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2))
-			c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3))
-		}()
-
-		// graceful shutdown and wait for all jobs to finish
+		// graceful shutdown and wait for goroutines that
+		// are calling worker.Run to finish
 		c.Stop()
-
-		time.Sleep(1 * time.Millisecond)
 
 		// it won't work on 4 because it stopped before 2 is finished
 		w.AssertCalled(t, []int64{1, 2, 3})
 		assertProcessed(t, cp, 0)
+
+		// still allow the existing job to finish
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1))
+		assertProcessed(t, cp, 1)
 	})
 }
 
