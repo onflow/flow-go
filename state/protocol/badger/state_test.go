@@ -56,7 +56,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 // needed otherwise the parent block would not have a valid QC, since the QC
 // is stored in the child.
 func TestBootstrapNonRoot(t *testing.T) {
-
+	t.Parallel()
 	// start with a regular post-spork root snapshot
 	participants := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
