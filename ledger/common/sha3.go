@@ -54,9 +54,6 @@ const (
 	//      Extendable-Output Functions (May 2014)"
 	dsbyte     = byte(0x06)
 	paddingEnd = uint64(1 << 63)
-
-	// output length
-	outputLength = 32
 )
 
 type state struct {
