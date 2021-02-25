@@ -14,7 +14,9 @@ import (
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
-const grpcClientTimeout = 2 * time.Second // the timeout used when connecting to a collection node or an execution node
+const defaultClientTimeout = 2 * time.Second // the timeout used when connecting to a collection node or an execution node
+
+var grcpClientTimeout = defaultClientTimeout
 
 // ConnectionFactory is used to create an access api client
 type ConnectionFactory interface {
@@ -100,7 +102,7 @@ func clientTimeoutInterceptor(
 ) error {
 
 	// create a context that expires after timeout
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, grpcClientTimeout)
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, grcpClientTimeout)
 
 	defer cancel()
 
