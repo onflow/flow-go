@@ -50,7 +50,7 @@ func GetDefaultHashForHeight(height int) []byte {
 func HashLeaf(path []byte, value []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
 	if len(path) != 32 {
-		panic(fmt.Sprintf("path input to HashInterNode must be 32 bytes, got %d", len(path))
+		panic(fmt.Sprintf("path input to HashLeaf must be 32 bytes, got %d", len(path)))
 	}
 	var out [32]byte
 	hasher := new256()
