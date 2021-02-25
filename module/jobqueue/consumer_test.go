@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -16,21 +17,20 @@ func TestProcessableJobs(t *testing.T) {
 	t.Parallel()
 
 	maxProcessing := int64(3)
-	maxFinished := int64(8)
 
 	t.Run("no job, nothing to process", func(t *testing.T) {
 		jobs := NewMockJobs() // no job in the queue
 		processings := map[int64]*jobStatus{}
 		processedIndex := int64(0)
 
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxFinished, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, int64(0), processedTo)
 		assertJobs(t, []int64{}, jobsToRun)
 	})
 
-	t.Run("neither max processing or max finished was reached", func(t *testing.T) {
+	t.Run("max processing was not reached", func(t *testing.T) {
 		jobs := NewMockJobs()
 		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
 		processings := map[int64]*jobStatus{}
@@ -45,7 +45,7 @@ func TestProcessableJobs(t *testing.T) {
 		}
 
 		processedIndex := int64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxFinished, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, int64(2), processedTo)
@@ -55,13 +55,13 @@ func TestProcessableJobs(t *testing.T) {
 		}, jobsToRun)
 	})
 
-	t.Run("only reached max processing", func(t *testing.T) {
+	t.Run("reached max processing", func(t *testing.T) {
 		jobs := NewMockJobs()
 		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
 		processings := map[int64]*jobStatus{}
 		for i := 3; i <= 12; i++ {
 			// job 3, 5, 6 are not done, which have reached max processing(3)
-			// 4, 7, 8, 9, 10, 11, 12 are finished, 7 finished in total, haven't reached max finished (8)
+			// 4, 7, 8, 9, 10, 11, 12 are finished, 7 finished in total
 			done := true
 			if i == 3 || i == 5 || i == 6 {
 				done = false
@@ -69,55 +69,11 @@ func TestProcessableJobs(t *testing.T) {
 			processings[int64(i)] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 		processedIndex := int64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxFinished, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, int64(2), processedTo)
 		// it will not process any job, because the max processing is reached.
-		assertJobs(t, []int64{}, jobsToRun)
-	})
-
-	t.Run("only reached max finished", func(t *testing.T) {
-		jobs := NewMockJobs()
-		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
-		processings := map[int64]*jobStatus{}
-		for i := 3; i <= 12; i++ {
-			// job 3 and 4 are not done, which have not reached max processing (3)
-			// 5, 6, 7, 8, 9, 10, 11, 12 are finished, 8 finished in total, which have reached max finished
-			done := true
-			if i == 3 || i == 4 {
-				done = false
-			}
-			processings[int64(i)] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
-		}
-
-		processedIndex := int64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxFinished, processedIndex)
-
-		require.NoError(t, err)
-		require.Equal(t, int64(2), processedTo)
-		assertJobs(t, []int64{}, jobsToRun)
-	})
-
-	t.Run("reached both max processing and max finished", func(t *testing.T) {
-		jobs := NewMockJobs()
-		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
-		processings := map[int64]*jobStatus{}
-		for i := 3; i <= 13; i++ {
-			// job 3, 4, 13 are not done, which have reached max processing (3)
-			// 5, 6, 7, 8, 9, 10, 11, 12 are finished, 8 finished in total, which have reached max finished
-			done := true
-			if i == 3 || i == 4 || i == 13 {
-				done = false
-			}
-			processings[int64(i)] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
-		}
-
-		processedIndex := int64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxFinished, processedIndex)
-
-		require.NoError(t, err)
-		require.Equal(t, int64(2), processedTo)
 		assertJobs(t, []int64{}, jobsToRun)
 	})
 
@@ -127,7 +83,7 @@ func TestProcessableJobs(t *testing.T) {
 		processings := map[int64]*jobStatus{}
 		for i := 3; i <= 11; i++ {
 			// job 3, 11 are not done, which have not reached max processing (3)
-			// 4, 5, 6, 7, 8, 9, 10 are finished, 7 finished in total, which have reached max finished
+			// 4, 5, 6, 7, 8, 9, 10 are finished, 7 finished in total
 			done := true
 			if i == 3 || i == 11 {
 				done = false
@@ -136,7 +92,7 @@ func TestProcessableJobs(t *testing.T) {
 		}
 
 		processedIndex := int64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxFinished, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, int64(2), processedTo)
@@ -148,7 +104,7 @@ func TestProcessableJobs(t *testing.T) {
 		require.NoError(t, jobs.PushN(20)) // enough jobs in the queue
 		processings := map[int64]*jobStatus{}
 		for i := 3; i <= 6; i++ {
-			// job 3, 5 are done, which have not reached max finished
+			// job 3, 5 are done
 			// job 4, 6 are not done, which have not reached max processing
 			done := true
 			if i == 4 || i == 6 {
@@ -158,7 +114,7 @@ func TestProcessableJobs(t *testing.T) {
 		}
 
 		processedIndex := int64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, maxFinished, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, int64(3), processedTo)
@@ -183,8 +139,8 @@ type MockJobs struct {
 	sync.Mutex
 	log      zerolog.Logger
 	last     int
-	jobs     map[int]Job
-	index    map[JobID]int
+	jobs     map[int]module.Job
+	index    map[module.JobID]int
 	JobMaker *JobMaker
 }
 
@@ -192,15 +148,13 @@ func NewMockJobs() *MockJobs {
 	return &MockJobs{
 		log:      unittest.Logger().With().Str("module", "jobs").Logger(),
 		last:     0, // must be from 1
-		jobs:     make(map[int]Job),
-		index:    make(map[JobID]int),
+		jobs:     make(map[int]module.Job),
+		index:    make(map[module.JobID]int),
 		JobMaker: NewJobMaker(),
 	}
 }
 
-// var _ storage.Jobs = &MockJobs{}
-
-func (j *MockJobs) AtIndex(index int64) (storage.Job, error) {
+func (j *MockJobs) AtIndex(index int64) (module.Job, error) {
 	j.Lock()
 	defer j.Unlock()
 
@@ -215,7 +169,11 @@ func (j *MockJobs) AtIndex(index int64) (storage.Job, error) {
 	return job, nil
 }
 
-func (j *MockJobs) Add(job storage.Job) error {
+func (j *MockJobs) Head() (int64, error) {
+	return int64(j.last), nil
+}
+
+func (j *MockJobs) Add(job module.Job) error {
 	j.Lock()
 	defer j.Unlock()
 
@@ -256,8 +214,8 @@ func (j *MockJobs) PushN(n int64) error {
 }
 
 // deterministically compute the JobID from index
-func JobIDAtIndex(index int) JobID {
-	return JobID(fmt.Sprintf("%v", index))
+func JobIDAtIndex(index int) module.JobID {
+	return module.JobID(fmt.Sprintf("%v", index))
 }
 
 // JobMaker is a test helper.
@@ -277,12 +235,12 @@ type TestJob struct {
 	index int
 }
 
-func (tj TestJob) ID() JobID {
+func (tj TestJob) ID() module.JobID {
 	return JobIDAtIndex(tj.index)
 }
 
 // return next unique job
-func (j *JobMaker) Next() storage.Job {
+func (j *JobMaker) Next() module.Job {
 	j.Lock()
 	defer j.Unlock()
 

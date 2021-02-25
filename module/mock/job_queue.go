@@ -3,7 +3,7 @@
 package mock
 
 import (
-	storage "github.com/onflow/flow-go/storage"
+	module "github.com/onflow/flow-go/module"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,11 +13,11 @@ type JobQueue struct {
 }
 
 // Add provides a mock function with given fields: job
-func (_m *JobQueue) Add(job storage.Job) error {
+func (_m *JobQueue) Add(job module.Job) error {
 	ret := _m.Called(job)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(storage.Job) error); ok {
+	if rf, ok := ret.Get(0).(func(module.Job) error); ok {
 		r0 = rf(job)
 	} else {
 		r0 = ret.Error(0)

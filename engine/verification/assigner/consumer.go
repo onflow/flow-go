@@ -19,7 +19,7 @@ type BlockJob struct {
 }
 
 // ID converts block id into job id, which guarantees uniqueness
-func (j *BlockJob) ID() module.JobID {
+func (j BlockJob) ID() module.JobID {
 	return blockIDToJobID(j.Block.ID())
 }
 
@@ -31,43 +31,53 @@ func blockToJob(block *flow.Block) *BlockJob {
 	return &BlockJob{Block: block}
 }
 
-func jobToBlock(job storage.Job) *flow.Block {
+func jobToBlock(job module.Job) *flow.Block {
 	blockJob, _ := job.(*BlockJob)
 	return blockJob.Block
 }
 
-// FinalizedBlockReader provide an abstraction for consumers to read blocks
+// FinalizedBlockReader provides an abstraction for consumers to read blocks
 // as job
 type FinalizedBlockReader struct {
 	state protocol.State
 }
 
 // the job index would just be the finalized block height
-func (r *FinalizedBlockReader) AtIndex(index int64) (storage.Job, error) {
+func (r *FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
 	var finalBlock *flow.Block
 	return blockToJob(finalBlock), fmt.Errorf("to be implement")
 }
 
+// Head returns the last finalized height as job index
+func (r *FinalizedBlockReader) Head() (int64, error) {
+	return 0, fmt.Errorf("return the last finalized height")
+}
+
 // Worker receives job from job consumer and converts it back to Block
 // for engine to process
+// Worker is stateless, it acts as a middleman to convert the job into
+// the entity that the engine is expecting, and translating the id of
+// the entity back to JobID notify the consumer a job is done.
 type Worker struct {
 	engine   *Engine
 	consumer *BlockConsumer
 }
 
-// BlockWorker takes the job which contains a block header, and work on it.
-// it checks whether it needs to be processed.
-// it should not work on a sealed block, it should not work on a block that is not staked.
-// then, it reads all the receipts from the block payload. For each receipt, it checks if
-// there is any chunk assigned to me, and store all these chunks in another chunk job queue
-func (w *Worker) Run(job storage.Job) {
+// BlockWorker receives a job corresponding to a finalized block.
+// It then converts the job to a block and passes it to the underlying engine
+// for processing.
+func (w *Worker) Run(job module.Job) {
 	block := jobToBlock(job)
 	w.engine.ProcessFinalizedBlock(block)
 }
 
+// FinishProcessing is a callback for engine to notify a block has been
+// processed by the given blockID
+// the worker will translate the block ID into jobID and notify the consumer
+// that the job is done.
 func (w *Worker) Notify(blockID flow.Identifier) {
 	jobID := blockIDToJobID(blockID)
-	w.consumer.FinishJob(jobID)
+	w.consumer.NotifyJobIsDone(jobID)
 }
 
 // ProcessingNotifier is for the worker's underneath engine to report an entity
@@ -98,26 +108,25 @@ func defaultProcessedIndex(state protocol.State) (int64, error) {
 	return int64(final.Height), nil
 }
 
+// NewBlockConsumer creates a new consumer and returns the default processed
+// index for initializing the processed index in storage.
 func NewBlockConsumer(
 	log zerolog.Logger,
 	processedHeight storage.ConsumerProgress,
 	state protocol.State,
 	engine *Engine,
 	maxProcessing int64,
-	maxFinished int64,
-) (*BlockConsumer, error) {
+) (*BlockConsumer, int64, error) {
 	worker := &Worker{engine: engine}
 	engine.withBlockConsumerNotifier(worker)
 
 	jobs := &FinalizedBlockReader{state: state}
 
-	consumer := jobqueue.NewConsumer(
-		log, jobs, processedHeight, worker, maxProcessing, maxFinished,
-	)
+	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
-		return nil, fmt.Errorf("could not read default processed index: %w", err)
+		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)
 	}
 
 	blockConsumer := &BlockConsumer{
@@ -127,11 +136,11 @@ func NewBlockConsumer(
 
 	worker.consumer = blockConsumer
 
-	return blockConsumer, nil
+	return blockConsumer, defaultIndex, nil
 }
 
-func (c *BlockConsumer) FinishJob(jobID module.JobID) {
-	c.consumer.FinishJob(jobID)
+func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
+	c.consumer.NotifyJobIsDone(jobID)
 }
 
 func (c *BlockConsumer) OnFinalizedBlock(block *model.Block) {

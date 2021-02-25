@@ -17,8 +17,8 @@ func (_m *JobConsumer) Check() {
 	_m.Called()
 }
 
-// FinishJob provides a mock function with given fields: _a0
-func (_m *JobConsumer) FinishJob(_a0 module.JobID) {
+// NotifyJobIsDone provides a mock function with given fields: _a0
+func (_m *JobConsumer) NotifyJobIsDone(_a0 module.JobID) {
 	_m.Called(_a0)
 }
 

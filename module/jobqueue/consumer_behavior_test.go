@@ -75,10 +75,6 @@ func TestConsumer(t *testing.T) {
 	// when job queue crashed and restarted, the queue can be resumed
 	t.Run("testWorkOnNextAfterFastforward", testWorkOnNextAfterFastforward)
 
-	// [+1, +2, +3, ... +12, +13, +14, 1*, 2*, 3*, 5*, 6*, ...12*] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
-	// when there are too many finished jobs, it will stop processing more but wait for job 4 to finish
-	t.Run("testTooManyFinished", testTooManyFinished)
-
 	// [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 	// when Stop is called, it won't work on any job any more
 	t.Run("testStopRunning", testStopRunning)
@@ -117,7 +113,7 @@ func testOnJobFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +1
 
 		c.Check()
-		c.FinishJob(jobqueue.JobIDAtIndex(1))
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1))
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -137,8 +133,8 @@ func testOnJobsFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +2
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(1)) // 1*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -188,7 +184,7 @@ func testNonNextFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -213,8 +209,8 @@ func testTwoNonNextFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -240,8 +236,8 @@ func testProcessingWithNonNextFinished(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
@@ -270,8 +266,8 @@ func testMaxWorkerWithFinishedNonNexts(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
@@ -303,13 +299,13 @@ func testFastforward(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(1)) // 1*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1*
 
 		time.Sleep(1 * time.Millisecond)
 
@@ -335,13 +331,13 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +4
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(3)) // 3*
-		c.FinishJob(jobqueue.JobIDAtIndex(2)) // 2*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2*
 
 		require.NoError(t, j.PushOne()) // +5
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(1)) // 1*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1*
 
 		require.NoError(t, j.PushOne()) // +6
 		c.Check()
@@ -349,14 +345,14 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 		require.NoError(t, j.PushOne()) // +7
 		c.Check()
 
-		c.FinishJob(jobqueue.JobIDAtIndex(6)) // 6*
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(6)) // 6*
 
 		time.Sleep(1 * time.Millisecond)
 
 		// rebuild a consumer with the dependencies to simulate a restart
 		// jobs need to be reused, since it stores all the jobs
 		reWorker := newMockWorker()
-		reProgress := badger.NewConsumeProgress(db, ConsumerTag)
+		reProgress := badger.NewConsumerProgress(db, ConsumerTag)
 		reConsumer := newTestConsumer(reProgress, j, reWorker)
 
 		err := reConsumer.Start(DefaultIndex)
@@ -366,41 +362,6 @@ func testWorkOnNextAfterFastforward(t *testing.T) {
 
 		reWorker.AssertCalled(t, []int64{4, 5, 6})
 		assertProcessed(t, reProgress, 3)
-	})
-}
-
-// [+1, +2, +3, ... +12 , 1*, 2*, 3*, 5*, 6*, ...12*, +13, +14] => [1#, 2#, 3#, 4!, 5*, 6*, ... 12*, 13, 14]
-// when there are too many finished (8) jobs, it will stop processing more but wait for job 4 to finish
-// 5* - 12* has 8 finished in total
-func testTooManyFinished(t *testing.T) {
-	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
-		require.NoError(t, c.Start(DefaultIndex))
-		for i := 1; i <= 12; i++ {
-			// +1, +2, ... +12
-			require.NoError(t, j.PushOne())
-			c.Check()
-		}
-
-		for i := 1; i <= 12; i++ {
-			// job 1 - 12 are all finished, except 4
-			// 5, 6, 7, 8, 9, 10, 11, 12 are finished, which have reached max finished (8)
-			if i == 4 {
-				continue
-			}
-			c.FinishJob(jobqueue.JobIDAtIndex(i))
-		}
-
-		require.NoError(t, j.PushOne()) // +13
-		c.Check()
-
-		require.NoError(t, j.PushOne()) // + 14
-		c.Check()
-
-		time.Sleep(1 * time.Millisecond)
-
-		// max finished reached, will not work on job 13
-		w.AssertCalled(t, []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
-		assertProcessed(t, cp, 3)
 	})
 }
 
@@ -414,46 +375,54 @@ func testStopRunning(t *testing.T) {
 			c.Check()
 		}
 
+		// graceful shutdown and wait for goroutines that
+		// are calling worker.Run to finish
 		c.Stop()
-
-		c.FinishJob(jobqueue.JobIDAtIndex(2))
-
-		time.Sleep(1 * time.Millisecond)
 
 		// it won't work on 4 because it stopped before 2 is finished
 		w.AssertCalled(t, []int64{1, 2, 3})
 		assertProcessed(t, cp, 0)
+
+		// still allow the existing job to finish
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1))
+		assertProcessed(t, cp, 1)
 	})
 }
 
 func testConcurrency(t *testing.T) {
 	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
 		require.NoError(t, c.Start(DefaultIndex))
+		var finishAll sync.WaitGroup
+		finishAll.Add(100)
 		// Finish job concurrently
 		w.fn = func(j Job) {
 			go func() {
-				c.FinishJob(j.ID())
+				c.NotifyJobIsDone(j.ID())
+				finishAll.Done()
 			}()
 		}
 
 		// Pushing job and checking job concurrently
-		var wg sync.WaitGroup
+		var pushAll sync.WaitGroup
 		for i := 0; i < 100; i++ {
-			wg.Add(1)
+			pushAll.Add(1)
 			go func() {
 				require.NoError(t, j.PushOne())
 				c.Check()
-				wg.Done()
+				pushAll.Done()
 			}()
 		}
-		wg.Wait()
+
+		// wait until pushed all
+		pushAll.Wait()
+
+		// wait until finished all
+		finishAll.Wait()
 
 		called := make([]int64, 0)
 		for i := 1; i <= 100; i++ {
 			called = append(called, int64(i))
 		}
-
-		time.Sleep(100 * time.Millisecond)
 
 		w.AssertCalled(t, called)
 		assertProcessed(t, cp, 100)
@@ -461,29 +430,28 @@ func testConcurrency(t *testing.T) {
 }
 
 type JobID = module.JobID
-type Job = storage.Job
+type Job = module.Job
 
-func runWith(t *testing.T, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
+func runWith(t testing.TB, runTestWith func(module.JobConsumer, storage.ConsumerProgress, *mockWorker, *jobqueue.MockJobs, *badgerdb.DB)) {
 	unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
 		jobs := jobqueue.NewMockJobs()
 		worker := newMockWorker()
-		progress := badger.NewConsumeProgress(db, ConsumerTag)
+		progress := badger.NewConsumerProgress(db, ConsumerTag)
 		consumer := newTestConsumer(progress, jobs, worker)
 		runTestWith(consumer, progress, worker, jobs, db)
 	})
 }
 
-func assertProcessed(t *testing.T, cp storage.ConsumerProgress, expectProcessed int64) {
+func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed int64) {
 	processed, err := cp.ProcessedIndex()
 	require.NoError(t, err)
 	require.Equal(t, expectProcessed, processed)
 }
 
-func newTestConsumer(cp storage.ConsumerProgress, jobs storage.Jobs, worker jobqueue.Worker) module.JobConsumer {
+func newTestConsumer(cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
 	maxProcessing := int64(3)
-	maxFinished := int64(8)
-	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing, maxFinished)
+	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing)
 	return c
 }
 
@@ -528,4 +496,38 @@ func (w *mockWorker) AssertCalled(t *testing.T, expectCalled []int64) {
 		called64 = append(called64, int64(c))
 	}
 	require.Equal(t, expectCalled, called64)
+}
+
+// if a job can be finished as soon as it's consumed,
+// benchmark to see how fast it consume jobs.
+// the latest result is
+// 0.16 ms to push job
+// 0.22 ms to finish job
+func BenchmarkPushAndConsume(b *testing.B) {
+	b.StopTimer()
+	runWith(b, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		var wg sync.WaitGroup
+		wg.Add(b.N)
+
+		// Finish job as soon as it's consumed
+		w.fn = func(j Job) {
+			go func() {
+				c.NotifyJobIsDone(j.ID())
+				wg.Done()
+			}()
+		}
+
+		require.NoError(b, c.Start(DefaultIndex))
+
+		b.StartTimer()
+		for i := 0; i < b.N; i++ {
+			err := j.PushOne()
+			if err != nil {
+				b.Error(err)
+			}
+			c.Check()
+		}
+		wg.Wait()
+		b.StopTimer()
+	})
 }

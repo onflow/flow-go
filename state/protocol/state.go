@@ -63,19 +63,8 @@ type MutableState interface {
 	MarkValid(blockID flow.Identifier) error
 }
 
-// IsNodeStakedAtBlockID returns true if the `identifier` is staked at `blockID` according to `state`.
-func IsNodeStakedAtBlockID(state State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
-	identity, err := state.AtBlockID(blockID).Identity(identifier)
-	if err != nil {
-		return false, fmt.Errorf("could not retrieve identity for identifier %v at block id snapshot %v: %w)", identifier, blockID, err)
-	}
-
-	staked := identity.Stake > 0
-	return staked, nil
-}
-
-// StakedIdentity returns staked identity of the input identifier is staked at the given block identifier according to the input state.
-func StakedIdentity(state State, blockID flow.Identifier, identifier flow.Identifier) (flow.Identity, error) {
+// IdentityAtBlockID returns identity of the input identifier is at the state snapshot of the given block identifier according to the input state.
+func IdentityAtBlockID(state State, blockID flow.Identifier, identifier flow.Identifier) (flow.Identity, error) {
 	identity, err := state.AtBlockID(blockID).Identity(identifier)
 	if err != nil {
 		return flow.Identity{}, fmt.Errorf("could not retrieve identity for identifier %v at block id snapshot %v: %w)", identifier, blockID, err)

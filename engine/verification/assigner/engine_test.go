@@ -127,7 +127,7 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 }
 
 // TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
-// a receipt  with one assigned chunk, results in the assigner engine passing the assigned chunk to the
+// a receipt with one assigned chunk, results in the assigner engine passing the assigned chunk to the
 // chunks queue and notifying the job listener of the assigned chunks.
 func TestNewBlock_HappyPath(t *testing.T) {
 	t.Parallel()
@@ -146,7 +146,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 	require.Equal(t, chunksNum, 1) // one chunk should be assigned
 
 	// mocks processing assigned chunks
-	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
+	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
 	// invoked for it.
 	// Also, once all receipts of the block processed, engine should notify the block consumer once, that
 	// it is done with processing this chunk.
@@ -174,7 +174,7 @@ func TestNewBlock_HappyPath(t *testing.T) {
 
 // TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
 // it drops the corresponding execution receipts for that block without performing any chunk assignment.
-// It also evaluates that the chunks queue is not called on any chunks of that receipt's result.
+// It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
 func TestNewBlock_Unstaked(t *testing.T) {
 	t.Parallel()
 
@@ -186,7 +186,9 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	// creates a container block, with a single receipt, that contains
 	// no assigned chunk to verification node.
 	containerBlock, _ := createContainerBlock(
-		test.WithChunks(
+		test.WithChunks( // all chunks assigned to some (random) identifiers, but not this verification node
+			test.WithAssignee(unittest.IdentifierFixture()),
+			test.WithAssignee(unittest.IdentifierFixture()),
 			test.WithAssignee(unittest.IdentifierFixture())))
 	result := &containerBlock.Payload.Receipts[0].ExecutionResult
 	s.mockStateAtBlockID(result.BlockID)
@@ -213,12 +215,13 @@ func TestNewBlock_Unstaked(t *testing.T) {
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
+		s.notifier,
 		s.indexer)
 }
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
 // a receipt with no chunk in its result. Assigner engine should
-// not pass any chunk to the chunks queue, and should not notify the job listener.
+// not pass any chunk to the chunks queue, and should never notify the job listener.
 func TestNewBlock_NoChunk(t *testing.T) {
 	t.Parallel()
 
@@ -268,7 +271,8 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	// creates a container block, with a single receipt, that contains 5 chunks, but
 	// none of them is assigned to this verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
+		test.WithChunks(
+			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
@@ -314,7 +318,8 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	// creates a container block, with a single receipt, that contains 5 chunks, but
 	// only 3 of them is assigned to this verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(unittest.IdentifierFixture()), // assigned to me
+		test.WithChunks(
+			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
 			test.WithAssignee(s.myID()),                     // assigned to me
 			test.WithAssignee(s.myID()),                     // assigned to me
 			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
@@ -325,7 +330,7 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 	require.Equal(t, chunksNum, 3) // 3 chunks should be assigned
 
 	// mocks processing assigned chunks
-	// each assigned chunk should be stored in the chunks queue and new chunk lister should be
+	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
 	// invoked for it.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
