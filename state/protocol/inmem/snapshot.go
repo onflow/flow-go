@@ -44,12 +44,8 @@ func (s Snapshot) Commit() (flow.StateCommitment, error) {
 	return s.enc.LatestSeal.FinalState, nil
 }
 
-func (s Snapshot) LatestSeal() (*flow.Seal, error) {
-	return s.enc.LatestSeal, nil
-}
-
-func (s Snapshot) LatestResult() (*flow.ExecutionResult, error) {
-	return s.enc.LatestResult, nil
+func (s Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
+	return s.enc.LatestResult, s.enc.LatestSeal, nil
 }
 
 func (s Snapshot) SealingSegment() ([]*flow.Block, error) {

@@ -37,15 +37,11 @@ type Snapshot interface {
 	// selected point of the protocol state history. It will error if it doesn't exist.
 	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
-	// LatestSeal returns the most recent included seal as of this block. The seal
-	// may have been included in a parent block, if this block is empty. If this
-	// block contains multiple seals, this returns the seal for the block with
-	// the greatest height.
-	LatestSeal() (*flow.Seal, error)
-
-	// LatestResult returns the execution result referenced by the most recent
-	// included seal as of this block (see LatestSeal).
-	LatestResult() (*flow.ExecutionResult, error)
+	// SealedResult returns the most recent included seal as of this block and
+	// the corresponding execution result. The seal may have been included in a
+	// parent block, if this block is empty. If this block contains multiple
+	// seals, this returns the seal for the block with the greatest height.
+	SealedResult() (*flow.ExecutionResult, *flow.Seal, error)
 
 	// Commit returns the state commitment of the most recently included seal
 	// as of this block. It represents the sealed state.
@@ -54,10 +50,18 @@ type Snapshot interface {
 	// SealingSegment returns the chain segment such that the head (greatest
 	// height) is this snapshot's reference block and the tail (least height)
 	// is the most recently sealed block as of this snapshot (ie. the block
-	// referenced by LatestSeal).
+	// referenced by LatestSeal). The segment is in ascending height order.
 	//
-	// This segment is used as the initial state for non-spork and non-genesis
-	// root states.
+	// TAIL <- B1 <- ... <- BN <- HEAD
+	//
+	// NOTE 1: TAIL is not always sealed by HEAD. In the case that the head of
+	// the snapshot contains no seals, TAIL must be sealed by the first ancestor
+	// of HEAD which contains any seal.
+	//
+	// NOTE 2: In the special case of a root snapshot generated for a spork,
+	// the sealing segment has exactly one block (the root block for the spork).
+	// For all other snapshots, the sealing segment contains at least 2 blocks.
+	//
 	SealingSegment() ([]*flow.Block, error)
 
 	// Pending returns the IDs of all descendants of the Head block. The IDs

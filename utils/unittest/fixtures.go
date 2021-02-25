@@ -166,28 +166,55 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 	}
 }
 
-func PayloadFixture(options ...func(*flow.Payload)) *flow.Payload {
-	payload := flow.Payload{
-		Guarantees: CollectionGuaranteesFixture(16),
-		Seals:      Seal.Fixtures(16),
-	}
+func ReceiptAndSealForBlock(block *flow.Block) (*flow.ExecutionReceipt, *flow.Seal) {
+	receipt := ReceiptForBlockFixture(block)
+	seal := Seal.Fixture(Seal.WithBlock(block.Header), Seal.WithResult(&receipt.ExecutionResult))
+	return receipt, seal
+}
+
+func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
+	payload := flow.EmptyPayload()
 	for _, option := range options {
 		option(&payload)
 	}
-	return &payload
+	return payload
 }
 
-func WithoutSeals(payload *flow.Payload) {
-	payload.Seals = nil
+// WithAllTheFixins ensures a payload contains no empty slice fields. When
+// encoding and decoding, nil vs empty slices are not preserved, which can
+// result in two models that are semantically equal being considered non-equal
+// by our testing framework.
+func WithAllTheFixins(payload *flow.Payload) {
+	payload.Seals = Seal.Fixtures(3)
+	payload.Guarantees = CollectionGuaranteesFixture(4)
+	payload.Receipts = []*flow.ExecutionReceipt{ExecutionReceiptFixture()}
+}
+
+func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.Seals = append(payload.Seals, seals...)
+	}
+}
+
+func WithGuarantees(guarantees ...*flow.CollectionGuarantee) func(*flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.Guarantees = append(payload.Guarantees, guarantees...)
+	}
+}
+
+func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
+	return func(payload *flow.Payload) {
+		payload.Receipts = append(payload.Receipts, receipts...)
+	}
 }
 
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
-	payload := PayloadFixture(WithoutSeals)
+	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  &header,
-		Payload: payload,
+		Payload: &payload,
 	}
 }
 
@@ -229,7 +256,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	header.PayloadHash = payload.Hash()
 	block := flow.Block{
 		Header:  &header,
-		Payload: payload,
+		Payload: &payload,
 	}
 
 	var stateInteractions []*delta.Snapshot
@@ -994,12 +1021,16 @@ func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 }
 
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
-	return &flow.QuorumCertificate{
+	qc := flow.QuorumCertificate{
 		View:      uint64(rand.Uint32()),
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
 		SigData:   CombinedSignatureFixture(2),
 	}
+	for _, apply := range opts {
+		apply(&qc)
+	}
+	return &qc
 }
 
 func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
@@ -1044,17 +1075,16 @@ func WithFirstView(view uint64) func(*flow.EpochSetup) {
 
 func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	participants := IdentityListFixture(5, WithAllRoles())
-	assignments := ClusterAssignment(1, participants)
 	setup := &flow.EpochSetup{
 		Counter:      uint64(rand.Uint32()),
 		FinalView:    uint64(rand.Uint32() + 1000),
 		Participants: participants,
-		Assignments:  assignments,
 		RandomSource: SeedFixture(flow.EpochSetupRandomSourceLength),
 	}
 	for _, apply := range opts {
 		apply(setup)
 	}
+	setup.Assignments = ClusterAssignment(1, setup.Participants)
 	return setup
 }
 

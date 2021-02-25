@@ -252,28 +252,20 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	return seal.FinalState, nil
 }
 
-func (s *Snapshot) LatestSeal() (*flow.Seal, error) {
+func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up latest seal: %w", err)
-	}
-	return seal, nil
-}
-
-func (s *Snapshot) LatestResult() (*flow.ExecutionResult, error) {
-	seal, err := s.LatestSeal()
-	if err != nil {
-		return nil, fmt.Errorf("could not get latest seal: %w", err)
+		return nil, nil, fmt.Errorf("could not look up latest seal: %w", err)
 	}
 	result, err := s.state.results.ByID(seal.ResultID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get latest result: %w", err)
+		return nil, nil, fmt.Errorf("could not get latest result: %w", err)
 	}
-	return result, nil
+	return result, seal, nil
 }
 
 func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
-	seal, err := s.LatestSeal()
+	_, seal, err := s.SealedResult()
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}

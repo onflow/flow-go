@@ -207,7 +207,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 // CompleteEpoch caps off the current epoch by building the first block of the next
 // epoch. We must be in the Committed phase to call CompleteEpoch. Once the epoch
 // has been capped off, we can build the next epoch with BuildEpoch.
-func (builder *EpochBuilder) CompleteEpoch() {
+func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 
 	phase, err := builder.state.Final().Phase()
 	require.Nil(builder.t, err)
@@ -236,6 +236,8 @@ func (builder *EpochBuilder) CompleteEpoch() {
 		},
 	})
 	builder.addBlock(&A)
+
+	return builder
 }
 
 // addBlock adds the given block to the state by: extending the state,
