@@ -208,13 +208,11 @@ func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
 	return staked, nil
 }
 
-// ProcessFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
-// Once it is done handling all the receipts in the block, it notifies the block consumer.
+// ProcessFinalizedBlock is the entry point of assigner engine. It pushes the block down the pipeline with tracing on it enabled.
+// Through the pipeline  the execution receipts included in the block are indexed, and their chunk assignments are done, and
+// the assigned chunks are pushed to the chunks queue, which is the output stream of this engine.
+// Once the assigner engine is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
-
-}
-
-func (e *Engine) processFinalizedBlockWithTracing(block *flow.Block) {
 	blockID := block.ID()
 	span, ok := e.tracer.GetSpan(blockID, trace.VERProcessFinalizedBlock)
 	ctx := context.Background()
@@ -230,6 +228,8 @@ func (e *Engine) processFinalizedBlockWithTracing(block *flow.Block) {
 	})
 }
 
+// handleFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
+// Once it is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) handleFinalizedBlock(ctx context.Context, block *flow.Block) {
 	blockID := block.ID()
 	log := e.log.With().
