@@ -216,7 +216,7 @@ func TestNewBlock_Unstaked(t *testing.T) {
 
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
 // a receipt with no chunk in its result. Assigner engine should
-// not pass any chunk to the chunks queue, and should not notify the job listener.
+// not pass any chunk to the chunks queue, and should never notify the job listener.
 func TestNewBlock_NoChunk(t *testing.T) {
 	t.Parallel()
 
