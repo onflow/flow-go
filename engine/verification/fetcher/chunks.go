@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
+// ChunkStatus is a data struct represents the current status of fetching
+// chunk data pack for the chunk.
 type ChunkStatus struct {
 	Chunk             *flow.Chunk
 	ExecutionResultID flow.Identifier
@@ -18,11 +20,11 @@ type ChunkStatus struct {
 	Attempt           int
 }
 
-func (s *ChunkStatus) ID() flow.Identifier {
+func (s ChunkStatus) ID() flow.Identifier {
 	return s.Chunk.ID()
 }
 
-func (s *ChunkStatus) Checksum() flow.Identifier {
+func (s ChunkStatus) Checksum() flow.Identifier {
 	return s.Chunk.ID()
 }
 
@@ -53,11 +55,19 @@ func NewChunks(limit uint) *Chunks {
 	return chunks
 }
 
+func fromEntity(entity flow.Entity) *ChunkStatus {
+	chunk, ok := entity.(*ChunkStatus)
+	if !ok {
+		panic(fmt.Sprintf("could not convert the entity into chunk status from the mempool: %v", entity))
+	}
+	return chunk
+}
+
 func (cs *Chunks) All() []*ChunkStatus {
 	all := cs.Backend.All()
 	allChunks := make([]*ChunkStatus, 0, len(all))
 	for _, entity := range all {
-		chunk, _ := entity.(*ChunkStatus)
+		chunk := fromEntity(entity)
 		allChunks = append(allChunks, chunk)
 	}
 	return allChunks
@@ -68,7 +78,7 @@ func (cs *Chunks) ByID(chunkID flow.Identifier) (*ChunkStatus, bool) {
 	if !exists {
 		return nil, false
 	}
-	chunk := entity.(*ChunkStatus)
+	chunk := fromEntity(entity)
 	return chunk, true
 }
 
@@ -86,7 +96,7 @@ func (cs *Chunks) IncrementAttempt(chunkID flow.Identifier) bool {
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		chunk := entity.(*ChunkStatus)
+		chunk := fromEntity(entity)
 		chunk.Attempt++
 		chunk.LastAttempt = time.Now()
 		return nil

@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
@@ -29,8 +28,6 @@ func TestChunkLocatorToJob(t *testing.T) {
 // TestProduceConsume evaluates different scenarios on passing jobs to chunk queue with 3 workers on the consumer side. It evaluates blocking and
 // none-blocking engines attached to the workers in sequential and concurrent scenarios.
 func TestProduceConsume(t *testing.T) {
-	t.Parallel()
-
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine blocking on the jobs,
 	// results in engine only receiving 3 jobs.
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
@@ -55,7 +52,8 @@ func TestProduceConsume(t *testing.T) {
 
 			<-consumer.Done()
 
-			// expect the mock engine receives 3 calls
+			// expect the mock engine receive only the first 3 calls (since it is blocked on those, hence no
+			// new job is fetched to process).
 			require.Equal(t, locators[:3], called)
 		})
 	})
@@ -65,11 +63,16 @@ func TestProduceConsume(t *testing.T) {
 	t.Run("pushing 10 receive 10", func(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
+		var finishAll sync.WaitGroup
 		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			go finishProcessing.Notify(locator.ID())
+			finishAll.Add(1)
+			go func() {
+				finishProcessing.FinishProcessing(locator.ID())
+				finishAll.Done()
+			}()
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
@@ -84,6 +87,7 @@ func TestProduceConsume(t *testing.T) {
 			}
 
 			<-consumer.Done()
+			finishAll.Wait() // wait until all finished
 			// expect the mock engine receives all 10 calls
 			require.Equal(t, locators, called)
 		})
@@ -94,11 +98,16 @@ func TestProduceConsume(t *testing.T) {
 	t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
+		var finishAll sync.WaitGroup
+		finishAll.Add(100)
 		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
-			go finishProcessing.Notify(locator.ID())
+			go func() {
+				finishProcessing.FinishProcessing(locator.ID())
+				finishAll.Done()
+			}()
 		}
 		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
@@ -116,12 +125,11 @@ func TestProduceConsume(t *testing.T) {
 				}(i)
 			}
 
-			// expect the mock engine receives all 100 calls
-			require.Eventually(t, func() bool {
-				return int(total.Load()) == 100
-			}, time.Second*10, time.Millisecond*10)
-
+			finishAll.Wait()
 			<-consumer.Done()
+
+			// expect the mock engine receives all 100 calls
+			require.Equal(t, uint32(100), total.Load())
 		})
 	})
 }
@@ -133,9 +141,8 @@ func WithConsumer(
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
-		maxFinished := int64(8)
 
-		processedIndex := storage.NewConsumeProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		processedIndex := storage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := storage.NewChunkQueue(db)
 		ok, err := chunksQueue.Init(fetcher.DefaultJobIndex)
 		require.NoError(t, err)
@@ -151,7 +158,6 @@ func WithConsumer(
 			chunksQueue,
 			engine,
 			maxProcessing,
-			maxFinished,
 		)
 
 		withConsumer(consumer, chunksQueue)

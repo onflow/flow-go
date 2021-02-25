@@ -23,10 +23,6 @@ type JobConsumer interface {
 	// NotifyJobIsDone let the workers notify consumer that a job has been finished, so that the consumer
 	// can check if there is new job could be read from storage and give to a worker for processing
 	NotifyJobIsDone(JobID)
-
-	// Check let the producer notify the consumer that a new job has been added, so that the consumer
-	// can check if there is worker available to process that job.
-	Check()
 }
 
 type Job interface {
@@ -38,6 +34,9 @@ type Job interface {
 // which start from 0
 type Jobs interface {
 	AtIndex(index int64) (Job, error)
+
+	// Head returns the index of the last job
+	Head() (int64, error)
 }
 
 type JobQueue interface {
