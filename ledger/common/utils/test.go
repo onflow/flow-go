@@ -9,28 +9,30 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
-// OneBytePath returns a path (1 byte) given a uint8
-func OneBytePath(inp uint8) ledger.Path {
-	return ledger.Path([]byte{inp})
+// PathByUint8 returns a path (32 bytes) given a uint8
+func PathByUint8(inp uint8) ledger.Path {
+	b := make([]byte, 32)
+	b[0] = inp
+	return ledger.Path(b)
 }
 
-// TwoBytesPath returns a path (2 bytes) given a uint16
-func TwoBytesPath(inp uint16) ledger.Path {
-	b := make([]byte, 2)
+// PathByUint16 returns a path (32 bytes) given a uint16
+func PathByUint16(inp uint16) ledger.Path {
+	b := make([]byte, 32)
 	binary.BigEndian.PutUint16(b, inp)
 	return ledger.Path(b)
 }
 
 // LightPayload returns a payload with 2 byte key and 2 byte value
 func LightPayload(key uint16, value uint16) *ledger.Payload {
-	k := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: Uint16ToBinary(key)}}}
+	k := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: Uint16ToBinary(key)}}}
 	v := ledger.Value(Uint16ToBinary(value))
 	return &ledger.Payload{Key: k, Value: v}
 }
 
 // LightPayload8 returns a payload with 1 byte key and 1 byte value
 func LightPayload8(key uint8, value uint8) *ledger.Payload {
-	k := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: []byte{key}}}}
+	k := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: []byte{key}}}}
 	v := ledger.Value([]byte{value})
 	return &ledger.Payload{Key: k, Value: v}
 }
@@ -83,7 +85,7 @@ func RootHashFixture() ledger.RootHash {
 // TrieProofFixture returns a trie proof fixture
 func TrieProofFixture() (*ledger.TrieProof, ledger.State) {
 	p := ledger.NewTrieProof()
-	p.Path = TwoBytesPath(330)
+	p.Path = PathByUint16(330)
 	p.Payload = LightPayload8('A', 'A')
 	p.Inclusion = true
 	p.Flags = []byte{byte(130), byte(0)}
@@ -100,7 +102,7 @@ func TrieProofFixture() (*ledger.TrieProof, ledger.State) {
 // TrieBatchProofFixture returns a trie batch proof fixture
 func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.State) {
 	p1 := ledger.NewTrieProof()
-	p1.Path = TwoBytesPath(330)
+	p1.Path = PathByUint16(330)
 	p1.Payload = LightPayload8('A', 'A')
 	p1.Inclusion = true
 	p1.Flags = []byte{byte(130), byte(0)}
@@ -112,7 +114,7 @@ func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.State) {
 	p1.Steps = uint8(7)
 
 	p2 := ledger.NewTrieProof()
-	p2.Path = TwoBytesPath(33354)
+	p2.Path = PathByUint16(33354)
 	p2.Payload = LightPayload8('C', 'C')
 	p2.Inclusion = true
 	p2.Flags = []byte{byte(129), byte(0)}
