@@ -891,7 +891,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if keyIndex < 0 {
-		return nil, fmt.Errorf("key index must be positve, received %d", keyIndex)
+		return nil, fmt.Errorf("key index must be positive, received %d", keyIndex)
 	}
 
 	var publicKey flow.AccountPublicKey
