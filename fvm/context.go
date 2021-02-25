@@ -59,7 +59,7 @@ const AccountKeyWeightThreshold = 1000
 const (
 	DefaultGasLimit                     = 100_000 // 100K
 	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
-	DefaultMaxNumOfTxRetries            = 2
+	DefaultMaxNumOfTxRetries            = 3
 )
 
 func defaultContext(logger zerolog.Logger) Context {
