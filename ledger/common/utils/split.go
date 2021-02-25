@@ -5,7 +5,6 @@ import (
 )
 
 // SplitByPath splits an slice of payloads based on the value of bit (bitIndex) of paths
-// TODO: remove error return
 func SplitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) ([]ledger.Path, []ledger.Payload, []ledger.Path, []ledger.Payload) {
 	rpaths := make([]ledger.Path, 0, len(paths))
 	rpayloads := make([]ledger.Payload, 0, len(payloads))
