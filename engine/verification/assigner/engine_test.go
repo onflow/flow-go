@@ -42,6 +42,7 @@ type AssignerEngineTestSuite struct {
 func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) int {
 	s.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 	assignedChunks := assignment.ByNodeID(s.myID())
+	s.metrics.On("OnChunksAssigned", len(assignedChunks)).Return().Once()
 	return len(assignedChunks)
 }
 
@@ -160,8 +161,8 @@ func TestNewBlock_HappyPath(t *testing.T) {
 
 	// sends containerBlock containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
-
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
@@ -199,6 +200,7 @@ func TestNewBlock_Unstaked(t *testing.T) {
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	// when the node is unstaked at reference block id, chunk assigner should not be called,
@@ -239,6 +241,7 @@ func TestNewBlock_NoChunk(t *testing.T) {
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -284,6 +287,7 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -336,6 +340,7 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 
 	// sends containerBlock containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -380,6 +385,7 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -425,6 +431,7 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
