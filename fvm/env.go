@@ -691,7 +691,7 @@ func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration
 	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []log.Field{tracelog.String("location", location.String())},
+				Fields: []tracelog.Field{tracelog.String("location", location.String())},
 			},
 			},
 		)
@@ -703,7 +703,7 @@ func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duratio
 	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []log.Field{tracelog.String("location", location.String())},
+				Fields: []tracelog.Field{tracelog.String("location", location.String())},
 			},
 			},
 		)
@@ -715,7 +715,7 @@ func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Dur
 	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []log.Field{tracelog.String("location", location.String())},
+				Fields: []tracelog.Field{tracelog.String("location", location.String())},
 			},
 			},
 		)
