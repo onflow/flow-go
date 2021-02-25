@@ -193,6 +193,7 @@ func (e *blockComputer) executeCollection(
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 
+	startedAt := time.Now()
 	var colSpan opentracing.Span
 	if e.tracer != nil {
 		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
@@ -231,6 +232,15 @@ func (e *blockComputer) executeCollection(
 			return nil, nil, nil, txIndex, 0, err
 		}
 	}
+
+	e.Info().Hex("collectionID", collection.Guarantee.CollectionID.String()).
+		Hex("blockID", collection.Guarantee.ReferenceBlockID.String()).
+		Int("numberOfTransactions", len(collection.Transactions)).
+		Int("numberOfEvents", len(events)).
+		Int("numberOfServiceEvents", len(serviceEvents)).
+		Uint64("totalGasUsed", gasUsed).
+		Int("timeSpent", time.Since(startedAt)).
+		Msg("collection executed")
 
 	return events, serviceEvents, txResults, txIndex, gasUsed, nil
 }
