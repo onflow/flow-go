@@ -95,42 +95,17 @@ func TrieProofFixture() (*ledger.TrieProof, ledger.State) {
 	p.Interims = append(p.Interims, interim1)
 	p.Interims = append(p.Interims, interim2)
 	p.Steps = uint8(7)
-	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
+	sc, _ := hex.DecodeString("4a9f3a15d7257b624b645955576f62edcceff5e125f49585cdf077d9f37c7ac0")
 	return p, ledger.State(sc)
 }
 
 // TrieBatchProofFixture returns a trie batch proof fixture
 func TrieBatchProofFixture() (*ledger.TrieBatchProof, ledger.State) {
-	p1 := ledger.NewTrieProof()
-	p1.Path = PathByUint16(330)
-	p1.Payload = LightPayload8('A', 'A')
-	p1.Inclusion = true
-	p1.Flags = []byte{byte(130), byte(0)}
-	p1.Interims = make([][]byte, 0)
-	p1interim1, _ := hex.DecodeString("accb0399dd2b3a7a48618b2376f5e61d822e0c7736b044c364a05c2904a2f315")
-	p1interim2, _ := hex.DecodeString("f3fba426a2f01c342304e3ca7796c3980c62c625f7fd43105ad5afd92b165542")
-	p1.Interims = append(p1.Interims, p1interim1)
-	p1.Interims = append(p1.Interims, p1interim2)
-	p1.Steps = uint8(7)
-
-	p2 := ledger.NewTrieProof()
-	p2.Path = PathByUint16(33354)
-	p2.Payload = LightPayload8('C', 'C')
-	p2.Inclusion = true
-	p2.Flags = []byte{byte(129), byte(0)}
-	p2.Interims = make([][]byte, 0)
-	p2interim1, _ := hex.DecodeString("fbb89a7115c48406de7b976049223484c4a9fa1a018f36e13e2b5a6d02d29de2")
-	p2interim2, _ := hex.DecodeString("71710ddc0967ef8fdc4e29444ae114165e339423799f9b7a05772cf19b71a9fd")
-	p2.Interims = append(p2.Interims, p2interim1)
-	p2.Interims = append(p2.Interims, p2interim2)
-	p2.Steps = uint8(8)
-
+	p, s := TrieProofFixture()
 	bp := ledger.NewTrieBatchProof()
-	bp.Proofs = append(bp.Proofs, p1)
-	bp.Proofs = append(bp.Proofs, p2)
-
-	sc, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
-	return bp, ledger.State(sc)
+	bp.Proofs = append(bp.Proofs, p)
+	bp.Proofs = append(bp.Proofs, p)
+	return bp, ledger.State(s)
 }
 
 // RandomPathsRandLen generate m random paths (size: byteSize),
