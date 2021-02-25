@@ -239,7 +239,7 @@ func (e *blockComputer) executeCollection(
 		Int("numberOfEvents", len(events)).
 		Int("numberOfServiceEvents", len(serviceEvents)).
 		Uint64("totalGasUsed", gasUsed).
-		Int("timeSpent", time.Since(startedAt)).
+		Int("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
 
 	return events, serviceEvents, txResults, txIndex, gasUsed, nil
