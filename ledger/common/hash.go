@@ -45,8 +45,9 @@ func GetDefaultHashForHeight(height int) []byte {
 func HashLeaf(path []byte, value []byte) []byte {
 	hasher := new256()
 	hasher.write256Plus(path, value) // path is always 256 bits
-	hasher.finalize256Plus()
-	return hasher.hashResult()
+	var out [32]byte
+	hasher.finalize256Plus(out[:])
+	return out[:]
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
@@ -55,8 +56,9 @@ func HashLeaf(path []byte, value []byte) []byte {
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	hasher := new256()
 	hasher.write512(hash1, hash2) // hash1 and hash2 are 256 bits
-	hasher.finalize512()
-	return hasher.hashResult()
+	var out [32]byte
+	hasher.finalize512(out[:])
+	return out[:]
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
