@@ -48,15 +48,10 @@ func GetDefaultHashForHeight(height int) []byte {
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
+	// TODO: this is a sanity check and should be removed soon
 	if len(path) != 32 {
-		hasher := hash.NewSHA3_256()
-		_, _ = hasher.Write(path)
-		_, _ = hasher.Write(value)
-		return hasher.SumHash()
-	}
-	/*if len(path) != 32 {
 		panic(fmt.Sprintf("path input to HashInterNode must be 32 bytes, got %d", len(path))
-	}*/
+	}
 	var out [32]byte
 	hasher := new256()
 	hasher.hash256Plus(&out, path, value) // path is always 256 bits
@@ -67,6 +62,7 @@ func HashLeaf(path []byte, value []byte) []byte {
 //
 // hash1 and hash2 must each be a 32 byte slice.
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
+	// TODO: this is a sanity check and should be removed soon
 	if len(hash1) != 32 || len(hash2) != 32 {
 		panic(fmt.Sprintf("inputs to HashInterNode must be 32 bytes, got %d and %d",
 			len(hash1), len(hash2)))
