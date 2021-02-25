@@ -252,12 +252,11 @@ func TestAccountFreezing(t *testing.T) {
 		require.Len(t, checkerErrors, 2)
 		require.IsType(t, &sema.ImportedProgramError{}, checkerErrors[0])
 
-		importedCheckerErrors := checkerErrors[0].(*sema.ImportedProgramError).CheckerError.Errors
-		require.Len(t, importedCheckerErrors, 1)
+		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
 
 		accountFrozenError := &state.AccountFrozenError{}
 
-		require.True(t, errors.As(importedCheckerErrors[0], &accountFrozenError))
+		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, frozenAddress, accountFrozenError.Address)
 	})
 

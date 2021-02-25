@@ -275,7 +275,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		const collectionCount = 2
 		const transactionCount = 2
-		block := generateBlock(collectionCount, transactionCount)
+		block := generateBlock(collectionCount, transactionCount, rag)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -337,7 +337,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 		require.NoError(t, err)
 
-		block := generateBlock(collectionCount, transactionCount)
+		block := generateBlock(collectionCount, transactionCount, rag)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
