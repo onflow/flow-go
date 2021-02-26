@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -33,22 +32,22 @@ type VerificationCollector struct {
 
 func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *VerificationCollector {
 	// Assigner Engine
-	rcvBlocksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	rcvBlocksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "block_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number of finalized blocks received by assigner engine",
 	})
 
-	assignedChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	assignedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_assigned_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number of chunks assigned to verification node",
 	})
 
-	sntChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
-		Name:      "chunk_sent_total",
+	sntChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "processed_chunk_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number chunks sent by assigner engine to chunk consumer",
@@ -59,7 +58,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	// later.
 	// TODO rename name space to assigner
 	// Finder (and Assigner) Engine
-	rcvReceiptsTotals := promauto.NewCounter(prometheus.CounterOpts{
+	rcvReceiptsTotals := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_receipt_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFinderEngine,
@@ -67,7 +66,7 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	})
 
 	// TODO remove metric once finer removed
-	sntExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sntExecutionResultsTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFinderEngine,
@@ -75,28 +74,28 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	})
 
 	// Match Engine
-	rcvExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
+	rcvExecutionResultsTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of execution results received by match engine from finder engine",
 	})
 
-	sntVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sntVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of verifiable chunks sent by match engine to verifier engine",
 	})
 
-	rcvChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
+	rcvChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of chunk data packs received by match engine",
 	})
 
-	reqChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
+	reqChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_requested_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
@@ -104,14 +103,14 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 	})
 
 	// Verifier Engine
-	rcvVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	rcvVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
 		Help:      "total number verifiable chunks received by verifier engine from match engine",
 	})
 
-	sntResultApprovalTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sntResultApprovalTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "result_approvals_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
