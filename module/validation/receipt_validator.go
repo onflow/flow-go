@@ -176,11 +176,15 @@ func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
 			return err
 		}
 
-		err = v.validate(r.Meta(), &r.ExecutionResult, prevResult)
+		err = v.validateReceipt(r.Meta(), r.ExecutionResult.BlockID)
 		if err != nil {
 			// It's very important that we fail the whole validation if one of the receipts is invalid.
 			// It allows us to make assumptions as stated in previous comment.
 			return fmt.Errorf("could not validate receipt %v at index %d: %w", r.ID(), i, err)
+		}
+		err = v.validateResult(&r.ExecutionResult, prevResult)
+		if err != nil {
+			return fmt.Errorf("could not validate result %v at index %d: %w", r.ExecutionResult.ID(), i, err)
 		}
 	}
 	return nil
@@ -257,10 +261,15 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		ancestorID = ancestor.ParentID
 	}
 
+	// results is used to keep unique execution results that were included into
+	// payload
 	results := make(map[flow.Identifier]*flow.ExecutionResult)
+
 	// check each receipt included in the payload for duplication
 	for _, receipt := range payload.Receipts {
 		result, found := results[receipt.ResultID]
+		// usually we will have many receipts for same result, let's collect results by their
+		// ids for easy lookup.
 		if !found {
 			result, err = fetchResult(receipt.ResultID)
 			if err != nil {
@@ -283,14 +292,26 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 	}
 
-	for i, r := range candidate.Payload.Receipts {
-		result := results[r.ResultID]
+	// first validate all results that were included into payload
+	// if one of results is invalid we fail the whole check because it could be violationg
+	// parent-children relationship
+	for i, result := range candidate.Payload.Results {
 		prevResult, err := fetchResult(result.PreviousResultID)
 		if err != nil {
 			return err
 		}
 
-		err = v.validate(r, result, prevResult)
+		err = v.validateResult(result, prevResult)
+		if err != nil {
+			return fmt.Errorf("could not validate result %v at index %d: %w", result.ID(), i, err)
+		}
+	}
+
+	// after results are validated we need to check if metas of receipts
+	// are valid
+	for i, r := range candidate.Payload.Receipts {
+		result := results[r.ResultID]
+		err = v.validateReceipt(r, result.BlockID)
 		if err != nil {
 			// It's very important that we fail the whole validation if one of the receipts is invalid.
 			// It allows us to make assumptions as stated in previous comment.
@@ -300,14 +321,32 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	return nil
 }
 
-func (v *receiptValidator) validate(receipt *flow.ExecutionReceiptMeta, result *flow.ExecutionResult,
-	prevResult *flow.ExecutionResult) error {
-	identity, err := identityForNode(v.state, result.BlockID, receipt.ExecutorID)
+func (v *receiptValidator) validateResult(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
+	err := v.verifyChunksFormat(result)
+	if err != nil {
+		return fmt.Errorf("invalid chunks format for result %v: %w", result.ID(), err)
+	}
+
+	err = v.subgraphCheck(result, prevResult)
+	if err != nil {
+		return fmt.Errorf("invalid execution result: %w", err)
+	}
+
+	err = v.resultChainCheck(result, prevResult)
+	if err != nil {
+		return fmt.Errorf("invalid execution results chain: %w", err)
+	}
+
+	return nil
+}
+
+func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, blockID flow.Identifier) error {
+	identity, err := identityForNode(v.state, blockID, receipt.ExecutorID)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to get executor identity %v at block %v: %w",
 			receipt.ExecutorID,
-			result.BlockID,
+			blockID,
 			err)
 	}
 
@@ -319,21 +358,6 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceiptMeta, result *
 	err = v.verifySignature(receipt, identity)
 	if err != nil {
 		return fmt.Errorf("invalid receipt signature: %w", err)
-	}
-
-	err = v.verifyChunksFormat(result)
-	if err != nil {
-		return fmt.Errorf("invalid chunks format for result %v: %w", receipt.ResultID, err)
-	}
-
-	err = v.subgraphCheck(result, prevResult)
-	if err != nil {
-		return fmt.Errorf("invalid execution result: %w", err)
-	}
-
-	err = v.resultChainCheck(result, prevResult)
-	if err != nil {
-		return fmt.Errorf("invalid execution results chain: %w", err)
 	}
 
 	return nil
