@@ -100,7 +100,11 @@ func (i *TransactionInvocator) Process(
 
 	// commit the env if no error
 	// this writes back the contract contents to accounts
-	env.Commit()
+	// if any error fail as a tx
+	err = env.Commit()
+	if err != nil {
+		return err
+	}
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

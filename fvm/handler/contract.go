@@ -95,11 +95,18 @@ func (h *ContractHandler) Commit() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
+	var err error
 	for _, v := range h.draftUpdates {
 		if len(v.code) > 0 {
-			h.accounts.SetContract(v.name, v.address, v.code)
+			err = h.accounts.SetContract(v.name, v.address, v.code)
+			if err != nil {
+				return err
+			}
 		} else {
-			h.accounts.DeleteContract(v.name, v.address)
+			err = h.accounts.DeleteContract(v.name, v.address)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
