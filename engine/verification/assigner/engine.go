@@ -96,7 +96,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		return
 	}
 	if !ok {
-		log.Debug().Msg("node is not staked at reference block id, receipt is discarded")
+		log.Warn().Msg("node is not staked at reference block id, receipt is discarded")
 		return
 	}
 
