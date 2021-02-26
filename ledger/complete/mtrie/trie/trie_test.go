@@ -202,6 +202,9 @@ func Test_UnallocateRegisters(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
+// simple Linear congruential RNG
+// https://en.wikipedia.org/wiki/Linear_congruential_generator
+// with configuration for 16bit output used by Microsoft Visual Basic 6 and earlier
 type LinearCongruentialGenerator struct {
 	seed uint64
 }
