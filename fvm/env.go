@@ -529,8 +529,11 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 	return nil
 }
 
-// Transaction Environment
+func (e *hostEnv) HasContractUpdates() bool {
+	return e.contracts.HasUpdates()
+}
 
+// Transaction Environment
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
