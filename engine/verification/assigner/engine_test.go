@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -30,7 +29,7 @@ type AssignerEngineTestSuite struct {
 	assigner         *module.ChunkAssigner
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
-	notifier         *mockassigner.ProcessingNotifier
+	notifier         *module.ProcessingNotifier
 	indexer          *storage.Indexer
 
 	// identities
@@ -75,7 +74,7 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		chunksQueue:      &storage.ChunksQueue{},
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		notifier:         &mockassigner.ProcessingNotifier{},
+		notifier:         &module.ProcessingNotifier{},
 		indexer:          &storage.Indexer{},
 	}
 

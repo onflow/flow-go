@@ -29,11 +29,11 @@ type Engine struct {
 	tracer                module.Tracer
 	me                    module.Local
 	state                 protocol.State
-	assigner              module.ChunkAssigner  // to determine chunks this node should verify.
-	chunksQueue           storage.ChunksQueue   // to store chunks to be verified.
-	newChunkListener      module.NewJobListener // to notify chunk queue consumer about a new chunk.
-	blockConsumerNotifier ProcessingNotifier    // to report a block has been processed.
-	indexer               storage.Indexer       // to index receipts of a block based on their executor identifier.
+	assigner              module.ChunkAssigner      // to determine chunks this node should verify.
+	chunksQueue           storage.ChunksQueue       // to store chunks to be verified.
+	newChunkListener      module.NewJobListener     // to notify chunk queue consumer about a new chunk.
+	blockConsumerNotifier module.ProcessingNotifier // to report a block has been processed.
+	indexer               storage.Indexer           // to index receipts of a block based on their executor identifier.
 }
 
 func New(
@@ -61,7 +61,7 @@ func New(
 	}
 }
 
-func (e *Engine) withBlockConsumerNotifier(notifier ProcessingNotifier) {
+func (e *Engine) withBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.blockConsumerNotifier = notifier
 }
 
