@@ -23,7 +23,7 @@ func Test_ProperLeaf(t *testing.T) {
 // Test_ProperLeaf verifies that the hash value of a compactified leaf (at height > 0) is computed correctly.
 // Here, we test with 16bit keys. Hence, the max height of a compactified leaf can be 16.
 // We test the hash at the lowest-possible height (1), for the leaf to be still compactified,
-// at an interim height (9) and the max possible height (16)
+// at an interim height (9) and the max possible height (256)
 func Test_CompactifiedLeaf(t *testing.T) {
 	path := utils.PathByUint16(56809)
 	payload := utils.LightPayload(56810, 59656)
@@ -41,7 +41,7 @@ func Test_CompactifiedLeaf(t *testing.T) {
 }
 
 // Test_InterimNode verifies that the hash value of an interim node without children is computed correctly.
-// We test the hash at the lowest-possible height (0), at an interim height (9) and the max possible height (16)
+// We test the hash at the lowest-possible height (0), at an interim height (9) and the max possible height (256)
 func Test_InterimNodeWithoutChildren(t *testing.T) {
 	n := node.NewInterimNode(0, nil, nil)
 	expectedRootHashHex := "18373b4b038cbbf37456c33941a7e346e752acd8fafa896933d4859002b62619"

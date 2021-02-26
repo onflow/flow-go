@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	// ReferenceImplPathByteSize is the path length in reference implementation: 2 bytes.
+	// ReferenceImplPathByteSize is the path length in reference implementation: 32 bytes.
 	// Please do NOT CHANGE.
 	ReferenceImplPathByteSize = 32
 )
