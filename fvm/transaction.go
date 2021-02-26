@@ -111,7 +111,7 @@ func (i *TransactionInvocator) Process(
 			break
 		}
 
-		i.logger.Info().
+		i.logger.Warn().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
 			Int("retries_count", numberOfRetries).
@@ -151,6 +151,7 @@ func (i *TransactionInvocator) Process(
 		Str("txHash", proc.ID.String()).
 		Uint64("blockHeight", blockHeight).
 		Uint64("ledgerInteractionUsed", st.InteractionUsed()).
+		Int("retried", proc.Retried).
 		Msg("transaction executed with no error")
 
 	return nil
