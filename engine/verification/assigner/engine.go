@@ -73,33 +73,6 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
-}
-
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
-}
-
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
-
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	return fmt.Errorf("assigner engine is not supposed to invoked by process method")
-}
-
 // handleExecutionReceipt receives a receipt that appears in a finalized container block. In case this verification node
 // is staked at the reference block of this execution receipt's result, chunk assignment is done on the execution result, and
 // the assigned chunks' locators are pushed to the chunks queue, which are made available for the chunk queue consumer (i.e., the
