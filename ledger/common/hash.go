@@ -1,6 +1,10 @@
 package common
 
 import (
+	"os"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -10,12 +14,20 @@ import (
 var defaultLeafHash []byte
 
 const defaultHashLen = 257
+
+// HashLen is the default output hash length in bytes
 const HashLen = 32
 
 // we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [defaultHashLen][]byte
 
+// TODO: remove once the hashing with 32-bytes input is tested
+var log zerolog.Logger
+
 func init() {
+
+	log = zerolog.New(os.Stderr)
+
 	hasher := hash.NewSHA3_256()
 	defaultLeafHash = hasher.ComputeHash([]byte("default:"))
 
@@ -49,6 +61,7 @@ func GetDefaultHashForHeight(height int) []byte {
 func HashLeaf(path []byte, value []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
 	if len(path) != HashLen {
+		log.Warn().Msgf("HashLeaf path input should be 32 bytes, got %d", len(path))
 		hasher := hash.NewSHA3_256()
 		_, _ = hasher.Write(path)
 		_, _ = hasher.Write(value)
@@ -66,6 +79,8 @@ func HashLeaf(path []byte, value []byte) []byte {
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
 	if len(hash1) != HashLen || len(hash2) != HashLen {
+		log.Warn().Msgf("HashInterNode inputs should be 32 bytes, got %d and %d",
+			len(hash1), len(hash2))
 		hasher := hash.NewSHA3_256()
 		_, _ = hasher.Write(hash1)
 		_, _ = hasher.Write(hash2)
