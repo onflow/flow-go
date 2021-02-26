@@ -427,12 +427,18 @@ func TestLeafInsert(t *testing.T) {
 	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
-	// path: 0000000100000000
-	p1 := pathByUint8s([]uint8{uint8(1), uint8(0)}, pathByteSize)
+	// path: 000...0000000100000000
+	pb1 := make([]uint8, 32)
+	pb1[30] = uint8(1)
+	pb1[31] = uint8(0)
+	p1 := pathByUint8s(pb1, pathByteSize)
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
-	// path: 0000000100000001
-	p2 := pathByUint8s([]uint8{uint8(1), uint8(1)}, pathByteSize)
+	// path: 000...0000000100000001
+	pb2 := make([]uint8, 32)
+	pb2[30] = uint8(1)
+	pb2[31] = uint8(1)
+	p2 := pathByUint8s(pb2, pathByteSize)
 	v2 := payloadBySlices([]byte{'B'}, []byte{'B'})
 
 	paths := []ledger.Path{p1, p2}
@@ -443,7 +449,7 @@ func TestLeafInsert(t *testing.T) {
 
 	updatedTrie, err := forest.GetTrie(updatedRoot)
 	require.NoError(t, err)
-	require.Equal(t, updatedTrie.MaxDepth(), uint16(16))
+	require.Equal(t, updatedTrie.MaxDepth(), uint16(256))
 	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(2))
 	// expected trie:
 	// 16: (path:, hash:63c...d7f)[]
@@ -781,9 +787,6 @@ func TestReadWithWrongPathSize(t *testing.T) {
 	require.Error(t, err)
 }
 
-// // TODO test read (multiple non exist in a branch)
-// // [AlexH] doesn't TestMixRead do this test?
-
 // TestForkingUpdates updates a base trie in two different ways. We expect
 // that for each update, a new trie is added to the forest preserving the
 // updated values independently of the other update.
@@ -1020,7 +1023,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
-	key := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: keydata}}}
+	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
 	value := ledger.Value(valuedata)
 	return &ledger.Payload{Key: key, Value: value}
 }

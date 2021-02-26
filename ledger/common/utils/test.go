@@ -16,11 +16,27 @@ func PathByUint8(inp uint8) ledger.Path {
 	return ledger.Path(b)
 }
 
-// PathByUint16 returns a path (32 bytes) given a uint16
+// PathByUint16 returns a path (32 bytes) given a uint16 (big endian)
 func PathByUint16(inp uint16) ledger.Path {
 	b := make([]byte, 32)
 	binary.BigEndian.PutUint16(b, inp)
 	return ledger.Path(b)
+}
+
+// PathByUint8LeftPadded returns a path (32 bytes) given a uint8 (left padded)
+func PathByUint8LeftPadded(inp uint8) ledger.Path {
+	b := make([]byte, 32)
+	b[31] = inp
+	return ledger.Path(b)
+}
+
+// PathByUint16LeftPadded returns a path (32 bytes) given a uint16 (left padded big endian)
+func PathByUint16LeftPadded(inp uint16) ledger.Path {
+	b := make([]byte, 2)
+	binary.BigEndian.PutUint16(b, inp)
+	r := make([]byte, 30)
+	r = append(r, b...)
+	return ledger.Path(r)
 }
 
 // LightPayload returns a payload with 2 byte key and 2 byte value

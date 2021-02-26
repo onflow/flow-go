@@ -36,7 +36,7 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.PathByUint16(0)
+	path := utils.PathByUint16LeftPadded(0)
 	payload := utils.LightPayload(11, 12345)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
@@ -52,11 +52,11 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.PathByUint16(65535)
+	path := utils.PathByUint16LeftPadded(65535)
 	payload := utils.LightPayload(12346, 54321)
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "d9ddb92fc7471650cf97002c8115177fa4cee420e447f10c2dd2ac8c6fe6643c"
+	expectedRootHashHex := "9555f8b5aa449ee47e656544234909fe93637a192cd6c683de02b9d8b7c67fa7"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
 }
 
@@ -68,11 +68,11 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.PathByUint16(56809)
+	path := utils.PathByUint16LeftPadded(56809)
 	payload := utils.LightPayload(12346, 59656)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "d2536303495a9325037d247cbb2b9be4d6cb3465986ea2c4481d8770ff16b6b0"
+	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
 }
 
@@ -89,7 +89,7 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, 12001))
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
-	expectedRootHashHex := "58042aca145b316263581d1789a1fc50ac2844f1df08cb006d0849e788f6b754"
+	expectedRootHashHex := "74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
@@ -107,14 +107,14 @@ func Test_FullTrie(t *testing.T) {
 	paths := make([]ledger.Path, 0, capacity)
 	payloads := make([]ledger.Payload, 0, capacity)
 	for i := 0; i < capacity; i++ {
-		paths = append(paths, utils.PathByUint16(uint16(i)))
+		paths = append(paths, utils.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
 		payload := utils.LightPayload(temp, temp)
 		payloads = append(payloads, *payload)
 	}
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
-	expectedRootHashHex := "99e12f9f9406ddd7b9b98bb15c6d643be3ae49e78098713fa00409fee634c065"
+	expectedRootHashHex := "6b3a48d672744f5586c571c47eae32d7a4a3549c1d4fa51a0acfd7b720471de9"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
@@ -122,26 +122,26 @@ func Test_FullTrie(t *testing.T) {
 // The expected root hashes are coming from a reference implementation in python and is hard-coded here.
 func Test_UpdateTrie(t *testing.T) {
 	expectedRootHashes := []string{
-		"d163b7f3de8ac52f94821f9ed0d90586beccfdd43a354ee09c877b1c2d9e2426",
-		"1b20ecb5ee4d86e6160778e7e589978612ca41f3dd4be4c0a62f78411b420988",
-		"5dfe9d5c1d6b5bb2dd637ce29169fb2be2c923ef7faf93931c53364e060af16e",
-		"2b0fcefa295024f20ef057bb8148288e6b75c07abc4ca3ec7c5b63dedd11fcc7",
-		"f3ae74b49f7172ef5b7c2013751a38c3d2aa13ea9524f86efbb66b8a28cabfea",
-		"0299b3b008429b6748f0ce2c0969da9cecceea27d4a4dd322e09330ce1a4e124",
-		"ca584ffa4f9a12cfeb80db84035e10927aaa77ef3b9e045070fd2aee7f00b80b",
-		"30ae55faccf75a406d946b5ea0ea3f3f0d15b88d916b5d3c50f368aeef454282",
-		"f1b2bc0d5cbab3c9683c1c4660145e33e38120cc96d5a34104b08513bbdf9d9b",
-		"86631d17047349631b744dbbf652db5f0d4aec4889e36af9dfdfd51b02df019a",
-		"0b592f1c0f0b06f169b378cecede79ec80769fb943220700771d30e71d30d679",
-		"ac46074bf22e83f62b048f6ac65c98db85ee6a441e14394bdf87e7e2714fd6d3",
-		"8fadb2a3a4013a912078b90995f0ad9d4c8aabc318d9ee74bd6a6cdf6e923fe4",
-		"ded726b94a953cfa2e5bae36bc8bcb805f34854007c58f0674487137cad43cba",
-		"9b1f623553614dc91aa61f782d46a8cd48f4a59a078f21daa41b215e07f2679d",
-		"58042aca145b316263581d1789a1fc50ac2844f1df08cb006d0849e788f6b754",
-		"4dbff09d0523fe95987052f93d233471f8e67292f5b9cdffcbe0f0cc301b570d",
-		"c9163bcc4adf6ca2e4f902489aae08d68e82421d1aaadf2f3cdca7e6f29d3a80",
-		"81ae9abd57c623cf801eb3b63837274b254506c4d9e2e8e32128f6229cb38095",
-		"9ab50f4c7cb985ef435e5d8ed2205654d125a477062c86d15e96187f8326e5a6",
+		"08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd",
+		"2f4b0f490fa05e5b3bbd43176e367c3e9b64cdb710e45d4508fff11759d7a08e",
+		"668811792995cd960e7e343540a360682ac375f7ec5533f774c464cd6b34adc9",
+		"169c145eaeda2038a0e409068a12cb26bde5e890115ad1ef624f422007fb2d2a",
+		"8f87b503a706d9eaf50873030e0e627850c841cc0cf382187b81ba26cec57588",
+		"faacc057336e10e13ff6f5667aefc3ac9d9d390b34ee50391a6f7f305dfdf761",
+		"049e035735a13fee09a3c36a7f567daf05baee419ac90ade538108492d80b279",
+		"bb8340a9772ab6d6aa4862b23c8bb830da226cdf6f6c26f1e1e850077be600af",
+		"8b9b7eb5c489bf4aeffd86d3a215dc045856094d0abe5cf7b4cc3f835d499168",
+		"6514743e986f20fcf22a02e50ba352a5bfde50fe949b57b990aeb863cfcd81d1",
+		"33c3d386e1c7c707f727fdeb65c52117537d175da9ab3f60a0a576301d20756e",
+		"09df0bc6eee9d0f76df05d19b2ac550cde8c4294cd6eafaa1332718bd62e912f",
+		"8b1fccbf7d1eca093441305ebff72d3f12b8b7cce5b4f89d6f464fc5df83b0d3",
+		"0830e2d015742e284c56075050e94d3ff9618a46f28aa9066379f012e45c05fc",
+		"9d95255bb75dddc317deda4e45223aa4a5ac02eaa537dc9e602d6f03fa26d626",
+		"74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa",
+		"c06903580432a27dee461e9022a6546cb4ddec2f8598c48429e9ba7a96a892da",
+		"a117f94e9cc6114e19b7639eaa630304788979cf92037736bbeb23ed1504638a",
+		"d382c97020371d8788d4c27971a89f1617f9bbf21c49c922f1b683cc36a4646c",
+		"ce633e9ca6329d6984c37a46e0a479bb1841674c2db00970dacfe035882d4aba",
 	}
 
 	// Make new Trie (independently of MForest):
@@ -150,12 +150,12 @@ func Test_UpdateTrie(t *testing.T) {
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
-	path := utils.PathByUint16(rng.next())
+	path := utils.PathByUint16LeftPadded(rng.next())
 	temp := rng.next()
 	payload := utils.LightPayload(temp, temp)
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "d163b7f3de8ac52f94821f9ed0d90586beccfdd43a354ee09c877b1c2d9e2426"
+	expectedRootHashHex := "08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 
 	for r := 0; r < 20; r++ {
@@ -190,7 +190,7 @@ func Test_UnallocateRegisters(t *testing.T) {
 	require.NoError(t, err)
 
 	// this should be identical to the first 99 registers never been written
-	expectedRootHashHex := "caebf1bec988450027a9a0155be7bc68f493c5037f8087537b17f9d9bae6e81d"
+	expectedRootHashHex := "d81e27a93f2bef058395f70e00fb5d3c8e426e22b3391d048b34017e1ecb483e"
 	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
 	require.NoError(t, err)
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisionTrie.RootHash()))
@@ -213,7 +213,7 @@ func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([
 	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
 	for i := 0; i < number; i++ {
-		path := utils.PathByUint16(rng.next())
+		path := utils.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
 		t := rng.next()
 		payload := utils.LightPayload(t, t)
