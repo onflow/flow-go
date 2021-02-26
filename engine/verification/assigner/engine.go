@@ -90,7 +90,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		Logger()
 
 	// verification node should be staked at the reference block id.
-	ok, err := e.stakedAtBlockID(referenceBlockID)
+	ok, err := stakedAsVerification(e.state, referenceBlockID, e.me.NodeID())
 	if err != nil {
 		log.Error().Err(err).Msg("could not verify stake of verification node for result at reference block id")
 		return
@@ -150,23 +150,6 @@ func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifie
 	}
 }
 
-// stakedAtBlockID checks whether this instance of verification node has staked at specified block ID.
-// It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
-// It returns false and error if it could not extract the stake of node as a verification node at the specified block.
-func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
-	identity, err := protocol.IdentityAtBlockID(e.state, blockID, e.me.NodeID())
-	if err != nil {
-		return false, fmt.Errorf("could not extract staked identify of node at block %v: %w", blockID, err)
-	}
-
-	if identity.Role != flow.RoleVerification {
-		return false, fmt.Errorf("node is staked for an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
-	}
-
-	staked := identity.Stake > 0
-	return staked, nil
-}
-
 // ProcessFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
 // Once it is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
@@ -209,6 +192,33 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 	}
 
 	return mine, nil
+}
+
+// stakedAsVerification checks whether this instance of verification node has staked at specified block ID.
+// It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
+// It returns false and error if it could not extract the stake of node as a verification node at the specified block.
+func stakedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
+	identity, err := state.AtBlockID(blockID).Identity(identifier)
+	if err != nil {
+		return false, fmt.Errorf("could not retrieve identity for identifier %v at block id snapshot %v: %w)", identifier, blockID, err)
+	}
+
+	// checks role of node is verification
+	if identity.Role != flow.RoleVerification {
+		return false, fmt.Errorf("node is staked for an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
+	}
+
+	// checks identity has not been ejected
+	if identity.Ejected {
+		return false, nil
+	}
+
+	// checks identity has stake
+	if identity.Stake == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
