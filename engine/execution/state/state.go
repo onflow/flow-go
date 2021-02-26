@@ -470,8 +470,8 @@ func (s *state) GetCollection(identifier flow.Identifier) (*flow.Collection, err
 	return s.collections.ByID(identifier)
 }
 
-func (s *state) GetBlockIDByChunkID(collectionID flow.Identifier) (flow.Identifier, error) {
-	return s.headers.IDByChunkID(collectionID)
+func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
+	return s.headers.IDByChunkID(chunkID)
 }
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {

@@ -15,15 +15,15 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	protocol2 "github.com/onflow/flow-go/state/protocol"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
-		ps := new(protocol.State)
-		ss := new(protocol.Snapshot)
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 
@@ -58,8 +58,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("unstaked (0 stake) origin", func(t *testing.T) {
-		ps := new(protocol.State)
-		ss := new(protocol.Snapshot)
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 
@@ -94,8 +94,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("unstaked (not found origin) origin", func(t *testing.T) {
-		ps := new(protocol.State)
-		ss := new(protocol.Snapshot)
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 
@@ -108,7 +108,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.On("AtBlockID", blockID).Return(ss)
 		ss.On("Identity", originID).
-			Return(nil, protocol2.IdentityNotFoundError{})
+			Return(nil, protocol.IdentityNotFoundError{})
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(&flow.ChunkDataPack{CollectionID: collectionID, ChunkID: chunkID}, nil)
@@ -120,7 +120,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			ChunkID: chunkID,
 			Nonce:   rand.Uint64(),
 		}
-		// submit using origin ID with zero stake
+		// submit using non-existing origin ID
 		err := e.onChunkDataRequest(context.Background(), originID, req)
 		assert.Error(t, err)
 
@@ -130,8 +130,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("non-existent chunk", func(t *testing.T) {
-		ps := new(protocol.State)
-		ss := new(protocol.Snapshot)
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 		execState.
@@ -157,8 +157,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		ps := new(protocol.State)
-		ss := new(protocol.Snapshot)
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
 		con := new(mocknetwork.Conduit)
 
 		execState := new(state.ExecutionState)

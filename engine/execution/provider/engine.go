@@ -161,23 +161,9 @@ func (e *Engine) onChunkDataRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
 	}
 
-	blockID, err := e.execState.GetBlockIDByChunkID(cdp.ChunkID)
+	origin, err := e.ensureStaked(err, cdp.ChunkID, originID)
 	if err != nil {
-		return fmt.Errorf("cannot find blockID corresponding to chunk data pack ID (%s): %w", cdp.ID(), err)
-	}
-
-	origin, err := e.state.AtBlockID(blockID).Identity(originID)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
-	}
-
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
-	if origin.Stake == 0 {
-		return engine.NewInvalidInputErrorf("node %s is not staked for the epoch corresponding to the requested chunk data pack", origin.NodeID)
+		return err
 	}
 
 	var collection flow.Collection
@@ -207,6 +193,28 @@ func (e *Engine) onChunkDataRequest(
 		Msg("chunk data pack request successfully replied")
 
 	return nil
+}
+
+func (e *Engine) ensureStaked(err error, chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
+	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
+	}
+
+	origin, err := e.state.AtBlockID(blockID).Identity(originID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
+	}
+
+	// only verifier nodes are allowed to request chunk data packs
+	if origin.Role != flow.RoleVerification {
+		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
+	}
+
+	if origin.Stake == 0 {
+		return nil, engine.NewInvalidInputErrorf("node %s is not staked for the epoch corresponding to the requested chunk data pack", origin.NodeID)
+	}
+	return origin, nil
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {

@@ -28,6 +28,6 @@ type Headers interface {
 	// Indexes block ID by chunk ID
 	IndexByChunkID(headerID, chunkID flow.Identifier) error
 
-	// Finds the ID of the block containing given collection
+	// Finds the ID of the block corresponding to given chunk ID
 	IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
