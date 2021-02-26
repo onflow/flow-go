@@ -122,9 +122,9 @@ func (d *state) hash256Plus(out *[32]byte, p1, p2 []byte) {
 	d.copyOut(out)
 }
 
-// has256plus256 absorbs two 256 bits slices of data into the hash's state
+// hash256plus256 absorbs two 256 bits slices of data into the hash's state
 // applies the permutation, and outpute the result in out
-func (d *state) has256plus256(out *[32]byte, p1, p2 []byte) {
+func (d *state) hash256plus256(out *[32]byte, p1, p2 []byte) {
 	xorIn512(d, p1, p2)
 	// permute
 	finalKeccakF1600(&d.a)

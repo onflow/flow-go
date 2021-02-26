@@ -87,6 +87,25 @@ func TestHash(t *testing.T) {
 			assert.Equal(t, []byte(expected), []byte(h))
 		}
 	})
+
+	// Sanity check
+	// TODO : remove once HashLeaf and HashInterNode are checked
+	// to only receive 32-bytes inputs
+	t.Run("HashLeaf", func(t *testing.T) {
+		inp1 := make([]byte, 10)  // not 32
+		inp2 := make([]byte, 100) // not 32
+		rand.Read(inp1)
+		rand.Read(inp2)
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(inp1)
+		_, _ = hasher.Write(inp2)
+		expected := hasher.SumHash()
+
+		h := common.HashLeaf(inp1, inp2)
+		assert.Equal(t, []byte(expected), []byte(h))
+		h = common.HashInterNode(inp1, inp2)
+		assert.Equal(t, []byte(expected), []byte(h))
+	})
 }
 
 func BenchmarkHash(b *testing.B) {

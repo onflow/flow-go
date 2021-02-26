@@ -1,8 +1,6 @@
 package common
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -12,6 +10,7 @@ import (
 var defaultLeafHash []byte
 
 const defaultHashLen = 257
+const HashLen = 32
 
 // we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [defaultHashLen][]byte
@@ -49,10 +48,13 @@ func GetDefaultHashForHeight(height int) []byte {
 // note that we don't include the keys here as they are already included in the path
 func HashLeaf(path []byte, value []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
-	if len(path) != 32 {
-		panic(fmt.Sprintf("path input to HashLeaf must be 32 bytes, got %d", len(path)))
+	if len(path) != HashLen {
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(path)
+		_, _ = hasher.Write(value)
+		return hasher.SumHash()
 	}
-	var out [32]byte
+	var out [HashLen]byte
 	hasher := new256()
 	hasher.hash256Plus(&out, path, value) // path is always 256 bits
 	return out[:]
@@ -63,13 +65,15 @@ func HashLeaf(path []byte, value []byte) []byte {
 // hash1 and hash2 must each be a 32 byte slice.
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
-	if len(hash1) != 32 || len(hash2) != 32 {
-		panic(fmt.Sprintf("inputs to HashInterNode must be 32 bytes, got %d and %d",
-			len(hash1), len(hash2)))
+	if len(hash1) != HashLen || len(hash2) != HashLen {
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(hash1)
+		_, _ = hasher.Write(hash2)
+		return hasher.SumHash()
 	}
-	var out [32]byte
+	var out [HashLen]byte
 	hasher := new256()
-	hasher.has256plus256(&out, hash1, hash2) // hash1 and hash2 are 256 bits
+	hasher.hash256plus256(&out, hash1, hash2) // hash1 and hash2 are 256 bits
 	return out[:]
 }
 
