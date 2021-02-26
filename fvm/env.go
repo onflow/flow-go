@@ -70,7 +70,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
-		programs:           NewPrograms(),
+		programs:           NewEmptyPrograms(),
 	}
 
 	if ctx.BlockHeader != nil {
