@@ -212,6 +212,52 @@ func main() {
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
+
+			// Given an epoch, checkEpochKey returns an error if we are a
+			// participant in the epoch and we don't have the corresponding DKG
+			// key in the database.
+			// TODO: move this to another component (dapperlabs/flow-go#5275)
+			checkEpochKey := func(protocol.Epoch) error {
+				identities, err := epoch.InitialIdentities()
+				if err != nil {
+					return err
+				}
+				if _, ok := identities.ByNodeID(node.NodeID); !ok {
+					counter, err := epoch.Counter()
+					if err != nil {
+						return err
+					}
+					_, err = node.Storage.DKGKeys.RetrieveMyDKGPrivateInfo(counter)
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+
+			// if we are a member of the current epoch, make sure we have the
+			// DKG key
+			currentEpoch := node.State.Final().Epochs().Current()
+			err = checkEpochKey(currentEpoch)
+			if err != nil {
+				return fmt.Errorf("a random beacon that we are a participant in is currently in use and we don't have our key share for it: %w", err)
+			}
+
+			// if we participated in the DKG protocol for the next epoch, and we
+			// are in EpochCommitted phase, make sure we have saved the
+			// resulting DKG key
+			phase, err := node.State.Final().Phase()
+			if err != nil {
+				return err
+			}
+			if phase == flow.EpochPhaseCommitted {
+				nextEpoch := node.State.Final().Epochs().Next()
+				err = checkEpochKey(nextEpoch)
+				if err != nil {
+					return fmt.Errorf("a random beacon DKG protocol that we were a participant in completed and we didn't store our key share for it: %w", err)
+				}
+			}
+
 			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {

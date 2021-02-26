@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/model/bootstrap"
+	dkgmod "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -545,7 +546,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
-		privParticpant := bootstrap.DKGParticipantPriv{
+		privParticpant := dkgmod.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,
 			GroupIndex:          i,
@@ -617,7 +618,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		RandomSource: rootID[:],
 	}
 
-	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)
+	dkgLookup := dkgmod.ToDKGLookup(dkg, participants)
 	epochCommit := &flow.EpochCommit{
 		Counter:         epochCounter,
 		ClusterQCs:      clusterQCs,
@@ -711,7 +712,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
+func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 
 	// filter by consensus nodes
 	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
@@ -720,17 +721,17 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	// run the core dkg algorithm
 	dkgSeed, err := getSeed()
 	if err != nil {
-		return bootstrap.DKGData{}, err
+		return dkgmod.DKGData{}, err
 	}
 
 	dkg, err := run.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
-		return bootstrap.DKGData{}, err
+		return dkgmod.DKGData{}, err
 	}
 
 	// sanity check
 	if nConsensusNodes != len(dkg.PrivKeyShares) {
-		return bootstrap.DKGData{}, fmt.Errorf(
+		return dkgmod.DKGData{}, fmt.Errorf(
 			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
 			nConsensusNodes,
 			len(dkg.PrivKeyShares),
