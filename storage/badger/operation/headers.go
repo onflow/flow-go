@@ -54,9 +54,18 @@ func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
+func IndexBlockIDByChunkID(chunkID, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
+}
+
 // LookupCollectionBlock looks up a block by a collection within that block.
 func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
+}
+
+// LookupBlockIDByChunkID looks up a block by a collection within that block.
+func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding
