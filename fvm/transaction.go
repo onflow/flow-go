@@ -98,6 +98,10 @@ func (i *TransactionInvocator) Process(
 		Str("txHash", proc.ID.String()).
 		Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
 
+	// commit the env if no error
+	// this writes back the contract contents to accounts
+	env.Commit()
+
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()

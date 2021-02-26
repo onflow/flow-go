@@ -533,6 +533,11 @@ func (e *hostEnv) HasContractUpdates() bool {
 	return e.contracts.HasUpdates()
 }
 
+func (e *hostEnv) Commit() error {
+	// commit changes
+	return e.contracts.Commit()
+}
+
 // Transaction Environment
 type transactionEnv struct {
 	vm               *VirtualMachine
