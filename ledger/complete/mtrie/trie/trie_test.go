@@ -98,20 +98,20 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
-// Test_FullTrie tests whether the root hash of a subtrie-fully-populated storing
-// matches the formal specification.
+// Test_FullTrie tests whether the root hash of a trie,
+// whose left-most 65536 registers are populated, matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	// allocate single random register
-	capacity := 65536
+	// allocate 65536 left-most registers
+	numberRegisters := 65536
 	rng := &LinearCongruentialGenerator{seed: 0}
-	paths := make([]ledger.Path, 0, capacity)
-	payloads := make([]ledger.Payload, 0, capacity)
-	for i := 0; i < capacity; i++ {
+	paths := make([]ledger.Path, 0, numberRegisters)
+	payloads := make([]ledger.Payload, 0, numberRegisters)
+	for i := 0; i < numberRegisters; i++ {
 		paths = append(paths, utils.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
 		payload := utils.LightPayload(temp, temp)
