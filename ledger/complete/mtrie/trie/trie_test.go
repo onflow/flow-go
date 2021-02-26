@@ -52,11 +52,16 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.PathByUint16LeftPadded(65535)
+	// build a path with all 1s
+	b := make([]byte, 32)
+	for i := 0; i < len(b); i++ {
+		b[i] = uint8(255)
+	}
+	path := ledger.Path(b)
 	payload := utils.LightPayload(12346, 54321)
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "9555f8b5aa449ee47e656544234909fe93637a192cd6c683de02b9d8b7c67fa7"
+	expectedRootHashHex := "4313d22bcabbf21b1cfb833d38f1921f06a91e7198a6672bc68fa24eaaa1a961"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
 }
 
@@ -93,7 +98,7 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
-// Test_FullTrie tests whether the root hash of a fully-populated trie storing
+// Test_FullTrie tests whether the root hash of a subtrie-fully-populated storing
 // matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
