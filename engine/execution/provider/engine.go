@@ -161,7 +161,7 @@ func (e *Engine) onChunkDataRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
 	}
 
-	origin, err := e.ensureStaked(err, cdp.ChunkID, originID)
+	origin, err := e.ensureStaked(cdp.ChunkID, originID)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (e *Engine) onChunkDataRequest(
 	return nil
 }
 
-func (e *Engine) ensureStaked(err error, chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
+func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
 	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
