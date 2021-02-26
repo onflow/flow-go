@@ -110,7 +110,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
 
-	// pushes assigned chunks to
+	// pushes assigned chunks to chunks queue.
 	e.processChunks(chunkList, resultID)
 }
 
