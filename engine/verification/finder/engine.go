@@ -240,24 +240,6 @@ func (e *Engine) isProcessable(result *flow.ExecutionResult) bool {
 	return err == nil
 }
 
-// stakedAtBlockID checks whether this instance of verification node has staked at specified block ID.
-// It returns true and nil if verification node has staked at specified block ID, and returns false, and nil otherwise.
-// It returns false and error if it could not extract the stake of (verification node) node at the specified block.
-func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
-	// extracts identity of verification node at block height of result
-	identity, err := protocol.IdentityAtBlockID(e.state, blockID, e.me.NodeID())
-	if err != nil {
-		return false, fmt.Errorf("could not check if node is staked at block %v: %w", blockID, err)
-	}
-
-	if identity.Role != flow.RoleVerification {
-		return false, fmt.Errorf("node is staked for an invalid role: %s", identity.Role)
-	}
-
-	staked := identity.Stake > 0
-	return staked, nil
-}
-
 // processResult submits the result to the match engine.
 // originID is the identifier of the node that initially sends a receipt containing this result.
 // It returns true and nil if the result is submitted successfully to the match engine.
@@ -412,7 +394,7 @@ func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) (bool
 	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
 
 	// checks whether verification node is staked at snapshot of this result's block.
-	ok, err := e.stakedAtBlockID(blockID)
+	ok, err := stakedAsVerification(e.state, blockID, e.me.NodeID())
 	if err != nil {
 		return false, false, fmt.Errorf("could not verify stake of verification node for result: %w", err)
 	}
@@ -573,7 +555,7 @@ func (e *Engine) checkPendingReceipts() {
 			Msg("removes all receipt ids pending for block")
 
 		// checks whether verification node is staked at snapshot of this block id/
-		ok, err := e.stakedAtBlockID(blockID)
+		ok, err := stakedAsVerification(e.state, blockID, e.me.NodeID())
 		if err != nil {
 			e.log.Debug().
 				Err(err).
@@ -629,6 +611,33 @@ func (e *Engine) checkReadyReceipt(rdp *verification.ReceiptDataPack) {
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).
 		Msg("result processed successfully")
+}
+
+// stakedAsVerification checks whether this instance of verification node has staked at specified block ID.
+// It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
+// It returns false and error if it could not extract the stake of node as a verification node at the specified block.
+func stakedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
+	identity, err := state.AtBlockID(blockID).Identity(identifier)
+	if err != nil {
+		return false, nil
+	}
+
+	// checks role of node is verification
+	if identity.Role != flow.RoleVerification {
+		return false, fmt.Errorf("node is staked for an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
+	}
+
+	// checks identity has not been ejected
+	if identity.Ejected {
+		return false, nil
+	}
+
+	// checks identity has stake
+	if identity.Stake == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // onTimer is called periodically by the unit module of Finder engine.
