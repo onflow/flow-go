@@ -6,25 +6,8 @@ import (
 
 type Spock []byte
 
-// ExecutionReceiptMeta contains the metadata the distinguishes an execution
-// receipt from an execution result. This is used for storing results and
-// receipts separately in a composable way.
-type ExecutionReceiptMeta struct {
-	ExecutorID        Identifier
-	ResultID          Identifier
-	Spocks            []crypto.Signature
-	ExecutorSignature crypto.Signature
-}
-
-func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult) *ExecutionReceipt {
-	return &ExecutionReceipt{
-		ExecutorID:        meta.ExecutorID,
-		ExecutionResult:   result,
-		Spocks:            meta.Spocks,
-		ExecutorSignature: meta.ExecutorSignature,
-	}
-}
-
+// ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
+// Specifically, it contains the detailed execution result.
 type ExecutionReceipt struct {
 	ExecutorID        Identifier
 	ExecutionResult   ExecutionResult
@@ -45,6 +28,27 @@ func (er *ExecutionReceipt) Meta() *ExecutionReceiptMeta {
 // ID returns the canonical ID of the execution receipt.
 func (er *ExecutionReceipt) ID() Identifier {
 	return er.Meta().ID()
+}
+
+// ExecutionReceiptMeta contains the fields from the Execution Receipts
+// that vary from one executor to another (assuming they commit to the same
+// result). It only contains the ID (cryptographic hash) of the execution
+// result the receipt commits to. The ExecutionReceiptMeta is useful for
+// storing results and receipts separately in a composable way.
+type ExecutionReceiptMeta struct {
+	ExecutorID        Identifier
+	ResultID          Identifier
+	Spocks            []crypto.Signature
+	ExecutorSignature crypto.Signature
+}
+
+func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult) *ExecutionReceipt {
+	return &ExecutionReceipt{
+		ExecutorID:        meta.ExecutorID,
+		ExecutionResult:   result,
+		Spocks:            meta.Spocks,
+		ExecutorSignature: meta.ExecutorSignature,
+	}
 }
 
 func (er *ExecutionReceiptMeta) ID() Identifier {
