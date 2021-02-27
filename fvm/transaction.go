@@ -3,12 +3,17 @@ package fvm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"path"
+	"time"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -35,6 +40,7 @@ type TransactionProcedure struct {
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
 	Err     Error
+	Retried int
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State, programs *Programs) error {
@@ -71,67 +77,117 @@ func (i *TransactionInvocator) Process(
 	st *state.State,
 	programs *Programs,
 ) error {
-	env, err := newEnvironment(ctx, vm, st, programs)
-	if err != nil {
-		return err
+
+	var err error
+	var env *hostEnv
+	var blockHeight uint64
+	if ctx.BlockHeader != nil {
+		blockHeight = ctx.BlockHeader.Height
 	}
-	env.setTransaction(proc.Transaction, proc.TxIndex)
 
-	location := common.TransactionLocation(proc.ID[:])
+	numberOfRetries := 0
+	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
+		env, err = newEnvironment(ctx, vm, st, programs)
+		// env construction error is fatal
+		if err != nil {
+			return err
+		}
+		env.setTransaction(proc.Transaction, proc.TxIndex)
 
-	err = vm.Runtime.ExecuteTransaction(
-		runtime.Script{
-			Source:    proc.Transaction.Script,
-			Arguments: proc.Transaction.Arguments,
-		},
-		runtime.Context{
-			Interface: env,
-			Location:  location,
-		},
-	)
+		location := common.TransactionLocation(proc.ID[:])
 
-	if err != nil {
-		i.safetyErrorCheck(err)
-		return err
+		err = vm.Runtime.ExecuteTransaction(
+			runtime.Script{
+				Source:    proc.Transaction.Script,
+				Arguments: proc.Transaction.Arguments,
+			},
+			runtime.Context{
+				Interface: env,
+				Location:  location,
+			},
+		)
+
+		// break the loop
+		if !i.requiresRetry(err, proc) {
+			break
+		}
+
+		programs.ForceCleanup()
+
+		i.logger.Warn().
+			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", blockHeight).
+			Int("retries_count", numberOfRetries).
+			Uint64("ledger_interaction_used", st.InteractionUsed()).
+			Msg("retrying transaction execution")
+
+		// reset error part of proc
+		// Warning right now the tx requires retry logic doesn't change
+		// anything on state but we might want to revert the state changes (or not commiting)
+		// if we decided to expand it furthur.
+		proc.Err = nil
+		proc.Logs = make([]string, 0)
+		proc.Events = make([]flow.Event, 0)
+		proc.ServiceEvents = make([]flow.Event, 0)
+		proc.Retried++
 	}
 
 	programs.Cleanup(env.changedPrograms)
 
-	i.logger.Info().
-		Str("txHash", proc.ID.String()).
-		Msgf("(%d) ledger interactions used by transaction", st.InteractionUsed())
+	// (for future) panic if we tried several times and still failing
+	// if numberOfTries == maxNumberOfRetries {
+	// 	panic(err)
+	// }
+
+	if err != nil {
+		i.logger.Info().
+			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", blockHeight).
+			Uint64("ledgerInteractionUsed", st.InteractionUsed()).
+			Msg("transaction executed with error")
+		return err
+	}
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
 
+	i.logger.Info().
+		Str("txHash", proc.ID.String()).
+		Uint64("blockHeight", blockHeight).
+		Uint64("ledgerInteractionUsed", st.InteractionUsed()).
+		Int("retried", proc.Retried).
+		Msg("transaction executed with no error")
+
 	return nil
 }
 
-// safetyErrorCheck is an additional check which was introduced
-// to help chase erroneous execution results which caused an unexpected network fork.
-// Parsing and checking of deployed contracts should normally succeed.
-// This is a temporary measure.
-func (i *TransactionInvocator) safetyErrorCheck(err error) {
+// requiresRetry returns true for transactions that has to be rerun
+// this is an additional check which was introduced
+func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedure) bool {
+	// if no error no retry
+	if err == nil {
+		return false
+	}
 
 	// Only consider runtime errors,
 	// in particular only consider parsing/checking errors
 
 	var runtimeErr runtime.Error
 	if !errors.As(err, &runtimeErr) {
-		return
+		return false
 	}
 
 	var parsingCheckingError *runtime.ParsingCheckingError
 	if !errors.As(err, &parsingCheckingError) {
-		return
+		return false
 	}
 
 	// Only consider errors in deployed contracts.
 
 	checkerError, ok := parsingCheckingError.Err.(*sema.CheckerError)
 	if !ok {
-		return
+		return false
 	}
 
 	var foundImportedProgramError bool
@@ -152,13 +208,43 @@ func (i *TransactionInvocator) safetyErrorCheck(err error) {
 	}
 
 	if !foundImportedProgramError {
-		return
+		return false
 	}
 
-	codesJSON, _ := json.Marshal(runtimeErr.Codes)
-	programsJSON, _ := json.Marshal(runtimeErr.Programs)
+	i.dumpRuntimeError(runtimeErr, proc)
+	return true
+}
+
+// logRuntimeError logs run time errors into a file
+// This is a temporary measure.
+func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error, procedure *TransactionProcedure) {
+
+	codesJSON, err := json.Marshal(runtimeErr.Codes)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot marshal codes JSON")
+	}
+	programsJSON, err := json.Marshal(runtimeErr.Programs)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot marshal programs JSON")
+	}
+
+	t := time.Now().UnixNano()
+
+	codesPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-codes-%d", procedure.ID.String(), t))
+	programsPath := path.Join(extralog.ExtraLogDumpPath, fmt.Sprintf("%s-programs-%d", procedure.ID.String(), t))
+
+	err = ioutil.WriteFile(codesPath, codesJSON, 0700)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot write codes json")
+	}
+
+	err = ioutil.WriteFile(programsPath, programsJSON, 0700)
+	if err != nil {
+		i.logger.Error().Err(err).Msg("cannot write programs json")
+	}
 
 	i.logger.Error().
+		Str("txHash", procedure.ID.String()).
 		Str("codes", string(codesJSON)).
 		Str("programs", string(programsJSON)).
 		Msg("checking failed")
