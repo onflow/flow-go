@@ -56,6 +56,8 @@ func ExecutionReceiptFromMeta(meta ExecutionReceiptMeta, result ExecutionResult)
 	}
 }
 
+// ID returns the canonical ID of the execution receipt.
+// It is identical to the ID of the full receipt.
 func (er *ExecutionReceiptMeta) ID() Identifier {
 	body := struct {
 		ExecutorID Identifier
