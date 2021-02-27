@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -37,8 +36,7 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	psEvents.Noop              // satisfy protocol events consumer interface
-	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
+	psEvents.Noop // satisfy protocol events consumer interface
 
 	unit               *engine.Unit
 	log                zerolog.Logger
@@ -1108,7 +1106,7 @@ func (e *Engine) saveExecutionResults(
 
 		chdp := generateChunkDataPack(chunk, collectionID, proof)
 
-		err = e.execState.PersistChunkDataPack(childCtx, chdp)
+		err = e.execState.PersistChunkDataPack(childCtx, chdp, blockID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
 		}

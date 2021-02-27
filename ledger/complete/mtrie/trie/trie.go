@@ -104,18 +104,18 @@ func (mt *MTrie) String() string {
 // UnsafeRead read payloads for the given paths. It is called unsafe as it requires the
 // paths to be sorted
 // TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
-func (mt *MTrie) UnsafeRead(paths []ledger.Path) ([]*ledger.Payload, error) {
+func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 	return mt.read(mt.root, paths)
 }
 
-func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]*ledger.Payload, error) {
+func (mt *MTrie) read(head *node.Node, paths []ledger.Path) []*ledger.Payload {
 	// path not found
 	if head == nil {
 		res := make([]*ledger.Payload, 0, len(paths))
 		for range paths {
 			res = append(res, ledger.EmptyPayload())
 		}
-		return res, nil
+		return res
 	}
 	// reached a leaf node
 	if head.IsLeaf() {
@@ -127,32 +127,23 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path) ([]*ledger.Payload, 
 				res = append(res, ledger.EmptyPayload())
 			}
 		}
-		return res, nil
+		return res
 	}
 
-	lpaths, rpaths, err := utils.SplitSortedPaths(paths, mt.height-head.Height())
-	if err != nil {
-		return nil, fmt.Errorf("can't read due to split path error: %w", err)
-	}
+	lpaths, rpaths := utils.SplitSortedPaths(paths, mt.height-head.Height())
 
 	// TODO make this parallel
 	payloads := make([]*ledger.Payload, 0)
 	if len(lpaths) > 0 {
-		p, err := mt.read(head.LeftChild(), lpaths)
-		if err != nil {
-			return nil, err
-		}
+		p := mt.read(head.LeftChild(), lpaths)
 		payloads = append(payloads, p...)
 	}
 
 	if len(rpaths) > 0 {
-		p, err := mt.read(head.RightChild(), rpaths)
-		if err != nil {
-			return nil, err
-		}
+		p := mt.read(head.RightChild(), rpaths)
 		payloads = append(payloads, p...)
 	}
-	return payloads, nil
+	return payloads
 }
 
 // NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.
@@ -211,10 +202,7 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 	}
 
 	// Split payloads so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads, err := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
-	if err != nil {
-		return nil, fmt.Errorf("error spliting payloads by path: %w", err)
-	}
+	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
 
 	// TODO [runtime optimization]: do not branch if either lpayload or rpayload is empty
 	var lChild, rChild *node.Node
@@ -263,14 +251,11 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 	// from here on, we have: len(paths) > 1
 
 	// Split updates by paths so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads, err := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
+	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
 	// Note: (pathLength-height) will never reach the value pathLength, i.e. we will never execute this code for height==0
 	// This is because at height=0, we only have (at most) one path left, as paths are not duplicated
 	// (by requirement of this function). But even if this condition is violated, the code will not return a faulty
 	// but instead panic with Index Out Of Range error
-	if err != nil {
-		return nil, fmt.Errorf("error spliting paths: %w", err)
-	}
 
 	// TODO [runtime optimization]: do not branch if either lpaths or rpaths is empty
 	var lChild, rChild *node.Node
@@ -301,15 +286,15 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 
 // UnsafeProofs provides proofs for the given paths, this is called unsafe as
 // it requires the input paths to be sorted in advance.
-func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) error {
-	return mt.proofs(mt.root, paths, proofs)
+func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) {
+	mt.proofs(mt.root, paths, proofs)
 }
 
-func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) error {
+func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 	// we've reached the end of a trie
 	// and path is not found (noninclusion proof)
 	if head == nil {
-		return nil
+		return
 	}
 
 	// we've reached a leaf
@@ -321,7 +306,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 			proofs[0].Inclusion = true
 		}
 		// TODO: insert ERROR if len(paths) != 1
-		return nil
+		return
 	}
 
 	// increment steps for all the proofs
@@ -329,10 +314,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 		p.Steps++
 	}
 	// split paths based on the value of i-th bit (i = trie height - node height)
-	lpaths, lproofs, rpaths, rproofs, err := utils.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
-	if err != nil {
-		return fmt.Errorf("proof generation failed, path split error: %w", err)
-	}
+	lpaths, lproofs, rpaths, rproofs := utils.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
 
 	if len(lpaths) > 0 {
 		if rChild := head.RightChild(); rChild != nil {
@@ -340,18 +322,12 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range lproofs {
-					err := utils.SetBit(p.Flags, mt.height-head.Height())
-					if err != nil {
-						return err
-					}
+					utils.SetBit(p.Flags, mt.height-head.Height())
 					p.Interims = append(p.Interims, nodeHash)
 				}
 			}
 		}
-		err := mt.proofs(head.LeftChild(), lpaths, lproofs)
-		if err != nil {
-			return err
-		}
+		mt.proofs(head.LeftChild(), lpaths, lproofs)
 	}
 
 	if len(rpaths) > 0 {
@@ -360,20 +336,13 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range rproofs {
-					err := utils.SetBit(p.Flags, mt.height-head.Height())
-					if err != nil {
-						return err
-					}
+					utils.SetBit(p.Flags, mt.height-head.Height())
 					p.Interims = append(p.Interims, nodeHash)
 				}
 			}
 		}
-		err := mt.proofs(head.RightChild(), rpaths, rproofs)
-		if err != nil {
-			return err
-		}
+		mt.proofs(head.RightChild(), rpaths, rproofs)
 	}
-	return nil
 }
 
 // Equals compares two tries for equality.

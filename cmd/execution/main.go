@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -28,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/extralog"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	wal "github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
@@ -55,6 +58,7 @@ func main() {
 		results               *storage.ExecutionResults
 		receipts              *storage.ExecutionReceipts
 		providerEngine        *exeprovider.Engine
+		checkerEng            *checker.Engine
 		syncCore              *chainsync.Core
 		pendingBlocks         *buffer.PendingBlocks // used in follower engine
 		deltas                *ingestion.Deltas
@@ -115,6 +119,14 @@ func main() {
 			return err
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
+			extraLogPath := path.Join(triedir, "extralogs")
+			err := os.MkdirAll(extraLogPath, 0777)
+			if err != nil {
+				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
+			}
+
+			extralog.ExtraLogDumpPath = extraLogPath
+
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
@@ -214,6 +226,7 @@ func main() {
 				chunkDataPacks,
 				results,
 				receipts,
+				node.Storage.Headers,
 				node.DB,
 				node.Tracer,
 			)
@@ -229,6 +242,15 @@ func main() {
 			)
 
 			return providerEngine, err
+		}).
+		Component("checker engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			checkerEng = checker.New(
+				node.Logger,
+				node.State,
+				executionState,
+				node.Storage.Seals,
+			)
+			return checkerEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
@@ -315,7 +337,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, ingestionEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, checkerEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
