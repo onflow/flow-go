@@ -16,9 +16,10 @@ import (
 
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
-	db          *badger.DB
-	cache       *Cache
-	heightCache *Cache
+	db           *badger.DB
+	cache        *Cache
+	heightCache  *Cache
+	chunkIDCache *Cache
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
@@ -35,6 +36,12 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		height := key.(uint64)
 		id := val.(flow.Identifier)
 		return operation.IndexBlockHeight(height, id)
+	}
+
+	storeChunkID := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		chunkID := key.(flow.Identifier)
+		blockID := val.(flow.Identifier)
+		return operation.IndexBlockIDByChunkID(chunkID, blockID)
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -55,6 +62,15 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		}
 	}
 
+	retrieveChunkID := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		chunkID := key.(flow.Identifier)
+		var blockID flow.Identifier
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := db.View(operation.LookupBlockIDByChunkID(chunkID, &blockID))
+			return blockID, err
+		}
+	}
+
 	h := &Headers{
 		db: db,
 		cache: newCache(collector,
@@ -67,6 +83,11 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(storeHeight),
 			withRetrieve(retrieveHeight),
+			withResource(metrics.ResourceFinalizedHeight)),
+		chunkIDCache: newCache(collector,
+			withLimit(4*flow.DefaultTransactionExpiry),
+			withStore(storeChunkID),
+			withRetrieve(retrieveChunkID),
 			withResource(metrics.ResourceFinalizedHeight)),
 	}
 
@@ -129,4 +150,19 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 	blocks := make([]flow.Header, 0, 1)
 	err := h.db.View(operation.FindHeaders(filter, &blocks))
 	return blocks, err
+}
+
+func (h *Headers) IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	bID, err := h.chunkIDCache.Get(chunkID)(tx)
+	if err != nil {
+		return flow.Identifier{}, fmt.Errorf("could not look up by chunk id: %w", err)
+	}
+	return bID.(flow.Identifier), nil
+}
+
+func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
+	return operation.RetryOnConflict(h.db.Update, h.chunkIDCache.Put(chunkID, headerID))
 }
