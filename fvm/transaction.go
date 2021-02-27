@@ -112,6 +112,7 @@ func (i *TransactionInvocator) Process(
 			break
 		}
 
+		// force cleanup if retries
 		programs.ForceCleanup()
 
 		i.logger.Warn().

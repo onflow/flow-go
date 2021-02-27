@@ -94,20 +94,23 @@ func (p *Programs) HasChanges() bool {
 	return len(p.programs) > 0 || p.cleaned
 }
 
-//func (p *Programs) Merge(child *Programs) {
-//	p.lock.Lock()
-//	defer p.lock.Unlock()
-//
-//	if child.cleaned {
-//		p.parentFunc = emptyProgramGetFunc
-//		p.cleaned = true
-//		p.programs = make(map[common.LocationID]ProgramEntry)
-//	} else {
-//		for id, entry := range child.programs {
-//			p.programs[id] = entry
-//		}
-//	}
-//}
+// ForceCleanup is used to force a complete cleanup
+// It exists temporarily to facilitate a temporary measure which can retry
+// a transaction in case checking fails
+// It should be gone when the extra retry is gone
+func (p *Programs) ForceCleanup() {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.cleaned = true
+
+	// Sop using parent's data to prevent
+	// infinite chaining of objects
+	p.parentFunc = emptyProgramGetFunc
+
+	// start with empty storage
+	p.programs = make(map[common.LocationID]ProgramEntry)
+}
 
 func (p *Programs) Cleanup(changedPrograms []ChangedProgram) {
 	p.lock.Lock()
