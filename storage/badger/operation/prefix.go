@@ -36,6 +36,7 @@ const (
 	codeExecutionResult      = 36
 	codeExecutionReceiptMeta = 36
 	codeResultApproval       = 37
+	codeChunk                = 38
 
 	// codes for indexing single identifier by identifier
 	codeHeightToBlock       = 40 // index mapping height to block ID
@@ -53,10 +54,16 @@ const (
 	codeBlockEpochStatus            = 56 // index mapping block ID to epoch status
 	codePayloadReceipts             = 57 // index mapping block ID  to payload receipts
 	codeExecutionIDExecutionReceipt = 58 // index mapping block ID, execution ID to execution receipt ID
+	codeIndexBlockByChunkID         = 59 // index mapping chunk ID to block ID
 
 	// codes related to epoch information
 	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID
 	codeEpochCommit = 61 // EpochCommit service event, keyed by ID
+
+	// job queue consumers and producers
+	codeJobConsumerProcessed = 70
+	codeJobQueue             = 71
+	codeJobQueuePointer      = 72
 
 	// legacy codes (should be cleaned up)
 	codeChunkDataPack                = 100

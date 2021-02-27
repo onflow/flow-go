@@ -14,8 +14,8 @@ import (
 func TestUpdate(t *testing.T) {
 
 	rootHash := ledger.RootHash([]byte{2, 1, 3, 7})
-	p1 := utils.TwoBytesPath(uint16(1))
-	p2 := utils.TwoBytesPath(uint16(772))
+	p1 := utils.PathByUint16(uint16(1))
+	p2 := utils.PathByUint16(uint16(772))
 	paths := []ledger.Path{p1, p2}
 	v1 := utils.LightPayload8(1, 2)
 	v2 := utils.LightPayload(2, 3)
@@ -24,8 +24,10 @@ func TestUpdate(t *testing.T) {
 
 	expected := []byte{
 		1, //update flag,
-		0, 0, 11, 0, 4, 2, 1, 3, 7, 0, 0, 0, 2, 0, 2, 0, 1, 3, 4,
-		0, 0, 0, 22, 0, 0, 0, 9, 0, 1, 0, 0, 0, 3, 0, 0, 1, 0, 0,
+		0, 0, 11, 0, 4, 2, 1, 3, 7, 0, 0, 0, 2, 0, 32,
+		0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		22, 0, 0, 0, 9, 0, 1, 0, 0, 0, 3, 0, 0, 1, 0, 0,
 		0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 24, 0, 0, 0, 10, 0, 1, 0, 0,
 		0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 3, // encoded update
 	}
