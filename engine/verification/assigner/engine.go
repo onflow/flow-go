@@ -198,9 +198,10 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 // It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
 // It returns false and error if it could not extract the stake of node as a verification node at the specified block.
 func stakedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
+	// TODO define specific error for handling cases
 	identity, err := state.AtBlockID(blockID).Identity(identifier)
 	if err != nil {
-		return false, fmt.Errorf("could not retrieve identity for identifier %v at block id snapshot %v: %w)", identifier, blockID, err)
+		return false, nil
 	}
 
 	// checks role of node is verification
