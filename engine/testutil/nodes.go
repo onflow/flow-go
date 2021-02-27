@@ -386,6 +386,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		vm,
 		vmCtx,
+		computation.DefaultProgramsCacheSize,
 	)
 	require.NoError(t, err)
 

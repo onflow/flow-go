@@ -74,6 +74,7 @@ func main() {
 		checkpointDistance    uint
 		checkpointsToKeep     uint
 		stateDeltasLimit      uint
+		cadenceExecutionCache uint
 		requestInterval       time.Duration
 		preferredExeNodeIDStr string
 		syncByBlocks          bool
@@ -93,6 +94,7 @@ func main() {
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 10, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
+			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
@@ -130,6 +132,7 @@ func main() {
 				node.State,
 				vm,
 				vmCtx,
+				cadenceExecutionCache,
 			)
 			computationManager = manager
 

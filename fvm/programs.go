@@ -12,16 +12,26 @@ type ProgramEntry struct {
 	Program  *interpreter.Program
 }
 
+type ChangedProgram struct {
+	Address common.Address
+	Name    string
+}
+
 type ProgramGetFunc func(location common.Location) *ProgramEntry
 
-func emptyProgramGetFunc(location common.Location) *ProgramEntry {
+func emptyProgramGetFunc(_ common.Location) *ProgramEntry {
 	return nil
 }
 
+// Programs is a cumulative cache-like storage for Programs helping speed up execution of Cadence
+// Programs don't evict elements at will, like a typical cache would, but it does it only
+// during a cleanup method, which must be called only when the Cadence execution has finished.
+// It it also fork-aware, support cheap creation of children capturing local changes.
 type Programs struct {
 	lock       sync.RWMutex
 	programs   map[common.LocationID]ProgramEntry
 	parentFunc ProgramGetFunc
+	cleaned    bool
 }
 
 func NewEmptyPrograms() *Programs {
@@ -34,8 +44,10 @@ func NewEmptyPrograms() *Programs {
 
 func (p *Programs) ChildPrograms() *Programs {
 	return &Programs{
-		programs:   map[common.LocationID]ProgramEntry{},
-		parentFunc: p.parentFunc,
+		programs: map[common.LocationID]ProgramEntry{},
+		parentFunc: func(location common.Location) *ProgramEntry {
+			return p.get(location)
+		},
 	}
 }
 
@@ -43,19 +55,27 @@ func (p *Programs) Get(location common.Location) *interpreter.Program {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
+	programEntry := p.get(location)
+
+	if programEntry != nil {
+		return programEntry.Program
+	}
+
+	return nil
+}
+
+func (p *Programs) get(location common.Location) *ProgramEntry {
 	programEntry, ok := p.programs[location.ID()]
 	if !ok {
-
 		parentEntry := p.parentFunc(location)
 
 		if parentEntry != nil {
-			return parentEntry.Program
+			return parentEntry
 		}
 
 		return nil
 	}
-
-	return programEntry.Program
+	return &programEntry
 }
 
 func (p *Programs) Set(location common.Location, program *interpreter.Program) {
@@ -68,26 +88,54 @@ func (p *Programs) Set(location common.Location, program *interpreter.Program) {
 	}
 }
 
-func (p *Programs) Cleanup(willDiscard bool) {
+// HasChanges indicates if any changes has been introduced
+// essentially telling if this object is identical to its parent
+func (p *Programs) HasChanges() bool {
+	return len(p.programs) > 0 || p.cleaned
+}
+
+//func (p *Programs) Merge(child *Programs) {
+//	p.lock.Lock()
+//	defer p.lock.Unlock()
+//
+//	if child.cleaned {
+//		p.parentFunc = emptyProgramGetFunc
+//		p.cleaned = true
+//		p.programs = make(map[common.LocationID]ProgramEntry)
+//	} else {
+//		for id, entry := range child.programs {
+//			p.programs[id] = entry
+//		}
+//	}
+//}
+
+func (p *Programs) Cleanup(changedPrograms []ChangedProgram) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	// In mature system, we would track dependencies between contracts
-	// and invalidate only affected ones
-	// But currently we just stop using parent's data to prevent
-	// infinite chaining of objects
-	p.parentFunc = emptyProgramGetFunc
+	// and invalidate only affected ones, possibly setting them to
+	// nil so they will override parent's data, but for now
+	// just throw everything away and use a special flag for this
+	if len(changedPrograms) > 0 {
 
-	// additionally, if we are not discarding this cache
+		p.cleaned = true
+
+		// Sop using parent's data to prevent
+		// infinite chaining of objects
+		p.parentFunc = emptyProgramGetFunc
+
+		// start with empty storage
+		p.programs = make(map[common.LocationID]ProgramEntry)
+		return
+	}
+
+	// However, if none of the programs were changed
 	// we remove all the non AddressLocation data
 	// (those are temporary tx related entries)
-	// if cache is going to be discarded anyway
-	// we don't bother
-	if !willDiscard {
-		for id, entry := range p.programs {
-			if _, is := entry.Location.(common.AddressLocation); !is {
-				delete(p.programs, id)
-			}
+	for id, entry := range p.programs {
+		if _, is := entry.Location.(common.AddressLocation); !is {
+			delete(p.programs, id)
 		}
 	}
 }

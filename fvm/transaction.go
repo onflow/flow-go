@@ -22,7 +22,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State, *Programs) error
 }
 
 type TransactionProcedure struct {
@@ -37,9 +37,9 @@ type TransactionProcedure struct {
 	Err     Error
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State, programs *Programs) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st)
+		err := p.Process(vm, ctx, proc, st, programs)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -69,8 +69,9 @@ func (i *TransactionInvocator) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
-	env, err := newEnvironment(ctx, vm, st)
+	env, err := newEnvironment(ctx, vm, st, programs)
 	if err != nil {
 		return err
 	}
@@ -93,6 +94,8 @@ func (i *TransactionInvocator) Process(
 		i.safetyErrorCheck(err)
 		return err
 	}
+
+	programs.Cleanup(env.changedPrograms)
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
