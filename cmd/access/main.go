@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	accessstorage "github.com/onflow/flow-go/engine/access/storage"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -206,6 +207,9 @@ func main() {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			panicyBlocks := &accessstorage.Blocks{
+				Blocks: node.Storage.Blocks,
+			}
 			rpcEng = rpc.New(
 				node.Logger,
 				node.State,
@@ -213,7 +217,7 @@ func main() {
 				executionRPC,
 				collectionRPC,
 				historicalAccessRPCs,
-				node.Storage.Blocks,
+				panicyBlocks,
 				node.Storage.Headers,
 				node.Storage.Collections,
 				node.Storage.Transactions,
