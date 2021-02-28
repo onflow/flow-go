@@ -39,6 +39,9 @@ type Node struct {
 	regCount  uint64          // number of registers allocated in the subtree
 }
 
+// why depth is in 16 bits?
+// is 64 bits enough for regCount?
+
 // NewNode creates a new Node.
 // UNCHECKED requirement: combination of values must conform to
 // a valid node type (see documentation of `Node` for details)
@@ -115,6 +118,7 @@ func NewLeaf(path ledger.Path,
 
 // NewInterimNode creates a new Node with the provided value and no children.
 // UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
+// UNCHECKED requirement: if lchild != nil then height = lchild.height + 1, and same for rchild
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	var lMaxDepth, rMaxDepth uint16
 	var lRegCount, rRegCount uint64
@@ -154,13 +158,17 @@ func (n *Node) computeHash() []byte {
 	}
 
 	// this is an INTERIOR node at least one of lChild or rChild is not nil.
-	h1 := common.GetDefaultHashForHeight(n.height - 1)
+	var h1, h2 []byte
 	if n.lChild != nil {
 		h1 = n.lChild.Hash()
+	} else {
+		h1 = common.GetDefaultHashForHeight(n.height - 1)
 	}
-	h2 := common.GetDefaultHashForHeight(n.height - 1)
+
 	if n.rChild != nil {
 		h2 = n.rChild.Hash()
+	} else {
+		h2 = common.GetDefaultHashForHeight(n.height - 1)
 	}
 	return common.HashInterNode(h1, h2)
 }
@@ -220,6 +228,7 @@ func (n *Node) RightChild() *Node { return n.rChild }
 func (n *Node) IsLeaf() bool {
 	// Per definition, a node is a leaf if and only if it has defined path
 	return n.path != nil && len(n.path) > 0
+	// shouldn't n.path != nil be enough?
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree
@@ -242,20 +251,21 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 }
 
 // AllPayloads returns the payload of this node and all payloads of the subtrie
+// UNCHECKED : n != nil
 func (n *Node) AllPayloads() []ledger.Payload {
 	payloads := make([]ledger.Payload, 0)
-	if n.IsLeaf() {
-		payloads = append(payloads, *n.Payload())
-	}
-
-	if lChild := n.LeftChild(); lChild != nil {
-		cp := lChild.AllPayloads()
-		payloads = append(payloads, cp...)
-	}
-
-	if rChild := n.RightChild(); rChild != nil {
-		cp := rChild.AllPayloads()
-		payloads = append(payloads, cp...)
-	}
+	recursiveAllPayload(&payloads, n)
 	return payloads
+}
+
+func recursiveAllPayload(payloads *[]ledger.Payload, n *Node) {
+	if n == nil { // TODO : this check is not needed if all tests are using a full tree (either 0 or 2 children)
+		return
+	}
+	if n.IsLeaf() {
+		*payloads = append(*payloads, *n.Payload())
+		return
+	}
+	recursiveAllPayload(payloads, n.lChild)
+	recursiveAllPayload(payloads, n.rChild)
 }

@@ -6,12 +6,13 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	c "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // default value and default hash value for a default node
-var defaultLeafHash []byte
+var defaultLeafHash c.Hash
 
 const defaultHashLen = 257
 
@@ -92,7 +93,47 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	return out[:]
 }
 
+// HashLeafIn generates hash value for leaf nodes (SHA3-256)
+// and stores the result in the result input
+//
+// path must be a 32 byte slice.
+// note that we don't include the keys here as they are already included in the path
+func HashLeafIn(result *[HashLen]byte, path []byte, value []byte) {
+	// TODO: this is a sanity check and should be removed soon
+	if len(path) != HashLen {
+		log.Warn().Msgf("HashLeaf path input should be 32 bytes, got %d", len(path))
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(path)
+		_, _ = hasher.Write(value)
+		copy((*result)[:], hasher.SumHash())
+		return
+	}
+	hasher := new256()
+	hasher.hash256Plus(result, path, value) // path is always 256 bits
+}
+
+// HashInterNodeIn generates hash value for intermediate nodes (SHA3-256)
+// and stores the result in the input array.
+//
+// result slice can be equal to hash1 or hash2.
+// hash1 and hash2 must each be a 32 byte slice.
+func HashInterNodeIn(result *[HashLen]byte, hash1 []byte, hash2 []byte) {
+	// TODO: this is a sanity check and should be removed soon
+	if len(hash1) != HashLen || len(hash2) != HashLen {
+		log.Warn().Msgf("HashInterNode inputs should be 32 bytes, got %d and %d",
+			len(hash1), len(hash2))
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(hash1)
+		_, _ = hasher.Write(hash2)
+		copy((*result)[:], hasher.SumHash())
+		return
+	}
+	hasher := new256()
+	hasher.hash256plus256(result, hash1, hash2) // hash1 and hash2 are 256 bits
+}
+
 // ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
+// UNCHECKED: payload!= nil
 func ComputeCompactValue(path []byte, payload *ledger.Payload, nodeHeight int) []byte {
 	// if register is unallocated: return default hash
 	if len(payload.Value) == 0 {
@@ -101,18 +142,18 @@ func ComputeCompactValue(path []byte, payload *ledger.Payload, nodeHeight int) [
 
 	// register is allocated
 	treeHeight := 8 * len(path)
-	// TODO Change this later to include the key as well
-	// for now is just the value to make it compatible with previous code
-	computedHash := HashLeaf(path, payload.Value) // we first compute the hash of the fully-expanded leaf
-	for h := 1; h <= nodeHeight; h++ {            // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+
+	var computedHash [HashLen]byte
+	HashLeafIn(&computedHash, path, payload.Value) // we first compute the hash of the fully-expanded leaf
+	for h := 1; h <= nodeHeight; h++ {             // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
 		bit := utils.Bit(path, treeHeight-h)
 		if bit == 1 { // right branching
-			computedHash = HashInterNode(GetDefaultHashForHeight(h-1), computedHash)
+			HashInterNodeIn(&computedHash, GetDefaultHashForHeight(h-1), computedHash[:])
 		} else { // left branching
-			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(h-1))
+			HashInterNodeIn(&computedHash, computedHash[:], GetDefaultHashForHeight(h-1))
 		}
 	}
-	return computedHash
+	return computedHash[:]
 }

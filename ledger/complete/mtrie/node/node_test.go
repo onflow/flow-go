@@ -120,7 +120,7 @@ func Test_AllPayloads(t *testing.T) {
 	n3 := node.NewLeaf(path, payload, 0)
 	n4 := node.NewInterimNode(1, n1, n2)
 	n5 := node.NewInterimNode(1, n4, n3)
-	require.Equal(t, len(n5.AllPayloads()), 3)
+	require.Equal(t, 3, len(n5.AllPayloads()))
 }
 
 func Test_VerifyCachedHash(t *testing.T) {

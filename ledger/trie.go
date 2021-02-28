@@ -119,9 +119,9 @@ func (p Path) Equals(o Path) bool {
 
 // DeepCopy returns a deep copy of the payload
 func (p *Path) DeepCopy() Path {
-	newP := make([]byte, len(*p))
-	copy(newP, *p)
-	return Path(newP)
+	newP := make([]byte, 0, len(*p))
+	path := []byte(*p)
+	return Path(append(newP, path...))
 }
 
 // Payload is the smallest immutable storable unit in ledger
