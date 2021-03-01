@@ -200,9 +200,15 @@ func (e *Engine) onChunkDataRequest(
 }
 
 func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
+
 	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
+	}
+
+	stakedAt := e.staker.AmIStakedAt(blockID)
+	if !stakedAt {
+		return nil, engine.NewInvalidInputErrorf("this node is not staked at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
 	}
 
 	origin, err := e.state.AtBlockID(blockID).Identity(originID)
@@ -216,7 +222,7 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 	}
 
 	if origin.Stake == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s is not staked for the epoch corresponding to the requested chunk data pack", origin.NodeID)
+		return nil, engine.NewInvalidInputErrorf("node %s is not staked at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
 	}
 	return origin, nil
 }

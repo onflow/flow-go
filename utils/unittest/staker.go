@@ -1,13 +1,10 @@
 package unittest
 
 import (
-	"fmt"
-
-	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type FixedStaker struct {
-	events.Noop
 	Staked bool
 }
 
@@ -17,11 +14,6 @@ func NewFixedStaker(initial bool) *FixedStaker {
 	}
 }
 
-func (f *FixedStaker) Refresh() error {
-	return nil
-}
-
-func (f *FixedStaker) AmIStaked() bool {
-	fmt.Printf("am I staked? %t\n", f.Staked)
+func (f *FixedStaker) AmIStakedAt(_ flow.Identifier) bool {
 	return f.Staked
 }

@@ -29,7 +29,6 @@ import (
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/state/protocol/events"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
@@ -1025,15 +1024,10 @@ func TestChunkifyEvents(t *testing.T) {
 }
 
 type AlternatingStaker struct {
-	events.Noop
 	Staked bool
 }
 
-func (a *AlternatingStaker) Refresh() error {
-	return nil
-}
-
-func (a *AlternatingStaker) AmIStaked() bool {
+func (a *AlternatingStaker) AmIStakedAt(_ flow.Identifier) bool {
 	a.Staked = !a.Staked
 	return !a.Staked
 }

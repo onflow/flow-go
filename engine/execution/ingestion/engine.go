@@ -353,11 +353,6 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 
 		log.Info().Msg("all unexecuted have been successfully reloaded")
 
-		err = e.staker.Refresh()
-		if err != nil {
-			return fmt.Errorf("cannot refresh staker state: %w", err)
-		}
-
 		return nil
 	})
 }
@@ -564,7 +559,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
 	broadcasted := false
-	if !isExecutedBlockSealed && e.staker.AmIStaked() {
+	if !isExecutedBlockSealed && e.staker.AmIStakedAt(executableBlock.Block.ID()) {
 		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 		if err != nil {
 			e.log.Err(err).Msg("critical: failed to broadcast the receipt")

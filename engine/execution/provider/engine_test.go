@@ -58,12 +58,13 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("unstaked (0 stake) origin", func(t *testing.T) {
+		staker := &unittest.FixedStaker{Staked: true}
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), staker: staker}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -94,12 +95,13 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("unstaked (not found origin) origin", func(t *testing.T) {
+		staker := &unittest.FixedStaker{Staked: true}
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), staker: staker}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -210,8 +212,9 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("reply to chunk data pack request only when staked", func(t *testing.T) {
-		ps := new(protocol.State)
-		ss := new(protocol.Snapshot)
+
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
 		con := new(mocknetwork.Conduit)
 
 		execState := new(state.ExecutionState)
@@ -224,8 +227,14 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		chunkID := unittest.IdentifierFixture()
 		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 		collection := unittest.CollectionFixture(1)
+		blockID := unittest.IdentifierFixture()
 
-		ps.On("Final").Return(ss).Once()
+		execState.
+			On("GetBlockIDByChunkID", chunkID).
+			Return(blockID, nil)
+		//ps.On("Final").Return(ss).Once()
+		ps.On("AtBlockID", blockID).Return(ss)
+
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
 		con.On("Unicast", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
@@ -239,7 +248,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
-			Return(chunkDataPack, nil).Once()
+			Return(chunkDataPack, nil).Twice()
 
 		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
 
@@ -253,11 +262,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		staker.Staked = false
 
-		// we execute the same method again, but with node being unstaken
-		// since all mocked methods are set to execute only once
-		// test should fail should this call respond to chkd
 		err = e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
-		assert.NoError(t, err)
+		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
