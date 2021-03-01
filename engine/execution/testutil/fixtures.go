@@ -36,6 +36,20 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 		AddAuthorizer(chain.ServiceAddress())
 }
 
+func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount, service: AuthAccount) {
+                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              }
+            }`, contractName, encoded)),
+		).
+		AddAuthorizer(authorizer).
+		AddAuthorizer(chain.ServiceAddress())
+}
+
 func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
