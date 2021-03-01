@@ -16,7 +16,7 @@ import (
 )
 
 func TestForestStoreAndLoad(t *testing.T) {
-	pathByteSize := 1
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -26,15 +26,15 @@ func TestForestStoreAndLoad(t *testing.T) {
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
-	p1 := utils.OneBytePath(1)
+	p1 := utils.PathByUint8(1)
 	v1 := utils.LightPayload8('A', 'a')
-	p2 := utils.OneBytePath(2)
+	p2 := utils.PathByUint8(2)
 	v2 := utils.LightPayload8('B', 'b')
-	p3 := utils.OneBytePath(130)
+	p3 := utils.PathByUint8(130)
 	v3 := utils.LightPayload8('C', 'c')
-	p4 := utils.OneBytePath(131)
+	p4 := utils.PathByUint8(131)
 	v4 := utils.LightPayload8('D', 'd')
-	p5 := utils.OneBytePath(132)
+	p5 := utils.PathByUint8(132)
 	v5 := utils.LightPayload8('E', 'e')
 
 	paths := []ledger.Path{p1, p2, p3, p4, p5}
@@ -44,7 +44,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	rootHash, err = mForest.Update(update)
 	require.NoError(t, err)
 
-	p6 := utils.OneBytePath(133)
+	p6 := utils.PathByUint8(133)
 	v6 := utils.LightPayload8('F', 'f')
 	update = &ledger.TrieUpdate{RootHash: rootHash, Paths: []ledger.Path{p6}, Payloads: []*ledger.Payload{v6}}
 	rootHash, err = mForest.Update(update)
