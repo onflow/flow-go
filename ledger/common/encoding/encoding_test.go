@@ -92,13 +92,13 @@ func Test_BatchProofEncodingDecoding(t *testing.T) {
 // Test_TrieUpdateEncodingDecoding tests encoding decoding functionality of a trie update
 func Test_TrieUpdateEncodingDecoding(t *testing.T) {
 
-	p1 := utils.TwoBytesPath(2)
+	p1 := utils.PathByUint16(2)
 	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1 part 1"))
 	kp2 := ledger.NewKeyPart(uint16(22), []byte("key 1 part 2"))
 	k1 := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
 	pl1 := ledger.NewPayload(k1, ledger.Value([]byte{'A'}))
 
-	p2 := utils.TwoBytesPath(2)
+	p2 := utils.PathByUint16(2)
 	kp3 := ledger.NewKeyPart(uint16(1), []byte("key2 part 1"))
 	k2 := ledger.NewKey([]ledger.KeyPart{kp3})
 	pl2 := ledger.NewPayload(k2, ledger.Value([]byte{'B'}))
