@@ -156,6 +156,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
 	log := e.log.With().
 		Hex("block_id", logging.ID(blockID)).
+		Uint64("block_height", block.Header.Height).
 		Int("receipt_num", len(block.Payload.Receipts)).Logger()
 
 	log.Debug().Msg("new finalized block arrived")
