@@ -52,7 +52,7 @@ func TestHandler(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
-	suite.log = zerolog.Logger{}
+	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
@@ -247,14 +247,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	txID := transactionBody.ID()
 	blockID := block.ID()
 
-	ids := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-	receipt := unittest.ReceiptForBlockFixture(&block)
-	receipt.ExecutorID = ids[0].NodeID
-	validTestENMap[receipt.ExecutorID] = true
-	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]*flow.ExecutionReceipt{receipt}, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+	receipts := suite.setupReceipts(&block)
+	validTestENMap[receipts[0].ExecutorID] = true
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -535,7 +529,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	setupStorage := func(n int) []*flow.Header {
 		headers := make([]*flow.Header, n)
-		ids = unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleExecution))
+		ids = unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 
 		for i := 0; i < n; i++ {
 			b := unittest.BlockFixture()
@@ -545,13 +539,16 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 			headers[i] = b.Header
 
-			r := unittest.ReceiptForBlockFixture(&b)
-			r.ExecutorID = ids[i].NodeID
+			receipt1 := unittest.ReceiptForBlockFixture(&b)
+			receipt1.ExecutorID = ids[0].NodeID
+			receipt2 := unittest.ReceiptForBlockFixture(&b)
+			receipt2.ExecutorID = ids[1].NodeID
+			receipt1.ExecutionResult = receipt2.ExecutionResult
 			// mark as valid EN
-			validTestENMap[r.ExecutorID] = true
+			validTestENMap[receipt1.ExecutorID] = true
 			suite.receipts.
 				On("ByBlockIDAllExecutionReceipts", b.ID()).
-				Return([]*flow.ExecutionReceipt{r}, nil).Once()
+				Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil).Once()
 		}
 
 		return headers
@@ -918,14 +915,7 @@ func (suite *Suite) TestGetAccount() {
 		Return(exeResp, nil).
 		Once()
 
-	ids := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleExecution))
-	receipt := unittest.ReceiptForBlockFixture(&block)
-	receipt.ExecutorID = ids[0].NodeID
-
-	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", blockID).
-		Return([]*flow.ExecutionReceipt{receipt}, nil).Once()
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+	receipts := suite.setupReceipts(&block)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -947,7 +937,7 @@ func (suite *Suite) TestGetAccount() {
 	)
 
 	suite.Run("happy path - valid request and valid response", func() {
-		validENMap = map[flow.Identifier]bool{receipt.ExecutorID: true}
+		validENMap = map[flow.Identifier]bool{receipts[0].ExecutorID: true}
 		account, err := backend.GetAccountAtLatestBlock(ctx, address)
 		suite.checkResponse(account, err)
 
@@ -1061,18 +1051,26 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		blockIDExecNodeMap[block.ID()] = ids
 		allExecutionIDs = append(allExecutionIDs, ids...)
 
+		// same execution result for all receipts for this block
+		executionResult := unittest.ExecutionResultFixture()
 		receipts := make([]*flow.ExecutionReceipt, receiptPerBlock)
 		for j := 0; j < receiptPerBlock; j++ {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = ids[j].NodeID
-			// mark as valid EN
-			validENMap[r.ExecutorID] = true
+			er := *executionResult
+			r.ExecutionResult = er
 			receipts[j] = r
 		}
 		suite.receipts.
 			On("ByBlockIDAllExecutionReceipts", block.ID()).
 			Return(receipts, nil).Once()
 	}
+
+	validENMap = make(map[flow.Identifier]bool, len(allExecutionIDs))
+	for _, id := range allExecutionIDs {
+		validENMap[id.ID()] = true
+	}
+	suite.snapshot.On("Identities", mock.Anything).Return(allExecutionIDs, nil)
 
 	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
@@ -1083,7 +1081,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 
 	testBlock := blocks[0]
 	expectedList := blockIDExecNodeMap[testBlock.ID()]
-	actualList, err := executionNodesForBlockID(testBlock.ID(), suite.receipts, suite.state)
+	actualList, err := executionNodesForBlockID(testBlock.ID(), suite.receipts, suite.state, suite.log)
 	require.NoError(suite.T(), err)
 	require.ElementsMatch(suite.T(), actualList, expectedList)
 }
@@ -1101,6 +1099,23 @@ func (suite *Suite) assertAllExpectations() {
 func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
+}
+
+func (suite *Suite) setupReceipts(block *flow.Block) []*flow.ExecutionReceipt {
+	ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	receipt1 := unittest.ReceiptForBlockFixture(block)
+	receipt1.ExecutorID = ids[0].NodeID
+	receipt2 := unittest.ReceiptForBlockFixture(block)
+	receipt2.ExecutorID = ids[1].NodeID
+	receipt1.ExecutionResult = receipt2.ExecutionResult
+
+	receipts := []*flow.ExecutionReceipt{receipt1, receipt2}
+	suite.receipts.
+		On("ByBlockIDAllExecutionReceipts", block.ID()).
+		Return(receipts, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+	return receipts
+
 }
 
 func getEvents(n int) []flow.Event {

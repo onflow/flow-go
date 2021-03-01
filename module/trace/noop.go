@@ -3,6 +3,7 @@ package trace
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
@@ -70,6 +71,15 @@ func (t *NoopTracer) StartSpanFromParent(
 	opts ...opentracing.StartSpanOption,
 ) opentracing.Span {
 	return &NoopSpan{t}
+}
+
+func (t *NoopTracer) RecordSpanFromParent(
+	span opentracing.Span,
+	operationName SpanName,
+	duration time.Duration,
+	logs []opentracing.LogRecord,
+	opts ...opentracing.StartSpanOption,
+) {
 }
 
 type InternalTracer struct {

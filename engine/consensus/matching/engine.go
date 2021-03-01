@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"time"
 
@@ -172,7 +173,7 @@ func New(
 	// of conditions, which only change with new blocks or new receipts.
 	// TEMPORARY FIX: to avoid sealing checks to monopolize the engine and delay processing
 	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
-	e.unit.LaunchPeriodically(e.checkSealing, 2*time.Second, 120*time.Second)
+	e.unit.LaunchPeriodically(e.checkSealing, 2*time.Second, 10*time.Second)
 
 	return e, nil
 }
@@ -809,50 +810,9 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 		}
 
 		if matched || emergencySealed {
-			// add the result to the results that should be sealed
-
-			// HOTFIX: the following will only consider a block sealable if we have _more_ than 1 receipt committing to the same result
-			receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(incorporatedResult.Result.BlockID)
-			if err != nil {
-				log.Error().Err(err).
-					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-					Msg("could not get receipts by block ID")
-				continue
-			}
-			receiptForResult := make(map[flow.Identifier]*flow.ExecutionReceipt)
-			for _, rcpt := range receipts {
-				resultID := rcpt.ExecutionResult.ID()
-				r1, found := receiptForResult[resultID]
-				if !found {
-					receiptForResult[resultID] = rcpt
-					continue
-				}
-				if r1.ID() == rcpt.ID() {
-					log.Error().
-						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-						Hex("receipt_id", logging.ID(rcpt.ID())).
-						Msg("duplicated receipts in blockID -> executor -> receipt ID storage")
-					continue
-				}
-				if r1.ExecutorID == rcpt.ExecutorID {
-					log.Error().
-						Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-						Hex("receipt_id", logging.ID(rcpt.ID())).
-						Msg("duplicated receipts from SAME EXECUTOR in blockID -> executor -> receipt ID storage")
-					continue
-				}
-
-				// we only reach the code below, if we already had a receipt in the map receiptForResult
-				// that is from DIFFERENT executor
-				log.Info().
-					Hex("block_id", logging.ID(incorporatedResult.Result.BlockID)).
-					Str("receipt_1_id", r1.ID().String()).
-					Str("receipt_1_executor", r1.ExecutorID.String()).
-					Str("receipt_2_id", rcpt.ID().String()).
-					Str("receipt_2_executor", rcpt.ExecutorID.String()).
-					Msg("producing candidate seal")
+			if e.resultHasMultipleReceipts(incorporatedResult) {
+				// add the result to the results that should be sealed
 				results = append(results, incorporatedResult)
-				break
 			}
 		}
 
@@ -873,6 +833,71 @@ func (e *Engine) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResu
 	}
 
 	return results, nextUnsealeds, nil
+}
+
+// resultHasMultipleReceipts implements an additional TEMPORARY SAFETY measure:
+// only consider incorporatedResult sealable if we have AT LEAST 2 receipts committing
+// to the respective result from _different_ ENs
+func (e *Engine) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedResult) bool {
+	blockID := incorporatedResult.Result.BlockID // block the result pertains to
+	resultID := incorporatedResult.Result.ID()
+
+	// get all receipts that are known for the block
+	receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	if err != nil {
+		log.Error().Err(err).
+			Hex("block_id", logging.ID(blockID)).
+			Msg("could not get receipts by block ID")
+		return false
+	}
+
+	// index receipts for given incorporatedResult by their executor
+	// in case there are multiple receipts from the same executor, we keep the last one
+	receiptByExecutor := make(map[flow.Identifier]*flow.ExecutionReceipt) //map: executorID -> receipt
+	for _, receipt := range receipts {
+		if resultID != receipt.ExecutionResult.ID() { // skip receipts that commit to _different_ results
+			continue
+		}
+		receiptByExecutor[receipt.ExecutorID] = receipt
+	}
+
+	// to few receipts
+	if len(receiptByExecutor) < 2 {
+		return false
+	}
+	// At this point, we have at least two receipts from different executors and should be able to
+	// generate a candidate seal. We log information about all receipts for the result as evidence.
+	// Note that this code is probably run many times (until the seal has been finalized).
+	// However, as soon as we have at least 2 receipts, the matching Engine will produce a candidate
+	// seal and put it in the mempool. To prevent spamming the logs, we log only when there is
+	// no seal in the mempool.
+	_, sealAlreadyGenerated := e.seals.ByID(incorporatedResult.ID()) // seals have the same ID as incorporatedResult
+	if !sealAlreadyGenerated {
+		header, err := e.headersDB.ByBlockID(blockID)
+		if err != nil {
+			log.Fatal().Err(err).
+				Hex("block_id", logging.ID(blockID)).
+				Msg("could not header for block")
+			return false
+		}
+
+		l := e.log.Info().
+			Str("block_id", incorporatedResult.Result.BlockID.String()).
+			Uint64("block_height", header.Height).
+			Str("result_id", resultID.String())
+
+		// add information about each receipt to log message
+		count := 0
+		for executorID, receipt := range receiptByExecutor {
+			keyPrefix := fmt.Sprintf("receipt_%d", count)
+			l = l.Str(keyPrefix+"_id", receipt.ID().String()).
+				Str(keyPrefix+"_executor", executorID.String())
+			count++
+		}
+
+		l.Msg("multiple-receipts sealing condition satisfied")
+	}
+	return true
 }
 
 // matchChunk checks that the number of ResultApprovals collected by a chunk
@@ -1114,7 +1139,6 @@ func (e *Engine) clearPools(sealedIDs []flow.Identifier) error {
 // blocks.
 // it returns the number of pending receipts requests being created
 func (e *Engine) requestPendingReceipts() (int, uint64, error) {
-
 	// last sealed block
 	sealed, err := e.state.Sealed().Head()
 	if err != nil {
@@ -1139,16 +1163,13 @@ func (e *Engine) requestPendingReceipts() (int, uint64, error) {
 	// heights would stop the sealing.
 	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, e.maxResultsToRequest)
 
-	// turn mempool into Lookup table: BlockID -> Result
-	knownResultForBlock := make(map[flow.Identifier]struct{})
-	for _, r := range e.incorporatedResults.All() {
-		knownResultForBlock[r.Result.BlockID] = struct{}{}
-	}
+	// set of blocks for which we have a candidate seal:
+	blocksWithCandidateSeal := make(map[flow.Identifier]struct{})
 	for _, s := range e.seals.All() {
-		knownResultForBlock[s.Seal.BlockID] = struct{}{}
+		blocksWithCandidateSeal[s.Seal.BlockID] = struct{}{}
 	}
 
-	var firstMissingHeight uint64
+	var firstMissingHeight uint64 = math.MaxUint64
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
 	// order to request them.
@@ -1167,46 +1188,72 @@ func (e *Engine) requestPendingReceipts() (int, uint64, error) {
 		// check if we have an result for the block at this height
 		blockID := header.ID()
 
-		_, ok := knownResultForBlock[blockID]
-		if ok {
+		// if we have already a candidate seal, we skip any further processing
+		// CAUTION: this is not BFT, as the existence of a candidate seal
+		//          does _not_ imply that all parent results are sealable.
+		// TODO: update for full BFT
+		if _, hasCandidateSeal := blocksWithCandidateSeal[blockID]; hasCandidateSeal {
 			continue
 		}
 
-		// since the index is only added when the block which includes the receipts
-		// get finalized, so the returned receipts must be from finalized blocks.
-		// Therefore, the return receipts must be incoporated receipts, which
-		// are safe to be added to the mempool
+		// Without the logic below, the matching engine would produce IncorporatedResults
+		// only from receipts received directly from ENs. Matching Core would not know about
+		// Receipts that are incorporated by other nodes in their blocks blocks (but never
+		// received directly from the EN). Also, receipts might have been lost from the
+		// mempool during a node crash. Hence we check also if we have the receipts in
+		// storage (which also persists receipts pre-crash or when received from other
+		// nodes as part of a block proposal).
+		// Currently, receipts are only indexed by the block which they compute when:
+		// (a) A block containing the receipt is incorporated into the main chain.
+		//     Therefore, the receipt must have passed validation
+		// (b) The matching engine processes and validates the receipt
+		// In either case, only valid receipts are index.
+		// CAUTION: shortcut for Sealing Phase 2:
+		// * The matching engine adds any known receipts for unsealed blocks
+		//   directly to the IncorporatedResults mempool. Hence, we do the same
+		//   for any receipts from the storage layer.
+		// ToDo: this logic must be updated for Sealing Phase 3
+		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
+		// and that the IncorporatedResult's IncorporatedBlockID should be set
+		// correctly.
 		receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
 		if err != nil {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}
 
-		if len(receipts) > 0 {
-			for _, receipt := range receipts {
-				_, err = e.receipts.AddReceipt(receipt, header)
-				if err != nil {
-					return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
-				}
+		enoughReceipts := false
+		receiptsForResult := make(map[flow.Identifier]int) // map: resultID -> number of receipts committing to this result
+		for _, receipt := range receipts {
 
-				_, err = e.incorporatedResults.Add(
-					flow.NewIncorporatedResult(
-						receipt.ExecutionResult.BlockID,
-						&receipt.ExecutionResult,
-					),
-				)
-
-				if err != nil {
-					return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
-				}
+			_, err = e.receipts.AddReceipt(receipt, header)
+			if err != nil {
+				return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
 			}
+
+			_, err = e.incorporatedResults.Add(
+				flow.NewIncorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult),
+			)
+			if err != nil {
+				return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
+			}
+
+			resultID := receipt.ExecutionResult.ID()
+			receiptsForResult[resultID] += 1
+			if receiptsForResult[resultID] >= 2 {
+				enoughReceipts = true
+			}
+		}
+
+		// we require at least 2 receipts having the same result to seal a block,
+		// if we haven't seen as many receipt, we will keep fetching receipts .
+		if enoughReceipts {
 			continue
 		}
 
 		missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
-		if firstMissingHeight == 0 {
+		if height < firstMissingHeight {
 			firstMissingHeight = height
 		}
-
 	}
 
 	// request missing execution results, if sealed height is low enough
