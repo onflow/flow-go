@@ -1,7 +1,6 @@
 package assigner
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -142,9 +141,6 @@ func TestAssignerEngine(t *testing.T) {
 	t.Run("new block multiple assignments", func(t *testing.T) {
 		newBlockMultipleAssignment(t)
 	})
-	t.Run("chunk queue unhappy path error", func(t *testing.T) {
-		chunkQueueUnhappyPathError(t)
-	})
 	t.Run("chunk queue unhappy path duplicate", func(t *testing.T) {
 		chunkQueueUnhappyPathDuplicate(t)
 	})
@@ -198,7 +194,9 @@ func newBlockHappyPath(t *testing.T) {
 func newBlockUnstaked(t *testing.T) {
 	// creates an assigner engine for an unstaked verification node.
 	s := SetupTest(WithIdentity(
-		unittest.IdentityFixture(unittest.WithStake(0))))
+		unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleVerification),
+			unittest.WithStake(0))))
 	e := NewAssignerEngine(s)
 
 	// creates a container block, with a single receipt, that contains
@@ -358,49 +356,6 @@ func newBlockMultipleAssignment(t *testing.T) {
 		s.notifier,
 		s.newChunkListener,
 		s.indexer)
-}
-
-// chunkQueueUnhappyPathError evaluates that if chunk queue returns an error upon submission of a
-// chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
-// added to the chunks queue, the consumer should not be notified.
-func chunkQueueUnhappyPathError(t *testing.T) {
-	s := SetupTest()
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains a single chunk assigned
-	// to verification node.
-	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(s.myID())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 1)
-
-	// mocks processing assigned chunks
-	// adding new chunks to queue results in an error
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
-		Return(false, fmt.Errorf("error")).
-		Times(chunksNum)
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends block containing receipt to assigner engine
-	e.ProcessFinalizedBlock(containerBlock)
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.notifier,
-		s.chunksQueue,
-		s.indexer)
-
-	// job listener should not be notified as no new chunk is added.
-	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
 // chunkQueueUnhappyPathDuplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.

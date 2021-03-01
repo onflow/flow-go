@@ -92,7 +92,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 	// verification node should be staked at the reference block id.
 	ok, err := stakedAsVerification(e.state, referenceBlockID, e.me.NodeID())
 	if err != nil {
-		log.Error().Err(err).Msg("could not verify stake of verification node for result at reference block id")
+		log.Fatal().Err(err).Msg("could not verify stake of verification node for result at reference block id")
 		return
 	}
 	if !ok {
@@ -103,7 +103,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 	// chunk assignment
 	chunkList, err := e.chunkAssignments(context.Background(), &receipt.ExecutionResult)
 	if err != nil {
-		log.Error().Err(err).Msg("could not determine chunk assignment")
+		log.Fatal().Err(err).Msg("could not determine chunk assignment")
 		return
 	}
 	log.Info().
@@ -111,43 +111,43 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		Msg("chunk assignment done")
 
 	// pushes assigned chunks to chunks queue.
-	e.processChunks(chunkList, resultID)
+	for _, chunk := range chunkList {
+		e.processChunk(chunk, resultID)
+	}
 }
 
-// processChunks receives a list of chunks all belong to the same execution result. It creates a chunk locator
-// for each of those chunks and stores the chunk locator in the chunks queue.
+// processChunk receives a chunk that belongs to execution result id. It creates a chunk locator
+// for the chunk and stores the chunk locator in the chunks queue.
 //
-// Note that all chunks in the input chunk list are assume to be legitimately assigned to this verification node
-// (through the chunk assigner), and all belong to the same execution result.
+// Note that the chunk is assume to be legitimately assigned to this verification node
+// (through the chunk assigner), and belong to the execution result.
 //
 // Deduplication of chunk locators is delegated to the chunks queue.
-func (e *Engine) processChunks(chunkList flow.ChunkList, resultID flow.Identifier) {
-	for _, chunk := range chunkList {
-		log := e.log.With().
-			Hex("result_id", logging.ID(resultID)).
-			Hex("chunk_id", logging.ID(chunk.ID())).
-			Uint64("chunk_index", chunk.Index).Logger()
+func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Hex("chunk_id", logging.ID(chunk.ID())).
+		Uint64("chunk_index", chunk.Index).Logger()
 
-		locator := &chunks.Locator{
-			ResultID: resultID,
-			Index:    chunk.Index,
-		}
-
-		// pushes chunk locator to the chunks queue
-		ok, err := e.chunksQueue.StoreChunkLocator(locator)
-		if err != nil {
-			log.Error().Err(err).Msg("could not push chunk locator to chunks queue")
-			continue
-		}
-		if !ok {
-			log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
-			continue
-		}
-
-		// notifies chunk queue consumer of a new chunk
-		e.newChunkListener.Check()
-		log.Debug().Msg("chunk locator successfully pushed to chunks queue")
+	locator := &chunks.Locator{
+		ResultID: resultID,
+		Index:    chunk.Index,
 	}
+
+	// pushes chunk locator to the chunks queue
+	ok, err := e.chunksQueue.StoreChunkLocator(locator)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not push chunk locator to chunks queue")
+		return
+	}
+	if !ok {
+		log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
+		return
+	}
+
+	// notifies chunk queue consumer of a new chunk
+	e.newChunkListener.Check()
+	log.Debug().Msg("chunk locator successfully pushed to chunks queue")
 }
 
 // ProcessFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
