@@ -106,6 +106,8 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		log.Fatal().Err(err).Msg("could not determine chunk assignment")
 		return
 	}
+
+	// TODO: de-escalate to debug level on stable version.
 	log.Info().
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
@@ -173,7 +175,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 
 	// tells block consumer that it is done with this block
 	e.blockConsumerNotifier.Notify(blockID)
-	log.Debug().Msg("finished processing finalized block")
+	log.Info().Msg("finished processing finalized block")
 }
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
