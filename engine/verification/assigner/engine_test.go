@@ -124,12 +124,36 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 	return e
 }
 
-// TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
+// TestAssignerEngine runs all subtests in parallel.
+func TestAssignerEngine(t *testing.T) {
+	t.Parallel()
+	t.Run("new block happy path", func(t *testing.T) {
+		newBlockHappyPath(t)
+	})
+	t.Run("new block unstaked", func(t *testing.T) {
+		newBlockUnstaked(t)
+	})
+	t.Run("new block zero chunk", func(t *testing.T) {
+		newBlockNoChunk(t)
+	})
+	t.Run("new block no assigned chunk", func(t *testing.T) {
+		newBlockNoAssignedChunk(t)
+	})
+	t.Run("new block multiple assignments", func(t *testing.T) {
+		newBlockMultipleAssignment(t)
+	})
+	t.Run("chunk queue unhappy path error", func(t *testing.T) {
+		chunkQueueUnhappyPathError(t)
+	})
+	t.Run("chunk queue unhappy path duplicate", func(t *testing.T) {
+		chunkQueueUnhappyPathDuplicate(t)
+	})
+}
+
+// newBlockHappyPath evaluates that passing a new finalized block to assigner engine that contains
 // a receipt with one assigned chunk, results in the assigner engine passing the assigned chunk to the
 // chunks queue and notifying the job listener of the assigned chunks.
-func TestNewBlock_HappyPath(t *testing.T) {
-	t.Parallel()
-
+func newBlockHappyPath(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -168,12 +192,10 @@ func TestNewBlock_HappyPath(t *testing.T) {
 		s.indexer)
 }
 
-// TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
+// newBlockUnstaked evaluates that when verification node is unstaked at a reference block,
 // it drops the corresponding execution receipts for that block without performing any chunk assignment.
 // It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
-func TestNewBlock_Unstaked(t *testing.T) {
-	t.Parallel()
-
+func newBlockUnstaked(t *testing.T) {
 	// creates an assigner engine for an unstaked verification node.
 	s := SetupTest(WithIdentity(
 		unittest.IdentityFixture(unittest.WithStake(0))))
@@ -213,12 +235,10 @@ func TestNewBlock_Unstaked(t *testing.T) {
 		s.indexer)
 }
 
-// TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
+// newBlockNoChunk evaluates passing a new finalized block to assigner engine that contains
 // a receipt with no chunk in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should never notify the job listener.
-func TestNewBlock_NoChunk(t *testing.T) {
-	t.Parallel()
-
+func newBlockNoChunk(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -251,12 +271,10 @@ func TestNewBlock_NoChunk(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
-// TestNewBlock_NoAssignedChunk evaluates passing a new finalized block to assigner engine that contains
+// newBlockNoAssignedChunk evaluates passing a new finalized block to assigner engine that contains
 // a receipt with no assigned chunk for the verification node in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should not notify the job listener.
-func TestNewBlock_NoAssignedChunk(t *testing.T) {
-	t.Parallel()
-
+func newBlockNoAssignedChunk(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -296,12 +314,10 @@ func TestNewBlock_NoAssignedChunk(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
-// TestNewBlock_MultipleAssignment evaluates that passing a new finalized block to assigner engine that contains
+// newBlockMultipleAssignment evaluates that passing a new finalized block to assigner engine that contains
 // a receipt with multiple assigned chunk, results in the assigner engine passing all assigned chunks to the
 // chunks queue and notifying the job listener of the assigned chunks.
-func TestNewBlock_MultipleAssignment(t *testing.T) {
-	t.Parallel()
-
+func newBlockMultipleAssignment(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -344,12 +360,10 @@ func TestNewBlock_MultipleAssignment(t *testing.T) {
 		s.indexer)
 }
 
-// TestChunkQueue_UnhappyPath_Error evaluates that if chunk queue returns an error upon submission of a
+// chunkQueueUnhappyPathError evaluates that if chunk queue returns an error upon submission of a
 // chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
 // added to the chunks queue, the consumer should not be notified.
-func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
-	t.Parallel()
-
+func chunkQueueUnhappyPathError(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
@@ -389,11 +403,9 @@ func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
-// TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
+// chunkQueueUnhappyPathDuplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
 // This is important as without a new chunk successfully added to the chunks queue, the consumer should not be notified.
-func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
-	t.Parallel()
-
+func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	s := SetupTest()
 	e := NewAssignerEngine(s)
 
