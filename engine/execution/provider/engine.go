@@ -153,21 +153,6 @@ func (e *Engine) onChunkDataRequest(
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
-	if !e.staker.AmIStaked() {
-		e.log.Warn().Str("origin_id", originID.String()).Msg("node not staked, but received chunk data pack request")
-		return nil
-	}
-
-	origin, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
-	}
-
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
 	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
@@ -177,7 +162,12 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	if err != nil {
-		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
+		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
+	}
+
+	origin, err := e.ensureStaked(cdp.ChunkID, originID)
+	if err != nil {
+		return err
 	}
 
 	var collection flow.Collection
@@ -207,6 +197,28 @@ func (e *Engine) onChunkDataRequest(
 		Msg("chunk data pack request successfully replied")
 
 	return nil
+}
+
+func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
+	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
+	}
+
+	origin, err := e.state.AtBlockID(blockID).Identity(originID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
+	}
+
+	// only verifier nodes are allowed to request chunk data packs
+	if origin.Role != flow.RoleVerification {
+		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
+	}
+
+	if origin.Stake == 0 {
+		return nil, engine.NewInvalidInputErrorf("node %s is not staked for the epoch corresponding to the requested chunk data pack", origin.NodeID)
+	}
+	return origin, nil
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
