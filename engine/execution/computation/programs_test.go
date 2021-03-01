@@ -38,39 +38,19 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	privKey := privateKeys[0]
 	// tx1 deploys contract version 1
 	tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
-	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
-		SetPayer(chain.ServiceAddress())
-	err = testutil.SignPayload(tx1, account, privKey)
-	require.NoError(t, err)
-	err = testutil.SignEnvelope(tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-	require.NoError(t, err)
+	prepareTx(t, tx1, account, privKey, 0, chain)
 
 	// tx2 calls the method of the contract (version 1)
 	tx2 := testutil.CreateEmitEventTransaction(account, account)
-	tx2.SetProposalKey(chain.ServiceAddress(), 0, 1).
-		SetPayer(chain.ServiceAddress())
-	err = testutil.SignPayload(tx2, account, privKey)
-	require.NoError(t, err)
-	err = testutil.SignEnvelope(tx2, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-	require.NoError(t, err)
+	prepareTx(t, tx2, account, privKey, 1, chain)
 
 	// tx3 updates the contract to version 2
 	tx3 := testutil.UpdateEventContractTransaction(account, chain, 2)
-	tx3.SetProposalKey(chain.ServiceAddress(), 0, 2).
-		SetPayer(chain.ServiceAddress())
-	err = testutil.SignPayload(tx3, account, privKey)
-	require.NoError(t, err)
-	err = testutil.SignEnvelope(tx3, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-	require.NoError(t, err)
+	prepareTx(t, tx3, account, privKey, 2, chain)
 
 	// tx4 calls the method of the contract (version 2)
 	tx4 := testutil.CreateEmitEventTransaction(account, account)
-	tx4.SetProposalKey(chain.ServiceAddress(), 0, 3).
-		SetPayer(chain.ServiceAddress())
-	err = testutil.SignPayload(tx4, account, privKey)
-	require.NoError(t, err)
-	err = testutil.SignEnvelope(tx4, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-	require.NoError(t, err)
+	prepareTx(t, tx4, account, privKey, 3, chain)
 
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3, tx4}
 
@@ -201,12 +181,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block11 (deploys contract version 1)", func(t *testing.T) {
 		block11tx1 := testutil.DeployEventContractTransaction(account, chain, 1)
-		block11tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block11tx1, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block11tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block11tx1, account, privKey, 0, chain)
 
 		txs11 := []*flow.TransactionBody{block11tx1}
 		col11 := flow.Collection{Transactions: txs11}
@@ -242,22 +217,13 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	t.Run("executing block111 (emit event (expected v1), update contract to v3)", func(t *testing.T) {
 		block111ExpectedValue := 1
+		// emit event
 		block111tx1 := testutil.CreateEmitEventTransaction(account, account)
-		block111tx1.SetProposalKey(chain.ServiceAddress(), 0, 1).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block111tx1, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block111tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block111tx1, account, privKey, 1, chain)
 
 		// update contract version 3
 		block111tx2 := testutil.UpdateEventContractTransaction(account, chain, 3)
-		block111tx2.SetProposalKey(chain.ServiceAddress(), 0, 2).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block111tx2, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block111tx2, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block111tx2, account, privKey, 2, chain)
 
 		col111 := flow.Collection{Transactions: []*flow.TransactionBody{block111tx1, block111tx2}}
 		guarantee111 := flow.CollectionGuarantee{
@@ -297,12 +263,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block1111 (emit event (expected v3))", func(t *testing.T) {
 		block1111ExpectedValue := 3
 		block1111tx1 := testutil.CreateEmitEventTransaction(account, account)
-		block1111tx1.SetProposalKey(chain.ServiceAddress(), 0, 3).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block1111tx1, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block1111tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block1111tx1, account, privKey, 3, chain)
 
 		col1111 := flow.Collection{Transactions: []*flow.TransactionBody{block1111tx1}}
 		guarantee1111 := flow.CollectionGuarantee{
@@ -339,21 +300,11 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block112 (emit event (expected v1))", func(t *testing.T) {
 		block112ExpectedValue := 1
 		block112tx1 := testutil.CreateEmitEventTransaction(account, account)
-		block112tx1.SetProposalKey(chain.ServiceAddress(), 0, 1).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block112tx1, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block112tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block112tx1, account, privKey, 1, chain)
 
 		// update contract version 4
 		block112tx2 := testutil.UpdateEventContractTransaction(account, chain, 4)
-		block112tx2.SetProposalKey(chain.ServiceAddress(), 0, 2).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block112tx2, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block112tx2, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block112tx2, account, privKey, 2, chain)
 
 		col112 := flow.Collection{Transactions: []*flow.TransactionBody{block112tx1, block112tx2}}
 		guarantee112 := flow.CollectionGuarantee{
@@ -391,12 +342,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block1121 (emit event (expected v4))", func(t *testing.T) {
 		block1121ExpectedValue := 4
 		block1121tx1 := testutil.CreateEmitEventTransaction(account, account)
-		block1121tx1.SetProposalKey(chain.ServiceAddress(), 0, 3).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block1121tx1, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block1121tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block1121tx1, account, privKey, 3, chain)
 
 		col1121 := flow.Collection{Transactions: []*flow.TransactionBody{block1121tx1}}
 		guarantee1121 := flow.CollectionGuarantee{
@@ -432,12 +378,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block12 (deploys contract V2)", func(t *testing.T) {
 
 		block12tx1 := testutil.DeployEventContractTransaction(account, chain, 2)
-		block12tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block12tx1, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block12tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block12tx1, account, privKey, 0, chain)
 
 		col12 := flow.Collection{Transactions: []*flow.TransactionBody{block12tx1}}
 		guarantee12 := flow.CollectionGuarantee{
@@ -471,12 +412,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	t.Run("executing block121 (emit event (expected V2)", func(t *testing.T) {
 		block121ExpectedValue := 2
 		block121tx1 := testutil.CreateEmitEventTransaction(account, account)
-		block121tx1.SetProposalKey(chain.ServiceAddress(), 0, 1).
-			SetPayer(chain.ServiceAddress())
-		err = testutil.SignPayload(block121tx1, account, privKey)
-		require.NoError(t, err)
-		err = testutil.SignEnvelope(block121tx1, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
+		prepareTx(t, block121tx1, account, privKey, 1, chain)
 
 		col121 := flow.Collection{Transactions: []*flow.TransactionBody{block121tx1}}
 		guarantee121 := flow.CollectionGuarantee{
@@ -507,6 +443,20 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// 1st event
 		hasValidEventValue(t, returnedComputationResult.Events[0], block121ExpectedValue)
 	})
+}
+
+func prepareTx(t *testing.T,
+	tx *flow.TransactionBody,
+	account flow.Address,
+	privKey flow.AccountPrivateKey,
+	seqNumber uint64,
+	chain flow.Chain) {
+	tx.SetProposalKey(chain.ServiceAddress(), 0, seqNumber).
+		SetPayer(chain.ServiceAddress())
+	err := testutil.SignPayload(tx, account, privKey)
+	require.NoError(t, err)
+	err = testutil.SignEnvelope(tx, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	require.NoError(t, err)
 }
 
 func hasValidEventValue(t *testing.T, event flow.Event, value int) {
