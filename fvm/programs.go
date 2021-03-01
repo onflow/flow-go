@@ -104,7 +104,7 @@ func (p *Programs) ForceCleanup() {
 
 	p.cleaned = true
 
-	// Sop using parent's data to prevent
+	// Stop using parent's data to prevent
 	// infinite chaining of objects
 	p.parentFunc = emptyProgramGetFunc
 

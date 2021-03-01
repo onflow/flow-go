@@ -87,12 +87,12 @@ func New(
 	return &e, nil
 }
 
-func (e *Manager) getProgramsOrEmpty(blockID flow.Identifier) *fvm.Programs {
+func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *fvm.Programs {
 	programs := e.programsCache.Get(blockID)
 	if programs == nil {
 		return fvm.NewEmptyPrograms()
 	}
-	return programs
+	return programs.ChildPrograms()
 }
 
 func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
@@ -100,7 +100,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	script := fvm.Script(code).WithArguments(arguments...)
 
-	programs := e.getProgramsOrEmpty(blockHeader.ID())
+	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
 	err := e.vm.Run(blockCtx, script, view, programs)
 	if err != nil {
@@ -167,7 +167,7 @@ func (e *Manager) ComputeBlock(
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 
-	programs := e.getProgramsOrEmpty(blockHeader.ID())
+	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
 	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
 	if err != nil {
