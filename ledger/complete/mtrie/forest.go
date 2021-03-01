@@ -95,7 +95,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 
 	// no key no change
 	if len(r.Paths) == 0 {
-		return make([]*ledger.Payload, 0), nil
+		return []*ledger.Payload{}, nil
 	}
 
 	// lookup the trie by rootHash
@@ -134,7 +134,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	orderedPayloads := make([]*ledger.Payload, len(r.Paths))
 	for i, p := range sortedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
-			orderedPayloads[j] = payloads[i].DeepCopy()
+			orderedPayloads[j] = payloads[i].DeepCopy() // why deepcopy? if needed, shouldn't the api return []ledger.Payload
 			totalPayloadSize += payloads[i].Size()
 		}
 	}
@@ -156,11 +156,11 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	}
 
 	if len(u.Paths) == 0 { // no key no change
-		return parentTrie.RootHash(), nil
+		return u.RootHash, nil
 	}
 
 	// sort and deduplicate paths (we only consider the last occurrence, and ignore the rest)
-	sortedPaths := make([]ledger.Path, 0)
+	deduplicatedPaths := make([]ledger.Path, 0)
 	payloadMap := make(map[string]ledger.Payload)
 	totalPayloadSize := 0
 	for i, path := range u.Paths {
@@ -170,26 +170,21 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		}
 		// check if doesn't exist
 		if _, ok := payloadMap[string(path)]; !ok {
-			sortedPaths = append(sortedPaths, path)
+			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		payloadMap[string(path)] = *u.Payloads[i]
-		totalPayloadSize += u.Payloads[i].Size()
+		totalPayloadSize += u.Payloads[i].Size() // not sure this is capturing what we want (it includes payloads of duplicated paths)
 	}
 
 	// TODO rename metrics names
 	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
-	// TODO we might be able to remove this
-	sort.Slice(sortedPaths, func(i, j int) bool {
-		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
-	})
-
-	sortedPayloads := make([]ledger.Payload, 0, len(sortedPaths))
-	for _, path := range sortedPaths {
-		sortedPayloads = append(sortedPayloads, payloadMap[string(path)])
+	payloads := make([]ledger.Payload, 0, len(deduplicatedPaths))
+	for _, path := range deduplicatedPaths {
+		payloads = append(payloads, payloadMap[string(path)])
 	}
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedPaths, sortedPayloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, payloads)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}

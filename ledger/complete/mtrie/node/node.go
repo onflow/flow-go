@@ -35,8 +35,10 @@ type Node struct {
 	path      ledger.Path     // the storage path (leaf nodes only)
 	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
 	hashValue []byte          // hash value of node (cached)
-	maxDepth  uint16          // captures the longest path from this node to compacted leafs in the subtree
-	regCount  uint64          // number of registers allocated in the subtree
+	// TODO : to delete
+	maxDepth uint16 // captures the longest path from this node to compacted leafs in the subtree
+	// TODO : to delete
+	regCount uint64 // number of registers allocated in the subtree
 }
 
 // why depth is in 16 bits?

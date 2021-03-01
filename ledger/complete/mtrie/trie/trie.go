@@ -182,7 +182,7 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []l
 				return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
 			}
 		}
-		// TODO: copy payload when using in-place MergeSort for separating the payloads
+		// TODO: copy payload when using in-place Quick Sort for separating the payloads
 		paths = append(paths, parentNode.Path()) // TODO: if paths are sorted, insert in order
 		payloads = append(payloads, *parentNode.Payload())
 
@@ -204,6 +204,7 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []l
 	rChild = parentTrie.update(nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
 	wg.Wait()
 
+	// mitigate storage exhaustion attack: overwrite a register with the exact current payload
 	if lChild == parentNode.LeftChild() && rChild == parentNode.RightChild() {
 		return parentNode
 	}
