@@ -128,6 +128,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 //             -> Block1121  (emit event - version should be 4)
 //     -> Block12 (deploy contract v2)
 //         -> Block121 (emit event - version should be 2)
+//             -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
 	// setup
 	rt := runtime.NewInterpreterRuntime()
@@ -162,8 +163,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	view := delta.NewView(ledger.Get)
 
 	var res *execution.ComputationResult
-	var block1, block11, block111, block112, block1121, block1111, block12, block121 *flow.Block
-	var block1View, block11View, block111View, block112View, block1121View, block1111View, block12View, block121View *delta.View
+	var block1, block11, block111, block112, block1121, block1111, block12, block121, block1211 *flow.Block
+	var block1View, block11View, block111View, block112View, block1121View, block1111View, block12View, block121View, block1211View *delta.View
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = &flow.Block{
 			Header: &flow.Header{
@@ -228,13 +229,10 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111, res = createTestBlockAndRun(t, engine, block111, col1111, block1111View)
 		// cache should include a program for this block
 		require.NotNil(t, programsCache.Get(block1111.ID()))
-
-		// had no change so cache should be equal to parent
-		// require.Equal(t, programsCache.Get(block111.ID()), programsCache.Get(block1111.ID()))
 		// 1st event
 		hasValidEventValue(t, res.Events[0], block1111ExpectedValue)
-
 	})
+
 	t.Run("executing block112 (emit event (expected v1))", func(t *testing.T) {
 		block112ExpectedValue := 1
 		block112tx1 := testutil.CreateEmitEventTransaction(account, account)
@@ -294,6 +292,22 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		// 1st event
 		hasValidEventValue(t, res.Events[0], block121ExpectedValue)
 	})
+	t.Run("executing Block1211 (emit event (expected V2)", func(t *testing.T) {
+		block1211ExpectedValue := 2
+		block1211tx1 := testutil.CreateEmitEventTransaction(account, account)
+		prepareTx(t, block1211tx1, account, privKey, 2, chain)
+
+		col1211 := flow.Collection{Transactions: []*flow.TransactionBody{block1211tx1}}
+		block1211View = block121View.NewChild()
+		block1211, res = createTestBlockAndRun(t, engine, block121, col1211, block1211View)
+		// cache should include a program for this block
+		require.NotNil(t, programsCache.Get(block1211.ID()))
+		// had no change so cache should be equal to parent
+		require.Equal(t, programsCache.Get(block111.ID()), programsCache.Get(block1111.ID()))
+		// 1st event
+		hasValidEventValue(t, res.Events[0], block1211ExpectedValue)
+	})
+
 }
 
 func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Block, col flow.Collection, view *delta.View) (*flow.Block, *execution.ComputationResult) {
