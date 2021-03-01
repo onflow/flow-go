@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/stretchr/testify/assert"
-	mock2 "github.com/stretchr/testify/mock"
+	testifymock "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,7 +32,7 @@ func TestExecutionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &execution.PingRequest{}
 	resp := &execution.PingResponse{}
-	en.handler.On("Ping", mock2.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	en.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
@@ -67,7 +67,7 @@ func TestCollectionNodeClientTimeout(t *testing.T) {
 	// setup the handler mock to not respond within the timeout
 	req := &access.PingRequest{}
 	resp := &access.PingResponse{}
-	cn.handler.On("Ping", mock2.Anything, req).After(timeout+time.Second).Return(resp, nil)
+	cn.handler.On("Ping", testifymock.Anything, req).After(timeout+time.Second).Return(resp, nil)
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
