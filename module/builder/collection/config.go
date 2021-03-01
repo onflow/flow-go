@@ -5,6 +5,7 @@ import (
 )
 
 const (
+	DefaultMinCollectionSize       uint    = 5        // minimum of 5 transactions per collection
 	DefaultMaxCollectionSize       uint    = 100      // max 100 transactions per collection
 	DefaultExpiryBuffer            uint    = 15       // 15 blocks for collections to be included
 	DefaultMaxPayerTransactionRate float64 = 0        // no rate limiting
@@ -14,6 +15,13 @@ const (
 
 // Config is the configurable options for the collection builder.
 type Config struct {
+
+	// MinCollectionSize is the minimum size of collections. Smaller and more
+	// numerous collections impose a greater per-collection storage cost on
+	// execution nodes, which can be significant.
+	//
+	// TODO note about when we create a small collection anyway
+	MinCollectionSize uint
 
 	// MaxCollectionSize is the maximum size of collections.
 	MaxCollectionSize uint
@@ -33,8 +41,7 @@ type Config struct {
 	// A negative value or 0 indicates no rate limiting.
 	MaxPayerTransactionRate float64
 
-	// UnlimitedPayer is a set of addresses which are not affected by per-payer
-	// rate limiting.
+	// UnlimitedPayer is a set of addresses which are not affected by per-payer rate limiting.
 	UnlimitedPayers map[flow.Address]struct{}
 
 	// MaxCollectionByteSize is the maximum byte size of a collection.
@@ -56,6 +63,12 @@ func DefaultConfig() Config {
 }
 
 type Opt func(config *Config)
+
+func WithMinCollectionSize(size uint) Opt {
+	return func(c *Config) {
+		c.MinCollectionSize = size
+	}
+}
 
 func WithMaxCollectionSize(size uint) Opt {
 	return func(c *Config) {

@@ -46,6 +46,7 @@ func main() {
 
 	var (
 		txLimit                                uint
+		minCollectionSize                      uint
 		maxCollectionSize                      uint
 		maxCollectionByteSize                  uint64
 		maxCollectionTotalGas                  uint64
@@ -96,6 +97,8 @@ func main() {
 				"rate limit for each payer (transactions/collection)")
 			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 				"set of payer addresses which are omitted from rate limiting")
+			flags.UintVar(&minCollectionSize, "builder-min-collection-size", builder.DefaultMinCollectionSize,
+				"target minimum number of transactions in proposed collections")
 			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", builder.DefaultMaxCollectionSize,
 				"maximum number of transactions in proposed collections")
 			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", builder.DefaultMaxCollectionByteSize,
@@ -305,6 +308,7 @@ func main() {
 				node.Tracer,
 				colMetrics,
 				push,
+				builder.WithMinCollectionSize(minCollectionSize),
 				builder.WithMaxCollectionSize(maxCollectionSize),
 				builder.WithMaxCollectionByteSize(maxCollectionByteSize),
 				builder.WithMaxCollectionTotalGas(maxCollectionTotalGas),
