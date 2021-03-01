@@ -230,7 +230,7 @@ func TestSafetyCheck(t *testing.T) {
 	t.Run("retriable errors causes retry", func(t *testing.T) {
 
 		rt := &ErrorReturningRuntime{TxErrors: []error{
-			runtime.Error{
+			runtime.Error{ // first error
 				Err: &runtime.ParsingCheckingError{
 					Err: &sema.CheckerError{
 						Errors: []error{
@@ -249,7 +249,7 @@ func TestSafetyCheck(t *testing.T) {
 				Codes:    nil,
 				Programs: nil,
 			},
-			nil,
+			nil, // second error, second call to runtime should be successful
 		}}
 
 		log := zerolog.Nop()
