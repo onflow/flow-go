@@ -162,9 +162,16 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 	view := delta.NewView(ledger.Get)
 
-	var res *execution.ComputationResult
-	var block1, block11, block111, block112, block1121, block1111, block12, block121, block1211 *flow.Block
-	var block1View, block11View, block111View, block112View, block1121View, block1111View, block12View, block121View, block1211View *delta.View
+	var (
+		res *execution.ComputationResult
+
+		block1, block11, block111, block112, block1121,
+		block1111, block12, block121, block1211 *flow.Block
+
+		block1View, block11View, block111View, block112View, block1121View,
+		block1111View, block12View, block121View, block1211View *delta.View
+	)
+
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
 		block1 = &flow.Block{
 			Header: &flow.Header{
