@@ -229,6 +229,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	}
 	returnedComputationResult, err = engine.ComputeBlock(context.Background(), executableBlock, block11View)
 	require.NoError(t, err)
+	require.NotNil(t, programsCache.Get(block11.ID()))
 	// 1st event should be contract deployed
 	assert.EqualValues(t, "flow.AccountContractAdded", returnedComputationResult.Events[0].Type)
 
@@ -278,7 +279,9 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	}
 	returnedComputationResult, err = engine.ComputeBlock(context.Background(), executableBlock, block111View)
 	require.NoError(t, err)
-
+	require.NotNil(t, programsCache.Get(block111.ID()))
+	// had change so cache should not be equal to parent
+	require.NotEqual(t, programsCache.Get(block11.ID()), programsCache.Get(block111.ID()))
 	// 1st event
 	hasValidEventValue(t, returnedComputationResult.Events[0], block111ExpectedValue)
 	// second event should be contract deployed
@@ -321,7 +324,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	}
 	returnedComputationResult, err = engine.ComputeBlock(context.Background(), executableBlock, block1111View)
 	require.NoError(t, err)
-
+	// had no change so cache should be equal to parent
+	require.Equal(t, programsCache.Get(block111.ID()), programsCache.Get(block1111.ID()))
 	// 1st event
 	hasValidEventValue(t, returnedComputationResult.Events[0], block1111ExpectedValue)
 
