@@ -87,8 +87,8 @@ func main() {
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
-			flags.UintVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout-seconds", 3, "grpc client timeout for a collection node")
-			flags.UintVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout-seconds", 3, "grpc client timeout for an execution node")
+			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
+			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
@@ -128,7 +128,7 @@ func main() {
 				rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 				grpc.WithInsecure(),
-				backend.WithClientUnaryInterceptor(time.Duration(rpcConf.CollectionClientTimeout)))
+				backend.WithClientUnaryInterceptor(rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
 			}
@@ -149,7 +149,7 @@ func main() {
 				rpcConf.ExecutionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 				grpc.WithInsecure(),
-				backend.WithClientUnaryInterceptor(time.Duration(rpcConf.ExecutionClientTimeout)))
+				backend.WithClientUnaryInterceptor(rpcConf.ExecutionClientTimeout))
 			if err != nil {
 				return err
 			}

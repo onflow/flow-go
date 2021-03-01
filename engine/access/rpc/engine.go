@@ -35,8 +35,8 @@ type Config struct {
 	CollectionAddr          string // the address of the upstream collection node
 	HistoricalAccessAddrs   string // the list of all access nodes from previous spork
 	MaxMsgSize              int    // GRPC max message size
-	ExecutionClientTimeout  uint   // execution API GRPC client timeout
-	CollectionClientTimeout uint   // collection API GRPC client timeout
+	ExecutionClientTimeout  time.Duration   // execution API GRPC client timeout
+	CollectionClientTimeout time.Duration   // collection API GRPC client timeout
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
