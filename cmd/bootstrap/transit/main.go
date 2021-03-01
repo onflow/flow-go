@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/rand"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -22,10 +21,10 @@ import (
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/cmd/bootstrap/build"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
@@ -45,6 +44,7 @@ var (
 	// default files to upload for all role type
 	filesToUpload = []string{
 		bootstrap.PathNodeInfoPub,
+		bootstrap.PathRootProtocolStateSnapshot, // push root protocol state snapshot
 	}
 
 	// consensus node additionally will need the transit key (to securely transport DKG in phase 2)
@@ -72,9 +72,6 @@ func main() {
 	flag.StringVar(&role, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 	flag.StringVar(&wrapID, "x-server-wrap", "", "(Flow Team Use), wrap response keys for consensus node")
 	flag.StringVar(&accessAddress, "access-address", "", "The address of an access node")
-	flag.StringVar(&flowBucket, "flow-bucket", "flow-genesis-bootstrap", "Storage for the transit server")
-
-	//
 	flag.StringVar(&flowBucket, "flow-bucket", "flow-genesis-bootstrap", "Storage for the transit server")
 
 	flag.Parse()
@@ -239,12 +236,12 @@ func runPull(ctx context.Context, bootDir, token, nodeID string, role flow.Role)
 		}
 	}
 
-	rootFile := filepath.Join(bootDir, bootstrap.PathRootBlock)
+	rootFile := filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot)
 	rootMD5, err := getFileMD5(rootFile)
 	if err != nil {
 		log.Fatalf("Failed to calculate md5 of %s: %v", rootFile, err)
 	}
-	log.Printf("MD5 of the root block is: %s\n", rootMD5)
+	log.Printf("MD5 of the root protocol snapshot is: %s\n", rootMD5)
 }
 
 // Run the prepare process
@@ -283,11 +280,10 @@ func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress 
 		log.Fatal("could not get latest protocol snapshot from access node")
 	}
 
-	// unmarshal bytes to snapshot object
-	var snapshot inmem.Snapshot
-	err = json.Unmarshal(bytes, &snapshot)
+	// unmarshal bytes to snapshot
+	snapshot, err := convert.BytesToInmemSnapshot(bytes)
 	if err != nil {
-		log.Fatal("could not unmarshal snapshot data retreived from access node")
+		log.Fatal("could not convert array of bytes to snapshot")
 	}
 
 	// check if given NodeID is part of the current or next epoch
@@ -296,7 +292,7 @@ func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress 
 		log.Fatal("could not get initial identities from current epoch")
 	}
 	if _, exists := currentIdentities.ByNodeID(nodeID); exists {
-		err := utilsio.WriteText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		err := utilsio.WriteFile(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
 		if err != nil {
 			log.Fatalf("could not write snapshot to disk: %v", err)
 		}
@@ -308,7 +304,7 @@ func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress 
 		log.Fatal("could not get initial identities from next epoch")
 	}
 	if _, exists := nextIdentities.ByNodeID(nodeID); exists {
-		err := utilsio.WriteText(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+		err := utilsio.WriteFile(filepath.Join(bootDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
 		if err != nil {
 			log.Fatalf("could not write snapshot to disk: %v", err)
 		}
