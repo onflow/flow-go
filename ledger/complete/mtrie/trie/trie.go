@@ -9,8 +9,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/hashicorp/go-multierror"
-
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -34,7 +32,7 @@ import (
 //
 // DEFINITIONS and CONVENTIONS:
 //   * HEIGHT of a node v in a tree is the number of edges on the longest downward path
-//     between v and a tree leaf. The height of a tree is the heights of its root.
+//     between v and a tree leaf. The height of a tree is the height of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
 	root         *node.Node
@@ -105,45 +103,41 @@ func (mt *MTrie) String() string {
 // paths to be sorted
 // TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
-	return mt.read(mt.root, paths)
+	res := make([]*ledger.Payload, 0, len(paths))
+	mt.read(&res, mt.root, paths)
+	return res
 }
 
-func (mt *MTrie) read(head *node.Node, paths []ledger.Path) []*ledger.Payload {
+func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Path) {
 	// path not found
 	if head == nil {
-		res := make([]*ledger.Payload, 0, len(paths))
 		for range paths {
-			res = append(res, ledger.EmptyPayload())
+			*res = append(*res, ledger.EmptyPayload())
 		}
-		return res
+		return
 	}
 	// reached a leaf node
 	if head.IsLeaf() {
-		res := make([]*ledger.Payload, 0)
 		for _, p := range paths {
 			if bytes.Equal(head.Path(), p) {
-				res = append(res, head.Payload())
+				*res = append(*res, head.Payload())
 			} else {
-				res = append(res, ledger.EmptyPayload())
+				*res = append(*res, ledger.EmptyPayload())
 			}
 		}
-		return res
+		return
 	}
 
 	lpaths, rpaths := utils.SplitSortedPaths(paths, mt.height-head.Height())
 
-	// TODO make this parallel
-	payloads := make([]*ledger.Payload, 0)
+	// must start with the left first, as left payloads have to be appended first
 	if len(lpaths) > 0 {
-		p := mt.read(head.LeftChild(), lpaths)
-		payloads = append(payloads, p...)
+		mt.read(res, head.LeftChild(), lpaths)
 	}
 
 	if len(rpaths) > 0 {
-		p := mt.read(head.RightChild(), rpaths)
-		payloads = append(payloads, p...)
+		mt.read(res, head.RightChild(), rpaths)
 	}
-	return payloads
 }
 
 // NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.
@@ -153,13 +147,10 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path) []*ledger.Payload {
 //   * subtries that remain unchanged are from the parent trie instead of copied.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * keys are NOT duplicated
-// TODO: move consistency checks from MForest to here, to make API is safe and self-contained
+// TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	updatedRoot, err := update(parentTrie.height, parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads)
-	if err != nil {
-		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
-	}
+	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads)
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -173,62 +164,50 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 //   * all keys AND the parent node share the same common prefix [0 : mt.maxHeight-1 - headHeight)
 //     (excluding the bit at index headHeight)
 //   * keys are NOT duplicated
-// TODO: remove error return
-func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) (*node.Node, error) {
-	if parentNode == nil { // parent Trie has no sub-trie for the set of paths => construct entire subtree
-		return constructSubtrie(treeHeight, nodeHeight, paths, payloads)
-	}
+func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
 
 	if len(paths) == 0 { // We are not changing any values in this sub-trie => return parent trie
-		return parentNode, nil
+		return parentNode
+	}
+
+	if parentNode == nil { // parent Trie has no sub-trie for the set of paths => construct entire subtree
+		return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
 	}
 
 	// from here on, we have parentNode != nil AND len(paths) > 0
 	if parentNode.IsLeaf() { // parent node is a leaf, i.e. parent Trie only stores a single value in this sub-trie
 		parentPath := parentNode.Path() // Per definition, a leaf must have a non-nil path
-		overrideExistingValue := false  // true if and only if we are updating the parent Trie's leaf node value
-		for _, p := range paths {
+		for _, p := range paths {       // TODO: binary search if paths are sorted - or maybe inputs paths->payload should be a map?
 			if bytes.Equal(p, parentPath) {
-				overrideExistingValue = true
-				break
+				return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
 			}
 		}
-		if !overrideExistingValue {
-			// TODO: copy payload when using in-place MergeSort for separating the payloads
-			paths = append(paths, parentNode.Path())
-			payloads = append(payloads, *parentNode.Payload())
-		}
-		return constructSubtrie(treeHeight, nodeHeight, paths, payloads)
+		// TODO: copy payload when using in-place MergeSort for separating the payloads
+		paths = append(paths, parentNode.Path()) // TODO: if paths are sorted, insert in order
+		payloads = append(payloads, *parentNode.Payload())
+
+		return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
 	}
 
 	// Split payloads so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
+	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
 
 	// TODO [runtime optimization]: do not branch if either lpayload or rpayload is empty
+	// TODO: what does the above TODO mean?
 	var lChild, rChild *node.Node
-	var lErr, rErr error
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		lChild, lErr = update(treeHeight, nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
+		lChild = parentTrie.update(nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
 	}()
-	rChild, rErr = update(treeHeight, nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
+	rChild = parentTrie.update(nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
 	wg.Wait()
-	if lErr != nil || rErr != nil {
-		var merr *multierror.Error
-		if lErr != nil {
-			merr = multierror.Append(merr, lErr)
-		}
-		if rErr != nil {
-			merr = multierror.Append(merr, rErr)
-		}
-		if err := merr.ErrorOrNil(); err != nil {
-			return nil, fmt.Errorf("internal error while updating trie: %w", err)
-		}
-	}
 
-	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
+	if lChild == parentNode.LeftChild() && rChild == parentNode.RightChild() {
+		return parentNode
+	}
+	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
 // constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs.
@@ -239,19 +218,19 @@ func update(treeHeight int, nodeHeight int, parentNode *node.Node, paths []ledge
 //   * paths contains at least one element
 //   * paths are NOT duplicated
 // TODO: remove error return
-func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, payloads []ledger.Payload) (*node.Node, error) {
+func (parentTrie *MTrie) constructSubtrie(nodeHeight int, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
 	// no inserts => default value, represented by nil node
 	if len(paths) == 0 {
-		return nil, nil
+		return nil
 	}
 	// If we are at a leaf node, we create the node
 	if len(paths) == 1 {
-		return node.NewLeaf(paths[0], &payloads[0], nodeHeight), nil
+		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
 	}
 	// from here on, we have: len(paths) > 1
 
 	// Split updates by paths so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, treeHeight-nodeHeight)
+	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
 	// Note: (pathLength-height) will never reach the value pathLength, i.e. we will never execute this code for height==0
 	// This is because at height=0, we only have (at most) one path left, as paths are not duplicated
 	// (by requirement of this function). But even if this condition is violated, the code will not return a faulty
@@ -259,29 +238,16 @@ func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, paylo
 
 	// TODO [runtime optimization]: do not branch if either lpaths or rpaths is empty
 	var lChild, rChild *node.Node
-	var lErr, rErr error
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		lChild, lErr = constructSubtrie(treeHeight, nodeHeight-1, lpaths, lpayloads)
+		lChild = parentTrie.constructSubtrie(nodeHeight-1, lpaths, lpayloads)
 	}()
-	rChild, rErr = constructSubtrie(treeHeight, nodeHeight-1, rpaths, rpayloads)
+	rChild = parentTrie.constructSubtrie(nodeHeight-1, rpaths, rpayloads)
 	wg.Wait()
-	if lErr != nil || rErr != nil {
-		var merr *multierror.Error
-		if lErr != nil {
-			merr = multierror.Append(merr, lErr)
-		}
-		if rErr != nil {
-			merr = multierror.Append(merr, rErr)
-		}
-		if err := merr.ErrorOrNil(); err != nil {
-			return nil, fmt.Errorf("internal error while constructing sub-trie: %w", err)
-		}
-	}
 
-	return node.NewInterimNode(nodeHeight, lChild, rChild), nil
+	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
 // UnsafeProofs provides proofs for the given paths, this is called unsafe as
@@ -317,10 +283,10 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	lpaths, lproofs, rpaths, rproofs := utils.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
 
 	if len(lpaths) > 0 {
-		if rChild := head.RightChild(); rChild != nil {
+		if rChild := head.RightChild(); rChild != nil { // TODO: is that a sanity check?
 			nodeHash := rChild.Hash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
-			if !isDef { // in proofs, we only provide non-default value hashes
+			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height())) // TODO: why not rChild.RegisterCount != 0?
+			if !isDef {                                                                     // in proofs, we only provide non-default value hashes
 				for _, p := range lproofs {
 					utils.SetBit(p.Flags, mt.height-head.Height())
 					p.Interims = append(p.Interims, nodeHash)
@@ -375,6 +341,7 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 		if err != nil {
 			return err
 		}
+		return nil
 	}
 
 	if lChild := n.LeftChild(); lChild != nil {

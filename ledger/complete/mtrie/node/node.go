@@ -88,7 +88,7 @@ func NewEmptyTreeRoot(height int) *Node {
 		maxDepth:  0,
 		regCount:  0,
 	}
-	n.hashValue = n.computeHash()
+	n.hashValue = common.GetDefaultHashForHeight(height)
 	return n
 }
 
@@ -259,7 +259,7 @@ func (n *Node) AllPayloads() []ledger.Payload {
 }
 
 func recursiveAllPayload(payloads *[]ledger.Payload, n *Node) {
-	if n == nil { // TODO : this check is not needed if all tests are using a full tree (either 0 or 2 children)
+	if n == nil {
 		return
 	}
 	if n.IsLeaf() {

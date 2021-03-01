@@ -184,7 +184,7 @@ type TrieProof struct {
 	Path      Path     // path
 	Payload   *Payload // payload
 	Interims  [][]byte // the non-default intermediate nodes in the proof
-	Inclusion bool     // flag indicating if this is an inclusion or exclusion
+	Inclusion bool     // flag indicating if this is an inclusion or exclusion proof
 	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
 	Steps     uint8    // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
 }
