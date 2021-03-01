@@ -152,7 +152,7 @@ func (i *TransactionInvocator) Process(
 		Uint64("blockHeight", blockHeight).
 		Uint64("ledgerInteractionUsed", st.InteractionUsed()).
 		Int("retried", proc.Retried).
-		Msg("transaction executed with successfully")
+		Msg("transaction executed successfully")
 	return nil
 }
 
