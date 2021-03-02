@@ -5,6 +5,8 @@ import (
 )
 
 // All functions are copied and modified from golang.org/x/crypto/sha3
+// This is a specific version of sha3 optimized only for the functions in
+// this package and must not be used elsewhere
 //
 // Copyright (c) 2009 The Go Authors. All rights reserved.
 
@@ -34,20 +36,9 @@ import (
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// spongeDirection indicates the direction bytes are flowing through the sponge.
-type spongeDirection int
-
 const (
-	// spongeAbsorbing indicates that the sponge is absorbing input.
-	spongeAbsorbing spongeDirection = iota
-	// spongeSqueezing indicates that the sponge is being squeezed.
-	spongeSqueezing
-)
-
-const (
-	// maxRate is the maximum size of the internal buffer. SHAKE-256
-	// currently needs the largest buffer.
-	maxRate = 168
+	// rate is size of the internal buffer.
+	rate = 136
 
 	// dsbyte contains the "domain separation" bits and the first bit of
 	// the padding. Sections 6.1 and 6.2 of [1] separate the outputs of the
@@ -61,160 +52,104 @@ const (
 	// [1] http://csrc.nist.gov/publications/drafts/fips-202/fips_202_draft.pdf
 	//     "Draft FIPS 202: SHA-3 Standard: Permutation-Based Hash and
 	//      Extendable-Output Functions (May 2014)"
-	dsbyte = byte(0x06)
-
-	// output length
-	outputLength = 32
+	dsbyte     = byte(0x06)
+	paddingEnd = uint64(1 << 63)
 )
 
 type state struct {
-	// Generic sponge components.
-	a    [25]uint64 // main state of the hash
-	buf  []byte     // points into storage
-	rate int        // the number of bytes of state to use
-
-	storage storageBuf
-
-	// Specific to SHA-3 and SHAKE.
-	state spongeDirection // whether the sponge is absorbing or squeezing
+	a [25]uint64 // main state of the hash
 }
-
-// A storageBuf is an aligned array of maxRate bytes.
-type storageBuf [maxRate]byte
 
 // New256 creates a new SHA3-256 hash.
 // Its generic security strength is 256 bits against preimage attacks,
 // and 128 bits against collision attacks.
 func new256() *state {
-	d := &state{
-		rate: 136,
-	}
-	d.buf = d.storage.asBytes()[:0]
+	d := &state{}
 	return d
 }
 
-func (d *state) hashResult() []byte {
-	return d.buf[:outputLength]
+// copyOut copies ulint64s to a byte buffer.
+func (d *state) copyOut(out *[32]byte) {
+	for i := 0; i < 4; i++ {
+		binary.LittleEndian.PutUint64((*out)[i<<3:], d.a[i])
+	}
 }
 
-func (b *storageBuf) asBytes() *[maxRate]byte {
-	return (*[maxRate]byte)(b)
-}
-
-// xorIn xors the bytes in buf into the state; it
-// makes no non-portable assumptions about memory layout
-// or alignment.
-func xorIn(d *state, buf []byte) {
-	n := len(buf) / 8
+func xorInAtIndex(d *state, buf []byte, index int) {
+	n := len(buf) >> 3
+	aAtIndex := d.a[index:]
 
 	for i := 0; i < n; i++ {
 		a := binary.LittleEndian.Uint64(buf)
-		d.a[i] ^= a
+		aAtIndex[i] ^= a
 		buf = buf[8:]
 	}
 }
 
-// copyOut copies ulint64s to a byte buffer.
-func copyOut(d *state, b []byte) {
-	for i := 0; len(b) >= 8; i++ {
-		binary.LittleEndian.PutUint64(b, d.a[i])
-		b = b[8:]
-	}
-}
+func (d *state) hash256Plus(out *[32]byte, p1, p2 []byte) {
+	//xorIn since p1 length is a multiple of 8
+	xorInAtIndex(d, p1, 0)
+	written := 32 // written uint64s in the state
 
-// permute applies the KeccakF-1600 permutation. It handles
-// any input-output buffering.
-func (d *state) permute() {
-	switch d.state {
-	case spongeAbsorbing:
-		// If we're absorbing, we need to xor the input into the state
-		// before applying the permutation.
-		xorIn(d, d.buf)
-		d.buf = d.storage.asBytes()[:0]
+	for len(p2)+written >= rate {
+		xorInAtIndex(d, p2[:rate-written], written>>3)
 		keccakF1600(&d.a)
-	case spongeSqueezing:
-		// If we're squeezing, we need to apply the permutatin before
-		// copying more output.
-		keccakF1600(&d.a)
-		d.buf = d.storage.asBytes()[:d.rate]
-		copyOut(d, d.buf)
+		p2 = p2[rate-written:]
+		written = 0 // to avoid
 	}
-}
 
-// finalize appends the domain separation bits in dsbyte, applies
-// the multi-bitrate 10..1 padding rule, and permutes the state.
-func (d *state) finalize() {
-	// Pad with this instance's domain-separator bits. We know that there's
-	// at least one byte of space in d.buf because, if it were full,
-	// permute would have been called to empty it. dsbyte also contains the
-	// first one bit for the padding. See the comment in the state struct.
-	d.buf = append(d.buf, dsbyte)
-	zerosStart := len(d.buf)
-	d.buf = d.storage.asBytes()[:d.rate]
-	for i := zerosStart; i < d.rate-1; i++ {
-		d.buf[i] = 0
+	// xorIn the left over of p2, 64 bits at a time
+	for len(p2) >= 8 {
+		a := binary.LittleEndian.Uint64(p2[:8])
+		d.a[written>>3] ^= a
+		p2 = p2[8:]
+		written += 8
 	}
-	// This adds the final one bit for the padding. Because of the way that
-	// bits are numbered from the LSB upwards, the final bit is the MSB of
-	// the last byte.
-	d.buf[d.rate-1] = 0x80
-	// Apply the permutation
-	d.permute()
-	d.state = spongeSqueezing
-	d.buf = d.storage.asBytes()[:d.rate]
-	copyOut(d, d.buf)
+
+	var tmp [8]byte
+	copy(tmp[:], p2)
+	tmp[len(p2)] = dsbyte
+	a := binary.LittleEndian.Uint64(tmp[:])
+	d.a[written>>3] ^= a
+
+	// the last padding
+	d.a[16] ^= paddingEnd
+
+	// permute
+	finalKeccakF1600(&d.a)
+
+	// reverse and output
+	d.copyOut(out)
 }
 
-// finalize512 is the padAndPermute function optimized for when the input written to
-// the state is 512 bits.
-func (d *state) finalize512() {
-	// Pad with this instance's domain-separator bits. We know that there's
-	// at least one byte of space in d.buf because, if it were full,
-	// permute would have been called to empty it. dsbyte also contains the
-	// first one bit for the padding. See the comment in the state struct.
-	d.buf = append(d.buf, dsbyte)
-	// This adds the final one bit for the padding. Because of the way that
-	// bits are numbered from the LSB upwards, the final bit is the MSB of
-	// the last byte.
-	d.buf = d.storage.asBytes()[:d.rate]
-	// There is no need to pad the bytes in between as the storage was initilized
-	// to zero un never overwritten
-	d.buf[d.rate-1] = 0x80
-	// Apply the permutation
-	d.permute()
-	d.state = spongeSqueezing
-	d.buf = d.storage.asBytes()[:d.rate]
-	copyOut(d, d.buf)
+// hash256plus256 absorbs two 256 bits slices of data into the hash's state
+// applies the permutation, and outpute the result in out
+func (d *state) hash256plus256(out *[32]byte, p1, p2 []byte) {
+	xorIn512(d, p1, p2)
+	// permute
+	finalKeccakF1600(&d.a)
+	// reverese the endianess to the output
+	d.copyOut(out)
 }
 
-// Write absorbs more data into the hash's state.
-func (d *state) write(p []byte) {
-	for len(p) > 0 {
-		if len(d.buf) == 0 && len(p) >= d.rate {
-			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
-			xorIn(d, p[:d.rate])
-			p = p[d.rate:]
-			keccakF1600(&d.a)
-		} else {
-			// The slow path; buffer the input until we can fill the sponge, and then xor it in.
-			todo := d.rate - len(d.buf)
-			if todo > len(p) {
-				todo = len(p)
-			}
-			d.buf = append(d.buf, p[:todo]...)
-			p = p[todo:]
-
-			// If the sponge is full, apply the permutation.
-			if len(d.buf) == d.rate {
-				d.permute()
-			}
-		}
+// xorIn256 xors two 32 bytes slices into the state; it
+// makes no non-portable assumptions about memory layout
+// or alignment.
+func xorIn512(d *state, buf1, buf2 []byte) {
+	var i int
+	for ; i < 4; i++ {
+		d.a[i] = binary.LittleEndian.Uint64(buf1)
+		buf1 = buf1[8:]
 	}
-}
-
-// write absorbs 256 bits more data into the hash's state.
-func (d *state) write256(p []byte) {
-	d.buf = append(d.buf, p...)
+	for ; i < 8; i++ {
+		d.a[i] = binary.LittleEndian.Uint64(buf2)
+		buf2 = buf2[8:]
+	}
+	// xor with the dsbyte
+	// dsbyte also contains the first one bit for the padding.
+	d.a[8] = 0x6
+	// xor the last padding bit
+	d.a[16] = paddingEnd
 }
 
 // rc stores the round constants for use in the ι step.
@@ -620,4 +555,680 @@ func keccakF1600(a *[25]uint64) {
 		a[23] = bc3 ^ (bc0 &^ bc4)
 		a[24] = bc4 ^ (bc1 &^ bc0)
 	}
+}
+
+func finalKeccakF1600(a *[25]uint64) {
+	// Implementation translated from Keccak-inplace.c
+	// in the keccak reference code.
+	var t, bc0, bc1, bc2, bc3, bc4, d0, d1, d2, d3, d4 uint64
+
+	var i int
+	for i = 0; i < 20; i += 4 {
+		// Combines the 5 steps in each round into 2 steps.
+		// Unrolls 4 rounds per loop and spreads some steps across rounds.
+
+		// Round 1
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+		bc0 = a[0] ^ d0
+		t = a[6] ^ d1
+		bc1 = t<<44 | t>>(64-44)
+		t = a[12] ^ d2
+		bc2 = t<<43 | t>>(64-43)
+		t = a[18] ^ d3
+		bc3 = t<<21 | t>>(64-21)
+		t = a[24] ^ d4
+		bc4 = t<<14 | t>>(64-14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i]
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[10] ^ d0
+		bc2 = t<<3 | t>>(64-3)
+		t = a[16] ^ d1
+		bc3 = t<<45 | t>>(64-45)
+		t = a[22] ^ d2
+		bc4 = t<<61 | t>>(64-61)
+		t = a[3] ^ d3
+		bc0 = t<<28 | t>>(64-28)
+		t = a[9] ^ d4
+		bc1 = t<<20 | t>>(64-20)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[20] ^ d0
+		bc4 = t<<18 | t>>(64-18)
+		t = a[1] ^ d1
+		bc0 = t<<1 | t>>(64-1)
+		t = a[7] ^ d2
+		bc1 = t<<6 | t>>(64-6)
+		t = a[13] ^ d3
+		bc2 = t<<25 | t>>(64-25)
+		t = a[19] ^ d4
+		bc3 = t<<8 | t>>(64-8)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[5] ^ d0
+		bc1 = t<<36 | t>>(64-36)
+		t = a[11] ^ d1
+		bc2 = t<<10 | t>>(64-10)
+		t = a[17] ^ d2
+		bc3 = t<<15 | t>>(64-15)
+		t = a[23] ^ d3
+		bc4 = t<<56 | t>>(64-56)
+		t = a[4] ^ d4
+		bc0 = t<<27 | t>>(64-27)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[15] ^ d0
+		bc3 = t<<41 | t>>(64-41)
+		t = a[21] ^ d1
+		bc4 = t<<2 | t>>(64-2)
+		t = a[2] ^ d2
+		bc0 = t<<62 | t>>(64-62)
+		t = a[8] ^ d3
+		bc1 = t<<55 | t>>(64-55)
+		t = a[14] ^ d4
+		bc2 = t<<39 | t>>(64-39)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
+
+		// Round 2
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+		bc0 = a[0] ^ d0
+		t = a[16] ^ d1
+		bc1 = t<<44 | t>>(64-44)
+		t = a[7] ^ d2
+		bc2 = t<<43 | t>>(64-43)
+		t = a[23] ^ d3
+		bc3 = t<<21 | t>>(64-21)
+		t = a[14] ^ d4
+		bc4 = t<<14 | t>>(64-14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+1]
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[20] ^ d0
+		bc2 = t<<3 | t>>(64-3)
+		t = a[11] ^ d1
+		bc3 = t<<45 | t>>(64-45)
+		t = a[2] ^ d2
+		bc4 = t<<61 | t>>(64-61)
+		t = a[18] ^ d3
+		bc0 = t<<28 | t>>(64-28)
+		t = a[9] ^ d4
+		bc1 = t<<20 | t>>(64-20)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[15] ^ d0
+		bc4 = t<<18 | t>>(64-18)
+		t = a[6] ^ d1
+		bc0 = t<<1 | t>>(64-1)
+		t = a[22] ^ d2
+		bc1 = t<<6 | t>>(64-6)
+		t = a[13] ^ d3
+		bc2 = t<<25 | t>>(64-25)
+		t = a[4] ^ d4
+		bc3 = t<<8 | t>>(64-8)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[10] ^ d0
+		bc1 = t<<36 | t>>(64-36)
+		t = a[1] ^ d1
+		bc2 = t<<10 | t>>(64-10)
+		t = a[17] ^ d2
+		bc3 = t<<15 | t>>(64-15)
+		t = a[8] ^ d3
+		bc4 = t<<56 | t>>(64-56)
+		t = a[24] ^ d4
+		bc0 = t<<27 | t>>(64-27)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[5] ^ d0
+		bc3 = t<<41 | t>>(64-41)
+		t = a[21] ^ d1
+		bc4 = t<<2 | t>>(64-2)
+		t = a[12] ^ d2
+		bc0 = t<<62 | t>>(64-62)
+		t = a[3] ^ d3
+		bc1 = t<<55 | t>>(64-55)
+		t = a[19] ^ d4
+		bc2 = t<<39 | t>>(64-39)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
+
+		// Round 3
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+		bc0 = a[0] ^ d0
+		t = a[11] ^ d1
+		bc1 = t<<44 | t>>(64-44)
+		t = a[22] ^ d2
+		bc2 = t<<43 | t>>(64-43)
+		t = a[8] ^ d3
+		bc3 = t<<21 | t>>(64-21)
+		t = a[19] ^ d4
+		bc4 = t<<14 | t>>(64-14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+2]
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[15] ^ d0
+		bc2 = t<<3 | t>>(64-3)
+		t = a[1] ^ d1
+		bc3 = t<<45 | t>>(64-45)
+		t = a[12] ^ d2
+		bc4 = t<<61 | t>>(64-61)
+		t = a[23] ^ d3
+		bc0 = t<<28 | t>>(64-28)
+		t = a[9] ^ d4
+		bc1 = t<<20 | t>>(64-20)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[5] ^ d0
+		bc4 = t<<18 | t>>(64-18)
+		t = a[16] ^ d1
+		bc0 = t<<1 | t>>(64-1)
+		t = a[2] ^ d2
+		bc1 = t<<6 | t>>(64-6)
+		t = a[13] ^ d3
+		bc2 = t<<25 | t>>(64-25)
+		t = a[24] ^ d4
+		bc3 = t<<8 | t>>(64-8)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[20] ^ d0
+		bc1 = t<<36 | t>>(64-36)
+		t = a[6] ^ d1
+		bc2 = t<<10 | t>>(64-10)
+		t = a[17] ^ d2
+		bc3 = t<<15 | t>>(64-15)
+		t = a[3] ^ d3
+		bc4 = t<<56 | t>>(64-56)
+		t = a[14] ^ d4
+		bc0 = t<<27 | t>>(64-27)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[10] ^ d0
+		bc3 = t<<41 | t>>(64-41)
+		t = a[21] ^ d1
+		bc4 = t<<2 | t>>(64-2)
+		t = a[7] ^ d2
+		bc0 = t<<62 | t>>(64-62)
+		t = a[18] ^ d3
+		bc1 = t<<55 | t>>(64-55)
+		t = a[4] ^ d4
+		bc2 = t<<39 | t>>(64-39)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
+
+		// Round 4
+		bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+		bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+		bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+		bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+		bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+		d0 = bc4 ^ (bc1<<1 | bc1>>63)
+		d1 = bc0 ^ (bc2<<1 | bc2>>63)
+		d2 = bc1 ^ (bc3<<1 | bc3>>63)
+		d3 = bc2 ^ (bc4<<1 | bc4>>63)
+		d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+		bc0 = a[0] ^ d0
+		t = a[1] ^ d1
+		bc1 = t<<44 | t>>(64-44)
+		t = a[2] ^ d2
+		bc2 = t<<43 | t>>(64-43)
+		t = a[3] ^ d3
+		bc3 = t<<21 | t>>(64-21)
+		t = a[4] ^ d4
+		bc4 = t<<14 | t>>(64-14)
+		a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+3]
+		a[1] = bc1 ^ (bc3 &^ bc2)
+		a[2] = bc2 ^ (bc4 &^ bc3)
+		a[3] = bc3 ^ (bc0 &^ bc4)
+		a[4] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[5] ^ d0
+		bc2 = t<<3 | t>>(64-3)
+		t = a[6] ^ d1
+		bc3 = t<<45 | t>>(64-45)
+		t = a[7] ^ d2
+		bc4 = t<<61 | t>>(64-61)
+		t = a[8] ^ d3
+		bc0 = t<<28 | t>>(64-28)
+		t = a[9] ^ d4
+		bc1 = t<<20 | t>>(64-20)
+		a[5] = bc0 ^ (bc2 &^ bc1)
+		a[6] = bc1 ^ (bc3 &^ bc2)
+		a[7] = bc2 ^ (bc4 &^ bc3)
+		a[8] = bc3 ^ (bc0 &^ bc4)
+		a[9] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[10] ^ d0
+		bc4 = t<<18 | t>>(64-18)
+		t = a[11] ^ d1
+		bc0 = t<<1 | t>>(64-1)
+		t = a[12] ^ d2
+		bc1 = t<<6 | t>>(64-6)
+		t = a[13] ^ d3
+		bc2 = t<<25 | t>>(64-25)
+		t = a[14] ^ d4
+		bc3 = t<<8 | t>>(64-8)
+		a[10] = bc0 ^ (bc2 &^ bc1)
+		a[11] = bc1 ^ (bc3 &^ bc2)
+		a[12] = bc2 ^ (bc4 &^ bc3)
+		a[13] = bc3 ^ (bc0 &^ bc4)
+		a[14] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[15] ^ d0
+		bc1 = t<<36 | t>>(64-36)
+		t = a[16] ^ d1
+		bc2 = t<<10 | t>>(64-10)
+		t = a[17] ^ d2
+		bc3 = t<<15 | t>>(64-15)
+		t = a[18] ^ d3
+		bc4 = t<<56 | t>>(64-56)
+		t = a[19] ^ d4
+		bc0 = t<<27 | t>>(64-27)
+		a[15] = bc0 ^ (bc2 &^ bc1)
+		a[16] = bc1 ^ (bc3 &^ bc2)
+		a[17] = bc2 ^ (bc4 &^ bc3)
+		a[18] = bc3 ^ (bc0 &^ bc4)
+		a[19] = bc4 ^ (bc1 &^ bc0)
+
+		t = a[20] ^ d0
+		bc3 = t<<41 | t>>(64-41)
+		t = a[21] ^ d1
+		bc4 = t<<2 | t>>(64-2)
+		t = a[22] ^ d2
+		bc0 = t<<62 | t>>(64-62)
+		t = a[23] ^ d3
+		bc1 = t<<55 | t>>(64-55)
+		t = a[24] ^ d4
+		bc2 = t<<39 | t>>(64-39)
+		a[20] = bc0 ^ (bc2 &^ bc1)
+		a[21] = bc1 ^ (bc3 &^ bc2)
+		a[22] = bc2 ^ (bc4 &^ bc3)
+		a[23] = bc3 ^ (bc0 &^ bc4)
+		a[24] = bc4 ^ (bc1 &^ bc0)
+	}
+
+	// Round 1
+	bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+	bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+	bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+	bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+	bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+	d0 = bc4 ^ (bc1<<1 | bc1>>63)
+	d1 = bc0 ^ (bc2<<1 | bc2>>63)
+	d2 = bc1 ^ (bc3<<1 | bc3>>63)
+	d3 = bc2 ^ (bc4<<1 | bc4>>63)
+	d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+	bc0 = a[0] ^ d0
+	t = a[6] ^ d1
+	bc1 = t<<44 | t>>(64-44)
+	t = a[12] ^ d2
+	bc2 = t<<43 | t>>(64-43)
+	t = a[18] ^ d3
+	bc3 = t<<21 | t>>(64-21)
+	t = a[24] ^ d4
+	bc4 = t<<14 | t>>(64-14)
+	a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i]
+	a[6] = bc1 ^ (bc3 &^ bc2)
+	a[12] = bc2 ^ (bc4 &^ bc3)
+	a[18] = bc3 ^ (bc0 &^ bc4)
+	a[24] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[10] ^ d0
+	bc2 = t<<3 | t>>(64-3)
+	t = a[16] ^ d1
+	bc3 = t<<45 | t>>(64-45)
+	t = a[22] ^ d2
+	bc4 = t<<61 | t>>(64-61)
+	t = a[3] ^ d3
+	bc0 = t<<28 | t>>(64-28)
+	t = a[9] ^ d4
+	bc1 = t<<20 | t>>(64-20)
+	a[10] = bc0 ^ (bc2 &^ bc1)
+	a[16] = bc1 ^ (bc3 &^ bc2)
+	a[22] = bc2 ^ (bc4 &^ bc3)
+	a[3] = bc3 ^ (bc0 &^ bc4)
+	a[9] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[20] ^ d0
+	bc4 = t<<18 | t>>(64-18)
+	t = a[1] ^ d1
+	bc0 = t<<1 | t>>(64-1)
+	t = a[7] ^ d2
+	bc1 = t<<6 | t>>(64-6)
+	t = a[13] ^ d3
+	bc2 = t<<25 | t>>(64-25)
+	t = a[19] ^ d4
+	bc3 = t<<8 | t>>(64-8)
+	a[20] = bc0 ^ (bc2 &^ bc1)
+	a[1] = bc1 ^ (bc3 &^ bc2)
+	a[7] = bc2 ^ (bc4 &^ bc3)
+	a[13] = bc3 ^ (bc0 &^ bc4)
+	a[19] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[5] ^ d0
+	bc1 = t<<36 | t>>(64-36)
+	t = a[11] ^ d1
+	bc2 = t<<10 | t>>(64-10)
+	t = a[17] ^ d2
+	bc3 = t<<15 | t>>(64-15)
+	t = a[23] ^ d3
+	bc4 = t<<56 | t>>(64-56)
+	t = a[4] ^ d4
+	bc0 = t<<27 | t>>(64-27)
+	a[5] = bc0 ^ (bc2 &^ bc1)
+	a[11] = bc1 ^ (bc3 &^ bc2)
+	a[17] = bc2 ^ (bc4 &^ bc3)
+	a[23] = bc3 ^ (bc0 &^ bc4)
+	a[4] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[15] ^ d0
+	bc3 = t<<41 | t>>(64-41)
+	t = a[21] ^ d1
+	bc4 = t<<2 | t>>(64-2)
+	t = a[2] ^ d2
+	bc0 = t<<62 | t>>(64-62)
+	t = a[8] ^ d3
+	bc1 = t<<55 | t>>(64-55)
+	t = a[14] ^ d4
+	bc2 = t<<39 | t>>(64-39)
+	a[15] = bc0 ^ (bc2 &^ bc1)
+	a[21] = bc1 ^ (bc3 &^ bc2)
+	a[2] = bc2 ^ (bc4 &^ bc3)
+	a[8] = bc3 ^ (bc0 &^ bc4)
+	a[14] = bc4 ^ (bc1 &^ bc0)
+
+	// Round 2
+	bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+	bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+	bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+	bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+	bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+	d0 = bc4 ^ (bc1<<1 | bc1>>63)
+	d1 = bc0 ^ (bc2<<1 | bc2>>63)
+	d2 = bc1 ^ (bc3<<1 | bc3>>63)
+	d3 = bc2 ^ (bc4<<1 | bc4>>63)
+	d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+	bc0 = a[0] ^ d0
+	t = a[16] ^ d1
+	bc1 = t<<44 | t>>(64-44)
+	t = a[7] ^ d2
+	bc2 = t<<43 | t>>(64-43)
+	t = a[23] ^ d3
+	bc3 = t<<21 | t>>(64-21)
+	t = a[14] ^ d4
+	bc4 = t<<14 | t>>(64-14)
+	a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+1]
+	a[16] = bc1 ^ (bc3 &^ bc2)
+	a[7] = bc2 ^ (bc4 &^ bc3)
+	a[23] = bc3 ^ (bc0 &^ bc4)
+	a[14] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[20] ^ d0
+	bc2 = t<<3 | t>>(64-3)
+	t = a[11] ^ d1
+	bc3 = t<<45 | t>>(64-45)
+	t = a[2] ^ d2
+	bc4 = t<<61 | t>>(64-61)
+	t = a[18] ^ d3
+	bc0 = t<<28 | t>>(64-28)
+	t = a[9] ^ d4
+	bc1 = t<<20 | t>>(64-20)
+	a[20] = bc0 ^ (bc2 &^ bc1)
+	a[11] = bc1 ^ (bc3 &^ bc2)
+	a[2] = bc2 ^ (bc4 &^ bc3)
+	a[18] = bc3 ^ (bc0 &^ bc4)
+	a[9] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[15] ^ d0
+	bc4 = t<<18 | t>>(64-18)
+	t = a[6] ^ d1
+	bc0 = t<<1 | t>>(64-1)
+	t = a[22] ^ d2
+	bc1 = t<<6 | t>>(64-6)
+	t = a[13] ^ d3
+	bc2 = t<<25 | t>>(64-25)
+	t = a[4] ^ d4
+	bc3 = t<<8 | t>>(64-8)
+	a[15] = bc0 ^ (bc2 &^ bc1)
+	a[6] = bc1 ^ (bc3 &^ bc2)
+	a[22] = bc2 ^ (bc4 &^ bc3)
+	a[13] = bc3 ^ (bc0 &^ bc4)
+	a[4] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[10] ^ d0
+	bc1 = t<<36 | t>>(64-36)
+	t = a[1] ^ d1
+	bc2 = t<<10 | t>>(64-10)
+	t = a[17] ^ d2
+	bc3 = t<<15 | t>>(64-15)
+	t = a[8] ^ d3
+	bc4 = t<<56 | t>>(64-56)
+	t = a[24] ^ d4
+	bc0 = t<<27 | t>>(64-27)
+	a[10] = bc0 ^ (bc2 &^ bc1)
+	a[1] = bc1 ^ (bc3 &^ bc2)
+	a[17] = bc2 ^ (bc4 &^ bc3)
+	a[8] = bc3 ^ (bc0 &^ bc4)
+	a[24] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[5] ^ d0
+	bc3 = t<<41 | t>>(64-41)
+	t = a[21] ^ d1
+	bc4 = t<<2 | t>>(64-2)
+	t = a[12] ^ d2
+	bc0 = t<<62 | t>>(64-62)
+	t = a[3] ^ d3
+	bc1 = t<<55 | t>>(64-55)
+	t = a[19] ^ d4
+	bc2 = t<<39 | t>>(64-39)
+	a[5] = bc0 ^ (bc2 &^ bc1)
+	a[21] = bc1 ^ (bc3 &^ bc2)
+	a[12] = bc2 ^ (bc4 &^ bc3)
+	a[3] = bc3 ^ (bc0 &^ bc4)
+	a[19] = bc4 ^ (bc1 &^ bc0)
+
+	// Round 3
+	bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+	bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+	bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+	bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+	bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+	d0 = bc4 ^ (bc1<<1 | bc1>>63)
+	d1 = bc0 ^ (bc2<<1 | bc2>>63)
+	d2 = bc1 ^ (bc3<<1 | bc3>>63)
+	d3 = bc2 ^ (bc4<<1 | bc4>>63)
+	d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+	bc0 = a[0] ^ d0
+	t = a[11] ^ d1
+	bc1 = t<<44 | t>>(64-44)
+	t = a[22] ^ d2
+	bc2 = t<<43 | t>>(64-43)
+	t = a[8] ^ d3
+	bc3 = t<<21 | t>>(64-21)
+	t = a[19] ^ d4
+	bc4 = t<<14 | t>>(64-14)
+	a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+2]
+	a[11] = bc1 ^ (bc3 &^ bc2)
+	a[22] = bc2 ^ (bc4 &^ bc3)
+	a[8] = bc3 ^ (bc0 &^ bc4)
+	a[19] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[15] ^ d0
+	bc2 = t<<3 | t>>(64-3)
+	t = a[1] ^ d1
+	bc3 = t<<45 | t>>(64-45)
+	t = a[12] ^ d2
+	bc4 = t<<61 | t>>(64-61)
+	t = a[23] ^ d3
+	bc0 = t<<28 | t>>(64-28)
+	t = a[9] ^ d4
+	bc1 = t<<20 | t>>(64-20)
+	a[15] = bc0 ^ (bc2 &^ bc1)
+	a[1] = bc1 ^ (bc3 &^ bc2)
+	a[12] = bc2 ^ (bc4 &^ bc3)
+	a[23] = bc3 ^ (bc0 &^ bc4)
+	a[9] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[5] ^ d0
+	bc4 = t<<18 | t>>(64-18)
+	t = a[16] ^ d1
+	bc0 = t<<1 | t>>(64-1)
+	t = a[2] ^ d2
+	bc1 = t<<6 | t>>(64-6)
+	t = a[13] ^ d3
+	bc2 = t<<25 | t>>(64-25)
+	t = a[24] ^ d4
+	bc3 = t<<8 | t>>(64-8)
+	a[5] = bc0 ^ (bc2 &^ bc1)
+	a[16] = bc1 ^ (bc3 &^ bc2)
+	a[2] = bc2 ^ (bc4 &^ bc3)
+	a[13] = bc3 ^ (bc0 &^ bc4)
+	a[24] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[20] ^ d0
+	bc1 = t<<36 | t>>(64-36)
+	t = a[6] ^ d1
+	bc2 = t<<10 | t>>(64-10)
+	t = a[17] ^ d2
+	bc3 = t<<15 | t>>(64-15)
+	t = a[3] ^ d3
+	bc4 = t<<56 | t>>(64-56)
+	t = a[14] ^ d4
+	bc0 = t<<27 | t>>(64-27)
+	a[20] = bc0 ^ (bc2 &^ bc1)
+	a[6] = bc1 ^ (bc3 &^ bc2)
+	a[17] = bc2 ^ (bc4 &^ bc3)
+	a[3] = bc3 ^ (bc0 &^ bc4)
+	a[14] = bc4 ^ (bc1 &^ bc0)
+
+	t = a[10] ^ d0
+	bc3 = t<<41 | t>>(64-41)
+	t = a[21] ^ d1
+	bc4 = t<<2 | t>>(64-2)
+	t = a[7] ^ d2
+	bc0 = t<<62 | t>>(64-62)
+	t = a[18] ^ d3
+	bc1 = t<<55 | t>>(64-55)
+	t = a[4] ^ d4
+	bc2 = t<<39 | t>>(64-39)
+	a[10] = bc0 ^ (bc2 &^ bc1)
+	a[21] = bc1 ^ (bc3 &^ bc2)
+	a[7] = bc2 ^ (bc4 &^ bc3)
+	a[18] = bc3 ^ (bc0 &^ bc4)
+	a[4] = bc4 ^ (bc1 &^ bc0)
+
+	// Round 4
+	bc0 = a[0] ^ a[5] ^ a[10] ^ a[15] ^ a[20]
+	bc1 = a[1] ^ a[6] ^ a[11] ^ a[16] ^ a[21]
+	bc2 = a[2] ^ a[7] ^ a[12] ^ a[17] ^ a[22]
+	bc3 = a[3] ^ a[8] ^ a[13] ^ a[18] ^ a[23]
+	bc4 = a[4] ^ a[9] ^ a[14] ^ a[19] ^ a[24]
+	d0 = bc4 ^ (bc1<<1 | bc1>>63)
+	d1 = bc0 ^ (bc2<<1 | bc2>>63)
+	d2 = bc1 ^ (bc3<<1 | bc3>>63)
+	d3 = bc2 ^ (bc4<<1 | bc4>>63)
+	d4 = bc3 ^ (bc0<<1 | bc0>>63)
+
+	bc0 = a[0] ^ d0
+	t = a[1] ^ d1
+	bc1 = t<<44 | t>>(64-44)
+	t = a[2] ^ d2
+	bc2 = t<<43 | t>>(64-43)
+	t = a[3] ^ d3
+	bc3 = t<<21 | t>>(64-21)
+	t = a[4] ^ d4
+	bc4 = t<<14 | t>>(64-14)
+	a[0] = bc0 ^ (bc2 &^ bc1) ^ rc[i+3]
+	a[1] = bc1 ^ (bc3 &^ bc2)
+	a[2] = bc2 ^ (bc4 &^ bc3)
+	a[3] = bc3 ^ (bc0 &^ bc4)
+	a[4] = bc4 ^ (bc1 &^ bc0)
 }
