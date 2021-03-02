@@ -199,6 +199,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block11, res = createTestBlockAndRun(t, engine, block1, col11, block11View)
 		// cache should include value for this block
 		require.NotNil(t, programsCache.Get(block11.ID()))
+		// cache should have changes
+		require.True(t, programsCache.Get(block11.ID()).HasChanges())
 		// 1st event should be contract deployed
 		assert.EqualValues(t, "flow.AccountContractAdded", res.Events[0].Type)
 	})
@@ -218,8 +220,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block111, res = createTestBlockAndRun(t, engine, block11, col111, block111View)
 		// cache should include a program for this block
 		require.NotNil(t, programsCache.Get(block111.ID()))
-		// had change so cache should not be equal to parent
-		require.NotEqual(t, programsCache.Get(block11.ID()), programsCache.Get(block111.ID()))
+		// cache should have changes
+		require.True(t, programsCache.Get(block111.ID()).HasChanges())
 		// 1st event
 		hasValidEventValue(t, res.Events[0], block111ExpectedValue)
 		// second event should be contract deployed
@@ -309,6 +311,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1211, res = createTestBlockAndRun(t, engine, block121, col1211, block1211View)
 		// cache should include a program for this block
 		require.NotNil(t, programsCache.Get(block1211.ID()))
+		// cache should not have any changes
+		require.False(t, programsCache.Get(block1211.ID()).HasChanges())
 		// had no change so cache should be equal to parent
 		require.Equal(t, programsCache.Get(block111.ID()), programsCache.Get(block1111.ID()))
 		// 1st event
