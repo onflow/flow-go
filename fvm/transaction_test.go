@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -236,12 +237,12 @@ func TestSafetyCheck(t *testing.T) {
 					Err: &sema.CheckerError{
 						Errors: []error{
 							&sema.AlwaysFailingNonResourceCastingTypeError{
-								ValueType:  &sema.AnyType{},
-								TargetType: &sema.AnyType{},
+								ValueType:  sema.AnyType,
+								TargetType: sema.AnyType,
 							}, // some dummy error
 							&sema.ImportedProgramError{
-								CheckerError: &sema.CheckerError{},
-								Location:     common.AddressLocation{Address: common.BytesToAddress([]byte{1, 2, 3, 4})},
+								Err:      &sema.CheckerError{},
+								Location: common.AddressLocation{Address: common.BytesToAddress([]byte{1, 2, 3, 4})},
 							},
 						},
 					},
@@ -291,7 +292,7 @@ func (e *ErrorReturningRuntime) ExecuteTransaction(script runtime.Script, contex
 func (e *ErrorReturningRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	panic("not used script")
 }
-func (e *ErrorReturningRuntime) ParseAndCheckProgram(source []byte, context runtime.Context) (*sema.Checker, error) {
+func (e *ErrorReturningRuntime) ParseAndCheckProgram(source []byte, context runtime.Context) (*interpreter.Program, error) {
 	panic("not used parse")
 }
 func (e *ErrorReturningRuntime) SetCoverageReport(coverageReport *runtime.CoverageReport) {
