@@ -43,9 +43,9 @@ type TransactionProcedure struct {
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed   uint64
 	Err       Error
-  Retried int
+	Retried   int
 	TraceSpan opentracing.Span
-
+}
 
 func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 	proc.TraceSpan = traceSpan
@@ -86,7 +86,7 @@ func (i *TransactionInvocator) Process(
 ) error {
 
 	var span opentracing.Span
-  
+
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
 		span.LogFields(
@@ -95,7 +95,7 @@ func (i *TransactionInvocator) Process(
 		defer span.Finish()
 	}
 
-  var err error
+	var err error
 	var env *hostEnv
 	var blockHeight uint64
 	if ctx.BlockHeader != nil {
@@ -109,7 +109,7 @@ func (i *TransactionInvocator) Process(
 			return err
 		}
 		env.setTransaction(proc.Transaction, proc.TxIndex)
-	  env.setTraceSpan(span)
+		env.setTraceSpan(span)
 
 		location := common.TransactionLocation(proc.ID[:])
 
