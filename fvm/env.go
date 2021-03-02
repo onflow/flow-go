@@ -42,7 +42,6 @@ type hostEnv struct {
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
 	programs           *Programs
-	changedPrograms    []ChangedProgram
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -500,12 +499,6 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 		return errors.New("updating account contract code is not supported")
 	}
 
-	// record updated contract
-	e.changedPrograms = append(e.changedPrograms, ChangedProgram{
-		Address: address,
-		Name:    name,
-	})
-
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.UpdateAccountContractCode(address, name, code)
 }
@@ -521,12 +514,6 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	if e.transactionEnv == nil {
 		return errors.New("removing account contracts is not supported")
 	}
-
-	// record updated contract
-	e.changedPrograms = append(e.changedPrograms, ChangedProgram{
-		Address: address,
-		Name:    name,
-	})
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.RemoveAccountContractCode(address, name)
@@ -545,8 +532,8 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 	return nil
 }
 
-func (e *hostEnv) HasContractUpdates() bool {
-	return e.contracts.HasUpdates()
+func (e *hostEnv) ContractUpdateKeys() []handler.ContractUpdateKey {
+	return e.contracts.UpdateKeys()
 }
 
 func (e *hostEnv) Commit() error {
@@ -731,9 +718,9 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 }
 
 func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
-	return e.contracts.SetContract(address, name, code, e.authorizers)
+	return e.contracts.SetContract(address, name, code, e.GetSigningAccounts())
 }
 
 func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	return e.contracts.RemoveContract(address, name, e.authorizers)
+	return e.contracts.RemoveContract(address, name, e.GetSigningAccounts())
 }

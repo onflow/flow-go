@@ -133,12 +133,13 @@ func (i *TransactionInvocator) Process(
 		proc.Retried++
 	}
 
-	programs.Cleanup(env.changedPrograms)
-
 	// (for future) panic if we tried several times and still failing
 	// if numberOfTries == maxNumberOfRetries {
 	// 	panic(err)
 	// }
+
+	// based on the contract updates decides how to clean up the programs
+	programs.Cleanup(env.ContractUpdateKeys())
 
 	if err != nil {
 		i.logger.Info().
@@ -149,11 +150,16 @@ func (i *TransactionInvocator) Process(
 		return err
 	}
 
-	// commit the env if no error
 	// this writes back the contract contents to accounts
 	// if any error fail as a tx
+	// this should be called after program cache clean up
 	err = env.Commit()
 	if err != nil {
+		i.logger.Info().
+			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", blockHeight).
+			Uint64("ledgerInteractionUsed", st.InteractionUsed()).
+			Msg("transaction executed with error")
 		return err
 	}
 

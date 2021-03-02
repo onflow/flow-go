@@ -10,9 +10,24 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type ContractUpdateKey struct {
+	address flow.Address
+	name    string
+}
+
+type ContractUpdate struct {
+	ContractUpdateKey
+	Code []byte
+}
+
+// ContractHandler handles all interaction
+// with smart contracts such as get/set/update
+// it also captures all changes as deltas and
+// only commit them when called so smart contract
+// updates can be delayed until end of the tx execution
 type ContractHandler struct {
 	accounts                    *state.Accounts
-	draftUpdates                map[contractUpdateKey]contractUpdate
+	draftUpdates                map[ContractUpdateKey]ContractUpdate
 	restrictedDeploymentEnabled bool
 	authorizedAccounts          []runtime.Address
 	// handler doesn't have to be thread safe and right now
@@ -24,7 +39,7 @@ type ContractHandler struct {
 func NewContractHandler(accounts *state.Accounts, restrictedDeploymentEnabled bool, authorizedAccounts []runtime.Address) *ContractHandler {
 	return &ContractHandler{
 		accounts:                    accounts,
-		draftUpdates:                make(map[contractUpdateKey]contractUpdate),
+		draftUpdates:                make(map[ContractUpdateKey]ContractUpdate),
 		restrictedDeploymentEnabled: restrictedDeploymentEnabled,
 		authorizedAccounts:          authorizedAccounts,
 	}
@@ -48,8 +63,8 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 	add := flow.Address(address)
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	uk := contractUpdateKey{add, name}
-	u := contractUpdate{uk, code}
+	uk := ContractUpdateKey{add, name}
+	u := ContractUpdate{uk, code}
 	h.draftUpdates[uk] = u
 
 	return nil
@@ -65,8 +80,8 @@ func (h *ContractHandler) RemoveContract(address runtime.Address, name string, s
 	// removes are stored in the draft updates with code value of nil
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	uk := contractUpdateKey{add, name}
-	u := contractUpdate{uk, nil}
+	uk := ContractUpdateKey{add, name}
+	u := ContractUpdate{uk, nil}
 	h.draftUpdates[uk] = u
 
 	return nil
@@ -79,8 +94,8 @@ func (h *ContractHandler) Commit() error {
 
 	var err error
 	for _, v := range h.draftUpdates {
-		if len(v.code) > 0 {
-			err = h.accounts.SetContract(v.name, v.address, v.code)
+		if len(v.Code) > 0 {
+			err = h.accounts.SetContract(v.name, v.address, v.Code)
 			if err != nil {
 				return err
 			}
@@ -93,7 +108,7 @@ func (h *ContractHandler) Commit() error {
 	}
 
 	// reset draft
-	h.draftUpdates = make(map[contractUpdateKey]contractUpdate)
+	h.draftUpdates = make(map[ContractUpdateKey]ContractUpdate)
 	return nil
 }
 
@@ -101,12 +116,23 @@ func (h *ContractHandler) Rollback() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	h.draftUpdates = make(map[contractUpdateKey]contractUpdate)
+	h.draftUpdates = make(map[ContractUpdateKey]ContractUpdate)
 	return nil
 }
 
 func (h *ContractHandler) HasUpdates() bool {
 	return len(h.draftUpdates) > 0
+}
+
+func (h *ContractHandler) UpdateKeys() []ContractUpdateKey {
+	if len(h.draftUpdates) == 0 {
+		return nil
+	}
+	keys := make([]ContractUpdateKey, 0, len(h.draftUpdates))
+	for k := range h.draftUpdates {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
@@ -122,14 +148,4 @@ func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
 		return false
 	}
 	return true
-}
-
-type contractUpdateKey struct {
-	address flow.Address
-	name    string
-}
-
-type contractUpdate struct {
-	contractUpdateKey
-	code []byte
 }

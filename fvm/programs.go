@@ -5,16 +5,12 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/flow-go/fvm/handler"
 )
 
 type ProgramEntry struct {
 	Location common.Location
 	Program  *interpreter.Program
-}
-
-type ChangedProgram struct {
-	Address common.Address
-	Name    string
 }
 
 type ProgramGetFunc func(location common.Location) *ProgramEntry
@@ -112,7 +108,7 @@ func (p *Programs) ForceCleanup() {
 	p.programs = make(map[common.LocationID]ProgramEntry)
 }
 
-func (p *Programs) Cleanup(changedPrograms []ChangedProgram) {
+func (p *Programs) Cleanup(changedContracts []handler.ContractUpdateKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -120,7 +116,7 @@ func (p *Programs) Cleanup(changedPrograms []ChangedProgram) {
 	// and invalidate only affected ones, possibly setting them to
 	// nil so they will override parent's data, but for now
 	// just throw everything away and use a special flag for this
-	if len(changedPrograms) > 0 {
+	if len(changedContracts) > 0 {
 
 		p.cleaned = true
 
