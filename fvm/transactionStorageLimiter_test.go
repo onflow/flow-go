@@ -27,7 +27,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
+		}, nil, st, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
@@ -45,7 +45,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
+		}, nil, st, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
@@ -63,7 +63,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
+		}, nil, st, fvm.NewEmptyPrograms())
 
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
@@ -81,7 +81,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
+		}, nil, st, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
@@ -98,7 +98,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
+		}, nil, st, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
@@ -143,7 +143,7 @@ func newMockState(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *s
 	return s
 }
 
-func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.State) (func(address common.Address) (value uint64, err error), error) {
+func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.State, _ *fvm.Programs) (func(address common.Address) (value uint64, err error), error) {
 	return func(address common.Address) (value uint64, err error) {
 		return 100, nil
 	}, nil

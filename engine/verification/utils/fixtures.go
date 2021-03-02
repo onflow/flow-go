@@ -98,6 +98,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
+		programs := fvm.NewEmptyPrograms()
 
 		// create BlockComputer
 		bc, err := computer.NewBlockComputer(vm, execCtx, nil, nil, log)
@@ -142,6 +143,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 				uint(i),
 				startStateCommitment,
 				view,
+				programs,
 				bc,
 				led)
 
@@ -279,6 +281,7 @@ func executeCollection(
 	chunkIndex uint,
 	startStateCommitment flow.StateCommitment,
 	view *delta.View,
+	programs *fvm.Programs,
 	bc computer.BlockComputer,
 	led *completeLedger.Ledger) (*flow.Chunk, *flow.ChunkDataPack, flow.StateCommitment, []byte) {
 
@@ -304,7 +307,7 @@ func executeCollection(
 	}
 
 	// *execution.ComputationResult, error
-	computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view)
+	computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 	require.NoError(t, err, "error executing block")
 	spock := computationResult.StateSnapshots[0].SpockSecret
 
