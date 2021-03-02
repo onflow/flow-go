@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module"
 )
 
 // Collection spans.
@@ -21,14 +21,14 @@ const (
 )
 
 type CollectionCollector struct {
-	tracer               *trace.OpenTracer
+	tracer               module.Tracer
 	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
 	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
 	proposals            *prometheus.HistogramVec // tracks the number/size of PROPOSED collections
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
 }
 
-func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
+func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 
 	cc := &CollectionCollector{
 		tracer: tracer,
