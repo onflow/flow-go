@@ -138,6 +138,7 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	// failed transaction path
 	if err != nil {
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
@@ -149,6 +150,7 @@ func (i *TransactionInvocator) Process(
 		return err
 	}
 
+	// applying contract changes
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
 	updatedKeys, err := env.Commit()
@@ -158,6 +160,7 @@ func (i *TransactionInvocator) Process(
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
+	// tx failed at update contract step
 	if err != nil {
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
