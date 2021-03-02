@@ -76,8 +76,8 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		chunksQueue:      &storage.ChunksQueue{},
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		notifier:         &mockassigner.ProcessingNotifier{},
-		indexer:          &storage.Indexer{},
+		notifier:         &module.ProcessingNotifier{},
+		indexer:          &mockassigner.Indexer{},
 	}
 
 	for _, apply := range options {
@@ -448,28 +448,6 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
-// SetupTest initiates the test setups prior to each test.
-func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineTestSuite {
-	s := &AssignerEngineTestSuite{
-		me:               &module.Local{},
-		state:            &protocol.State{},
-		snapshot:         &protocol.Snapshot{},
-		metrics:          &module.VerificationMetrics{},
-		tracer:           trace.NewNoopTracer(),
-		assigner:         &module.ChunkAssigner{},
-		chunksQueue:      &storage.ChunksQueue{},
-		newChunkListener: &module.NewJobListener{},
-		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		notifier:         &module.ProcessingNotifier{},
-		indexer:          &mockassigner.Indexer{},
-	}
-
-	for _, apply := range options {
-		apply(s)
-	}
-	return s
 }
 
 // createContainerBlock creates and returns a block that contains an execution receipt, with its corresponding chunks assignment based
