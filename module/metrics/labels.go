@@ -68,6 +68,7 @@ const (
 	ResourceApprovalQueue            = "matching_approval_queue"          // consensus node, matching engine
 	ResourceReceiptQueue             = "matching_receipt_queue"           // consensus node, matching engine
 	ResourceApprovalResponseQueue    = "matching_approval_response_queue" // consensus node, matching engine
+	ResourceDKGKey                   = "dkg-key"
 )
 
 const (
