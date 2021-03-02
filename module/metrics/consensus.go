@@ -6,7 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module"
 )
 
 // Consensus spans.
@@ -24,7 +24,7 @@ const (
 
 // ConsensusCollector ...
 type ConsensusCollector struct {
-	tracer *trace.OpenTracer
+	tracer module.Tracer
 
 	// Total time spent in onReceipt excluding checkSealing
 	onReceiptDuration prometheus.Counter
@@ -40,7 +40,7 @@ type ConsensusCollector struct {
 }
 
 // NewConsensusCollector created a new consensus collector
-func NewConsensusCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ConsensusCollector {
+func NewConsensusCollector(tracer module.Tracer, registerer prometheus.Registerer) *ConsensusCollector {
 	onReceiptDuration := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "push_receipts_on_receipt_duration_seconds_total",
 		Namespace: namespaceConsensus,
