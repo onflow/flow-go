@@ -49,6 +49,8 @@ type ReadOnlyExecutionState interface {
 	GetHighestExecutedBlockID(context.Context) (uint64, flow.Identifier, error)
 
 	GetCollection(identifier flow.Identifier) (*flow.Collection, error)
+
+	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
 
 // IsBlockExecuted returns whether the block has been executed.
@@ -137,6 +139,7 @@ func NewExecutionState(
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
+	headers storage.Headers,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
@@ -328,13 +331,18 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 	return s.chunkDataPacks.ByChunkID(chunkID)
 }
 
-func (s *state) PersistChunkDataPack(ctx context.Context, c *flow.ChunkDataPack) error {
+func (s *state) PersistChunkDataPack(ctx context.Context, c *flow.ChunkDataPack, blockID flow.Identifier) error {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
 		defer span.Finish()
 	}
 
-	return s.chunkDataPacks.Store(c)
+	err := s.chunkDataPacks.Store(c)
+	if err != nil {
+		return fmt.Errorf("cannot store chunk data pack: %w", err)
+	}
+
+	return s.headers.IndexByChunkID(blockID, c.ID())
 }
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
@@ -522,6 +530,10 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 
 func (s *state) GetCollection(identifier flow.Identifier) (*flow.Collection, error) {
 	return s.collections.ByID(identifier)
+}
+
+func (s *state) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
+	return s.headers.IDByChunkID(chunkID)
 }
 
 func (s *state) UpdateHighestExecutedBlockIfHigher(ctx context.Context, header *flow.Header) error {

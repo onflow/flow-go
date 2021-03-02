@@ -32,6 +32,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 				stateCommitments := mocks.NewMockCommits(ctrl)
 				blocks := mocks.NewMockBlocks(ctrl)
+				headers := mocks.NewMockHeaders(ctrl)
 				collections := mocks.NewMockCollections(ctrl)
 				events := mocks.NewMockEvents(ctrl)
 				serviceEvents := mocks.NewMockEvents(ctrl)
