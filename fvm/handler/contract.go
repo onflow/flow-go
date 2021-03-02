@@ -50,7 +50,7 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	u := contractUpdate{add, name, code}
-	h.draftUpdates[u.key()] = u
+	h.draftUpdates[u.draftUpdateKey()] = u
 
 	return nil
 }
@@ -66,7 +66,7 @@ func (h *ContractHandler) RemoveContract(address runtime.Address, name string, s
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	u := contractUpdate{add, name, nil}
-	h.draftUpdates[u.key()] = u
+	h.draftUpdates[u.draftUpdateKey()] = u
 
 	return nil
 }
@@ -129,6 +129,8 @@ type contractUpdate struct {
 	code    []byte
 }
 
-func (c *contractUpdate) key() string {
+// warning, do not use this for any storage reasons,
+// this only serves as a way to add things to draft
+func (c *contractUpdate) draftUpdateKey() string {
 	return strings.Join([]string{c.address.String(), c.name}, "\x1F")
 }
