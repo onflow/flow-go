@@ -7,7 +7,7 @@ import (
 )
 
 type VerificationCollector struct {
-	tracer          module.Tracer
+	tracer module.Tracer
 
 	// Assigner Engine
 	rcvBlocksTotal      prometheus.Counter // total finalized blocks received by assigner engine
