@@ -4,8 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Indexer indexes all execution receipts in a finalized container block based on
-// their reference block ID and the executor ID.
+// Indexer indexes the provided execution receipts. Each Receipt is indexed by the block the receipt pertains to.
 type Indexer interface {
-	IndexReceipts(blockID flow.Identifier) error
+	IndexReceipts(Receipts  []*ExecutionReceipt) error
 }
