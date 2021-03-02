@@ -37,7 +37,7 @@ func TestContract_DraftFunctionality(t *testing.T) {
 	require.Equal(t, len(cont), 0)
 
 	// commit
-	err = contractHandler.Commit()
+	_, err = contractHandler.Commit()
 	require.NoError(t, err)
 	cont, err = contractHandler.GetContract(rAdd, "testContract")
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func TestContract_DraftFunctionality(t *testing.T) {
 	err = contractHandler.Rollback()
 	require.NoError(t, err)
 	require.False(t, contractHandler.HasUpdates())
-	err = contractHandler.Commit()
+	_, err = contractHandler.Commit()
 	require.NoError(t, err)
 
 	// test contract shouldn't be there

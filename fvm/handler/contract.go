@@ -87,29 +87,30 @@ func (h *ContractHandler) RemoveContract(address runtime.Address, name string, s
 	return nil
 }
 
-func (h *ContractHandler) Commit() error {
+func (h *ContractHandler) Commit() ([]ContractUpdateKey, error) {
 
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
+	updatedKeys := h.UpdateKeys()
 	var err error
 	for _, v := range h.draftUpdates {
 		if len(v.Code) > 0 {
 			err = h.accounts.SetContract(v.name, v.address, v.Code)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		} else {
 			err = h.accounts.DeleteContract(v.name, v.address)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 
 	// reset draft
 	h.draftUpdates = make(map[ContractUpdateKey]ContractUpdate)
-	return nil
+	return updatedKeys, nil
 }
 
 func (h *ContractHandler) Rollback() error {

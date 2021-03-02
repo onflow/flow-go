@@ -532,12 +532,8 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 	return nil
 }
 
-func (e *hostEnv) ContractUpdateKeys() []handler.ContractUpdateKey {
-	return e.contracts.UpdateKeys()
-}
-
-func (e *hostEnv) Commit() error {
-	// commit changes
+func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
+	// commit changes and return a list of updated keys
 	return e.contracts.Commit()
 }
 
