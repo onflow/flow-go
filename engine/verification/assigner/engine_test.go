@@ -450,25 +450,6 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
-// createContainerBlock creates and returns a block that contains an execution receipt, with its corresponding chunks assignment based
-// on the input options.
-func createContainerBlock(options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.Block, *chunks.Assignment) {
-	result, assignment := test.CreateExecutionResult(unittest.IdentifierFixture(), options...)
-	receipt := &flow.ExecutionReceipt{
-		ExecutorID:      unittest.IdentifierFixture(),
-		ExecutionResult: *result,
-	}
-	// container block
-	header := unittest.BlockHeaderFixture()
-	block := &flow.Block{
-		Header: &header,
-		Payload: &flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt},
-		},
-	}
-	return block, assignment
-}
-
 // NewAssignerEngine returns an assigner engine for testing.
 func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 
