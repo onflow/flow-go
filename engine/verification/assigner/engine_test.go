@@ -126,57 +126,6 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 	return e
 }
 
-// TestNewBlock_MultipleAssignment evaluates that passing a new finalized block to assigner engine that contains
-// a receipt with multiple assigned chunk, results in the assigner engine passing all assigned chunks to the
-// chunks queue and notifying the job listener of the assigned chunks.
-func TestNewBlock_MultipleAssignment(t *testing.T) {
-	t.Parallel()
-
-	s := SetupTest()
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains 5 chunks, but
-	// only 3 of them is assigned to this verification node.
-	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(
-			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
-			test.WithAssignee(s.myID()),                     // assigned to me
-			test.WithAssignee(s.myID()),                     // assigned to me
-			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
-			test.WithAssignee(s.myID())))                    // assigned to me
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 3) // 3 chunks should be assigned
-
-	// mocks processing assigned chunks
-	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
-	// invoked for it.
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
-	s.newChunkListener.On("Check").Return().Times(chunksNum)
-	s.metrics.On("OnChunkProcessed").Return().Times(chunksNum)
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends containerBlock containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
-	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.chunksQueue,
-		s.notifier,
-		s.newChunkListener,
-		s.indexer)
-}
-
 // TestChunkQueue_UnhappyPath_Error evaluates that if chunk queue returns an error upon submission of a
 // chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
 // added to the chunks queue, the consumer should not be notified.
@@ -494,6 +443,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 	// invoked for it.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
+	s.metrics.On("OnChunkProcessed").Return().Times(chunksNum)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
@@ -503,6 +453,8 @@ func newBlockMultipleAssignment(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends containerBlock containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
