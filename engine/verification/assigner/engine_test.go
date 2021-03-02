@@ -126,53 +126,6 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 	return e
 }
 
-// TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
-// it drops the corresponding execution receipts for that block without performing any chunk assignment.
-// It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
-func TestNewBlock_Unstaked(t *testing.T) {
-	t.Parallel()
-
-	// creates an assigner engine for an unstaked verification node.
-	s := SetupTest(WithIdentity(
-		unittest.IdentityFixture(unittest.WithStake(0))))
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains
-	// no assigned chunk to verification node.
-	containerBlock, _ := createContainerBlock(
-		test.WithChunks( // all chunks assigned to some (random) identifiers, but not this verification node
-			test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
-	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-
-	// when the node is unstaked at reference block id, chunk assigner should not be called,
-	// and nothing should be passed to chunks queue, and
-	// job listener should not be notified.
-	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
-	s.newChunkListener.AssertNotCalled(t, "Check")
-	s.assigner.AssertNotCalled(t, "Assign")
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.notifier,
-		s.indexer)
-}
-
 // TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
 // a receipt with no chunk in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should never notify the job listener.
@@ -501,6 +454,8 @@ func newBlockUnstaked(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	// when the node is unstaked at reference block id, chunk assigner should not be called,
