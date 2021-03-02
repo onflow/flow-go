@@ -39,7 +39,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
@@ -47,7 +47,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, fvm.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 
@@ -65,8 +65,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create an empty block
 		block := generateBlock(0, 0)
+		programs := fvm.NewEmptyPrograms()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
 			Return(nil).
 			Once() // just system chunk
 
@@ -74,7 +75,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResult, 1)
@@ -98,8 +99,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection)
+		programs := fvm.NewEmptyPrograms()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
@@ -114,7 +116,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
@@ -230,7 +232,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, fvm.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		// all events should have been collected
@@ -278,7 +280,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, fvm.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -340,7 +342,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, fvm.NewEmptyPrograms())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
