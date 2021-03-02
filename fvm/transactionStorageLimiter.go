@@ -13,6 +13,7 @@ type TransactionStorageLimiter struct {
 		ctx Context,
 		tp *TransactionProcedure,
 		st *state.State,
+		programs *Programs,
 	) (func(address common.Address) (value uint64, err error), error)
 }
 
@@ -21,8 +22,9 @@ func getStorageCapacityFuncFactory(
 	ctx Context,
 	_ *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) (func(address common.Address) (value uint64, err error), error) {
-	env, err := newEnvironment(ctx, vm, st)
+	env, err := newEnvironment(ctx, vm, st, programs)
 	if err != nil {
 		return nil, err
 	}
@@ -42,12 +44,13 @@ func (d *TransactionStorageLimiter) Process(
 	ctx *Context,
 	tp *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
 	if !ctx.LimitAccountStorage {
 		return nil
 	}
 
-	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, st)
+	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, st, programs)
 	if err != nil {
 		return err
 	}

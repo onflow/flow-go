@@ -24,6 +24,7 @@ func (v *TransactionSignatureVerifier) Process(
 	_ *Context,
 	proc *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
 	return v.verifyTransactionSignatures(proc.Transaction, st)
 }

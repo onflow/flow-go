@@ -16,6 +16,7 @@ func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
 	st *state.State,
+	programs *Programs,
 	address flow.Address,
 ) (*flow.Account, error) {
 	accounts := state.NewAccounts(st)
@@ -30,7 +31,7 @@ func getAccount(
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env, err := newEnvironment(ctx, vm, st)
+		env, err := newEnvironment(ctx, vm, st, programs)
 		if err != nil {
 			return nil, err
 		}

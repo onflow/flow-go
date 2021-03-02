@@ -98,6 +98,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
+		programs := fvm.NewEmptyPrograms()
 
 		// create BlockComputer
 		bc, err := computer.NewBlockComputer(vm, execCtx, nil, nil, log)
