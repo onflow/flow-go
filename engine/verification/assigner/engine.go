@@ -77,7 +77,7 @@ func (e *Engine) Done() <-chan struct{} {
 // is staked at the reference block of this execution receipt's result, chunk assignment is done on the execution result, and
 // the assigned chunks' locators are pushed to the chunks queue, which are made available for the chunk queue consumer (i.e., the
 // fetcher engine).
-func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
+func (e *Engine) handleExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
 	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 	referenceBlockID := receipt.ExecutionResult.BlockID
@@ -88,6 +88,8 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 		Hex("reference_block_id", logging.ID(referenceBlockID)).
 		Hex("container_block_id", logging.ID(containerBlockID)).
 		Logger()
+
+	e.metrics.OnExecutionReceiptReceived()
 
 	// verification node should be staked at the reference block id.
 	ok, err := stakedAsVerification(e.state, referenceBlockID, e.me.NodeID())
@@ -101,11 +103,12 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 	}
 
 	// chunk assignment
-	chunkList, err := e.chunkAssignments(context.Background(), &receipt.ExecutionResult)
+	chunkList, err := e.chunkAssignments(ctx, &receipt.ExecutionResult)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not determine chunk assignment")
 		return
 	}
+	e.metrics.OnChunksAssigned(len(chunkList))
 
 	// TODO: de-escalate to debug level on stable version.
 	log.Info().
@@ -114,7 +117,7 @@ func (e *Engine) handleExecutionReceipt(receipt *flow.ExecutionReceipt, containe
 
 	// pushes assigned chunks to chunks queue.
 	for _, chunk := range chunkList {
-		e.processChunk(chunk, resultID)
+		e.processChunksWithTracing(ctx, chunk, resultID)
 	}
 }
 
@@ -232,49 +235,6 @@ func (e *Engine) handleExecutionReceiptsWithTracing(ctx context.Context, receipt
 			e.handleExecutionReceipt(ctx, receipt, containerBlockID)
 		})
 	}
-}
-
-// handleExecutionReceipt receives a receipt that appears in a finalized container block. In case this verification node
-// is staked at the reference block of this execution receipt's result, chunk assignment is done on the execution result, and
-// the assigned chunks' locators are pushed to the chunks queue, which are made available for the chunk queue consumer (i.e., the
-// fetcher engine).
-func (e *Engine) handleExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt, containerBlockID flow.Identifier) {
-	receiptID := receipt.ID()
-	resultID := receipt.ExecutionResult.ID()
-	referenceBlockID := receipt.ExecutionResult.BlockID
-
-	log := log.With().
-		Hex("receipt_id", logging.ID(receiptID)).
-		Hex("result_id", logging.ID(resultID)).
-		Hex("reference_block_id", logging.ID(referenceBlockID)).
-		Hex("container_block_id", logging.ID(containerBlockID)).
-		Logger()
-
-	e.metrics.OnExecutionReceiptReceived()
-
-	// verification node should be staked at the reference block id.
-	ok, err := e.stakedAtBlockID(referenceBlockID)
-	if err != nil {
-		log.Error().Err(err).Msg("could not verify stake of verification node for result at reference block id")
-		return
-	}
-	if !ok {
-		log.Debug().Msg("node is not staked at reference block id, receipt is discarded")
-		return
-	}
-
-	// chunk assignment
-	chunkList, err := e.chunkAssignments(ctx, &receipt.ExecutionResult)
-	if err != nil {
-		log.Error().Err(err).Msg("could not determine chunk assignment")
-		return
-	}
-	e.metrics.OnChunksAssigned(len(chunkList))
-	log.Info().
-		Int("total_assigned_chunks", len(chunkList)).
-		Msg("chunk assignment done")
-
-	e.processChunksWithTracing(ctx, chunkList, resultID)
 }
 
 // processChunk receives an assigned chunk to this verification node, creates a chunk
