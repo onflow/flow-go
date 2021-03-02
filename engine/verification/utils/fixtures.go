@@ -29,8 +29,9 @@ import (
 // verify it.
 // TODO update this as needed based on execution requirements
 type CompleteExecutionResult struct {
+	ContainerBlock *flow.Block // block that contains execution receipt of reference block
+	ReferenceBlock *flow.Block // block that execution receipt refers to
 	Receipt        *flow.ExecutionReceipt
-	Block          *flow.Block
 	Collections    []*flow.Collection
 	ChunkDataPacks []*flow.ChunkDataPack
 	SpockSecrets   [][]byte
@@ -67,7 +68,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	chunkDataPacks := make([]*flow.ChunkDataPack, 0)
 
 	var payload flow.Payload
-	var block flow.Block
+	var referenceBlock flow.Block
 	header := unittest.BlockHeaderWithParentFixture(root)
 
 	unittest.RunWithTempDir(t, func(dir string) {
@@ -124,11 +125,11 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			Guarantees: guarantees,
 		}
 		header.PayloadHash = payload.Hash()
-		block = flow.Block{
+		referenceBlock = flow.Block{
 			Header:  &header,
 			Payload: &payload,
 		}
-		blockID := block.ID()
+		blockID := referenceBlock.ID()
 
 		// executes collections
 		for i := 0; i < len(collections); i++ {
@@ -154,7 +155,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	})
 
 	// makes sure all chunks are referencing the correct block id.
-	blockID := block.ID()
+	blockID := referenceBlock.ID()
 	for _, chunk := range chunks {
 		require.Equal(t, blockID, chunk.BlockID, "inconsistent block id in chunk fixture")
 	}
@@ -164,13 +165,18 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		Chunks:  chunks,
 	}
 
-	receipt := flow.ExecutionReceipt{
+	receipt := &flow.ExecutionReceipt{
 		ExecutionResult: result,
 	}
 
+	// container block is the block that contains the execution receipt of reference block
+	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
+	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
+
 	return CompleteExecutionResult{
-		Receipt:        &receipt,
-		Block:          &block,
+		Receipt:        receipt,
+		ReferenceBlock: &referenceBlock,
+		ContainerBlock: &containerBlock,
 		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
@@ -203,11 +209,11 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 	header.Height = 0
 	header.PayloadHash = payload.Hash()
 
-	block := flow.Block{
+	referenceBlock := flow.Block{
 		Header:  &header,
 		Payload: &payload,
 	}
-	blockID := block.ID()
+	blockID := referenceBlock.ID()
 
 	// creates chunks
 	chunks := make([]*flow.Chunk, 0)
@@ -234,13 +240,19 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 		Chunks:  chunks,
 	}
 
-	receipt := flow.ExecutionReceipt{
+	receipt := &flow.ExecutionReceipt{
 		ExecutionResult: result,
 	}
 
+	// container block contains the execution receipt and points back to reference block
+	// as its parent.
+	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
+	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
+
 	return CompleteExecutionResult{
-		Receipt:        &receipt,
-		Block:          &block,
+		Receipt:        receipt,
+		ReferenceBlock: &referenceBlock,
+		ContainerBlock: &containerBlock,
 		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
 	}

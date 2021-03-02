@@ -63,7 +63,7 @@ type Worker struct {
 	consumer *BlockConsumer
 }
 
-// BlockWorker receives a job corresponding to a finalized block.
+// Run is a block worker that receives a job corresponding to a finalized block.
 // It then converts the job to a block and passes it to the underlying engine
 // for processing.
 func (w *Worker) Run(job module.Job) {
@@ -71,21 +71,13 @@ func (w *Worker) Run(job module.Job) {
 	w.engine.ProcessFinalizedBlock(block)
 }
 
-// FinishProcessing is a callback for engine to notify a block has been
+// Notify is a callback for engine to notify a block has been
 // processed by the given blockID
 // the worker will translate the block ID into jobID and notify the consumer
 // that the job is done.
-func (w *Worker) FinishProcessing(blockID flow.Identifier) {
+func (w *Worker) Notify(blockID flow.Identifier) {
 	jobID := blockIDToJobID(blockID)
 	w.consumer.NotifyJobIsDone(jobID)
-}
-
-// finishProcessing is for the worker's underneath engine to report a block
-// has been processed without knowing the job queue
-// it's a callback so that the worker can convert the block id into a job
-// id, and notify the consumer about a finished job.
-type finishProcessing interface {
-	FinishProcessing(blockID flow.Identifier)
 }
 
 // BlockConsumer listens to the OnFinalizedBlock event
@@ -116,13 +108,11 @@ func NewBlockConsumer(
 	maxProcessing int64,
 ) (*BlockConsumer, int64, error) {
 	worker := &Worker{engine: engine}
-	engine.withFinishProcessing(worker)
+	engine.withBlockConsumerNotifier(worker)
 
 	jobs := &FinalizedBlockReader{state: state}
 
-	consumer := jobqueue.NewConsumer(
-		log, jobs, processedHeight, worker, maxProcessing,
-	)
+	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
