@@ -3,8 +3,8 @@ package main
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/badger"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
@@ -15,7 +15,7 @@ import (
 )
 
 func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics, tracer module.Tracer, index storage.Index, chain flow.ChainID,
-	indexer *matching.Indexer,
+	indexer *badger.Indexer,
 ) hotstuff.Consumer {
 	telemetryConsumer := notifications.NewTelemetryConsumer(log, chain)
 	tracingConsumer := notifications.NewConsensusTracingConsumer(log, tracer, index)
