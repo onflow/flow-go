@@ -1,4 +1,4 @@
-package badger
+package matching
 
 import (
 	"fmt"
