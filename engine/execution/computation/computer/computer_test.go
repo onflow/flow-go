@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/stdlib"
@@ -344,67 +343,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view)
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
-	})
-	t.Run("forks are not sharing programs", func(t *testing.T) {
-
-		logger := zerolog.Nop()
-
-		ctx := fvm.NewContext(
-			logger,
-			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvocator(logger),
-			),
-		)
-
-		contractLocation := common.AddressLocation{
-			Address: common.Address{0x1},
-			Name:    "Test",
-		}
-
-		// TODO fix me to be distinct
-		contractProgram1 := &interpreter.Program{Program: ast.NewProgram(nil)}
-		contractProgram2 := &interpreter.Program{}
-
-		const transactionCount = 1
-		const collectionCount = 1
-		var executionCalls int
-
-		rt := &testRuntime{
-			executeTransaction: func(script runtime.Script, r runtime.Context) error {
-				executionCalls++
-				if executionCalls == 0 {
-					err := r.Interface.SetProgram(
-						contractLocation,
-						contractProgram1,
-					)
-					require.NoError(t, err)
-				}
-				err := r.Interface.SetProgram(
-					contractLocation,
-					contractProgram2,
-				)
-				require.NoError(t, err)
-				return nil
-			},
-		}
-
-		vm := fvm.New(rt)
-		exe, err := computer.NewBlockComputer(vm, ctx, nil, nil, zerolog.Nop())
-		require.NoError(t, err)
-
-		block1 := generateBlock(collectionCount, transactionCount)
-		block2 := generateBlock(collectionCount, transactionCount)
-		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-			return nil, nil
-		})
-		_, err = exe.ExecuteBlock(context.Background(), block1, view)
-		require.NoError(t, err)
-
-		_, err = exe.ExecuteBlock(context.Background(), block2, view)
-		require.NoError(t, err)
-
-		// TODO How to compare the cache and parents
-
 	})
 }
 
