@@ -128,13 +128,13 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		payload = flow.Payload{
 			Guarantees: guarantees,
 		}
-		block = flow.Block{
+		referenceBlock = flow.Block{
 			Header: &header,
 		}
-		block.SetPayload(payload)
+		referenceBlock.SetPayload(payload)
 
 		executableBlock := &entity.ExecutableBlock{
-			Block:               &block,
+			Block:               &referenceBlock,
 			CompleteCollections: completeColls,
 			StartState:          startStateCommitment,
 		}
@@ -227,7 +227,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	}
 
 	result := flow.ExecutionResult{
-		BlockID: block.ID(),
+		BlockID: referenceBlock.ID(),
 		Chunks:  chunks,
 	}
 
