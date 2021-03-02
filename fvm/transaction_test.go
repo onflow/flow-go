@@ -237,8 +237,8 @@ func TestSafetyCheck(t *testing.T) {
 					Err: &sema.CheckerError{
 						Errors: []error{
 							&sema.AlwaysFailingNonResourceCastingTypeError{
-								ValueType:  sema.AnyType,
-								TargetType: sema.AnyType,
+								ValueType:  &sema.AnyType{},
+								TargetType: &sema.AnyType{},
 							}, // some dummy error
 							&sema.ImportedProgramError{
 								Err:      &sema.CheckerError{},
