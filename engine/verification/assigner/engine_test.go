@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,7 +30,7 @@ type AssignerEngineTestSuite struct {
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
 	notifier         *module.ProcessingNotifier
-	indexer          *storage.Indexer
+	indexer          *mockassigner.Indexer
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -74,7 +75,7 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 		notifier:         &module.ProcessingNotifier{},
-		indexer:          &storage.Indexer{},
+		indexer:          &mockassigner.Indexer{},
 	}
 
 	for _, apply := range options {
@@ -174,7 +175,7 @@ func newBlockHappyPath(t *testing.T) {
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -214,7 +215,7 @@ func newBlockUnstaked(t *testing.T) {
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -252,7 +253,7 @@ func newBlockNoChunk(t *testing.T) {
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -295,7 +296,7 @@ func newBlockNoAssignedChunk(t *testing.T) {
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -344,7 +345,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends containerBlock containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
@@ -384,7 +385,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
+	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
 	e.ProcessFinalizedBlock(containerBlock)
