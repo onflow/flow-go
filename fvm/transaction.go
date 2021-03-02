@@ -167,7 +167,9 @@ func (i *TransactionInvocator) Process(
 		Str("txHash", proc.ID.String()).
 		Uint64("blockHeight", blockHeight).
 		Uint64("ledgerInteractionUsed", st.InteractionUsed()).
-		Msg("transaction executed with no error")
+		Int("retried", proc.Retried).
+		Msg("transaction executed successfully")
+
 	return nil
 }
 

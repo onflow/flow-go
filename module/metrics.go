@@ -5,8 +5,9 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 )
+
+type EntriesFunc func() uint
 
 // Network Metrics
 type NetworkMetrics interface {
@@ -64,7 +65,7 @@ type CacheMetrics interface {
 
 type MempoolMetrics interface {
 	MempoolEntries(resource string, entries uint)
-	Register(resource string, entriesFunc metrics.EntriesFunc) error
+	Register(resource string, entriesFunc EntriesFunc) error
 }
 
 type HotstuffMetrics interface {
