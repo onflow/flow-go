@@ -163,7 +163,7 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 
 	log.Debug().Msg("new finalized block arrived")
 
-	err := e.indexer.IndexReceipts(blockID)
+	err := e.indexer.IndexReceipts(block.Payload.Receipts)
 	if err != nil {
 		// TODO: consider aborting the process
 		log.Error().Err(err).Msg("could not index receipts for block")
