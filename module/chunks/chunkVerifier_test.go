@@ -266,7 +266,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 type vmMock struct{}
 
-func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Ledger) error {
+func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Ledger, programs *fvm.Programs) error {
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
