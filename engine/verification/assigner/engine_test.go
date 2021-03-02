@@ -1,7 +1,6 @@
 package assigner
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -124,99 +123,6 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 	s.me.On("NodeID").Return(s.verIdentity.NodeID)
 
 	return e
-}
-
-// TestChunkQueue_UnhappyPath_Error evaluates that if chunk queue returns an error upon submission of a
-// chunk to it, the new job listener is never invoked. This is important as without a new chunk successfully
-// added to the chunks queue, the consumer should not be notified.
-func TestChunkQueue_UnhappyPath_Error(t *testing.T) {
-	t.Parallel()
-
-	s := SetupTest()
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains a single chunk assigned
-	// to verification node.
-	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(s.myID())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 1)
-
-	// mocks processing assigned chunks
-	// adding new chunks to queue results in an error
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
-		Return(false, fmt.Errorf("error")).
-		Times(chunksNum)
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
-	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.notifier,
-		s.chunksQueue,
-		s.indexer)
-
-	// job listener should not be notified as no new chunk is added.
-	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
-// TestChunkQueue_UnhappyPath_Duplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
-// This is important as without a new chunk successfully added to the chunks queue, the consumer should not be notified.
-func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
-	t.Parallel()
-
-	s := SetupTest()
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains a single chunk assigned
-	// to verification node.
-	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(s.myID())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 1)
-
-	// mocks processing assigned chunks
-	// adding new chunks to queue returns false, which means a duplicate chunk.
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
-		Return(false, nil).
-		Times(chunksNum)
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
-	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.chunksQueue,
-		s.notifier,
-		s.indexer)
-
-	// job listener should not be notified as no new chunk is added.
-	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
 // TestAssignerEngine runs all subtests in parallel.
@@ -495,6 +401,8 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
