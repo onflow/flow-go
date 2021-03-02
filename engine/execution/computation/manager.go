@@ -20,8 +20,8 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger) error
-	GetAccount(fvm.Context, flow.Address, state.Ledger) (*flow.Account, error)
+	Run(fvm.Context, fvm.Procedure, state.Ledger, *fvm.Programs) error
+	GetAccount(fvm.Context, flow.Address, state.Ledger, *fvm.Programs) (*flow.Account, error)
 }
 
 type ComputationManager interface {
@@ -42,6 +42,7 @@ type Manager struct {
 	vm            VirtualMachine
 	vmCtx         fvm.Context
 	blockComputer computer.BlockComputer
+	programsCache *ProgramsCache
 }
 
 func New(
@@ -52,6 +53,7 @@ func New(
 	protoState protocol.State,
 	vm VirtualMachine,
 	vmCtx fvm.Context,
+	programsCacheSize uint,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -67,6 +69,11 @@ func New(
 		return nil, fmt.Errorf("cannot create block computer: %w", err)
 	}
 
+	programsCache, err := NewProgramsCache(programsCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create programs cache: %w", err)
+	}
+
 	e := Manager{
 		log:           log,
 		me:            me,
@@ -74,9 +81,18 @@ func New(
 		vm:            vm,
 		vmCtx:         vmCtx,
 		blockComputer: blockComputer,
+		programsCache: programsCache,
 	}
 
 	return &e, nil
+}
+
+func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *fvm.Programs {
+	programs := e.programsCache.Get(blockID)
+	if programs == nil {
+		return fvm.NewEmptyPrograms()
+	}
+	return programs.ChildPrograms()
 }
 
 func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
@@ -84,7 +100,9 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	script := fvm.Script(code).WithArguments(arguments...)
 
-	err := e.vm.Run(blockCtx, script, view)
+	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
+
+	err := e.vm.Run(blockCtx, script, view, programs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}
@@ -111,7 +129,16 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view)
+	var programs *fvm.Programs
+	fromCache := e.programsCache.Get(block.ParentID())
+
+	if fromCache == nil {
+		programs = fvm.NewEmptyPrograms()
+	} else {
+		programs = fromCache.ChildPrograms()
+	}
+
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, programs)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
@@ -119,6 +146,16 @@ func (e *Manager) ComputeBlock(
 
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
+
+	toInsert := programs
+
+	// if we have item from cache and there were no changes
+	// insert it under new block, to prevent long chains
+	if fromCache != nil && !programs.HasChanges() {
+		toInsert = fromCache
+	}
+
+	e.programsCache.Set(block.ID(), toInsert)
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
@@ -130,7 +167,9 @@ func (e *Manager) ComputeBlock(
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 
-	account, err := e.vm.GetAccount(blockCtx, address, view)
+	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
+
+	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get account at block (%s): %w", blockHeader.ID(), err)
 	}
