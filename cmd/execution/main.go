@@ -223,6 +223,7 @@ func main() {
 				ledgerStorage,
 				stateCommitments,
 				node.Storage.Blocks,
+				node.Storage.Headers,
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
@@ -230,7 +231,6 @@ func main() {
 				events,
 				serviceEvents,
 				txResults,
-				node.Storage.Headers,
 				node.DB,
 				node.Tracer,
 			)

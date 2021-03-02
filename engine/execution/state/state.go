@@ -8,13 +8,12 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
-
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -98,6 +97,7 @@ type state struct {
 	ls                 ledger.Ledger
 	commits            storage.Commits
 	blocks             storage.Blocks
+	headers            storage.Headers
 	collections        storage.Collections
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
@@ -135,11 +135,11 @@ func NewExecutionState(
 	ls ledger.Ledger,
 	commits storage.Commits,
 	blocks storage.Blocks,
+	headers storage.Headers,
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
-	headers storage.Headers,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
@@ -151,6 +151,7 @@ func NewExecutionState(
 		ls:                 ls,
 		commits:            commits,
 		blocks:             blocks,
+		headers:            headers,
 		collections:        collections,
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
@@ -331,19 +332,19 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 	return s.chunkDataPacks.ByChunkID(chunkID)
 }
 
-func (s *state) PersistChunkDataPack(ctx context.Context, c *flow.ChunkDataPack, blockID flow.Identifier) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
-		defer span.Finish()
-	}
-
-	err := s.chunkDataPacks.Store(c)
-	if err != nil {
-		return fmt.Errorf("cannot store chunk data pack: %w", err)
-	}
-
-	return s.headers.IndexByChunkID(blockID, c.ID())
-}
+//func (s *state) PersistChunkDataPack(ctx context.Context, c *flow.ChunkDataPack, blockID flow.Identifier) error {
+//	if s.tracer != nil {
+//		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
+//		defer span.Finish()
+//	}
+//
+//	err := s.chunkDataPacks.Store(c)
+//	if err != nil {
+//		return fmt.Errorf("cannot store chunk data pack: %w", err)
+//	}
+//
+//	return s.headers.IndexByChunkID(blockID, c.ID())
+//}
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
 	if s.tracer != nil {
