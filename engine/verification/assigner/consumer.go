@@ -63,7 +63,7 @@ type Worker struct {
 	consumer *BlockConsumer
 }
 
-// BlockWorker receives a job corresponding to a finalized block.
+// Run is a block worker that receives a job corresponding to a finalized block.
 // It then converts the job to a block and passes it to the underlying engine
 // for processing.
 func (w *Worker) Run(job module.Job) {
@@ -71,23 +71,13 @@ func (w *Worker) Run(job module.Job) {
 	w.engine.ProcessFinalizedBlock(block)
 }
 
-// FinishProcessing is a callback for engine to notify a block has been
+// Notify is a callback for engine to notify a block has been
 // processed by the given blockID
 // the worker will translate the block ID into jobID and notify the consumer
 // that the job is done.
 func (w *Worker) Notify(blockID flow.Identifier) {
 	jobID := blockIDToJobID(blockID)
 	w.consumer.NotifyJobIsDone(jobID)
-}
-
-// ProcessingNotifier is for the worker's underneath engine to report an entity
-// has been processed without knowing the job queue.
-// It is a callback so that the worker can convert the entity id into a job
-// id, and notify the consumer about a finished job.
-//
-// At the current version, entities used in this interface are chunks and blocks ids.
-type ProcessingNotifier interface {
-	Notify(entityID flow.Identifier)
 }
 
 // BlockConsumer listens to the OnFinalizedBlock event

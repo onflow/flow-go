@@ -8,33 +8,46 @@ const (
 
 	// State
 	// mutator.Extend - full payload check
-	ProtoStateMutatorExtend                = "common.state.proto.mutator.extend"
-	ProtoStateMutatorExtendCheckHeader     = "common.state.proto.mutator.extend.checkHeader"
-	ProtoStateMutatorExtendCheckGuarantees = "common.state.proto.mutator.extend.checkGuarantees"
-	ProtoStateMutatorExtendCheckSeals      = "common.state.proto.mutator.extend.checkSeals"
-	ProtoStateMutatorExtendCheckReceipts   = "common.state.proto.mutator.extend.checkReceipts"
-	ProtoStateMutatorExtendDBInsert        = "common.state.proto.mutator.extend.dbInsert"
+	ProtoStateMutatorExtend                SpanName = "common.state.proto.mutator.extend"
+	ProtoStateMutatorExtendCheckHeader     SpanName = "common.state.proto.mutator.extend.checkHeader"
+	ProtoStateMutatorExtendCheckGuarantees SpanName = "common.state.proto.mutator.extend.checkGuarantees"
+	ProtoStateMutatorExtendCheckSeals      SpanName = "common.state.proto.mutator.extend.checkSeals"
+	ProtoStateMutatorExtendCheckReceipts   SpanName = "common.state.proto.mutator.extend.checkReceipts"
+	ProtoStateMutatorExtendDBInsert        SpanName = "common.state.proto.mutator.extend.dbInsert"
 
 	// mutator.HeaderExtend - header-only check
-	ProtoStateMutatorHeaderExtend              = "common.state.proto.mutator.headerExtend"
-	ProtoStateMutatorHeaderExtendGetLastSealed = "common.state.proto.mutator.headerExtend.lastSealed"
+	ProtoStateMutatorHeaderExtend              SpanName = "common.state.proto.mutator.headerExtend"
+	ProtoStateMutatorHeaderExtendGetLastSealed SpanName = "common.state.proto.mutator.headerExtend.lastSealed"
 
 	// mutator.Finalize
-	ProtoStateMutatorFinalize = "common.state.proto.mutator.finalize"
+	ProtoStateMutatorFinalize SpanName = "common.state.proto.mutator.finalize"
 
 	// Consensus Node
 	//
 
 	CONProcessCollection SpanName = "con.processCollection"
-	// children of CONProcessCollection
-	CONHotFinalizeCollection          SpanName = "con.hotstuff.finalizeCollection"
-	CONIngOnCollectionGuarantee       SpanName = "con.ingestion.onCollectionGuarantee"
-	CONPropOnGuarantee                SpanName = "con.propagation.onGuarantee"
-	CONCompBroadcastProposalWithDelay SpanName = "con.compliance.BroadcastProposalWithDelay"
-	CONCompOnBlockProposal            SpanName = "con.compliance.onBlockProposal"
-	CONProvOnBlockProposal            SpanName = "con.provider.onBlockProposal"
+	CONProcessBlock      SpanName = "con.processBlock"
 
-	// Matching engine
+	// Hotstuff
+	CONHotFinalizeCollection SpanName = "con.hotstuff.finalizeCollection"
+	CONHotFinalizeBlock      SpanName = "con.hotstuff.finalizeBlock"
+
+	// Ingestion
+	CONIngOnCollectionGuarantee SpanName = "con.ingestion.onCollectionGuarantee"
+
+	// Propagation
+	CONPropOnGuarantee SpanName = "con.propagation.onGuarantee"
+
+	// Provider
+	CONProvOnBlockProposal SpanName = "con.provider.onBlockProposal"
+
+	// Compliance
+	CONCompBroadcastProposalWithDelay      SpanName = "con.compliance.BroadcastProposalWithDelay"
+	CONCompOnBlockProposal                 SpanName = "con.compliance.onBlockProposal"
+	CONCompOnBlockProposalProcessRecursive SpanName = "con.compliance.onBlockProposal.processBlockProposal.recursive"
+	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
+
+	// Matching
 	CONMatchCheckSealing                        SpanName = "con.matching.checkSealing"
 	CONMatchCheckSealingSealableResults         SpanName = "con.matching.checkSealing.sealableResults"
 	CONMatchCheckSealingClearPools              SpanName = "con.matching.checkSealing.clearPools"
@@ -44,37 +57,33 @@ const (
 	CONMatchOnReceiptVal                        SpanName = "con.matching.onReceipt.validation"
 	CONMatchOnApproval                          SpanName = "con.matching.onApproval"
 
-	CONProcessBlock SpanName = "con.processBlock"
-	// children of CONProcessBlock
-	CONHotFinalizeBlock SpanName = "con.hotstuff.finalizeBlock"
-
 	// Builder
-	CONBuildOn                        = "con.builder"
-	CONBuildOnCreatePayloadGuarantees = "con.builder.createPayload.guarantees"
-	CONBuildOnCreatePayloadSeals      = "con.builder.createPayload.seals"
-	CONBuildOnCreatePayloadReceipts   = "con.builder.createPayload.receipts"
-	CONBuildOnCreateHeader            = "con.builder.createHeader"
-	CONBuildOnDBInsert                = "con.builder.dbInsert"
+	CONBuildOn                        SpanName = "con.builder"
+	CONBuildOnCreatePayloadGuarantees SpanName = "con.builder.createPayload.guarantees"
+	CONBuildOnCreatePayloadSeals      SpanName = "con.builder.createPayload.seals"
+	CONBuildOnCreatePayloadReceipts   SpanName = "con.builder.createPayload.receipts"
+	CONBuildOnCreateHeader            SpanName = "con.builder.createHeader"
+	CONBuildOnDBInsert                SpanName = "con.builder.dbInsert"
 
 	// Collection Node
 	//
 
 	// Builder
-	COLBuildOn                  = "col.builder"
-	COLBuildOnSetup             = "col.builder.setup"
-	COLBuildOnUnfinalizedLookup = "col.builder.unfinalizedLookup"
-	COLBuildOnFinalizedLookup   = "col.builder.finalizedLookup"
-	COLBuildOnCreatePayload     = "col.builder.createPayload"
-	COLBuildOnCreateHeader      = "col.builder.createHeader"
-	COLBuildOnDBInsert          = "col.builder.dbInsert"
+	COLBuildOn                  SpanName = "col.builder"
+	COLBuildOnSetup             SpanName = "col.builder.setup"
+	COLBuildOnUnfinalizedLookup SpanName = "col.builder.unfinalizedLookup"
+	COLBuildOnFinalizedLookup   SpanName = "col.builder.finalizedLookup"
+	COLBuildOnCreatePayload     SpanName = "col.builder.createPayload"
+	COLBuildOnCreateHeader      SpanName = "col.builder.createHeader"
+	COLBuildOnDBInsert          SpanName = "col.builder.dbInsert"
 
 	// Cluster State
-	COLClusterStateMutatorExtend                       = "col.state.mutator.extend"
-	COLClusterStateMutatorExtendSetup                  = "col.state.mutator.extend.setup"
-	COLClusterStateMutatorExtendCheckAncestry          = "col.state.mutator.extend.ancestry"
-	COLClusterStateMutatorExtendCheckTransactionsValid = "col.state.mutator.extend.transactions.validity"
-	COLClusterStateMutatorExtendCheckTransactionsDupes = "col.state.mutator.extend.transactions.dupes"
-	COLClusterStateMutatorExtendDBInsert               = "col.state.mutator.extend.dbInsert"
+	COLClusterStateMutatorExtend                       SpanName = "col.state.mutator.extend"
+	COLClusterStateMutatorExtendSetup                  SpanName = "col.state.mutator.extend.setup"
+	COLClusterStateMutatorExtendCheckAncestry          SpanName = "col.state.mutator.extend.ancestry"
+	COLClusterStateMutatorExtendCheckTransactionsValid SpanName = "col.state.mutator.extend.transactions.validity"
+	COLClusterStateMutatorExtendCheckTransactionsDupes SpanName = "col.state.mutator.extend.transactions.dupes"
+	COLClusterStateMutatorExtendDBInsert               SpanName = "col.state.mutator.extend.dbInsert"
 
 	// Execution Node
 	//

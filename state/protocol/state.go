@@ -3,8 +3,6 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -61,14 +59,4 @@ type MutableState interface {
 	// has to be already valid.
 	// It modifies the persistent immutable protocol state accordingly.
 	MarkValid(blockID flow.Identifier) error
-}
-
-// IdentityAtBlockID returns identity of the input identifier is at the state snapshot of the given block identifier according to the input state.
-func IdentityAtBlockID(state State, blockID flow.Identifier, identifier flow.Identifier) (flow.Identity, error) {
-	identity, err := state.AtBlockID(blockID).Identity(identifier)
-	if err != nil {
-		return flow.Identity{}, fmt.Errorf("could not retrieve identity for identifier %v at block id snapshot %v: %w)", identifier, blockID, err)
-	}
-
-	return *identity, nil
 }

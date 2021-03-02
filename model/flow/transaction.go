@@ -454,7 +454,12 @@ func compareSignatures(signatures []TransactionSignature) func(i, j int) bool {
 	return func(i, j int) bool {
 		sigA := signatures[i]
 		sigB := signatures[j]
-		return sigA.SignerIndex < sigB.SignerIndex || sigA.KeyIndex < sigB.KeyIndex
+
+		if sigA.SignerIndex == sigB.SignerIndex {
+			return sigA.KeyIndex < sigB.KeyIndex
+		}
+
+		return sigA.SignerIndex < sigB.SignerIndex
 	}
 }
 
