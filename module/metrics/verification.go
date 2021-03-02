@@ -3,11 +3,11 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module"
 )
 
 type VerificationCollector struct {
-	tracer *trace.OpenTracer
+	tracer          module.Tracer
 
 	// Assigner Engine
 	rcvBlocksTotal      prometheus.Counter // total finalized blocks received by assigner engine
