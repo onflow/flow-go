@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	tracelog "github.com/opentracing/opentracing-go/log"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
@@ -134,6 +135,10 @@ func (e *hostEnv) isTraceable() bool {
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetValue)
+		sp.LogFields(
+			traceLog.String("owner", string(owner)),
+			traceLog.String("key", string(key)),
+		)
 		defer sp.Finish()
 	}
 
