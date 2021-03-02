@@ -103,16 +103,16 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 			return fmt.Errorf("could not retrieve cluster final: %w", err)
 		}
 
-		// short-circuit and build an empty collection if the number of available
-		// transactions isn't enough to satisfy min collection size
-		if builder.transactions.Size() < builder.config.MinCollectionSize {
-			payload := cluster.EmptyPayload(refChainFinalizedID)
-			proposal, err = builder.createProposal(&parent, parentID, &payload, setter)
-			if err != nil {
-				return fmt.Errorf("could not create empty proposal: %w", err)
-			}
-			return nil
-		}
+		//// short-circuit and build an empty collection if the number of available
+		//// transactions isn't enough to satisfy min collection size
+		//if builder.transactions.Size() < builder.config.MinCollectionSize {
+		//	payload := cluster.EmptyPayload(refChainFinalizedID)
+		//	proposal, err = builder.createProposal(&parent, parentID, &payload, setter)
+		//	if err != nil {
+		//		return fmt.Errorf("could not create empty proposal: %w", err)
+		//	}
+		//	return nil
+		//}
 
 		// STEP TWO: create a lookup of all previously used transactions on the
 		// part of the chain we care about. We do this separately for
@@ -129,6 +129,8 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		// transaction every N sequential collections, or we allow K transactions
 		// per collection.
 
+		// keep track of number of empty ancestors to skip min size requirement
+		numEmptyAncestors := 0
 		// keep track of transactions in the ancestry to avoid duplicates
 		lookup := newTransactionLookup()
 		// keep track of transactions to enforce rate limiting
@@ -157,6 +159,11 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 				lookup.addUnfinalizedAncestor(tx.ID())
 				limiter.addAncestor(ancestor.Height, tx)
 			}
+
+			if len(collection.Transactions) == 0 && len(lookup.unfinalized) == 0 {
+				numEmptyAncestors++
+			}
+
 			ancestorID = ancestor.ParentID
 		}
 
@@ -189,6 +196,10 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 			for _, tx := range collection.Transactions {
 				lookup.addFinalizedAncestor(tx.ID())
 				limiter.addAncestor(ancestor.Height, tx)
+			}
+
+			if len(collection.Transactions) == 0 && lookup.size() == 0 {
+				numEmptyAncestors++
 			}
 
 			ancestorID = ancestor.ParentID
@@ -302,7 +313,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		defer builder.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
 		var payload cluster.Payload
-		if uint(len(transactions)) >= builder.config.MinCollectionSize {
+		if uint(len(transactions)) >= builder.config.MinCollectionSize || numEmptyAncestors > 10 {
 			// if we have enough transactions form them into a collection
 			payload = cluster.PayloadFromTransactions(minRefID, transactions...)
 		} else {

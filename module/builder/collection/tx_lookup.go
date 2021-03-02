@@ -40,3 +40,7 @@ func (lookup *transactionLookup) isUnfinalizedAncestor(txID flow.Identifier) boo
 	_, exists := lookup.unfinalized[txID]
 	return exists
 }
+
+func (lookup *transactionLookup) size() uint {
+	return uint(len(lookup.finalized) + len(lookup.unfinalized))
+}
