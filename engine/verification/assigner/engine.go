@@ -150,6 +150,8 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) {
 		return
 	}
 
+	e.metrics.OnChunkProcessed()
+
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
 	log.Debug().Msg("chunk locator successfully pushed to chunks queue")
@@ -235,39 +237,6 @@ func (e *Engine) handleExecutionReceiptsWithTracing(ctx context.Context, receipt
 			e.handleExecutionReceipt(ctx, receipt, containerBlockID)
 		})
 	}
-}
-
-// processChunk receives an assigned chunk to this verification node, creates a chunk
-// locator for it, and stores the chunk locator in the chunks queue.
-//
-// Deduplication of chunk locators is delegated to the chunks queue.
-func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) {
-	log := e.log.With().
-		Hex("result_id", logging.ID(resultID)).
-		Hex("chunk_id", logging.ID(chunk.ID())).
-		Uint64("chunk_index", chunk.Index).Logger()
-
-	locator := &chunks.Locator{
-		ResultID: resultID,
-		Index:    chunk.Index,
-	}
-
-	// pushes chunk locator to the chunks queue
-	ok, err := e.chunksQueue.StoreChunkLocator(locator)
-	if err != nil {
-		log.Error().Err(err).Msg("could not push chunk locator to chunks queue")
-		return
-	}
-	if !ok {
-		log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
-		return
-	}
-
-	e.metrics.OnChunkProcessed()
-
-	// notifies chunk queue consumer of a new chunk
-	e.newChunkListener.Check()
-	log.Debug().Msg("chunk locator successfully pushed to chunks queue")
 }
 
 // processChunksWithTracing receives a list of chunks all belong to the same execution result and processes them with tracing enabled.
