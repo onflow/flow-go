@@ -283,7 +283,7 @@ func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress 
 	// unmarshal bytes to snapshot
 	snapshot, err := convert.BytesToInmemSnapshot(bytes)
 	if err != nil {
-		log.Fatal("could not convert array of bytes to snapshot")
+		log.Fatalf("could not convert array of bytes to snapshot: %v", err)
 	}
 
 	// check if given NodeID is part of the current or next epoch
