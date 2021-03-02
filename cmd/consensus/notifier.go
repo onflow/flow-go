@@ -14,7 +14,7 @@ import (
 )
 
 func createNotifier(log zerolog.Logger, metrics module.HotstuffMetrics, tracer module.Tracer, index storage.Index, chain flow.ChainID,
-	indexer *badger.Indexer,
+	indexer *matching.Indexer,
 ) hotstuff.Consumer {
 	telemetryConsumer := notifications.NewTelemetryConsumer(log, chain)
 	tracingConsumer := notifications.NewConsensusTracingConsumer(log, tracer, index)
