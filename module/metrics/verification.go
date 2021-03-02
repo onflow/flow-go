@@ -4,6 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type VerificationCollector struct {
