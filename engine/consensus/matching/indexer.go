@@ -1,4 +1,4 @@
-package badger
+package matching
 
 import (
 	"fmt"
@@ -35,14 +35,14 @@ func (i *Indexer) OnFinalizedBlock(block *model.Block) {
 	// we index the execution receipts by the executed block ID only for all finalized blocks
 	// that guarantees if we could retrieve the receipt by the index, then the receipts
 	// must be for a finalized blocks.
-	err := i.IndexReceipts(block.BlockID)
+	err := i.indexReceipts(block.BlockID)
 	if err != nil {
 		i.log.Error().Err(err).Hex("block_id", block.BlockID[:]).
 			Msg("could not index receipts for block")
 	}
 }
 
-func (i *Indexer) IndexReceipts(blockID flow.Identifier) error {
+func (i *Indexer) indexReceipts(blockID flow.Identifier) error {
 	payload, err := i.payloadsDB.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get block payload: %w", err)

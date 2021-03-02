@@ -388,7 +388,7 @@ func main() {
 
 			// initialize the indexer to add index for receipts by the executed block id.
 			// so that receipts can be found by block id.
-			indexer := bstorage.NewIndexer(node.Logger, node.Storage.Receipts, node.Storage.Payloads)
+			indexer := matching.NewIndexer(node.Logger, node.Storage.Receipts, node.Storage.Payloads)
 
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
