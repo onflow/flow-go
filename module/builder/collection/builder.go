@@ -313,7 +313,7 @@ func (builder *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Head
 		defer builder.tracer.FinishSpan(parentID, trace.COLBuildOnCreateHeader)
 
 		var payload cluster.Payload
-		if uint(len(transactions)) >= builder.config.MinCollectionSize || numEmptyAncestors > 10 {
+		if uint(len(transactions)) >= builder.config.MinCollectionSize || numEmptyAncestors > 6 {
 			// if we have enough transactions form them into a collection
 			payload = cluster.PayloadFromTransactions(minRefID, transactions...)
 		} else {

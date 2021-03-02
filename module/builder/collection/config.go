@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	DefaultMinCollectionSize       uint    = 5        // minimum of 5 transactions per collection
+	DefaultMinCollectionSize       uint    = 10       // minimum # of transactions per collection
 	DefaultMaxCollectionSize       uint    = 100      // max 100 transactions per collection
 	DefaultExpiryBuffer            uint    = 15       // 15 blocks for collections to be included
 	DefaultMaxPayerTransactionRate float64 = 0        // no rate limiting
