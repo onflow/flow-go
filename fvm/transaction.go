@@ -152,8 +152,9 @@ func (i *TransactionInvocator) Process(
 	// this should be called after program cache clean up
 	updatedKeys, err := env.Commit()
 
-	// based on the contract updates decides how to clean up the programs
-	// TODO what to do with the programs if tx fails ?
+	// based on the contract updates we decide how to clean up the programs
+	// for failed transactions we also do the same as
+	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
 	if err != nil {
