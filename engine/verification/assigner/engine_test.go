@@ -450,13 +450,6 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
-// mockStateAtBlockID is a test helper that mocks the protocol state of test suite at the given block id. This is the
-// underlying protocol state of the verification node of the test suite.
-func (s *AssignerEngineTestSuite) mockStateAtBlockID(blockID flow.Identifier) {
-	s.state.On("AtBlockID", blockID).Return(s.snapshot)
-	s.snapshot.On("Identity", s.verIdentity.NodeID).Return(s.verIdentity, nil)
-}
-
 // myID is a test helper that returns identifier of verification identity.
 func (s *AssignerEngineTestSuite) myID() flow.Identifier {
 	return s.verIdentity.NodeID
