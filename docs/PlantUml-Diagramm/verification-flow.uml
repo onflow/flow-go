@@ -1,0 +1,68 @@
+@startuml
+
+!pragma teoz true
+skinparam backgroundcolor transparent
+skinparam defaulttextalignment left
+skinparam sequence {
+	ArrowColor MidnightBlue
+	ActorBorderColor MidnightBlue
+	LifeLineBorderColor LightSlateGrey
+	LifeLineBackgroundColor MidnightBlue
+
+	ParticipantBorderColor LightSlateGrey
+}
+skinparam noteBorderColor MidnightBlue
+skinparam dpi 300
+
+participant "**<size:14>Collector Nodes</size>**" as Access
+participant "**<size:14>Consensus Nodes</size>**" as Security
+participant "**<size:14>Execution Nodes</size>**" as Execution
+participant "**<size:14>Verification Nodes</size>**" as Verification
+
+hnote over Access: **Collecting Transactions**
+Access o-> Security: new Collections (hash references only)
+hnote over Security: **Proposing Block B<sub>1</sub>**
+rnote over Security #FFFFFF: including Collection references
+Security [#green]-> Verification
+& Security [#green]-> Verification
+& Security [#green]-> Execution
+& Security [#green]-> Access
+& rnote over Security  #90EE90: Broadcast Block B<sub>1</sub>
+
+/'
+Access o-> Execution: Collections for Block B<sub>1</sub>
+'/
+hnote over Execution: **Executing Block B<sub>1</sub>**
+Execution o-> Access: Request: Collections for Block B<sub>1</sub>
+Access o-> Execution
+Execution o-> Security: Execution Receipt for B<sub>1</sub>
+
+hnote over Security: **Proposing Block B<sub>k</sub>**
+rnote over Security #FFFFFF: including Execution Receipts
+Security [#green]-> Verification
+& Security [#green]-> Verification
+& Security [#green]-> Execution
+& Security [#green]-> Access
+& rnote over Security  #90EE90: Broadcast Block B<sub>k</sub>
+
+hnote over Verification: **Checking Execution of B<sub>k</sub> **
+Verification o-> Execution: Request: partial execution state\n""                  ""and transaction texts
+Execution o-> Verification: ChunkDataResponse
+/'
+Verification o-> Execution: Request Registers for verifying Collections
+Execution o-> Verification: Register Values
+'/
+rnote over Verification #FFFFFF: Verify Transactions in Collection
+Verification o-> Security: Result Approvals for assigned Collections
+
+rnote over Security #FFFFFF: Enough Approvals for B<sub>1</sub>?\n→ store Seal in mempool
+hnote over Security: **Proposing Block B<sub>n</sub>**
+rnote over Security #FFFFFF: including Seals
+Security [#green]-> Verification
+& Security [#green]-> Verification
+& Security [#green]-> Execution
+& Security [#green]-> Access
+& rnote over Security  #90EE90: Broadcast Block B<sub>n</sub>
+
+
+@enduml
