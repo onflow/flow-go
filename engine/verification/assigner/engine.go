@@ -116,9 +116,8 @@ func (e *Engine) handleExecutionReceipt(ctx context.Context, receipt *flow.Execu
 		Msg("chunk assignment done")
 
 	// pushes assigned chunks to chunks queue.
-	for _, chunk := range chunkList {
-		e.processChunksWithTracing(ctx, chunk, resultID)
-	}
+	e.processChunksWithTracing(ctx, chunkList, resultID)
+
 }
 
 // processChunk receives a chunk that belongs to execution result id. It creates a chunk locator
@@ -286,84 +285,92 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleFinalizedBlock, func() {
 		e.handleFinalizedBlock(ctx, block)
 	})
-// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
-func assignedChunks(assignee flow.Identifier, assignment *chunks.Assignment, chunks flow.ChunkList) (flow.ChunkList, error) {
-	// indices of chunks assigned to verifier
-	chunkIndices := assignment.ByNodeID(assignee)
+	// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
+	func
+	assignedChunks(assignee
+	flow.Identifier, assignment * chunks.Assignment, chunks
+	flow.ChunkList) flow.ChunkList, error) {
+		// indices of chunks assigned to verifier
+		chunkIndices := assignment.ByNodeID(assignee)
 
-	// chunks keeps the list of chunks assigned to the verifier
-	myChunks := make(flow.ChunkList, 0, len(chunkIndices))
-	for _, index := range chunkIndices {
-		chunk, ok := chunks.ByIndex(index)
-		if !ok {
-			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		// chunks keeps the list of chunks assigned to the verifier
+		myChunks := make(flow.ChunkList, 0, len(chunkIndices))
+		for _, index := range chunkIndices {
+			chunk, ok := chunks.ByIndex(index)
+			if !ok {
+				return nil, fmt.Errorf("chunk out of range requested: %v", index)
+			}
+
+			myChunks = append(myChunks, chunk)
 		}
 
-		myChunks = append(myChunks, chunk)
+		return myChunks, nil
 	}
 
-	return myChunks, nil
-}
+	// handleFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
+	// Once it is done handling all the receipts in the block, it notifies the block consumer.
+	func(e *Engine) handleFinalizedBlock(ctx
+	context.Context, block * flow.Block) {
+		blockID := block.ID()
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Int("receipt_num", len(block.Payload.Receipts)).Logger()
 
-// handleFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
-// Once it is done handling all the receipts in the block, it notifies the block consumer.
-func (e *Engine) handleFinalizedBlock(ctx context.Context, block *flow.Block) {
-	blockID := block.ID()
-	log := e.log.With().
-		Hex("block_id", logging.ID(blockID)).
-		Int("receipt_num", len(block.Payload.Receipts)).Logger()
+		log.Debug().Msg("new finalized block arrived")
 
-	log.Debug().Msg("new finalized block arrived")
+		e.metrics.OnFinalizedBlockReceived()
 
-	e.metrics.OnFinalizedBlockReceived()
-
-	err := e.indexer.IndexReceipts(blockID)
-	if err != nil {
-		// TODO: consider aborting the process
-		log.Error().Err(err).Msg("could not index receipts for block")
-	}
-
-	e.handleExecutionReceiptsWithTracing(ctx, block.Payload.Receipts, blockID)
-
-	// tells block consumer that it is done with this block
-	e.blockConsumerNotifier.Notify(blockID)
-	log.Debug().Msg("finished processing finalized block")
-}
-
-// chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
-func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
-	var span opentracing.Span
-	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERAssignerChunkAssignment)
-	defer span.Finish()
-
-	assignment, err := e.assigner.Assign(result, result.BlockID)
-	if err != nil {
-		return nil, err
-	}
-
-	mine, err := assignedChunks(e.me.NodeID(), assignment, result.Chunks)
-	if err != nil {
-		return nil, fmt.Errorf("could not determine my assignments: %w", err)
-	}
-
-	return mine, nil
-}
-
-// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
-func assignedChunks(assignee flow.Identifier, assignment *chunks.Assignment, chunks flow.ChunkList) (flow.ChunkList, error) {
-	// indices of chunks assigned to verifier
-	chunkIndices := assignment.ByNodeID(assignee)
-
-	// chunks keeps the list of chunks assigned to the verifier
-	myChunks := make(flow.ChunkList, 0, len(chunkIndices))
-	for _, index := range chunkIndices {
-		chunk, ok := chunks.ByIndex(index)
-		if !ok {
-			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		err := e.indexer.IndexReceipts(blockID)
+		if err != nil {
+			// TODO: consider aborting the process
+			log.Error().Err(err).Msg("could not index receipts for block")
 		}
 
-		myChunks = append(myChunks, chunk)
+		e.handleExecutionReceiptsWithTracing(ctx, block.Payload.Receipts, blockID)
+
+		// tells block consumer that it is done with this block
+		e.blockConsumerNotifier.Notify(blockID)
+		log.Debug().Msg("finished processing finalized block")
 	}
 
-	return myChunks, nil
-}
+	// chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
+	func(e *Engine) chunkAssignments(ctx
+	context.Context, result * flow.ExecutionResult) flow.ChunkList, error) {
+		var span opentracing.Span
+		span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERAssignerChunkAssignment)
+		defer span.Finish()
+
+		assignment, err := e.assigner.Assign(result, result.BlockID)
+		if err != nil {
+			return nil, err
+		}
+
+		mine, err := assignedChunks(e.me.NodeID(), assignment, result.Chunks)
+		if err != nil {
+			return nil, fmt.Errorf("could not determine my assignments: %w", err)
+		}
+
+		return mine, nil
+	}
+
+	// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
+	func
+	assignedChunks(assignee
+	flow.Identifier, assignment * chunks.Assignment, chunks
+	flow.ChunkList) flow.ChunkList, error) {
+		// indices of chunks assigned to verifier
+		chunkIndices := assignment.ByNodeID(assignee)
+
+		// chunks keeps the list of chunks assigned to the verifier
+		myChunks := make(flow.ChunkList, 0, len(chunkIndices))
+		for _, index := range chunkIndices {
+			chunk, ok := chunks.ByIndex(index)
+			if !ok {
+				return nil, fmt.Errorf("chunk out of range requested: %v", index)
+			}
+
+			myChunks = append(myChunks, chunk)
+		}
+
+		return myChunks, nil
+	}
