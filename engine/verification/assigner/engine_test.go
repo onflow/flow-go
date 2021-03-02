@@ -126,93 +126,6 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 	return e
 }
 
-// TestNewBlock_NoChunk evaluates passing a new finalized block to assigner engine that contains
-// a receipt with no chunk in its result. Assigner engine should
-// not pass any chunk to the chunks queue, and should never notify the job listener.
-func TestNewBlock_NoChunk(t *testing.T) {
-	t.Parallel()
-
-	s := SetupTest()
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains no chunks.
-	containerBlock, assignment := createContainerBlock()
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 0) // no chunk should be assigned
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
-	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.notifier,
-		s.indexer)
-
-	// when there is no chunk, nothing should be passed to chunks queue, and
-	// job listener should not be notified.
-	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
-	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
-// TestNewBlock_NoAssignedChunk evaluates passing a new finalized block to assigner engine that contains
-// a receipt with no assigned chunk for the verification node in its result. Assigner engine should
-// not pass any chunk to the chunks queue, and should not notify the job listener.
-func TestNewBlock_NoAssignedChunk(t *testing.T) {
-	t.Parallel()
-
-	s := SetupTest()
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains 5 chunks, but
-	// none of them is assigned to this verification node.
-	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()))) // assigned to others
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 0) // no chunk should be assigned
-
-	// once assigner engine is done processing the block, it should notify the processing notifier.
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
-	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.notifier,
-		s.indexer)
-
-	// when there is no assigned chunk, nothing should be passed to chunks queue, and
-	// job listener should not be notified.
-	s.chunksQueue.AssertNotCalled(t, "StoreChunkLocator")
-	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
 // TestNewBlock_MultipleAssignment evaluates that passing a new finalized block to assigner engine that contains
 // a receipt with multiple assigned chunk, results in the assigner engine passing all assigned chunks to the
 // chunks queue and notifying the job listener of the assigned chunks.
@@ -494,6 +407,8 @@ func newBlockNoChunk(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -537,6 +452,8 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
