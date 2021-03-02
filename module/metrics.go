@@ -50,6 +50,7 @@ type ComplianceMetrics interface {
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
+	BlockProposalDuration(duration time.Duration)
 }
 
 type CleanerMetrics interface {
