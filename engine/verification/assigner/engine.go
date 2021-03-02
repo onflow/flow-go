@@ -270,83 +270,21 @@ func (e *Engine) processChunksWithTracing(ctx context.Context, chunkList flow.Ch
 	}
 }
 
-// stakedAtBlockID checks whether this instance of verification node has staked at specified block ID.
-// It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
-// It returns false and error if it could not extract the stake of node as a verification node at the specified block.
-func (e *Engine) stakedAtBlockID(blockID flow.Identifier) (bool, error) {
-	identity, err := protocol.IdentityAtBlockID(e.state, blockID, e.me.NodeID())
-	if err != nil {
-		return false, fmt.Errorf("could not extract staked identify of node at block %v: %w", blockID, err)
+// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
+func assignedChunks(assignee flow.Identifier, assignment *chunks.Assignment, chunks flow.ChunkList) (flow.ChunkList, error) {
+	// indices of chunks assigned to verifier
+	chunkIndices := assignment.ByNodeID(assignee)
+
+	// chunks keeps the list of chunks assigned to the verifier
+	myChunks := make(flow.ChunkList, 0, len(chunkIndices))
+	for _, index := range chunkIndices {
+		chunk, ok := chunks.ByIndex(index)
+		if !ok {
+			return nil, fmt.Errorf("chunk out of range requested: %v", index)
+		}
+
+		myChunks = append(myChunks, chunk)
 	}
 
-	if identity.Role != flow.RoleVerification {
-		return false, fmt.Errorf("node is staked for an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
-	}
-
-	staked := identity.Stake > 0
-	return staked, nil
-}
-
-// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
-func
-assignedChunks(assignee
-flow.Identifier, assignment * chunks.Assignment, chunks
-flow.ChunkList) flow.ChunkList, error) {
-// indices of chunks assigned to verifier
-chunkIndices := assignment.ByNodeID(assignee)
-
-// chunks keeps the list of chunks assigned to the verifier
-myChunks := make(flow.ChunkList, 0, len(chunkIndices))
-for _, index := range chunkIndices {
-chunk, ok := chunks.ByIndex(index)
-if !ok {
-return nil, fmt.Errorf("chunk out of range requested: %v", index)
-}
-
-myChunks = append(myChunks, chunk)
-}
-
-return myChunks, nil
-}
-
-// chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
-func (e *Engine) chunkAssignments(ctx
-context.Context, result * flow.ExecutionResult) flow.ChunkList, error) {
-var span opentracing.Span
-span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERAssignerChunkAssignment)
-defer span.Finish()
-
-assignment, err := e.assigner.Assign(result, result.BlockID)
-if err != nil {
-return nil, err
-}
-
-mine, err := assignedChunks(e.me.NodeID(), assignment, result.Chunks)
-if err != nil {
-return nil, fmt.Errorf("could not determine my assignments: %w", err)
-}
-
-return mine, nil
-}
-
-// assignedChunks returns the chunks assigned to a specific assignee based on the input chunk assignment.
-func
-assignedChunks(assignee
-flow.Identifier, assignment * chunks.Assignment, chunks
-flow.ChunkList) flow.ChunkList, error) {
-// indices of chunks assigned to verifier
-chunkIndices := assignment.ByNodeID(assignee)
-
-// chunks keeps the list of chunks assigned to the verifier
-myChunks := make(flow.ChunkList, 0, len(chunkIndices))
-for _, index := range chunkIndices {
-chunk, ok := chunks.ByIndex(index)
-if !ok {
-return nil, fmt.Errorf("chunk out of range requested: %v", index)
-}
-
-myChunks = append(myChunks, chunk)
-}
-
-return myChunks, nil
+	return myChunks, nil
 }
