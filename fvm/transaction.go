@@ -139,6 +139,8 @@ func (i *TransactionInvocator) Process(
 	// }
 
 	if err != nil {
+		// if tx fails just do clean up
+		programs.Cleanup(nil)
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
@@ -148,8 +150,7 @@ func (i *TransactionInvocator) Process(
 	}
 
 	// this writes back the contract contents to accounts
-	// if any error fail as a tx
-	// this should be called after program cache clean up
+	// if any error occurs we fail the tx
 	updatedKeys, err := env.Commit()
 
 	// based on the contract updates we decide how to clean up the programs
