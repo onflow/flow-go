@@ -4,7 +4,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 type VerificationCollector struct {
@@ -31,7 +30,7 @@ type VerificationCollector struct {
 
 }
 
-func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *VerificationCollector {
+func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Registerer) *VerificationCollector {
 	// Assigner Engine
 	rcvBlocksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "block_received_total",
