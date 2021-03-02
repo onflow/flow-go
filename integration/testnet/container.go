@@ -38,6 +38,7 @@ type ContainerConfig struct {
 	LogLevel        zerolog.Level
 	Ghost           bool
 	AdditionalFlags []string
+	DiskSpace int64
 }
 
 // ImageName returns the Docker image name for the given config.

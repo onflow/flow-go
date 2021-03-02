@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -230,6 +231,7 @@ type NodeConfig struct {
 	LogLevel        zerolog.Level
 	Ghost           bool
 	AdditionalFlags []string
+	DiskSpace       int64
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -306,6 +308,12 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	}
 }
 
+func WithDiskSpace(size int64) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.DiskSpace = size
+	}
+}
+
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
@@ -378,6 +386,21 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		HostConfig: &container.HostConfig{},
 	}
 
+	nodeContainer := &Container{
+		Config: nodeConf,
+		Ports:  make(map[string]string),
+		net:    net,
+		opts:   opts,
+	}
+
+	// Bind the common bootstrap directory to the container
+	// NOTE: I did this using the approach from:
+	// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
+	opts.HostConfig.Binds = append(
+		opts.HostConfig.Binds,
+		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
+	)
+
 	// get a temporary directory in the host. On macOS the default tmp
 	// directory is NOT accessible to Docker by default, so we use /tmp
 	// instead.
@@ -386,28 +409,32 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
 
-	nodeContainer := &Container{
-		Config:  nodeConf,
-		Ports:   make(map[string]string),
-		datadir: tmpdir,
-		net:     net,
-		opts:    opts,
+	limitDiskSpace := nodeConf.DiskSpace > 0
+	// if a limited disk space container is needed, a tmpfs mount is created which allows restricting the
+	// available disk space else a regular bind is creates which has no size restriction
+	if limitDiskSpace {
+		// create a tmpfs mount for the flowdb dir
+		tmpfsMount := createMount(nodeConf.DiskSpace, DefaultFlowDBDir)
+		opts.HostConfig.Mounts = []mount.Mount{tmpfsMount}
+
+		// if using a tmpfs mount, the database is created in-memory (https://docs.docker.com/storage/tmpfs/)
+		// and not accessible from outside
+		nodeContainer.datadir = ""
+	} else {
+
+		// create a directory for the node database
+		flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
+		err = os.Mkdir(flowDBDir, 0700)
+		require.NoError(t, err)
+
+		// Bind the host directory to the container's database directory if no disk space specified
+		opts.HostConfig.Binds = append(
+			opts.HostConfig.Binds,
+			fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
+		)
+
+		nodeContainer.datadir = tmpdir
 	}
-
-	// create a directory for the node database
-	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
-	err = os.Mkdir(flowDBDir, 0700)
-	require.NoError(t, err)
-
-	// Bind the host directory to the container's database directory
-	// Bind the common bootstrap directory to the container
-	// NOTE: I did this using the approach from:
-	// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
-	opts.HostConfig.Binds = append(
-		opts.HostConfig.Binds,
-		fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
-		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
-	)
 
 	if !nodeConf.Ghost {
 		switch nodeConf.Role {
@@ -448,15 +475,24 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.Ports[ExeNodeMetricsPort] = hostMetricsPort
 			net.AccessPorts[ExeNodeMetricsPort] = hostMetricsPort
 
-			// create directories for execution state trie and values in the tmp
-			// host directory.
-			tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
-			require.NoError(t, err)
 
-			opts.HostConfig.Binds = append(
-				opts.HostConfig.Binds,
-				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
-			)
+			if limitDiskSpace {
+				// mount another tmpfs for the execution state trie
+				tmpfsTrieMount := createMount(nodeConf.DiskSpace, DefaultExecutionRootDir)
+				opts.HostConfig.Mounts = append(
+					opts.HostConfig.Mounts,
+					tmpfsTrieMount)
+			} else {
+				// create directories for execution state trie and values in the tmp
+				// host directory.
+				tmpLedgerDir, err := ioutil.TempDir(tmpdir, "flow-integration-trie")
+				require.NoError(t, err)
+
+				opts.HostConfig.Binds = append(
+					opts.HostConfig.Binds,
+					fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
+				)
+			}
 
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
@@ -512,6 +548,18 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		net.network.After(suiteContainer)
 	}
 	return nil
+}
+
+func createMount(diskSpace int64, target string) mount.Mount {
+	// create a limited size tmpfs mount
+	return mount.Mount{
+		Type:     mount.TypeTmpfs,
+		Target:   target,
+		ReadOnly: false,
+		TmpfsOptions: &mount.TmpfsOptions{
+			SizeBytes: diskSpace,
+		},
+	}
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.Seal, []ContainerConfig, error) {
@@ -699,6 +747,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			LogLevel:        conf.LogLevel,
 			Ghost:           conf.Ghost,
 			AdditionalFlags: conf.AdditionalFlags,
+			DiskSpace:       conf.DiskSpace,
 		}
 
 		confs = append(confs, containerConf)

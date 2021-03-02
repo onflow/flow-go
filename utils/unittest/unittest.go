@@ -160,9 +160,11 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 
 func BadgerDB(t testing.TB, dir string) *badger.DB {
 	opts := badger.
-		DefaultOptions(dir).
+		DefaultOptions("dir").
 		WithKeepL0InMemory(true).
-		WithLogger(nil)
+		WithLogger(nil).
+		WithMaxTableSize(10).
+		WithValueThreshold(0)
 	db, err := badger.Open(opts)
 	require.NoError(t, err)
 	return db
