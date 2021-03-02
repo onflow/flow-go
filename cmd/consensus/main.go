@@ -301,23 +301,23 @@ func main() {
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			// initialize the compliance engine
-			comp, err = compliance.New(
-				node.Logger,
+			core, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
-				conMetrics,
-				node.Network,
-				node.Me,
+				node.Metrics.Compliance,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				mutableState,
-				prov,
 				proposals,
-				syncCore,
-			)
+				syncCore)
+			if err != nil {
+				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -388,7 +388,7 @@ func main() {
 
 			// initialize the indexer to add index for receipts by the executed block id.
 			// so that receipts can be found by block id.
-			indexer := matching.NewIndexer(node.Logger, node.Storage.Receipts, node.Storage.Payloads)
+			indexer := bstorage.NewIndexer(node.Logger, node.Storage.Receipts, node.Storage.Payloads)
 
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
