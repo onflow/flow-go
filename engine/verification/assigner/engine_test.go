@@ -126,52 +126,6 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 	return e
 }
 
-// TestNewBlock_HappyPath evaluates that passing a new finalized block to assigner engine that contains
-// a receipt with one assigned chunk, results in the assigner engine passing the assigned chunk to the
-// chunks queue and notifying the job listener of the assigned chunks.
-func TestNewBlock_HappyPath(t *testing.T) {
-	t.Parallel()
-
-	s := SetupTest()
-	e := NewAssignerEngine(s)
-
-	// creates a container block, with a single receipt, that contains
-	// one assigned chunk to verification node.
-	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(
-			test.WithAssignee(s.myID())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
-	s.mockStateAtBlockID(result.BlockID)
-	chunksNum := s.mockChunkAssigner(result, assignment)
-	require.Equal(t, chunksNum, 1) // one chunk should be assigned
-
-	// mocks processing assigned chunks
-	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
-	// invoked for it.
-	// Also, once all receipts of the block processed, engine should notify the block consumer once, that
-	// it is done with processing this chunk.
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
-	s.newChunkListener.On("Check").Return().Times(chunksNum)
-	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
-	s.metrics.On("OnChunkProcessed").Return().Once()
-
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("IndexReceipts", containerBlock.ID()).Return(nil).Once()
-
-	// sends containerBlock containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
-	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
-	e.ProcessFinalizedBlock(containerBlock)
-	mock.AssertExpectationsForObjects(t,
-		s.metrics,
-		s.assigner,
-		s.chunksQueue,
-		s.newChunkListener,
-		s.notifier,
-		s.indexer)
-}
-
 // TestNewBlock_Unstaked evaluates that when verification node is unstaked at a reference block,
 // it drops the corresponding execution receipts for that block without performing any chunk assignment.
 // It also evaluates that the chunks queue is never called on any chunks of that receipt's result.
@@ -498,12 +452,15 @@ func newBlockHappyPath(t *testing.T) {
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.metrics.On("OnChunkProcessed").Return().Once()
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends containerBlock containing receipt to assigner engine
+	s.metrics.On("OnFinalizedBlockReceived").Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
