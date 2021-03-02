@@ -30,7 +30,7 @@ type AssignerEngineTestSuite struct {
 	assigner         *module.ChunkAssigner
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
-	notifier         *mockassigner.ProcessingNotifier
+	notifier         *module.ProcessingNotifier
 	indexer          *storage.Indexer
 
 	// identities
@@ -448,50 +448,6 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
-import (
-	"testing"
-
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
-	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
-	"github.com/onflow/flow-go/engine/verification/test"
-	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/flow"
-	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/trace"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/utils/unittest"
-)
-
-// AssignerEngineTestSuite encapsulates data structures for running unittests on assigner engine.
-type AssignerEngineTestSuite struct {
-	// modules
-	me               *module.Local
-	state            *protocol.State
-	snapshot         *protocol.Snapshot
-	metrics          *module.VerificationMetrics
-	tracer           *trace.NoopTracer
-	assigner         *module.ChunkAssigner
-	chunksQueue      *storage.ChunksQueue
-	newChunkListener *module.NewJobListener
-	notifier         *module.ProcessingNotifier
-	indexer          *mockassigner.Indexer
-
-	// identities
-	verIdentity *flow.Identity // verification node
-}
-
-// mockChunkAssigner mocks the chunk assigner of this test suite to assign the chunks based on the input assignment.
-// It returns number of chunks assigned to verification node of this test suite.
-func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) int {
-	s.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
-	assignedChunks := assignment.ByNodeID(s.myID())
-	return len(assignedChunks)
 }
 
 // mockStateAtBlockID is a test helper that mocks the protocol state of test suite at the given block id. This is the
