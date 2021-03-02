@@ -450,17 +450,6 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
-// myID is a test helper that returns identifier of verification identity.
-func (s *AssignerEngineTestSuite) myID() flow.Identifier {
-	return s.verIdentity.NodeID
-}
-
-func WithIdentity(identity *flow.Identity) func(*AssignerEngineTestSuite) {
-	return func(testSuite *AssignerEngineTestSuite) {
-		testSuite.verIdentity = identity
-	}
-}
-
 // SetupTest initiates the test setups prior to each test.
 func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineTestSuite {
 	s := &AssignerEngineTestSuite{
