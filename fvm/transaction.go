@@ -138,7 +138,6 @@ func (i *TransactionInvocator) Process(
 		predeclaredValues = append(predeclaredValues, setAccountFrozen)
 	}
 
-
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		env, err = newEnvironment(*ctx, vm, st)
@@ -156,8 +155,8 @@ func (i *TransactionInvocator) Process(
 				Arguments: proc.Transaction.Arguments,
 			},
 			runtime.Context{
-				Interface: env,
-				Location:  location,
+				Interface:         env,
+				Location:          location,
 				PredeclaredValues: predeclaredValues,
 			},
 		)
