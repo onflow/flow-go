@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"strings"
 	"sync"
 
 	"github.com/onflow/cadence/runtime"
@@ -13,7 +12,7 @@ import (
 
 type ContractHandler struct {
 	accounts                    *state.Accounts
-	draftUpdates                map[string]contractUpdate
+	draftUpdates                map[contractUpdateKey]contractUpdate
 	restrictedDeploymentEnabled bool
 	authorizedAccounts          []runtime.Address
 	// handler doesn't have to be thread safe and right now
@@ -25,7 +24,7 @@ type ContractHandler struct {
 func NewContractHandler(accounts *state.Accounts, restrictedDeploymentEnabled bool, authorizedAccounts []runtime.Address) *ContractHandler {
 	return &ContractHandler{
 		accounts:                    accounts,
-		draftUpdates:                make(map[string]contractUpdate),
+		draftUpdates:                make(map[contractUpdateKey]contractUpdate),
 		restrictedDeploymentEnabled: restrictedDeploymentEnabled,
 		authorizedAccounts:          authorizedAccounts,
 	}
@@ -49,8 +48,9 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 	add := flow.Address(address)
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	u := contractUpdate{add, name, code}
-	h.draftUpdates[u.draftUpdateKey()] = u
+	uk := contractUpdateKey{add, name}
+	u := contractUpdate{uk, code}
+	h.draftUpdates[uk] = u
 
 	return nil
 }
@@ -65,8 +65,9 @@ func (h *ContractHandler) RemoveContract(address runtime.Address, name string, s
 	// removes are stored in the draft updates with code value of nil
 	h.lock.Lock()
 	defer h.lock.Unlock()
-	u := contractUpdate{add, name, nil}
-	h.draftUpdates[u.draftUpdateKey()] = u
+	uk := contractUpdateKey{add, name}
+	u := contractUpdate{uk, nil}
+	h.draftUpdates[uk] = u
 
 	return nil
 }
@@ -92,7 +93,7 @@ func (h *ContractHandler) Commit() error {
 	}
 
 	// reset draft
-	h.draftUpdates = make(map[string]contractUpdate)
+	h.draftUpdates = make(map[contractUpdateKey]contractUpdate)
 	return nil
 }
 
@@ -100,7 +101,7 @@ func (h *ContractHandler) Rollback() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	h.draftUpdates = make(map[string]contractUpdate)
+	h.draftUpdates = make(map[contractUpdateKey]contractUpdate)
 	return nil
 }
 
@@ -123,14 +124,12 @@ func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
 	return true
 }
 
-type contractUpdate struct {
+type contractUpdateKey struct {
 	address flow.Address
 	name    string
-	code    []byte
 }
 
-// warning, do not use this for any storage reasons,
-// this only serves as a way to add things to draft
-func (c *contractUpdate) draftUpdateKey() string {
-	return strings.Join([]string{c.address.String(), c.name}, "\x1F")
+type contractUpdate struct {
+	contractUpdateKey
+	code []byte
 }
