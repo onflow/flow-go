@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/crypto"
-	model "github.com/onflow/flow-go/model/bootstrap"
+	model "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/module/signature"
 )
 

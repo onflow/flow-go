@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
@@ -113,7 +114,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 	return validators, signers, nil
 }
 
-func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData bootstrap.DKGData) (*ParticipantData, error) {
+func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.DKGData) (*ParticipantData, error) {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {

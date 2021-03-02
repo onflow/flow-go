@@ -9,11 +9,14 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -53,6 +56,11 @@ func TestEpochSetup(t *testing.T) {
 	}
 	firstBlock := blocks[100]
 
+	// expectedPrivKey is the expected private share produced by the dkg run. We
+	// will mock the controller to return this value, and we will check it
+	// against the value that gets inserted in the DB at the end.
+	expectedPrivKey, _ := unittest.NetworkingKey()
+
 	// insert epoch setup in mock state
 	epochSetup := flow.EpochSetup{
 		Counter:            nextCounter,
@@ -77,6 +85,21 @@ func TestEpochSetup(t *testing.T) {
 	state := new(protocol.State)
 	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
 
+	// ensure that an attempt is made to insert the expected dkg private share
+	// for the next epoch.
+	keyStorage := new(storage.DKGKeys)
+	keyStorage.On("InsertMyDKGPrivateInfo", mock.Anything, mock.Anything).Run(
+		func(args mock.Arguments) {
+			epochCounter := args.Get(0).(uint64)
+			require.Equal(t, nextCounter, epochCounter)
+			dkgPriv := args.Get(1).(*dkgmodel.DKGParticipantPriv)
+			require.Equal(t, me.NodeID(), dkgPriv.NodeID)
+			require.Equal(t, expectedPrivKey, dkgPriv.RandomBeaconPrivKey.PrivateKey)
+			require.Equal(t, myIndex, dkgPriv.GroupIndex)
+		}).
+		Return(nil).
+		Once()
+
 	// we will ensure that the controller state transitions get called
 	// appropriately
 	controller := new(module.DKGController)
@@ -85,6 +108,8 @@ func TestEpochSetup(t *testing.T) {
 	controller.On("EndPhase2").Return(nil).Once()
 	controller.On("End").Return(nil).Once()
 	controller.On("Poll", mock.Anything).Return(nil).Times(15)
+	controller.On("GetArtifacts").Return(expectedPrivKey, nil, nil).Once()
+	controller.On("SubmitResult").Return(nil).Once()
 
 	factory := new(module.DKGControllerFactory)
 	factory.On("Create",
@@ -98,6 +123,7 @@ func TestEpochSetup(t *testing.T) {
 		zerolog.New(ioutil.Discard),
 		me,
 		state,
+		keyStorage,
 		factory,
 		viewEvents,
 	)
@@ -111,4 +137,5 @@ func TestEpochSetup(t *testing.T) {
 	// check that the appropriate callbacks were registered
 	time.Sleep(50 * time.Millisecond)
 	controller.AssertExpectations(t)
+	keyStorage.AssertExpectations(t)
 }
