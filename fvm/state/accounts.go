@@ -15,13 +15,15 @@ import (
 )
 
 const (
-	KeyExists         = "exists"
-	KeyCode           = "code"
-	KeyContractNames  = "contract_names"
-	KeyPublicKeyCount = "public_key_count"
-	KeyStorageUsed    = "storage_used"
-	KeyAccountFrozen  = "frozen"
-	uint64StorageSize = 8
+	KeyExists             = "exists"
+	KeyCode               = "code"
+	KeyContractNames      = "contract_names"
+	KeyPublicKeyCount     = "public_key_count"
+	KeyStorageUsed        = "storage_used"
+	KeyAccountFrozen      = "frozen"
+	uint64StorageSize     = 8
+	AccountFrozenValue    = 1
+	AccountNotFrozenValue = 0
 )
 
 var (
@@ -517,14 +519,14 @@ func (a *Accounts) GetAccountFrozen(address flow.Address) (bool, error) {
 		return false, err
 	}
 
-	return frozen[0] != 0, nil
+	return frozen[0] != AccountNotFrozenValue, nil
 }
 
 func (a *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
 
 	val := make([]byte, 1) //zero value for byte is 0
 	if frozen {
-		val[0] = 1
+		val[0] = AccountFrozenValue
 	}
 
 	return a.setValue(address, false, KeyAccountFrozen, val)

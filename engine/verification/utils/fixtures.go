@@ -208,17 +208,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		}
 
 	})
-	//
-	//payload := flow.Payload{
-	//	Guarantees: guarantees,
-	//}
-	//header := unittest.BlockHeaderWithParentFixture(root)
-	//header.PayloadHash = payload.Hash()
-	//
-	//block := flow.Block{
-	//	Header:  &header,
-	//	Payload: &payload,
-	//}
 
 	// makes sure all chunks are referencing the correct block id.
 	blockID := referenceBlock.ID()

@@ -130,7 +130,7 @@ func (i *TransactionInvocator) Process(
 						panic(fmt.Errorf("cannot set account frozen: %w", err))
 					}
 
-					return trampoline.Done{}
+					return trampoline.Done{Result: interpreter.VoidValue{}}
 				},
 			),
 		}

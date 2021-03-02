@@ -387,7 +387,7 @@ func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 		return fmt.Errorf("cannot freeze service account")
 	}
 
-	if e.transactionEnv.isAuthorizerServiceAccount() {
+	if !e.transactionEnv.isAuthorizerServiceAccount() {
 		return fmt.Errorf("SetAccountFrozen can only be used in transactions authorized by service account")
 	}
 
