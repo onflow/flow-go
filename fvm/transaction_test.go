@@ -268,7 +268,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		st := state.NewState(ledger)
 
-		err := txInvocator.Process(vm, context, proc, st)
+		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		require.Equal(t, 1, proc.Retried)

@@ -311,10 +311,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1211, res = createTestBlockAndRun(t, engine, block121, col1211, block1211View)
 		// cache should include a program for this block
 		require.NotNil(t, programsCache.Get(block1211.ID()))
-		// cache should not have any changes
-		require.False(t, programsCache.Get(block1211.ID()).HasChanges())
 		// had no change so cache should be equal to parent
-		require.Equal(t, programsCache.Get(block111.ID()), programsCache.Get(block1111.ID()))
+		require.Equal(t, programsCache.Get(block121.ID()), programsCache.Get(block1211.ID()))
 		// 1st event
 		hasValidEventValue(t, res.Events[0], block1211ExpectedValue)
 	})
