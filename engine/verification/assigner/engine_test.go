@@ -31,7 +31,7 @@ type AssignerEngineTestSuite struct {
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
 	notifier         *module.ProcessingNotifier
-	indexer          *storage.Indexer
+	indexer          *mockassigner.Indexer
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -448,27 +448,6 @@ func TestChunkQueue_UnhappyPath_Duplicate(t *testing.T) {
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
-}
-
-// NewAssignerEngine returns an assigner engine for testing.
-func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
-
-	e := New(zerolog.Logger{},
-		s.metrics,
-		s.tracer,
-		s.me,
-		s.state,
-		s.assigner,
-		s.chunksQueue,
-		s.newChunkListener,
-		s.indexer)
-
-	e.withBlockConsumerNotifier(s.notifier)
-
-	// mocks identity of the verification node
-	s.me.On("NodeID").Return(s.verIdentity.NodeID)
-
-	return e
 }
 
 // TestAssignerEngine runs all subtests in parallel.
