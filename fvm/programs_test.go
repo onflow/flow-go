@@ -6,8 +6,9 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/handler"
 )
 
 func Test_Programs(t *testing.T) {
