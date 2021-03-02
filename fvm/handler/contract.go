@@ -2,7 +2,6 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -48,15 +47,6 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 		return errors.New("code deployment requires authorization from specific accounts")
 	}
 	add := flow.Address(address)
-	// check if account exists
-	ok, err := h.accounts.Exists(add)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("account with address %s does not exist", address)
-	}
-
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	u := contractUpdate{add, name, code}
@@ -72,15 +62,6 @@ func (h *ContractHandler) RemoveContract(address runtime.Address, name string, s
 	}
 
 	add := flow.Address(address)
-	// check if account exists
-	ok, err := h.accounts.Exists(add)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return fmt.Errorf("account with address %s does not exist", address)
-	}
-
 	// removes are stored in the draft updates with code value of nil
 	h.lock.Lock()
 	defer h.lock.Unlock()
