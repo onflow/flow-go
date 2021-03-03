@@ -18,6 +18,7 @@ func (c *TransactionAccountFrozenChecker) Process(
 	_ *Context,
 	proc *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
 	return c.checkAccountNotFrozen(proc.Transaction, st)
 }
@@ -59,6 +60,7 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	ctx *Context,
 	proc *TransactionProcedure,
 	_ *state.State,
+	_ *Programs,
 ) error {
 
 	serviceAddress := ctx.Chain.ServiceAddress()

@@ -422,7 +422,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 		return nil, nil
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view)
+	_, err = exe.ExecuteBlock(context.Background(), block, view, fvm.NewEmptyPrograms())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()

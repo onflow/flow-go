@@ -552,8 +552,6 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 		return fmt.Errorf("update account contract code: %w", err)
 	}
 
-
-
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.UpdateAccountContractCode(address, name, code)
 }
@@ -775,6 +773,15 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 
 func (e *transactionEnv) isAuthorizerServiceAccount() bool {
 	return e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress()))
+}
+
+func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {
+	for _, accountAddress := range e.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {

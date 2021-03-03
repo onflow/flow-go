@@ -139,7 +139,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 			CompleteCollections: completeColls,
 			StartState:          startStateCommitment,
 		}
-		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view)
+		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)
 
 		for i, stateSnapshot := range computationResult.StateSnapshots {

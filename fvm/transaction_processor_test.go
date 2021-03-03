@@ -41,10 +41,14 @@ func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []
 
 func TestAccountFreezing(t *testing.T) {
 
+	chain := flow.Mainnet.Chain()
+	serviceAddress := chain.ServiceAddress()
+
 	t.Run("setFrozenAccount can be enabled", func(t *testing.T) {
 
 		address, _, st := makeTwoAccounts(t, nil, nil)
 		accounts := state.NewAccounts(st)
+		programs := fvm.NewEmptyPrograms()
 
 		// account should no be frozen
 		frozen, err := accounts.GetAccountFrozen(address)
@@ -58,24 +62,26 @@ func TestAccountFreezing(t *testing.T) {
 
 		code := fmt.Sprintf(`
 			transaction {
-				execute {
+				prepare(auth: AuthAccount) {
 					setAccountFrozen(0x%s, true)
 				}
 			}
 		`, address.String())
 
-		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		tx := flow.TransactionBody{Script: []byte(code)}
+		tx.AddAuthorizer(chain.ServiceAddress())
+		proc := fvm.Transaction(&tx, 0)
 
-		context := fvm.NewContext(log, fvm.WithAccountFreezeAvailable(false))
+		context := fvm.NewContext(log, fvm.WithAccountFreezeAvailable(false), fvm.WithChain(chain))
 
-		err = txInvocator.Process(vm, &context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, st, programs)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "cannot find")
 		require.Contains(t, err.Error(), "setAccountFrozen")
 
-		context = fvm.NewContext(log, fvm.WithAccountFreezeAvailable(true))
+		context = fvm.NewContext(log, fvm.WithAccountFreezeAvailable(true), fvm.WithChain(chain))
 
-		err = txInvocator.Process(vm, &context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, st, programs)
 		require.NoError(t, err)
 
 		// account should be frozen now
@@ -90,6 +96,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := state.NewAccounts(st)
+		programs := fvm.NewEmptyPrograms()
 
 		// freeze account
 		err := accounts.SetAccountFrozen(frozenAddress, true)
@@ -108,40 +115,40 @@ func TestAccountFreezing(t *testing.T) {
 
 		// no account associated with tx so it should work
 		tx := fvm.Transaction(&flow.TransactionBody{}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.NoError(t, err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{Authorizers: []flow.Address{notFrozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.NoError(t, err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{Authorizers: []flow.Address{frozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.Error(t, err)
 
 		// all addresses must not be frozen
 		tx = fvm.Transaction(&flow.TransactionBody{Authorizers: []flow.Address{frozenAddress, notFrozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.Error(t, err)
 
 		// Payer should be part of authorizers account, but lets check it separately for completeness
 
 		tx = fvm.Transaction(&flow.TransactionBody{Payer: notFrozenAddress}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.NoError(t, err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{Payer: frozenAddress}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.Error(t, err)
 
 		// Proposal account
 
 		tx = fvm.Transaction(&flow.TransactionBody{ProposalKey: flow.ProposalKey{Address: frozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.Error(t, err)
 
 		tx = fvm.Transaction(&flow.TransactionBody{ProposalKey: flow.ProposalKey{Address: notFrozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st)
+		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programs)
 		require.NoError(t, err)
 	})
 
@@ -149,6 +156,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		frozenAddress, notFrozenAddress, st := makeTwoAccounts(t, nil, nil)
 		accounts := state.NewAccounts(st)
+		programs := fvm.NewEmptyPrograms()
 
 		rt := runtime.NewInterpreterRuntime()
 
@@ -183,9 +191,9 @@ func TestAccountFreezing(t *testing.T) {
 
 		deployVm := fvm.New(deployRt)
 
-		err := deployTxInvocator.Process(deployVm, &deployContext, procFrozen, st)
+		err := deployTxInvocator.Process(deployVm, &deployContext, procFrozen, st, programs)
 		require.NoError(t, err)
-		err = deployTxInvocator.Process(deployVm, &deployContext, procNotFrozen, st)
+		err = deployTxInvocator.Process(deployVm, &deployContext, procNotFrozen, st, programs)
 		require.NoError(t, err)
 
 		// both contracts should load now
@@ -206,14 +214,14 @@ func TestAccountFreezing(t *testing.T) {
 		// code from not frozen loads fine
 		proc := fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
 
-		err = txInvocator.Process(vm, &context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, st, programs)
 		require.NoError(t, err)
 		require.Len(t, proc.Logs, 1)
 		require.Contains(t, proc.Logs[0], "Düsseldorf")
 
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(notFrozenAddress)}, 0)
 
-		err = txInvocator.Process(vm, &context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, st, programs)
 		require.NoError(t, err)
 		require.Len(t, proc.Logs, 1)
 		require.Contains(t, proc.Logs[0], "Düsseldorf")
@@ -234,7 +242,7 @@ func TestAccountFreezing(t *testing.T) {
 		// loading code from frozen account triggers error
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
 
-		err = txInvocator.Process(vm, &context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, st, programs)
 		require.Error(t, err)
 
 		// find frozen account specific error
@@ -267,6 +275,7 @@ func TestAccountFreezing(t *testing.T) {
 		vm := fvm.New(rt)
 		// create default context
 		context := fvm.NewContext(log)
+		programs := fvm.NewEmptyPrograms()
 
 		ledger := testutil.RootBootstrappedLedger(vm, context)
 
@@ -274,13 +283,14 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, context.Chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs, privateKeys, context.Chain)
 		require.NoError(t, err)
 
 		address := accounts[0]
 
 		code := fmt.Sprintf(`
 			transaction {
+				prepare(auth: AuthAccount) {}
 				execute {
 					setAccountFrozen(0x%s, true)
 				}
@@ -288,12 +298,17 @@ func TestAccountFreezing(t *testing.T) {
 		`, address.String())
 
 		txBody := &flow.TransactionBody{Script: []byte(code)}
+		txBody.SetPayer(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
 
-		err = testutil.SignTransaction(txBody, accounts[0], privateKeys[0], 0)
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
 		tx := fvm.Transaction(txBody, 0)
-		err = vm.Run(context, tx, ledger)
+		err = vm.Run(context, tx, ledger, programs)
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
@@ -303,17 +318,18 @@ func TestAccountFreezing(t *testing.T) {
 
 		// sign tx by service account now
 		txBody = &flow.TransactionBody{Script: []byte(code)}
-		txBody.SetProposalKey(context.Chain.ServiceAddress(), 0, 0)
-		txBody.SetPayer(context.Chain.ServiceAddress())
+		txBody.AddAuthorizer(serviceAddress)
+		txBody.SetPayer(serviceAddress)
+		txBody.SetProposalKey(serviceAddress, 0, 0)
 
-		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		err = testutil.SignPayload(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
-		err = testutil.SignEnvelope(txBody, context.Chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		tx = fvm.Transaction(txBody, 0)
-		err = vm.Run(context, tx, ledger)
+		err = vm.Run(context, tx, ledger, programs)
 		require.NoError(t, err)
 
 		require.NoError(t, tx.Err)
@@ -327,6 +343,7 @@ func TestAccountFreezing(t *testing.T) {
 		vm := fvm.New(rt)
 		// create default context
 		context := fvm.NewContext(log)
+		programs := fvm.NewEmptyPrograms()
 
 		ledger := testutil.RootBootstrappedLedger(vm, context)
 
@@ -334,22 +351,23 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, context.Chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs, privateKeys, context.Chain)
 		require.NoError(t, err)
 
 		address := accounts[0]
 
 		codeAccount := fmt.Sprintf(`
 			transaction {
+				prepare(auth: AuthAccount) {}
 				execute {
 					setAccountFrozen(0x%s, true)
 				}
 			}
 		`, address.String())
 
-		serviceAddress := context.Chain.ServiceAddress()
 		codeService := fmt.Sprintf(`
 			transaction {
+				prepare(auth: AuthAccount) {}
 				execute {
 					setAccountFrozen(0x%s, true)
 				}
@@ -360,15 +378,16 @@ func TestAccountFreezing(t *testing.T) {
 		txBody := &flow.TransactionBody{Script: []byte(codeAccount)}
 		txBody.SetProposalKey(serviceAddress, 0, 0)
 		txBody.SetPayer(serviceAddress)
+		txBody.AddAuthorizer(serviceAddress)
 
-		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		err = testutil.SignPayload(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 
 		tx := fvm.Transaction(txBody, 0)
-		err = vm.Run(context, tx, ledger)
+		err = vm.Run(context, tx, ledger, programs)
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
@@ -387,6 +406,7 @@ func TestAccountFreezing(t *testing.T) {
 		txBody = &flow.TransactionBody{Script: []byte(codeService)}
 		txBody.SetProposalKey(serviceAddress, 0, 1)
 		txBody.SetPayer(serviceAddress)
+		txBody.AddAuthorizer(serviceAddress)
 
 		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
@@ -395,7 +415,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 
 		tx = fvm.Transaction(txBody, 0)
-		err = vm.Run(context, tx, ledger)
+		err = vm.Run(context, tx, ledger, programs)
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
