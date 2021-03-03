@@ -35,7 +35,7 @@ type hostEnv struct {
 	st                 *state.State
 	vm                 *VirtualMachine
 	accounts           *state.Accounts
-  contracts        *handler.ContractHandler
+	contracts          *handler.ContractHandler
 	addressGenerator   flow.AddressGenerator
 	uuidGenerator      *UUIDGenerator
 	metrics            runtime.Metrics
