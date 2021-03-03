@@ -45,6 +45,7 @@ type hostEnv struct {
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
 	programs           *Programs
+	changedPrograms    []ChangedProgram
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -59,7 +60,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv, error) {
+func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *Programs) (*hostEnv, error) {
 	accounts := state.NewAccounts(st)
 	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
@@ -78,7 +79,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
-		programs:           NewPrograms(),
+		programs:           programs,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -105,6 +106,7 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		e.vm,
 		e.ctx,
 		e.st,
+		e.programs,
 		e.accounts,
 		e.addressGenerator,
 		tx,
@@ -197,6 +199,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 		e.ctx,
 		script,
 		e.st,
+		e.programs,
 	)
 	if err != nil {
 		return 0, err
@@ -229,6 +232,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 		e.ctx,
 		script,
 		e.st,
+		e.programs,
 	)
 	if err != nil {
 		return 0, err
@@ -621,6 +625,12 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 		return errors.New("updating account contract code is not supported")
 	}
 
+	// record updated contract
+	e.changedPrograms = append(e.changedPrograms, ChangedProgram{
+		Address: address,
+		Name:    name,
+	})
+
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.UpdateAccountContractCode(address, name, code)
 }
@@ -646,6 +656,12 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	if e.transactionEnv == nil {
 		return errors.New("removing account contracts is not supported")
 	}
+
+	// record updated contract
+	e.changedPrograms = append(e.changedPrograms, ChangedProgram{
+		Address: address,
+		Name:    name,
+	})
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.RemoveAccountContractCode(address, name)
@@ -752,6 +768,7 @@ type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
 	st               *state.State
+	programs         *Programs
 	accounts         *state.Accounts
 	addressGenerator flow.AddressGenerator
 	tx               *flow.TransactionBody
@@ -765,6 +782,7 @@ func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
 	st *state.State,
+	programs *Programs,
 	accounts *state.Accounts,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
@@ -774,6 +792,7 @@ func newTransactionEnv(
 		vm:               vm,
 		ctx:              ctx,
 		st:               st,
+		programs:         programs,
 		accounts:         accounts,
 		addressGenerator: addressGenerator,
 		tx:               tx,
@@ -827,6 +846,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
 			e.st,
+			e.programs,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202

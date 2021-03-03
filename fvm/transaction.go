@@ -30,7 +30,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State, *Programs) error
 }
 
 type TransactionProcedure struct {
@@ -51,9 +51,9 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 	proc.TraceSpan = traceSpan
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State, programs *Programs) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st)
+		err := p.Process(vm, ctx, proc, st, programs)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -83,6 +83,7 @@ func (i *TransactionInvocator) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
 
 	var span opentracing.Span
@@ -103,7 +104,7 @@ func (i *TransactionInvocator) Process(
 	}
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-		env, err = newEnvironment(ctx, vm, st)
+		env, err = newEnvironment(ctx, vm, st, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
@@ -129,6 +130,9 @@ func (i *TransactionInvocator) Process(
 			break
 		}
 
+		// force cleanup if retries
+		programs.ForceCleanup()
+
 		i.logger.Warn().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
@@ -146,6 +150,8 @@ func (i *TransactionInvocator) Process(
 		proc.ServiceEvents = make([]flow.Event, 0)
 		proc.Retried++
 	}
+
+	programs.Cleanup(env.changedPrograms)
 
 	// (for future) panic if we tried several times and still failing
 	// if numberOfTries == maxNumberOfRetries {

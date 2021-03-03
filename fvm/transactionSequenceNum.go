@@ -20,6 +20,7 @@ func (c *TransactionSequenceNumberChecker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
 
 	return c.checkAndIncrementSequenceNumber(proc, ctx, st)
