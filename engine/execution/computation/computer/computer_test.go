@@ -361,12 +361,16 @@ func (e *testRuntime) ExecuteTransaction(script runtime.Script, context runtime.
 	return e.executeTransaction(script, context)
 }
 
-func (e *testRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
+func (*testRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
 	panic("ParseAndCheckProgram not expected")
 }
 
-func (e *testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
+func (*testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 	panic("SetCoverageReport not expected")
+}
+
+func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
+	panic("SetContractUpdateValidationEnabled not expected")
 }
 
 func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBlock {
