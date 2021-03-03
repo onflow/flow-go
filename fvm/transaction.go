@@ -133,13 +133,34 @@ func (i *TransactionInvocator) Process(
 		proc.Retried++
 	}
 
-	programs.Cleanup(env.changedPrograms)
-
 	// (for future) panic if we tried several times and still failing
 	// if numberOfTries == maxNumberOfRetries {
 	// 	panic(err)
 	// }
 
+	// failed transaction path
+	if err != nil {
+		// if tx fails just do clean up
+		programs.Cleanup(nil)
+		i.logger.Info().
+			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", blockHeight).
+			Uint64("ledgerInteractionUsed", st.InteractionUsed()).
+			Msg("transaction executed with error")
+		return err
+	}
+
+	// applying contract changes
+	// this writes back the contract contents to accounts
+	// if any error occurs we fail the tx
+	updatedKeys, err := env.Commit()
+
+	// based on the contract updates we decide how to clean up the programs
+	// for failed transactions we also do the same as
+	// transaction without any deployed contracts
+	programs.Cleanup(updatedKeys)
+
+	// tx failed at update contract step
 	if err != nil {
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).

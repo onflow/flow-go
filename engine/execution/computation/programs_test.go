@@ -53,7 +53,17 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	tx4 := testutil.CreateEmitEventTransaction(account, account)
 	prepareTx(t, tx4, account, privKey, 3, chain)
 
-	transactions := []*flow.TransactionBody{tx1, tx2, tx3, tx4}
+	// tx5 updates the contract to version 3 but fails (no env signature of service account)
+	tx5 := testutil.UnauthorizedDeployEventContractTransaction(account, chain, 3)
+	tx5.SetProposalKey(account, 0, 4).SetPayer(account)
+	err = testutil.SignEnvelope(tx5, account, privKey)
+	require.NoError(t, err)
+
+	// tx6 calls the method of the contract (version 2 expected)
+	tx6 := testutil.CreateEmitEventTransaction(account, account)
+	prepareTx(t, tx6, account, privKey, 4, chain)
+
+	transactions := []*flow.TransactionBody{tx1, tx2, tx3, tx4, tx5, tx6}
 
 	col := flow.Collection{Transactions: transactions}
 
@@ -113,6 +123,9 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	// 4th event should have a value of 2 (since is calling version 2 of contract)
 	hasValidEventValue(t, returnedComputationResult.Events[3], 2)
+
+	// 5th event should have a value of 2 (since is calling version 2 of contract)
+	hasValidEventValue(t, returnedComputationResult.Events[4], 2)
 }
 
 // TestPrograms_TestBlockForks tests the functionality of
@@ -355,7 +368,7 @@ func prepareTx(t *testing.T,
 	privKey flow.AccountPrivateKey,
 	seqNumber uint64,
 	chain flow.Chain) {
-	tx.SetProposalKey(chain.ServiceAddress(), 0, seqNumber).
+	tx.SetProposalKey(account, 0, seqNumber).
 		SetPayer(chain.ServiceAddress())
 	err := testutil.SignPayload(tx, account, privKey)
 	require.NoError(t, err)

@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/handler"
 )
 
 func Test_Programs(t *testing.T) {
@@ -71,7 +73,7 @@ func Test_Programs(t *testing.T) {
 		require.NotNil(t, retrieved)
 
 		// we don't care about the changed program, just their amount (for now)
-		programs.Cleanup([]ChangedProgram{{}, {}})
+		programs.Cleanup([]handler.ContractUpdateKey{{}, {}})
 
 		retrieved = programs.Get(someLocation)
 		require.Nil(t, retrieved)
@@ -120,7 +122,7 @@ func Test_Programs(t *testing.T) {
 		child := parent.ChildPrograms()
 		require.False(t, child.HasChanges())
 
-		child.Cleanup([]ChangedProgram{{}, {}})
+		child.Cleanup([]handler.ContractUpdateKey{{}, {}})
 		require.True(t, child.HasChanges())
 
 		child = parent.ChildPrograms()
