@@ -38,7 +38,7 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) *DKGKeys {
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
 			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochSetup)),
+			withResource(metrics.ResourceDKGKey)),
 	}
 
 	return k

@@ -221,7 +221,7 @@ func main() {
 				if err != nil {
 					return err
 				}
-				if _, ok := identities.ByNodeID(node.NodeID); !ok {
+				if _, ok := identities.ByNodeID(node.NodeID); ok {
 					counter, err := epoch.Counter()
 					if err != nil {
 						return err
