@@ -221,7 +221,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
-	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB)
+	receiptsDB := storage.NewAllExecutionReceipts(node.Metrics, node.DB, resultsDB)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)

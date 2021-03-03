@@ -1007,7 +1007,7 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
 		// and that the IncorporatedResult's IncorporatedBlockID should be set
 		// correctly.
-		receipts, err := c.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+		receipts, err := c.receiptsDB.ByBlockID(blockID)
 		if err != nil {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}

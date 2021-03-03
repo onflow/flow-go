@@ -13,7 +13,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	seals := NewSeals(metrics, db)
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)
-	receipts := NewExecutionReceipts(metrics, db, results)
+	receipts := NewAllExecutionReceipts(metrics, db, results)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts)
 	blocks := NewBlocks(db, headers, payloads)
 	setups := NewEpochSetups(metrics, db)

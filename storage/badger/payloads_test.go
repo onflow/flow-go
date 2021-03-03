@@ -24,7 +24,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		seals := badgerstorage.NewSeals(metrics, db)
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
 		results := badgerstorage.NewExecutionResults(metrics, db)
-		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
+		receipts := badgerstorage.NewAllExecutionReceipts(metrics, db, results)
 		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
 
 		blockID := unittest.IdentifierFixture()
@@ -50,7 +50,7 @@ func TestPayloadRetreiveWithoutStore(t *testing.T) {
 		seals := badgerstorage.NewSeals(metrics, db)
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
 		results := badgerstorage.NewExecutionResults(metrics, db)
-		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
+		receipts := badgerstorage.NewAllExecutionReceipts(metrics, db, results)
 		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
 
 		blockID := unittest.IdentifierFixture()

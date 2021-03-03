@@ -208,7 +208,7 @@ func executionNodesForBlockID(
 	state protocol.State) (flow.IdentityList, error) {
 
 	// lookup the receipts storage with the block ID
-	receipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
+	receipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}

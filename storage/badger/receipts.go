@@ -91,75 +91,10 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 	return r.byID(receiptID)(tx)
 }
 
-func (r *ExecutionReceipts) IndexByExecutor(receipt *flow.ExecutionReceipt) error {
-	blockID := receipt.ExecutionResult.BlockID
-	executorID := receipt.ExecutorID
-	receiptID := receipt.ID()
-	return operation.RetryOnConflict(r.db.Update, func(tx *badger.Txn) error {
-
-		err := operation.IndexExecutionReceiptByBlockIDExecutionID(blockID, executorID, receiptID)(tx)
-		if err == nil {
-			return nil
-		}
-
-		if !errors.Is(err, storage.ErrAlreadyExists) {
-			return err
-		}
-
-		// when trying to index a receipt for a block, and there is already a receipt indexed for this block,
-		// double check if the indexed receipt is the same
-		var storedReceiptID flow.Identifier
-		err = operation.LookupExecutionReceiptByBlockIDExecutionID(blockID, executorID, &storedReceiptID)(tx)
-		if err != nil {
-			return fmt.Errorf("there is a receipt stored already, but cannot retrieve the ID of it: %w", err)
-		}
-
-		_, err = r.byID(storedReceiptID)(tx)
-		if err != nil {
-			return fmt.Errorf("there is a receipt stored already, but cannot retrieve it (stored receiptID: %v): %w", storedReceiptID, err)
-		}
-
-		if storedReceiptID != receiptID {
-			return fmt.Errorf(
-				"storing receipt that is different from the already stored one for block: %v, execution ID: %v, storing receipt: %v, stored receipt: %v, %w",
-				blockID, executorID, receiptID, storedReceiptID, storage.ErrDataMismatch)
-		}
-
-		return nil
-	})
-}
-
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 	return r.byBlockId(tx, blockID)
-}
-
-func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
-	var receipts []*flow.ExecutionReceipt
-	err := r.db.View(func(btx *badger.Txn) error {
-		var receiptIDs []flow.Identifier
-
-		err := operation.LookupExecutionReceiptByBlockIDAllExecutionIDs(blockID, &receiptIDs)(btx)
-		if err != nil {
-			return fmt.Errorf("could not find receipt index for block: %w", err)
-		}
-
-		for _, id := range receiptIDs {
-			receipt, err := r.byID(id)(btx)
-			if err != nil {
-				return fmt.Errorf("could not find receipt by id: %v, %w", id, err)
-			}
-			receipts = append(receipts, receipt)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("could not get receipts for block: %v, %w", blockID, err)
-	}
-	return receipts, nil
 }
 
 func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
@@ -221,9 +156,41 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 	return r
 }
 
-//func NewConsensusExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
-//	r := newExecutionReceipts(collector, db, results)
-//	r.index = func(txn *badger.Txn, receipt *flow.ExecutionReceipt) error {
-//
-//	}
-//}
+func NewAllExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
+	r := newExecutionReceipts(collector, db, results)
+	r.index = func(tx *badger.Txn, receipt *flow.ExecutionReceipt) error {
+		blockID := receipt.ExecutionResult.BlockID
+		receiptID := receipt.ID()
+
+		err := operation.IndexExecutionReceipts(blockID, receiptID)(tx)
+		if err == nil {
+			return nil
+		}
+
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return err
+		}
+
+		return nil
+	}
+	r.byBlockId = func(tx *badger.Txn, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+		var receipts []*flow.ExecutionReceipt
+		var receiptIDs []flow.Identifier
+
+		err := operation.LookupExecutionReceipts(blockID, &receiptIDs)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not find receipt index for block: %w", err)
+		}
+
+		for _, id := range receiptIDs {
+			receipt, err := r.byID(id)(tx)
+			if err != nil {
+				return nil, fmt.Errorf("could not find receipt by id: %v, %w", id, err)
+			}
+			receipts = append(receipts, receipt)
+		}
+
+		return receipts, nil
+	}
+	return r
+}
