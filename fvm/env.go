@@ -18,6 +18,7 @@ import (
 	tracelog "github.com/opentracing/opentracing-go/log"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -34,6 +35,7 @@ type hostEnv struct {
 	st                 *state.State
 	vm                 *VirtualMachine
 	accounts           *state.Accounts
+  contracts        *handler.ContractHandler
 	addressGenerator   flow.AddressGenerator
 	uuidGenerator      *UUIDGenerator
 	metrics            runtime.Metrics
@@ -45,7 +47,6 @@ type hostEnv struct {
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
 	programs           *Programs
-	changedPrograms    []ChangedProgram
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -67,6 +68,10 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *
 		return nil, err
 	}
 
+	contracts := handler.NewContractHandler(accounts,
+		ctx.RestrictedDeploymentEnabled,
+		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
+
 	uuids := state.NewUUIDs(st)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
@@ -76,6 +81,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *
 		vm:                 vm,
 		metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
+		contracts:          contracts,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
@@ -108,6 +114,7 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		e.st,
 		e.programs,
 		e.accounts,
+		e.contracts,
 		e.addressGenerator,
 		tx,
 		txIndex,
@@ -276,8 +283,7 @@ func (e *hostEnv) ResolveLocation(
 	// then fetch all identifiers at this address
 
 	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.Address)
-		contractNames, err := e.accounts.GetContractNames(address)
+		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
 		if err != nil {
 			panic(err)
 		}
@@ -327,14 +333,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
 
-	address := flow.BytesToAddress(contractLocation.Address.Bytes())
-
-	code, err := e.accounts.GetContract(contractLocation.Name, address)
-	if err != nil {
-		return nil, err
-	}
-
-	return code, nil
+	return e.contracts.GetContract(contractLocation.Address, contractLocation.Name)
 }
 
 func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
@@ -625,12 +624,6 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 		return errors.New("updating account contract code is not supported")
 	}
 
-	// record updated contract
-	e.changedPrograms = append(e.changedPrograms, ChangedProgram{
-		Address: address,
-		Name:    name,
-	})
-
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.UpdateAccountContractCode(address, name, code)
 }
@@ -657,38 +650,8 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 		return errors.New("removing account contracts is not supported")
 	}
 
-	// record updated contract
-	e.changedPrograms = append(e.changedPrograms, ChangedProgram{
-		Address: address,
-		Name:    name,
-	})
-
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.RemoveAccountContractCode(address, name)
-}
-
-func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
-	accountAddress := flow.Address(address)
-
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return errors.New("code deployment requires authorization from the service account")
-	}
-
-	return e.accounts.SetContract(name, accountAddress, code)
-}
-
-func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	accountAddress := flow.Address(address)
-
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return errors.New("code deployment requires authorization from the service account")
-	}
-
-	return e.accounts.DeleteContract(name, accountAddress)
 }
 
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
@@ -762,14 +725,19 @@ func (e *hostEnv) ValueDecoded(duration time.Duration) {
 	e.metrics.ValueDecoded(duration)
 }
 
-// Transaction Environment
+func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
+	// commit changes and return a list of updated keys
+	return e.contracts.Commit()
+}
 
+// Transaction Environment
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
 	st               *state.State
 	programs         *Programs
 	accounts         *state.Accounts
+	contracts        *handler.ContractHandler
 	addressGenerator flow.AddressGenerator
 	tx               *flow.TransactionBody
 	txIndex          uint32
@@ -784,6 +752,7 @@ func newTransactionEnv(
 	st *state.State,
 	programs *Programs,
 	accounts *state.Accounts,
+	contracts *handler.ContractHandler,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
 	txIndex uint32,
@@ -794,6 +763,7 @@ func newTransactionEnv(
 		st:               st,
 		programs:         programs,
 		accounts:         accounts,
+		contracts:        contracts,
 		addressGenerator: addressGenerator,
 		tx:               tx,
 		txIndex:          txIndex,
@@ -934,11 +904,10 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	return encodedPublicKey, nil
 }
 
-func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {
-	for _, accountAddress := range e.GetSigningAccounts() {
-		if accountAddress == address {
-			return true
-		}
-	}
-	return false
+func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+	return e.contracts.SetContract(address, name, code, e.GetSigningAccounts())
+}
+
+func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	return e.contracts.RemoveContract(address, name, e.GetSigningAccounts())
 }
