@@ -15,12 +15,18 @@ import (
 
 // ExecutionReceipts implements storage for execution receipts.
 type ExecutionReceipts struct {
-	db      *badger.DB
-	results *ExecutionResults
-	cache   *Cache
+	db        *badger.DB
+	results   *ExecutionResults
+	cache     *Cache
+	index     func(*badger.Txn, *flow.ExecutionReceipt) error
+	byBlockId func(*badger.Txn, flow.Identifier) ([]*flow.ExecutionReceipt, error)
 }
 
-func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
+func newExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
+	r := &ExecutionReceipts{
+		db:      db,
+		results: results,
+	}
 	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
 		return func(tx *badger.Txn) error {
 			receipt := val.(*flow.ExecutionReceipt)
@@ -33,7 +39,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 			if err != nil {
 				return fmt.Errorf("could not store result: %w", err)
 			}
-			return nil
+			return r.index(tx, receipt)
 		}
 	}
 
@@ -53,15 +59,12 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 		}
 	}
 
-	return &ExecutionReceipts{
-		db:      db,
-		results: results,
-		cache: newCache(collector,
-			withLimit(flow.DefaultTransactionExpiry+100),
-			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceReceipt)),
-	}
+	r.cache = newCache(collector,
+		withLimit(flow.DefaultTransactionExpiry+100),
+		withStore(store),
+		withRetrieve(retrieve),
+		withResource(metrics.ResourceReceipt))
+	return r
 }
 
 func (r *ExecutionReceipts) store(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
@@ -78,17 +81,6 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*
 	}
 }
 
-func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) func(*badger.Txn) (*flow.ExecutionReceipt, error) {
-	return func(tx *badger.Txn) (*flow.ExecutionReceipt, error) {
-		var receiptID flow.Identifier
-		err := operation.LookupExecutionReceipt(blockID, &receiptID)(tx)
-		if err != nil {
-			return nil, fmt.Errorf("could not lookup receipt ID: %w", err)
-		}
-		return r.byID(receiptID)(tx)
-	}
-}
-
 func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(receipt))
 }
@@ -97,50 +89,6 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 	return r.byID(receiptID)(tx)
-}
-
-func (r *ExecutionReceipts) Index(blockID, receiptID flow.Identifier) error {
-	return operation.RetryOnConflict(r.db.Update, func(tx *badger.Txn) error {
-
-		err := operation.IndexExecutionReceipt(blockID, receiptID)(tx)
-		if err == nil {
-			return nil
-		}
-
-		if !errors.Is(err, storage.ErrAlreadyExists) {
-			return err
-		}
-
-		// when trying to index a receipt for a block, and there is already a receipt indexed for this block,
-		// double check if the indexed receipt has the same result.
-		// if the result is the same, we could skip indexing the receipt
-		// if the result is different, then return error
-		var storedReceiptID flow.Identifier
-		err = operation.LookupExecutionReceipt(blockID, &storedReceiptID)(tx)
-		if err != nil {
-			return fmt.Errorf("there is a receipt stored already, but cannot retrieve the ID of it: %w", err)
-		}
-
-		storedReceipt, err := r.byID(storedReceiptID)(tx)
-		if err != nil {
-			return fmt.Errorf("there is a receipt stored already, but cannot retrieve of it: %w", err)
-		}
-
-		storingReceipt, err := r.byID(receiptID)(tx)
-		if err != nil {
-			return fmt.Errorf("attempting to index a receipt, but the receipt is not stored yet: %w", err)
-		}
-
-		storedResultID := storedReceipt.ExecutionResult.ID()
-		storingResultID := storingReceipt.ExecutionResult.ID()
-		if storedResultID != storingResultID {
-			return fmt.Errorf(
-				"storing receipt that is different from the already stored one for block: %v, storing receipt: %v, stored receipt: %v. storing result: %v, stored result: %v, %w",
-				blockID, receiptID, storedReceiptID, storingResultID, storedResultID, storage.ErrDataMismatch)
-		}
-
-		return nil
-	})
 }
 
 func (r *ExecutionReceipts) IndexByExecutor(receipt *flow.ExecutionReceipt) error {
@@ -181,10 +129,10 @@ func (r *ExecutionReceipts) IndexByExecutor(receipt *flow.ExecutionReceipt) erro
 	})
 }
 
-func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
+func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
-	return r.byBlockID(blockID)(tx)
+	return r.byBlockId(tx, blockID)
 }
 
 func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
@@ -213,3 +161,69 @@ func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifie
 	}
 	return receipts, nil
 }
+
+func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
+	r := newExecutionReceipts(collector, db, results)
+	r.index = func(tx *badger.Txn, receipt *flow.ExecutionReceipt) error {
+		blockID := receipt.ExecutionResult.BlockID
+		receiptID := receipt.ID()
+		err := operation.IndexExecutionReceipt(blockID, receiptID)(tx)
+		if err == nil {
+			return nil
+		}
+
+		if !errors.Is(err, storage.ErrAlreadyExists) {
+			return err
+		}
+
+		// when trying to index a receipt for a block, and there is already a receipt indexed for this block,
+		// double check if the indexed receipt has the same result.
+		// if the result is the same, we could skip indexing the receipt
+		// if the result is different, then return error
+		var storedReceiptID flow.Identifier
+		err = operation.LookupExecutionReceipt(blockID, &storedReceiptID)(tx)
+		if err != nil {
+			return fmt.Errorf("there is a receipt stored already, but cannot retrieve the ID of it: %w", err)
+		}
+
+		storedReceipt, err := r.byID(storedReceiptID)(tx)
+		if err != nil {
+			return fmt.Errorf("there is a receipt stored already, but cannot retrieve of it: %w", err)
+		}
+
+		storingReceipt, err := r.byID(receiptID)(tx)
+		if err != nil {
+			return fmt.Errorf("attempting to index a receipt, but the receipt is not stored yet: %w", err)
+		}
+
+		storedResultID := storedReceipt.ExecutionResult.ID()
+		storingResultID := storingReceipt.ExecutionResult.ID()
+		if storedResultID != storingResultID {
+			return fmt.Errorf(
+				"storing receipt that is different from the already stored one for block: %v, storing receipt: %v, stored receipt: %v. storing result: %v, stored result: %v, %w",
+				blockID, receiptID, storedReceiptID, storingResultID, storedResultID, storage.ErrDataMismatch)
+		}
+
+		return nil
+	}
+	r.byBlockId = func(tx *badger.Txn, blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+		var receiptID flow.Identifier
+		err := operation.LookupExecutionReceipt(blockID, &receiptID)(tx)
+		if err != nil {
+			return nil, fmt.Errorf("could not lookup receipt ID: %w", err)
+		}
+		receipt, err := r.byID(receiptID)(tx)
+		if err != nil {
+			return nil, err
+		}
+		return []*flow.ExecutionReceipt{receipt}, nil
+	}
+	return r
+}
+
+//func NewConsensusExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
+//	r := newExecutionReceipts(collector, db, results)
+//	r.index = func(txn *badger.Txn, receipt *flow.ExecutionReceipt) error {
+//
+//	}
+//}

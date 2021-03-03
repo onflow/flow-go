@@ -371,12 +371,6 @@ func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.Execu
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}
-	// TODO if the second operation fails we should remove stored execution result
-	// This is global execution storage problem - see TODO at the top
-	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution receipt: %w", err)
-	}
 	return nil
 }
 
