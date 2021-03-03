@@ -121,7 +121,7 @@ func NewLeaf(path ledger.Path,
 		regCount:  regCount,
 		hashValue: make([]byte, common.HashLen),
 	}
-	n.computeHash(&n.hashValue)
+	n.computeHash()
 	return n
 }
 
@@ -150,13 +150,44 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		regCount:  lRegCount + rRegCount,
 		hashValue: make([]byte, common.HashLen),
 	}
-	n.computeHash(&n.hashValue)
+	n.computeHash()
 	return n
 }
 
 // computeHash computes the hashValue for the given Node
 // we kept it this way to stay compatible with the previous versions
-func (n *Node) computeHash(result *[]byte) {
+func (n *Node) computeHash() {
+	if n.lChild == nil && n.rChild == nil {
+		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
+		if n.payload != nil {
+			// LEAF node: defined by key-value pair
+			common.ComputeCompactValue(&n.hashValue, n.path, n.payload, n.height)
+			return
+		}
+		// ROOT NODE: no children, no key-value pair
+		copy(n.hashValue, common.GetDefaultHashForHeight(n.height))
+		return
+	}
+
+	// this is an INTERIOR node at least one of lChild or rChild is not nil.
+	var h1, h2 []byte
+	if n.lChild != nil {
+		h1 = n.lChild.Hash()
+	} else {
+		h1 = common.GetDefaultHashForHeight(n.height - 1)
+	}
+
+	if n.rChild != nil {
+		h2 = n.rChild.Hash()
+	} else {
+		h2 = common.GetDefaultHashForHeight(n.height - 1)
+	}
+	common.HashInterNodeIn(&n.hashValue, h1, h2)
+}
+
+// computeHash computes the hashValue for the given node
+// and stores the value in result.
+func computeHash(result *[]byte, n *Node) {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
@@ -185,23 +216,30 @@ func (n *Node) computeHash(result *[]byte) {
 	common.HashInterNodeIn(result, h1, h2)
 }
 
-func (n *Node) VerifyCachedHash() bool {
+// VerifyCachedHash verifies the hash of a node is valid
+func (n *Node) verifyCachedHashRecursive(computedHash *[]byte) bool {
 	if n.lChild != nil {
-		if !n.lChild.VerifyCachedHash() {
+		if !n.lChild.verifyCachedHashRecursive(computedHash) {
 			return false
 		}
 	}
 	if n.rChild != nil {
-		if !n.rChild.VerifyCachedHash() {
+		if !n.rChild.verifyCachedHashRecursive(computedHash) {
 			return false
 		}
 	}
+
 	if n.hashValue != nil {
-		computedHash := make([]byte, common.HashLen)
-		n.computeHash(&computedHash)
-		return bytes.Equal(n.hashValue, computedHash)
+		computeHash(computedHash, n)
+		return bytes.Equal(n.hashValue, *computedHash)
 	}
 	return true
+}
+
+// VerifyCachedHash verifies the hash of a node is valid
+func (n *Node) VerifyCachedHash() bool {
+	computedHash := make([]byte, common.HashLen)
+	return n.verifyCachedHashRecursive(&computedHash)
 }
 
 // Hash returns the Node's hash value.
@@ -227,6 +265,9 @@ func (n *Node) Path() ledger.Path { return n.path }
 // only leaf nodes have children.
 // Do NOT MODIFY returned slices!
 func (n *Node) Payload() *ledger.Payload { return n.payload }
+
+// SetPayload sets the payload of the node.
+func (n *Node) SetPayload(p *ledger.Payload) { n.payload = p }
 
 // LeftChild returns the the Node's left child.
 // Only INTERIOR nodes have children.

@@ -62,6 +62,7 @@ func GetDefaultHashForHeight(height int) []byte {
 //
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
+// TODO: delete this function after refactoring ptrie
 func HashLeaf(path []byte, value []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
 	if len(path) != HashLen {
@@ -80,6 +81,7 @@ func HashLeaf(path []byte, value []byte) []byte {
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 //
 // hash1 and hash2 must each be a 32 byte slice.
+// TODO: delete this function after refactoring ptrie
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
 	if len(hash1) != HashLen || len(hash2) != HashLen {
