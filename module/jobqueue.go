@@ -1,5 +1,9 @@
 package module
 
+import (
+	"github.com/onflow/flow-go/model/flow"
+)
+
 const (
 	ConsumeProgressVerificationBlockHeight = "ConsumeProgressVerificationBlockHeight"
 	ConsumeProgressVerificationChunkIndex  = "ConsumeProgressVerificationChunkIndex"
@@ -50,4 +54,14 @@ type Jobs interface {
 type JobQueue interface {
 	// Add a job to the job queue
 	Add(job Job) error
+}
+
+// ProcessingNotifier is for the worker's underneath engine to report an entity
+// has been processed without knowing the job queue.
+// It is a callback so that the worker can convert the entity id into a job
+// id, and notify the consumer about a finished job.
+//
+// At the current version, entities used in this interface are chunks and blocks ids.
+type ProcessingNotifier interface {
+	Notify(entityID flow.Identifier)
 }

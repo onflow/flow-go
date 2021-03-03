@@ -19,6 +19,7 @@ type BootstrapProcedure struct {
 	vm       *VirtualMachine
 	ctx      Context
 	st       *state.State
+	programs *Programs
 	accounts *state.Accounts
 
 	// genesis parameters
@@ -104,10 +105,11 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
+func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State, programs *Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
 	b.st = st
+	b.programs = programs
 
 	// initialize the account addressing state
 	b.accounts = state.NewAccounts(st)
@@ -170,6 +172,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
@@ -187,6 +190,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
@@ -207,6 +211,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
@@ -226,6 +231,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 		b.ctx,
 		deployStorageFeesTransaction(service, contract),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
@@ -244,6 +250,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy service account contract: %s", err.Error()))
@@ -258,6 +265,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to mint initial token supply: %s", err.Error()))
@@ -274,6 +282,7 @@ func (b *BootstrapProcedure) setupFees(
 		b.ctx,
 		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup fees: %s", err.Error()))
@@ -287,6 +296,7 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 		b.ctx,
 		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
 		b.st,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", err.Error()))
