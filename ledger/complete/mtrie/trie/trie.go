@@ -177,8 +177,12 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []l
 	// from here on, we have parentNode != nil AND len(paths) > 0
 	if parentNode.IsLeaf() { // parent node is a leaf, i.e. parent Trie only stores a single value in this sub-trie
 		parentPath := parentNode.Path() // Per definition, a leaf must have a non-nil path
-		for _, p := range paths {       // TODO: binary search if paths are sorted - or maybe inputs paths->payload should be a map?
+		for _, p := range paths {
 			if bytes.Equal(p, parentPath) {
+				// avoid creating a new node when the exact same payload is re-written at a register.
+				if len(paths) == 1 && bytes.Equal(parentNode.Payload().Value, payloads[0].Value) {
+					return parentNode
+				}
 				return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
 			}
 		}
@@ -204,7 +208,8 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []l
 	rChild = parentTrie.update(nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
 	wg.Wait()
 
-	// mitigate storage exhaustion attack: overwrite a register with the exact current payload
+	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
+	// payload is re-written at a register.
 	if lChild == parentNode.LeftChild() && rChild == parentNode.RightChild() {
 		return parentNode
 	}

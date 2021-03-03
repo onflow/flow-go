@@ -64,16 +64,22 @@ func NewNode(height int,
 	if len(path) > 0 {
 		p = path.DeepCopy()
 	}
+
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
 		height:    height,
 		path:      p,
 		payload:   pl,
-		hashValue: hashValue,
+		hashValue: make([]byte, 0, common.HashLen),
 		maxDepth:  maxDepth,
 		regCount:  regCount,
 	}
+	n.hashValue = append(n.hashValue, hashValue...)
+	// pad the hash to Hashlen
+	// TODO: remove the 2 lines if hashValue is always HashLen bytes
+	paddingLen := common.HashLen - len(hashValue)
+	n.hashValue = append(n.hashValue, common.EmptyHash[:paddingLen]...)
 	return n
 }
 
@@ -86,11 +92,11 @@ func NewEmptyTreeRoot(height int) *Node {
 		height:    height,
 		path:      nil,
 		payload:   nil,
-		hashValue: nil,
+		hashValue: make([]byte, 0, common.HashLen),
 		maxDepth:  0,
 		regCount:  0,
 	}
-	n.hashValue = common.GetDefaultHashForHeight(height)
+	n.hashValue = append(n.hashValue, common.GetDefaultHashForHeight(height)...)
 	return n
 }
 
@@ -106,15 +112,16 @@ func NewLeaf(path ledger.Path,
 	}
 
 	n := &Node{
-		lChild:   nil,
-		rChild:   nil,
-		height:   height,
-		path:     path.DeepCopy(),
-		payload:  payload.DeepCopy(),
-		maxDepth: 0,
-		regCount: regCount,
+		lChild:    nil,
+		rChild:    nil,
+		height:    height,
+		path:      path.DeepCopy(),
+		payload:   payload.DeepCopy(),
+		maxDepth:  0,
+		regCount:  regCount,
+		hashValue: make([]byte, common.HashLen),
 	}
-	n.hashValue = n.computeHash()
+	n.computeHash(&n.hashValue)
 	return n
 }
 
@@ -134,29 +141,32 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	}
 
 	n := &Node{
-		lChild:   lchild,
-		rChild:   rchild,
-		height:   height,
-		path:     nil,
-		payload:  nil,
-		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
-		regCount: lRegCount + rRegCount,
+		lChild:    lchild,
+		rChild:    rchild,
+		height:    height,
+		path:      nil,
+		payload:   nil,
+		maxDepth:  utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
+		regCount:  lRegCount + rRegCount,
+		hashValue: make([]byte, common.HashLen),
 	}
-	n.hashValue = n.computeHash()
+	n.computeHash(&n.hashValue)
 	return n
 }
 
 // computeHash computes the hashValue for the given Node
 // we kept it this way to stay compatible with the previous versions
-func (n *Node) computeHash() []byte {
+func (n *Node) computeHash(result *[]byte) {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
 			// LEAF node: defined by key-value pair
-			return common.ComputeCompactValue(n.path, n.payload, n.height)
+			common.ComputeCompactValue(result, n.path, n.payload, n.height)
+			return
 		}
 		// ROOT NODE: no children, no key-value pair
-		return common.GetDefaultHashForHeight(n.height)
+		copy(*result, common.GetDefaultHashForHeight(n.height))
+		return
 	}
 
 	// this is an INTERIOR node at least one of lChild or rChild is not nil.
@@ -172,7 +182,7 @@ func (n *Node) computeHash() []byte {
 	} else {
 		h2 = common.GetDefaultHashForHeight(n.height - 1)
 	}
-	return common.HashInterNode(h1, h2)
+	common.HashInterNodeIn(result, h1, h2)
 }
 
 func (n *Node) VerifyCachedHash() bool {
@@ -187,7 +197,9 @@ func (n *Node) VerifyCachedHash() bool {
 		}
 	}
 	if n.hashValue != nil {
-		return bytes.Equal(n.hashValue, n.computeHash())
+		computedHash := make([]byte, common.HashLen)
+		n.computeHash(&computedHash)
+		return bytes.Equal(n.hashValue, computedHash)
 	}
 	return true
 }
@@ -229,8 +241,7 @@ func (n *Node) RightChild() *Node { return n.rChild }
 // IsLeaf returns true if and only if Node is a LEAF.
 func (n *Node) IsLeaf() bool {
 	// Per definition, a node is a leaf if and only if it has defined path
-	return n.path != nil && len(n.path) > 0
-	// shouldn't n.path != nil be enough?
+	return len(n.path) > 0
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree

@@ -93,7 +93,6 @@ func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metr
 // Read reads values for an slice of paths and returns values and error (if any)
 func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 
-	// no key no change
 	if len(r.Paths) == 0 {
 		return []*ledger.Payload{}, nil
 	}
@@ -115,11 +114,9 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		// only collect duplicated keys once
 		if _, ok := pathOrgIndex[string(path)]; !ok {
 			sortedPaths = append(sortedPaths, path)
-			pathOrgIndex[string(path)] = []int{i}
-		} else {
-			// handles duplicated keys
-			pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
 		}
+		// append the index
+		pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
 	}
 
 	sort.Slice(sortedPaths, func(i, j int) bool {
@@ -134,7 +131,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	orderedPayloads := make([]*ledger.Payload, len(r.Paths))
 	for i, p := range sortedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
-			orderedPayloads[j] = payloads[i].DeepCopy() // why deepcopy? if needed, shouldn't the api return []ledger.Payload
+			orderedPayloads[j] = payloads[i].DeepCopy()
 			totalPayloadSize += payloads[i].Size()
 		}
 	}
