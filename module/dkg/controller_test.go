@@ -127,6 +127,11 @@ func (b *broker) FlagMisbehavior(node int, logData string) {
 	b.logger.Debug().Msgf("node %d flagged node %d: %s", b.id, node, logData)
 }
 
+// GetIndex implements the DKGBroker interface.
+func (b *broker) GetIndex() int {
+	return int(b.id)
+}
+
 // GetPrivateMsgCh implements the DKGBroker interface.
 func (b *broker) GetPrivateMsgCh() <-chan msg.DKGMessage {
 	return b.privateChannels[b.id]

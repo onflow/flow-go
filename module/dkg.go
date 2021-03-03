@@ -18,7 +18,7 @@ type DKGContractClient interface {
 	// smart contract. An error is returned if the transaction has failed has
 	// failed.
 	// TBD: retry logic
-	Broadcast(msg messages.DKGMessage) error
+	Broadcast(msg messages.BcastDKGMessage) error
 
 	// ReadBroadcast reads the broadcast messages from the smart contract.
 	// Messages are returned in the order in which they were broadcast (received
@@ -31,7 +31,7 @@ type DKGContractClient interface {
 	// DKG nodes should call ReadBroadcast one final time once they have
 	// observed the phase deadline trigger to guarantee they receive all
 	// messages for that phase.
-	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.DKGMessage, error)
+	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BcastDKGMessage, error)
 
 	// SubmitResult submits the final public result of the DKG protocol. This
 	// represents the group public key and the node's local computation of the
@@ -61,14 +61,17 @@ type DKGController interface {
 	// Shutdown stops the controller regardless of the current state.
 	Shutdown()
 
-	// GetArtifacts returns the private and public shares, as well as the set of
-	// public keys computed by DKG.
-	GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey)
-
 	// Poll instructs the controller to actively fetch broadcast messages (ex.
 	// read from DKG smart contract). The method does not return until all
 	// received messages are processed.
 	Poll(blockReference flow.Identifier) error
+
+	// GetArtifacts returns the private and public shares, as well as the set of
+	// public keys computed by DKG.
+	GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey)
+
+	// GetIndex returns the index of this node in the DKG committee list.
+	GetIndex() int
 
 	// SubmitResult instructs the broker to publish the results of the DKG run
 	// (ex. publish to DKG smart contract).
@@ -79,7 +82,7 @@ type DKGController interface {
 type DKGControllerFactory interface {
 
 	// Create instantiates a new DKGController.
-	Create(dkgInstanceID string, participants []flow.Identifier, myIndex int, seed []byte) (DKGController, error)
+	Create(dkgInstanceID string, participants flow.IdentityList, seed []byte) (DKGController, error)
 }
 
 // DKGBroker extends the crypto.DKGProcessor interface with methods that enable
@@ -87,6 +90,9 @@ type DKGControllerFactory interface {
 // new DKG broadcast messages.
 type DKGBroker interface {
 	crypto.DKGProcessor
+
+	// GetIndex returns the index of this node in the DKG committee list.
+	GetIndex() int
 
 	// GetPrivateMsgCh returns the channel through which a user can receive
 	// incoming private DKGMessages.

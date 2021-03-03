@@ -109,13 +109,13 @@ func TestEpochSetup(t *testing.T) {
 	controller.On("End").Return(nil).Once()
 	controller.On("Poll", mock.Anything).Return(nil).Times(15)
 	controller.On("GetArtifacts").Return(expectedPrivKey, nil, nil).Once()
+	controller.On("GetIndex").Return(myIndex).Once()
 	controller.On("SubmitResult").Return(nil).Once()
 
 	factory := new(module.DKGControllerFactory)
 	factory.On("Create",
 		fmt.Sprintf("dkg-%d", epochSetup.Counter),
-		committee.NodeIDs(),
-		myIndex,
+		committee,
 		epochSetup.RandomSource).Return(controller, nil)
 
 	viewEvents := gadgets.NewViews()

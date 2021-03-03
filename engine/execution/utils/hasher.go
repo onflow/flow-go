@@ -22,6 +22,12 @@ func NewSPOCKHasher() hash.Hasher {
 	return h
 }
 
+// NewDKGMessageHasher returns a hasher for signing and verifying DKG broadcast
+// messages.
+func NewDKGMessageHasher() hash.Hasher {
+	return crypto.NewBLSKMAC(encoding.DKGMessageTag)
+}
+
 // NewHasher returns one of the hashers supported by Flow transactions.
 func NewHasher(algo hash.HashingAlgorithm) (hash.Hasher, error) {
 	switch algo {
