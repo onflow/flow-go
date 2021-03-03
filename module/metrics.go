@@ -195,7 +195,7 @@ type VerificationMetrics interface {
 	// It increments the total number of finalized blocks.
 	OnFinalizedBlockReceived()
 
-	// OnChunksAssigned is called whenever a chunks assigned to this verification node by applying chunk assignment on an
+	// OnChunksAssigned is called whenever chunks assigned to this verification node by applying chunk assignment on an
 	// execution result.
 	// It increases the total number of assigned chunks by the input.
 	OnChunksAssigned(chunks int)

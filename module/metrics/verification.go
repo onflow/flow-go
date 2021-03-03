@@ -208,7 +208,7 @@ func (vc *VerificationCollector) OnFinalizedBlockReceived() {
 	vc.rcvBlocksTotal.Inc()
 }
 
-// OnChunksAssigned is called whenever a chunks assigned to this verification node by applying chunk assignment on an
+// OnChunksAssigned is called whenever chunks assigned to this verification node by applying chunk assignment on an
 // execution result.
 // It increases the total number of assigned chunks by the input.
 func (vc *VerificationCollector) OnChunksAssigned(chunks int) {
