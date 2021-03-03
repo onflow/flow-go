@@ -385,7 +385,7 @@ docker-build-util:
 
 PHONY: tool-util
 tool-util: docker-build-util
-	docker container create --name util ${CONTAINER_REGISTRY)/util:latest;docker container cp util:/bin/app ./util;docker container rm util
+	docker container create --name util $(CONTAINER_REGISTRY)/util:latest;docker container cp util:/bin/app ./util;docker container rm util
 
 PHONY: docker-build-read-badger
 docker-build-read-badger:
@@ -394,7 +394,7 @@ docker-build-read-badger:
 
 PHONY: tool-read-badger
 tool-read-badger: docker-build-read-badger
-	docker container create --name read-badger ${CONTAINER_REGISTRY)/read-badger:latest;docker container cp read-badger:/bin/app ./read-badger;docker container rm read-badger
+	docker container create --name read-badger $(CONTAINER_REGISTRY)/read-badger:latest;docker container cp read-badger:/bin/app ./read-badger;docker container rm read-badger
 
 PHONY: docker-build-read-protocol-state
 docker-build-read-protocol-state:
@@ -403,7 +403,7 @@ docker-build-read-protocol-state:
 
 PHONY: tool-read-protocol-state
 tool-read-protocol-state: docker-build-read-protocol-state
-	docker container create --name read-protocol-state ${CONTAINER_REGISTRY)/read-protocol-state:latest;docker container cp read-protocol-state:/bin/app ./read-protocol-state;docker container rm read-protocol-state
+	docker container create --name read-protocol-state $(CONTAINER_REGISTRY)/read-protocol-state:latest;docker container cp read-protocol-state:/bin/app ./read-protocol-state;docker container rm read-protocol-state
 
 PHONY: docker-build-remove-execution-fork
 docker-build-remove-execution-fork:
@@ -412,7 +412,7 @@ docker-build-remove-execution-fork:
 
 PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
-	docker container create --name remove-execution-fork ${CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
+	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
 # Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
 .PHONY: check-go-version
