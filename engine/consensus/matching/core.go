@@ -1008,7 +1008,7 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 		// and that the IncorporatedResult's IncorporatedBlockID should be set
 		// correctly.
 		receipts, err := c.receiptsDB.ByBlockID(blockID)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}
 

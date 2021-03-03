@@ -26,12 +26,12 @@ func LookupExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifier)
 	return retrieve(makePrefix(codeOwnBlockReceipt, blockID), receiptID)
 }
 
-// IndexExecutionReceipt inserts an execution receipt ID keyed by block ID and execution ID
+// IndexExecutionReceipts inserts an execution receipt ID keyed by block ID
 func IndexExecutionReceipts(blockID, receiptID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeAllBlockReceipt, blockID, receiptID), struct{}{})
 }
 
-// LookupExecutionReceipt finds execution receipt ID by block ID for all execution IDs
+// LookupExecutionReceipts finds all execution receipts by block ID
 func LookupExecutionReceipts(blockID flow.Identifier, receiptIDs *[]flow.Identifier) func(*badger.Txn) error {
 	iterationFunc := receiptIterationFunc(receiptIDs)
 	return traverse(makePrefix(codeAllBlockReceipt, blockID), iterationFunc)

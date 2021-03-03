@@ -370,7 +370,11 @@ func main() {
 		}).
 		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
-				return receipts.ByBlockID(blockID)
+				r, err := receipts.ByBlockID(blockID)
+				if err != nil {
+					return nil, err
+				}
+				return r[0], err
 			}
 			eng, err := provider.New(
 				node.Logger,

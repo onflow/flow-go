@@ -2,12 +2,12 @@ package badger_test
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"

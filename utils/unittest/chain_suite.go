@@ -43,7 +43,7 @@ type BaseChainSuite struct {
 	// mock storage.ExecutionReceipts: backed by in-memory map PersistedReceipts
 	ReceiptsDB             *storage.ExecutionReceipts
 	PersistedReceipts      map[flow.Identifier]*flow.ExecutionReceipt
-	PersistedReceiptsIndex map[flow.Identifier]flow.Identifier // index ExecutionResult.BlockID -> ExecutionReceipt.ID
+	PersistedReceiptsIndex map[flow.Identifier][]flow.Identifier // index ExecutionResult.BlockID -> ExecutionReceipt.ID
 
 	ResultsDB        *storage.ExecutionResults
 	PersistedResults map[flow.Identifier]*flow.ExecutionResult
@@ -209,7 +209,7 @@ func (bc *BaseChainSuite) SetupChain() {
 	).Maybe() // this call is optional
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.PersistedReceipts = make(map[flow.Identifier]*flow.ExecutionReceipt)
-	bc.PersistedReceiptsIndex = make(map[flow.Identifier]flow.Identifier)
+	bc.PersistedReceiptsIndex = make(map[flow.Identifier][]flow.Identifier)
 	bc.ReceiptsDB = &storage.ExecutionReceipts{}
 	bc.ReceiptsDB.On("ByID", mock.Anything).Return(
 		func(receiptID flow.Identifier) *flow.ExecutionReceipt {
@@ -223,23 +223,17 @@ func (bc *BaseChainSuite) SetupChain() {
 			return nil
 		},
 	).Maybe()
-	bc.ReceiptsDB.On("Index", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, receiptID flow.Identifier) error {
-			_, found := bc.PersistedReceiptsIndex[receiptID]
-			if found {
-				return storerr.ErrAlreadyExists
-			}
-			bc.PersistedReceiptsIndex[blockID] = receiptID
-			return nil
-		},
-	)
 	bc.ReceiptsDB.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.ExecutionReceipt {
-			receiptID, found := bc.PersistedReceiptsIndex[blockID]
+		func(blockID flow.Identifier) []*flow.ExecutionReceipt {
+			receiptIDs, found := bc.PersistedReceiptsIndex[blockID]
 			if !found {
 				return nil
 			}
-			return bc.PersistedReceipts[receiptID]
+			var receipts []*flow.ExecutionReceipt
+			for _, id := range receiptIDs {
+				receipts = append(receipts, bc.PersistedReceipts[id])
+			}
+			return receipts
 		},
 		func(blockID flow.Identifier) error {
 			_, found := bc.PersistedReceiptsIndex[blockID]
@@ -255,18 +249,11 @@ func (bc *BaseChainSuite) SetupChain() {
 			if found {
 				return storerr.ErrAlreadyExists
 			}
+			blockID := receipt.ExecutionResult.BlockID
+			bc.PersistedReceiptsIndex[blockID] = append(bc.PersistedReceiptsIndex[blockID], receipt.ID())
 			return nil
 		},
 	).Maybe() // this call is optional
-	bc.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.ExecutionReceipt {
-			var receipts []*flow.ExecutionReceipt
-			return receipts
-		},
-		func(blockID flow.Identifier) error {
-			return nil
-		},
-	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~ SETUP BLOCK HEADER STORAGE ~~~~~~~~~~~~~~~~~~~~~ //
 	bc.HeadersDB = &storage.Headers{}
