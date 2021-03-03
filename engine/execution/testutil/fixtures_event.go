@@ -22,6 +22,11 @@ func DeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, e
 	return CreateContractDeploymentTransaction("EventContract", contract, authorizer, chain)
 }
 
+func UnauthorizedDeployEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
+	contract := fmt.Sprintf(EventContract, eventValue)
+	return CreateUnauthorizedContractDeploymentTransaction("EventContract", contract, authorizer)
+}
+
 func UpdateEventContractTransaction(authorizer flow.Address, chain flow.Chain, eventValue int) *flow.TransactionBody {
 	contract := fmt.Sprintf(EventContract, eventValue)
 	return UpdateContractDeploymentTransaction("EventContract", contract, authorizer, chain)
