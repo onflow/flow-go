@@ -26,6 +26,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// RequiredApprovalsForSealConstructionTestingValue defines the number of approvals that are
+// required to construct a seal for testing purposes. Thereby, the default production value
+// can be set independently without changing test behaviour.
+const RequiredApprovalsForSealConstructionTestingValue = 1
+
 // 1. Matching Core should validate the incoming receipt (aka ExecutionReceipt):
 //     1. it should stores it to the mempool if valid
 //     2. it should ignore it when:
@@ -104,7 +109,7 @@ func (ms *MatchingSuite) SetupTest() {
 		receiptValidator:                     ms.receiptValidator,
 		requestTracker:                       NewRequestTracker(1, 3),
 		approvalRequestsThreshold:            10,
-		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
 		emergencySealingActive:               false,
 		approvalValidator:                    ms.approvalValidator,
 	}
@@ -544,10 +549,8 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 	for i := range emergencySealingCandidates {
 		block := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
 		result := unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))
-		receipt1 := unittest.ExecutionReceiptFixture(
-			unittest.WithResult(result))
-		receipt2 := unittest.ExecutionReceiptFixture(
-			unittest.WithResult(result))
+		receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
+		receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
 		block.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceipt{receipt1, receipt2},
 		})
