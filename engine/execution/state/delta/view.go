@@ -42,6 +42,7 @@ func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:             NewDelta(),
 		regTouchSet:       make(map[string]flow.RegisterID),
+		readCache:         make(map[string]flow.RegisterEntry),
 		readFunc:          readFunc,
 		spockSecretHasher: hash.NewSHA3_256(),
 	}
