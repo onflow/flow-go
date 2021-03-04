@@ -119,8 +119,9 @@ type SignatureCollector struct {
 	// List of signer identifiers
 	signerIDs []Identifier
 
-	// set of all signerIDs for de-duplicating signatures
-	signerIDSet map[Identifier]struct{}
+	// set of all signerIDs for de-duplicating signatures; the mapped value
+	// is the storage index in the verifierSignatures and signerIDs
+	signerIDSet map[Identifier]int
 }
 
 // NewSignatureCollector instantiates a new SignatureCollector
@@ -128,7 +129,7 @@ func NewSignatureCollector() *SignatureCollector {
 	return &SignatureCollector{
 		verifierSignatures: nil,
 		signerIDs:          nil,
-		signerIDSet:        make(map[Identifier]struct{}),
+		signerIDSet:        make(map[Identifier]int),
 	}
 }
 
@@ -149,12 +150,11 @@ func (c *SignatureCollector) ToAggregatedSignature() AggregatedSignature {
 
 // BySigner returns a signer's signature if it exists
 func (c *SignatureCollector) BySigner(signerID Identifier) (*crypto.Signature, bool) {
-	for index, id := range c.signerIDs {
-		if id == signerID {
-			return &c.verifierSignatures[index], true
-		}
+	idx, found := c.signerIDSet[signerID]
+	if !found {
+		return nil, false
 	}
-	return nil, false
+	return &c.verifierSignatures[idx], true
 }
 
 // Add appends a signature. Only the _first_ signature is retained for each signerID.
@@ -162,7 +162,7 @@ func (c *SignatureCollector) Add(signerID Identifier, signature crypto.Signature
 	if _, found := c.signerIDSet[signerID]; found {
 		return
 	}
-	c.signerIDSet[signerID] = struct{}{}
+	c.signerIDSet[signerID] = len(c.signerIDs)
 	c.signerIDs = append(c.signerIDs, signerID)
 	c.verifierSignatures = append(c.verifierSignatures, signature)
 }

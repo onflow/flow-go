@@ -759,9 +759,68 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 	return true
 }
 
-// matchChunk checks that the number of ResultApprovals collected by a chunk
-// exceeds the required threshold. It also populates the IncorporatedResult's
-// collection of approval signatures to avoid repeated work.
+// matchResult matches the ResultApprovals in the mempool to the given incorporatedResult
+// and determines whether sufficient number of approvals are known for each chunk.
+// It also populates the IncorporatedResult's SignatureCollector.
+func (c *Core) matchResult(incorporatedResult *flow.IncorporatedResult) (bool, int, error) {
+	// the chunk assigment is based on the first block in its fork which contains a receipt that commits to this result.
+	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
+	if err != nil {
+		return false, -1, fmt.Errorf("could not determine chunk assignment: %w", err)
+	}
+
+	// Internal consistency check:
+	// To be valid, an Execution Receipt must have a system chunk, which is verified by the receipt
+	// validator. Encountering a receipt without any chunks is a fatal internal error, as such receipts
+	// should have never made it into the mempool in the first place. We explicitly check this here,
+	// so we don't have to worry about this edge case below.
+	if len(incorporatedResult.Result.Chunks) == 0 {
+		return false, -1, fmt.Errorf("could not determine chunk assignment: %w", err)
+	}
+
+	// check that each chunk collects enough approvals
+	resultID := incorporatedResult.Result.ID()
+	for _, chunk := range incorporatedResult.Result.Chunks {
+		approvals := c.approvals.ByChunk(resultID, chunk.Index) // get all the chunk approvals from mempool
+
+		validApprovals := uint(0)
+		for approverID, approval := range approvals {
+			// skip if the incorporated result already has a signature for that chunk and verifier
+			_, ok := incorporatedResult.GetSignature(chunk.Index, approverID)
+			if ok {
+				validApprovals++
+				continue
+			}
+
+			// For now, we just ignore approvals from Verifiers that are invalid for a specific incorporated block.
+			// This is to avoid complications at epoch boundaries, where the Verifiers from teh previous Epoch
+			// are still valid for one fork but not part of the Verifier set for the new Epoch.
+			err := c.ensureStakedNodeWithRole(approverID, incorporatedResult.IncorporatedBlockID, flow.RoleVerification)
+			if err != nil {
+				if engine.IsInvalidInputError(err) {
+					continue
+				}
+				return false, -1, fmt.Errorf("failed to match chunks: %w", err)
+			}
+
+			// skip approval if verifier was not assigned to this chunk.
+			if !assignment.HasVerifier(chunk, approverID) {
+				continue
+			}
+
+			// AddReceipt signature to incorporated result so that we don't have to check it again.
+			incorporatedResult.AddSignature(chunk.Index, approverID, approval.Body.AttestationSignature)
+			validApprovals++
+		}
+
+		if validApprovals < c.requiredApprovalsForSealConstruction {
+			return false, int(chunk.Index), nil
+		}
+	}
+
+	return true, -1, nil
+}
+
 func (c *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *flow.Header, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
 
 	// get all the chunk approvals from mempool
@@ -804,20 +863,16 @@ func (c *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *fl
 }
 
 // TODO: to be extracted as a common function in state/protocol/state.go
-// ToDo: add check that node was not ejected
 // checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
 //   * is an authorized member of the network
 //   * has _positive_ weight
 //   * and has the expected role
 // Returns the following errors:
 //   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
-//   * generic error indicating a fatal internal bug
-// Note: the method receives the block header as proof of its existence.
-// Therefore, we consider the case where the respective block is unknown to the
-// protocol state as a symptom of a fatal implementation bug.
-func (c *Core) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.Header, expectedRole flow.Role) error {
+//   * badger.ErrKeyNotFound if Protocol state information at the given block does not exist
+func (c *Core) ensureStakedNodeWithRole(nodeID flow.Identifier, blockID flow.Identifier, expectedRole flow.Role) error {
 	// get the identity of the origin node
-	identity, err := c.state.AtBlockID(block.ID()).Identity(nodeID)
+	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
 	if err != nil {
 		if protocol.IsIdentityNotFound(err) {
 			return engine.NewInvalidInputErrorf("unknown node identity: %w", err)
@@ -838,7 +893,7 @@ func (c *Core) ensureStakedNodeWithRole(nodeID flow.Identifier, block *flow.Head
 
 	// check that node was not ejected
 	if identity.Ejected {
-		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
+		return engine.NewInvalidInputErrorf("node was ejected (%x)", identity.NodeID)
 	}
 
 	return nil
