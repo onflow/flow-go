@@ -11,11 +11,14 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
@@ -27,7 +30,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.State, *Programs) error
 }
 
 type TransactionProcedure struct {
@@ -38,14 +41,19 @@ type TransactionProcedure struct {
 	Events        []flow.Event
 	ServiceEvents []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
-	GasUsed uint64
-	Err     Error
-	Retried int
+	GasUsed   uint64
+	Err       Error
+	TraceSpan opentracing.Span
+	Retried   int
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+	proc.TraceSpan = traceSpan
+}
+
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State, programs *Programs) error {
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st)
+		err := p.Process(vm, ctx, proc, st, programs)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -75,19 +83,31 @@ func (i *TransactionInvocator) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
+
+	var span opentracing.Span
+
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
+		span.LogFields(
+			traceLog.String("transaction.hash", proc.ID.String()),
+		)
+		defer span.Finish()
+	}
 
 	var err error
 	var env *hostEnv
 
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-		env, err = newEnvironment(ctx, vm, st)
+		env, err = newEnvironment(ctx, vm, st, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
 		}
 		env.setTransaction(proc.Transaction, proc.TxIndex)
+		env.setTraceSpan(span)
 
 		location := common.TransactionLocation(proc.ID[:])
 
@@ -111,7 +131,10 @@ func (i *TransactionInvocator) Process(
 		if ctx.BlockHeader != nil {
 			blockHeight = ctx.BlockHeader.Height
 		}
-		i.logger.Info().
+		// force cleanup if retries
+		programs.ForceCleanup()
+
+		i.logger.Warn().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
 			Int("retries_count", numberOfRetries).
@@ -131,6 +154,34 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	var blockHeight uint64
+	if ctx.BlockHeader != nil {
+		blockHeight = ctx.BlockHeader.Height
+	}
+
+	// failed transaction path
+	if err != nil {
+		// if tx fails just do clean up
+		programs.Cleanup(nil)
+		i.logger.Info().
+			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", blockHeight).
+			Uint64("ledgerInteractionUsed", st.InteractionUsed()).
+			Msg("transaction executed with error")
+		return err
+	}
+
+	// applying contract changes
+	// this writes back the contract contents to accounts
+	// if any error occurs we fail the tx
+	updatedKeys, err := env.Commit()
+
+	// based on the contract updates we decide how to clean up the programs
+	// for failed transactions we also do the same as
+	// transaction without any deployed contracts
+	programs.Cleanup(updatedKeys)
+
+	// tx failed at update contract step
 	if err != nil {
 		return err
 	}
@@ -140,15 +191,13 @@ func (i *TransactionInvocator) Process(
 	proc.ServiceEvents = env.getServiceEvents()
 	proc.Logs = env.getLogs()
 
-	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
-	}
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
 		Uint64("blockHeight", blockHeight).
 		Uint64("ledgerInteractionUsed", st.InteractionUsed()).
-		Msg("transaction executed with no error")
+		Int("retried", proc.Retried).
+		Msg("transaction executed successfully")
+
 	return nil
 }
 
