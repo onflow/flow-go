@@ -24,8 +24,7 @@ func MakeSigners(t *testing.T,
 	committee hotstuff.Committee,
 	signerIDs []flow.Identifier,
 	stakingKeys []crypto.PrivateKey,
-	beaconKeys []crypto.PrivateKey,
-	epochCounter uint64) []hotstuff.SignerVerifier {
+	beaconKeys []crypto.PrivateKey) []hotstuff.SignerVerifier {
 
 	// generate our consensus node identities
 	require.NotEmpty(t, signerIDs)
@@ -38,7 +37,7 @@ func MakeSigners(t *testing.T,
 		}
 	} else {
 		for i, signerID := range signerIDs {
-			signer := MakeBeaconSigner(t, committee, signerID, stakingKeys[i], beaconKeys[i], epochCounter)
+			signer := MakeBeaconSigner(t, committee, signerID, stakingKeys[i], beaconKeys[i])
 			signers = append(signers, signer)
 		}
 	}
@@ -58,8 +57,7 @@ func MakeBeaconSigner(t *testing.T,
 	committee hotstuff.Committee,
 	signerID flow.Identifier,
 	stakingPriv crypto.PrivateKey,
-	beaconKey crypto.PrivateKey,
-	epochCounter uint64) *CombinedSigner {
+	beaconKey crypto.PrivateKey) *CombinedSigner {
 
 	local, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)

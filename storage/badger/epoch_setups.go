@@ -8,20 +8,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
-
-type viewRange struct {
-	first uint64
-	last  uint64
-}
 
 type EpochSetups struct {
 	db     *badger.DB
 	cache  *Cache
-	lookup map[uint64]*viewRange // used to track the first and last view per epoch
+	lookup map[uint64]storage.ViewRange // used to track the first and last view per epoch
 }
 
+// NewEpochSetups instantiates a new EpochSetups storage and loads items into
+// the in-memory lookup cache.
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
 	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
@@ -46,10 +44,18 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 			withStore(store),
 			withRetrieve(retrieve),
 			withResource(metrics.ResourceEpochSetup)),
-		lookup: make(map[uint64]*viewRange),
+		lookup: make(map[uint64]storage.ViewRange),
 	}
 
+	_ = es.loadLookup()
+
 	return es
+}
+
+func (es *EpochSetups) loadLookup() error {
+	tx := es.db.NewTransaction(false)
+	defer tx.Discard()
+	return operation.PopulateEpochSetupLookup(es.lookup)(tx)
 }
 
 func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *badger.Txn) error {
@@ -58,7 +64,10 @@ func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *badger.Txn) erro
 		if err != nil {
 			return err
 		}
-		es.lookup[setup.Counter] = &viewRange{first: setup.FirstView, last: setup.FinalView}
+		es.lookup[setup.Counter] = storage.ViewRange{
+			First: setup.FirstView,
+			Last:  setup.FinalView,
+		}
 		return nil
 	}
 }
@@ -81,7 +90,7 @@ func (es *EpochSetups) ByID(setupID flow.Identifier) (*flow.EpochSetup, error) {
 
 func (es *EpochSetups) CounterByView(view uint64) (uint64, error) {
 	for c, vr := range es.lookup {
-		if view >= vr.first && view <= vr.last {
+		if view >= vr.First && view <= vr.Last {
 			return c, nil
 		}
 	}

@@ -8,6 +8,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// ViewRange is used to store the first and last views epochs in a lookup table.
+type ViewRange struct {
+	First uint64
+	Last  uint64
+}
+
 type EpochSetups interface {
 
 	// StoreTx allows us to store a new epoch setup in a DB transaction while going through the cache.

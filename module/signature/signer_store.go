@@ -32,17 +32,17 @@ func (s *EpochAwareSignerStore) GetSigner(view uint64) (module.ThresholdSigner, 
 	if err != nil {
 		return nil, err
 	}
-	sig, ok := s.signers[epoch]
+	signer, ok := s.signers[epoch]
 	if ok {
-		return sig, nil
+		return signer, nil
 	}
 	privDKGData, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
 	if err != nil {
 		return nil, err
 	}
-	sig = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
-	s.signers[epoch] = sig
-	return sig, nil
+	signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
+	s.signers[epoch] = signer
+	return signer, nil
 }
 
 // SingleSignerStore implements the SignerStore interface. It only keeps one

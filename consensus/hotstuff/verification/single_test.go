@@ -16,7 +16,7 @@ func TestSingleVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
 	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false, epochCounter)
-	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil, epochCounter)
+	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
@@ -63,7 +63,7 @@ func TestSingleProposalIsVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
 	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false, epochCounter)
-	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil, epochCounter)
+	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
@@ -81,7 +81,7 @@ func TestSingleQC(t *testing.T) {
 	voterIDs := identities.NodeIDs()
 	minShares := (len(voterIDs)-1)/2 + 1
 	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false, epochCounter)
-	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil, epochCounter)
+	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
