@@ -275,7 +275,7 @@ func (e *blockComputer) executeTransaction(
 			txSpan.SetTag("transaction.proposer", txBody.ProposalKey.Address.String())
 			txSpan.SetTag("transaction.payer", txBody.Payer.String())
 			txSpan.LogFields(
-				log.String("transaction.hash", txBody.ID().String()),
+				log.String("transaction.ID", txBody.ID().String()),
 				log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
 				log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
 				log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),

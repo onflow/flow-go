@@ -41,7 +41,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
 		span.LogFields(
-			log.String("transaction.hash", proc.ID.String()),
+			log.String("transaction.ID", proc.ID.String()),
 		)
 		defer span.Finish()
 	}

@@ -91,7 +91,7 @@ func (i *TransactionInvocator) Process(
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
 		span.LogFields(
-			traceLog.String("transaction.hash", proc.ID.String()),
+			traceLog.String("transaction.ID", proc.ID.String()),
 		)
 		defer span.Finish()
 	}
