@@ -16,20 +16,18 @@ var (
 	DirnameExecutionState = "execution-state"
 
 	// public genesis information
-	DirnamePublicBootstrap    = "public-root-information"
-	PathInternalNodeInfosPub  = filepath.Join(DirnamePublicBootstrap, "node-internal-infos.pub.json")
-	PathFinallist             = filepath.Join(DirnamePublicBootstrap, "finallist.pub.json")
-	PathNodeInfosPub          = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
-	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
-	PathNodeInfoPub           = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
-
+	DirnamePublicBootstrap        = "public-root-information"
+	PathInternalNodeInfosPub      = filepath.Join(DirnamePublicBootstrap, "node-internal-infos.pub.json")
+	PathFinallist                 = filepath.Join(DirnamePublicBootstrap, "finallist.pub.json")
+	PathNodeInfosPub              = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
+	PathPartnerNodeInfoPrefix     = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
+	PathNodeInfoPub               = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
 	PathRootBlock                 = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootQC                    = filepath.Join(DirnamePublicBootstrap, "root-qc.json")
+	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
 	PathRootResult                = filepath.Join(DirnamePublicBootstrap, "root-execution-result.json")
 	PathRootSeal                  = filepath.Join(DirnamePublicBootstrap, "root-block-seal.json")
-	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
-
-	PathRootCheckpoint = filepath.Join(DirnameExecutionState, wal.RootCheckpointFilename) // only available on an execution node
+	PathRootCheckpoint            = filepath.Join(DirnameExecutionState, wal.RootCheckpointFilename) // only available on an execution node
 
 	// private genesis information
 	DirPrivateRoot           = "private-root-information"

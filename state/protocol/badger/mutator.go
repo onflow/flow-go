@@ -771,7 +771,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 				}
 
 				// Finally, the epoch setup event must contain all necessary information.
-				err = validSetup(ev)
+				err = isValidEpochSetup(ev)
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
 				}
@@ -805,7 +805,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
 				}
-				err = validCommit(ev, setup)
+				err = isValidEpochCommit(ev, setup)
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
 				}

@@ -466,10 +466,10 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root QC")
 
-		fnb.RootResult, err = state.AtBlockID(rootBlock.ID()).LatestResult()
-		fnb.MustNot(err).Msg("could not get root result")
-		fnb.RootSeal, err = state.AtBlockID(rootBlock.ID()).LatestSeal()
-		fnb.MustNot(err).Msg("could not get root seal")
+		result, seal, err := state.AtBlockID(rootBlock.ID()).SealedResult()
+		fnb.MustNot(err).Msg("could not get sealed result")
+		fnb.RootResult = result
+		fnb.RootSeal = seal
 	} else {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")

@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-func validSetup(setup *flow.EpochSetup) error {
+func isValidEpochSetup(setup *flow.EpochSetup) error {
 	// STEP 1: general sanity checks
 	// the seed needs to be at least minimum length
 	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
@@ -87,7 +87,7 @@ func validSetup(setup *flow.EpochSetup) error {
 	return nil
 }
 
-func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return fmt.Errorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
@@ -120,38 +120,46 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 	return nil
 }
 
-// validRootSnapshot checks internal consistency of root state snapshot
-func validRootSnapshot(snap protocol.Snapshot) error {
+// isValidRootSnapshot checks internal consistency of root state snapshot
+func isValidRootSnapshot(snap protocol.Snapshot) error {
 
 	segment, err := snap.SealingSegment()
 	if err != nil {
 		return fmt.Errorf("could not get sealing segment: %w", err)
 	}
-	seal, err := snap.LatestSeal()
+	result, seal, err := snap.SealedResult()
 	if err != nil {
-		return fmt.Errorf("could not latest seal: %w", err)
-	}
-	result, err := snap.LatestResult()
-	if err != nil {
-		return fmt.Errorf("could not get latest result: %w", err)
+		return fmt.Errorf("could not latest sealed result: %w", err)
 	}
 
 	if len(segment) == 0 {
 		return fmt.Errorf("invalid empty sealing segment")
 	}
+	// TAIL <- ... <- HEAD
 	head := segment[len(segment)-1] // reference block of the snapshot
 	tail := segment[0]              // last sealed block
+	headID := head.ID()
+	tailID := tail.ID()
 
-	if result.BlockID != tail.ID() {
+	if result.BlockID != tailID {
 		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, tail.ID())
 	}
 
-	if seal.BlockID != tail.ID() {
+	if seal.BlockID != tailID {
 		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, tail.ID())
 	}
 
 	if seal.ResultID != result.ID() {
 		return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+	}
+
+	// root qc must be for reference block of snapshot
+	qc, err := snap.QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not get qc for root snapshot: %w", err)
+	}
+	if qc.BlockID != headID {
+		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, headID)
 	}
 
 	firstView, err := snap.Epochs().Current().FirstView()
@@ -165,7 +173,7 @@ func validRootSnapshot(snap protocol.Snapshot) error {
 
 	// the segment must be fully within the current epoch
 	if firstView > tail.Header.View {
-		return fmt.Errorf("root block has lower view than first view of epoch")
+		return fmt.Errorf("tail block of sealing segment has lower view than first view of epoch")
 	}
 	if head.Header.View >= finalView {
 		return fmt.Errorf("final view of epoch less than first block view")

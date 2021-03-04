@@ -590,7 +590,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate root block
 	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
-	rootID := root.Header.ID()
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
@@ -609,13 +608,19 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, err
 	}
 
+	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err = rand.Read(randomSource)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:      epochCounter,
 		FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  clusterAssignments,
-		RandomSource: rootID[:],
+		RandomSource: randomSource,
 	}
 
 	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)

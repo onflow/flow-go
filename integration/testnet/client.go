@@ -190,3 +190,8 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 
 	return result, err
 }
+
+// GetLatestProtocolSnapshot ...
+func (c *Client) GetLatestProtocolSnapshot(ctx context.Context, tx *sdk.Transaction) error {
+	c.client.GetLatestProtocolSnapshot()
+}

@@ -47,9 +47,6 @@ func TestFromSnapshot(t *testing.T) {
 
 		// test that we are able retrieve an in-memory version of root snapshot
 		t.Run("root snapshot", func(t *testing.T) {
-			// TODO need root QC stored for this test to pass
-			t.SkipNow()
-
 			expected := state.AtHeight(0)
 			actual, err := inmem.FromSnapshot(expected)
 			require.NoError(t, err)
