@@ -77,7 +77,6 @@ func NewNode(height int,
 	}
 	n.hashValue = append(n.hashValue, hashValue...)
 	// pad the hash to Hashlen
-	// TODO: remove the 2 lines if hashValue is always HashLen bytes
 	paddingLen := common.HashLen - len(hashValue)
 	n.hashValue = append(n.hashValue, common.EmptyHash[:paddingLen]...)
 	return n
@@ -121,7 +120,7 @@ func NewLeaf(path ledger.Path,
 		regCount:  regCount,
 		hashValue: make([]byte, common.HashLen),
 	}
-	n.computeHash()
+	n.ComputeHash()
 	return n
 }
 
@@ -150,13 +149,33 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		regCount:  lRegCount + rRegCount,
 		hashValue: make([]byte, common.HashLen),
 	}
-	n.computeHash()
+	n.ComputeHash()
 	return n
 }
 
-// computeHash computes the hashValue for the given Node
+// UNCHECKED requirement: node must be an interim node
+func (n *Node) UpdateInterimNode(lchild, rchild *Node) {
+	var lMaxDepth, rMaxDepth uint16
+	var lRegCount, rRegCount uint64
+	if lchild != nil {
+		lMaxDepth = lchild.maxDepth
+		lRegCount = lchild.regCount
+	}
+	if rchild != nil {
+		rMaxDepth = rchild.maxDepth
+		rRegCount = rchild.regCount
+	}
+
+	n.lChild = lchild
+	n.rChild = rchild
+	n.maxDepth = utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1)
+	n.regCount = lRegCount + rRegCount
+	n.ComputeHash()
+}
+
+// ComputeHash computes the hashValue for the given Node
 // we kept it this way to stay compatible with the previous versions
-func (n *Node) computeHash() {
+func (n *Node) ComputeHash() {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
@@ -265,9 +284,6 @@ func (n *Node) Path() ledger.Path { return n.path }
 // only leaf nodes have children.
 // Do NOT MODIFY returned slices!
 func (n *Node) Payload() *ledger.Payload { return n.payload }
-
-// SetPayload sets the payload of the node.
-func (n *Node) SetPayload(p *ledger.Payload) { n.payload = p }
 
 // LeftChild returns the the Node's left child.
 // Only INTERIOR nodes have children.

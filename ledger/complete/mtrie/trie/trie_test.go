@@ -196,9 +196,9 @@ func Test_UnallocateRegisters(t *testing.T) {
 
 	// this should be identical to the first 99 registers never been written
 	expectedRootHashHex := "d81e27a93f2bef058395f70e00fb5d3c8e426e22b3391d048b34017e1ecb483e"
-	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
+	comparisonTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
 	require.NoError(t, err)
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisionTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisonTrie.RootHash()))
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 

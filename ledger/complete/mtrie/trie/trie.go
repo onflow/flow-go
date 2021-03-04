@@ -158,8 +158,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 	return updatedTrie, nil
 }
 
-//------
-/*func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
+func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
 
 	if len(paths) == 0 { // We are not changing any values in this sub-trie => return parent trie
 		return parentNode
@@ -169,43 +168,56 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
 	}
 
-	if len(paths) == 1 && parentNode.IsLeaf() {
-		// check if a node with the ptha already exist
-		if bytes.Equal(paths[0], parentNode.Path()) {
-			// update the payoad
-			parentNode.SetPayload(payloads[0]) // TODO: check if the payload value has changed
-			commonHashLeafIn(result, path, payload.Value)
-			return parentNode
-		}
-	}
-
-	// from here on, we have parentNode != nil AND len(paths) > 0
-	if parentNode.IsLeaf() { // parent node is a leaf, i.e. parent Trie only stores a single value in this sub-trie
-		parentPath := parentNode.Path() // Per definition, a leaf must have a non-nil path
-		for _, p := range paths {
+	if parentNode != nil && parentNode.IsLeaf() {
+		// check if the parent path node is among the updated paths
+		parentPath := parentNode.Path()
+		found := false
+		for i, p := range paths {
 			if bytes.Equal(p, parentPath) {
-				// avoid creating a new node when the exact same payload is re-written at a register.
-				if len(paths) == 1 && bytes.Equal(parentNode.Payload().Value, payloads[0].Value) {
+				// the case where the leaf can be reused
+				if len(paths) == 1 {
+					// avoid creating a new node when the same payload is written
+					if !bytes.Equal(parentNode.Payload().Value, payloads[i].Value) {
+						// NB: if the same node is reused by updating the value and computing the hash,
+						// the storage exhaustion attack mitigation at the end of the function has
+						// to be commented.
+						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
+					}
 					return parentNode
-					// TODO: update the value and return the same parentNode
 				}
-				return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
+				found = true
+				break
 			}
 		}
-		// TODO: copy payload when using in-place Quick Sort for separating the payloads
-		paths = append(paths, parentNode.Path())
-		payloads = append(payloads, *parentNode.Payload())
-
-		return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
+		if !found {
+			paths = append(paths, parentNode.Path())
+			payloads = append(payloads, *parentNode.Payload())
+		}
 	}
 
 	// Split payloads so we can update the trie in parallel
 	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
 
-	// TODO [runtime optimization]: do not branch if either lpayload or rpayload is empty
-	// TODO: what does the above TODO mean?
 	var lChild, rChild *node.Node
 	wg := sync.WaitGroup{}
+
+	// in the remaining code: len(paths)>1
+	if parentNode == nil {
+		newInterimNode := node.NewNode(nodeHeight, nil, nil, nil, nil, nil, 0, 0)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			lChild = parentTrie.update(nodeHeight-1, nil, lpaths, lpayloads)
+		}()
+		rChild = parentTrie.update(nodeHeight-1, nil, rpaths, rpayloads)
+		wg.Wait()
+
+		newInterimNode.UpdateInterimNode(lChild, rChild)
+		return newInterimNode
+	}
+
+	// in the remaining code: parentNode != nil
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -219,107 +231,6 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 	if lChild == parentNode.LeftChild() && rChild == parentNode.RightChild() {
 		return parentNode
 	}
-	return node.NewInterimNode(nodeHeight, lChild, rChild)
-}*/
-
-//------
-
-// update returns the head of updated sub-trie for the specified key-value pairs.
-// UNSAFE: update requires the following conditions to be satisfied,
-// but does not explicitly check them for performance reasons
-//   * all keys AND the parent node share the same common prefix [0 : mt.maxHeight-1 - headHeight)
-//     (excluding the bit at index headHeight)
-//   * keys are NOT duplicated
-func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
-
-	if len(paths) == 0 { // We are not changing any values in this sub-trie => return parent trie
-		return parentNode
-	}
-
-	if parentNode == nil { // parent Trie has no sub-trie for the set of paths => construct entire subtree
-		return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
-	}
-
-	// from here on, we have parentNode != nil AND len(paths) > 0
-	if parentNode.IsLeaf() { // parent node is a leaf, i.e. parent Trie only stores a single value in this sub-trie
-		parentPath := parentNode.Path() // Per definition, a leaf must have a non-nil path
-		for _, p := range paths {
-			if bytes.Equal(p, parentPath) {
-				// avoid creating a new node when the exact same payload is re-written at a register.
-				if len(paths) == 1 && bytes.Equal(parentNode.Payload().Value, payloads[0].Value) {
-					return parentNode
-					// TODO: update the value and return the same parentNode
-				}
-				return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
-			}
-		}
-		// TODO: copy payload when using in-place Quick Sort for separating the payloads
-		paths = append(paths, parentNode.Path())
-		payloads = append(payloads, *parentNode.Payload())
-
-		return parentTrie.constructSubtrie(nodeHeight, paths, payloads)
-	}
-
-	// Split payloads so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
-
-	// TODO [runtime optimization]: do not branch if either lpayload or rpayload is empty
-	// TODO: what does the above TODO mean?
-	var lChild, rChild *node.Node
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		lChild = parentTrie.update(nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
-	}()
-	rChild = parentTrie.update(nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
-	wg.Wait()
-
-	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
-	// payload is re-written at a register.
-	if lChild == parentNode.LeftChild() && rChild == parentNode.RightChild() {
-		return parentNode
-	}
-	return node.NewInterimNode(nodeHeight, lChild, rChild)
-}
-
-// constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs.
-// UNSAFE: constructSubtrie requires the following conditions to be satisfied,
-// but does not explicitly check them for performance reasons
-//   * paths all share the same common prefix [0 : mt.maxHeight-1 - headHeight)
-//     (excluding the bit at index headHeight)
-//   * paths contains at least one element
-//   * paths are NOT duplicated
-// TODO: remove error return
-func (parentTrie *MTrie) constructSubtrie(nodeHeight int, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
-	// no inserts => default value, represented by nil node
-	if len(paths) == 0 {
-		return nil
-	}
-	// If we are at a leaf node, we create the node
-	if len(paths) == 1 {
-		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
-	}
-	// from here on, we have: len(paths) > 1
-
-	// Split updates by paths so we can update the trie in parallel
-	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
-	// Note: (pathLength-height) will never reach the value pathLength, i.e. we will never execute this code for height==0
-	// This is because at height=0, we only have (at most) one path left, as paths are not duplicated
-	// (by requirement of this function). But even if this condition is violated, the code will not return a faulty
-	// but instead panic with Index Out Of Range error
-
-	// TODO [runtime optimization]: do not branch if either lpaths or rpaths is empty
-	var lChild, rChild *node.Node
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		lChild = parentTrie.constructSubtrie(nodeHeight-1, lpaths, lpayloads)
-	}()
-	rChild = parentTrie.constructSubtrie(nodeHeight-1, rpaths, rpayloads)
-	wg.Wait()
-
 	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
