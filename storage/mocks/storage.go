@@ -8,6 +8,7 @@ import (
 	v2 "github.com/dgraph-io/badger/v2"
 	gomock "github.com/golang/mock/gomock"
 	flow "github.com/onflow/flow-go/model/flow"
+	storage "github.com/onflow/flow-go/storage"
 	reflect "reflect"
 )
 
@@ -171,6 +172,20 @@ func NewMockHeaders(ctrl *gomock.Controller) *MockHeaders {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockHeaders) EXPECT() *MockHeadersMockRecorder {
 	return m.recorder
+}
+
+// BatchIndexByChunkID mocks base method
+func (m *MockHeaders) BatchIndexByChunkID(arg0, arg1 flow.Identifier, arg2 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchIndexByChunkID", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchIndexByChunkID indicates an expected call of BatchIndexByChunkID
+func (mr *MockHeadersMockRecorder) BatchIndexByChunkID(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchIndexByChunkID), arg0, arg1, arg2)
 }
 
 // ByBlockID mocks base method
@@ -460,6 +475,20 @@ func (m *MockCommits) EXPECT() *MockCommitsMockRecorder {
 	return m.recorder
 }
 
+// BatchStore mocks base method
+func (m *MockCommits) BatchStore(arg0 flow.Identifier, arg1 []byte, arg2 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchStore indicates an expected call of BatchStore
+func (mr *MockCommitsMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockCommits)(nil).BatchStore), arg0, arg1, arg2)
+}
+
 // ByBlockID mocks base method
 func (m *MockCommits) ByBlockID(arg0 flow.Identifier) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -510,6 +539,20 @@ func NewMockEvents(ctrl *gomock.Controller) *MockEvents {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockEvents) EXPECT() *MockEventsMockRecorder {
 	return m.recorder
+}
+
+// BatchStore mocks base method
+func (m *MockEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.Event, arg2 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchStore indicates an expected call of BatchStore
+func (mr *MockEventsMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockEvents)(nil).BatchStore), arg0, arg1, arg2)
 }
 
 // ByBlockID mocks base method
@@ -594,6 +637,20 @@ func (m *MockServiceEvents) EXPECT() *MockServiceEventsMockRecorder {
 	return m.recorder
 }
 
+// BatchStore mocks base method
+func (m *MockServiceEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.Event, arg2 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchStore indicates an expected call of BatchStore
+func (mr *MockServiceEventsMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockServiceEvents)(nil).BatchStore), arg0, arg1, arg2)
+}
+
 // ByBlockID mocks base method
 func (m *MockServiceEvents) ByBlockID(arg0 flow.Identifier) ([]flow.Event, error) {
 	m.ctrl.T.Helper()
@@ -647,17 +704,17 @@ func (m *MockTransactionResults) EXPECT() *MockTransactionResultsMockRecorder {
 }
 
 // BatchStore mocks base method
-func (m *MockTransactionResults) BatchStore(arg0 flow.Identifier, arg1 []flow.TransactionResult) error {
+func (m *MockTransactionResults) BatchStore(arg0 flow.Identifier, arg1 []flow.TransactionResult, arg2 storage.BatchStorage) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1)
+	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // BatchStore indicates an expected call of BatchStore
-func (mr *MockTransactionResultsMockRecorder) BatchStore(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockTransactionResultsMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockTransactionResults)(nil).BatchStore), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchStore", reflect.TypeOf((*MockTransactionResults)(nil).BatchStore), arg0, arg1, arg2)
 }
 
 // ByBlockIDTransactionID mocks base method

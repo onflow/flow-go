@@ -3,8 +3,11 @@ package fvm
 import (
 	"errors"
 
+	"github.com/opentracing/opentracing-go/log"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSignatureVerifier struct {
@@ -26,14 +29,24 @@ func (v *TransactionSignatureVerifier) Process(
 	st *state.State,
 	programs *Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc.Transaction, st)
+	return v.verifyTransactionSignatures(proc, ctx, st)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
-	tx *flow.TransactionBody,
+	proc *TransactionProcedure,
+	ctx Context,
 	st *state.State,
 ) (err error) {
 
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
+		span.LogFields(
+			log.String("transaction.ID", proc.ID.String()),
+		)
+		defer span.Finish()
+	}
+
+	tx := proc.Transaction
 	accounts := state.NewAccounts(st)
 
 	if tx.Payer == flow.EmptyAddress {
