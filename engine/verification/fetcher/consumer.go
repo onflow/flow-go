@@ -81,7 +81,7 @@ func (w *Worker) Run(job module.Job) {
 	w.engine.ProcessMyChunk(chunk)
 }
 
-func (w *Worker) FinishProcessing(chunkID flow.Identifier) {
+func (w *Worker) Notify(chunkID flow.Identifier) {
 	jobID := locatorIDToJobID(chunkID)
 	w.consumer.NotifyJobIsDone(jobID)
 }
@@ -91,7 +91,7 @@ func (w *Worker) FinishProcessing(chunkID flow.Identifier) {
 // it's a callback so that the worker can convert the chunk id into a job
 // id, and notify the consumer about a finished job with the
 type FinishProcessing interface {
-	FinishProcessing(chunkID flow.Identifier)
+	Notify(chunkID flow.Identifier)
 }
 
 // ChunkConsumer consumes the jobs from the job queue, and pass it to the
