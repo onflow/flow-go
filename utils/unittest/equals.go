@@ -34,9 +34,9 @@ func AssertSnapshotsEqual(t *testing.T, snap1, snap2 protocol.Snapshot) {
 	inmem2, err := inmem.FromSnapshot(snap2)
 	require.NoError(t, err)
 
-	encoded1, err := json.Marshal(inmem1)
+	encoded1, err := json.Marshal(inmem1.Encodable())
 	require.NoError(t, err)
-	encoded2, err := json.Marshal(inmem2)
+	encoded2, err := json.Marshal(inmem2.Encodable())
 	require.NoError(t, err)
 
 	assert.Equal(t, encoded1, encoded2)
