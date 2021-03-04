@@ -187,7 +187,7 @@ func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (*flow.ExecutionR
 	return r.byBlockID(blockID)(tx)
 }
 
-func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+func (r *ExecutionReceipts) ByBlockIDAllExecutionReceipts(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	var receipts []*flow.ExecutionReceipt
 	err := r.db.View(func(btx *badger.Txn) error {
 		var receiptIDs []flow.Identifier

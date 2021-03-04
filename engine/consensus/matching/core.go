@@ -606,8 +606,10 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 	}
 
 	nextUnsealeds := make([]*nextUnsealedResult, 0)
-	// go through the results mempool and check which ones we have collected
-	// enough approvals for
+	// go through the results mempool and check which ones we have collected enough approvals for
+
+	c.incorporatedResults.All().GroupByExecutedBlockID()
+
 	for _, incorporatedResult := range c.incorporatedResults.All() {
 		// not finding the block header for an incorporated result is a fatal
 		// implementation bug, as we only add results to the IncorporatedResults
@@ -639,7 +641,7 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 		// responsibility to filter out results without chunks, there is no harm in also in enforcing
 		// the same condition here as well. It simplifies the code, because otherwise the
 		// matching core must enforce equality of start and end state for a result with zero chunks,
-		// in the absence of anyone else doing do.
+		// in the absence of anyone else doing so.
 		matched := false
 		unmatchedIndex := -1
 		// check that each chunk collects enough approvals
@@ -700,7 +702,7 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, nextUnsealedResult
 }
 
 // resultHasMultipleReceipts implements an additional _temporary_ safety measure:
-// only consider incorporatedResult sealable if we have AT LEAST 2 receipts committing
+// only consider incorporatedResult sealable if we have AT LEAST 2 RECEIPTS committing
 // to the respective result from _different_ ENs
 func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedResult) bool {
 	blockID := incorporatedResult.Result.BlockID // block the result pertains to
@@ -717,18 +719,11 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 
 	// index receipts for given incorporatedResult by their executor
 	// in case there are multiple receipts from the same executor, we keep the last one
-	receiptByExecutor := make(map[flow.Identifier]*flow.ExecutionReceipt) //map: executorID -> receipt
-	for _, receipt := range receipts {
-		if resultID != receipt.ExecutionResult.ID() { // skip receipts that commit to _different_ results
-			continue
-		}
-		receiptByExecutor[receipt.ExecutorID] = receipt
+	receiptsForIncorporatedResults := receipts.GroupByResultID().GetGroup(resultID)
+	if receiptsForIncorporatedResults.GroupByExecutorID().NumberGroups() < 2 {
+		return false // too few receipts
 	}
 
-	// too few receipts
-	if len(receiptByExecutor) < 2 {
-		return false
-	}
 	// At this point, we have at least two receipts from different executors and should be able to
 	// generate a candidate seal. We log information about all receipts for the result as evidence.
 	// Note that this code is probably run many times (until the seal has been finalized).
@@ -752,10 +747,10 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 
 		// add information about each receipt to log message
 		count := 0
-		for executorID, receipt := range receiptByExecutor {
+		for _, receipt := range receiptsForIncorporatedResults {
 			keyPrefix := fmt.Sprintf("receipt_%d", count)
 			l = l.Str(keyPrefix+"_id", receipt.ID().String()).
-				Str(keyPrefix+"_executor", executorID.String())
+				Str(keyPrefix+"_executor", receipt.ExecutorID.String())
 			count++
 		}
 
@@ -1038,6 +1033,7 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
 	// order to request them.
+HEIGHT_LOOP:
 	for height := sealed.Height + 1; height <= final.Height; height++ {
 		// add at most <maxUnsealedResults> number of results
 		if len(missingBlocksOrderedByHeight) >= c.maxResultsToRequest {
@@ -1079,8 +1075,6 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}
 
-		enoughReceipts := false
-		receiptsForResult := make(map[flow.Identifier]int) // map: resultID -> number of receipts committing to this result
 		for _, receipt := range receipts {
 
 			_, err = c.receipts.AddReceipt(receipt, header)
@@ -1094,18 +1088,16 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 			if err != nil {
 				return 0, 0, fmt.Errorf("could not add result to incorporated results mempool %v, %w", receipt.ID(), err)
 			}
-
-			resultID := receipt.ExecutionResult.ID()
-			receiptsForResult[resultID] += 1
-			if receiptsForResult[resultID] >= 2 {
-				enoughReceipts = true
-			}
 		}
 
-		// we require at least 2 receipts having the same result to seal a block,
-		// if we haven't seen as many receipt, we will keep fetching receipts .
-		if enoughReceipts {
-			continue
+		// We require at least 2 consistent receipts from different ENs to seal a block. If don't need to fetching receipts.
+		// CAUTION: This is a temporary shortcut incompatible with the mature BFT protocol!
+		// There might be multiple consistent receipts that commit to a wrong result. To guarantee
+		// sealing liveness, we need to fetch receipts from those ENs, whose receipts we don't have yet,
+		for _, receiptsForResult := range receipts.GroupByResultID() {
+			if receiptsForResult.GroupByExecutorID().NumberGroups() >= 2 {
+				continue HEIGHT_LOOP
+			}
 		}
 
 		missingBlocksOrderedByHeight = append(missingBlocksOrderedByHeight, blockID)
