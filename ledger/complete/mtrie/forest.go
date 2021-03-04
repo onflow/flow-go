@@ -103,8 +103,8 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		return nil, err
 	}
 
-	// sort paths and deduplicate keys
-	sortedPaths := make([]ledger.Path, 0)
+	// deduplicate keys
+	deduplicatedPaths := make([]ledger.Path, 0)
 	pathOrgIndex := make(map[string][]int)
 	for i, path := range r.Paths {
 		// check key sizes
@@ -113,23 +113,19 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		}
 		// only collect duplicated keys once
 		if _, ok := pathOrgIndex[string(path)]; !ok {
-			sortedPaths = append(sortedPaths, path)
+			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		// append the index
 		pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
 	}
 
-	sort.Slice(sortedPaths, func(i, j int) bool {
-		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
-	})
-
-	payloads := trie.UnsafeRead(sortedPaths)
+	payloads := trie.UnsafeRead(deduplicatedPaths)
 
 	totalPayloadSize := 0
 
 	// reconstruct the payloads in the same key order that called the method
 	orderedPayloads := make([]*ledger.Payload, len(r.Paths))
-	for i, p := range sortedPaths {
+	for i, p := range deduplicatedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
 			orderedPayloads[j] = payloads[i].DeepCopy()
 			totalPayloadSize += payloads[i].Size()
@@ -213,7 +209,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		return nil, err
 	}
 
-	sortedPaths := make([]ledger.Path, 0)
+	deduplicatedPaths := make([]ledger.Path, 0)
 	notFoundPaths := make([]ledger.Path, 0)
 	notFoundPayloads := make([]ledger.Payload, 0)
 	pathOrgIndex := make(map[string][]int)
@@ -224,7 +220,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		}
 		// only collect duplicated keys once
 		if _, ok := pathOrgIndex[string(path)]; !ok {
-			sortedPaths = append(sortedPaths, path)
+			deduplicatedPaths = append(deduplicatedPaths, path)
 			pathOrgIndex[string(path)] = []int{i}
 
 			// add it only once if is empty
@@ -263,22 +259,18 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		stateTrie = newTrie
 	}
 
-	sort.Slice(sortedPaths, func(i, j int) bool {
-		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
-	})
-
-	bp := ledger.NewTrieBatchProofWithEmptyProofs(len(sortedPaths))
+	bp := ledger.NewTrieBatchProofWithEmptyProofs(len(deduplicatedPaths))
 
 	for _, p := range bp.Proofs {
 		p.Flags = make([]byte, f.pathByteSize)
 		p.Inclusion = false
 	}
 
-	stateTrie.UnsafeProofs(sortedPaths, bp.Proofs)
+	stateTrie.UnsafeProofs(deduplicatedPaths, bp.Proofs)
 
 	// reconstruct the proofs in the same key order that called the method
 	retbp := ledger.NewTrieBatchProofWithEmptyProofs(len(r.Paths))
-	for i, p := range sortedPaths {
+	for i, p := range deduplicatedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
 			retbp.Proofs[j] = bp.Proofs[i]
 		}

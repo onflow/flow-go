@@ -128,7 +128,9 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 		return
 	}
 
-	lpaths, rpaths := utils.SplitSortedPaths(paths, mt.height-head.Height())
+	// partition step to quick sort the paths
+	partitionIndex := utils.SplitPaths(paths, mt.height-head.Height())
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 
 	// must start with the left first, as left payloads have to be appended first
 	if len(lpaths) > 0 {
@@ -158,7 +160,8 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 	return updatedTrie, nil
 }
 
-func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
+func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
+	paths []ledger.Path, payloads []ledger.Payload) *node.Node {
 
 	if len(paths) == 0 { // We are not changing any values in this sub-trie => return parent trie
 		return parentNode
@@ -195,7 +198,10 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node, paths []l
 		}
 	}
 
-	// Split payloads so we can update the trie in parallel
+	// Split paths and payloads to recurse
+	/*partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]*/
 	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
 
 	var lChild, rChild *node.Node
@@ -263,8 +269,11 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	for _, p := range proofs {
 		p.Steps++
 	}
-	// split paths based on the value of i-th bit (i = trie height - node height)
-	lpaths, lproofs, rpaths, rproofs := utils.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
+
+	// partition step to quick sort the paths
+	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
 	if len(lpaths) > 0 {
 		if rChild := head.RightChild(); rChild != nil { // TODO: is that a sanity check?

@@ -24,39 +24,66 @@ func SplitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) (
 	return lpaths, lpayloads, rpaths, rpayloads
 }
 
-// SplitSortedPaths splits a set of ordered paths based on the value of bit (bitIndex).
-// Requirement: paths must be sorted in ascending order.
-func SplitSortedPaths(paths []ledger.Path, bitIndex int) ([]ledger.Path, []ledger.Path) {
-	// TODO: binary search
-	for i, path := range paths {
+// SplitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
+// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
+// is returned.
+// The same permutation is applied to the payloads slice.
+//
+// This would be the partition step of an ascending quick sort of paths (lexicographic order)
+// with the pivot being the path with all zeros and 1 at bitIndex.
+// The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
+// equal bits from 0 to bitIndex-1
+func SplitByPath_(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
+	i := 0
+	for j, path := range paths {
 		bit := Bit(path, bitIndex)
-		// found the breaking point
-		if bit == 1 {
-			return paths[:i], paths[i:]
+		if bit == 0 {
+			paths[i], paths[j] = paths[j], paths[i]
+			payloads[i], payloads[j] = payloads[j], payloads[i]
+			i++
 		}
 	}
-	// all paths have unset bit at bitIndex
-	return paths, nil
+	return i
 }
 
-// SplitTrieProofsByPath splits a set of unordered path and proof pairs based on the value of bit (bitIndex) of path
-// Requirement: paths must be sorted in ascending order.
-func SplitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.TrieProof, bitIndex int) ([]ledger.Path, []*ledger.TrieProof, []ledger.Path, []*ledger.TrieProof) {
-	rpaths := make([]ledger.Path, 0, len(paths))
-	rproofs := make([]*ledger.TrieProof, 0, len(proofs))
-	lpaths := make([]ledger.Path, 0, len(paths))
-	lproofs := make([]*ledger.TrieProof, 0, len(proofs))
-
-	// TODO: binary search
-	for i, path := range paths {
+// SplitPaths permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
+// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
+// is returned.
+//
+// This would be the partition step of an ascending quick sort of paths (lexicographic order)
+// with the pivot being the path with all zeros and 1 at bitIndex.
+// The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
+// equal bits from 0 to bitIndex-1
+func SplitPaths(paths []ledger.Path, bitIndex int) int {
+	i := 0
+	for j, path := range paths {
 		bit := Bit(path, bitIndex)
-		if bit == 1 {
-			rpaths = append(rpaths, path)
-			rproofs = append(rproofs, proofs[i])
-		} else {
-			lpaths = append(lpaths, path)
-			lproofs = append(lproofs, proofs[i])
+		if bit == 0 {
+			paths[i], paths[j] = paths[j], paths[i]
+			i++
 		}
 	}
-	return lpaths, lproofs, rpaths, rproofs
+	return i
+}
+
+// SplitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
+// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
+// is returned.
+// The same permutation is applied to the proofs slice.
+//
+// This would be the partition step of an ascending quick sort of paths (lexicographic order)
+// with the pivot being the path with all zeros and 1 at bitIndex.
+// The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
+// equal bits from 0 to bitIndex-1
+func SplitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.TrieProof, bitIndex int) int {
+	i := 0
+	for j, path := range paths {
+		bit := Bit(path, bitIndex)
+		if bit == 0 {
+			paths[i], paths[j] = paths[j], paths[i]
+			proofs[i], proofs[j] = proofs[j], proofs[i]
+			i++
+		}
+	}
+	return i
 }
