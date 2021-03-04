@@ -237,8 +237,8 @@ func TestSafetyCheck(t *testing.T) {
 					Err: &sema.CheckerError{
 						Errors: []error{
 							&sema.AlwaysFailingNonResourceCastingTypeError{
-								ValueType:  &sema.AnyType{},
-								TargetType: &sema.AnyType{},
+								ValueType:  sema.AnyType,
+								TargetType: sema.AnyType,
 							}, // some dummy error
 							&sema.ImportedProgramError{
 								Err:      &sema.CheckerError{},
@@ -279,7 +279,7 @@ type ErrorReturningRuntime struct {
 	TxErrors []error
 }
 
-func (e *ErrorReturningRuntime) ExecuteTransaction(script runtime.Script, context runtime.Context) error {
+func (e *ErrorReturningRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
 	if len(e.TxErrors) == 0 {
 		panic("no tx errors left")
 	}
@@ -289,14 +289,20 @@ func (e *ErrorReturningRuntime) ExecuteTransaction(script runtime.Script, contex
 	return errToReturn
 }
 
-func (e *ErrorReturningRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
-	panic("not used script")
+func (*ErrorReturningRuntime) ExecuteScript(_ runtime.Script, _ runtime.Context) (cadence.Value, error) {
+	panic("ExecuteScript not expected")
 }
-func (e *ErrorReturningRuntime) ParseAndCheckProgram(source []byte, context runtime.Context) (*interpreter.Program, error) {
-	panic("not used parse")
+
+func (*ErrorReturningRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
+	panic("ParseAndCheckProgram not expected")
 }
-func (e *ErrorReturningRuntime) SetCoverageReport(coverageReport *runtime.CoverageReport) {
+
+func (*ErrorReturningRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 	panic("not used coverage")
+}
+
+func (*ErrorReturningRuntime) SetContractUpdateValidationEnabled(_ bool) {
+	panic("SetContractUpdateValidationEnabled not expected")
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {
