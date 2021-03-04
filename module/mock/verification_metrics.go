@@ -9,9 +9,9 @@ type VerificationMetrics struct {
 	mock.Mock
 }
 
-// OnAssignerProcessFinalizedBlock provides a mock function with given fields:
-func (_m *VerificationMetrics) OnAssignerProcessFinalizedBlock() {
-	_m.Called()
+// OnAssignerProcessFinalizedBlock provides a mock function with given fields: height
+func (_m *VerificationMetrics) OnAssignerProcessFinalizedBlock(height uint64) {
+	_m.Called(height)
 }
 
 // OnChunkDataPackReceived provides a mock function with given fields:

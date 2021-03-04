@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -10,7 +11,7 @@ type VerificationCollector struct {
 	tracer module.Tracer
 
 	// Assigner Engine
-	rcvBlocksTotal      prometheus.Counter // total finalized blocks received by assigner engine
+	rcvFinalizedHeight  prometheus.Gauge   // the last finalized height received by assigner engine
 	assignedChunksTotal prometheus.Counter // total chunks assigned to this verification node
 	sntChunksTotal      prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
 
@@ -32,11 +33,11 @@ type VerificationCollector struct {
 
 func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Registerer) *VerificationCollector {
 	// Assigner Engine
-	rcvBlocksTotal := prometheus.NewCounter(prometheus.CounterOpts{
-		Name:      "block_received_total",
+	rcvFinalizedHeight := promauto.NewGauge(prometheus.GaugeOpts{
+		Name:      "finalized_height",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
-		Help:      "total number of finalized blocks received by assigner engine",
+		Help:      "the last finalized height received by assigner engine",
 	})
 
 	assignedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
@@ -119,7 +120,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 
 	// registers all metrics and panics if any fails.
 	registerer.MustRegister(
-		rcvBlocksTotal,
+		rcvFinalizedHeight,
 		assignedChunksTotal,
 		sntChunksTotal,
 		rcvReceiptsTotals,
@@ -133,7 +134,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 
 	vc := &VerificationCollector{
 		tracer:                   tracer,
-		rcvBlocksTotal:           rcvBlocksTotal,
+		rcvFinalizedHeight:       rcvFinalizedHeight,
 		assignedChunksTotal:      assignedChunksTotal,
 		sntChunksTotal:           sntChunksTotal,
 		rcvReceiptsTotal:         rcvReceiptsTotals,
@@ -203,9 +204,11 @@ func (vc *VerificationCollector) OnResultApproval() {
 }
 
 // OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
-// It increments the total number of finalized blocks.
-func (vc *VerificationCollector) OnAssignerProcessFinalizedBlock() {
-	vc.rcvBlocksTotal.Inc()
+// It sets updates the latest finalized height processed at assigner engine.
+//
+// Note: it assumes blocks are coming to assigner engine in strictly increasing order of their height.
+func (vc *VerificationCollector) OnAssignerProcessFinalizedBlock(height uint64) {
+	vc.rcvFinalizedHeight.Set(float64(height))
 }
 
 // OnChunksAssigned is called whenever chunks assigned to this verification node by applying chunk assignment on an

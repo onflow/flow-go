@@ -193,7 +193,10 @@ type VerificationMetrics interface {
 
 	// OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
 	// It increments the total number of finalized blocks.
-	OnAssignerProcessFinalizedBlock()
+	//
+	//
+	// Note: it assumes blocks are coming to assigner engine in strictly increasing order of their height.
+	OnAssignerProcessFinalizedBlock(height uint64)
 
 	// OnChunksAssigned is called whenever chunks assigned to this verification node by applying chunk assignment on an
 	// execution result.

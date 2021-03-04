@@ -186,8 +186,6 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	log.Debug().Msg("new finalized block arrived")
 
-	e.metrics.OnAssignerProcessFinalizedBlock()
-
 	err := e.indexer.Index(block.Payload.Receipts)
 	if err != nil {
 		// TODO: consider aborting the process
@@ -195,6 +193,8 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	}
 
 	e.handleExecutionReceiptsWithTracing(ctx, block.Payload.Receipts, blockID)
+
+	e.metrics.OnAssignerProcessFinalizedBlock(block.Header.Height)
 
 	// tells block consumer that it is done with this block
 	e.blockConsumerNotifier.Notify(blockID)
