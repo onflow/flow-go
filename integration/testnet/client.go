@@ -13,7 +13,9 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -192,6 +194,16 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 }
 
 // GetLatestProtocolSnapshot ...
-func (c *Client) GetLatestProtocolSnapshot(ctx context.Context, tx *sdk.Transaction) error {
-	c.client.GetLatestProtocolSnapshot()
+func (c *Client) GetLatestProtocolSnapshot(ctx context.Context) (*inmem.Snapshot, error) {
+	b, err := c.client.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest snapshot from access node: %v", err)
+	}
+
+	snapshot, err := convert.BytesToInmemSnapshot(b)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert bytes to snapshot: %v", err)
+	}
+
+	return snapshot, nil
 }

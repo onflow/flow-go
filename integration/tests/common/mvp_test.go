@@ -24,7 +24,7 @@ func TestMVP_Network(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Remove()
 
@@ -36,15 +36,27 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	flowNetwork.Start(ctx)
 	defer flowNetwork.Remove()
 
-	// finalize a few blocks
+	initialRoot := flowNetwork.Root()
+	chain := initialRoot.Header.ChainID.Chain()
+
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	require.NoError(t, err)
+
+	// TODO: finalize a few blocks
 
 	// download root snapshot from Access Node
-	client, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(t, err)
+
+	// TODO: verify root snapshot block is not for the genesis block
+
+	// TODO: overrite bootstrap public root information file with the latest snapshot
+	// Restart network and run MVP test
+	runMVPTest(t, ctx, flowNetwork)
 }
 
 func TestMVP_Emulator(t *testing.T) {
@@ -64,7 +76,7 @@ func TestMVP_Emulator(t *testing.T) {
 	// _ = c
 }
 
-func prepareNetwork(t *testing.T) *testnet.FlowNetwork) {
+func prepareNetwork(t *testing.T) *testnet.FlowNetwork {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
