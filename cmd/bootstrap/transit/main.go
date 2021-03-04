@@ -44,7 +44,6 @@ var (
 	// default files to upload for all role type
 	filesToUpload = []string{
 		bootstrap.PathNodeInfoPub,
-		bootstrap.PathRootProtocolStateSnapshot, // push root protocol state snapshot
 	}
 
 	// consensus node additionally will need the transit key (to securely transport DKG in phase 2)
