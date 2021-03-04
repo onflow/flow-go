@@ -50,7 +50,7 @@ type hostEnv struct {
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
 		defer sp.Finish()
 	}
@@ -672,7 +672,7 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 }
 
 func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
 				Fields: []tracelog.Field{tracelog.String("location", location.String())},
@@ -684,7 +684,7 @@ func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration
 }
 
 func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
 				Fields: []tracelog.Field{tracelog.String("location", location.String())},
@@ -696,7 +696,7 @@ func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duratio
 }
 
 func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
 				Fields: []tracelog.Field{tracelog.String("location", location.String())},
@@ -708,7 +708,7 @@ func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Dur
 }
 
 func (e *hostEnv) ValueEncoded(duration time.Duration) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceEncodeValue, duration,
 			[]opentracing.LogRecord{},
 		)
@@ -717,7 +717,7 @@ func (e *hostEnv) ValueEncoded(duration time.Duration) {
 }
 
 func (e *hostEnv) ValueDecoded(duration time.Duration) {
-	if e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil {
+	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceDecodeValue, duration,
 			[]opentracing.LogRecord{},
 		)
