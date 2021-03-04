@@ -10,6 +10,8 @@ import (
 
 	opentracing "github.com/opentracing/opentracing-go"
 
+	time "time"
+
 	trace "github.com/onflow/flow-go/module/trace"
 )
 
@@ -76,6 +78,18 @@ func (_m *Tracer) Ready() <-chan struct{} {
 	}
 
 	return r0
+}
+
+// RecordSpanFromParent provides a mock function with given fields: span, operationName, duration, logs, opts
+func (_m *Tracer) RecordSpanFromParent(span opentracing.Span, operationName trace.SpanName, duration time.Duration, logs []opentracing.LogRecord, opts ...opentracing.StartSpanOption) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, span, operationName, duration, logs)
+	_ca = append(_ca, _va...)
+	_m.Called(_ca...)
 }
 
 // StartSpan provides a mock function with given fields: entity, spanName, opts
