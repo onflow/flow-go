@@ -58,6 +58,11 @@ func IndexBlockIDByChunkID(chunkID, blockID flow.Identifier) func(*badger.Txn) e
 	return insert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
 }
 
+// BatchIndexBlockByChunkID indexes blockID by chunkID into a batch
+func BatchIndexBlockByChunkID(blockID, chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
+}
+
 // LookupCollectionBlock looks up a block by a collection within that block.
 func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
