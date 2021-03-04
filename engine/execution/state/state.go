@@ -332,20 +332,6 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 	return s.chunkDataPacks.ByChunkID(chunkID)
 }
 
-//func (s *state) PersistChunkDataPack(ctx context.Context, c *flow.ChunkDataPack, blockID flow.Identifier) error {
-//	if s.tracer != nil {
-//		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
-//		defer span.Finish()
-//	}
-//
-//	err := s.chunkDataPacks.Store(c)
-//	if err != nil {
-//		return fmt.Errorf("cannot store chunk data pack: %w", err)
-//	}
-//
-//	return s.headers.IndexByChunkID(blockID, c.ID())
-//}
-
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
@@ -405,6 +391,11 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
 			return fmt.Errorf("cannot store chunk data pack: %w", err)
+		}
+
+		err = s.headers.BatchIndexByChunkID(header.ID(), chunkDataPack.ChunkID, batch)
+		if err != nil {
+			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
 		}
 	}
 

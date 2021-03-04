@@ -174,6 +174,20 @@ func (m *MockHeaders) EXPECT() *MockHeadersMockRecorder {
 	return m.recorder
 }
 
+// BatchIndexByChunkID mocks base method
+func (m *MockHeaders) BatchIndexByChunkID(arg0, arg1 flow.Identifier, arg2 storage.BatchStorage) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchIndexByChunkID", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchIndexByChunkID indicates an expected call of BatchIndexByChunkID
+func (mr *MockHeadersMockRecorder) BatchIndexByChunkID(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchIndexByChunkID", reflect.TypeOf((*MockHeaders)(nil).BatchIndexByChunkID), arg0, arg1, arg2)
+}
+
 // ByBlockID mocks base method
 func (m *MockHeaders) ByBlockID(arg0 flow.Identifier) (*flow.Header, error) {
 	m.ctrl.T.Helper()
