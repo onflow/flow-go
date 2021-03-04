@@ -168,9 +168,8 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 		span.SetTag("block_id", blockID)
 		defer span.Finish()
 	}
-	
-	ctx := opentracing.ContextWithSpan(context.Background(), span)
 
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
 	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleFinalizedBlock, func() {
 		e.processFinalizedBlock(ctx, block)
 	})
@@ -187,7 +186,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	log.Debug().Msg("new finalized block arrived")
 
-	e.metrics.OnFinalizedBlockReceived()
+	e.metrics.OnAssignerProcessFinalizedBlock()
 
 	err := e.indexer.Index(block.Payload.Receipts)
 	if err != nil {
