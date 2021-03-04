@@ -163,13 +163,13 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) {
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
 	span, ok := e.tracer.GetSpan(blockID, trace.VERProcessFinalizedBlock)
-	ctx := context.Background()
 	if !ok {
 		span = e.tracer.StartSpan(blockID, trace.VERProcessFinalizedBlock)
 		span.SetTag("block_id", blockID)
 		defer span.Finish()
 	}
-	ctx = opentracing.ContextWithSpan(ctx, span)
+	
+	ctx := opentracing.ContextWithSpan(context.Background(), span)
 
 	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleFinalizedBlock, func() {
 		e.processFinalizedBlock(ctx, block)
