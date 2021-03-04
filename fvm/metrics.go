@@ -35,19 +35,31 @@ type metricsCollector struct {
 
 func (m metricsCollector) ProgramParsed(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
-		m.parsed += duration
+		// These checks prevent re-reporting durations, the metrics collection is a bit counter-intuitive:
+		// The three functions (parsing, checking, interpretation) are not called in sequence, but in some cases as part of each other.
+		// We basically only measure the durations reported for the entry-point (the transaction), and not for child locations,
+		// because they might be already part of the duration for the entry-point.
+		if _, ok := location.(common.TransactionLocation); ok {
+			m.parsed = duration
+		}
 	}
 }
 
 func (m metricsCollector) ProgramChecked(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
-		m.checked += duration
+		// see the comment for ProgramParsed
+		if _, ok := location.(common.TransactionLocation); ok {
+			m.checked = duration
+		}
 	}
 }
 
 func (m metricsCollector) ProgramInterpreted(location common.Location, duration time.Duration) {
 	if m.MetricsCollector != nil {
-		m.interpreted += duration
+		// see the comment for ProgramInterpreted
+		if _, ok := location.(common.TransactionLocation); ok {
+			m.interpreted = duration
+		}
 	}
 }
 
