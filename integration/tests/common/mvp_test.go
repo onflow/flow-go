@@ -20,6 +20,51 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
+	flowNetwork := prepareNetwork(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
+	flowNetwork.Start(ctx)
+	defer flowNetwork.Remove()
+
+	runMVPTest(t, ctx, flowNetwork)
+}
+
+func TestMVP_Bootstrap(t *testing.T) {
+	flowNetwork := prepareNetwork(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
+	flowNetwork.Start(ctx)
+	defer flowNetwork.Remove()
+
+	// finalize a few blocks
+
+	// download root snapshot from Access Node
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
+	require.NoError(t, err)
+}
+
+func TestMVP_Emulator(t *testing.T) {
+	// Start emulator manually for now, used for testing the test
+	// TODO - start an emulator instance
+	t.Skip()
+
+	// key, err := unittest.EmulatorRootKey()
+	// require.NoError(t, err)
+
+	// c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
+	// require.NoError(t, err)
+
+	//TODO commented out because main test requires root for sending tx
+	// with valid reference block ID
+	//runMVPTest(t, c)
+	// _ = c
+}
+
+func prepareNetwork(t *testing.T) *testnet.FlowNetwork) {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -45,32 +90,7 @@ func TestMVP_Network(t *testing.T) {
 
 	conf := testnet.NewNetworkConfig("mvp", net)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	flowNetwork := testnet.PrepareFlowNetwork(t, conf)
-
-	flowNetwork.Start(ctx)
-	defer flowNetwork.Remove()
-
-	runMVPTest(t, ctx, flowNetwork)
-}
-
-func TestMVP_Emulator(t *testing.T) {
-	// Start emulator manually for now, used for testing the test
-	// TODO - start an emulator instance
-	t.Skip()
-
-	// key, err := unittest.EmulatorRootKey()
-	// require.NoError(t, err)
-
-	// c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
-	// require.NoError(t, err)
-
-	//TODO commented out because main test requires root for sending tx
-	// with valid reference block ID
-	//runMVPTest(t, c)
-	// _ = c
+	return testnet.PrepareFlowNetwork(t, conf)
 }
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
