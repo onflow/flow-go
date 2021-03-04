@@ -9,6 +9,11 @@ type VerificationMetrics struct {
 	mock.Mock
 }
 
+// OnAssignerProcessFinalizedBlock provides a mock function with given fields:
+func (_m *VerificationMetrics) OnAssignerProcessFinalizedBlock() {
+	_m.Called()
+}
+
 // OnChunkDataPackReceived provides a mock function with given fields:
 func (_m *VerificationMetrics) OnChunkDataPackReceived() {
 	_m.Called()
@@ -19,14 +24,14 @@ func (_m *VerificationMetrics) OnChunkDataPackRequested() {
 	_m.Called()
 }
 
+// OnChunkProcessed provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkProcessed() {
+	_m.Called()
+}
+
 // OnChunksAssigned provides a mock function with given fields: chunks
 func (_m *VerificationMetrics) OnChunksAssigned(chunks int) {
 	_m.Called(chunks)
-}
-
-// OnChunksProcessed provides a mock function with given fields:
-func (_m *VerificationMetrics) OnChunkProcessed() {
-	_m.Called()
 }
 
 // OnExecutionReceiptReceived provides a mock function with given fields:
@@ -41,11 +46,6 @@ func (_m *VerificationMetrics) OnExecutionResultReceived() {
 
 // OnExecutionResultSent provides a mock function with given fields:
 func (_m *VerificationMetrics) OnExecutionResultSent() {
-	_m.Called()
-}
-
-// OnFinalizedBlockReceived provides a mock function with given fields:
-func (_m *VerificationMetrics) OnFinalizedBlockReceived() {
 	_m.Called()
 }
 

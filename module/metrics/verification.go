@@ -204,7 +204,7 @@ func (vc *VerificationCollector) OnResultApproval() {
 
 // OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
 // It increments the total number of finalized blocks.
-func (vc *VerificationCollector) OnFinalizedBlockReceived() {
+func (vc *VerificationCollector) OnAssignerProcessFinalizedBlock() {
 	vc.rcvBlocksTotal.Inc()
 }
 
