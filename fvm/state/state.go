@@ -22,8 +22,8 @@ type State struct {
 	parent                *State
 	touchLog              []payload
 	changeLog             []payload
-	delta                 map[string]payload
-	readCache             map[string]payload
+	delta                 map[payloadKey]payload
+	readCache             map[payloadKey]payload
 	updatedAddresses      map[flow.Address]struct{}
 	interactionUsed       uint64
 	maxKeySizeAllowed     uint64
@@ -37,9 +37,9 @@ func defaultState(ledger Ledger) *State {
 		interactionUsed:       uint64(0),
 		touchLog:              make([]payload, 0),
 		changeLog:             make([]payload, 0),
-		delta:                 make(map[string]payload),
+		delta:                 make(map[payloadKey]payload),
 		updatedAddresses:      make(map[flow.Address]struct{}),
-		readCache:             make(map[string]payload),
+		readCache:             make(map[payloadKey]payload),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
@@ -88,11 +88,11 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 }
 
 func (s *State) logTouch(owner, controller, key string, value flow.RegisterValue) {
-	s.touchLog = append(s.touchLog, payload{owner, controller, key, value})
+	s.touchLog = append(s.touchLog, payload{payloadKey{owner, controller, key}, value})
 }
 
 func (s *State) logChange(owner, controller, key string, value flow.RegisterValue) {
-	s.changeLog = append(s.changeLog, payload{owner, controller, key, value})
+	s.changeLog = append(s.changeLog, payload{payloadKey{owner, controller, key}, value})
 }
 
 // Get returns a register value given owner, controller and key
@@ -101,14 +101,16 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 		return nil, err
 	}
 
+	pKey := payloadKey{owner, controller, key}
+
 	// check delta first
-	if p, ok := s.delta[fullKey(owner, controller, key)]; ok {
+	if p, ok := s.delta[pKey]; ok {
 		s.logTouch(owner, controller, key, p.value)
 		return p.value, nil
 	}
 
 	// return from read cache
-	if p, ok := s.readCache[fullKey(owner, controller, key)]; ok {
+	if p, ok := s.readCache[pKey]; ok {
 		s.logTouch(owner, controller, key, p.value)
 		return p.value, nil
 	}
@@ -116,7 +118,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	// read from parent
 	if s.parent != nil {
 		value, err := s.parent.Get(owner, controller, key)
-		s.readCache[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+		s.readCache[pKey] = payload{pKey, value}
 		s.logTouch(owner, controller, key, value)
 		return value, err
 	}
@@ -128,7 +130,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	}
 
 	// update read catch
-	s.readCache[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+	s.readCache[pKey] = payload{pKey, value}
 	s.logTouch(owner, controller, key, value)
 	return value, s.updateInteraction(owner, controller, key, value, []byte{})
 }
@@ -139,7 +141,9 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 		return err
 	}
 
-	s.delta[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+	pKey := payloadKey{owner, controller, key}
+
+	s.delta[pKey] = payload{pKey, value}
 	s.logTouch(owner, controller, key, value)
 	s.logChange(owner, controller, key, value)
 	address, isAddress := addressFromOwner(owner)
@@ -260,9 +264,12 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	return address, true
 }
 
-type payload struct {
+type payloadKey struct {
 	owner      string
 	controller string
 	key        string
-	value      flow.RegisterValue
+}
+type payload struct {
+	payloadKey
+	value flow.RegisterValue
 }

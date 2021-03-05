@@ -12,38 +12,75 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 	ledger := state.NewMapLedger()
 	st := state.NewState(ledger)
 
-	stChild := st.NewChild()
-	value := createByteArray(11)
-	err := stChild.Set("address", "controller", "key", value)
-	require.NoError(t, err)
+	// TODO Test read cache (only once call from ledger )
+	// TODO test touchLog and writeLog
 
-	// read from delta
-	v, err := stChild.Get("address", "controller", "key")
-	require.NoError(t, err)
-	require.Equal(t, v, value)
+	t.Run("test read from parent state (backoff)", func(t *testing.T) {
+		key := "key1"
+		value := createByteArray(1)
+		// set key1 on parent
+		err := st.Set("address", "controller", key, value)
+		require.NoError(t, err)
 
-	// merge back
-	st.MergeState(stChild)
-	require.NoError(t, err)
-	v, err = st.Get("address", "controller", "key")
-	require.NoError(t, err)
-	require.Equal(t, v, value)
+		// read key1 on child
+		stChild := st.NewChild()
+		v, err := stChild.Get("address", "controller", key)
+		require.NoError(t, err)
+		require.Equal(t, v, value)
+	})
 
-	stChild2 := st.NewChild()
-	value2 := createByteArray(12)
-	err = stChild2.Set("address", "controller", "key", value2)
-	require.NoError(t, err)
+	t.Run("test write to child (no merge)", func(t *testing.T) {
+		key := "key2"
+		value := createByteArray(2)
+		stChild := st.NewChild()
 
-	// read from draft
-	v, err = stChild2.Get("address", "controller", "key")
-	require.NoError(t, err)
-	require.Equal(t, v, value2)
+		// set key2 on child
+		err := stChild.Set("address", "controller", key, value)
+		require.NoError(t, err)
 
-	// rollback
-	require.NoError(t, err)
-	v, err = st.Get("address", "controller", "key")
-	require.NoError(t, err)
-	require.Equal(t, v, value)
+		// read key2 on parent
+		v, err := st.Get("address", "controller", key)
+		require.NoError(t, err)
+		require.Equal(t, len(v), 0)
+	})
+
+	t.Run("test write to child and merge", func(t *testing.T) {
+		key := "key3"
+		value := createByteArray(3)
+		stChild := st.NewChild()
+
+		// set key3 on child
+		err := stChild.Set("address", "controller", key, value)
+		require.NoError(t, err)
+
+		// merge to parent
+		st.MergeState(stChild)
+
+		// read key3 on parent
+		v, err := st.Get("address", "controller", key)
+		require.NoError(t, err)
+		require.Equal(t, v, value)
+	})
+
+	t.Run("test write to ledger", func(t *testing.T) {
+		key := "key4"
+		value := createByteArray(4)
+		// set key4 on parent
+		err := st.Set("address", "controller", key, value)
+		require.NoError(t, err)
+
+		// shouldn't be part of the ledger before applyToLedger call
+		v, err := ledger.Get("address", "controller", key)
+		require.NoError(t, err)
+		require.Equal(t, len(v), 0)
+
+		// now should be part of the ledger
+		st.ApplyDeltaToLedger()
+		v, err = ledger.Get("address", "controller", key)
+		require.NoError(t, err)
+		require.Equal(t, v, value)
+	})
+
 }
 
 func TestState_MaxValueSize(t *testing.T) {
