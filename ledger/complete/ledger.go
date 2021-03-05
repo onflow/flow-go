@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -386,10 +387,15 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	if err != nil {
 		return err
 	}
+
+	targetRootHash := ledger.RootHash(state)
 	for _, trie := range allTries {
-		if !bytes.Equal(trie.RootHash(), ledger.RootHash(state)) {
-			l.forest.RemoveTrie(trie.RootHash())
+		trieRootHash := trie.RootHash()
+		if !bytes.Equal(trieRootHash, targetRootHash) {
+			l.forest.RemoveTrie(trieRootHash)
 		}
 	}
+	// call gc to free up mem
+	runtime.GC()
 	return nil
 }
