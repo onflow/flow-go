@@ -149,7 +149,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) error
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	log.Debug().Msg("chunk locator successfully pushed to chunks queue")
+	log.Info().Msg("chunk locator successfully pushed to chunks queue")
 
 	return nil
 }
