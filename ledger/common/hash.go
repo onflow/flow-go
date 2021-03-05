@@ -6,20 +6,19 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
-	c "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // default value and default hash value for a default node
-var defaultLeafHash c.Hash
+var defaultLeafHash hash.Hash
 
 const defaultHashLen = 257
 
 // HashLen is the default output hash length in bytes
 const HashLen = 32
 
-// hash with all zeroes used for padding
+// EmptyHash is a hash with all zeroes, used for padding
 var EmptyHash [HashLen]byte
 
 // we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.

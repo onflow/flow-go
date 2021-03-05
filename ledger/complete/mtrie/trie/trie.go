@@ -100,11 +100,12 @@ func (mt *MTrie) String() string {
 	return trieStr + mt.root.FmtStr("", "")
 }
 
-// UnsafeRead read payloads for the given paths. It is called unsafe as it requires the
-// paths to be sorted
-// TODO move consistency checks from Forrest into Trie to obtain a safe, self-contained API
+// UnsafeRead read payloads for the given paths. It is called unsafe as it modifies the
+// input paths (paths are sorted when the function returns).
+// TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
-	res := make([]*ledger.Payload, 0, len(paths))
+	// allocate the result buffer
+	res := make([]*ledger.Payload, len(paths))
 	mt.read(&res, mt.root, paths)
 	return res
 }
@@ -112,18 +113,18 @@ func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Path) {
 	// path not found
 	if head == nil {
-		for range paths {
-			*res = append(*res, ledger.EmptyPayload())
+		for i := range paths {
+			(*res)[i] = ledger.EmptyPayload()
 		}
 		return
 	}
 	// reached a leaf node
 	if head.IsLeaf() {
-		for _, p := range paths {
+		for i, p := range paths {
 			if bytes.Equal(head.Path(), p) {
-				*res = append(*res, head.Payload())
+				(*res)[i] = head.Payload()
 			} else {
-				*res = append(*res, ledger.EmptyPayload())
+				(*res)[i] = ledger.EmptyPayload()
 			}
 		}
 		return
@@ -132,15 +133,36 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	// partition step to quick sort the paths
 	partitionIndex := utils.SplitPaths(paths, mt.Height()-head.Height())
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lres, rres := (*res)[:partitionIndex], (*res)[partitionIndex:]
 
-	// must start with the left first, as left payloads have to be appended first
+	// read values from left and right subtrees in parallel
+	wg := sync.WaitGroup{}
+	parallelRecursionThreshold := 64 // thresold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) > 0 {
-		mt.read(res, head.LeftChild(), lpaths)
+		if len(lpaths) > parallelRecursionThreshold {
+			wg.Add(1)
+			go func() {
+				mt.read(&lres, head.LeftChild(), lpaths)
+				wg.Done()
+			}()
+		} else {
+			mt.read(&lres, head.LeftChild(), lpaths)
+		}
 	}
 
 	if len(rpaths) > 0 {
-		mt.read(res, head.RightChild(), rpaths)
+		if len(lpaths) > parallelRecursionThreshold {
+			wg.Add(1)
+			go func() {
+				mt.read(&rres, head.RightChild(), rpaths)
+				wg.Done()
+			}()
+		} else {
+			mt.read(&rres, head.RightChild(), rpaths)
+		}
 	}
+	// wait for all threads
+	wg.Wait()
 }
 
 // NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.

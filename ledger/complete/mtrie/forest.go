@@ -91,6 +91,7 @@ func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metr
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)
+// TODO: can be optimized further if we don't care about changing the order of the input r.Paths
 func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 
 	if len(r.Paths) == 0 {
@@ -112,14 +113,14 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
 		}
 		// only collect duplicated keys once
-		if _, ok := pathOrgIndex[string(path)]; !ok {
+		if _, ok := pathOrgIndex[string(path)]; !ok { // deduplication here is optional
 			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		// append the index
 		pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
 	}
 
-	payloads := trie.UnsafeRead(deduplicatedPaths)
+	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths
 
 	totalPayloadSize := 0
 
@@ -166,7 +167,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		payloadMap[string(path)] = *u.Payloads[i]
-		totalPayloadSize += u.Payloads[i].Size() // not sure this is capturing what we want (it includes payloads of duplicated paths)
+		totalPayloadSize += u.Payloads[i].Size()
 	}
 
 	// TODO rename metrics names
