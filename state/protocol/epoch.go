@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -78,4 +80,51 @@ type Epoch interface {
 
 	// DKG returns the result of the distributed key generation procedure.
 	DKG() (DKG, error)
+}
+
+func IsSetup(epoch Epoch) bool {
+	_, err := epoch.Counter()
+	return err == nil
+}
+
+func IsCommitted(epoch Epoch) bool {
+	_, err := epoch.DKG()
+	return err == nil
+}
+
+func SetupEpochs(query EpochQuery) []Epoch {
+	var epochs []Epoch
+
+	prev := query.Previous()
+	if IsSetup(prev) {
+		epochs = append(epochs, prev)
+	}
+	curr := query.Current()
+	if IsSetup(curr) {
+		epochs = append(epochs, curr)
+	}
+	next := query.Next()
+	if IsSetup(next) {
+		epochs = append(epochs, next)
+	}
+
+	return epochs
+}
+
+func EpochByView(snapshot Snapshot, view uint64) (Epoch, error) {
+
+	for _, epoch := range SetupEpochs(snapshot.Epochs()) {
+		firstView, err := epoch.FirstView()
+		if err != nil {
+			return nil, fmt.Errorf("could not get first view: %w", err)
+		}
+		finalView, err := epoch.FinalView()
+		if err != nil {
+			return nil, fmt.Errorf("could not get final view: %w", err)
+		}
+		if firstView <= view && view <= finalView {
+			return epoch, nil
+		}
+	}
+	return nil, fmt.Errorf("could not find epoch containing view %d", view)
 }
