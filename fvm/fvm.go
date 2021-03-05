@@ -57,7 +57,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger, 
 		return err
 	}
 
-	return st.Commit()
+	return st.ApplyDeltaToLedger()
 }
 
 // GetAccount returns an account by address or an error if none exists.
@@ -72,12 +72,6 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 		// TODO: wrap error
 		return nil, err
 	}
-	err = st.Commit()
-	if err != nil {
-		// TODO: wrap error
-		return nil, err
-	}
-
 	return account, nil
 }
 

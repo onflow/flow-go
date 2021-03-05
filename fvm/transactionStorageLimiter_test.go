@@ -134,7 +134,6 @@ func newMockState(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *s
 	for _, okv := range ownerKeyStorageValue {
 		_ = s.Set(okv.Owner, "", okv.Key, utils.Uint64ToBinary(okv.Value))
 	}
-	_ = s.Commit()
 
 	for _, key := range updatedKeys {
 		_ = s.Set(key, "", "", []byte("1"))

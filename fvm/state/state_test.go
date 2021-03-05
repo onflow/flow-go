@@ -8,37 +8,38 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
-func TestState_DraftFunctionality(t *testing.T) {
+func TestState_ChildMergeFunctionality(t *testing.T) {
 	ledger := state.NewMapLedger()
 	st := state.NewState(ledger)
 
+	stChild := st.NewChild()
 	value := createByteArray(11)
-	err := st.Set("address", "controller", "key", value)
+	err := stChild.Set("address", "controller", "key", value)
 	require.NoError(t, err)
 
-	// read from draft
-	v, err := st.Get("address", "controller", "key")
+	// read from delta
+	v, err := stChild.Get("address", "controller", "key")
 	require.NoError(t, err)
 	require.Equal(t, v, value)
 
-	// commit
-	err = st.Commit()
+	// merge back
+	st.MergeState(stChild)
 	require.NoError(t, err)
 	v, err = st.Get("address", "controller", "key")
 	require.NoError(t, err)
 	require.Equal(t, v, value)
 
+	stChild2 := st.NewChild()
 	value2 := createByteArray(12)
-	err = st.Set("address", "controller", "key", value2)
+	err = stChild2.Set("address", "controller", "key", value2)
 	require.NoError(t, err)
 
 	// read from draft
-	v, err = st.Get("address", "controller", "key")
+	v, err = stChild2.Get("address", "controller", "key")
 	require.NoError(t, err)
 	require.Equal(t, v, value2)
 
 	// rollback
-	err = st.Rollback()
 	require.NoError(t, err)
 	v, err = st.Get("address", "controller", "key")
 	require.NoError(t, err)
@@ -103,13 +104,15 @@ func TestState_MaxInteraction(t *testing.T) {
 
 	st = state.NewState(ledger, state.WithMaxInteractionSizeAllowed(9))
 
+	stChild := st.NewChild()
+
 	// update - 0
-	err = st.Set("1", "2", "3", []byte{'A'})
+	err = stChild.Set("1", "2", "3", []byte{'A'})
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
-	err = st.Commit()
+	st.MergeState(stChild)
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(4))
 

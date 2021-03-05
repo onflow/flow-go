@@ -98,13 +98,16 @@ func (i *TransactionInvocator) Process(
 
 	var err error
 	var env *hostEnv
+	var childState *state.State
 	var blockHeight uint64
 	if ctx.BlockHeader != nil {
 		blockHeight = ctx.BlockHeader.Height
 	}
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-		env, err = newEnvironment(ctx, vm, st, programs)
+
+		childState = st.NewChild()
+		env, err = newEnvironment(ctx, vm, childState, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
@@ -187,6 +190,8 @@ func (i *TransactionInvocator) Process(
 			Msg("transaction executed with error")
 		return err
 	}
+
+	st.MergeState(childState)
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

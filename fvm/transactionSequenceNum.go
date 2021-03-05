@@ -40,7 +40,8 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		defer span.Finish()
 	}
 
-	accounts := state.NewAccounts(st)
+	childSt := st.NewChild()
+	accounts := state.NewAccounts(childSt)
 	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
@@ -80,5 +81,6 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		return err
 	}
 
+	st.MergeState(childSt)
 	return nil
 }
