@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -33,7 +32,7 @@ type VerificationCollector struct {
 
 func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Registerer) *VerificationCollector {
 	// Assigner Engine
-	receivedFinalizedHeight := promauto.NewGauge(prometheus.GaugeOpts{
+	receivedFinalizedHeight := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "finalized_height",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
