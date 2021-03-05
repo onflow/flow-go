@@ -80,7 +80,9 @@ func (nc *NoopCollector) OnVerifiableChunkReceived()                            
 func (nc *NoopCollector) OnChunkDataPackReceived()                                               {}
 func (nc *NoopCollector) OnChunkDataPackRequested()                                              {}
 func (nc *NoopCollector) OnResultApproval()                                                      {}
-func (nc *NoopCollector) LogVerifiableChunkSize(size float64)                                    {}
+func (nc *NoopCollector) OnAssignerProcessFinalizedBlock(height uint64)                          {}
+func (nc *NoopCollector) OnChunksAssigned(chunks int)                                            {}
+func (nc *NoopCollector) OnChunkProcessed()                                                      {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                                    {}
