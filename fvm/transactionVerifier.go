@@ -26,16 +26,16 @@ func (v *TransactionSignatureVerifier) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	st *state.State,
+	stm *state.StateManager,
 	programs *Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc, ctx, st)
+	return v.verifyTransactionSignatures(proc, ctx, stm)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	proc *TransactionProcedure,
 	ctx Context,
-	st *state.State,
+	stm *state.StateManager,
 ) (err error) {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -47,8 +47,9 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	}
 
 	tx := proc.Transaction
-	childState := st.NewChild()
-	accounts := state.NewAccounts(childState)
+
+	stm.Nest()
+	accounts := state.NewAccounts(stm)
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -105,7 +106,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	st.MergeState(childState)
+	stm.RollUp(true)
 	return nil
 }
 

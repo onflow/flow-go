@@ -15,7 +15,7 @@ import (
 func TestTransactionStorageLimiter_Process(t *testing.T) {
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateManager(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 99),
@@ -27,13 +27,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st, fvm.NewEmptyPrograms())
+		}, nil, sm, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateManager(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 100),
@@ -45,13 +45,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st, fvm.NewEmptyPrograms())
+		}, nil, sm, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateManager(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -63,13 +63,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st, fvm.NewEmptyPrograms())
+		}, nil, sm, fvm.NewEmptyPrograms())
 
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("non account registers are ignored", func(t *testing.T) {
 		owner := ""
-		st := newMockState(
+		sm := newMockStateManager(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -81,13 +81,13 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st, fvm.NewEmptyPrograms())
+		}, nil, sm, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
 	t.Run("account registers without exists are ignored", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateManager(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -98,7 +98,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st, fvm.NewEmptyPrograms())
+		}, nil, sm, fvm.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
@@ -126,10 +126,11 @@ func accountExists(owner string) OwnerKeyValue {
 	}
 }
 
-func newMockState(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.State {
+func newMockStateManager(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.StateManager {
 
 	ledger := state.NewMapLedger()
 	s := state.NewState(ledger)
+	sm := state.NewStateManager(s)
 
 	for _, okv := range ownerKeyStorageValue {
 		_ = s.Set(okv.Owner, "", okv.Key, utils.Uint64ToBinary(okv.Value))
@@ -139,10 +140,10 @@ func newMockState(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *s
 		_ = s.Set(key, "", "", []byte("1"))
 	}
 
-	return s
+	return sm
 }
 
-func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.State, _ *fvm.Programs) (func(address common.Address) (value uint64, err error), error) {
+func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateManager, _ *fvm.Programs) (func(address common.Address) (value uint64, err error), error) {
 	return func(address common.Address) (value uint64, err error) {
 		return 100, nil
 	}, nil

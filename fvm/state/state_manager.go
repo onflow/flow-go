@@ -5,7 +5,6 @@ type StateManager struct {
 	activeState *State
 }
 
-// TODO update the state manager to do set/get
 func NewStateManager(startState *State) *StateManager {
 	return &StateManager{
 		startState:  startState,
@@ -17,7 +16,7 @@ func (s *StateManager) Nest() {
 	s.activeState = s.activeState.NewChild()
 }
 
-func (s *StateManager) Rollup(merge bool) {
+func (s *StateManager) RollUp(merge bool) {
 	if merge {
 		s.activeState.parent.MergeState(s.activeState)
 	}

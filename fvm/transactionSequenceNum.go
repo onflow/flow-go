@@ -19,17 +19,17 @@ func (c *TransactionSequenceNumberChecker) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	st *state.State,
+	stm *state.StateManager,
 	programs *Programs,
 ) error {
 
-	return c.checkAndIncrementSequenceNumber(proc, ctx, st)
+	return c.checkAndIncrementSequenceNumber(proc, ctx, stm)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proc *TransactionProcedure,
 	ctx Context,
-	st *state.State,
+	stm *state.StateManager,
 ) error {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -40,8 +40,8 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		defer span.Finish()
 	}
 
-	childSt := st.NewChild()
-	accounts := state.NewAccounts(childSt)
+	stm.Nest()
+	accounts := state.NewAccounts(stm)
 	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
@@ -81,6 +81,6 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		return err
 	}
 
-	st.MergeState(childSt)
+	stm.RollUp(true)
 	return nil
 }

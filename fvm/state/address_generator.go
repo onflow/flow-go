@@ -23,6 +23,16 @@ func NewStateBoundAddressGenerator(stateManager *StateManager, chain flow.Chain)
 	}, nil
 }
 
+// TODO return error instead of a panic
+// this requires changes outside of fvm since the type is defined on flow model
+func (g *StateBoundAddressGenerator) Bytes() []byte {
+	stateBytes, err := g.stateManager.State().Get("", "", keyAddressState)
+	if err != nil {
+		panic(err)
+	}
+	return stateBytes
+}
+
 func (g *StateBoundAddressGenerator) constructAddressGen() (flow.AddressGenerator, error) {
 	st := g.stateManager.State()
 	stateBytes, err := st.Get("", "", keyAddressState)
