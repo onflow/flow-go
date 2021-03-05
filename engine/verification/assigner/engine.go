@@ -149,7 +149,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	log.Debug().Msg("chunk locator successfully pushed to chunks queue")
+	log.Info().Msg("chunk locator successfully pushed to chunks queue")
 
 	return true, nil
 }
@@ -195,7 +195,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	err := e.indexer.Index(block.Payload.Receipts)
 	if err != nil {
 		// TODO: consider aborting the process
-		log.Error().Err(err).Msg("could not index receipts for block")
+		log.Fatal().Err(err).Msg("could not index receipts for block")
 	}
 
 	// performs chunk assigment on each receipt and pushes the assigned chunks to the
