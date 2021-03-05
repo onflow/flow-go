@@ -367,6 +367,11 @@ func (e *testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 	panic("SetCoverageReport not expected")
 }
 
+func (e *testRuntime) SetContractUpdateValidationEnabled(enabled bool) {
+	panic("SetContractUpdateValidationEnabled not expected")
+
+}
+
 func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBlock {
 	collections := make([]*entity.CompleteCollection, collectionCount)
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)

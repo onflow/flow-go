@@ -5,10 +5,12 @@ on:
     branches: 
       - master
       - v0.14
+      - v0.14.5-patch
   pull_request:
     branches:
       - master
       - v0.14
+      - v0.14.5-patch
 
 jobs:
   golangci:
