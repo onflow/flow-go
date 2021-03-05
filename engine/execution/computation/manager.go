@@ -92,7 +92,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 			if r := recover(); r != nil {
 				err = fmt.Errorf("cadence runtime error: %s", r)
 
-				args := make([]string, 0)
+				args := make([]string, 0, len(arguments))
 				for _, a := range arguments {
 					args = append(args, hex.EncodeToString(a))
 				}
