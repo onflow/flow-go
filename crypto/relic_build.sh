@@ -17,7 +17,7 @@ pushd "$DIR/relic/build"
 #
 GENERAL=(-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF)
 LIBS=(-DSHLIB=OFF -DSTLIB=ON)
-COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer -march=native -mtune=native")
+COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer -march=haswell")
 RAND=(-DRAND=HASHD -DSEED=)
 
 #
