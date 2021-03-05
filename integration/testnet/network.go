@@ -631,8 +631,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate execution result and block seal
-	result := run.GenerateRootResult(root, commit)
-	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
+	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
+	seal := run.GenerateRootSeal(result)
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootBlock), root)
 	if err != nil {

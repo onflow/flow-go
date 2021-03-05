@@ -5,7 +5,7 @@ type ExecutionResult struct {
 	PreviousResultID Identifier // commit of the previous ER
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
-	ServiceEvents    []*ServiceEvent
+	ServiceEvents    []ServiceEvent
 }
 
 // ID returns the hash of the execution result body
