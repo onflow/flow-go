@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -358,4 +361,30 @@ func MessagesToIdentifiers(l [][]byte) []flow.Identifier {
 		results[i] = MessageToIdentifier(item)
 	}
 	return results
+}
+
+// SnapshotToBytes converts a `protocol.Snapshot` to bytes, encoded as JSON
+func SnapshotToBytes(snapshot protocol.Snapshot) ([]byte, error) {
+	serializable, err := inmem.FromSnapshot(snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(serializable.Encodable())
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+// BytesToInmemSnapshot converts an array of bytes to `inmem.Snapshot`
+func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
+	var snapshot inmem.Snapshot
+	err := json.Unmarshal(bytes, &snapshot)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal snapshot data retreived from access node: %w", err)
+	}
+
+	return &snapshot, nil
 }

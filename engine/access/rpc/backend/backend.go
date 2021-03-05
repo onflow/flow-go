@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -172,7 +173,11 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	// retrieve the collection from the collection storage
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
-		err = convertStorageError(err)
+		// Collections are retrieved asynchronously as we finalize blocks, so
+		// it is possible for a client to request a finalized block from us
+		// containing some collection, then get a not found error when requesting
+		// that collection. These clients should retry.
+		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
 		return nil, err
 	}
 
@@ -183,6 +188,15 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
+}
+
+func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
+	data, err := convert.SnapshotToBytes(b.state.Sealed())
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func convertStorageError(err error) error {

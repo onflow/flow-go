@@ -36,6 +36,20 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 		AddAuthorizer(chain.ServiceAddress())
 }
 
+func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+	encoded := hex.EncodeToString([]byte(contract))
+
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`transaction {
+              prepare(signer: AuthAccount, service: AuthAccount) {
+                signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+              }
+            }`, contractName, encoded)),
+		).
+		AddAuthorizer(authorizer).
+		AddAuthorizer(chain.ServiceAddress())
+}
+
 func CreateUnauthorizedContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address) *flow.TransactionBody {
 	encoded := hex.EncodeToString([]byte(contract))
 
@@ -135,15 +149,17 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	ledger state.Ledger,
+	programs *fvm.Programs,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	return CreateAccountsWithSimpleAddresses(vm, ledger, privateKeys, chain)
+	return CreateAccountsWithSimpleAddresses(vm, ledger, programs, privateKeys, chain)
 }
 
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	ledger state.Ledger,
+	programs *fvm.Programs,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -180,7 +196,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, uint32(i))
-		err := vm.Run(ctx, tx, ledger)
+		err := vm.Run(ctx, tx, ledger, programs)
 		if err != nil {
 			return nil, err
 		}
@@ -212,6 +228,7 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *state.MapLedger {
 	ledger := state.NewMapLedger()
+	programs := fvm.NewEmptyPrograms()
 
 	bootstrap := fvm.Bootstrap(
 		unittest.ServiceAccountPublicKey,
@@ -222,6 +239,7 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *state.MapL
 		ctx,
 		bootstrap,
 		ledger,
+		programs,
 	)
 
 	return ledger

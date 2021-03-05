@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -33,6 +34,11 @@ func (h *Handler) Ping(ctx context.Context, _ *access.PingRequest) (*access.Ping
 	}
 
 	return &access.PingResponse{}, nil
+}
+
+func (h *Handler) GetLatestProtocolStateSnapshot(_ context.Context,
+	_ *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	return nil, fmt.Errorf("unimplemented method")
 }
 
 func (h *Handler) GetNetworkParameters(
@@ -402,6 +408,18 @@ func (h *Handler) GetEventsForBlockIDs(
 
 	return &access.EventsResponse{
 		Results: resultEvents,
+	}, nil
+}
+
+// GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
+func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
 	}, nil
 }
 

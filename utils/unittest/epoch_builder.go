@@ -120,13 +120,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: prevReceipts,
 		Seals:    sealsForPrev,
 	})
-	err = builder.state.Extend(&B)
-	require.Nil(builder.t, err)
-	// finalize block B
-	err = builder.state.Finalize(B.ID())
-	require.Nil(builder.t, err)
-	// cache block B
-	builder.blocks[B.ID()] = &B
+	builder.addBlock(&B)
 	// create a receipt for block B, to be included in block C
 	receiptB := ReceiptForBlockFixture(&B)
 
@@ -143,13 +137,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptB},
 		Seals:    sealsForA,
 	})
-	err = builder.state.Extend(&C)
-	require.Nil(builder.t, err)
-	// finalize block C
-	err = builder.state.Finalize(C.ID())
-	require.Nil(builder.t, err)
-	// cache block C
-	builder.blocks[C.ID()] = &C
+	builder.addBlock(&C)
 	// create a receipt for block C, to be included in block D
 	receiptC := ReceiptForBlockFixture(&C)
 
@@ -157,6 +145,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	setupDefaults := []func(*flow.EpochSetup){
 		WithParticipants(identities),
 		SetupWithCounter(counter + 1),
+		WithFirstView(finalView + 1),
 		WithFinalView(finalView + 1000),
 	}
 
@@ -173,13 +162,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptC},
 		Seals:    []*flow.Seal{sealForB},
 	})
-	err = builder.state.Extend(&D)
-	require.Nil(builder.t, err)
-	// finalize block D
-	err = builder.state.Finalize(D.ID())
-	require.Nil(builder.t, err)
-	// cache block D
-	builder.blocks[D.ID()] = &D
+	builder.addBlock(&D)
 	// create receipt for block D
 	receiptD := ReceiptForBlockFixture(&D)
 
@@ -193,13 +176,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptD},
 		Seals:    []*flow.Seal{sealForC},
 	})
-	err = builder.state.Extend(&E)
-	require.Nil(builder.t, err)
-	// finalize block E
-	err = builder.state.Finalize(E.ID())
-	require.Nil(builder.t, err)
-	// cache block E
-	builder.blocks[E.ID()] = &E
+	builder.addBlock(&E)
 	// create receipt for block E
 	receiptE := ReceiptForBlockFixture(&E)
 
@@ -222,13 +199,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Receipts: []*flow.ExecutionReceipt{receiptE},
 		Seals:    []*flow.Seal{sealForD},
 	})
-	err = builder.state.Extend(&F)
-	require.Nil(builder.t, err)
-	// finalize block F
-	err = builder.state.Finalize(F.ID())
-	require.Nil(builder.t, err)
-	// cache block F
-	builder.blocks[F.ID()] = &F
+	builder.addBlock(&F)
 
 	return builder
 }
@@ -236,7 +207,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 // CompleteEpoch caps off the current epoch by building the first block of the next
 // epoch. We must be in the Committed phase to call CompleteEpoch. Once the epoch
 // has been capped off, we can build the next epoch with BuildEpoch.
-func (builder *EpochBuilder) CompleteEpoch() {
+func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 
 	phase, err := builder.state.Final().Phase()
 	require.Nil(builder.t, err)
@@ -264,10 +235,22 @@ func (builder *EpochBuilder) CompleteEpoch() {
 			),
 		},
 	})
-	err = builder.state.Extend(&A)
-	require.Nil(builder.t, err)
-	err = builder.state.Finalize(A.ID())
-	require.Nil(builder.t, err)
+	builder.addBlock(&A)
 
-	builder.blocks[A.ID()] = &A
+	return builder
+}
+
+// addBlock adds the given block to the state by: extending the state,
+// finalizing the block, marking the block as valid, and caching the block.
+func (builder *EpochBuilder) addBlock(block *flow.Block) {
+
+	err := builder.state.Extend(block)
+	require.NoError(builder.t, err)
+
+	blockID := block.ID()
+	err = builder.state.Finalize(blockID)
+	require.NoError(builder.t, err)
+	err = builder.state.MarkValid(blockID)
+	require.NoError(builder.t, err)
+	builder.blocks[block.ID()] = block
 }

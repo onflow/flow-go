@@ -11,6 +11,8 @@ import (
 )
 
 func TestIncorporatedResults(t *testing.T) {
+	t.Parallel()
+
 	pool, err := NewIncorporatedResults(1000)
 	require.NoError(t, err)
 
@@ -77,6 +79,7 @@ func TestIncorporatedResults(t *testing.T) {
 
 // Test that size gets decremented when items are automatically ejected
 func TestIncorporatedResultsEjectSize(t *testing.T) {
+	t.Parallel()
 
 	t.Run("check ejection of block with only a single result", func(t *testing.T) {
 		pool, err := NewIncorporatedResults(10)

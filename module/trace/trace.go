@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
@@ -130,6 +131,21 @@ func (t *OpenTracer) StartSpanFromParent(
 ) opentracing.Span {
 	opts = append(opts, opentracing.FollowsFrom(span.Context()))
 	return t.Tracer.StartSpan(string(operationName), opts...)
+}
+
+func (t *OpenTracer) RecordSpanFromParent(
+	span opentracing.Span,
+	operationName SpanName,
+	duration time.Duration,
+	logs []opentracing.LogRecord,
+	opts ...opentracing.StartSpanOption,
+) {
+	end := time.Now()
+	start := end.Add(-duration)
+	opts = append(opts, opentracing.FollowsFrom(span.Context()))
+	opts = append(opts, opentracing.StartTime(start))
+	sp := t.Tracer.StartSpan(string(operationName), opts...)
+	sp.FinishWithOptions(opentracing.FinishOptions{FinishTime: end, LogRecords: logs})
 }
 
 // WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,

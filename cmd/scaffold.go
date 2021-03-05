@@ -33,6 +33,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -58,6 +59,7 @@ type BaseConfig struct {
 	profilerDir      string
 	profilerInterval time.Duration
 	profilerDuration time.Duration
+	tracerEnabled    bool
 }
 
 type Metrics struct {
@@ -113,7 +115,7 @@ type FlowNodeBuilder struct {
 	flags             *pflag.FlagSet
 	Logger            zerolog.Logger
 	Me                *local.Local
-	Tracer            *trace.OpenTracer
+	Tracer            module.Tracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
@@ -157,6 +159,9 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 		"the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second,
 		"the duration to run the auto-profile for")
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
+		"whether to enable tracer")
+
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -300,11 +305,15 @@ func (fnb *FlowNodeBuilder) initLogger() {
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
-	tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
-	fnb.MustNot(err).Msg("could not initialize tracer")
-	fnb.Logger.Info().Msg("Tracer Started")
+
+	fnb.Tracer = trace.NewNoopTracer()
+	if fnb.BaseConfig.tracerEnabled {
+		tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
+		fnb.MustNot(err).Msg("could not initialize tracer")
+		fnb.Logger.Info().Msg("Tracer Started")
+		fnb.Tracer = tracer
+	}
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
-	fnb.Tracer = tracer
 
 	mempools := metrics.NewMempoolCollector(5 * time.Second)
 
@@ -415,11 +424,12 @@ func (fnb *FlowNodeBuilder) initState() {
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
 	if isBootStrapped {
-		state, stateRoot, err := badgerState.OpenState(
+		state, err := badgerState.OpenState(
 			fnb.Metrics.Compliance,
 			fnb.DB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
+			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
 			fnb.Storage.Commits,
@@ -433,14 +443,17 @@ func (fnb *FlowNodeBuilder) initState() {
 		// but the protocol state is not updated, so they don't match
 		// when this happens during a spork, we could try deleting the protocol state database.
 		// TODO: revisit this check when implementing Epoch
-		rootBlock, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root block")
-		if rootBlock.ID() != stateRoot.Block().ID() {
+		rootBlockFromBootstrap, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
+		fnb.MustNot(err).Msg("could not load root block from disk")
+
+		rootBlock, err := state.Params().Root()
+		fnb.MustNot(err).Msg("could not load root block from protocol state")
+		if rootBlockFromBootstrap.ID() != rootBlock.ID() {
 			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
-				rootBlock.ID(),
+				rootBlockFromBootstrap.ID(),
 				fnb.RootBlock.ID())
 		}
-		fnb.RootBlock = stateRoot.Block()
+		fnb.RootBlock = rootBlockFromBootstrap
 
 		// TODO: we shouldn't have to load any files again after bootstrapping; in
 		// order to make it unnecessary, we need to changes:
@@ -454,14 +467,17 @@ func (fnb *FlowNodeBuilder) initState() {
 		// not use a global variable for chain ID anymore, but rely on the protocol
 		// state as final authority on what the chain ID is
 		// => https://github.com/dapperlabs/flow-go/issues/4167
-		fnb.RootChainID = stateRoot.Block().Header.ChainID
+		fnb.RootChainID = rootBlock.ChainID
 
 		// load the root QC data from bootstrap files
+		// TODO get from protocol state
 		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
 		fnb.MustNot(err).Msg("could not load root QC")
 
-		fnb.RootResult = stateRoot.Result()
-		fnb.RootSeal = stateRoot.Seal()
+		result, seal, err := state.AtBlockID(rootBlock.ID()).SealedResult()
+		fnb.MustNot(err).Msg("could not get sealed result")
+		fnb.RootResult = result
+		fnb.RootSeal = seal
 	} else {
 		// Bootstrap!
 
@@ -487,7 +503,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not load root seal")
 
 		// bootstrap the protocol state with the loaded data
-		stateRoot, err := badgerState.NewStateRoot(fnb.RootBlock, fnb.RootResult, fnb.RootSeal, fnb.RootBlock.Header.View)
+		rootSnapshot, err := inmem.SnapshotFromBootstrapState(fnb.RootBlock, fnb.RootResult, fnb.RootSeal, fnb.RootQC)
 		fnb.MustNot(err).Msg("failed to construct state root")
 
 		fnb.State, err = badgerState.Bootstrap(
@@ -495,11 +511,12 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.DB,
 			fnb.Storage.Headers,
 			fnb.Storage.Seals,
+			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
-			stateRoot,
+			rootSnapshot,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
