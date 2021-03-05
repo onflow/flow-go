@@ -153,26 +153,6 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
-// UNCHECKED requirement: node must be an interim node
-func (n *Node) UpdateInterimNode(lchild, rchild *Node) {
-	var lMaxDepth, rMaxDepth uint16
-	var lRegCount, rRegCount uint64
-	if lchild != nil {
-		lMaxDepth = lchild.maxDepth
-		lRegCount = lchild.regCount
-	}
-	if rchild != nil {
-		rMaxDepth = rchild.maxDepth
-		rRegCount = rchild.regCount
-	}
-
-	n.lChild = lchild
-	n.rChild = rchild
-	n.maxDepth = utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1)
-	n.regCount = lRegCount + rRegCount
-	n.ComputeHash()
-}
-
 // ComputeHash computes the hashValue for the given Node
 // we kept it this way to stay compatible with the previous versions
 func (n *Node) ComputeHash() {

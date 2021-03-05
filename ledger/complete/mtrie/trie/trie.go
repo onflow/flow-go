@@ -165,9 +165,8 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 
 	// No new paths to write
 	if len(paths) == 0 {
-		// check is a compactLeaf is still left
+		// check is a compactLeaf from a higher height is still left
 		if compactLeaf != nil {
-			// TODO: recycle the same node?
 			return node.NewLeaf(compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
 		}
 		return parentNode
@@ -186,9 +185,6 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 				// the case where the leaf can be reused
 				if len(paths) == 1 {
 					if !bytes.Equal(parentNode.Payload().Value, payloads[i].Value) {
-						// NB: if the same node is reused by updating the value and computing the hash,
-						// the storage exhaustion attack mitigation at the end of the function has
-						// to be commented.
 						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
 					}
 					// avoid creating a new node when the same payload is written
@@ -244,7 +240,6 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 	if lChild == lchildParent && rChild == rchildParent {
 		return parentNode
 	}
-
 	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
