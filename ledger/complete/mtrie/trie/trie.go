@@ -36,7 +36,6 @@ import (
 //     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
 	root         *node.Node
-	height       int
 	pathByteSize int
 }
 
@@ -49,7 +48,6 @@ func NewEmptyMTrie(pathByteSize int) (*MTrie, error) {
 	return &MTrie{
 		root:         node.NewEmptyTreeRoot(height),
 		pathByteSize: pathByteSize,
-		height:       height,
 	}, nil
 }
 
@@ -62,9 +60,12 @@ func NewMTrie(root *node.Node) (*MTrie, error) {
 	return &MTrie{
 		root:         root,
 		pathByteSize: pathByteSize,
-		height:       root.Height(),
 	}, nil
 }
+
+// Height returns the height of the trie, which
+// is the height of its root node.
+func (mt *MTrie) Height() int { return mt.root.Height() }
 
 // StringRootHash returns the trie's Hex-encoded root hash.
 // Concurrency safe (as Tries are immutable structures by convention)
@@ -129,7 +130,7 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	}
 
 	// partition step to quick sort the paths
-	partitionIndex := utils.SplitPaths(paths, mt.height-head.Height())
+	partitionIndex := utils.SplitPaths(paths, mt.Height()-head.Height())
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 
 	// must start with the left first, as left payloads have to be appended first
@@ -202,7 +203,7 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 	// in the remaining code: len(paths)>1
 
 	// Split paths and payloads to recurse
-	partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
+	partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.Height()-nodeHeight)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
@@ -210,7 +211,7 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 	var lcompactLeaf, rcompactLeaf *node.Node
 	if compactLeaf != nil {
 		// if yes, check which branch it will go to.
-		if utils.Bit(compactLeaf.Path(), parentTrie.height-nodeHeight) == 0 {
+		if utils.Bit(compactLeaf.Path(), parentTrie.Height()-nodeHeight) == 0 {
 			lcompactLeaf = compactLeaf
 		} else {
 			rcompactLeaf = compactLeaf
@@ -274,7 +275,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	}
 
 	// partition step to quick sort the paths
-	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, mt.height-head.Height())
+	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, mt.Height()-head.Height())
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
@@ -284,7 +285,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height())) // TODO: why not rChild.RegisterCount != 0?
 			if !isDef {                                                                     // in proofs, we only provide non-default value hashes
 				for _, p := range lproofs {
-					utils.SetBit(p.Flags, mt.height-head.Height())
+					utils.SetBit(p.Flags, mt.Height()-head.Height())
 					p.Interims = append(p.Interims, nodeHash)
 				}
 			}
@@ -298,7 +299,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range rproofs {
-					utils.SetBit(p.Flags, mt.height-head.Height())
+					utils.SetBit(p.Flags, mt.Height()-head.Height())
 					p.Interims = append(p.Interims, nodeHash)
 				}
 			}
