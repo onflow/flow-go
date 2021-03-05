@@ -1,5 +1,6 @@
 package unittest
 
+import "C"
 import (
 	"math/rand"
 	"testing"
@@ -114,6 +115,15 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		}
 	}
 
+	// defaults for the EpochSetup event
+	setupDefaults := []func(*flow.EpochSetup){
+		WithParticipants(identities),
+		SetupWithCounter(counter + 1),
+		WithFirstView(finalView + 1),
+		WithFinalView(finalView + 1000),
+	}
+	setup := EpochSetupFixture(append(setupDefaults, builder.setupOpts...)...)
+
 	// build block B, sealing up to and including block A
 	B := BlockWithParentFixture(A)
 	B.SetPayload(flow.Payload{
@@ -121,8 +131,11 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seals:    sealsForPrev,
 	})
 	builder.addBlock(&B)
+
 	// create a receipt for block B, to be included in block C
+	// the receipt for B contains the EpochSetup event
 	receiptB := ReceiptForBlockFixture(&B)
+	receiptB.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
 
 	// insert block C with a receipt for block B, and a seal for the receipt in
 	// block B if there was one
@@ -141,30 +154,29 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// create a receipt for block C, to be included in block D
 	receiptC := ReceiptForBlockFixture(&C)
 
-	// defaults for the EpochSetup event
-	setupDefaults := []func(*flow.EpochSetup){
-		WithParticipants(identities),
-		SetupWithCounter(counter + 1),
-		WithFirstView(finalView + 1),
-		WithFinalView(finalView + 1000),
-	}
-
 	// build block D
-	// D contains a seal for block B and the EpochSetup event, as well as a
-	// receipt for block C
-	setup := EpochSetupFixture(append(setupDefaults, builder.setupOpts...)...)
+	// D contains a seal for block B and a receipt for block C
 	D := BlockWithParentFixture(C.Header)
 	sealForB := Seal.Fixture(
 		Seal.WithResult(&receiptB.ExecutionResult),
-		Seal.WithServiceEvents(setup.ServiceEvent()),
 	)
 	D.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receiptC},
 		Seals:    []*flow.Seal{sealForB},
 	})
 	builder.addBlock(&D)
-	// create receipt for block D
+
+	// defaults for the EpochCommit event
+	commitDefaults := []func(*flow.EpochCommit){
+		CommitWithCounter(counter + 1),
+		WithDKGFromParticipants(setup.Participants),
+	}
+	commit := EpochCommitFixture(append(commitDefaults, builder.commitOpts...)...)
+
+	// create receipt for block D, to be included in block E
+	// the receipt for block D contains the EpochCommit event
 	receiptD := ReceiptForBlockFixture(&D)
+	receiptD.ExecutionResult.ServiceEvents = []flow.ServiceEvent{commit.ServiceEvent()}
 
 	// build block E
 	// E contains a seal for C and a receipt for D
@@ -180,20 +192,12 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// create receipt for block E
 	receiptE := ReceiptForBlockFixture(&E)
 
-	// defaults for the EpochCommit event
-	commitDefaults := []func(*flow.EpochCommit){
-		CommitWithCounter(counter + 1),
-		WithDKGFromParticipants(setup.Participants),
-	}
-
 	// build block F
 	// F contains a seal for block D and the EpochCommit event, as well as a
 	// receipt for block E
-	commit := EpochCommitFixture(append(commitDefaults, builder.commitOpts...)...)
 	F := BlockWithParentFixture(E.Header)
 	sealForD := Seal.Fixture(
 		Seal.WithResult(&receiptD.ExecutionResult),
-		Seal.WithServiceEvents(commit.ServiceEvent()),
 	)
 	F.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receiptE},
