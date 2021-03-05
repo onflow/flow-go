@@ -137,7 +137,7 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 
 	// read values from left and right subtrees in parallel
 	wg := sync.WaitGroup{}
-	parallelRecursionThreshold := 64 // thresold to avoid the parallelization going too deep in the recursion
+	parallelRecursionThreshold := 32 // thresold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) > 0 {
 		if len(lpaths) > parallelRecursionThreshold {
 			wg.Add(1)
@@ -301,6 +301,9 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
+	wg := sync.WaitGroup{}
+	parallelRecursionThreshold := 128 // thresold to avoid the parallelization going too deep in the recursion
+
 	if len(lpaths) > 0 {
 		if rChild := head.RightChild(); rChild != nil { // TODO: is that a sanity check?
 			nodeHash := rChild.Hash()
@@ -312,7 +315,15 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 				}
 			}
 		}
-		mt.proofs(head.LeftChild(), lpaths, lproofs)
+		if len(lpaths) > parallelRecursionThreshold {
+			wg.Add(1)
+			go func() {
+				mt.proofs(head.LeftChild(), lpaths, lproofs)
+				wg.Done()
+			}()
+		} else {
+			mt.proofs(head.LeftChild(), lpaths, lproofs)
+		}
 	}
 
 	if len(rpaths) > 0 {
@@ -326,8 +337,17 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 				}
 			}
 		}
-		mt.proofs(head.RightChild(), rpaths, rproofs)
+		if len(lpaths) > parallelRecursionThreshold {
+			wg.Add(1)
+			go func() {
+				mt.proofs(head.RightChild(), rpaths, rproofs)
+				wg.Done()
+			}()
+		} else {
+			mt.proofs(head.RightChild(), rpaths, rproofs)
+		}
 	}
+	wg.Wait()
 }
 
 // Equals compares two tries for equality.

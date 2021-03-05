@@ -233,7 +233,6 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 			// handles duplicated keys
 			pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
 		}
-
 	}
 
 	stateTrie, err := f.GetTrie(r.RootHash)
