@@ -190,7 +190,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	err := e.indexer.Index(block.Payload.Receipts)
 	if err != nil {
 		// TODO: consider aborting the process
-		log.Error().Err(err).Msg("could not index receipts for block")
+		log.Fatal().Err(err).Msg("could not index receipts for block")
 	}
 
 	// performs chunk assigment on each receipt and pushes the assigned chunks to the
