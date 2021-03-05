@@ -154,7 +154,9 @@ func demo() {
 				vc.OnChunksAssigned(rand.Int() % 10)
 			})
 			tryRandomCall(vc.OnChunkProcessed)
-			tryRandomCall(vc.OnFinalizedBlockReceived)
+			tryRandomCall(func() {
+				vc.OnAssignerProcessFinalizedBlock(uint64(i))
+			})
 
 			// finder
 			tryRandomCall(vc.OnExecutionReceiptReceived)
