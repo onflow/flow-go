@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
@@ -165,4 +166,11 @@ func (h *Headers) IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) 
 
 func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
 	return operation.RetryOnConflict(h.db.Update, h.chunkIDCache.Put(chunkID, headerID))
+}
+
+func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
 }
