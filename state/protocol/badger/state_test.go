@@ -30,7 +30,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		block.Header.ParentID = unittest.IdentifierFixture()
 	})
 
-	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.State) {
+	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		metrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(metrics, db)
@@ -166,7 +166,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 			}
 		})
 
-		bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
 			require.NoError(t, err)
 			unittest.AssertSnapshotsEqual(t, after, state.Final())
 		})

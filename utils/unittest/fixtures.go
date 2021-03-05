@@ -9,6 +9,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 
@@ -1070,7 +1071,7 @@ func VoteFixture() *hotstuff.Vote {
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants
+		setup.Participants = participants.Order(order.ByNodeIDAsc)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
