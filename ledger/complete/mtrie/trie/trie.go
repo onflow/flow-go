@@ -152,7 +152,7 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads)
+	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, nil)
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -161,17 +161,23 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 }
 
 func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
-	paths []ledger.Path, payloads []ledger.Payload) *node.Node {
+	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node) *node.Node {
 
-	if len(paths) == 0 { // We are not changing any values in this sub-trie => return parent trie
+	// No new paths to write
+	if len(paths) == 0 {
+		// check is a compactLeaf is still left
+		if compactLeaf != nil {
+			// TODO: recycle the same node?
+			return node.NewLeaf(compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
+		}
 		return parentNode
 	}
 
-	if len(paths) == 1 && parentNode == nil {
+	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
 		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
 	}
 
-	if parentNode != nil && parentNode.IsLeaf() {
+	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
 		// check if the parent path node is among the updated paths
 		parentPath := parentNode.Path()
 		found := false
@@ -179,13 +185,13 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 			if bytes.Equal(p, parentPath) {
 				// the case where the leaf can be reused
 				if len(paths) == 1 {
-					// avoid creating a new node when the same payload is written
 					if !bytes.Equal(parentNode.Payload().Value, payloads[i].Value) {
 						// NB: if the same node is reused by updating the value and computing the hash,
 						// the storage exhaustion attack mitigation at the end of the function has
 						// to be commented.
 						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
 					}
+					// avoid creating a new node when the same payload is written
 					return parentNode
 				}
 				found = true
@@ -193,50 +199,52 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 			}
 		}
 		if !found {
-			paths = append(paths, parentNode.Path())
-			payloads = append(payloads, *parentNode.Payload())
+			compactLeaf = parentNode
 		}
 	}
 
-	// Split paths and payloads to recurse
-	/*partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
-	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
-	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]*/
-	lpaths, lpayloads, rpaths, rpayloads := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
-
-	var lChild, rChild *node.Node
-	wg := sync.WaitGroup{}
-
 	// in the remaining code: len(paths)>1
-	if parentNode == nil {
-		newInterimNode := node.NewNode(nodeHeight, nil, nil, nil, nil, nil, 0, 0)
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			lChild = parentTrie.update(nodeHeight-1, nil, lpaths, lpayloads)
-		}()
-		rChild = parentTrie.update(nodeHeight-1, nil, rpaths, rpayloads)
-		wg.Wait()
+	// Split paths and payloads to recurse
+	partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.height-nodeHeight)
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
-		newInterimNode.UpdateInterimNode(lChild, rChild)
-		return newInterimNode
+	// check if there is a compact leaf that needs to get deep to height 0
+	var lcompactLeaf, rcompactLeaf *node.Node
+	if compactLeaf != nil {
+		// if yes, check which branch it will go to.
+		if utils.Bit(compactLeaf.Path(), parentTrie.height-nodeHeight) == 0 {
+			lcompactLeaf = compactLeaf
+		} else {
+			rcompactLeaf = compactLeaf
+		}
 	}
 
-	// in the remaining code: parentNode != nil
+	// set the parent node children
+	var lchildParent, rchildParent *node.Node
+	if parentNode != nil {
+		lchildParent = parentNode.LeftChild()
+		rchildParent = parentNode.RightChild()
+	}
+
+	// recurse over each branch
+	var lChild, rChild *node.Node
+	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		lChild = parentTrie.update(nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
+		lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
 	}()
-	rChild = parentTrie.update(nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
+	rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
 	wg.Wait()
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
 	// payload is re-written at a register.
-	if lChild == parentNode.LeftChild() && rChild == parentNode.RightChild() {
+	if lChild == lchildParent && rChild == rchildParent {
 		return parentNode
 	}
+
 	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
