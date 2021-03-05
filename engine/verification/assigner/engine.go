@@ -173,8 +173,8 @@ func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	})
 }
 
-// processFinalizedBlock indexes the execution receipts included in the block, and handles their chunk assignments.
-// Once it is done handling all the receipts in the block, it notifies the block consumer.
+// processFinalizedBlock indexes the execution receipts included in the block, performs chunk assignment on its result, and
+// processes the chunks assigned to this verification node by pushing them to the chunks consumer.
 func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	blockID := block.ID()
 	// we should always notify block consumer before returning.
@@ -193,6 +193,8 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		log.Error().Err(err).Msg("could not index receipts for block")
 	}
 
+	// performs chunk assigment on each receipt and pushes the assigned chunks to the
+	// chunks queue.
 	for _, receipt := range block.Payload.Receipts {
 		chunkList, err := e.receiptChunkAssignmentWithTracing(ctx, receipt, blockID)
 		resultID := receipt.ExecutionResult.ID()
