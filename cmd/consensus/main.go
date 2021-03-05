@@ -459,7 +459,7 @@ func main() {
 			}
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			signerStore := signature.NewEpochAwareSignerStore(node.Storage.Setups, node.Storage.DKGKeys)
+			signerStore := signature.NewEpochAwareSignerStore(node.State, node.Storage.DKGKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
