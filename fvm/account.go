@@ -19,7 +19,8 @@ func getAccount(
 	programs *Programs,
 	address flow.Address,
 ) (*flow.Account, error) {
-	accounts := state.NewAccounts(st)
+	stm := state.NewStateManager(st)
+	accounts := state.NewAccounts(stm)
 
 	account, err := accounts.Get(address)
 	if err != nil {

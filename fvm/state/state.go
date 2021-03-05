@@ -14,9 +14,6 @@ const (
 
 type StateOption func(st *State) *State
 
-type StateProvider interface {
-	State() *State
-}
 type State struct {
 	ledger                Ledger
 	parent                *State
