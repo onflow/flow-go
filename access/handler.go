@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/access"
@@ -33,6 +34,11 @@ func (h *Handler) Ping(ctx context.Context, _ *access.PingRequest) (*access.Ping
 	}
 
 	return &access.PingResponse{}, nil
+}
+
+func (h *Handler) GetLatestProtocolStateSnapshot(_ context.Context,
+	_ *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	return nil, fmt.Errorf("unimplemented method")
 }
 
 func (h *Handler) GetNetworkParameters(

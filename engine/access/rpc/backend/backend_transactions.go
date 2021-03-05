@@ -205,7 +205,17 @@ func (b *backendTransactions) GetTransactionResult(
 	if txErr != nil {
 		if status.Code(txErr) == codes.NotFound {
 			// Tx not found. If we have historical Sporks setup, lets look through those as well
-			return b.getHistoricalTransactionResult(ctx, txID)
+			historicalTxResult, err := b.getHistoricalTransactionResult(ctx, txID)
+			if err != nil {
+				// if tx not found in old access nodes either, then assume that the tx was submitted to a different AN
+				// and return status as unknown
+				status := flow.TransactionStatusUnknown
+				return &access.TransactionResult{
+					Status:     status,
+					StatusCode: uint(status),
+				}, nil
+			}
+			return historicalTxResult, nil
 		}
 		return nil, txErr
 	}
@@ -217,7 +227,7 @@ func (b *backendTransactions) GetTransactionResult(
 	}
 
 	// derive status of the transaction
-	status, err := b.DeriveTransactionStatus(tx, executed)
+	status, err := b.deriveTransactionStatus(tx, executed)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
@@ -232,8 +242,8 @@ func (b *backendTransactions) GetTransactionResult(
 	}, nil
 }
 
-// DeriveTransactionStatus derives the transaction status based on current protocol state
-func (b *backendTransactions) DeriveTransactionStatus(
+// deriveTransactionStatus derives the transaction status based on current protocol state
+func (b *backendTransactions) deriveTransactionStatus(
 	tx *flow.TransactionBody,
 	executed bool,
 ) (flow.TransactionStatus, error) {

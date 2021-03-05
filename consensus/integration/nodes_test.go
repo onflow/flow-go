@@ -228,7 +228,10 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, metrics, tracer, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, fullState, prov, cache, syncCore)
+	compCore, err := compliance.NewCore(log, metrics, tracer, metrics, metrics, cleaner, headersDB, payloadsDB, fullState, cache, syncCore)
+	require.NoError(t, err)
+
+	comp, err := compliance.NewEngine(log, net, local, prov, compCore)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine

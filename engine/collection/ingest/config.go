@@ -25,7 +25,7 @@ func DefaultConfig() Config {
 		ExpiryBuffer:          flow.DefaultTransactionExpiryBuffer,
 		MaxGasLimit:           flow.DefaultMaxGasLimit,
 		CheckScriptsParse:     true,
-		MaxAddressIndex:       1_000_000,
+		MaxAddressIndex:       10_000_000,
 		PropagationRedundancy: 2,
 	}
 }

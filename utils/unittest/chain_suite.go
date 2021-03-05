@@ -258,6 +258,15 @@ func (bc *BaseChainSuite) SetupChain() {
 			return nil
 		},
 	).Maybe() // this call is optional
+	bc.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", mock.Anything).Return(
+		func(blockID flow.Identifier) []*flow.ExecutionReceipt {
+			var receipts []*flow.ExecutionReceipt
+			return receipts
+		},
+		func(blockID flow.Identifier) error {
+			return nil
+		},
+	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~ SETUP BLOCK HEADER STORAGE ~~~~~~~~~~~~~~~~~~~~~ //
 	bc.HeadersDB = &storage.Headers{}

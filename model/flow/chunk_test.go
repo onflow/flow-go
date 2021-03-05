@@ -75,3 +75,32 @@ func TestDistinctChunkIDs_FullChunks(t *testing.T) {
 	// chunks with distinct block ids should have distinct chunk ids
 	require.NotEqual(t, chunkA.ID(), chunkB.ID())
 }
+
+// TestChunkList_Indices evaluates the Indices method of ChunkList on lists of different sizes.
+func TestChunkList_Indices(t *testing.T) {
+	cl := unittest.ChunkListFixture(5, unittest.IdentifierFixture())
+	t.Run("empty chunk subset indices", func(t *testing.T) {
+		// subset of chunk list that is empty should return an empty list
+		subset := flow.ChunkList{}
+		indices := subset.Indices()
+		require.Len(t, indices, 0)
+	})
+
+	t.Run("single chunk subset indices", func(t *testing.T) {
+		// subset of chunk list that contains chunk index of zero, should
+		// return a uint64 slice that only contains chunk index of zero.
+		subset := cl[:1]
+		indices := subset.Indices()
+		require.Len(t, indices, 1)
+		require.Contains(t, indices, uint64(0))
+	})
+
+	t.Run("multiple chunk subset indices", func(t *testing.T) {
+		// subset that only contains even chunk indices, should return
+		// a uint64 slice that only contains even chunk indices
+		subset := flow.ChunkList{cl[0], cl[2], cl[4]}
+		indices := subset.Indices()
+		require.Len(t, indices, 3)
+		require.Contains(t, indices, uint64(0), uint64(2), uint64(4))
+	})
+}
