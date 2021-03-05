@@ -99,7 +99,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 				e.log.Error().
 					Hex("script_hex", code).
 					Str("args", strings.Join(args[:], ",")).
-					Interface("r", r).
+					Interface("recovered", r).
 					Msg("script execution caused runtime panic")
 			}
 		}()
