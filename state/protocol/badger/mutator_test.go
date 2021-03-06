@@ -569,7 +569,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		_, seal, err := rootSnapshot.SealedResult()
+		result, _, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// we should begin the epoch in the staking phase
@@ -585,7 +585,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Finalize(block1.ID())
 		require.Nil(t, err)
 
-		epoch1Setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		epoch1FinalView := epoch1Setup.FinalView
 
 		// add a participant for the next epoch
@@ -760,7 +760,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		_, seal, err := rootSnapshot.SealedResult()
+		result, _, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// add two conflicting blocks for each service event to reference
@@ -774,7 +774,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		err = state.Extend(&block2)
 		require.Nil(t, err)
 
-		rootSetup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
 		// create two conflicting epoch setup events for the next epoch (final view differs)
 		nextEpochSetup1 := unittest.EpochSetupFixture(
@@ -854,7 +854,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		_, seal, err := rootSnapshot.SealedResult()
+		result, _, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// add a block for the first seal to reference
@@ -865,7 +865,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		err = state.Finalize(block1.ID())
 		require.Nil(t, err)
 
-		epoch1Setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -1078,7 +1078,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
-		_, seal, err := rootSnapshot.SealedResult()
+		result, _, err := rootSnapshot.SealedResult()
 		require.NoError(t, err)
 
 		// add a block for the first seal to reference
@@ -1089,7 +1089,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		err = state.Finalize(block1.ID())
 		require.Nil(t, err)
 
-		epoch1Setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		epoch1FinalView := epoch1Setup.FinalView
 
 		// add a participant for the next epoch

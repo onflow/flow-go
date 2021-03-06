@@ -187,13 +187,13 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
 
-	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
-		return nil, fmt.Errorf("invalid setup event type (%T)", seal.ServiceEvents[0].Event)
+		return nil, fmt.Errorf("invalid setup event type (%T)", result.ServiceEvents[0].Event)
 	}
-	commit, ok := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+	commit, ok := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 	if !ok {
-		return nil, fmt.Errorf("invalid commit event type (%T)", seal.ServiceEvents[1].Event)
+		return nil, fmt.Errorf("invalid commit event type (%T)", result.ServiceEvents[1].Event)
 	}
 
 	current, err := NewCommittedEpoch(setup, commit)

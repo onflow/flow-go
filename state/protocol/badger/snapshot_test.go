@@ -96,8 +96,8 @@ func TestClusters(t *testing.T) {
 
 	root, result, seal := unittest.BootstrapFixture(identities)
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
-	setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-	commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
 	commit.ClusterQCs = make([]*flow.QuorumCertificate, nClusters)
 	for i := 0; i < nClusters; i++ {
@@ -428,11 +428,11 @@ func TestQuorumCertificate(t *testing.T) {
 func TestSnapshot_EpochQuery(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
-	_, seal, err := rootSnapshot.SealedResult()
+	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
-		epoch1Counter := seal.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
+		epoch1Counter := result.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
 		epoch2Counter := epoch1Counter + 1
 
 		// Prepare an epoch builder, which builds epochs with 6 blocks, A,B,C,D,E,F
@@ -531,7 +531,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	_, seal, err := rootSnapshot.SealedResult()
+	result, _, err := rootSnapshot.SealedResult()
 	require.NoError(t, err)
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
@@ -562,7 +562,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 		// figure out the expected first views of the epochs
 		epoch1FirstView := head.View
-		epoch2FirstView := seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView + 1
+		epoch2FirstView := result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView + 1
 
 		epoch1Heights := []uint64{0, 1, 2, 3, 4, 5}
 		epoch2Heights := []uint64{6, 7, 8, 9, 10, 11}
