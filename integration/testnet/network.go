@@ -74,6 +74,7 @@ type FlowNetwork struct {
 	Containers  map[string]*Container
 	AccessPorts map[string]string
 	root        *flow.Block
+	result      *flow.ExecutionResult
 	seal        *flow.Seal
 }
 
@@ -94,6 +95,11 @@ func (net *FlowNetwork) Root() *flow.Block {
 // Seal returns the root block seal generated for the network.
 func (net *FlowNetwork) Seal() *flow.Seal {
 	return net.seal
+}
+
+// Result returns the root block result generated for the network.
+func (net *FlowNetwork) Result() *flow.ExecutionResult {
+	return net.result
 }
 
 // Start starts the network.
@@ -334,7 +340,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
-	root, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
+	root, result, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
@@ -347,6 +353,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		AccessPorts: make(map[string]string),
 		root:        root,
 		seal:        seal,
+		result:      result,
 	}
 
 	// add each node to the network
@@ -514,7 +521,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.Seal, []ContainerConfig, error) {
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, error) {
 	// Setup as Testnet
 	chainID := flow.Testnet
 	chain := chainID.Chain()
@@ -522,7 +529,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, nil, nil, fmt.Errorf("must specify at least one node")
+		return nil, nil, nil, nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -531,13 +538,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate staking and networking keys for each configured node
 	confs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// run DKG for all consensus nodes
 	dkg, err := runDKG(confs)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// write private key files for each DKG participant
@@ -553,7 +560,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
 
@@ -564,12 +571,12 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		// retrieve private representation of the node
 		private, err := nodeConfig.NodeInfo.Private()
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 
 		err = writeJSON(path, private)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
 
@@ -577,7 +584,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
 	commit, err := run.GenerateExecutionState(trieDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// define root block parameters
@@ -594,23 +601,23 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
 	signerData, err := run.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	qc, err := run.GenerateRootQC(root, signerData)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// generate root blocks for each collector cluster
 	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, confs)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err = rand.Read(randomSource)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	// generate epoch service events
@@ -636,25 +643,25 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootBlock), root)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootQC), qc)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootResult), result)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootSeal), seal)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 
-	return root, seal, confs, nil
+	return root, result, seal, confs, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured
