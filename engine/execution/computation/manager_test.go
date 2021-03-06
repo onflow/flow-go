@@ -161,7 +161,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx)
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -174,10 +174,10 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 type PanickingVM struct {
 }
 
-func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, ledger state.Ledger) error {
+func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, ledger state.Ledger, programs *fvm.Programs) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
-func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, ledger state.Ledger) (*flow.Account, error) {
+func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, ledger state.Ledger, programs *fvm.Programs) (*flow.Account, error) {
 	panic("not expected")
 }
