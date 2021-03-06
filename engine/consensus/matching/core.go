@@ -16,12 +16,10 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	chmodule "github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -759,144 +757,102 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 	return true
 }
 
-// matchResult matches the ResultApprovals in the mempool to the given incorporatedResult
+// hasEnoughApprovals matches the ResultApprovals in the mempool to the given incorporatedResult
 // and determines whether sufficient number of approvals are known for each chunk.
 // It also populates the IncorporatedResult's SignatureCollector.
-func (c *Core) matchResult(incorporatedResult *flow.IncorporatedResult) (bool, int, error) {
-	// the chunk assigment is based on the first block in its fork which contains a receipt that commits to this result.
+// Returns:
+// * bool: true if and only if all chunks have sufficient approvals
+// * int: This value is only set if _some_ chunks have insufficient approvals. In this case,
+//        the int holds the index of the _first_ chunk with insufficient approvals.
+//        Otherwise, this value is -1.
+// * error:
+//   - NoValidChildBlockError: if the block that incorporates `incorporatedResult` does _not_
+//     have a child yet. Then, the chunk assignment cannot be computed.
+//   - All other errors are unexpected and symptoms of internal bugs, uncovered edge cases,
+//     or a corrupted internal node state. These are all fatal failures.
+// Essentially, this method has 3 possible classes of returns:
+// * [false, i, nil] for i=0,1,2,...:
+//   the result has _not_ enough approvals; the first chunk with insufficient approvals has index i
+// * [true, -1, nil]:
+//   all chunks of the result have sufficient number of approvals
+// * [false, -1, err]:
+//   an error has occurred (possible error cases above)
+func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (bool, int, error) {
+	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
 		return false, -1, fmt.Errorf("could not determine chunk assignment: %w", err)
+	}
+
+	// pre-select all authorized Verifiers at the block that incorporates the result
+	authorizedVerifiers, err := c.authorizedVerifiersAtBlock(incorporatedResult.IncorporatedBlockID)
+	if err != nil {
+		return false, -1, fmt.Errorf("could not determine authorized verifiers at block %v: %w", incorporatedResult.IncorporatedBlockID, err)
 	}
 
 	// Internal consistency check:
 	// To be valid, an Execution Receipt must have a system chunk, which is verified by the receipt
 	// validator. Encountering a receipt without any chunks is a fatal internal error, as such receipts
 	// should have never made it into the mempool in the first place. We explicitly check this here,
-	// so we don't have to worry about this edge case below.
+	// so we don't have to worry about this edge case when matching approvals to chunks (below).
 	if len(incorporatedResult.Result.Chunks) == 0 {
 		return false, -1, fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
 
-	// check that each chunk collects enough approvals
+	// Check whether each chunk has enough approvals
+	// return: (false, chunk.Index), indicating the first chunk with insufficient approvals
 	resultID := incorporatedResult.Result.ID()
 	for _, chunk := range incorporatedResult.Result.Chunks {
-		approvals := c.approvals.ByChunk(resultID, chunk.Index) // get all the chunk approvals from mempool
+		// if we already have collected a sufficient number of approvals, we don't need to re-check
+		if incorporatedResult.NumberSignatures(chunk.Index) >= c.requiredApprovalsForSealConstruction {
+			continue
+		}
 
-		validApprovals := uint(0)
+		// go over all approvals from mempool for the current chunk and add them to the incorporatedResult
+		approvals := c.approvals.ByChunk(resultID, chunk.Index)
 		for approverID, approval := range approvals {
-			// skip if the incorporated result already has a signature for that chunk and verifier
-			_, ok := incorporatedResult.GetSignature(chunk.Index, approverID)
-			if ok {
-				validApprovals++
+			// Skip approvals from non-authorized IDs. (Whether a Verification Node is authorized to
+			// check a result is generally fork-dependent, specifically at epoch boundaries. Therefore,
+			// we should _not_ remove approvals just because the verifier is not authorized in this fork)
+			if _, ok := authorizedVerifiers[approverID]; !ok {
 				continue
 			}
-
-			// For now, we just ignore approvals from Verifiers that are invalid for a specific incorporated block.
-			// This is to avoid complications at epoch boundaries, where the Verifiers from teh previous Epoch
-			// are still valid for one fork but not part of the Verifier set for the new Epoch.
-			err := c.ensureStakedNodeWithRole(approverID, incorporatedResult.IncorporatedBlockID, flow.RoleVerification)
-			if err != nil {
-				if engine.IsInvalidInputError(err) {
-					continue
-				}
-				return false, -1, fmt.Errorf("failed to match chunks: %w", err)
-			}
-
-			// skip approval if verifier was not assigned to this chunk.
+			// skip approval of authorized Verifier, it it was _not_ assigned to this chunk
 			if !assignment.HasVerifier(chunk, approverID) {
 				continue
 			}
 
-			// AddReceipt signature to incorporated result so that we don't have to check it again.
+			// add Verifier's approval signature to incorporated result (implementation de-duplicates efficiently)
 			incorporatedResult.AddSignature(chunk.Index, approverID, approval.Body.AttestationSignature)
-			validApprovals++
 		}
 
-		if validApprovals < c.requiredApprovalsForSealConstruction {
+		// abort checking approvals for incorporatedResult if current chunk has insufficient approvals
+		if incorporatedResult.NumberSignatures(chunk.Index) < c.requiredApprovalsForSealConstruction {
 			return false, int(chunk.Index), nil
 		}
 	}
 
+	// all chunks have sufficient approvals
 	return true, -1, nil
 }
 
-func (c *Core) matchChunk(incorporatedResult *flow.IncorporatedResult, block *flow.Header, chunk *flow.Chunk, assignment *chunks.Assignment) (bool, error) {
-
-	// get all the chunk approvals from mempool
-	approvals := c.approvals.ByChunk(incorporatedResult.Result.ID(), chunk.Index)
-
-	validApprovals := uint(0)
-	for approverID, approval := range approvals {
-		// skip if the incorporated result already has a signature for that
-		// chunk and verifier
-		_, ok := incorporatedResult.GetSignature(chunk.Index, approverID)
-		if ok {
-			validApprovals++
-			continue
-		}
-
-		// if the approval comes from a node that wasn't even a staked
-		// verifier at that block, remove the approval from the mempool.
-		err := c.ensureStakedNodeWithRole(approverID, block, flow.RoleVerification)
-		if err != nil {
-			if engine.IsInvalidInputError(err) {
-				_, err = c.approvals.RemApproval(approval)
-				if err != nil {
-					return false, fmt.Errorf("failed to remove approval from mempool: %w", err)
-				}
-				continue
-			}
-			return false, fmt.Errorf("failed to match chunks: %w", err)
-		}
-		// skip approval if verifier was not assigned to this chunk.
-		if !chmodule.IsValidVerifer(assignment, chunk, approverID) {
-			continue
-		}
-
-		// AddReceipt signature to incorporated result so that we don't have to check it again.
-		incorporatedResult.AddSignature(chunk.Index, approverID, approval.Body.AttestationSignature)
-		validApprovals++
-	}
-
-	return validApprovals >= c.requiredApprovalsForSealConstruction, nil
-}
-
-// TODO: to be extracted as a common function in state/protocol/state.go
-// checkIsStakedNodeWithRole checks whether, at the given block, `nodeID`
-//   * is an authorized member of the network
-//   * has _positive_ weight
-//   * and has the expected role
-// Returns the following errors:
-//   * sentinel engine.InvalidInputError if any of the above-listed conditions are violated.
-//   * badger.ErrKeyNotFound if Protocol state information at the given block does not exist
-func (c *Core) ensureStakedNodeWithRole(nodeID flow.Identifier, blockID flow.Identifier, expectedRole flow.Role) error {
-	// get the identity of the origin node
-	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
+// authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
+// The method returns the set of all node IDs that:
+//   * are authorized members of the network at the given block and
+//   * have the Verification role and
+//   * have _positive_ weight and
+//   * are not ejected
+func (c *Core) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Identifier]struct{}, error) {
+	authorizedVerifierList, err := c.state.AtBlockID(blockID).Identities(
+		filter.And(
+			filter.HasRole(flow.RoleVerification),
+			filter.HasStake(true),
+			filter.Not(filter.Ejected),
+		))
 	if err != nil {
-		if protocol.IsIdentityNotFound(err) {
-			return engine.NewInvalidInputErrorf("unknown node identity: %w", err)
-		}
-		// unexpected exception
-		return fmt.Errorf("failed to retrieve node identity: %w", err)
+		return nil, fmt.Errorf("could not determine authorized verifiers at block %v: %w", blockID, err)
 	}
-
-	// check that the origin is a verification node
-	if identity.Role != expectedRole {
-		return engine.NewInvalidInputErrorf("expected node %x to have identity %s but got %s", nodeID, expectedRole, identity.Role)
-	}
-
-	// check if the identity has a stake
-	if identity.Stake == 0 {
-		return engine.NewInvalidInputErrorf("node has zero stake (%x)", identity.NodeID)
-	}
-
-	// check that node was not ejected
-	if identity.Ejected {
-		return engine.NewInvalidInputErrorf("node was ejected (%x)", identity.NodeID)
-	}
-
-	return nil
+	return authorizedVerifierList.Lookup(), nil
 }
 
 // sealResult creates a seal for the incorporated result and adds it to the

@@ -87,6 +87,18 @@ func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifie
 	as.Add(signerID, signature)
 }
 
+// NumberSignatures returns the number of stored (distinct) signatures for the given chunk
+func (ir *IncorporatedResult) NumberSignatures(chunkIndex uint64) uint {
+	ir.chunkApprovalsLock.Lock()
+	defer ir.chunkApprovalsLock.Unlock()
+
+	as, ok := ir.chunkApprovals[chunkIndex]
+	if !ok {
+		return 0
+	}
+	return as.NumberSignatures()
+}
+
 // GetAggregatedSignatures returns all the aggregated signatures orderd by chunk
 // index
 func (ir *IncorporatedResult) GetAggregatedSignatures() []AggregatedSignature {
@@ -165,6 +177,11 @@ func (c *SignatureCollector) Add(signerID Identifier, signature crypto.Signature
 	c.signerIDSet[signerID] = len(c.signerIDs)
 	c.signerIDs = append(c.signerIDs, signerID)
 	c.verifierSignatures = append(c.verifierSignatures, signature)
+}
+
+// NumberSignatures returns the number of stored (distinct) signatures
+func (c *SignatureCollector) NumberSignatures() uint {
+	return uint(len(c.signerIDs))
 }
 
 /* GROUPING allows to split a list or map of incorporated results by some property */
