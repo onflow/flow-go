@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
@@ -28,12 +29,14 @@ import (
 
 // Config defines the configurable options for the access node server
 type Config struct {
-	GRPCListenAddr        string
-	HTTPListenAddr        string
-	ExecutionAddr         string
-	CollectionAddr        string
-	HistoricalAccessAddrs string
-	MaxMsgSize            int // In bytes
+	GRPCListenAddr          string        // the GRPC server address as ip:port
+	HTTPListenAddr          string        // the HTTP web proxy address as ip:port
+	ExecutionAddr           string        // the address of the upstream execution node
+	CollectionAddr          string        // the address of the upstream collection node
+	HistoricalAccessAddrs   string        // the list of all access nodes from previous spork
+	MaxMsgSize              int           // GRPC max message size
+	ExecutionClientTimeout  time.Duration // execution API GRPC client timeout
+	CollectionClientTimeout time.Duration // collection API GRPC client timeout
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -106,8 +109,10 @@ func New(log zerolog.Logger,
 	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
 
 	connectionFactory := &backend.ConnectionFactoryImpl{
-		CollectionGRPCPort: collectionGRPCPort,
-		ExecutionGRPCPort:  executionGRPCPort,
+		CollectionGRPCPort:        collectionGRPCPort,
+		ExecutionGRPCPort:         executionGRPCPort,
+		CollectionNodeGRPCTimeout: time.Duration(config.CollectionClientTimeout),
+		ExecutionNodeGRPCTimeout:  time.Duration(config.ExecutionClientTimeout),
 	}
 
 	backend := backend.New(

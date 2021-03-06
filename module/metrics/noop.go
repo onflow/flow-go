@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 type NoopCollector struct{}
@@ -47,7 +48,7 @@ func (nc *NoopCollector) CacheEntries(resource string, entries uint)            
 func (nc *NoopCollector) CacheHit(resource string)                                               {}
 func (nc *NoopCollector) CacheMiss(resource string)                                              {}
 func (nc *NoopCollector) MempoolEntries(resource string, entries uint)                           {}
-func (nc *NoopCollector) Register(resource string, entriesFunc EntriesFunc) error                { return nil }
+func (nc *NoopCollector) Register(resource string, entriesFunc module.EntriesFunc) error         { return nil }
 func (nc *NoopCollector) HotStuffBusyDuration(duration time.Duration, event string)              {}
 func (nc *NoopCollector) HotStuffIdleDuration(duration time.Duration)                            {}
 func (nc *NoopCollector) HotStuffWaitDuration(duration time.Duration, event string)              {}
@@ -79,7 +80,9 @@ func (nc *NoopCollector) OnVerifiableChunkReceived()                            
 func (nc *NoopCollector) OnChunkDataPackReceived()                                               {}
 func (nc *NoopCollector) OnChunkDataPackRequested()                                              {}
 func (nc *NoopCollector) OnResultApproval()                                                      {}
-func (nc *NoopCollector) LogVerifiableChunkSize(size float64)                                    {}
+func (nc *NoopCollector) OnAssignerProcessFinalizedBlock(height uint64)                          {}
+func (nc *NoopCollector) OnChunksAssigned(chunks int)                                            {}
+func (nc *NoopCollector) OnChunkProcessed()                                                      {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                                    {}

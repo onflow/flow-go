@@ -32,7 +32,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -89,9 +89,13 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 	require.NoError(t, err)
 
+	programsCache, err := NewProgramsCache(10)
+	require.NoError(t, err)
+
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
+		programsCache: programsCache,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -133,9 +137,10 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	engine, err := New(logger, nil, nil, me, nil, vm, execCtx)
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize)
 	require.NoError(t, err)
 
-	_, err = engine.ExecuteScript(script, nil, nil, scriptView)
+	header := unittest.BlockHeaderFixture()
+	_, err = engine.ExecuteScript(script, nil, &header, scriptView)
 	require.NoError(t, err)
 }
