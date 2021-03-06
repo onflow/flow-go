@@ -757,9 +757,14 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 	return true
 }
 
-// hasEnoughApprovals matches the ResultApprovals in the mempool to the given incorporatedResult
-// and determines whether sufficient number of approvals are known for each chunk.
-// It also populates the IncorporatedResult's SignatureCollector.
+// hasEnoughApprovals implements the HAPPY-PATH SEALING-logic. Details:
+// We match ResultApprovals (from the mempool) to the given incorporatedResult
+// and determine whether sufficient number of approvals are known for each chunk.
+// For each of its chunks, the IncorporatedResult tracks internally the added
+// approvals. Here, we go through the ResultApprovals mempool, check whether
+// the approval is from an authorized Verifiers (at the block which incorporates
+// the result). Approvals from all authorized Verifiers are added to
+// IncorporatedResult (which internally de-duplicates Approvals).
 // Returns:
 // * bool: true if and only if all chunks have sufficient approvals
 // * int: This value is only set if _some_ chunks have insufficient approvals. In this case,
