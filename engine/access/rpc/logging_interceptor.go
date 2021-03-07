@@ -14,7 +14,7 @@ func customClientCodeToLevel(c codes.Code) logging.Level {
 		// log successful returns as Debug to avoid excessive logging in info mode
 		return logging.DEBUG
 	}
-	return logging.DefaultClientCodeToLevel(c)
+	return logging.DefaultServerCodeToLevel(c)
 }
 
 // loggingInterceptor creates the logging interceptors
