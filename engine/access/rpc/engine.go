@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"time"
 
+	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -80,12 +83,27 @@ func New(log zerolog.Logger,
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
+
+	var interceptors []grpc.UnaryServerInterceptor
+
+	// if rpc metrics is enabled, first create the grpc metrics interceptor
 	if rpcMetricsEnabled {
 		grpcOpts = append(
 			grpcOpts,
 			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
 			grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 		)
+		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
+	}
+
+	tagsInterceptor := tags.UnaryServerInterceptor(tags.WithFieldExtractor(tags.CodeGenRequestFieldExtractor))
+	loggingInterceptor := logging.UnaryServerInterceptor(grpczerolog.InterceptorLogger(log))
+	interceptors = append(interceptors, tagsInterceptor, loggingInterceptor)
+
+	if len(interceptors) > 0 {
+		// create a chained unary interceptor
+		chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+		grpcOpts = append(grpcOpts, chainedInterceptors)
 	}
 
 	grpcServer := grpc.NewServer(grpcOpts...)
@@ -96,8 +114,8 @@ func New(log zerolog.Logger,
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
-		CollectionNodeGRPCTimeout: time.Duration(config.CollectionClientTimeout),
-		ExecutionNodeGRPCTimeout:  time.Duration(config.ExecutionClientTimeout),
+		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
+		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 	}
 
 	backend := backend.New(
