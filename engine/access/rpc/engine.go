@@ -8,16 +8,12 @@ import (
 	"net/http"
 	"time"
 
-	grpczerolog "github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/tags"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
-
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
@@ -86,11 +82,16 @@ func New(log zerolog.Logger,
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
+	// collect all the interceptors
 	interceptors := []grpc.UnaryServerInterceptor{}
+
 	// if rpc metrics is enabled, first create the grpc metrics interceptor
 	if rpcMetricsEnabled {
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
+
+	// add the logging interceptor
+	interceptors = append(interceptors, loggingInterceptor(log)...)
 
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
@@ -98,10 +99,6 @@ func New(log zerolog.Logger,
 		// append the rate limit interceptor to the list of interceptors
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
-
-	tagsInterceptor := tags.UnaryServerInterceptor(tags.WithFieldExtractor(tags.CodeGenRequestFieldExtractor))
-	loggingInterceptor := logging.UnaryServerInterceptor(grpczerolog.InterceptorLogger(log))
-	interceptors = append(interceptors, tagsInterceptor, loggingInterceptor)
 
 	if len(interceptors) > 0 {
 		// create a chained unary interceptor
