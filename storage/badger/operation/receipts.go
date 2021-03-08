@@ -26,7 +26,8 @@ func LookupOwnExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifi
 	return retrieve(makePrefix(codeOwnBlockReceipt, blockID), receiptID)
 }
 
-// IndexExecutionReceipts inserts an execution receipt ID keyed by block ID
+// IndexExecutionReceipts inserts an execution receipt ID keyed by block ID and receipt ID.
+// one block could have multiple receipts, even if they are from the same executor
 func IndexExecutionReceipts(blockID, receiptID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeAllBlockReceipts, blockID, receiptID), struct{}{})
 }
