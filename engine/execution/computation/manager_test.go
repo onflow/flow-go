@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +23,8 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+var scriptLogThreshold = 1 * time.Second
 
 func TestComputeBlockWithStorage(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
@@ -135,7 +139,7 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	engine, err := New(logger, nil, nil, me, nil, vm, execCtx)
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, scriptLogThreshold)
 	require.NoError(t, err)
 
 	_, err = engine.ExecuteScript(script, nil, nil, scriptView)
@@ -156,7 +160,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx)
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, scriptLogThreshold)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -164,6 +168,30 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	require.Error(t, err)
 
 	require.Contains(t, buffer.String(), "Verunsicherung")
+}
+
+func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
+
+	ctx := fvm.NewContext(zerolog.Nop())
+
+	vm := &LongRunningVM{duration: 2 * time.Millisecond}
+
+	buffer := &bytes.Buffer{}
+	log := zerolog.New(buffer)
+
+	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+	header := unittest.BlockHeaderFixture()
+
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, 1*time.Millisecond)
+	require.NoError(t, err)
+
+	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+
+	require.NoError(t, err)
+
+	require.Contains(t, buffer.String(), "exceeded threshold")
 }
 
 type PanickingVM struct {
@@ -174,5 +202,23 @@ func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, ledger state.L
 }
 
 func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, ledger state.Ledger) (*flow.Account, error) {
+	panic("not expected")
+}
+
+type LongRunningVM struct {
+	duration time.Duration
+}
+
+func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, ledger state.Ledger) error {
+	time.Sleep(l.duration)
+	// satisfy value marshaller
+	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
+		scriptProcedure.Value = cadence.NewVoid()
+	}
+
+	return nil
+}
+
+func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, ledger state.Ledger) (*flow.Account, error) {
 	panic("not expected")
 }
