@@ -53,7 +53,7 @@ const (
 	codeOwnBlockReceipt     = 55 // index mapping block ID to execution receipt ID for execution nodes
 	codeBlockEpochStatus    = 56 // index mapping block ID to epoch status
 	codePayloadReceipts     = 57 // index mapping block ID  to payload receipts
-	codeAllBlockReceipt     = 58 // index mapping of blockID to multiple receipts
+	codeAllBlockReceipts    = 58 // index mapping of blockID to multiple receipts
 	codeIndexBlockByChunkID = 59 // index mapping chunk ID to block ID
 
 	// codes related to epoch information
