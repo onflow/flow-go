@@ -41,12 +41,13 @@ type Config struct {
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
 type Engine struct {
-	unit       *engine.Unit
-	log        zerolog.Logger
-	backend    *backend.Backend // the gRPC service implementation
-	grpcServer *grpc.Server     // the gRPC server
-	httpServer *http.Server
-	config     Config
+	unit        *engine.Unit
+	log         zerolog.Logger
+	backend     *backend.Backend // the gRPC service implementation
+	grpcServer  *grpc.Server     // the gRPC server
+	httpServer  *http.Server
+	config      Config
+	grpcAddress net.Addr
 }
 
 // New returns a new RPC engine.
@@ -67,6 +68,8 @@ func New(log zerolog.Logger,
 	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
+	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -80,12 +83,24 @@ func New(log zerolog.Logger,
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
+
+	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
+	// if rpc metrics is enabled, first create the grpc metrics interceptor
 	if rpcMetricsEnabled {
-		grpcOpts = append(
-			grpcOpts,
-			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
-			grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
-		)
+		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
+	}
+
+	if len(apiRatelimits) > 0 {
+		// create a rate limit interceptor
+		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
+		// append the rate limit interceptor to the list of interceptors
+		interceptors = append(interceptors, rateLimitInterceptor)
+	}
+
+	if len(interceptors) > 0 {
+		// create a chained unary interceptor
+		chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+		grpcOpts = append(grpcOpts, chainedInterceptors)
 	}
 
 	grpcServer := grpc.NewServer(grpcOpts...)
@@ -178,6 +193,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 	})
 }
 
+func (e *Engine) GRPCAddress() net.Addr {
+	return e.grpcAddress
+}
+
 // process processes the given ingestion engine event. Events that are given
 // to this function originate within the expulsion engine on the node with the
 // given origin ID.
@@ -194,9 +213,8 @@ func (e *Engine) process(event interface{}) error {
 // serveGRPC starts the gRPC server
 // When this function returns, the server is considered ready.
 func (e *Engine) serveGRPC() {
-	log := e.log.With().Str("grpc_address", e.config.GRPCListenAddr).Logger()
 
-	log.Info().Msg("starting grpc server on address")
+	e.log.Info().Str("grpc_address", e.config.GRPCListenAddr).Msg("starting grpc server on address")
 
 	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
 	if err != nil {
@@ -204,9 +222,15 @@ func (e *Engine) serveGRPC() {
 		return
 	}
 
-	err = e.grpcServer.Serve(l)
+	// save the actual address on which we are listening (may be different from e.config.GRPCListenAddr if not port
+	// was specified)
+	e.grpcAddress = l.Addr()
+
+	e.log.Debug().Str("grpc_address", e.grpcAddress.String()).Msg("listening on port")
+
+	err = e.grpcServer.Serve(l) // blocking call
 	if err != nil {
-		e.log.Err(err).Msg("fatal error in grpc server")
+		e.log.Fatal().Err(err).Msg("fatal error in grpc server")
 	}
 }
 
