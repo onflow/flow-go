@@ -174,9 +174,16 @@ func (s *State) NewChild() *State {
 	return NewState(s.ledger, WithParent(s))
 }
 
+func (s *State) MergeTouchLogs(child *State) error {
+	// append touches
+	s.logTouches(child.touchLog)
+	// TODO maybe merge read cache for performance on failed cases
+	return nil
+}
+
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(child *State) error {
-	// transfer touches
+	// append touches
 	s.logTouches(child.touchLog)
 
 	// merge read cache
