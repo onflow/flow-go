@@ -140,7 +140,6 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Error(t, err)
 
 	st = state.NewState(ledger, state.WithMaxInteractionSizeAllowed(9))
-
 	stChild := st.NewChild()
 
 	// update - 0
@@ -150,6 +149,11 @@ func TestState_MaxInteraction(t *testing.T) {
 
 	// commit
 	st.MergeState(stChild)
+	require.NoError(t, err)
+	require.Equal(t, st.InteractionUsed(), uint64(0))
+
+	// apply delta to ledger
+	st.ApplyDeltaToLedger()
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(4))
 
