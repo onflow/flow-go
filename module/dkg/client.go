@@ -1,9 +1,13 @@
 package dkg
 
 import (
+	"context"
+	"fmt"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -17,7 +21,7 @@ import (
 type Client struct {
 	accessAddress      string
 	dkgContractAddress string
-	accountAddress     string
+	accountAddress     sdk.Address
 	accountKey         uint
 	flowClient         *client.Client
 	signer             sdkcrypto.Signer
@@ -31,7 +35,7 @@ func NewClient(accessAddress, dkgContractAddress, accountAddress string, account
 		dkgContractAddress: dkgContractAddress,
 		signer:             signer,
 		accountKey:         accountKeyIndex,
-		accountAddress:     accountAddress,
+		accountAddress:     sdk.HexToAddress(accountAddress),
 	}
 }
 
@@ -40,12 +44,17 @@ func NewClient(accessAddress, dkgContractAddress, accountAddress string, account
 // smart contract. An error is returned if the transaction has failed has
 // failed
 func (c *Client) Broadcast(msg messages.DKGMessage) error {
+	account, err := c.flowClient.GetAccount(context.Background(), c.accountAddress, grpc.EmptyCallOption{})
+	if err != nil {
+		return fmt.Errorf("could not get account details: %v", err)
+	}
+
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGMessage()).
 		SetGasLimit(9999).
-		SetProposalKey(b.ServiceKey().Address, b.ServiceKey().Index, b.ServiceKey().SequenceNumber).
-		SetPayer(b.ServiceKey().Address).
-		AddAuthorizer(authorizerAddress)
+		SetProposalKey(c.accountAddress, int(c.accountKey), account.Keys[int(c.accountKey)].SequenceNumber).
+		SetPayer(c.accountAddress).
+		AddAuthorizer(c.accountAddress)
 
 	return nil
 }
