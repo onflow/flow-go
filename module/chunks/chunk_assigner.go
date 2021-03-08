@@ -52,6 +52,10 @@ func (p *ChunkAssigner) Size() uint {
 }
 
 // Assign generates the assignment
+// error returns:
+//  * NoValidChildBlockError indicates that no valid child block is known
+//    (which contains the block's source of randomness)
+//  * unexpected errors should be considered symptoms of internal bugs
 func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
 	// computes a finger print for blockID||resultID||alpha
 	hash, err := fingerPrint(blockID, result.ID(), p.alpha)
@@ -94,7 +98,7 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
 	// TODO: rng could be cached to optimize performance
 
-	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...)
+	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...) // potentially returns NoValidChildBlockError
 	if err != nil {
 		return nil, err
 	}
