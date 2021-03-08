@@ -23,10 +23,9 @@ type ExecutionReceipts interface {
 	ByBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error)
 }
 
-// MyExecutionReceipts holds and indexes Execution Receipts.
-// MyExecutionReceipts is an extension of storage.ExecutionReceipts API.
-// It introduces the notion of "MY execution receipt", from the viewpoint
-// of an individual Execution Node.
+// MyExecutionReceipts reuses the storage.ExecutionReceipts API, but doesn't expose
+// them. Instead, it includes the "My" in the method name in order to highlight the notion
+// of "MY execution receipt", from the viewpoint of an individual Execution Node.
 type MyExecutionReceipts interface {
 	// StoreMyReceipt stores the receipt and marks it as mine (trusted).
 	StoreMyReceipt(receipt *flow.ExecutionReceipt) error

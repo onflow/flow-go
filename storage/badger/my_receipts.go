@@ -15,7 +15,7 @@ import (
 
 // MyExecutionReceipts holds and indexes Execution Receipts.
 // MyExecutionReceipts is implemented as a wrapper around badger.ExecutionReceipts
-// The wrapper ads the ability to "MY execution receipt", from the viewpoint
+// The wrapper adds the ability to "MY execution receipt", from the viewpoint
 // of an individual Execution Node.
 type MyExecutionReceipts struct {
 	genericReceipts *ExecutionReceipts
