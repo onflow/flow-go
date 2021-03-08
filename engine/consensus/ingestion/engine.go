@@ -310,15 +310,15 @@ func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.Collec
 		return nil, engine.NewInvalidInputErrorf("could not get origin (id=%x) identity w.r.t. reference block : %w", originID, err)
 	}
 
-	// if it is a collection or consensus node and a valid epoch participant, it is a valid origin
+	// if it is a collection node and a valid epoch participant, it is a valid origin
 	if filter.And(
-		filter.IsValidCurrentEpochParticipant,                   // staked and un-ejected
-		filter.HasRole(flow.RoleCollection, flow.RoleConsensus), // either collection or consensus
+		filter.IsValidCurrentEpochParticipant,
+		filter.HasRole(flow.RoleCollection),
 	)(origin) {
 		return origin, nil
 	}
 
-	// a consensus node which is a valid epoch participant w.r.t. latest finalized block is also ok
+	// A consensus node which is a valid epoch participant w.r.t. latest finalized block is also ok.
 	// this can happen when we have just passed an epoch boundary and a consensus
 	// node which has just joined sends us a guarantee referencing a block prior
 	// to the epoch boundary.
@@ -326,7 +326,7 @@ func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.Collec
 	// get the origin identity w.r.t. the latest finalized block
 	origin, err = e.state.Final().Identity(originID)
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("could not get origin (id=%x) identity w.r.t. finalized block: %w", err)
+		return nil, engine.NewInvalidInputErrorf("could not get origin (id=%x) identity w.r.t. finalized block: %w", originID, err)
 	}
 
 	if filter.And(
@@ -335,6 +335,8 @@ func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.Collec
 	)(origin) {
 		return origin, nil
 	}
+
+	fmt.Println(origin)
 
 	return nil, engine.NewInvalidInputErrorf("invalid origin (id=%x)", originID)
 }
