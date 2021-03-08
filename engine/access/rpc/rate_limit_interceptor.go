@@ -67,8 +67,7 @@ func (interceptor *rateLimiterInterceptor) unaryServerInterceptor(ctx context.Co
 	// if not found, use the default limiter
 	if limiter == nil {
 
-		// log error since each API should typically have a defined rate limit
-		interceptor.log.Error().Str("method", methodName).Msg("rate limit not defined, using default limit")
+		interceptor.log.Trace().Str("method", methodName).Msg("rate limit not defined, using default limit")
 
 		limiter = interceptor.defaultLimiter
 	}
