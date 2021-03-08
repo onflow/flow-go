@@ -36,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
@@ -459,7 +460,9 @@ func main() {
 			}
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
-			signerStore := signature.NewEpochAwareSignerStore(node.State, node.Storage.DKGKeys)
+			epochLookup := epochs.NewEpochLookup(node.State)
+
+			signerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
