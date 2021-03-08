@@ -51,6 +51,7 @@ func main() {
 		pingEnabled                  bool
 		nodeInfoFile                 string
 		apiRatelimits                map[string]int
+		apiBurstlimits               map[string]int
 		followerState                protocol.MutableState
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
@@ -97,7 +98,8 @@ func main() {
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
 			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
-			flags.StringToIntVar(&apiRatelimits, "rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -233,6 +235,7 @@ func main() {
 				retryEnabled,
 				rpcMetricsEnabled,
 				apiRatelimits,
+				apiBurstlimits,
 			)
 			return rpcEng, nil
 		}).
