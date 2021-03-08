@@ -61,11 +61,12 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 
 		if vmErr != nil {
 			proc.Err = vmErr
-			return nil
+			// TODO we should not break here we should continue for fee deductions
+			break
 		}
 	}
 
-	return nil
+	return st.State().ApplyTouchesToLedger()
 }
 
 type TransactionInvocator struct {
