@@ -49,7 +49,7 @@ type IngestionSuite struct {
 	ingest *Engine
 }
 
-func (is *IngestionSuite) SetupTest() {
+func (suite *IngestionSuite) SetupTest() {
 
 	head := unittest.BlockHeaderFixture()
 	head.Height = 2 * flow.DefaultTransactionExpiry
@@ -60,25 +60,25 @@ func (is *IngestionSuite) SetupTest() {
 	coll := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exec := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-	is.con1ID = con1.NodeID
-	is.con2ID = con2.NodeID
-	is.con3ID = con3.NodeID
-	is.collID = coll.NodeID
-	is.execID = exec.NodeID
+	suite.con1ID = con1.NodeID
+	suite.con2ID = con2.NodeID
+	suite.con3ID = con3.NodeID
+	suite.collID = coll.NodeID
+	suite.execID = exec.NodeID
 
 	clusters := flow.ClusterList{flow.IdentityList{coll}}
 
 	identities := flow.IdentityList{con1, con2, con3, coll, exec}
-	is.finalIdentities = identities.Copy()
-	is.refIdentities = identities.Copy()
+	suite.finalIdentities = identities.Copy()
+	suite.refIdentities = identities.Copy()
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 	state := &mockprotocol.State{}
 	final := &mockprotocol.Snapshot{}
 	ref := &mockprotocol.Snapshot{}
-	is.query = &mockprotocol.EpochQuery{}
-	is.epoch = &mockprotocol.Epoch{}
+	suite.query = &mockprotocol.EpochQuery{}
+	suite.epoch = &mockprotocol.Epoch{}
 	headers := &mockstorage.Headers{}
 	me := &mockmodule.Local{}
 	pool := &mockmempool.Guarantees{}
@@ -91,11 +91,11 @@ func (is *IngestionSuite) SetupTest() {
 	final.On("Head").Return(&head, nil)
 	final.On("Identity", mock.Anything).Return(
 		func(nodeID flow.Identifier) *flow.Identity {
-			identity, _ := is.finalIdentities.ByNodeID(nodeID)
+			identity, _ := suite.finalIdentities.ByNodeID(nodeID)
 			return identity
 		},
 		func(nodeID flow.Identifier) error {
-			_, ok := is.finalIdentities.ByNodeID(nodeID)
+			_, ok := suite.finalIdentities.ByNodeID(nodeID)
 			if !ok {
 				return protocol.IdentityNotFoundError{NodeID: nodeID}
 			}
@@ -104,22 +104,22 @@ func (is *IngestionSuite) SetupTest() {
 	)
 	final.On("Identities", mock.Anything).Return(
 		func(selector flow.IdentityFilter) flow.IdentityList {
-			return is.finalIdentities.Filter(selector)
+			return suite.finalIdentities.Filter(selector)
 		},
 		nil,
 	)
-	ref.On("Epochs").Return(is.query)
-	is.query.On("Current").Return(is.epoch)
-	is.epoch.On("Clustering").Return(clusters, nil)
+	ref.On("Epochs").Return(suite.query)
+	suite.query.On("Current").Return(suite.epoch)
+	suite.epoch.On("Clustering").Return(clusters, nil)
 
 	state.On("AtBlockID", mock.Anything).Return(ref)
 	ref.On("Identity", mock.Anything).Return(
 		func(nodeID flow.Identifier) *flow.Identity {
-			identity, _ := is.refIdentities.ByNodeID(nodeID)
+			identity, _ := suite.refIdentities.ByNodeID(nodeID)
 			return identity
 		},
 		func(nodeID flow.Identifier) error {
-			_, ok := is.refIdentities.ByNodeID(nodeID)
+			_, ok := suite.refIdentities.ByNodeID(nodeID)
 			if !ok {
 				return protocol.IdentityNotFoundError{NodeID: nodeID}
 			}
@@ -128,7 +128,7 @@ func (is *IngestionSuite) SetupTest() {
 	)
 
 	// we use the first consensus node as our local identity
-	me.On("NodeID").Return(is.con1ID)
+	me.On("NodeID").Return(suite.con1ID)
 
 	// we need to return the head as it's also used as reference block
 	headers.On("ByBlockID", head.ID()).Return(&head, nil)
@@ -148,250 +148,250 @@ func (is *IngestionSuite) SetupTest() {
 		con:     con,
 	}
 
-	is.head = &head
-	is.final = final
-	is.ref = ref
-	is.headers = headers
-	is.pool = pool
-	is.con = con
-	is.ingest = ingest
+	suite.head = &head
+	suite.final = final
+	suite.ref = ref
+	suite.headers = headers
+	suite.pool = pool
+	suite.con = con
+	suite.ingest = ingest
 }
 
-func (is *IngestionSuite) TestOnGuaranteeNewFromCollection() {
+func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.collID}
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is not part of the memory pool yet
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(true)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
 
-	is.expectGuaranteePublished(guarantee)
+	suite.expectGuaranteePublished(guarantee)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().NoError(err, "should not error on new guarantee from collection node")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().NoError(err, "should not error on new guarantee from collection node")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
-func (is *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
+func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.collID}
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is not part of the memory pool yet
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(true)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := is.ingest.onGuarantee(is.con1ID, guarantee)
-	is.Assert().NoError(err, "should not error on new guarantee from consensus node")
+	err := suite.ingest.onGuarantee(suite.con1ID, guarantee)
+	suite.Assert().NoError(err, "should not error on new guarantee from consensus node")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
-func (is *IngestionSuite) TestOnGuaranteeOld() {
+func (suite *IngestionSuite) TestOnGuaranteeOld() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.collID}
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is part of the memory pool
-	is.pool.On("Has", guarantee.ID()).Return(true)
-	is.pool.On("Add", guarantee).Return(true)
+	suite.pool.On("Has", guarantee.ID()).Return(true)
+	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().NoError(err, "should not error on old guarantee")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().NoError(err, "should not error on old guarantee")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertNotCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
-func (is *IngestionSuite) TestOnGuaranteeNotAdded() {
+func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.collID}
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is not already part of the memory pool
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().NoError(err, "should not error when guarantee was already added")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().NoError(err, "should not error when guarantee was already added")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
-func (is *IngestionSuite) TestOnGuaranteeNoGuarantor() {
+func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = nil
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is part of the memory pool
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().Error(err, "should error with missing guarantor")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().Error(err, "should error with missing guarantor")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertNotCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
-func (is *IngestionSuite) TestOnGuaranteeInvalidRole() {
+func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.execID}
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.SignerIDs = []flow.Identifier{suite.execID}
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is part of the memory pool
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().Error(err, "should error with missing guarantor")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().Error(err, "should error with missing guarantor")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertNotCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
-func (is *IngestionSuite) TestOnGuaranteeExpired() {
+func (suite *IngestionSuite) TestOnGuaranteeExpired() {
 
 	// create an alternative block
 	header := unittest.BlockHeaderFixture()
-	header.Height = is.head.Height - flow.DefaultTransactionExpiry - 1
-	is.headers.On("ByBlockID", header.ID()).Return(&header, nil)
+	header.Height = suite.head.Height - flow.DefaultTransactionExpiry - 1
+	suite.headers.On("ByBlockID", header.ID()).Return(&header, nil)
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.collID}
+	guarantee.SignerIDs = []flow.Identifier{suite.collID}
 	guarantee.ReferenceBlockID = header.ID()
 
 	// the guarantee is part of the memory pool
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().Error(err, "should error with expired collection")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().Error(err, "should error with expired collection")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertNotCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
-func (is *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
+func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.collID, unittest.IdentifierFixture()}
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.SignerIDs = []flow.Identifier{suite.collID, unittest.IdentifierFixture()}
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is not part of the memory pool
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().Error(err, "should error with invalid guarantor")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().Error(err, "should error with invalid guarantor")
 
 	// check that the guarantee has not been added to the mempool
-	is.pool.AssertNotCalled(is.T(), "Add", guarantee)
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
 // test that just after an epoch boundary we still accept guarantees from collectors
 // in clusters from the previous epoch (and collectors which are leaving the network
 // at this epoch boundary).
-func (is *IngestionSuite) TestOnGuaranteeEpochEnd() {
+func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 
 	// in the finalized state the collectors has 0 stake but is not ejected
 	// this is what happens when we finalize the final block of the epoch during
 	// which this node requested to unstake
-	colID, ok := is.finalIdentities.ByNodeID(is.collID)
-	is.Require().True(ok)
+	colID, ok := suite.finalIdentities.ByNodeID(suite.collID)
+	suite.Require().True(ok)
 	colID.Stake = 0
 
 	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{is.collID}
-	guarantee.ReferenceBlockID = is.head.ID()
+	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is not part of the memory pool
-	is.pool.On("Has", guarantee.ID()).Return(false)
-	is.pool.On("Add", guarantee).Return(true)
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
 
-	is.expectGuaranteePublished(guarantee)
+	suite.expectGuaranteePublished(guarantee)
 
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary
-	err := is.ingest.onGuarantee(is.collID, guarantee)
-	is.Assert().NoError(err, "should not error with collector from ending epoch")
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().NoError(err, "should not error with collector from ending epoch")
 
 	// check that the guarantee has been added to the mempool
-	is.pool.AssertExpectations(is.T())
+	suite.pool.AssertExpectations(suite.T())
 
 	// check that the Publish call was called
-	is.con.AssertExpectations(is.T())
+	suite.con.AssertExpectations(suite.T())
 }
 
 // expectGuaranteePublished creates an expectation on the Conduit mock that the
 // guarantee should be published to the consensus nodes
-func (is *IngestionSuite) expectGuaranteePublished(guarantee *flow.CollectionGuarantee) {
+func (suite *IngestionSuite) expectGuaranteePublished(guarantee *flow.CollectionGuarantee) {
 
 	// check that we call the submit with the correct consensus node IDs
-	is.con.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
+	suite.con.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			nodeID1 := args.Get(1).(flow.Identifier)
 			nodeID2 := args.Get(2).(flow.Identifier)
-			is.Assert().ElementsMatch([]flow.Identifier{nodeID1, nodeID2}, []flow.Identifier{is.con2ID, is.con3ID})
+			suite.Assert().ElementsMatch([]flow.Identifier{nodeID1, nodeID2}, []flow.Identifier{suite.con2ID, suite.con3ID})
 		},
 	).Return(nil).Once()
 }
