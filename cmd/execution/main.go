@@ -85,6 +85,7 @@ func main() {
 		syncFast              bool
 		syncThreshold         int
 		extensiveLog          bool
+		scriptLogThreshold    time.Duration
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -100,6 +101,7 @@ func main() {
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
+			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
@@ -145,6 +147,7 @@ func main() {
 				vm,
 				vmCtx,
 				cadenceExecutionCache,
+				scriptLogThreshold,
 			)
 			computationManager = manager
 
