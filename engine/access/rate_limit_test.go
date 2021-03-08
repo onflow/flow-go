@@ -169,9 +169,9 @@ func (suite *RateLimitTestSuite) TestRatelimitingWithBurst() {
 	req := &accessproto.PingRequest{}
 	ctx := context.Background()
 
-	// expect rpc.DefaultBurst number of upstream calls
-	suite.execClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(rpc.DefaultBurst)
-	suite.collClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(rpc.DefaultBurst)
+	// expect rpc.defaultBurst number of upstream calls
+	suite.execClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(suite.burstLimit)
+	suite.collClient.On("Ping", mock.Anything, mock.Anything).Return(nil, nil).Times(suite.burstLimit)
 
 	requestCnt := 0
 	// generate a permissible burst of request and assert that they succeed

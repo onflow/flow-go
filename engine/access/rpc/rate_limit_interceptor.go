@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var defaultRateLimit = 1000 // aggregate default rate limit for all unspecified API calls
-var DefaultBurst = 100      // default burst limit (calls made at the same time) for an API
+const defaultRateLimit = 1000 // aggregate default rate limit for all unspecified API calls
+const defaultBurst = 100      // default burst limit (calls made at the same time) for an API
 
 // rateLimiterInterceptor rate limits the
 type rateLimiterInterceptor struct {
@@ -25,15 +25,17 @@ type rateLimiterInterceptor struct {
 	methodLimiterMap map[string]*rate.Limiter
 }
 
+// NewRateLimiterInterceptor creates a new rate limiter interceptor with the defined per second rate limits and the
+// optional burst limit for each API.
 func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int, apiBurstLimits map[string]int) *rateLimiterInterceptor {
 
-	defaultLimiter := rate.NewLimiter(rate.Limit(defaultRateLimit), DefaultBurst)
+	defaultLimiter := rate.NewLimiter(rate.Limit(defaultRateLimit), defaultBurst)
 	methodLimiterMap := make(map[string]*rate.Limiter, len(apiRateLimits))
 
 	// read rate limit values for each API and create a limiter for each
 	for api, limit := range apiRateLimits {
 		// if a burst limit is defined for this api, use that else use the default
-		burst := DefaultBurst
+		burst := defaultBurst
 		if b, ok := apiBurstLimits[api]; ok {
 			burst = b
 		}
