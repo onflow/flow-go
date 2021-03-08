@@ -198,13 +198,14 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			e.log.Error().Msg(chFault.String())
+			// TODO raise challenge
+			e.log.Warn().Msg(chFault.String())
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
-			e.log.Error().Msg(chFault.String())
+			e.log.Warn().Msg(chFault.String())
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
 				chFault, chFault.String())
