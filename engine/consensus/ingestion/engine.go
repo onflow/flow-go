@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // Engine represents the ingestion engine, used to funnel collections from a
@@ -145,67 +144,39 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	childSpan := e.tracer.StartSpanFromParent(span, trace.CONIngOnCollectionGuarantee)
 	defer childSpan.Finish()
 
+	guaranteeID := guarantee.ID()
+
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.Entity(guarantee)).
+		Hex("collection_id", guaranteeID[:]).
 		Int("signers", len(guarantee.SignerIDs)).
 		Logger()
 
 	log.Info().Msg("collection guarantee received")
 
 	// skip collection guarantees that are already in our memory pool
-	exists := e.pool.Has(guarantee.ID())
+	exists := e.pool.Has(guaranteeID)
 	if exists {
 		log.Debug().Msg("skipping known collection guarantee")
 		return nil
 	}
 
-	// ensure there is at least one guarantor
-	guarantors := guarantee.SignerIDs
-	if len(guarantors) == 0 {
-		return engine.NewInvalidInputError("invalid collection guarantee with no guarantors")
-	}
-
-	// get the identity of the origin node, so we can check if it's a valid
-	// source for a collection guarantee (collection or consensus nodes)
-	identity, err := e.state.Final().Identity(originID)
+	// retrieve and validate the sender of the guarantee message
+	origin, err := e.validateOrigin(originID, guarantee)
 	if err != nil {
-		return fmt.Errorf("could not get origin node identity: %w", err)
-	}
-
-	// we only accept guarantees from collection nodes or other consensus nodes
-	if identity.Role != flow.RoleCollection && identity.Role != flow.RoleConsensus {
-		return engine.NewInvalidInputErrorf("invalid origin role for guarantee (%s)", identity.Role)
+		return fmt.Errorf("origin validation error: %w", err)
 	}
 
 	// ensure that collection has not expired
 	err = e.validateExpiry(guarantee)
 	if err != nil {
-		return fmt.Errorf("could not validate guarantee expiry: %w", err)
+		return fmt.Errorf("expiry validation error: %w", err)
 	}
 
-	// get the clusters to assign the guarantee and check if the guarantor is part of it
-	clusters, err := e.state.Final().Epochs().Current().Clustering()
+	// ensure the guarantors are allowed to produce this collection
+	err = e.validateGuarantors(guarantee)
 	if err != nil {
-		return fmt.Errorf("could not get clusters: %w", err)
-	}
-	cluster, _, ok := clusters.ByNodeID(guarantors[0])
-	if !ok {
-		return engine.NewInvalidInputErrorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
-	}
-
-	// NOTE: Eventually we should check the signatures, ensure a quorum of the
-	// cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
-	// version of the follower will be a good fit for this. For now, collection
-	// nodes independently decide when a collection is finalized and we only check
-	// that the guarantors are all from the same cluster.
-
-	// ensure the guarantors are from the same cluster
-	for _, guarantorID := range guarantors {
-		_, exists := cluster.ByNodeID(guarantorID)
-		if !exists {
-			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
-		}
+		return fmt.Errorf("guarantor validation error: %w", err)
 	}
 
 	// at this point, we can add the guarantee to the memory pool
@@ -222,7 +193,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	// if the collection guarantee stems from a collection node, we should propagate it
 	// to the other consensus nodes on the network; we no longer need to care about
 	// fan-out here, as libp2p will take care of the pub-sub pattern adequately
-	if identity.Role != flow.RoleCollection {
+	if origin.Role != flow.RoleCollection {
 		return nil
 	}
 
@@ -238,7 +209,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	// select all the consensus nodes on the network as our targets
 	committee, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
+		filter.IsVotingConsensusCommitteeMember,
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
@@ -251,11 +222,13 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 		return fmt.Errorf("could not send guarantee: %w", err)
 	}
 
-	log.Info().Msg("collection guarantee broadcasted to committee")
+	log.Info().Msg("collection guarantee broadcast to committee")
 
 	return nil
 }
 
+// validateExpiry validates that the collection has not expired w.r.t. the local
+// latest finalized block.
 func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 
 	// get the last finalized header and the reference block header
@@ -280,4 +253,88 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	return nil
+}
+
+// validateGuarantors validates that the guarantors of a collection are valid,
+// in that they are all from the same cluster and that cluster is allowed to
+// produce the given collection w.r.t. the guarantee's reference block.
+func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
+
+	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
+	guarantors := guarantee.SignerIDs
+
+	if len(guarantors) == 0 {
+		return engine.NewInvalidInputError("invalid collection guarantee with no guarantors")
+	}
+
+	// get the clusters to assign the guarantee and check if the guarantor is part of it
+	clusters, err := snapshot.Epochs().Current().Clustering()
+	if err != nil {
+		return fmt.Errorf("could not get clusters: %w", err)
+	}
+	cluster, _, ok := clusters.ByNodeID(guarantors[0])
+	if !ok {
+		return engine.NewInvalidInputErrorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
+	}
+
+	// NOTE: Eventually we should check the signatures, ensure a quorum of the
+	// cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
+	// version of the follower will be a good fit for this. For now, collection
+	// nodes independently decide when a collection is finalized and we only check
+	// that the guarantors are all from the same cluster.
+
+	// ensure the guarantors are from the same cluster
+	clusterLookup := cluster.Lookup()
+	for _, guarantorID := range guarantors {
+		_, exists := clusterLookup[guarantorID]
+		if !exists {
+			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
+		}
+	}
+
+	return nil
+}
+
+// validateOrigin validates that the message has a valid sender (origin). We
+// allow Guarantee messages either from collection nodes or from consensus nodes.
+// Collection nodes must be valid in the identity table w.r.t. the reference
+// block of the collection; consensus nodes must be valid w.r.t. the latest
+// finalized block.
+//
+// Returns the origin identity as validated if validation passes.
+func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.CollectionGuarantee) (*flow.Identity, error) {
+
+	// get the origin identity w.r.t. the collection reference block
+	origin, err := e.state.AtBlockID(guarantee.ReferenceBlockID).Identity(originID)
+	if err != nil && !protocol.IsIdentityNotFound(err) {
+		return nil, engine.NewInvalidInputErrorf("could not get origin (id=%x) identity w.r.t. reference block : %w", originID, err)
+	}
+
+	// if it is a collection or consensus node and a valid epoch participant, it is a valid origin
+	if filter.And(
+		filter.IsValidCurrentEpochParticipant,                   // staked and un-ejected
+		filter.HasRole(flow.RoleCollection, flow.RoleConsensus), // either collection or consensus
+	)(origin) {
+		return origin, nil
+	}
+
+	// a consensus node which is a valid epoch participant w.r.t. latest finalized block is also ok
+	// this can happen when we have just passed an epoch boundary and a consensus
+	// node which has just joined sends us a guarantee referencing a block prior
+	// to the epoch boundary.
+
+	// get the origin identity w.r.t. the latest finalized block
+	origin, err = e.state.Final().Identity(originID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("could not get origin (id=%x) identity w.r.t. finalized block: %w", err)
+	}
+
+	if filter.And(
+		filter.IsValidCurrentEpochParticipant,
+		filter.HasRole(flow.RoleConsensus),
+	)(origin) {
+		return origin, nil
+	}
+
+	return nil, engine.NewInvalidInputErrorf("invalid origin (id=%x)", originID)
 }
