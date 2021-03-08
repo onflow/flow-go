@@ -26,6 +26,7 @@ type Context struct {
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
+	TransactionFeesEnabled           bool
 	CadenceLoggingEnabled            bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
@@ -246,6 +247,14 @@ func WithSetValueHandler(handler SetValueHandler) Option {
 func WithAccountStorageLimit(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.LimitAccountStorage = enabled
+		return ctx
+	}
+}
+
+// WithTransactionFeesEnabled enables or disables charging transaction fees for transactions
+func WithTransactionFeesEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionFeesEnabled = enabled
 		return ctx
 	}
 }

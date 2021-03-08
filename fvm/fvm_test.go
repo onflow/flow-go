@@ -564,6 +564,221 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 	}
 }
 
+func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
+	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
+		return flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(`
+							// This transaction is a template for a transaction that
+							// could be used by anyone to send tokens to another account
+							// that has been set up to receive tokens.
+							//
+							// The withdraw amount and the account from getAccount
+							// would be the parameters to the transaction
+							
+							import FungibleToken from 0x%s
+							import FlowToken from 0x%s
+							
+							transaction(amount: UFix64, to: Address) {
+							
+								// The Vault resource that holds the tokens that are being transferred
+								let sentVault: @FungibleToken.Vault
+							
+								prepare(signer: AuthAccount) {
+							
+									// Get a reference to the signer's stored vault
+									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+										?? panic("Could not borrow reference to the owner's Vault!")
+							
+									// Withdraw tokens from the signer's stored vault
+									self.sentVault <- vaultRef.withdraw(amount: amount)
+								}
+							
+								execute {
+							
+									// Get the recipient's public account object
+									let recipient = getAccount(to)
+							
+									// Get a reference to the recipient's Receiver
+									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
+										.borrow<&{FungibleToken.Receiver}>()
+										?? panic("Could not borrow receiver reference to the recipient's Vault")
+							
+									// Deposit the withdrawn tokens in the recipient's receiver
+									receiverRef.deposit(from: <-self.sentVault)
+								}
+							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+			)
+	}
+
+	getBalance := func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, address flow.Address) uint64 {
+
+		code := []byte(fmt.Sprintf(`
+					import FungibleToken from 0x%s
+					import FlowToken from 0x%s
+					
+					pub fun main(account: Address): UFix64 {
+						let acct = getAccount(account)
+						let vaultRef = acct.getCapability(/public/flowTokenBalance)
+							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+							?? panic("Could not borrow Balance reference to the Vault")
+					
+						return vaultRef.balance
+					}
+				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
+		script := fvm.Script(code).WithArguments(
+			jsoncdc.MustEncode(cadence.NewAddress(address)),
+		)
+		err := vm.Run(ctx, script, ledger, fvm.NewEmptyPrograms())
+		require.NoError(t, err)
+		return script.Value.ToGoValue().(uint64)
+	}
+	t.Run("Transaction fees are deducted from the payer", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			ctx.LimitAccountStorage = true    // this test requires storage limits to be enforced
+			ctx.TransactionFeesEnabled = true // this is what we are testing
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, ledger, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			// fund the new account
+			txBody := transferTokensTx(chain).
+				AddAuthorizer(chain.ServiceAddress()).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(accounts[0])))
+			txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+			txBody.SetPayer(chain.ServiceAddress())
+			err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+			require.NoError(t, err)
+			err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+			require.NoError(t, err)
+			tx := fvm.Transaction(txBody, 0)
+			err = vm.Run(ctx, tx, ledger, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			balanceBefore := getBalance(vm, chain, ctx, ledger, accounts[0])
+
+			// do any transaction that doesnt fail
+			txBody = transferTokensTx(chain).
+				AddAuthorizer(accounts[0]).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(0))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+			txBody.SetProposalKey(accounts[0], 0, 0)
+			txBody.SetPayer(accounts[0])
+			err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
+			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
+			tx = fvm.Transaction(txBody, 1)
+			err = vm.Run(ctx, tx, ledger, programs)
+			require.NoError(t, err)
+			require.NoError(t, tx.Err)
+
+			balanceAfter := getBalance(vm, chain, ctx, ledger, accounts[0])
+			require.Less(t, balanceAfter, balanceBefore, "Balance of the payer after the transaction should be less then before the transaction")
+		}),
+	)
+
+	t.Run("Transaction fails but fees are deducted", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			t.Skip("not ready yet")
+			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, ledger, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			balanceBefore := getBalance(vm, chain, ctx, ledger, accounts[0])
+
+			txBody := transferTokensTx(chain).
+				AddAuthorizer(accounts[0]).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+			txBody.SetProposalKey(accounts[0], 0, 0)
+			txBody.SetPayer(accounts[0])
+
+			err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
+
+			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+
+			err = vm.Run(ctx, tx, ledger, programs)
+			require.NoError(t, err)
+
+			require.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+
+			balanceAfter := getBalance(vm, chain, ctx, ledger, accounts[0])
+
+			require.Less(t, balanceAfter, balanceBefore)
+		}),
+	)
+
+	t.Run("Transaction fails but fees are deducted, unless account is close to 0", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(100),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+	).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+				t.Skip("not ready yet")
+				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, ledger, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				balanceBefore := getBalance(vm, chain, ctx, ledger, accounts[0])
+
+				txBody := transferTokensTx(chain).
+					AddAuthorizer(accounts[0]).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+				txBody.SetProposalKey(accounts[0], 0, 0)
+				txBody.SetPayer(accounts[0])
+
+				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, ledger, programs)
+				require.NoError(t, err)
+
+				require.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+
+				balanceAfter := getBalance(vm, chain, ctx, ledger, accounts[0])
+
+				require.Less(t, balanceAfter, balanceBefore)
+			}),
+	)
+}
+
 func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Parallel()

@@ -28,9 +28,13 @@ func (d *TransactionFeeDeductor) deductFees(
 	st *state.State,
 	programs *Programs,
 ) error {
+	if !ctx.TransactionFeesEnabled {
+		return nil
+	}
+
 	return vm.invokeMetaTransaction(
 		ctx,
-		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),
+		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress(), DefaultTransactionFees.ToGoValue().(uint64)),
 		st,
 		programs,
 	)

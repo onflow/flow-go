@@ -28,7 +28,6 @@ type BootstrapProcedure struct {
 	addressGenerator        flow.AddressGenerator
 
 	accountCreationFee        cadence.UFix64
-	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
 }
 
@@ -74,13 +73,6 @@ func WithAccountCreationFee(fee cadence.UFix64) BootstrapProcedureOption {
 	}
 }
 
-func WithTransactionFee(fee cadence.UFix64) BootstrapProcedureOption {
-	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.transactionFee = fee
-		return bp
-	}
-}
-
 func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.minimumStorageReservation = reservation
@@ -96,7 +88,6 @@ func Bootstrap(
 ) *BootstrapProcedure {
 	bootstrapProcedure := &BootstrapProcedure{
 		serviceAccountPublicKey: serviceAccountPublicKey,
-		transactionFee:          0,
 	}
 
 	for _, applyOption := range opts {
@@ -131,7 +122,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, st *state.Stat
 	}
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
-	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation)
+	b.setupFees(service, b.accountCreationFee, b.minimumStorageReservation)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 	return nil
@@ -274,13 +265,12 @@ func (b *BootstrapProcedure) mintInitialTokens(
 
 func (b *BootstrapProcedure) setupFees(
 	service flow.Address,
-	transactionFee,
 	addressCreationFee,
 	minimumStorageReservation cadence.UFix64,
 ) {
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation),
+		setupFeesTransaction(service, addressCreationFee, minimumStorageReservation),
 		b.st,
 		b.programs,
 	)
@@ -371,7 +361,7 @@ transaction(amount: UFix64) {
 const setupFeesTransactionTemplate = `
 import FlowStorageFees, FlowServiceAccount from 0x%s
 
-transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageReservation: UFix64) {
+transaction(accountCreationFee: UFix64, minimumStorageReservation: UFix64) {
     prepare(service: AuthAccount) {
         let serviceAdmin = service.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
             ?? panic("Could not borrow reference to the flow service admin!");
@@ -379,7 +369,6 @@ transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageRe
         let storageAdmin = service.borrow<&FlowStorageFees.Administrator>(from: /storage/storageFeesAdmin)
             ?? panic("Could not borrow reference to the flow storage fees admin!");
 
-        serviceAdmin.setTransactionFee(transactionFee)
         serviceAdmin.setAccountCreationFee(accountCreationFee)
         storageAdmin.setMinimumStorageReservation(minimumStorageReservation)
     }
@@ -475,14 +464,9 @@ func mintFlowTokenTransaction(
 
 func setupFeesTransaction(
 	service flow.Address,
-	transactionFee,
 	addressCreationFee,
 	minimumStorageReservation cadence.UFix64,
 ) *TransactionProcedure {
-	transactionFeeArg, err := jsoncdc.Encode(transactionFee)
-	if err != nil {
-		panic(fmt.Sprintf("failed to encode transaction fee: %s", err.Error()))
-	}
 	addressCreationFeeArg, err := jsoncdc.Encode(addressCreationFee)
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode address creation fee: %s", err.Error()))
@@ -495,7 +479,6 @@ func setupFeesTransaction(
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(setupFeesTransactionTemplate, service))).
-			AddArgument(transactionFeeArg).
 			AddArgument(addressCreationFeeArg).
 			AddArgument(minimumStorageReservationArg).
 			AddAuthorizer(service),
