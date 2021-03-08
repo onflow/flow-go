@@ -15,17 +15,17 @@ func (d *TransactionFeeDeductor) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	st *state.State,
+	stm *state.StateManager,
 	programs *Programs,
 ) error {
-	return d.deductFees(vm, ctx, proc.Transaction, st, programs)
+	return d.deductFees(vm, ctx, proc.Transaction, stm, programs)
 }
 
 func (d *TransactionFeeDeductor) deductFees(
 	vm *VirtualMachine,
 	ctx Context,
 	tx *flow.TransactionBody,
-	st *state.State,
+	stm *state.StateManager,
 	programs *Programs,
 ) error {
 	if !ctx.TransactionFeesEnabled {
@@ -35,7 +35,7 @@ func (d *TransactionFeeDeductor) deductFees(
 	return vm.invokeMetaTransaction(
 		ctx,
 		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress(), DefaultTransactionFees.ToGoValue().(uint64)),
-		st,
+		stm,
 		programs,
 	)
 }

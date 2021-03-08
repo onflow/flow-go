@@ -13,7 +13,8 @@ import (
 )
 
 func TestContract_DraftFunctionality(t *testing.T) {
-	accounts := state.NewAccounts(state.NewState(state.NewMapLedger()))
+	stm := state.NewStateManager(state.NewState(state.NewMapLedger()))
+	accounts := state.NewAccounts(stm)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
@@ -64,7 +65,8 @@ func TestContract_DraftFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	accounts := state.NewAccounts(state.NewState(state.NewMapLedger()))
+	stm := state.NewStateManager(state.NewState(state.NewMapLedger()))
+	accounts := state.NewAccounts(stm)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
