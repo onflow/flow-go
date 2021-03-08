@@ -200,6 +200,30 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	require.Contains(t, buffer.String(), "exceeded threshold")
 }
 
+func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
+
+	ctx := fvm.NewContext(zerolog.Nop())
+
+	vm := &LongRunningVM{duration: 0}
+
+	buffer := &bytes.Buffer{}
+	log := zerolog.New(buffer)
+
+	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+	header := unittest.BlockHeaderFixture()
+
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, 1*time.Second)
+	require.NoError(t, err)
+
+	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+
+	require.NoError(t, err)
+
+	require.NotContains(t, buffer.String(), "exceeded threshold")
+}
+
 type PanickingVM struct{}
 
 func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
