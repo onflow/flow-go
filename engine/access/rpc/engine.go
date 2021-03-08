@@ -37,6 +37,7 @@ type Config struct {
 	MaxMsgSize              int           // GRPC max message size
 	ExecutionClientTimeout  time.Duration // execution API GRPC client timeout
 	CollectionClientTimeout time.Duration // collection API GRPC client timeout
+
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
