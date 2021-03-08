@@ -23,9 +23,9 @@ func (s *StateManager) Nest() {
 func (s *StateManager) RollUp(merge bool) {
 	// TODO merge the register touches
 	if merge {
-		s.activeState.parent.MergeState(s.activeState)
+		_ = s.activeState.parent.MergeState(s.activeState)
 	} else {
-		s.activeState.parent.MergeTouchLogs(s.activeState)
+		_ = s.activeState.parent.MergeTouchLogs(s.activeState)
 	}
 	// otherwise ignore for now
 	if s.activeState.parent != nil {

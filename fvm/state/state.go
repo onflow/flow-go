@@ -165,7 +165,7 @@ func (s *State) Delete(owner, controller, key string) error {
 func (s *State) Touch(owner, controller, key string) error {
 	s.logTouch(&payload{payloadKey{owner, controller, key}, nil})
 	// TODO we don't need to call the ledger touch, touch can be returned later form the logs
-	err := s.Touch(owner, controller, key)
+	err := s.ledger.Touch(owner, controller, key)
 	return err
 }
 
