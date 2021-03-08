@@ -18,21 +18,26 @@ var DefaultBurst = 100      // default burst limit (calls made at the same time)
 type rateLimiterInterceptor struct {
 	log zerolog.Logger
 
-	// default rate limiter for APIs whose rate limit is not explicitly defined
+	// a shared default rate limiter for APIs whose rate limit is not explicitly defined
 	defaultLimiter *rate.Limiter
 
 	// a map of api and its limiter
 	methodLimiterMap map[string]*rate.Limiter
 }
 
-func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int) *rateLimiterInterceptor {
+func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int, apiBurstLimits map[string]int) *rateLimiterInterceptor {
 
 	defaultLimiter := rate.NewLimiter(rate.Limit(defaultRateLimit), DefaultBurst)
 	methodLimiterMap := make(map[string]*rate.Limiter, len(apiRateLimits))
 
 	// read rate limit values for each API and create a limiter for each
 	for api, limit := range apiRateLimits {
-		methodLimiterMap[api] = rate.NewLimiter(rate.Limit(limit), DefaultBurst)
+		// if a burst limit is defined for this api, use that else use the default
+		burst := DefaultBurst
+		if b, ok := apiBurstLimits[api]; ok {
+			burst = b
+		}
+		methodLimiterMap[api] = rate.NewLimiter(rate.Limit(limit), burst)
 	}
 
 	if len(methodLimiterMap) == 0 {

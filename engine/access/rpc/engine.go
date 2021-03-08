@@ -69,6 +69,7 @@ func New(log zerolog.Logger,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int,
+	apiBurstLimits map[string]int,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -91,7 +92,7 @@ func New(log zerolog.Logger,
 
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
-		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits).unaryServerInterceptor
+		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
 		// append the rate limit interceptor to the list of interceptors
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}

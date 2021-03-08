@@ -53,7 +53,8 @@ type RateLimitTestSuite struct {
 	receipts     *storagemock.ExecutionReceipts
 
 	// test rate limit
-	rateLimit int
+	rateLimit  int
+	burstLimit int
 }
 
 func (suite *RateLimitTestSuite) SetupTest() {
@@ -95,15 +96,19 @@ func (suite *RateLimitTestSuite) SetupTest() {
 
 	// set the rate limit to test with
 	suite.rateLimit = 2
-	// set the default burst
-	rpc.DefaultBurst = 2
+	// set the burst limit to test with
+	suite.burstLimit = 2
 
 	apiRateLimt := map[string]int{
 		"Ping": suite.rateLimit,
 	}
 
+	apiBurstLimt := map[string]int{
+		"Ping": suite.rateLimit,
+	}
+
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.execClient, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt)
+		nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup
@@ -170,7 +175,7 @@ func (suite *RateLimitTestSuite) TestRatelimitingWithBurst() {
 
 	requestCnt := 0
 	// generate a permissible burst of request and assert that they succeed
-	for requestCnt < rpc.DefaultBurst {
+	for requestCnt < suite.burstLimit {
 		resp, err := suite.client.Ping(ctx, req)
 		assert.NoError(suite.T(), err)
 		assert.NotNil(suite.T(), resp)
