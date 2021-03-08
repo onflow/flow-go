@@ -139,6 +139,19 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	return value, s.checkMaxInteraction()
 }
 
+func (s *State) updateDelta(p *payload) {
+	// check if a delta already exist for this key
+	// reduce the bytes to be written
+	if old, ok := s.delta[p.payloadKey]; ok {
+		s.ToBeWrittenCounter--
+		s.TotalBytesToBeWritten -= old.size()
+	}
+
+	s.delta[p.payloadKey] = *p
+	s.ToBeWrittenCounter++
+	s.TotalBytesToBeWritten += p.size()
+}
+
 // Set updates state delta with a register update
 func (s *State) Set(owner, controller, key string, value flow.RegisterValue) error {
 	if err := s.checkSize(owner, controller, key, value); err != nil {
@@ -148,7 +161,9 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	pKey := payloadKey{owner, controller, key}
 	p := payload{pKey, value}
 	s.logTouch(&p)
-	s.delta[pKey] = p
+
+	s.updateDelta(&p)
+
 	address, isAddress := addressFromOwner(owner)
 	if isAddress {
 		s.updatedAddresses[address] = struct{}{}
@@ -164,14 +179,17 @@ func (s *State) Delete(owner, controller, key string) error {
 // We don't need this later, it should be invisible to the cadence
 func (s *State) Touch(owner, controller, key string) error {
 	s.logTouch(&payload{payloadKey{owner, controller, key}, nil})
-	// TODO we don't need to call the ledger touch, touch can be returned later form the logs
-	err := s.ledger.Touch(owner, controller, key)
-	return err
+	return nil
 }
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
-	return NewState(s.ledger, WithParent(s))
+	return NewState(s.ledger,
+		WithParent(s),
+		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
+		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
+		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+	)
 }
 
 func (s *State) MergeTouchLogs(child *State) error {
@@ -192,8 +210,8 @@ func (s *State) MergeState(child *State) error {
 	}
 
 	// apply delta
-	for k, v := range child.delta {
-		s.delta[k] = v
+	for _, v := range child.delta {
+		s.updateDelta(&v)
 	}
 
 	// apply address updates
@@ -291,10 +309,12 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 // LedgerInteraction captures stats on how much an state
 // interacted with the ledger
 type LedgerInteraction struct {
-	ReadCounter       uint64
-	WriteCounter      uint64
-	TotalBytesRead    uint64
-	TotalBytesWritten uint64
+	ReadCounter           uint64
+	ToBeWrittenCounter    uint64
+	WriteCounter          uint64
+	TotalBytesRead        uint64
+	TotalBytesToBeWritten uint64
+	TotalBytesWritten     uint64
 }
 
 func (li *LedgerInteraction) InteractionUsed() uint64 {

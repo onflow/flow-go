@@ -58,6 +58,10 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger, 
 		return err
 	}
 
+	err = st.ApplyTouchesToLedger()
+	if err != nil {
+		return err
+	}
 	return st.ApplyDeltaToLedger()
 }
 

@@ -33,6 +33,15 @@ func (s *StateManager) RollUp(merge bool) {
 	}
 }
 
+func (s *StateManager) RollUpAll(merge bool) {
+	for {
+		if s.activeState == s.startState || s.activeState.parent == nil {
+			break
+		}
+		s.RollUp(merge)
+	}
+}
+
 func (s *StateManager) ApplyStartStateToLedger() error {
 	return s.startState.ApplyDeltaToLedger()
 }
