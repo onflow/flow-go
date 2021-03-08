@@ -44,7 +44,7 @@ type IngestionSuite struct {
 	epoch   *mockprotocol.Epoch
 	headers *mockstorage.Headers
 	pool    *mockmempool.Guarantees
-	con     *mocknetwork.Conduit
+	conduit *mocknetwork.Conduit
 
 	ingest *Engine
 }
@@ -153,7 +153,7 @@ func (suite *IngestionSuite) SetupTest() {
 	suite.ref = ref
 	suite.headers = headers
 	suite.pool = pool
-	suite.con = con
+	suite.conduit = con
 	suite.ingest = ingest
 }
 
@@ -179,7 +179,7 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
@@ -202,7 +202,7 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeOld() {
@@ -225,7 +225,7 @@ func (suite *IngestionSuite) TestOnGuaranteeOld() {
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
@@ -248,7 +248,7 @@ func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
@@ -271,7 +271,7 @@ func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
@@ -294,7 +294,7 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeExpired() {
@@ -322,7 +322,7 @@ func (suite *IngestionSuite) TestOnGuaranteeExpired() {
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
@@ -345,7 +345,7 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 	// check that the submit call was not called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // test that just after an epoch boundary we still accept guarantees from collectors
@@ -379,7 +379,7 @@ func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 	suite.pool.AssertExpectations(suite.T())
 
 	// check that the Publish call was called
-	suite.con.AssertExpectations(suite.T())
+	suite.conduit.AssertExpectations(suite.T())
 }
 
 // expectGuaranteePublished creates an expectation on the Conduit mock that the
@@ -387,7 +387,7 @@ func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 func (suite *IngestionSuite) expectGuaranteePublished(guarantee *flow.CollectionGuarantee) {
 
 	// check that we call the submit with the correct consensus node IDs
-	suite.con.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
+	suite.conduit.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			nodeID1 := args.Get(1).(flow.Identifier)
 			nodeID2 := args.Get(2).(flow.Identifier)
