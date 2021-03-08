@@ -24,6 +24,7 @@ func (s *StateManager) RollUp(merge bool) {
 	// TODO merge the register touches
 	if merge {
 		s.activeState.parent.MergeState(s.activeState)
+		s.activeState = s.activeState.parent
 	}
 	// otherwise ignore for now
 	if s.activeState.parent != nil {
