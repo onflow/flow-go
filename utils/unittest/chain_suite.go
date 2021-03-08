@@ -225,13 +225,12 @@ func (bc *BaseChainSuite) SetupChain() {
 	).Maybe()
 	bc.ReceiptsDB.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) []*flow.ExecutionReceipt {
-			receiptIDs, found := bc.PersistedReceiptsIndex[blockID]
-			if !found {
-				return nil
-			}
 			var receipts []*flow.ExecutionReceipt
-			for _, id := range receiptIDs {
-				receipts = append(receipts, bc.PersistedReceipts[id])
+			receiptIDs, found := bc.PersistedReceiptsIndex[blockID]
+			if found {
+				for _, id := range receiptIDs {
+					receipts = append(receipts, bc.PersistedReceipts[id])
+				}
 			}
 			return receipts
 		},

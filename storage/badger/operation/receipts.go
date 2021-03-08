@@ -29,7 +29,7 @@ func LookupOwnExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifi
 // IndexExecutionReceipts inserts an execution receipt ID keyed by block ID and receipt ID.
 // one block could have multiple receipts, even if they are from the same executor
 func IndexExecutionReceipts(blockID, receiptID flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeAllBlockReceipts, blockID, receiptID), struct{}{})
+	return insert(makePrefix(codeAllBlockReceipts, blockID, receiptID), receiptID)
 }
 
 // LookupExecutionReceipts finds all execution receipts by block ID
@@ -40,26 +40,19 @@ func LookupExecutionReceipts(blockID flow.Identifier, receiptIDs *[]flow.Identif
 
 // receiptIterationFunc returns an in iteration function which returns all receipt IDs found during traversal
 func receiptIterationFunc(receiptIDs *[]flow.Identifier) func() (checkFunc, createFunc, handleFunc) {
-	return func() (checkFunc, createFunc, handleFunc) {
-		var val flow.Identifier
-		check := func(key []byte) bool {
-			if len(key) == len(val)*2+1 {
-				offset := len(val) + 1
-				copy(val[:], key[offset:])
-				return true
-			} else {
-				return false
-			}
-		}
+	check := func(key []byte) bool {
+		return true
+	}
 
-		var dummy struct{}
-		create := func() interface{} {
-			return &dummy
-		}
-		handle := func() error {
-			*receiptIDs = append(*receiptIDs, val)
-			return nil
-		}
+	var receiptID flow.Identifier
+	create := func() interface{} {
+		return &receiptID
+	}
+	handle := func() error {
+		*receiptIDs = append(*receiptIDs, receiptID)
+		return nil
+	}
+	return func() (checkFunc, createFunc, handleFunc) {
 		return check, create, handle
 	}
 }

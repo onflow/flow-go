@@ -1,7 +1,9 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/storage"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -96,7 +98,7 @@ func (r *ExecutionReceipts) byBlockId(blockID flow.Identifier) func(*badger.Txn)
 	return func(tx *badger.Txn) ([]*flow.ExecutionReceipt, error) {
 		var receiptIDs []flow.Identifier
 		err := operation.LookupExecutionReceipts(blockID, &receiptIDs)(tx)
-		if err != nil {
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return nil, fmt.Errorf("could not find receipt index for block: %w", err)
 		}
 

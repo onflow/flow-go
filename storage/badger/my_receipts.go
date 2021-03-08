@@ -41,9 +41,12 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 					return err
 				}
 
-				// if we are storing same receipt we shouldn't error
 				if savedReceiptID == receiptID {
+					// if we are storing same receipt we shouldn't error
 					return nil
+				} else {
+					return fmt.Errorf("could not index receipt %v execution receipt %v already indexed", receiptID,
+						savedReceiptID)
 				}
 			}
 			return err
