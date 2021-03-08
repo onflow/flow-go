@@ -53,6 +53,7 @@ func NewRateLimiterInterceptor(log zerolog.Logger, apiRateLimits map[string]int,
 	}
 }
 
+// unaryServerInterceptor rate limits the given request based on the limits defined when creating the rateLimiterInterceptor
 func (interceptor *rateLimiterInterceptor) unaryServerInterceptor(ctx context.Context,
 	req interface{},
 	info *grpc.UnaryServerInfo,

@@ -68,8 +68,8 @@ func New(log zerolog.Logger,
 	executionGRPCPort uint,
 	retryEnabled bool,
 	rpcMetricsEnabled bool,
-	apiRatelimits map[string]int,
-	apiBurstLimits map[string]int,
+	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
+	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -84,7 +84,7 @@ func New(log zerolog.Logger,
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
 
-	interceptors := []grpc.UnaryServerInterceptor{}
+	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	// if rpc metrics is enabled, first create the grpc metrics interceptor
 	if rpcMetricsEnabled {
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
@@ -97,11 +97,10 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, rateLimitInterceptor)
 	}
 
-	var interceptorsAsServerOption grpc.ServerOption
 	if len(interceptors) > 0 {
 		// create a chained unary interceptor
-		interceptorsAsServerOption = grpc.ChainUnaryInterceptor(interceptors...)
-		grpcOpts = append(grpcOpts, interceptorsAsServerOption)
+		chainedInterceptors := grpc.ChainUnaryInterceptor(interceptors...)
+		grpcOpts = append(grpcOpts, chainedInterceptors)
 	}
 
 	grpcServer := grpc.NewServer(grpcOpts...)
@@ -231,7 +230,7 @@ func (e *Engine) serveGRPC() {
 
 	err = e.grpcServer.Serve(l) // blocking call
 	if err != nil {
-		e.log.Err(err).Msg("fatal error in grpc server")
+		e.log.Fatal().Err(err).Msg("fatal error in grpc server")
 	}
 }
 
