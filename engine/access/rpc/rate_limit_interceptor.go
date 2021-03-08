@@ -76,6 +76,13 @@ func (interceptor *rateLimiterInterceptor) unaryServerInterceptor(ctx context.Co
 	// check if request within limit
 	if !limiter.Allow() {
 
+		// log the limit violation
+		interceptor.log.Trace().
+			Str("method", methodName).
+			Interface("request", req).
+			Float64("limit", float64(limiter.Limit())).
+			Msg("rate limit exceeded")
+
 		// reject the request
 		return nil, status.Errorf(codes.ResourceExhausted, "%s rate limit reached, please retry later.",
 			info.FullMethod)
