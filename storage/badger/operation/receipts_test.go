@@ -48,17 +48,17 @@ func TestReceipts_Index(t *testing.T) {
 
 func TestReceipts_MultiIndex(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		receipt := unittest.ExecutionReceiptFixture()
-		expected := receipt.ID()
-		blockID := receipt.ExecutionResult.BlockID
+		expected := []flow.Identifier{unittest.IdentifierFixture(), unittest.IdentifierFixture()}
+		blockID := unittest.IdentifierFixture()
 
-		err := db.Update(IndexExecutionReceipts(blockID, expected))
-		require.Nil(t, err)
-
+		for _, id := range expected {
+			err := db.Update(IndexExecutionReceipts(blockID, id))
+			require.Nil(t, err)
+		}
 		var actual []flow.Identifier
-		err = db.View(LookupExecutionReceipts(blockID, &actual))
+		err := db.View(LookupExecutionReceipts(blockID, &actual))
 		require.Nil(t, err)
 
-		assert.Equal(t, []flow.Identifier{expected}, actual)
+		assert.ElementsMatch(t, expected, actual)
 	})
 }
