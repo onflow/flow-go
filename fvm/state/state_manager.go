@@ -12,11 +12,16 @@ func NewStateManager(startState *State) *StateManager {
 	}
 }
 
+func (s *StateManager) State() *State {
+	return s.activeState
+}
+
 func (s *StateManager) Nest() {
 	s.activeState = s.activeState.NewChild()
 }
 
 func (s *StateManager) RollUp(merge bool) {
+	// TODO merge the register touches
 	if merge {
 		s.activeState.parent.MergeState(s.activeState)
 	}
@@ -28,8 +33,4 @@ func (s *StateManager) RollUp(merge bool) {
 
 func (s *StateManager) ApplyStartStateToLedger() error {
 	return s.startState.ApplyDeltaToLedger()
-}
-
-func (s *StateManager) State() *State {
-	return s.activeState
 }

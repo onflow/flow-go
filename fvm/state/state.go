@@ -12,12 +12,6 @@ const (
 	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
 )
 
-// construct and return touchSecret byte concat of all touchlogs
-// (we need to add it to tx proc for later spock building)
-// ledger intracts can include several numbers (numberOfReads, numberOfWrites, totalByteRead, totalByteWritten)
-// delta should not be merged (we should just do it by touchlogs) - no need to sort delta
-// read cache needs to be merged
-// batch insert touches (for caching purpose)
 type State struct {
 	ledger                Ledger
 	parent                *State
@@ -85,6 +79,17 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 		st.maxInteractionAllowed = limit
 		return st
 	}
+}
+
+// TouchLogBytes returns a large byte slice of all register touches
+// for read touches the value part is nil for updates
+// the value part is also included
+func (s *State) TouchLogBytes() []byte {
+	res := make([]byte, 0)
+	for _, p := range s.touchLog {
+		res = append(res, p.bytes()...)
+	}
+	return res
 }
 
 func (s *State) logTouch(pk *payload) {
@@ -213,6 +218,20 @@ func (s *State) ApplyDeltaToLedger() error {
 	return s.checkMaxInteraction()
 }
 
+// ApplyTouchesToLedger applies all the register touches to the ledger,
+// this is needed for failed transactions
+// TODO later we might not need this if we return the touches directly
+// to the layer above for SPoCK and data pack construction
+func (s *State) ApplyTouchesToLedger() error {
+	for _, v := range s.touchLog {
+		err := s.ledger.Touch(v.owner, v.controller, v.key)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *State) Ledger() Ledger {
 	return s.ledger
 }
@@ -292,4 +311,13 @@ type payload struct {
 
 func (p *payload) size() uint64 {
 	return uint64(len(p.owner) + len(p.controller) + len(p.key) + len(p.value))
+}
+
+func (p *payload) bytes() []byte {
+	res := make([]byte, 0)
+	res = append(res, []byte(p.owner)...)
+	res = append(res, []byte(p.controller)...)
+	res = append(res, []byte(p.key)...)
+	res = append(res, p.value...)
+	return res
 }
