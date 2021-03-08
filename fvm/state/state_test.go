@@ -12,8 +12,8 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 	ledger := state.NewMapLedger()
 	st := state.NewState(ledger)
 
-	// TODO Test read cache (only once call from ledger )
-	// TODO test touchLog and writeLog
+	// TODO Test read cache (only once call from ledger)
+	// TODO test touchLog
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
 		key := "key1"
