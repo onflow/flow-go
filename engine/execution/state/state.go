@@ -101,7 +101,8 @@ type state struct {
 	collections        storage.Collections
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
-	receipts           storage.MyExecutionReceipts
+	receipts           storage.ExecutionReceipts
+	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
@@ -139,7 +140,8 @@ func NewExecutionState(
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
-	receipts storage.MyExecutionReceipts,
+	receipts storage.ExecutionReceipts,
+	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
@@ -156,6 +158,7 @@ func NewExecutionState(
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
 		receipts:           receipts,
+		myReceipts:         myReceipts,
 		events:             events,
 		serviceEvents:      serviceEvents,
 		transactionResults: transactionResults,
@@ -351,7 +354,7 @@ func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.Execu
 		defer span.Finish()
 	}
 
-	err := s.receipts.StoreMyReceipt(receipt)
+	err := s.myReceipts.StoreMyReceipt(receipt)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
 	}

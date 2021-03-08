@@ -28,8 +28,6 @@ type ExecutionReceipts interface {
 // It introduces the notion of "MY execution receipt", from the viewpoint
 // of an individual Execution Node.
 type MyExecutionReceipts interface {
-	ExecutionReceipts
-
 	// StoreMyReceipt stores the receipt and marks it as mine (trusted).
 	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
 

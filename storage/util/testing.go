@@ -19,7 +19,7 @@ func StorageLayer(t testing.TB, db *badger.DB) (*storage.Headers, *storage.Guara
 	guarantees := storage.NewGuarantees(metrics, db)
 	seals := storage.NewSeals(metrics, db)
 	results := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewAllExecutionReceipts(metrics, db, results)
+	receipts := storage.NewExecutionReceipts(metrics, db, results)
 	index := storage.NewIndex(metrics, db)
 	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts)
 	blocks := storage.NewBlocks(db, headers, payloads)

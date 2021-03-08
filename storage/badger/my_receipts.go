@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -8,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -16,9 +18,9 @@ import (
 // The wrapper ads the ability to "MY execution receipt", from the viewpoint
 // of an individual Execution Node.
 type MyExecutionReceipts struct {
-	*ExecutionReceipts
-	db    *badger.DB
-	cache *Cache
+	genericReceipts *ExecutionReceipts
+	db              *badger.DB
+	cache           *Cache
 }
 
 func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receipts *ExecutionReceipts) *MyExecutionReceipts {
@@ -27,9 +29,25 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 		// assemble DB operations to store receipt (no execution)
 		storeReceiptOps := receipts.store(receipt)
 		// assemble DB operations to index receipt as one of my own (no execution)
-		indexOwnReceiptOps := operation.SkipDuplicates(
-			operation.IndexOwnExecutionReceipt(receipt.ExecutionResult.BlockID, receipt.ID()),
-		)
+		blockID := receipt.ExecutionResult.BlockID
+		receiptID := receipt.ID()
+		indexOwnReceiptOps := func(tx *badger.Txn) error {
+			err := operation.IndexOwnExecutionReceipt(blockID, receiptID)(tx)
+			// check if we are storing same receipt
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				var savedReceiptID flow.Identifier
+				err := operation.LookupOwnExecutionReceipt(blockID, &savedReceiptID)(tx)
+				if err != nil {
+					return err
+				}
+
+				// if we are storing same receipt we shouldn't error
+				if savedReceiptID == receiptID {
+					return nil
+				}
+			}
+			return err
+		}
 
 		return func(tx *badger.Txn) error {
 			err := storeReceiptOps(tx) // execute operations to store receipt
@@ -62,8 +80,8 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 	}
 
 	return &MyExecutionReceipts{
-		ExecutionReceipts: receipts,
-		db:                db,
+		genericReceipts: receipts,
+		db:              db,
 		cache: newCache(collector,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),

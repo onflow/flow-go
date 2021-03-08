@@ -57,7 +57,8 @@ func main() {
 		serviceEvents         *storage.ServiceEvents
 		txResults             *storage.TransactionResults
 		results               *storage.ExecutionResults
-		receipts              *storage.MyExecutionReceipts
+		receipts              *storage.ExecutionReceipts
+		myReceipts            *storage.MyExecutionReceipts
 		providerEngine        *exeprovider.Engine
 		checkerEng            *checker.Engine
 		syncCore              *chainsync.Core
@@ -159,8 +160,8 @@ func main() {
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-			genericReceipts := storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
-			receipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, genericReceipts)
+			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, receipts)
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -232,6 +233,7 @@ func main() {
 				chunkDataPacks,
 				results,
 				receipts,
+				myReceipts,
 				events,
 				serviceEvents,
 				txResults,
