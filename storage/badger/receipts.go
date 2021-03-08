@@ -20,6 +20,8 @@ type ExecutionReceipts struct {
 	cache   *Cache
 }
 
+// NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
+// supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults) *ExecutionReceipts {
 	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
 		receipt := val.(*flow.ExecutionReceipt)

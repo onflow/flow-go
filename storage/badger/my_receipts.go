@@ -23,6 +23,8 @@ type MyExecutionReceipts struct {
 	cache           *Cache
 }
 
+// NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around badger.ExecutionReceipts
+// It's useful for execution nodes to keep track of produced execution receipts.
 func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receipts *ExecutionReceipts) *MyExecutionReceipts {
 	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
 		receipt := val.(*flow.ExecutionReceipt)
