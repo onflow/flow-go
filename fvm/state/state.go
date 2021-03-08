@@ -139,6 +139,19 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	return value, s.checkMaxInteraction()
 }
 
+func (s *State) updateDelta(p *payload) {
+	// check if a delta already exist for this key
+	// reduce the bytes to be written
+	if old, ok := s.delta[p.payloadKey]; ok {
+		s.ToBeWrittenCounter--
+		s.TotalBytesToBeWritten -= old.size()
+	}
+
+	s.delta[p.payloadKey] = *p
+	s.ToBeWrittenCounter++
+	s.TotalBytesToBeWritten += p.size()
+}
+
 // Set updates state delta with a register update
 func (s *State) Set(owner, controller, key string, value flow.RegisterValue) error {
 	if err := s.checkSize(owner, controller, key, value); err != nil {
@@ -148,7 +161,9 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	pKey := payloadKey{owner, controller, key}
 	p := payload{pKey, value}
 	s.logTouch(&p)
-	s.delta[pKey] = p
+
+	s.updateDelta(&p)
+
 	address, isAddress := addressFromOwner(owner)
 	if isAddress {
 		s.updatedAddresses[address] = struct{}{}
@@ -192,8 +207,8 @@ func (s *State) MergeState(child *State) error {
 	}
 
 	// apply delta
-	for k, v := range child.delta {
-		s.delta[k] = v
+	for _, v := range child.delta {
+		s.updateDelta(&v)
 	}
 
 	// apply address updates
@@ -291,10 +306,12 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 // LedgerInteraction captures stats on how much an state
 // interacted with the ledger
 type LedgerInteraction struct {
-	ReadCounter       uint64
-	WriteCounter      uint64
-	TotalBytesRead    uint64
-	TotalBytesWritten uint64
+	ReadCounter           uint64
+	ToBeWrittenCounter    uint64
+	WriteCounter          uint64
+	TotalBytesRead        uint64
+	TotalBytesToBeWritten uint64
+	TotalBytesWritten     uint64
 }
 
 func (li *LedgerInteraction) InteractionUsed() uint64 {
