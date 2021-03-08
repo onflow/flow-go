@@ -186,7 +186,12 @@ func (s *State) Touch(owner, controller, key string) error {
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
-	return NewState(s.ledger, WithParent(s))
+	return NewState(s.ledger,
+		WithParent(s),
+		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
+		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
+		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+	)
 }
 
 func (s *State) MergeTouchLogs(child *State) error {
