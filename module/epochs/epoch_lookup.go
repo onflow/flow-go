@@ -32,8 +32,14 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 	previous := l.state.Final().Epochs().Previous()
 
 	for _, epoch := range []protocol.Epoch{previous, current, next} {
-		firstView, _ := epoch.FirstView()
-		finalView, _ := epoch.FinalView()
+		firstView, err := epoch.FirstView()
+		if err != nil {
+			return 0, err
+		}
+		finalView, err := epoch.FinalView()
+		if err != nil {
+			return 0, err
+		}
 		if firstView <= view && view <= finalView {
 			return epoch.Counter()
 		}
