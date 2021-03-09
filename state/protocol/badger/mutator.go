@@ -580,7 +580,11 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// track protocol events that should be emitted
 	var events []func()
 	for _, seal := range payload.Seals {
-		for _, event := range seal.ServiceEvents {
+		result, err := m.results.ByID(seal.ResultID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+		}
+		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
