@@ -1,12 +1,11 @@
 package ptrie
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
@@ -31,8 +30,8 @@ func (p *PSMT) PathSize() int {
 }
 
 // RootHash returns the rootNode hash value of the SMT
-func (p *PSMT) RootHash() []byte {
-	return p.root.HashValue()
+func (p *PSMT) RootHash() ledger.RootHash {
+	return ledger.RootHash(p.root.HashValue())
 }
 
 // Get returns an slice of payloads (same order), an slice of failed paths and errors (if any)
@@ -59,7 +58,7 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 
 // Update updates registers and returns rootValue after updates
 // in case of error, it returns a list of paths for which update failed
-func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, error) {
+func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (hash.Hash, error) {
 	var failedKeys []ledger.Key
 	for i, path := range paths {
 		payload := payloads[i]
@@ -69,10 +68,10 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, 
 			failedKeys = append(failedKeys, payload.Key)
 			continue
 		}
-		common.ComputeCompactValue(&node.hashValue, path, payload, node.height)
+		hash.ComputeCompactValue(&node.hashValue, path, payload.Value, node.height)
 	}
 	if len(failedKeys) > 0 {
-		return nil, &ledger.ErrMissingKeys{Keys: failedKeys}
+		return hash.EmptyHash, &ledger.ErrMissingKeys{Keys: failedKeys}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return p.root.HashValue(), nil
@@ -81,7 +80,7 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, 
 // NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
 // TODO just accept batch proof as input
 func NewPSMT(
-	rootValue []byte, // rootHash
+	rootValue hash.Hash, // rootHash
 	pathByteSize int,
 	batchProof *ledger.TrieBatchProof,
 ) (*PSMT, error) {
@@ -89,7 +88,7 @@ func NewPSMT(
 	if pathByteSize < 1 {
 		return nil, errors.New("trie's path size [in bytes] must be positive")
 	}
-	psmt := PSMT{newNode(nil, pathByteSize*8), pathByteSize, make(map[string]*node)}
+	psmt := PSMT{newNode(hash.EmptyHash, pathByteSize*8), pathByteSize, make(map[string]*node)}
 
 	paths := batchProof.Paths()
 	payloads := batchProof.Payloads()
@@ -122,7 +121,7 @@ func NewPSMT(
 		for j := 0; j < int(pr.Steps); j++ {
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
-			v := common.GetDefaultHashForHeight(currentNode.height - 1)
+			v := hash.GetDefaultHashForHeight(currentNode.height - 1)
 			flag := utils.Bit(pr.Flags, j)
 			if flag == 1 {
 				// use the proof at index proofIndex
@@ -139,7 +138,7 @@ func NewPSMT(
 				// 	return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.lChild.ComputeValue(), v)
 				// }
 				if currentNode.rChild == nil { // create the right child if not exist
-					currentNode.rChild = newNode(nil, currentNode.height-1)
+					currentNode.rChild = newNode(hash.EmptyHash, currentNode.height-1)
 				}
 				currentNode = currentNode.rChild
 			} else { // left branching
@@ -150,7 +149,7 @@ func NewPSMT(
 				// 	return nil, fmt.Errorf("incompatible proof (right node value doesn't match) expected [%x], got [%x]", currentNode.rChild.ComputeValue(), v)
 				// }
 				if currentNode.lChild == nil { // create the left child if not exist
-					currentNode.lChild = newNode(nil, currentNode.height-1)
+					currentNode.lChild = newNode(hash.EmptyHash, currentNode.height-1)
 				}
 				currentNode = currentNode.lChild
 			}
@@ -160,7 +159,7 @@ func NewPSMT(
 		currentNode.path = path
 		// update node's hashvalue only for inclusion proofs (for others we assume default value)
 		if pr.Inclusion {
-			common.ComputeCompactValue(&currentNode.hashValue, path, payload, currentNode.height)
+			hash.ComputeCompactValue(&currentNode.hashValue, path, payload.Value, currentNode.height)
 		}
 		// keep a reference to this node by path (for update purpose)
 		psmt.pathLookUp[string(path)] = currentNode
@@ -168,7 +167,7 @@ func NewPSMT(
 	}
 
 	// check if the rootHash matches the root node's hash value of the partial trie
-	if !bytes.Equal(psmt.root.HashValue(), rootValue) {
+	if psmt.root.HashValue() != rootValue {
 		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.HashValue(), rootValue)
 	}
 	return &psmt, nil

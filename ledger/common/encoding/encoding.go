@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
@@ -435,7 +436,7 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 
 	// encode root hash (size and data)
 	buffer = utils.AppendUint16(buffer, uint16(len(t.RootHash)))
-	buffer = append(buffer, t.RootHash...)
+	buffer = append(buffer, t.RootHash[:]...)
 
 	// encode number of paths
 	buffer = utils.AppendUint32(buffer, uint32(t.Size()))
@@ -492,10 +493,12 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
-	rh, rest, err := utils.ReadSlice(rest, int(rhSize))
+	rhBytes, rest, err := utils.ReadSlice(rest, int(rhSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
+	var rh ledger.RootHash
+	copy(rh[:], rhBytes)
 
 	// decode number of paths
 	numOfPaths, rest, err := utils.ReadUint32(rest)
@@ -557,7 +560,8 @@ func EncodeTrieProof(p *ledger.TrieProof) []byte {
 	buffer = utils.AppendUint8(buffer, TypeProof)
 
 	// append encoded proof content
-	buffer = append(buffer, encodeTrieProof(p)...)
+	proof := encodeTrieProof(p)
+	buffer = append(buffer, proof[:]...)
 
 	return buffer
 }
@@ -591,7 +595,7 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 	buffer = utils.AppendUint8(buffer, uint8(len(p.Interims)))
 	for _, inter := range p.Interims {
 		buffer = utils.AppendUint16(buffer, uint16(len(inter)))
-		buffer = append(buffer, inter...)
+		buffer = append(buffer, inter[:]...)
 	}
 
 	return buffer
@@ -671,10 +675,11 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	interims := make([][]byte, 0)
+	interims := make([]hash.Hash, 0)
 
 	var interimSize uint16
-	var interim []byte
+	var interim hash.Hash
+	var interimBytes []byte
 
 	for i := 0; i < int(interimsLen); i++ {
 		interimSize, rest, err = utils.ReadUint16(rest)
@@ -682,7 +687,8 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
 
-		interim, rest, err = utils.ReadSlice(rest, int(interimSize))
+		interimBytes, rest, err = utils.ReadSlice(rest, int(interimSize))
+		copy(interim[:], interimBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}

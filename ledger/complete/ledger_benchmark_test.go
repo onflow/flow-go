@@ -11,7 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/module/metrics"
@@ -55,8 +55,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 	state := led.InitialState()
 	for i := 0; i < steps; i++ {
 
-		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 		totalRegOperation += len(keys)
 
@@ -102,7 +102,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		p, _ := encoding.DecodeTrieBatchProof(proof)
 
 		// construct a partial trie using proofs
-		_, err = ptrie.NewPSMT(newState, pathByteSize, p)
+		_, err = ptrie.NewPSMT(hash.Hash(newState), pathByteSize, p)
 		if err != nil {
 			b.Fatal("failed to create PSMT")
 		}

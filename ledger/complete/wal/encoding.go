@@ -47,7 +47,7 @@ func EncodeUpdate(update *ledger.TrieUpdate) []byte {
 func EncodeDelete(rootHash ledger.RootHash) []byte {
 	buf := make([]byte, 0)
 	buf = append(buf, byte(WALDelete))
-	buf = utils.AppendShortData(buf, rootHash)
+	buf = utils.AppendShortData(buf, rootHash[:])
 	return buf
 }
 
@@ -63,10 +63,13 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 		update, err = encoding.DecodeTrieUpdate(data[1:])
 		return
 	case WALDelete:
-		rootHash, _, err = utils.ReadShortData(data[1:])
+		var rootHashBytes []byte
+		rootHashBytes, _, err = utils.ReadShortData(data[1:])
 		if err != nil {
 			err = fmt.Errorf("cannot read state commitment: %w", err)
 		}
+
+		copy(rootHash[:], rootHashBytes)
 		return
 	default:
 		err = fmt.Errorf("unknown operation type, given: %x", operation)

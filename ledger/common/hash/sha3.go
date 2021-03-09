@@ -1,4 +1,4 @@
-package common
+package hash
 
 import (
 	"encoding/binary"
@@ -69,7 +69,7 @@ func new256() *state {
 }
 
 // copyOut copies ulint64s to a byte buffer.
-func (d *state) copyOut(out *[]byte) {
+func (d *state) copyOut(out *Hash) {
 	for i := 0; i < 4; i++ {
 		binary.LittleEndian.PutUint64((*out)[i<<3:], d.a[i])
 	}
@@ -86,7 +86,7 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 	}
 }
 
-func (d *state) hash256Plus(out *[]byte, p1, p2 []byte) {
+func (d *state) hash256Plus(out *Hash, p1, p2 []byte) {
 	//xorIn since p1 length is a multiple of 8
 	xorInAtIndex(d, p1, 0)
 	written := 32 // written uint64s in the state
@@ -124,7 +124,7 @@ func (d *state) hash256Plus(out *[]byte, p1, p2 []byte) {
 
 // hash256plus256 absorbs two 256 bits slices of data into the hash's state
 // applies the permutation, and outpute the result in out
-func (d *state) hash256plus256(out *[]byte, p1, p2 []byte) {
+func (d *state) hash256plus256(out *Hash, p1, p2 Hash) {
 	xorIn512(d, p1, p2)
 	// permute
 	finalKeccakF1600(&d.a)
@@ -135,15 +135,17 @@ func (d *state) hash256plus256(out *[]byte, p1, p2 []byte) {
 // xorIn256 xors two 32 bytes slices into the state; it
 // makes no non-portable assumptions about memory layout
 // or alignment.
-func xorIn512(d *state, buf1, buf2 []byte) {
+func xorIn512(d *state, buf1, buf2 Hash) {
+	sliceBuf1, sliceBuf2 := buf1[:], buf2[:]
+
 	var i int
 	for ; i < 4; i++ {
-		d.a[i] = binary.LittleEndian.Uint64(buf1)
-		buf1 = buf1[8:]
+		d.a[i] = binary.LittleEndian.Uint64(sliceBuf1)
+		sliceBuf1 = sliceBuf1[8:]
 	}
 	for ; i < 8; i++ {
-		d.a[i] = binary.LittleEndian.Uint64(buf2)
-		buf2 = buf2[8:]
+		d.a[i] = binary.LittleEndian.Uint64(sliceBuf2)
+		sliceBuf2 = sliceBuf2[8:]
 	}
 	// xor with the dsbyte
 	// dsbyte also contains the first one bit for the padding.

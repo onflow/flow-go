@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
@@ -69,11 +69,14 @@ func (mt *MTrie) Height() int { return mt.root.Height() }
 
 // StringRootHash returns the trie's Hex-encoded root hash.
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) StringRootHash() string { return hex.EncodeToString(mt.root.Hash()) }
+func (mt *MTrie) StringRootHash() string {
+	rootHash := mt.root.Hash()
+	return hex.EncodeToString(rootHash[:])
+}
 
 // RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) RootHash() []byte { return mt.root.Hash() }
+func (mt *MTrie) RootHash() ledger.RootHash { return ledger.RootHash(mt.root.Hash()) }
 
 // PathLength return the length [in bytes] the trie operates with.
 // Concurrency safe (as Tries are immutable structures by convention)
@@ -131,7 +134,7 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	}
 
 	// partition step to quick sort the paths
-	partitionIndex := utils.SplitPaths(paths, mt.Height()-head.Height())
+	partitionIndex := splitPaths(paths, mt.Height()-head.Height())
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lres, rres := (*res)[:partitionIndex], (*res)[partitionIndex:]
 
@@ -224,8 +227,8 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 
 	// in the remaining code: len(paths)>1
 
-	// Split paths and payloads to recurse
-	partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.Height()-nodeHeight)
+	// split paths and payloads to recurse
+	partitionIndex := splitByPath(paths, payloads, parentTrie.Height()-nodeHeight)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
@@ -297,7 +300,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	}
 
 	// partition step to quick sort the paths
-	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, mt.Height()-head.Height())
+	partitionIndex := splitTrieProofsByPath(paths, proofs, mt.Height()-head.Height())
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
@@ -307,8 +310,8 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	if len(lpaths) > 0 {
 		if rChild := head.RightChild(); rChild != nil { // TODO: is that a sanity check?
 			nodeHash := rChild.Hash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height())) // TODO: why not rChild.RegisterCount != 0?
-			if !isDef {                                                                     // in proofs, we only provide non-default value hashes
+			isDef := nodeHash == hash.GetDefaultHashForHeight(rChild.Height()) // TODO: why not rChild.RegisterCount != 0?
+			if !isDef {                                                        // in proofs, we only provide non-default value hashes
 				for _, p := range lproofs {
 					utils.SetBit(p.Flags, mt.Height()-head.Height())
 					p.Interims = append(p.Interims, nodeHash)
@@ -329,7 +332,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	if len(rpaths) > 0 {
 		if lChild := head.LeftChild(); lChild != nil {
 			nodeHash := lChild.Hash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
+			isDef := nodeHash == hash.GetDefaultHashForHeight(lChild.Height())
 			if !isDef { // in proofs, we only provide non-default value hashes
 				for _, p := range rproofs {
 					utils.SetBit(p.Flags, mt.Height()-head.Height())
@@ -357,7 +360,7 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	if o == nil {
 		return false
 	}
-	return o.PathLength() == mt.PathLength() && bytes.Equal(o.RootHash(), mt.RootHash())
+	return o.PathLength() == mt.PathLength() && o.RootHash() == mt.RootHash()
 }
 
 // DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
@@ -400,8 +403,8 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 }
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
-func EmptyTrieRootHash(pathByteSize int) []byte {
-	return node.NewEmptyTreeRoot(8 * pathByteSize).Hash()
+func EmptyTrieRootHash(pathByteSize int) ledger.RootHash {
+	return ledger.RootHash(node.NewEmptyTreeRoot(8 * pathByteSize).Hash())
 }
 
 // AllPayloads returns all payloads
@@ -413,4 +416,68 @@ func (mt *MTrie) AllPayloads() []ledger.Payload {
 func (mt *MTrie) IsAValidTrie() bool {
 	// TODO add checks on the health of node max height ...
 	return mt.root.VerifyCachedHash()
+}
+
+// splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
+// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
+// is returned.
+// The same permutation is applied to the payloads slice.
+//
+// This would be the partition step of an ascending quick sort of paths (lexicographic order)
+// with the pivot being the path with all zeros and 1 at bitIndex.
+// The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
+// equal bits from 0 to bitIndex-1
+func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
+	i := 0
+	for j, path := range paths {
+		bit := utils.Bit(path, bitIndex)
+		if bit == 0 {
+			paths[i], paths[j] = paths[j], paths[i]
+			payloads[i], payloads[j] = payloads[j], payloads[i]
+			i++
+		}
+	}
+	return i
+}
+
+// splitPaths permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
+// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
+// is returned.
+//
+// This would be the partition step of an ascending quick sort of paths (lexicographic order)
+// with the pivot being the path with all zeros and 1 at bitIndex.
+// The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
+// equal bits from 0 to bitIndex-1
+func splitPaths(paths []ledger.Path, bitIndex int) int {
+	i := 0
+	for j, path := range paths {
+		bit := utils.Bit(path, bitIndex)
+		if bit == 0 {
+			paths[i], paths[j] = paths[j], paths[i]
+			i++
+		}
+	}
+	return i
+}
+
+// splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
+// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
+// is returned.
+// The same permutation is applied to the proofs slice.
+//
+// This would be the partition step of an ascending quick sort of paths (lexicographic order)
+// with the pivot being the path with all zeros and 1 at bitIndex.
+// The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
+// equal bits from 0 to bitIndex-1
+func splitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.TrieProof, bitIndex int) int {
+	i := 0
+	for j, path := range paths {
+		bit := utils.Bit(path, bitIndex)
+		if bit == 0 {
+			paths[i], paths[j] = paths[j], paths[i]
+			proofs[i], proofs[j] = proofs[j], proofs[i]
+			i++
+		}
+	}
+	return i
 }

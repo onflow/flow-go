@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger/common/hash"
 )
 
 type Root []byte
@@ -22,18 +22,13 @@ type node struct {
 	height    int             // Height where the node is at
 	path      ledger.Path     // path
 	payload   *ledger.Payload // payload
-	hashValue []byte          // hash value
+	hashValue hash.Hash       // hash value
 }
 
 // newNode creates a new node with the provided value and no children
-func newNode(hashValue []byte, height int) *node {
+func newNode(hashValue hash.Hash, height int) *node {
 	n := new(node)
-	n.hashValue = make([]byte, 0, common.HashLen)
-	n.hashValue = append(n.hashValue, hashValue...)
-	// pad the hash to Hashlen
-	paddingLen := common.HashLen - len(hashValue)
-	n.hashValue = append(n.hashValue, common.EmptyHash[:paddingLen]...)
-
+	n.hashValue = hashValue
 	n.height = height
 	n.lChild = nil
 	n.rChild = nil
@@ -42,24 +37,25 @@ func newNode(hashValue []byte, height int) *node {
 
 // TODO: revisit this
 // ComputeValue recomputes value for this node in recursive manner
-func (n *node) HashValue() []byte {
+func (n *node) HashValue() hash.Hash {
 	// leaf node
 	if n.lChild == nil && n.rChild == nil {
-		if n.hashValue != nil {
-			return n.hashValue
-		}
-		return common.GetDefaultHashForHeight(n.height)
+		return n.hashValue
 	}
 	// otherwise compute
-	h1 := common.GetDefaultHashForHeight(n.height - 1)
+	var h1, h2 hash.Hash
 	if n.lChild != nil {
 		h1 = n.lChild.HashValue()
+	} else {
+		h1 = hash.GetDefaultHashForHeight(n.height - 1)
 	}
-	h2 := common.GetDefaultHashForHeight(n.height - 1)
+
 	if n.rChild != nil {
 		h2 = n.rChild.HashValue()
+	} else {
+		h2 = hash.GetDefaultHashForHeight(n.height - 1)
 	}
 	// For debugging purpose uncomment this
 	// n.value = HashInterNode(h1, h2)
-	return common.HashInterNode(h1, h2)
+	return hash.HashInterNode(h1, h2)
 }

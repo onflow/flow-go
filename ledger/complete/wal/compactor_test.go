@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -59,8 +58,8 @@ func Test_Compactor(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := utils.RandomPaths(numInsPerStep, pathByteSize)
-				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
+				paths0 := ledger.RandomPaths(numInsPerStep, pathByteSize)
+				payloads0 := ledger.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
 				var payloads []*ledger.Payload
@@ -82,7 +81,7 @@ func Test_Compactor(t *testing.T) {
 					data[string(path)] = payloads[j]
 				}
 
-				savedData[string(rootHash)] = data
+				savedData[string(rootHash[:])] = data
 			}
 
 			assert.Eventually(t, func() bool {
@@ -163,7 +162,9 @@ func Test_Compactor(t *testing.T) {
 					paths = append(paths, path)
 				}
 
-				read := &ledger.TrieRead{RootHash: ledger.RootHash(rootHash), Paths: paths}
+				var root ledger.RootHash
+				copy(root[:], []byte(rootHash))
+				read := &ledger.TrieRead{RootHash: ledger.RootHash(root), Paths: paths}
 				payloads, err := f.Read(read)
 				require.NoError(t, err)
 
@@ -222,8 +223,8 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := utils.RandomPaths(numInsPerStep, pathByteSize)
-				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
+				paths0 := ledger.RandomPaths(numInsPerStep, pathByteSize)
+				payloads0 := ledger.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
 				var payloads []*ledger.Payload

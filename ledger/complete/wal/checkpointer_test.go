@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -58,8 +57,8 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 
-			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+			keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := ledger.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			require.NoError(t, err)
 			state, err = led.Set(update)
@@ -72,7 +71,7 @@ func Test_WAL(t *testing.T) {
 				data[string(encoding.EncodeKey(&key))] = values[j]
 			}
 
-			savedData[string(state)] = data
+			savedData[string(state[:])] = data
 		}
 
 		<-led.Done()
@@ -92,7 +91,9 @@ func Test_WAL(t *testing.T) {
 
 			fmt.Printf("Querying with %x\n", state)
 
-			query, err := ledger.NewQuery([]byte(state), keys)
+			var ledgerState ledger.State
+			copy(ledgerState[:], []byte(state))
+			query, err := ledger.NewQuery(ledgerState, keys)
 			require.NoError(t, err)
 			values, err := led2.Get(query)
 			require.NoError(t, err)
@@ -130,9 +131,9 @@ func Test_Checkpointing(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-				values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
-				update, err := ledger.NewUpdate(rootHash, keys, values)
+				keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+				values := ledger.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
 				require.NoError(t, err)
 
 				trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
@@ -151,7 +152,7 @@ func Test_Checkpointing(t *testing.T) {
 					data[string(path)] = trieUpdate.Payloads[j]
 				}
 
-				savedData[string(rootHash)] = data
+				savedData[string(rootHash[:])] = data
 			}
 			// some buffer time of the checkpointer to run
 			time.Sleep(1 * time.Second)
@@ -236,13 +237,15 @@ func Test_Checkpointing(t *testing.T) {
 					paths = append(paths, path)
 				}
 
-				payloads1, err := f.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
+				var root ledger.RootHash
+				copy(root[:], []byte(rootHash))
+				payloads1, err := f.Read(&ledger.TrieRead{RootHash: root, Paths: paths})
 				require.NoError(t, err)
 
-				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
+				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: root, Paths: paths})
 				require.NoError(t, err)
 
-				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
+				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: root, Paths: paths})
 				require.NoError(t, err)
 
 				for i, path := range paths {
@@ -253,8 +256,8 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
-		keys2 := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values2 := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys2 := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values2 := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 		t.Run("create segment after checkpoint", func(t *testing.T) {
 
 			//require.NoFileExists(t, path.Join(dir, "00000011"))
@@ -265,7 +268,7 @@ func Test_Checkpointing(t *testing.T) {
 			wal4, err := realWAL.NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
-			update, err := ledger.NewUpdate(rootHash, keys2, values2)
+			update, err := ledger.NewUpdate(ledger.State(rootHash), keys2, values2)
 			require.NoError(t, err)
 
 			trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
@@ -316,7 +319,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("extra updates were applied correctly", func(t *testing.T) {
 
-			query, err := ledger.NewQuery(rootHash, keys2)
+			query, err := ledger.NewQuery(ledger.State(rootHash), keys2)
 			require.NoError(t, err)
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
@@ -399,7 +402,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.NoError(t, err)
 
 			// check if the latest data is still there
-			query, err := ledger.NewQuery(rootHash, keys2)
+			query, err := ledger.NewQuery(ledger.State(rootHash), keys2)
 			require.NoError(t, err)
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)

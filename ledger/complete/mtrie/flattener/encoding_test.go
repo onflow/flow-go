@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 )
 
@@ -18,8 +18,8 @@ func TestStorableNode(t *testing.T) {
 		LIndex:     1,
 		RIndex:     2,
 		Height:     2137,
-		Path:       utils.PathByUint8(3),
-		EncPayload: encoding.EncodePayload(utils.LightPayload8('A', 'a')),
+		Path:       ledger.PathByUint8(3),
+		EncPayload: encoding.EncodePayload(ledger.LightPayload8('A', 'a')),
 		HashValue:  []byte{4, 4, 4},
 		MaxDepth:   7,
 		RegCount:   5000,

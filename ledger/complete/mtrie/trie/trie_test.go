@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
@@ -25,7 +24,8 @@ func Test_EmptyTrie(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedRootHashHex := "568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(emptyTrie.RootHash()))
+	hash := emptyTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
@@ -36,12 +36,13 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.PathByUint16LeftPadded(0)
-	payload := utils.LightPayload(11, 12345)
+	path := ledger.PathByUint16LeftPadded(0)
+	payload := ledger.LightPayload(11, 12345)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "b30c99cc3e027a6ff463876c638041b1c55316ed935f1b3699e52a2c3e3eaaab"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
+	hash := leftPopulatedTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 }
 
 // Test_TrieWithRightRegister tests whether the root hash of trie with only the right-most
@@ -58,11 +59,12 @@ func Test_TrieWithRightRegister(t *testing.T) {
 		b[i] = uint8(255)
 	}
 	path := ledger.Path(b)
-	payload := utils.LightPayload(12346, 54321)
+	payload := ledger.LightPayload(12346, 54321)
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "4313d22bcabbf21b1cfb833d38f1921f06a91e7198a6672bc68fa24eaaa1a961"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
+	hash := rightPopulatedTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 }
 
 // // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
@@ -73,12 +75,13 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.PathByUint16LeftPadded(56809)
-	payload := utils.LightPayload(12346, 59656)
+	path := ledger.PathByUint16LeftPadded(56809)
+	payload := ledger.LightPayload(12346, 59656)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
+	hash := leftPopulatedTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 }
 
 // Test_TrieWithManyRegisters tests whether the root hash of a trie storing 12001 randomly selected registers
@@ -95,7 +98,8 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
 	expectedRootHashHex := "74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
+	hash := updatedTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 }
 
 // Test_FullTrie tests whether the root hash of a trie,
@@ -112,15 +116,16 @@ func Test_FullTrie(t *testing.T) {
 	paths := make([]ledger.Path, 0, numberRegisters)
 	payloads := make([]ledger.Payload, 0, numberRegisters)
 	for i := 0; i < numberRegisters; i++ {
-		paths = append(paths, utils.PathByUint16LeftPadded(uint16(i)))
+		paths = append(paths, ledger.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
-		payload := utils.LightPayload(temp, temp)
+		payload := ledger.LightPayload(temp, temp)
 		payloads = append(payloads, *payload)
 	}
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
 	expectedRootHashHex := "6b3a48d672744f5586c571c47eae32d7a4a3549c1d4fa51a0acfd7b720471de9"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
+	hash := updatedTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 }
 
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
@@ -155,13 +160,14 @@ func Test_UpdateTrie(t *testing.T) {
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
-	path := utils.PathByUint16LeftPadded(rng.next())
+	path := ledger.PathByUint16LeftPadded(rng.next())
 	temp := rng.next()
-	payload := utils.LightPayload(temp, temp)
+	payload := ledger.LightPayload(temp, temp)
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
+	hash := updatedTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 
 	var paths []ledger.Path
 	var payloads []ledger.Payload
@@ -169,12 +175,14 @@ func Test_UpdateTrie(t *testing.T) {
 		paths, payloads = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
 		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
 		require.NoError(t, err)
-		require.Equal(t, expectedRootHashes[r], hex.EncodeToString(updatedTrie.RootHash()))
+		hash := updatedTrie.RootHash()
+		require.Equal(t, expectedRootHashes[r], hex.EncodeToString(hash[:]))
 	}
 	// update with the same registers with the same values
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
 	require.NoError(t, err)
-	require.Equal(t, expectedRootHashes[19], hex.EncodeToString(updatedTrie.RootHash()))
+	hash = updatedTrie.RootHash()
+	require.Equal(t, expectedRootHashes[19], hex.EncodeToString(hash[:]))
 	// check the root node pointers are equal
 	require.True(t, updatedTrie.RootNode() == newTrie.RootNode())
 }
@@ -206,8 +214,10 @@ func Test_UnallocateRegisters(t *testing.T) {
 	expectedRootHashHex := "d81e27a93f2bef058395f70e00fb5d3c8e426e22b3391d048b34017e1ecb483e"
 	comparisonTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
 	require.NoError(t, err)
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisonTrie.RootHash()))
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
+	hash := comparisonTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	hash = updatedTrie.RootHash()
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
 }
 
 // simple Linear congruential RNG
@@ -229,10 +239,10 @@ func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([
 	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
 	for i := 0; i < number; i++ {
-		path := utils.PathByUint16LeftPadded(rng.next())
+		path := ledger.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
 		t := rng.next()
-		payload := utils.LightPayload(t, t)
+		payload := ledger.LightPayload(t, t)
 		payloads = append(payloads, *payload)
 	}
 	return paths, payloads

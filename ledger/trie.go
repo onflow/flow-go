@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
+	"github.com/onflow/flow-go/ledger/common/hash"
 )
 
 // TrieRead captures a trie read query
@@ -75,18 +77,15 @@ func (u *TrieUpdate) Equals(other *TrieUpdate) bool {
 }
 
 // RootHash captures the root hash of a trie
-type RootHash []byte
+type RootHash hash.Hash
 
 func (rh RootHash) String() string {
-	return hex.EncodeToString(rh)
+	return hex.EncodeToString(rh[:])
 }
 
 // Equals compares the root hash to another one
 func (rh RootHash) Equals(o RootHash) bool {
-	if o == nil {
-		return false
-	}
-	return bytes.Equal(rh, o)
+	return rh == o
 }
 
 // Path captures storage path of a payload;
@@ -181,12 +180,12 @@ func EmptyPayload() *Payload {
 // through a trie branch from an specific leaf node (key)
 // up to the root of the trie.
 type TrieProof struct {
-	Path      Path     // path
-	Payload   *Payload // payload
-	Interims  [][]byte // the non-default intermediate nodes in the proof
-	Inclusion bool     // flag indicating if this is an inclusion or exclusion proof
-	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
-	Steps     uint8    // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
+	Path      Path        // path
+	Payload   *Payload    // payload
+	Interims  []hash.Hash // the non-default intermediate nodes in the proof
+	Inclusion bool        // flag indicating if this is an inclusion or exclusion proof
+	Flags     []byte      // The flags of the proofs (is set if an intermediate node has a non-default)
+	Steps     uint8       // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
 }
 
 // NewTrieProof creates a new instance of Trie Proof
@@ -194,7 +193,7 @@ func NewTrieProof() *TrieProof {
 	return &TrieProof{
 		Path:      make([]byte, 0),
 		Payload:   EmptyPayload(),
-		Interims:  make([][]byte, 0),
+		Interims:  make([]hash.Hash, 0),
 		Inclusion: false,
 		Flags:     make([]byte, 0),
 		Steps:     0,
@@ -240,7 +239,7 @@ func (p *TrieProof) Equals(o *TrieProof) bool {
 		return false
 	}
 	for i, inter := range p.Interims {
-		if !bytes.Equal(inter, o.Interims[i]) {
+		if inter != o.Interims[i] {
 			return false
 		}
 	}

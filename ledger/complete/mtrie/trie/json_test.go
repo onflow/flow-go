@@ -59,7 +59,7 @@ func Test_DumpJSON(t *testing.T) {
 			ledger.NewKeyPart(5, []byte("dolor")),
 		})
 
-		update, err := ledger.NewUpdate(emptyRootHash, []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
+		update, err := ledger.NewUpdate(ledger.State(emptyRootHash), []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
 		require.NoError(t, err)
 
 		trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)

@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
 	"github.com/onflow/flow-go/ledger/common/encoding"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/module/metrics"
@@ -47,7 +47,7 @@ func TestTrieOperations(t *testing.T) {
 	// Get trie
 	retnt, err := forest.GetTrie(updatedTrie.RootHash())
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(retnt.RootHash(), updatedTrie.RootHash()))
+	require.Equal(t, retnt.RootHash(), updatedTrie.RootHash())
 	require.Equal(t, forest.Size(), 2)
 
 	// Remove trie
@@ -379,11 +379,11 @@ func TestLeafInsert(t *testing.T) {
 	require.NoError(t, err)
 
 	// path: 000...0000000100000000
-	p1 := utils.PathByUint16LeftPadded(256)
+	p1 := ledger.PathByUint16LeftPadded(256)
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
 	// path: 000...0000000100000001
-	p2 := utils.PathByUint16LeftPadded(257)
+	p2 := ledger.PathByUint16LeftPadded(257)
 	v2 := payloadBySlices([]byte{'B'}, []byte{'B'})
 
 	paths := []ledger.Path{p1, p2}
@@ -863,8 +863,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	latestPayloadByPath := make(map[string]*ledger.Payload) // map store
 
 	for e := 0; e < rep; e++ {
-		paths := utils.RandomPathsRandLen(maxNumPathsPerStep, pathByteSize)
-		payloads := utils.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
+		paths := ledger.RandomPathsRandLen(maxNumPathsPerStep, pathByteSize)
+		payloads := ledger.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
 
 		// update map store with key values
 		// we use this at the end of each step to check all existing keys
@@ -907,11 +907,11 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		read = &ledger.TrieRead{RootHash: activeRoot, Paths: proofPaths}
 		batchProof, err := forest.Proofs(read)
 		require.NoError(t, err, "error generating proofs")
-		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
+		require.True(t, proof.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
 
-		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, batchProof)
+		psmt, err := ptrie.NewPSMT(hash.Hash(activeRoot), pathByteSize, batchProof)
 		require.NoError(t, err, "error building partial trie")
-		require.True(t, bytes.Equal(psmt.RootHash(), activeRoot))
+		require.Equal(t, psmt.RootHash(), activeRoot)
 
 		// check payloads for all existing paths
 		allPaths := make([]ledger.Path, 0, len(latestPayloadByPath))
@@ -957,10 +957,10 @@ func TestProofGenerationInclusion(t *testing.T) {
 	updatedRoot, err := forest.Update(update)
 	require.NoError(t, err)
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
-	proof, err := forest.Proofs(read)
+	proofs, err := forest.Proofs(read)
 
 	require.NoError(t, err)
-	require.True(t, common.VerifyTrieBatchProof(proof, ledger.State(updatedRoot)))
+	require.True(t, proof.VerifyTrieBatchProof(proofs, ledger.State(updatedRoot)))
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {

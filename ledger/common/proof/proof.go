@@ -1,9 +1,8 @@
-package common
+package proof
 
 import (
-	"bytes"
-
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
@@ -19,15 +18,15 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 	}
 	// We start with the leaf and hash our way upwards towards the root
 	proofIndex := len(p.Interims) - 1
-	computed := make([]byte, HashLen)                             // the index of the last non-default value furthest down the tree (-1 if there is none)
-	ComputeCompactValue(&computed, p.Path, p.Payload, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
-	for h := leafHeight + 1; h <= treeHeight; h++ {               // then, we hash our way upwards until we hit the root (at height `treeHeight`)
+	var computed hash.Hash                                                   // the index of the last non-default value furthest down the tree (-1 if there is none)
+	hash.ComputeCompactValue(&computed, p.Path, p.Payload.Value, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
+	for h := leafHeight + 1; h <= treeHeight; h++ {                          // then, we hash our way upwards until we hit the root (at height `treeHeight`)
 		// we are currently at a node n (initially the leaf). In this iteration, we want to compute the
 		// parent's hash. Here, h is the height of the parent, whose hash want to compute.
 		// The parent has two children: child n, whose hash we have already computed (aka `computed`);
 		// and the sibling to node n, whose hash (aka `siblingHash`) must be defined by the Proof.
 
-		var siblingHash []byte
+		var siblingHash hash.Hash
 		flag := utils.Bit(p.Flags, treeHeight-h)
 
 		if flag == 1 { // if flag is set, siblingHash is stored in the proof
@@ -37,18 +36,18 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 			siblingHash = p.Interims[proofIndex]
 			proofIndex--
 		} else { // otherwise, siblingHash is a default hash
-			siblingHash = GetDefaultHashForHeight(h - 1)
+			siblingHash = hash.GetDefaultHashForHeight(h - 1)
 		}
 
 		bit := utils.Bit(p.Path, treeHeight-h)
 		// hashing is order dependant
 		if bit == 1 { // we hash our way up to the parent along the parent's right branch
-			HashInterNodeIn(&computed, siblingHash, computed)
+			hash.HashInterNodeIn(&computed, siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
-			HashInterNodeIn(&computed, computed, siblingHash)
+			hash.HashInterNodeIn(&computed, computed, siblingHash)
 		}
 	}
-	return bytes.Equal(computed, expectedState) == p.Inclusion
+	return (computed == hash.Hash(expectedState)) == p.Inclusion
 }
 
 // VerifyTrieBatchProof verifies all the proof inside the batchproof

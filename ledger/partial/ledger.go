@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 )
@@ -34,7 +35,7 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 	}
 
 	// decode proof
-	psmt, err := ptrie.NewPSMT(s, pathfinder.PathByteSize, batchProof)
+	psmt, err := ptrie.NewPSMT(hash.Hash(s), pathfinder.PathByteSize, batchProof)
 
 	if err != nil {
 		// TODO provide more details based on the error type
@@ -106,9 +107,11 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
+	emptyState := ledger.State(hash.EmptyHash)
+
 	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
-		return nil, err
+		return emptyState, err
 	}
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
@@ -117,7 +120,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 			paths, err := pathfinder.KeysToPaths(update.Keys(), l.pathFinderVersion)
 			if err != nil {
-				return nil, err
+				return emptyState, err
 			}
 
 			//store mappings and restore keys from missing paths
@@ -132,9 +135,9 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 			for _, path := range pErr.Paths {
 				keys = append(keys, pathToKey[string(path)])
 			}
-			return nil, &ledger.ErrMissingKeys{Keys: keys}
+			return emptyState, &ledger.ErrMissingKeys{Keys: keys}
 		}
-		return nil, err
+		return emptyState, err
 	}
 
 	// TODO log info state

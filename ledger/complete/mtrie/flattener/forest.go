@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -79,20 +80,23 @@ func FlattenForest(f *mtrie.Forest) (*FlattenedForest, error) {
 func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode, error) {
 	leftIndex, found := indexForNode[node.LeftChild()]
 	if !found {
-		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(node.LeftChild().Hash()))
+		hash := node.LeftChild().Hash()
+		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
 	}
 	rightIndex, found := indexForNode[node.RightChild()]
 	if !found {
-		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(node.RightChild().Hash()))
+		hash := node.RightChild().Hash()
+		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
 	}
 
+	hash := node.Hash()
 	storableNode := &StorableNode{
 		LIndex:     leftIndex,
 		RIndex:     rightIndex,
 		Height:     uint16(node.Height()),
 		Path:       node.Path(),
 		EncPayload: encoding.EncodePayload(node.Payload()),
-		HashValue:  node.Hash(),
+		HashValue:  hash[:],
 		MaxDepth:   node.MaxDepth(),
 		RegCount:   node.RegCount(),
 	}
@@ -102,11 +106,13 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 func toStorableTrie(mtrie *trie.MTrie, indexForNode node2indexMap) (*StorableTrie, error) {
 	rootIndex, found := indexForNode[mtrie.RootNode()]
 	if !found {
-		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(mtrie.RootNode().Hash()))
+		hash := mtrie.RootNode().Hash()
+		return nil, fmt.Errorf("internal error: missing node with hash %s", hex.EncodeToString(hash[:]))
 	}
+	hash := mtrie.RootHash()
 	storableTrie := &StorableTrie{
 		RootIndex: rootIndex,
-		RootHash:  mtrie.RootHash(),
+		RootHash:  hash[:],
 	}
 
 	return storableTrie, nil
@@ -126,7 +132,8 @@ func RebuildTries(flatForest *FlattenedForest) ([]*trie.MTrie, error) {
 		if err != nil {
 			return nil, fmt.Errorf("restoring trie failed: %w", err)
 		}
-		if !bytes.Equal(storableTrie.RootHash, mtrie.RootHash()) {
+		rootHash := mtrie.RootHash()
+		if !bytes.Equal(storableTrie.RootHash, rootHash[:]) {
 			return nil, fmt.Errorf("restoring trie failed: roothash doesn't match")
 		}
 		tries = append(tries, mtrie)
@@ -153,11 +160,15 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode a payload for an storableNode %w", err)
 			}
-			node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], path, payload, snode.HashValue, snode.MaxDepth, snode.RegCount)
+			var nodeHash hash.Hash
+			copy(nodeHash[:], snode.HashValue)
+			node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], path, payload, nodeHash, snode.MaxDepth, snode.RegCount)
 			nodes = append(nodes, node)
 			continue
 		}
-		node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], nil, nil, snode.HashValue, snode.MaxDepth, snode.RegCount)
+		var nodeHash hash.Hash
+		copy(nodeHash[:], snode.HashValue)
+		node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], nil, nil, nodeHash, snode.MaxDepth, snode.RegCount)
 		nodes = append(nodes, node)
 	}
 	return nodes, nil
