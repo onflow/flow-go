@@ -9,3 +9,7 @@ import (
 type ExecutionAPIClient interface {
 	execution.ExecutionAPIClient
 }
+
+type ExecutionAPIServer interface {
+	execution.ExecutionAPIServer
+}

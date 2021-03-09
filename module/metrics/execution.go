@@ -7,7 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module"
 )
 
 // Execution spans.
@@ -18,7 +18,7 @@ const (
 )
 
 type ExecutionCollector struct {
-	tracer                           *trace.OpenTracer
+	tracer                           module.Tracer
 	gasUsedPerBlock                  prometheus.Histogram
 	stateReadsPerBlock               prometheus.Histogram
 	totalExecutedTransactionsCounter prometheus.Counter
@@ -51,7 +51,7 @@ type ExecutionCollector struct {
 	executionStateDiskUsage          prometheus.Gauge
 }
 
-func NewExecutionCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer) *ExecutionCollector {
+func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registerer) *ExecutionCollector {
 
 	forestApproxMemorySize := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
