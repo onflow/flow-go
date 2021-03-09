@@ -33,7 +33,6 @@ type Engine struct {
 	chunksQueue           storage.ChunksQueue       // to store chunks to be verified.
 	newChunkListener      module.NewJobListener     // to notify chunk queue consumer about a new chunk.
 	blockConsumerNotifier module.ProcessingNotifier // to report a block has been processed.
-	indexer               Indexer                   // to index receipts of a block based on their executor identifier.
 }
 
 func New(
@@ -45,7 +44,6 @@ func New(
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	newChunkListener module.NewJobListener,
-	indexer Indexer,
 ) *Engine {
 	return &Engine{
 		unit:             engine.NewUnit(),
@@ -57,7 +55,6 @@ func New(
 		assigner:         assigner,
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,
-		indexer:          indexer,
 	}
 }
 
@@ -191,12 +188,6 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		Int("receipt_num", len(block.Payload.Receipts)).Logger()
 
 	log.Debug().Msg("new finalized block arrived")
-
-	err := e.indexer.Index(block.Payload.Receipts)
-	if err != nil {
-		// TODO: consider aborting the process
-		log.Fatal().Err(err).Msg("could not index receipts for block")
-	}
 
 	// performs chunk assigment on each receipt and pushes the assigned chunks to the
 	// chunks queue.
