@@ -41,6 +41,7 @@ type AssignerEngineTestSuite struct {
 func (s *AssignerEngineTestSuite) mockChunkAssigner(result *flow.ExecutionResult, assignment *chunks.Assignment) int {
 	s.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
 	assignedChunks := assignment.ByNodeID(s.myID())
+	s.metrics.On("OnChunksAssigned", len(assignedChunks)).Return().Once()
 	return len(assignedChunks)
 }
 
@@ -172,12 +173,15 @@ func newBlockHappyPath(t *testing.T) {
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
+	s.metrics.On("OnChunkProcessed").Return().Once()
 
 	// mocks indexer module
 	// on receiving a new finalized block, indexer indexes all its receipts
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends containerBlock containing receipt to assigner engine
+	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -218,6 +222,8 @@ func newBlockUnstaked(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	// when the node is unstaked at reference block id, chunk assigner should not be called,
@@ -256,6 +262,8 @@ func newBlockNoChunk(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -299,6 +307,8 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -339,6 +349,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 	// invoked for it.
 	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
+	s.metrics.On("OnChunkProcessed").Return().Times(chunksNum)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
@@ -348,6 +359,8 @@ func newBlockMultipleAssignment(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends containerBlock containing receipt to assigner engine
+	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,
@@ -388,6 +401,8 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
 
 	// sends block containing receipt to assigner engine
+	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
 	mock.AssertExpectationsForObjects(t,

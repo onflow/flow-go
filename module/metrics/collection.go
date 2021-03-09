@@ -49,7 +49,7 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 		proposals: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
-			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "proposals_size_transactions",
 			Help:      "size/number of proposed collections",
 		}, []string{LabelChain}),
@@ -57,7 +57,7 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 		guarantees: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
-			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "guarantees_size_transactions",
 			Help:      "size/number of guaranteed/finalized collections",
 		}, []string{LabelChain}),
