@@ -433,7 +433,7 @@ func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	var valid bool
 	err := s.db.View(operation.RetrieveBlockValidity(blockID, &valid))
 	if err != nil {
-		return invalid.NewSnapshot(fmt.Errorf("could not get validity for block (id=%x): %w", err))
+		return invalid.NewSnapshot(fmt.Errorf("could not get validity for block (id=%x): %w", blockID, err))
 	}
 	if !valid {
 		return invalid.NewSnapshot(state.NewUnvalidatedBlockQueryError(blockID))
