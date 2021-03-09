@@ -6,18 +6,20 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm/handler"
 )
 
 type ProgramEntry struct {
 	Location common.Location
 	Program  *interpreter.Program
+	View     *delta.View
 }
 
-type ProgramGetFunc func(location common.Location) *ProgramEntry
+type ProgramGetFunc func(location common.Location) (*ProgramEntry, bool)
 
-func emptyProgramGetFunc(_ common.Location) *ProgramEntry {
-	return nil
+func emptyProgramGetFunc(_ common.Location) (*ProgramEntry, bool) {
+	return nil, false
 }
 
 // Programs is a cumulative cache-like storage for Programs helping speed up execution of Cadence
@@ -42,46 +44,46 @@ func NewEmptyPrograms() *Programs {
 func (p *Programs) ChildPrograms() *Programs {
 	return &Programs{
 		programs: map[common.LocationID]ProgramEntry{},
-		parentFunc: func(location common.Location) *ProgramEntry {
+		parentFunc: func(location common.Location) (*ProgramEntry, bool) {
 			return p.get(location)
 		},
 	}
 }
 
-func (p *Programs) Get(location common.Location) *interpreter.Program {
+func (p *Programs) Get(location common.Location) (*interpreter.Program, *delta.View, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	programEntry := p.get(location)
+	programEntry, has := p.get(location)
 
-	if programEntry != nil {
-		return programEntry.Program
+	if has {
+		return programEntry.Program, programEntry.View, true
 	}
 
-	return nil
+	return nil, nil, false
 }
 
-func (p *Programs) get(location common.Location) *ProgramEntry {
+func (p *Programs) get(location common.Location) (*ProgramEntry, bool) {
 	programEntry, ok := p.programs[location.ID()]
 	if !ok {
-		parentEntry := p.parentFunc(location)
+		parentEntry, has := p.parentFunc(location)
 
-		if parentEntry != nil {
-			return parentEntry
+		if has {
+			return parentEntry, true
 		}
-
-		return nil
+		return nil, false
 	}
-	return &programEntry
+	return &programEntry, true
 }
 
-func (p *Programs) Set(location common.Location, program *interpreter.Program) {
+func (p *Programs) Set(location common.Location, program *interpreter.Program, view *delta.View) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.programs[location.ID()] = ProgramEntry{
 		Location: location,
 		Program:  program,
+		View:     view,
 	}
 }
 

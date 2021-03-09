@@ -36,6 +36,7 @@ type hostEnv struct {
 	vm                 *VirtualMachine
 	accounts           *state.Accounts
 	contracts          *handler.ContractHandler
+	programs           *handler.ProgramsHandler
 	addressGenerator   flow.AddressGenerator
 	uuidGenerator      *UUIDGenerator
 	metrics            runtime.Metrics
@@ -46,7 +47,6 @@ type hostEnv struct {
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
-	programs           *Programs
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
@@ -75,6 +75,10 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *
 	uuids := state.NewUUIDs(st)
 	uuidGenerator := NewUUIDGenerator(uuids)
 
+	programsHandler := handler.NewProgramsHandler(
+		programs, st,
+	)
+
 	env := &hostEnv{
 		ctx:                ctx,
 		st:                 st,
@@ -85,7 +89,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
-		programs:           programs,
+		programs:           programsHandler,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -112,7 +116,7 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		e.vm,
 		e.ctx,
 		e.st,
-		e.programs,
+		//e.programs,
 		e.accounts,
 		e.contracts,
 		e.addressGenerator,
@@ -206,7 +210,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 		e.ctx,
 		script,
 		e.st,
-		e.programs,
+		e.programs.Programs,
 	)
 	if err != nil {
 		return 0, err
@@ -239,7 +243,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 		e.ctx,
 		script,
 		e.st,
-		e.programs,
+		e.programs.Programs,
 	)
 	if err != nil {
 		return 0, err
@@ -342,19 +346,12 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 		defer sp.Finish()
 	}
 
-	program := e.programs.Get(location)
-	if program != nil {
-		// Program was found, do an explicit ledger register touch
-		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(common.AddressLocation); ok {
-			e.accounts.TouchContract(
-				addressLocation.Name,
-				flow.BytesToAddress(addressLocation.Address.Bytes()),
-			)
-		}
+	program, has := e.programs.Get(location)
+	if has {
+		return program, nil
 	}
 
-	return program, nil
+	return nil, nil
 }
 
 func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
@@ -363,9 +360,7 @@ func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Prog
 		defer sp.Finish()
 	}
 
-	e.programs.Set(location, program)
-
-	return nil
+	return e.programs.Set(location, program)
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
@@ -732,10 +727,10 @@ func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
 
 // Transaction Environment
 type transactionEnv struct {
-	vm               *VirtualMachine
-	ctx              Context
-	st               *state.State
-	programs         *Programs
+	vm  *VirtualMachine
+	ctx Context
+	st  *state.State
+	//programs         *Programs
 	accounts         *state.Accounts
 	contracts        *handler.ContractHandler
 	addressGenerator flow.AddressGenerator
@@ -750,7 +745,7 @@ func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
 	st *state.State,
-	programs *Programs,
+	//programs *Programs,
 	accounts *state.Accounts,
 	contracts *handler.ContractHandler,
 	addressGenerator flow.AddressGenerator,
@@ -758,10 +753,10 @@ func newTransactionEnv(
 	txIndex uint32,
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:               vm,
-		ctx:              ctx,
-		st:               st,
-		programs:         programs,
+		vm:  vm,
+		ctx: ctx,
+		st:  st,
+		//programs:         programs,
 		accounts:         accounts,
 		contracts:        contracts,
 		addressGenerator: addressGenerator,
