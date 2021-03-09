@@ -66,7 +66,7 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
-	preferredExecutionNodeIDs flow.IdentifierList,
+	preferredExecutionNodeIDs []string,
 	log zerolog.Logger,
 ) *Backend {
 	retry := newRetry()
@@ -135,7 +135,11 @@ func New(
 	retry.SetBackend(b)
 
 	validENMap = make(map[flow.Identifier]bool, len(preferredExecutionNodeIDs))
-	for _, id := range preferredExecutionNodeIDs {
+	for _, idStr := range preferredExecutionNodeIDs {
+		id, err := flow.HexStringToIdentifier(idStr)
+		if err != nil {
+			log.Fatal().Err(err).Str("node_id", idStr).Msg("failed to convert node id string to Flow Identifier")
+		}
 		validENMap[id] = true
 	}
 

@@ -111,7 +111,7 @@ func (suite *Suite) RunTest(
 			suite.metrics,
 			nil,
 			false,
-			flow.IdentifierList{},
+			nil,
 			suite.log,
 		)
 
@@ -285,7 +285,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			metrics,
 			connFactory, // passing in the connection factory
 			false,
-			flow.IdentifierList{},
+			nil,
 			suite.log,
 		)
 
@@ -516,7 +516,7 @@ func (suite *Suite) TestExecuteScript() {
 			suite.metrics,
 			connFactory,
 			false,
-			flow.IdentifierList{},
+			nil,
 			suite.log,
 		)
 
