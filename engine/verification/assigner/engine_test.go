@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -30,7 +29,6 @@ type AssignerEngineTestSuite struct {
 	chunksQueue      *storage.ChunksQueue
 	newChunkListener *module.NewJobListener
 	notifier         *module.ProcessingNotifier
-	indexer          *mockassigner.Indexer
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -76,7 +74,6 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 		newChunkListener: &module.NewJobListener{},
 		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 		notifier:         &module.ProcessingNotifier{},
-		indexer:          &mockassigner.Indexer{},
 	}
 
 	for _, apply := range options {
@@ -114,8 +111,7 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
 		s.state,
 		s.assigner,
 		s.chunksQueue,
-		s.newChunkListener,
-		s.indexer)
+		s.newChunkListener)
 
 	e.withBlockConsumerNotifier(s.notifier)
 
@@ -175,10 +171,6 @@ func newBlockHappyPath(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 	s.metrics.On("OnChunkProcessed").Return().Once()
 
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
-
 	// sends containerBlock containing receipt to assigner engine
 	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
@@ -189,8 +181,7 @@ func newBlockHappyPath(t *testing.T) {
 		s.assigner,
 		s.chunksQueue,
 		s.newChunkListener,
-		s.notifier,
-		s.indexer)
+		s.notifier)
 }
 
 // newBlockUnstaked evaluates that when verification node is unstaked at a reference block,
@@ -217,10 +208,6 @@ func newBlockUnstaked(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
-
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
@@ -236,8 +223,7 @@ func newBlockUnstaked(t *testing.T) {
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
-		s.notifier,
-		s.indexer)
+		s.notifier)
 }
 
 // newBlockNoChunk evaluates passing a new finalized block to assigner engine that contains
@@ -257,10 +243,6 @@ func newBlockNoChunk(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
-
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
@@ -269,8 +251,7 @@ func newBlockNoChunk(t *testing.T) {
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
-		s.notifier,
-		s.indexer)
+		s.notifier)
 
 	// when there is no chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
@@ -302,10 +283,6 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
-
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
@@ -314,8 +291,7 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
-		s.notifier,
-		s.indexer)
+		s.notifier)
 
 	// when there is no assigned chunk, nothing should be passed to chunks queue, and
 	// job listener should not be notified.
@@ -354,10 +330,6 @@ func newBlockMultipleAssignment(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
-
 	// sends containerBlock containing receipt to assigner engine
 	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
@@ -368,8 +340,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 		s.assigner,
 		s.chunksQueue,
 		s.notifier,
-		s.newChunkListener,
-		s.indexer)
+		s.newChunkListener)
 }
 
 // chunkQueueUnhappyPathDuplicate evaluates that after submitting duplicate chunk to chunk queue, assigner engine does not invoke the notifier.
@@ -396,10 +367,6 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
-	// mocks indexer module
-	// on receiving a new finalized block, indexer indexes all its receipts
-	s.indexer.On("Index", containerBlock.Payload.Receipts).Return(nil).Once()
-
 	// sends block containing receipt to assigner engine
 	s.metrics.On("OnAssignerProcessFinalizedBlock", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
@@ -409,8 +376,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 		s.metrics,
 		s.assigner,
 		s.chunksQueue,
-		s.notifier,
-		s.indexer)
+		s.notifier)
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
