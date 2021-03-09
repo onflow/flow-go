@@ -323,6 +323,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
@@ -349,7 +350,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, eventsStorage, serviceEventsStorage, txResultStorage, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.DB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
