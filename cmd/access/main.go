@@ -91,7 +91,7 @@ func main() {
 			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
 			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
 			preferredExecutionNodeIDs := common.IdentifierListValue(rpcConf.PreferredExecutionNodeIDs)
-			flags.Var(&preferredExecutionNodeIDs, "nodeids", "usage")
+			flags.Var(&preferredExecutionNodeIDs, "preferred-execution-node-ids", "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
