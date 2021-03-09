@@ -4,9 +4,11 @@ on:
   push:
     branches: 
       - master
+      - feature/epochs
   pull_request:
     branches:
       - master
+      - feature/epochs
 
 jobs:
   golangci:
