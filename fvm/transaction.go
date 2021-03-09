@@ -134,8 +134,10 @@ func (i *TransactionInvocator) Process(
 		}
 
 		// rest state
-		stm.RollUp(false)
-
+		err = stm.RollUp(false)
+		if err != nil {
+			return err
+		}
 		// force cleanup if retries
 		programs.ForceCleanup()
 
@@ -186,7 +188,10 @@ func (i *TransactionInvocator) Process(
 
 	// tx failed at update contract step
 	if err != nil {
-		stm.RollUp(false)
+		err2 := stm.RollUp(false)
+		if err2 != nil {
+			return err2
+		}
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
@@ -196,7 +201,10 @@ func (i *TransactionInvocator) Process(
 	}
 
 	// don't roll up with true for failed tx
-	stm.RollUp(true)
+	err = stm.RollUp(true)
+	if err != nil {
+		return err
+	}
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

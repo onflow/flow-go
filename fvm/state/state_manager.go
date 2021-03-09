@@ -20,26 +20,35 @@ func (s *StateManager) Nest() {
 	s.activeState = s.activeState.NewChild()
 }
 
-func (s *StateManager) RollUp(merge bool) {
+func (s *StateManager) RollUp(merge bool) error {
+	var err error
 	// TODO merge the register touches
 	if merge {
-		s.activeState.parent.MergeState(s.activeState)
+		err = s.activeState.parent.MergeState(s.activeState)
 	} else {
-		s.activeState.parent.MergeTouchLogs(s.activeState)
+		err = s.activeState.parent.MergeTouchLogs(s.activeState)
+	}
+	if err != nil {
+		return err
 	}
 	// otherwise ignore for now
 	if s.activeState.parent != nil {
 		s.activeState = s.activeState.parent
 	}
+	return nil
 }
 
-func (s *StateManager) RollUpAll(merge bool) {
+func (s *StateManager) RollUpAll(merge bool) error {
 	for {
 		if s.activeState == s.startState || s.activeState.parent == nil {
 			break
 		}
-		s.RollUp(merge)
+		err := s.RollUp(merge)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func (s *StateManager) ApplyStartStateToLedger() error {

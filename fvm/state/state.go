@@ -327,10 +327,6 @@ type payloadKey struct {
 	key        string
 }
 
-func (pk *payloadKey) size() uint64 {
-	return uint64(len(pk.owner) + len(pk.controller) + len(pk.key))
-}
-
 type payload struct {
 	payloadKey
 	value flow.RegisterValue
