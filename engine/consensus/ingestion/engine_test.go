@@ -159,11 +159,7 @@ func (suite *IngestionSuite) SetupTest() {
 
 func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 
-	// create a guarantee signed by the collection node and referencing the
-	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID}
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee := suite.validGuarantee()
 
 	// the guarantee is not part of the memory pool yet
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -184,11 +180,7 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 
 func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
 
-	// create a guarantee signed by the collection node and referencing the
-	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID}
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee := suite.validGuarantee()
 
 	// the guarantee is not part of the memory pool yet
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -207,11 +199,7 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
 
 func (suite *IngestionSuite) TestOnGuaranteeOld() {
 
-	// create a guarantee signed by the collection node and referencing the
-	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID}
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee := suite.validGuarantee()
 
 	// the guarantee is part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(true)
@@ -230,11 +218,7 @@ func (suite *IngestionSuite) TestOnGuaranteeOld() {
 
 func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
 
-	// create a guarantee signed by the collection node and referencing the
-	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID}
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee := suite.validGuarantee()
 
 	// the guarantee is not already part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -255,9 +239,8 @@ func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee := suite.validGuarantee()
 	guarantee.SignerIDs = nil
-	guarantee.ReferenceBlockID = suite.head.ID()
 
 	// the guarantee is part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -278,9 +261,8 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.execID}
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee := suite.validGuarantee()
+	guarantee.SignerIDs = append(guarantee.SignerIDs, suite.execID)
 
 	// the guarantee is part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -306,8 +288,7 @@ func (suite *IngestionSuite) TestOnGuaranteeExpired() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee := suite.validGuarantee()
 	guarantee.ReferenceBlockID = header.ID()
 
 	// the guarantee is part of the memory pool
@@ -329,9 +310,8 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID, unittest.IdentifierFixture()}
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee := suite.validGuarantee()
+	guarantee.SignerIDs = append(guarantee.SignerIDs, unittest.IdentifierFixture())
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -360,9 +340,7 @@ func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 	suite.Require().True(ok)
 	colID.Stake = 0
 
-	guarantee := unittest.CollectionGuaranteeFixture()
-	guarantee.SignerIDs = []flow.Identifier{suite.collID}
-	guarantee.ReferenceBlockID = suite.head.ID()
+	guarantee := suite.validGuarantee()
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
@@ -380,6 +358,29 @@ func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 
 	// check that the Publish call was called
 	suite.conduit.AssertExpectations(suite.T())
+}
+
+func (suite *IngestionSuite) TestOnGuaranteeUnknownOrigin() {
+
+	guarantee := suite.validGuarantee()
+
+	// the guarantee is not part of the memory pool
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
+
+	// submit the guarantee with an unknown origin
+	err := suite.ingest.onGuarantee(unittest.IdentifierFixture(), guarantee)
+	suite.Assert().Error(err)
+
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
+}
+
+// validGuarantee returns a valid collection guarantee based on the suite state.
+func (suite *IngestionSuite) validGuarantee() *flow.CollectionGuarantee {
+	guarantee := unittest.CollectionGuaranteeFixture()
+	guarantee.SignerIDs = []flow.Identifier{suite.collID}
+	guarantee.ReferenceBlockID = suite.head.ID()
+	return guarantee
 }
 
 // expectGuaranteePublished creates an expectation on the Conduit mock that the

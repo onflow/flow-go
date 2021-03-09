@@ -336,7 +336,5 @@ func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.Collec
 		return origin, nil
 	}
 
-	fmt.Println(origin)
-
 	return nil, engine.NewInvalidInputErrorf("invalid origin (id=%x)", originID)
 }
