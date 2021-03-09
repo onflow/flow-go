@@ -77,7 +77,7 @@ func (interceptor *rateLimiterInterceptor) unaryServerInterceptor(ctx context.Co
 	if !limiter.Allow() {
 
 		// log the limit violation
-		interceptor.log.Info().
+		interceptor.log.Trace().
 			Str("method", methodName).
 			Interface("request", req).
 			Float64("limit", float64(limiter.Limit())).

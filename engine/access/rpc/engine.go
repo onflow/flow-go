@@ -9,12 +9,11 @@ import (
 	"time"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc"
-
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
@@ -90,6 +89,9 @@ func New(log zerolog.Logger,
 		interceptors = append(interceptors, grpc_prometheus.UnaryServerInterceptor)
 	}
 
+	// add the logging interceptor
+	interceptors = append(interceptors, loggingInterceptor(log)...)
+
 	if len(apiRatelimits) > 0 {
 		// create a rate limit interceptor
 		rateLimitInterceptor := NewRateLimiterInterceptor(log, apiRatelimits, apiBurstLimits).unaryServerInterceptor
@@ -111,8 +113,8 @@ func New(log zerolog.Logger,
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
 		ExecutionGRPCPort:         executionGRPCPort,
-		CollectionNodeGRPCTimeout: time.Duration(config.CollectionClientTimeout),
-		ExecutionNodeGRPCTimeout:  time.Duration(config.ExecutionClientTimeout),
+		CollectionNodeGRPCTimeout: config.CollectionClientTimeout,
+		ExecutionNodeGRPCTimeout:  config.ExecutionClientTimeout,
 	}
 
 	backend := backend.New(
