@@ -51,6 +51,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		flow.IdentifierList{},
 		suite.log,
 	)
 
@@ -105,6 +106,7 @@ func (suite *Suite) TestHistoricalTransaction() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		flow.IdentifierList{},
 		suite.log,
 	)
 

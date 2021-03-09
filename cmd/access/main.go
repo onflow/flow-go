@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -89,13 +90,14 @@ func main() {
 			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
 			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
 			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
+			preferredExecutionNodeIDs := common.IdentifierListValue(rpcConf.PreferredExecutionNodeIDs)
+			flags.Var(&preferredExecutionNodeIDs, "nodeids", "usage")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
 			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
 			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
-			flags.Inte()
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
