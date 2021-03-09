@@ -1,6 +1,5 @@
 package unittest
 
-import "C"
 import (
 	"math/rand"
 	"testing"

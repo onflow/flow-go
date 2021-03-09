@@ -3,6 +3,8 @@ package state
 import (
 	"errors"
 	"fmt"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // InvalidExtensionError is an error for invalid extension of the state
@@ -30,8 +32,7 @@ func (e InvalidExtensionError) Error() string {
 
 // IsInvalidExtensionError returns whether the given error is an InvalidExtensionError error
 func IsInvalidExtensionError(err error) bool {
-	var errInvalidExtensionError InvalidExtensionError
-	return errors.As(err, &errInvalidExtensionError)
+	return errors.As(err, &InvalidExtensionError{})
 }
 
 // OutdatedExtensionError is an error for the extension of the state being outdated.
@@ -61,11 +62,10 @@ func (e OutdatedExtensionError) Error() string {
 }
 
 func IsOutdatedExtensionError(err error) bool {
-	var errOutdatedExtensionError OutdatedExtensionError
-	return errors.As(err, &errOutdatedExtensionError)
+	return errors.As(err, &OutdatedExtensionError{})
 }
 
-// NoValidChildBlockError is a sentinal error when the case where a certain block has
+// NoValidChildBlockError is a sentinel error when the case where a certain block has
 // no valid child.
 type NoValidChildBlockError struct {
 	err error
@@ -90,6 +90,26 @@ func (e NoValidChildBlockError) Error() string {
 }
 
 func IsNoValidChildBlockError(err error) bool {
-	var errNoValidChildBlockError NoValidChildBlockError
-	return errors.As(err, &errNoValidChildBlockError)
+	return errors.As(err, &NoValidChildBlockError{})
+}
+
+// UnvalidatedBlockQueryError is an error returned when we query a block by ID
+// which has not been marked valid by HotStuff. This means that we aren't yet
+// sure whether the block contains a valid quorum certificate. As a rule, the
+// protocol state returns an error for these blocks rather than returning a
+// state which may be invalid.
+type UnvalidatedBlockQueryError struct {
+	BlockID flow.Identifier
+}
+
+func (e UnvalidatedBlockQueryError) Error() string {
+	return fmt.Sprintf("invalid query for unvalidated block (id=%x)", e.BlockID)
+}
+
+func NewUnvalidatedBlockQueryError(blockID flow.Identifier) error {
+	return UnvalidatedBlockQueryError{BlockID: blockID}
+}
+
+func IsUnvalidatedBlockQueryError(err error) bool {
+	return errors.As(err, &UnvalidatedBlockQueryError{})
 }

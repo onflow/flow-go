@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
@@ -422,10 +423,21 @@ func (s *State) AtHeight(height uint64) protocol.Snapshot {
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not look up block by height: %w", err))
 	}
-	return s.AtBlockID(blockID)
+	return NewSnapshot(s, blockID)
 }
 
 func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+	// check that the block has been marked valid by HotStuff
+	// we don't need this check for Final/Sealed/AtHeight queries because all
+	// blocks which have been indexed must have been marked valid
+	var valid bool
+	err := s.db.View(operation.RetrieveBlockValidity(blockID, &valid))
+	if err != nil {
+		return invalid.NewSnapshot(fmt.Errorf("could not get validity for block (id=%x): %w", err))
+	}
+	if !valid {
+		return invalid.NewSnapshot(state.NewUnvalidatedBlockQueryError(blockID))
+	}
 	return NewSnapshot(s, blockID)
 }
 
