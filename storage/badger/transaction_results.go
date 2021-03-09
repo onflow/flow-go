@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -28,21 +29,19 @@ func (tr *TransactionResults) Store(blockID flow.Identifier, transactionResult *
 	return nil
 }
 
-// BatchStore will store the transaction results for the given block ID
-func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult) error {
-	err := operation.RetryOnConflict(tr.db.Update, func(tx *badger.Txn) error {
-		for _, txResult := range transactionResults {
-			err := operation.SkipDuplicates(operation.InsertTransactionResult(blockID, &txResult))(tx)
+// BatchStore will store the transaction results for the given block ID in a batch
+func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionResults []flow.TransactionResult, batch storage.BatchStorage) error {
+
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		for _, result := range transactionResults {
+			err := operation.BatchInsertTransactionResult(blockID, &result)(writeBatch)
 			if err != nil {
-				return err
+				return fmt.Errorf("cannot batch insert tx result: %w", err)
 			}
 		}
 		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("could not batch insert transaction results: %w", err)
 	}
-	return nil
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
 }
 
 // ByBlockIDTransactionID returns the runtime transaction result for the given block ID and transaction ID
