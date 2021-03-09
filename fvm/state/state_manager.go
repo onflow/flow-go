@@ -1,5 +1,7 @@
 package state
 
+import "fmt"
+
 type StateManager struct {
 	startState  *State
 	activeState *State
@@ -22,6 +24,11 @@ func (s *StateManager) Nest() {
 
 func (s *StateManager) RollUp(merge bool, mergeTouches bool) error {
 	var err error
+
+	if s.activeState.parent == nil {
+		return fmt.Errorf("parent not exist for this state")
+	}
+
 	// TODO merge the register touches
 	if merge {
 		err = s.activeState.parent.MergeState(s.activeState)

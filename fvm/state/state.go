@@ -96,12 +96,14 @@ func (s *State) Touches() []Payload {
 	return s.touchLog
 }
 
-func (s *State) logTouch(pk *Payload) {
+func (s *State) LogTouch(pk *Payload) {
 	s.touchLog = append(s.touchLog, *pk)
 }
 
-func (s *State) logTouches(pks []Payload) {
-	s.touchLog = append(s.touchLog, pks...)
+func (s *State) LogTouches(pks []Payload) {
+	if len(pks) > 0 {
+		s.touchLog = append(s.touchLog, pks...)
+	}
 }
 
 // Get returns a register value given owner, controller and key
@@ -111,7 +113,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	}
 
 	pKey := PayloadKey{owner, controller, key}
-	s.logTouch(&Payload{pKey, nil})
+	s.LogTouch(&Payload{pKey, nil})
 	// check delta first
 	if p, ok := s.delta[pKey]; ok {
 		return p.Value, nil
@@ -164,7 +166,7 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 
 	pKey := PayloadKey{owner, controller, key}
 	p := Payload{pKey, value}
-	s.logTouch(&p)
+	s.LogTouch(&p)
 
 	s.updateDelta(&p)
 
@@ -182,7 +184,7 @@ func (s *State) Delete(owner, controller, key string) error {
 
 // We don't need this later, it should be invisible to the cadence
 func (s *State) Touch(owner, controller, key string) error {
-	s.logTouch(&Payload{PayloadKey{owner, controller, key}, nil})
+	s.LogTouch(&Payload{PayloadKey{owner, controller, key}, nil})
 	return nil
 }
 
@@ -198,7 +200,7 @@ func (s *State) NewChild() *State {
 
 func (s *State) MergeTouchLogs(child *State) error {
 	// append touches
-	s.logTouches(child.touchLog)
+	s.LogTouches(child.touchLog)
 	// TODO maybe merge read cache for performance on failed cases
 	return nil
 }
@@ -206,7 +208,7 @@ func (s *State) MergeTouchLogs(child *State) error {
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(child *State) error {
 	// append touches
-	s.logTouches(child.touchLog)
+	s.LogTouches(child.touchLog)
 
 	// merge read cache
 	for k, v := range child.readCache {
