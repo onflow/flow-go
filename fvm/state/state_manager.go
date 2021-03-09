@@ -18,6 +18,10 @@ func (s *StateManager) State() *State {
 	return s.activeState
 }
 
+func (s *StateManager) MergeStateIntoActiveState(other *State) error {
+	return s.activeState.MergeAnyState(other)
+}
+
 func (s *StateManager) Nest() {
 	s.activeState = s.activeState.NewChild()
 }

@@ -205,6 +205,31 @@ func (s *State) MergeTouchLogs(child *State) error {
 	return nil
 }
 
+// MergeAnyState applies the changes from any given state
+func (s *State) MergeAnyState(other *State) error {
+	// append touches
+	s.LogTouches(other.touchLog)
+
+	// apply delta
+	for _, v := range other.delta {
+		s.updateDelta(&v)
+	}
+
+	// apply address updates
+	for k, v := range other.updatedAddresses {
+		s.updatedAddresses[k] = v
+	}
+
+	// update ledger interactions
+	s.ReadCounter += other.ReadCounter
+	s.WriteCounter += other.WriteCounter
+	s.TotalBytesRead += other.TotalBytesRead
+	s.TotalBytesWritten += other.TotalBytesWritten
+
+	// check max interaction as last step
+	return s.checkMaxInteraction()
+}
+
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(child *State) error {
 	// append touches
