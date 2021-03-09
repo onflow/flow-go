@@ -51,7 +51,8 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.NoError(t, err)
 
 		// merge to parent
-		st.MergeState(stChild)
+		err = st.MergeState(stChild)
+		require.NoError(t, err)
 
 		// read key3 on parent
 		v, err := st.Get("address", "controller", key)
@@ -72,7 +73,8 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.Equal(t, len(v), 0)
 
 		// now should be part of the ledger
-		st.ApplyDeltaToLedger()
+		err = st.ApplyDeltaToLedger()
+		require.NoError(t, err)
 		v, err = ledger.Get("address", "controller", key)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
@@ -112,7 +114,7 @@ func TestState_InteractionMeasuring(t *testing.T) {
 	// should be appended to touches
 	// should be counted towards reading from the ledger
 	key2 := "key2"
-	v, err = st.Get("address", "controller", key2)
+	_, err = st.Get("address", "controller", key2)
 	require.NoError(t, err)
 	require.Equal(t, len(st.Touches()), 3)
 	require.Equal(t,
@@ -121,7 +123,7 @@ func TestState_InteractionMeasuring(t *testing.T) {
 
 	// read again should be from cache
 	// but not an addition ot the ledger read
-	v, err = st.Get("address", "controller", key2)
+	_, err = st.Get("address", "controller", key2)
 	require.NoError(t, err)
 	require.Equal(t, len(st.Touches()), 4)
 	require.Equal(t,
@@ -201,12 +203,12 @@ func TestState_MaxInteraction(t *testing.T) {
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// commit
-	st.MergeState(stChild)
+	err = st.MergeState(stChild)
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(0))
 
 	// apply delta to ledger
-	st.ApplyDeltaToLedger()
+	err = st.ApplyDeltaToLedger()
 	require.NoError(t, err)
 	require.Equal(t, st.InteractionUsed(), uint64(4))
 
