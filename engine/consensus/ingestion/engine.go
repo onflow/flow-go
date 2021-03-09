@@ -311,15 +311,21 @@ func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.Collec
 	}
 
 	// if it is a collection node and a valid epoch participant, it is a valid origin
-	if filter.And(
-		filter.IsValidCurrentEpochParticipant,
-		filter.HasRole(flow.RoleCollection),
-	)(origin) {
-		return origin, nil
+	if err == nil {
+		if filter.And(
+			filter.IsValidCurrentEpochParticipant,
+			filter.HasRole(flow.RoleCollection),
+		)(origin) {
+			return origin, nil
+		}
 	}
 
-	// A consensus node which is a valid epoch participant w.r.t. latest finalized block is also ok.
-	// this can happen when we have just passed an epoch boundary and a consensus
+	// At this point there are two cases:
+	// 1) origin was not found at reference block state
+	// 2) origin was found at reference block state, but isn't a collection node
+	//
+	// Now, check whether the origin is a valid consensus node using finalized state.
+	// This can happen when we have just passed an epoch boundary and a consensus
 	// node which has just joined sends us a guarantee referencing a block prior
 	// to the epoch boundary.
 
