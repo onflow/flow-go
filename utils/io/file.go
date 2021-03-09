@@ -3,6 +3,7 @@ package io
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 )
 
@@ -20,4 +21,12 @@ func ReadFile(path string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func FileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

@@ -231,6 +231,7 @@ func contractKey(contractName string) string {
 }
 
 func (a *Accounts) getContract(contractName string, address flow.Address) ([]byte, error) {
+
 	contract, err := a.getValue(address,
 		true,
 		contractKey(contractName))

@@ -175,7 +175,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // once to it.
 func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.ExecutionResult) error {
 	resultID := result.ID()
-	blockID := result.ExecutionResultBody.BlockID
+	blockID := result.BlockID
 
 	// metrics
 	//
@@ -188,14 +188,35 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 	// monitoring: increases number of received execution results
 	e.metrics.OnExecutionResultReceived()
 
+	// if result has already been sealed, then not to verify this result, nor fetching chunk
+	// data pack for this block
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not get last sealed height: %w", err)
+	}
+
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get block by height: %w", err)
+	}
+
+	isResultSealed := header.Height <= lastSealed.Height
+
+	// isResultSealed :=
 	log := e.log.With().
 		Hex("originID", logging.ID(originID)).
 		Hex("result_id", logging.ID(resultID)).
 		Hex("block_id", logging.ID(blockID)).
 		Int("total_chunks", len(result.Chunks)).
+		Uint64("height", header.Height).
+		Bool("sealed", isResultSealed).
 		Logger()
 
 	log.Info().Msg("execution result arrived")
+
+	if isResultSealed {
+		return nil
+	}
 
 	// different execution results can be chunked in parallel
 	// chunk assignment requires the randomness from the child block of the block that includes the result.
@@ -219,10 +240,11 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 
 	log.Info().
 		Int("total_assigned_chunks", len(chunks)).
+		Uints64("assigned_chunks_indices", chunks.Indices()).
 		Msg("chunk assignment done")
 
 	if len(chunks) == 0 {
-		// no chunk is assigned to this verifiaction node
+		// no chunk is assigned to this verification node
 		return nil
 	}
 
@@ -233,8 +255,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		ExecutionResult: result,
 	}
 	if ok := e.results.Add(rdp); !ok {
-		log.Debug().
-			Msg("could not add result to results mempool")
+		log.Debug().Msg("could not add result to results mempool")
 		return nil
 	}
 
@@ -300,6 +321,14 @@ func (e *Engine) onTimer() {
 
 	now := time.Now()
 	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending pendingChunks")
+	sealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not get sealed height when calling onTimer")
+		return
+	}
+
+	sealedHeight := sealed.Height
+
 	defer e.log.Debug().
 		Int("processed", len(allChunks)-int(e.pendingChunks.Size())).
 		Uint("left", e.pendingChunks.Size()).
@@ -310,9 +339,26 @@ func (e *Engine) onTimer() {
 		chunkID := chunk.ID()
 
 		log := e.log.With().
-			Hex("chunk_id", logging.ID(chunkID)).
+			Hex("block_id", logging.ID(chunk.Chunk.BlockID)).
 			Hex("result_id", logging.ID(chunk.ExecutionResultID)).
+			Hex("chunk_id", logging.ID(chunkID)).
+			Uint64("chunk_index", chunk.Chunk.Index).
 			Logger()
+
+		header, err := e.headers.ByBlockID(chunk.Chunk.BlockID)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("could not get header for block")
+			continue
+		}
+
+		// skips requesting chunks of already sealed blocks
+		isSealed := header.Height <= sealedHeight
+		if isSealed {
+			e.pendingChunks.Rem(chunkID)
+			e.chunkMetaDataCleanup(chunkID, chunk.ExecutionResultID)
+			log.Debug().Msg("block has been sealed")
+			continue
+		}
 
 		// check if has reached max try
 		if !CanTry(e.maxAttempt, chunk) {
@@ -333,7 +379,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		err := e.requestChunkDataPack(chunk)
+		err = e.requestChunkDataPack(chunk)
 		if err != nil {
 			log.Warn().Msg("could not request chunk data pack")
 			continue
@@ -394,29 +440,25 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 	chunkID := chunk.ID()
 	status := NewChunkStatus(chunk, resultID, executorID)
 	added := e.pendingChunks.Add(status)
+	log := e.log.With().
+		Hex("result_id", logging.ID(status.ExecutionResultID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Uint64("chunk_index", chunk.Index).
+		Logger()
+
 	if !added {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
-			Msg("could not add chunk status to pendingChunks mempool")
+		log.Debug().Msg("could not add chunk status to pendingChunks mempool")
 		return
 	}
 
-	// attachs the chunk ID to its result ID for sake of memory cleanup tracking
+	// attaches the chunk ID to its result ID for sake of memory cleanup tracking
 	err := e.chunkIdsByResult.Append(resultID, chunkID)
 	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
-			Msg("could not append chunk id to its result id")
+		log.Debug().Err(err).Msg("could not append chunk id to its result id")
 		return
 	}
 
-	e.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Hex("result_id", logging.ID(status.ExecutionResultID)).
-		Msg("chunk marked assigned to this verification node")
+	e.log.Debug().Msg("chunk marked assigned to this verification node")
 }
 
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
@@ -430,7 +472,10 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 
 	log := e.log.With().
 		Hex("executor_id", logging.ID(originID)).
-		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).Logger()
+		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
+		Hex("collection_id", logging.ID(chunkDataPack.CollectionID)).
+		Hex("chunk_id", logging.ID(chunkID)).Logger()
+
 	log.Info().Msg("chunk data pack received")
 
 	// monitoring: increments number of received chunk data packs
@@ -527,33 +572,29 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 // If all assigned chunks of the corresponding result have been dropped, it also removes
 // the result from the memory.
 func (e *Engine) chunkMetaDataCleanup(chunkID, resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Logger()
 	err := e.chunkIdsByResult.RemIdFromKey(resultID, chunkID)
 	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("result_id", logging.ID(resultID)).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could not dropped chunk")
+		log.Debug().Err(err).Msg("could not dropped chunk")
 		return
 	}
 
 	if e.chunkIdsByResult.Has(resultID) {
 		// there are still un-matched chunks correspond to this result
-		// so the result should not be cleanned.
+		// so the result should not be cleaned.
 		return
 	}
 
 	// no pending chunk is attached to this result, hence removes it
 	if ok := e.results.Rem(resultID); !ok {
-		e.log.Debug().
-			Hex("result_id", logging.ID(resultID)).
-			Msg("could not remove result")
+		log.Debug().Msg("could not remove result")
 		return
 	}
 
-	e.log.Info().
-		Hex("result_id", logging.ID(resultID)).
-		Msg("result successfully removed")
+	e.log.Info().Msg("result successfully removed")
 }
 
 // matchChunk performs the last step in matching pipeline for a chunk.
@@ -567,7 +608,7 @@ func (e *Engine) matchChunk(
 	chunkDataPack *flow.ChunkDataPack,
 	endState flow.StateCommitment) error {
 
-	blockID := result.ExecutionResultBody.BlockID
+	blockID := result.BlockID
 
 	// header must exist in storage
 	header, err := e.headers.ByBlockID(blockID)

@@ -225,7 +225,7 @@ func migrateContractValue(p ledger.Payload) ([]ledger.Payload, *contractValueMap
 	if len(storedData) == 0 {
 		return []ledger.Payload{}, nil, nil
 	}
-	storedValue, err := interpreter.DecodeValue(storedData, &address, []string{"contract"}, version)
+	storedValue, err := interpreter.DecodeValue(storedData, &address, []string{"contract"}, version, nil)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -288,7 +288,7 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 			Msg("Cannot parse program at address")
 		return nil, err
 	}
-	declarations := program.Declarations
+	declarations := program.Declarations()
 
 	// find import declarations
 	importDeclarations := make([]ast.Declaration, 0)
@@ -323,8 +323,8 @@ func migrateContractCode(p ledger.Payload) ([]ledger.Payload, error) {
 			Msg("Cannot parse program at address after removing declarations")
 		return nil, err
 	}
-	declarations = program.Declarations
 
+	declarations = program.Declarations()
 	switch len(declarations) {
 	case 0:
 		// If there is no declarations. Only comments? was this legal before?

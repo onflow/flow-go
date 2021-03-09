@@ -2,10 +2,9 @@ package access
 
 import (
 	"context"
-	"fmt"
-	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
@@ -95,6 +94,8 @@ func (suite *Suite) RunTest(
 		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
+		results := storage.NewExecutionResults(suite.metrics, db)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
 
 		suite.backend = backend.New(
 			suite.state,
@@ -105,11 +106,12 @@ func (suite *Suite) RunTest(
 			headers,
 			collections,
 			transactions,
+			receipts,
 			suite.chainID,
 			suite.metrics,
-			uint(9000),
 			nil,
 			false,
+			suite.log,
 		)
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
@@ -216,8 +218,6 @@ func (mc *mockCloser) Close() error { return nil }
 func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 
-		collectionGrpcPort := uint(9000)
-
 		// create a transaction
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
@@ -267,13 +267,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		grpcAddr := func(node *flow.Identity) string {
-			host, _, err := net.SplitHostPort(node.Address)
-			require.NoError(suite.T(), err)
-			return fmt.Sprintf("%s:%d", host, collectionGrpcPort)
-		}
-		connFactory.On("GetAccessAPIClient", grpcAddr(collNode1)).Return(col1ApiClient, &mockCloser{}, nil)
-		connFactory.On("GetAccessAPIClient", grpcAddr(collNode2)).Return(col2ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode1.Address).Return(col1ApiClient, &mockCloser{}, nil)
+		connFactory.On("GetAccessAPIClient", collNode2.Address).Return(col2ApiClient, &mockCloser{}, nil)
 
 		backend := backend.New(
 			suite.state,
@@ -284,11 +279,12 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			nil,
 			collections,
 			transactions,
+			nil,
 			suite.chainID,
 			metrics,
-			collectionGrpcPort,
 			connFactory, // passing in the connection factory
 			false,
+			suite.log,
 		)
 
 		handler := access.NewHandler(backend, suite.chainID.Chain())
@@ -447,11 +443,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
-			suite.chainID, metrics, 0, false, false)
+			nil, suite.chainID, metrics, 0, 0, false, false, nil, nil)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+			transactions, nil, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
@@ -489,16 +485,73 @@ func (suite *Suite) TestGetSealedTransaction() {
 // TestExecuteScript tests the three execute Script related calls to make sure that the execution api is called with
 // the correct block id
 func (suite *Suite) TestExecuteScript() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers) {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+		transactions := storage.NewTransactions(suite.metrics, db)
+		collections := storage.NewCollections(db, transactions)
+		results := storage.NewExecutionResults(suite.metrics, db)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+
+		identities := unittest.IdentityListFixture(1)
+		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
+		executionNodeIdentity := identities[0]
+
+		// create a mock connection factory
+		connFactory := new(factorymock.ConnectionFactory)
+		connFactory.On("GetExecutionAPIClient", executionNodeIdentity.Address).Return(suite.execClient, &mockCloser{}, nil)
+
+		suite.backend = backend.New(
+			suite.state,
+			nil,
+			suite.collClient,
+			nil,
+			blocks,
+			headers,
+			collections,
+			transactions,
+			receipts,
+			suite.chainID,
+			suite.metrics,
+			connFactory,
+			false,
+			suite.log,
+		)
+
+		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
+
+		// initialize metrics related storage
+		metrics := metrics.NewNoopCollector()
+		collectionsToMarkFinalized, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		collectionsToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+		blocksToMarkExecuted, err := stdmap.NewTimes(100)
+		require.NoError(suite.T(), err)
+
+		conduit := new(mocknetwork.Conduit)
+		suite.net.On("Register", engine.ReceiveReceipts, mock.Anything).Return(conduit, nil).
+			Once()
+		// create the ingest engine
+		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
+			transactions, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
+		require.NoError(suite.T(), err)
 
 		// create a block and a seal pointing to that block
 		lastBlock := unittest.BlockFixture()
 		lastBlock.Header.Height = 2
-		err := blocks.Store(&lastBlock)
+		err = blocks.Store(&lastBlock)
 		require.NoError(suite.T(), err)
 		err = db.Update(operation.IndexBlockHeight(lastBlock.Header.Height, lastBlock.ID()))
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
+
+		// create an execution receipt for the block
+		executionReceiptLast := unittest.ReceiptForBlockFixture(&lastBlock)
+		executionReceiptLast.ExecutorID = identities[0].NodeID
+
+		// notify the ingestion engine about the receipt
+		err = ingestEng.ProcessLocal(executionReceiptLast)
+		require.NoError(suite.T(), err)
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()
@@ -508,6 +561,15 @@ func (suite *Suite) TestExecuteScript() {
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
+		// create an execution receipt for the block
+		executionReceiptPrev := unittest.ReceiptForBlockFixture(&prevBlock)
+		executionReceiptPrev.ExecutorID = identities[0].NodeID
+
+		// notify the ingestion engine about the receipt
+		err = ingestEng.ProcessLocal(executionReceiptPrev)
+		require.NoError(suite.T(), err)
+		// wait for the receipt to be persisted
+		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
 		ctx := context.Background()
 
 		script := []byte("dummy script")

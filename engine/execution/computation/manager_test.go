@@ -2,6 +2,7 @@ package computation
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/onflow/cadence/runtime"
@@ -31,7 +32,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -88,9 +89,13 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 	require.NoError(t, err)
 
+	programsCache, err := NewProgramsCache(10)
+	require.NoError(t, err)
+
 	engine := &Manager{
 		blockComputer: blockComputer,
 		me:            me,
+		programsCache: programsCache,
 	}
 
 	view := delta.NewView(ledger.Get)
@@ -102,4 +107,40 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
+}
+
+func TestExecuteScript(t *testing.T) {
+
+	logger := zerolog.Nop()
+
+	execCtx := fvm.NewContext(logger)
+
+	me := new(module.Local)
+	me.On("NodeID").Return(flow.ZeroID)
+
+	rt := runtime.NewInterpreterRuntime()
+
+	vm := fvm.New(rt)
+
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+
+	view := delta.NewView(ledger.Get)
+
+	scriptView := view.NewChild()
+
+	script := []byte(fmt.Sprintf(
+		`
+			import FungibleToken from %s
+
+			pub fun main() {}
+		`,
+		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
+	))
+
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize)
+	require.NoError(t, err)
+
+	header := unittest.BlockHeaderFixture()
+	_, err = engine.ExecuteScript(script, nil, &header, scriptView)
+	require.NoError(t, err)
 }

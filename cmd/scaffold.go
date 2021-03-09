@@ -58,6 +58,7 @@ type BaseConfig struct {
 	profilerDir      string
 	profilerInterval time.Duration
 	profilerDuration time.Duration
+	tracerEnabled    bool
 }
 
 type Metrics struct {
@@ -113,7 +114,7 @@ type FlowNodeBuilder struct {
 	flags             *pflag.FlagSet
 	Logger            zerolog.Logger
 	Me                *local.Local
-	Tracer            *trace.OpenTracer
+	Tracer            module.Tracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
@@ -157,6 +158,9 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 		"the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second,
 		"the duration to run the auto-profile for")
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
+		"whether to enable tracer")
+
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -197,10 +201,11 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		// topology
 		// subscription manager
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State, subscriptionManager)
+		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
+		topologyCache := topology.NewCache(fnb.Logger, top)
 
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
@@ -209,7 +214,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			fnb.Me,
 			fnb.Middleware,
 			10e6,
-			top,
+			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network)
 		if err != nil {
@@ -299,10 +304,15 @@ func (fnb *FlowNodeBuilder) initLogger() {
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
-	tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
-	fnb.MustNot(err).Msg("could not initialize tracer")
+
+	fnb.Tracer = trace.NewNoopTracer()
+	if fnb.BaseConfig.tracerEnabled {
+		tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
+		fnb.MustNot(err).Msg("could not initialize tracer")
+		fnb.Logger.Info().Msg("Tracer Started")
+		fnb.Tracer = tracer
+	}
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
-	fnb.Tracer = tracer
 
 	mempools := metrics.NewMempoolCollector(5 * time.Second)
 

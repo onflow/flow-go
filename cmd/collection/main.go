@@ -100,7 +100,7 @@ func main() {
 				"expiry buffer for inbound transactions")
 			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 				"how many additional cluster members we propagate transactions to")
-			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 1_000_000,
+			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 10_000_000,
 				"the maximum address index allowed in transactions")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 				"expiry buffer for transactions in proposed collections")
