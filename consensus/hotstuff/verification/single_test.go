@@ -15,7 +15,7 @@ import (
 func TestSingleVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false)
+	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false, epochCounter)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
@@ -62,7 +62,7 @@ func TestSingleProposalIsVote(t *testing.T) {
 	// NOTE: I don't think this is true for every signature scheme
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false)
+	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false, epochCounter)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
@@ -80,7 +80,7 @@ func TestSingleQC(t *testing.T) {
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
 	voterIDs := identities.NodeIDs()
 	minShares := (len(voterIDs)-1)/2 + 1
-	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false)
+	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false, epochCounter)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
