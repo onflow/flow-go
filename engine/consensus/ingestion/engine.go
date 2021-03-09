@@ -260,7 +260,6 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 // produce the given collection w.r.t. the guarantee's reference block.
 func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 
-	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
 	guarantors := guarantee.SignerIDs
 
 	if len(guarantors) == 0 {
@@ -268,6 +267,7 @@ func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
+	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
 	clusters, err := snapshot.Epochs().Current().Clustering()
 	if err != nil {
 		return fmt.Errorf("could not get clusters: %w", err)
