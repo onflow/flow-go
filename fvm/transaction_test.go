@@ -79,14 +79,14 @@ func TestSafetyCheck(t *testing.T) {
 
 			context := NewContext(log)
 
-			st := state.NewState(
+			stm := state.NewStateManager(state.NewState(
 				ledger,
 				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-			)
+			))
 
-			err = txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+			err = txInvocator.Process(vm, context, proc, stm, NewEmptyPrograms())
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -149,14 +149,14 @@ func TestSafetyCheck(t *testing.T) {
 
 		context := NewContext(log)
 
-		st := state.NewState(
+		stm := state.NewStateManager(state.NewState(
 			ledger,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err = txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err = txInvocator.Process(vm, context, proc, stm, NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -181,14 +181,14 @@ func TestSafetyCheck(t *testing.T) {
 		ledger := state.NewMapLedger()
 		context := NewContext(log)
 
-		st := state.NewState(
+		stm := state.NewStateManager(state.NewState(
 			ledger,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, stm, NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -214,14 +214,14 @@ func TestSafetyCheck(t *testing.T) {
 		ledger := state.NewMapLedger()
 		context := NewContext(log)
 
-		st := state.NewState(
+		stm := state.NewStateManager(state.NewState(
 			ledger,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, stm, NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -266,9 +266,9 @@ func TestSafetyCheck(t *testing.T) {
 		header := unittest.BlockHeaderFixture()
 		context := NewContext(log, WithBlockHeader(&header))
 
-		st := state.NewState(ledger)
+		stm := state.NewStateManager(state.NewState(ledger))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, stm, NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		require.Equal(t, 1, proc.Retried)

@@ -33,12 +33,12 @@ func keyPublicKey(index uint64) string {
 }
 
 type Accounts struct {
-	state *State
+	stateManager *StateManager
 }
 
-func NewAccounts(state *State) *Accounts {
+func NewAccounts(stateManager *StateManager) *Accounts {
 	return &Accounts{
-		state: state,
+		stateManager: stateManager,
 	}
 }
 
@@ -335,9 +335,9 @@ func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValu
 
 func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
+		return a.stateManager.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 	}
-	return a.state.Get(string(address.Bytes()), "", key)
+	return a.stateManager.State().Get(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -352,9 +352,9 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	}
 
 	if isController {
-		return a.state.Set(string(address.Bytes()), string(address.Bytes()), key, value)
+		return a.stateManager.State().Set(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return a.state.Set(string(address.Bytes()), "", key, value)
+	return a.stateManager.State().Set(string(address.Bytes()), "", key, value)
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -418,10 +418,10 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 // TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
+		_, _ = a.stateManager.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 		return
 	}
-	_, _ = a.state.Get(string(address.Bytes()), "", key)
+	_, _ = a.stateManager.State().Get(string(address.Bytes()), "", key)
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {

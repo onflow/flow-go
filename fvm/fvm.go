@@ -11,7 +11,7 @@ import (
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, st *state.State, programs *Programs) error
+	Run(vm *VirtualMachine, ctx Context, stm *state.StateManager, programs *Programs) error
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
@@ -33,6 +33,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger, 
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+	stm := state.NewStateManager(st)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -52,12 +53,12 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger, 
 		}
 	}()
 
-	err = proc.Run(vm, ctx, st, programs)
+	err = proc.Run(vm, ctx, stm, programs)
 	if err != nil {
 		return err
 	}
 
-	return st.Commit()
+	return st.ApplyDeltaToLedger()
 }
 
 // GetAccount returns an account by address or an error if none exists.
@@ -67,17 +68,12 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	account, err := getAccount(vm, ctx, st, programs, address)
+	stm := state.NewStateManager(st)
+	account, err := getAccount(vm, ctx, stm, programs, address)
 	if err != nil {
 		// TODO: wrap error
 		return nil, err
 	}
-	err = st.Commit()
-	if err != nil {
-		// TODO: wrap error
-		return nil, err
-	}
-
 	return account, nil
 }
 
@@ -85,9 +81,9 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, st *state.State, programs *Programs) error {
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, stm *state.StateManager, programs *Programs) error {
 	invocator := NewTransactionInvocator(zerolog.Nop())
-	err := invocator.Process(vm, ctx, tx, st, programs)
+	err := invocator.Process(vm, ctx, tx, stm, programs)
 	if err != nil {
 		return err
 	}

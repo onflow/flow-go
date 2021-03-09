@@ -12,22 +12,22 @@ import (
 func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 	ledger := state.NewMapLedger()
 	chain := flow.MonotonicEmulator.Chain()
-	st := state.NewState(ledger)
-	_, err := state.NewStateBoundAddressGenerator(st, chain)
+	stm := state.NewStateManager(state.NewState(ledger))
+	_, err := state.NewStateBoundAddressGenerator(stm, chain)
 	require.NoError(t, err)
 }
 
 func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	ledger := state.NewMapLedger()
 	chain := flow.MonotonicEmulator.Chain()
-	st := state.NewState(ledger)
-	generator, err := state.NewStateBoundAddressGenerator(st, chain)
+	stm := state.NewStateManager(state.NewState(ledger))
+	generator, err := state.NewStateBoundAddressGenerator(stm, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	err = st.Commit()
+	stm.ApplyStartStateToLedger()
 	require.NoError(t, err)
 	stateBytes, err := ledger.Get("", "", "account_address_state")
 	require.NoError(t, err)
@@ -41,14 +41,14 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
-	st := state.NewState(ledger)
-	generator, err := state.NewStateBoundAddressGenerator(st, chain)
+	stm := state.NewStateManager(state.NewState(ledger))
+	generator, err := state.NewStateBoundAddressGenerator(stm, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	err = st.Commit()
+	stm.ApplyStartStateToLedger()
 	require.NoError(t, err)
 
 	stateBytes, err := ledger.Get("", "", "account_address_state")

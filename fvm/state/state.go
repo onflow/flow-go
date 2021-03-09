@@ -1,9 +1,6 @@
 package state
 
 import (
-	"sort"
-	"sync"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -18,15 +15,13 @@ const (
 type StateOption func(st *State) *State
 
 type State struct {
-	ledger Ledger
-	// reason for using mutex instead of channel
-	// state doesn't have to be thread safe and right now
-	// is only used in a single thread but a mutex has been added
-	// here to prevent accidental multi-thread use in the future
-	lock                  sync.Mutex
-	draft                 map[string]payload
+	ledger                Ledger
+	parent                *State
+	touchLog              []payload
+	changeLog             []payload
+	delta                 map[payloadKey]payload
+	readCache             map[payloadKey]payload
 	updatedAddresses      map[flow.Address]struct{}
-	readCache             map[string]payload
 	interactionUsed       uint64
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
@@ -37,9 +32,11 @@ func defaultState(ledger Ledger) *State {
 	return &State{
 		ledger:                ledger,
 		interactionUsed:       uint64(0),
-		draft:                 make(map[string]payload),
+		touchLog:              make([]payload, 0),
+		changeLog:             make([]payload, 0),
+		delta:                 make(map[payloadKey]payload),
 		updatedAddresses:      make(map[flow.Address]struct{}),
-		readCache:             make(map[string]payload),
+		readCache:             make(map[payloadKey]payload),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
@@ -53,6 +50,14 @@ func NewState(ledger Ledger, opts ...StateOption) *State {
 		ctx = applyOption(ctx)
 	}
 	return ctx
+}
+
+// WithParent sets a parent for the state
+func WithParent(parent *State) func(st *State) *State {
+	return func(st *State) *State {
+		st.parent = parent
+		return st
+	}
 }
 
 // WithMaxKeySizeAllowed sets limit on max key size
@@ -79,42 +84,40 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *State) logTouch(owner, controller, key string, value flow.RegisterValue) {
+	s.touchLog = append(s.touchLog, payload{payloadKey{owner, controller, key}, value})
+}
 
+func (s *State) logChange(owner, controller, key string, value flow.RegisterValue) {
+	s.changeLog = append(s.changeLog, payload{payloadKey{owner, controller, key}, value})
+}
+
+// Get returns a register value given owner, controller and key
+func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	if err := s.checkSize(owner, controller, key, []byte{}); err != nil {
 		return nil, err
 	}
 
-	// check draft first
-	if p, ok := s.draft[fullKey(owner, controller, key)]; ok {
-		// just call the ledger get for tracking touches
-		_, err := s.ledger.Get(owner, controller, key)
-		if err != nil {
-			return nil, &LedgerFailure{err}
-		}
-		return p.value, nil
-	}
+	pKey := payloadKey{owner, controller, key}
 
-	// return from draft
-	if p, ok := s.draft[fullKey(owner, controller, key)]; ok {
-		// just call the ledger get for tracking touches
-		_, err := s.ledger.Get(owner, controller, key)
-		if err != nil {
-			return nil, &LedgerFailure{err}
-		}
+	// check delta first
+	if p, ok := s.delta[pKey]; ok {
+		s.logTouch(owner, controller, key, p.value)
 		return p.value, nil
 	}
 
 	// return from read cache
-	if p, ok := s.readCache[fullKey(owner, controller, key)]; ok {
-		// just call the ledger get for tracking touches
-		_, err := s.ledger.Get(owner, controller, key)
-		if err != nil {
-			return nil, &LedgerFailure{err}
-		}
+	if p, ok := s.readCache[pKey]; ok {
+		s.logTouch(owner, controller, key, p.value)
 		return p.value, nil
+	}
+
+	// read from parent
+	if s.parent != nil {
+		value, err := s.parent.Get(owner, controller, key)
+		s.readCache[pKey] = payload{pKey, value}
+		s.logTouch(owner, controller, key, value)
+		return value, err
 	}
 
 	// read from ledger
@@ -124,20 +127,22 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	}
 
 	// update read catch
-	s.readCache[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
-
+	s.readCache[pKey] = payload{pKey, value}
+	s.logTouch(owner, controller, key, value)
 	return value, s.updateInteraction(owner, controller, key, value, []byte{})
 }
 
+// Set updates state delta with a register update
 func (s *State) Set(owner, controller, key string, value flow.RegisterValue) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	if err := s.checkSize(owner, controller, key, value); err != nil {
 		return err
 	}
 
-	s.draft[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+	pKey := payloadKey{owner, controller, key}
+
+	s.delta[pKey] = payload{pKey, value}
+	s.logTouch(owner, controller, key, value)
+	s.logChange(owner, controller, key, value)
 	address, isAddress := addressFromOwner(owner)
 	if isAddress {
 		s.updatedAddresses[address] = struct{}{}
@@ -146,65 +151,56 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 }
 
 func (s *State) Touch(owner, controller, key string) error {
-	_, err := s.Get(owner, controller, key)
+	// TODO we don't need to call the ledger touch, touch can be returned later form the logs
+	err := s.Touch(owner, controller, key)
+	// TODO figure out value instead of nil
+	s.logTouch(owner, controller, key, nil)
 	return err
 }
 
 func (s *State) Delete(owner, controller, key string) error {
 	err := s.Set(owner, controller, key, nil)
+	s.logTouch(owner, controller, key, nil)
+	s.logChange(owner, controller, key, nil)
 	return err
 }
 
-func (s *State) Commit() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	// TODO right now we sort keys to minimize
-	// the impact on the spock, but later we might
-	// expose interactionFingerprint as a separate
-	// parameters, this preserve number of reads and
-	// order of reads as extra layer of entropy
-
-	keys := make([]string, 0)
-	for k := range s.draft {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		p := s.draft[k]
-		oldValue, err := s.ledger.Get(p.owner, p.controller, p.key)
-		if err != nil {
-			return err
-		}
-		// update interaction
-		err = s.updateInteraction(p.owner, p.controller, p.key, oldValue, p.value)
-		if err != nil {
-			return err
-		}
-		err = s.ledger.Set(p.owner, p.controller, p.key, p.value)
-		if err != nil {
-			return err
-		}
-
-		// update read cache
-		s.readCache[fullKey(p.owner, p.controller, p.key)] = p
-	}
-
-	// reset draft
-	s.draft = make(map[string]payload)
-	s.updatedAddresses = make(map[flow.Address]struct{})
-
-	return nil
+// NewChild generates a new child state
+func (s *State) NewChild() *State {
+	return NewState(s.ledger, WithParent(s))
 }
 
-func (s *State) Rollback() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+// MergeState applies the changes from a the given view to this view.
+// TODO rename this, this is not actually a merge as we can't merge
+// ledger
+func (s *State) MergeState(child *State) {
+	// transfer touches
+	for _, l := range child.touchLog {
+		// TODO do this through touch method
+		s.logTouch(l.owner, l.controller, l.key, l.value)
+	}
 
-	s.draft = make(map[string]payload)
-	s.updatedAddresses = make(map[flow.Address]struct{})
+	// transfer changes
+	for _, l := range child.changeLog {
+		s.Set(l.owner, l.controller, l.key, l.value)
+	}
+}
+
+// ApplyDeltaToLedger should only be used for applying changes to ledger at the end of tx
+// if successful
+func (s *State) ApplyDeltaToLedger() error {
+
+	// TODO
+	// we can change this to only use delta
+	// when SPoCK secret is moved to lower level
+	for _, v := range s.changeLog {
+		err := s.ledger.Set(v.owner, v.controller, v.key, v.value)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO clean up change log and others if needed to be called multiple times in the future
 	return nil
 }
 
@@ -221,8 +217,6 @@ func (s *State) UpdatedAddresses() []flow.Address {
 }
 
 func (s *State) InteractionUsed() uint64 {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	return s.interactionUsed
 }
 
@@ -267,9 +261,12 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	return address, true
 }
 
-type payload struct {
+type payloadKey struct {
 	owner      string
 	controller string
 	key        string
-	value      flow.RegisterValue
+}
+type payload struct {
+	payloadKey
+	value flow.RegisterValue
 }

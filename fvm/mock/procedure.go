@@ -14,13 +14,13 @@ type Procedure struct {
 	mock.Mock
 }
 
-// Run provides a mock function with given fields: vm, ctx, st, programs
-func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, st *state.State, programs *fvm.Programs) error {
-	ret := _m.Called(vm, ctx, st, programs)
+// Run provides a mock function with given fields: vm, ctx, stm, programs
+func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, stm *state.StateManager, programs *fvm.Programs) error {
+	ret := _m.Called(vm, ctx, stm, programs)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *state.State, *fvm.Programs) error); ok {
-		r0 = rf(vm, ctx, st, programs)
+	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *state.StateManager, *fvm.Programs) error); ok {
+		r0 = rf(vm, ctx, stm, programs)
 	} else {
 		r0 = ret.Error(0)
 	}
