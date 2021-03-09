@@ -103,7 +103,10 @@ func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error
 		return nil, err
 	}
 
-	stm.State().ApplyDeltaToLedger()
+	err = stm.State().ApplyDeltaToLedger()
+	if err != nil {
+		return nil, err
+	}
 
 	return l.Payloads(), nil
 }

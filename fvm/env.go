@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
-	tracelog "github.com/opentracing/opentracing-go/log"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
@@ -669,7 +668,7 @@ func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration
 	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", location.String())},
 			},
 			},
 		)
@@ -681,7 +680,7 @@ func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duratio
 	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", location.String())},
 			},
 			},
 		)
@@ -693,7 +692,7 @@ func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Dur
 	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", location.String())},
 			},
 			},
 		)

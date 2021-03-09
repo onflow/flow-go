@@ -106,8 +106,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	stm.RollUp(true)
-	return nil
+	return stm.RollUp(true, true)
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

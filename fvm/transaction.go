@@ -61,11 +61,12 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 
 		if vmErr != nil {
 			proc.Err = vmErr
-			return nil
+			// TODO we should not break here we should continue for fee deductions
+			break
 		}
 	}
 
-	return nil
+	return st.State().ApplyTouchesToLedger()
 }
 
 type TransactionInvocator struct {
@@ -133,8 +134,10 @@ func (i *TransactionInvocator) Process(
 		}
 
 		// rest state
-		stm.RollUp(false)
-
+		rollUpError := stm.RollUp(false, false)
+		if rollUpError != nil {
+			return rollUpError
+		}
 		// force cleanup if retries
 		programs.ForceCleanup()
 
@@ -185,7 +188,10 @@ func (i *TransactionInvocator) Process(
 
 	// tx failed at update contract step
 	if err != nil {
-		stm.RollUp(false)
+		err2 := stm.RollUp(false, true)
+		if err2 != nil {
+			return err2
+		}
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
@@ -195,7 +201,10 @@ func (i *TransactionInvocator) Process(
 	}
 
 	// don't roll up with true for failed tx
-	stm.RollUp(true)
+	err = stm.RollUp(true, true)
+	if err != nil {
+		return err
+	}
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

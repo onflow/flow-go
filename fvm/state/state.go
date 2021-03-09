@@ -12,36 +12,33 @@ const (
 	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
 )
 
-type StateOption func(st *State) *State
-
 type State struct {
 	ledger                Ledger
 	parent                *State
-	touchLog              []payload
-	changeLog             []payload
-	delta                 map[payloadKey]payload
-	readCache             map[payloadKey]payload
+	touchLog              []Payload
+	delta                 map[PayloadKey]Payload
+	readCache             map[PayloadKey]Payload
 	updatedAddresses      map[flow.Address]struct{}
-	interactionUsed       uint64
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
+	LedgerInteraction
 }
 
 func defaultState(ledger Ledger) *State {
 	return &State{
 		ledger:                ledger,
-		interactionUsed:       uint64(0),
-		touchLog:              make([]payload, 0),
-		changeLog:             make([]payload, 0),
-		delta:                 make(map[payloadKey]payload),
+		touchLog:              make([]Payload, 0),
+		delta:                 make(map[PayloadKey]Payload),
 		updatedAddresses:      make(map[flow.Address]struct{}),
-		readCache:             make(map[payloadKey]payload),
+		readCache:             make(map[PayloadKey]Payload),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
 	}
 }
+
+type StateOption func(st *State) *State
 
 // NewState constructs a new state
 func NewState(ledger Ledger, opts ...StateOption) *State {
@@ -84,12 +81,29 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-func (s *State) logTouch(owner, controller, key string, value flow.RegisterValue) {
-	s.touchLog = append(s.touchLog, payload{payloadKey{owner, controller, key}, value})
+// TouchLogBytes returns a large byte slice of all register touches
+// for read touches the value part is nil for updates
+// the value part is also included
+func (s *State) TouchLogBytes() []byte {
+	res := make([]byte, 0)
+	for _, p := range s.touchLog {
+		res = append(res, p.bytes()...)
+	}
+	return res
 }
 
-func (s *State) logChange(owner, controller, key string, value flow.RegisterValue) {
-	s.changeLog = append(s.changeLog, payload{payloadKey{owner, controller, key}, value})
+func (s *State) Touches() []Payload {
+	return s.touchLog
+}
+
+func (s *State) LogTouch(pk *Payload) {
+	s.touchLog = append(s.touchLog, *pk)
+}
+
+func (s *State) LogTouches(pks []Payload) {
+	if len(pks) > 0 {
+		s.touchLog = append(s.touchLog, pks...)
+	}
 }
 
 // Get returns a register value given owner, controller and key
@@ -98,25 +112,22 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 		return nil, err
 	}
 
-	pKey := payloadKey{owner, controller, key}
-
+	pKey := PayloadKey{owner, controller, key}
+	s.LogTouch(&Payload{pKey, nil})
 	// check delta first
 	if p, ok := s.delta[pKey]; ok {
-		s.logTouch(owner, controller, key, p.value)
-		return p.value, nil
+		return p.Value, nil
 	}
 
 	// return from read cache
 	if p, ok := s.readCache[pKey]; ok {
-		s.logTouch(owner, controller, key, p.value)
-		return p.value, nil
+		return p.Value, nil
 	}
 
 	// read from parent
 	if s.parent != nil {
 		value, err := s.parent.Get(owner, controller, key)
-		s.readCache[pKey] = payload{pKey, value}
-		s.logTouch(owner, controller, key, value)
+		s.readCache[pKey] = Payload{pKey, value}
 		return value, err
 	}
 
@@ -127,9 +138,24 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	}
 
 	// update read catch
-	s.readCache[pKey] = payload{pKey, value}
-	s.logTouch(owner, controller, key, value)
-	return value, s.updateInteraction(owner, controller, key, value, []byte{})
+	p := Payload{pKey, value}
+	s.readCache[pKey] = p
+	s.ReadCounter++
+	s.TotalBytesRead += p.size()
+	return value, s.checkMaxInteraction()
+}
+
+func (s *State) updateDelta(p *Payload) {
+	// check if a delta already exist for this key
+	// reduce the bytes to be written
+	if old, ok := s.delta[p.PayloadKey]; ok {
+		s.ToBeWrittenCounter--
+		s.TotalBytesToBeWritten -= old.size()
+	}
+
+	s.delta[p.PayloadKey] = *p
+	s.ToBeWrittenCounter++
+	s.TotalBytesToBeWritten += p.size()
 }
 
 // Set updates state delta with a register update
@@ -138,11 +164,12 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 		return err
 	}
 
-	pKey := payloadKey{owner, controller, key}
+	pKey := PayloadKey{owner, controller, key}
+	p := Payload{pKey, value}
+	s.LogTouch(&p)
 
-	s.delta[pKey] = payload{pKey, value}
-	s.logTouch(owner, controller, key, value)
-	s.logChange(owner, controller, key, value)
+	s.updateDelta(&p)
+
 	address, isAddress := addressFromOwner(owner)
 	if isAddress {
 		s.updatedAddresses[address] = struct{}{}
@@ -150,57 +177,114 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	return nil
 }
 
-func (s *State) Touch(owner, controller, key string) error {
-	// TODO we don't need to call the ledger touch, touch can be returned later form the logs
-	err := s.Touch(owner, controller, key)
-	// TODO figure out value instead of nil
-	s.logTouch(owner, controller, key, nil)
+func (s *State) Delete(owner, controller, key string) error {
+	err := s.Set(owner, controller, key, nil)
 	return err
 }
 
-func (s *State) Delete(owner, controller, key string) error {
-	err := s.Set(owner, controller, key, nil)
-	s.logTouch(owner, controller, key, nil)
-	s.logChange(owner, controller, key, nil)
-	return err
+// We don't need this later, it should be invisible to the cadence
+func (s *State) Touch(owner, controller, key string) error {
+	s.LogTouch(&Payload{PayloadKey{owner, controller, key}, nil})
+	return nil
 }
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
-	return NewState(s.ledger, WithParent(s))
+	return NewState(s.ledger,
+		WithParent(s),
+		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
+		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
+		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+	)
+}
+
+func (s *State) MergeTouchLogs(child *State) error {
+	// append touches
+	s.LogTouches(child.touchLog)
+	// TODO maybe merge read cache for performance on failed cases
+	return nil
+}
+
+// MergeAnyState applies the changes from any given state
+func (s *State) MergeAnyState(other *State) error {
+	// append touches
+	s.LogTouches(other.touchLog)
+
+	// apply delta
+	for _, v := range other.delta {
+		s.updateDelta(&v)
+	}
+
+	// apply address updates
+	for k, v := range other.updatedAddresses {
+		s.updatedAddresses[k] = v
+	}
+
+	// update ledger interactions
+	s.ReadCounter += other.ReadCounter
+	s.WriteCounter += other.WriteCounter
+	s.TotalBytesRead += other.TotalBytesRead
+	s.TotalBytesWritten += other.TotalBytesWritten
+
+	// check max interaction as last step
+	return s.checkMaxInteraction()
 }
 
 // MergeState applies the changes from a the given view to this view.
-// TODO rename this, this is not actually a merge as we can't merge
-// ledger
-func (s *State) MergeState(child *State) {
-	// transfer touches
-	for _, l := range child.touchLog {
-		// TODO do this through touch method
-		s.logTouch(l.owner, l.controller, l.key, l.value)
+func (s *State) MergeState(child *State) error {
+	// append touches
+	s.LogTouches(child.touchLog)
+
+	// merge read cache
+	for k, v := range child.readCache {
+		s.readCache[k] = v
 	}
 
-	// transfer changes
-	for _, l := range child.changeLog {
-		s.Set(l.owner, l.controller, l.key, l.value)
+	// apply delta
+	for _, v := range child.delta {
+		s.updateDelta(&v)
 	}
+
+	// apply address updates
+	for k, v := range child.updatedAddresses {
+		s.updatedAddresses[k] = v
+	}
+
+	// update ledger interactions
+	s.ReadCounter += child.ReadCounter
+	s.WriteCounter += child.WriteCounter
+	s.TotalBytesRead += child.TotalBytesRead
+	s.TotalBytesWritten += child.TotalBytesWritten
+
+	// check max interaction as last step
+	return s.checkMaxInteraction()
 }
 
 // ApplyDeltaToLedger should only be used for applying changes to ledger at the end of tx
 // if successful
 func (s *State) ApplyDeltaToLedger() error {
-
-	// TODO
-	// we can change this to only use delta
-	// when SPoCK secret is moved to lower level
-	for _, v := range s.changeLog {
-		err := s.ledger.Set(v.owner, v.controller, v.key, v.value)
+	for _, v := range s.delta {
+		s.WriteCounter++
+		s.TotalBytesWritten += v.size()
+		err := s.ledger.Set(v.Owner, v.Controller, v.Key, v.Value)
 		if err != nil {
 			return err
 		}
 	}
+	return s.checkMaxInteraction()
+}
 
-	// TODO clean up change log and others if needed to be called multiple times in the future
+// ApplyTouchesToLedger applies all the register touches to the ledger,
+// this is needed for failed transactions
+// TODO later we might not need this if we return the touches directly
+// to the layer above for SPoCK and data pack construction
+func (s *State) ApplyTouchesToLedger() error {
+	for _, v := range s.touchLog {
+		err := s.ledger.Touch(v.Owner, v.Controller, v.Key)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -216,18 +300,10 @@ func (s *State) UpdatedAddresses() []flow.Address {
 	return addresses
 }
 
-func (s *State) InteractionUsed() uint64 {
-	return s.interactionUsed
-}
-
-func (s *State) updateInteraction(owner, controller, key string, oldValue, newValue flow.RegisterValue) error {
-	keySize := uint64(len(owner) + len(controller) + len(key))
-	oldValueSize := uint64(len(oldValue))
-	newValueSize := uint64(len(newValue))
-	s.interactionUsed += keySize + oldValueSize + newValueSize
-	if s.interactionUsed > s.maxInteractionAllowed {
+func (s *State) checkMaxInteraction() error {
+	if s.InteractionUsed() > s.maxInteractionAllowed {
 		return &StateInteractionLimitExceededError{
-			Used:  s.interactionUsed,
+			Used:  s.InteractionUsed(),
 			Limit: s.maxInteractionAllowed}
 	}
 	return nil
@@ -261,12 +337,41 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	return address, true
 }
 
-type payloadKey struct {
-	owner      string
-	controller string
-	key        string
+// LedgerInteraction captures stats on how much an state
+// interacted with the ledger
+type LedgerInteraction struct {
+	ReadCounter           uint64
+	ToBeWrittenCounter    uint64
+	WriteCounter          uint64
+	TotalBytesRead        uint64
+	TotalBytesToBeWritten uint64
+	TotalBytesWritten     uint64
 }
-type payload struct {
-	payloadKey
-	value flow.RegisterValue
+
+func (li *LedgerInteraction) InteractionUsed() uint64 {
+	return li.TotalBytesRead + li.TotalBytesWritten
+}
+
+type PayloadKey struct {
+	Owner      string
+	Controller string
+	Key        string
+}
+
+type Payload struct {
+	PayloadKey
+	Value flow.RegisterValue
+}
+
+func (p *Payload) size() uint64 {
+	return uint64(len(p.Owner) + len(p.Controller) + len(p.Key) + len(p.Value))
+}
+
+func (p *Payload) bytes() []byte {
+	res := make([]byte, 0)
+	res = append(res, []byte(p.Owner)...)
+	res = append(res, []byte(p.Controller)...)
+	res = append(res, []byte(p.Key)...)
+	res = append(res, p.Value...)
+	return res
 }
