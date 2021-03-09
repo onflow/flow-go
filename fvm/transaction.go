@@ -134,9 +134,9 @@ func (i *TransactionInvocator) Process(
 		}
 
 		// rest state
-		err = stm.RollUp(false)
-		if err != nil {
-			return err
+		rollUpError := stm.RollUp(false, false)
+		if rollUpError != nil {
+			return rollUpError
 		}
 		// force cleanup if retries
 		programs.ForceCleanup()
@@ -188,7 +188,7 @@ func (i *TransactionInvocator) Process(
 
 	// tx failed at update contract step
 	if err != nil {
-		err2 := stm.RollUp(false)
+		err2 := stm.RollUp(false, true)
 		if err2 != nil {
 			return err2
 		}
@@ -201,7 +201,7 @@ func (i *TransactionInvocator) Process(
 	}
 
 	// don't roll up with true for failed tx
-	err = stm.RollUp(true)
+	err = stm.RollUp(true, true)
 	if err != nil {
 		return err
 	}

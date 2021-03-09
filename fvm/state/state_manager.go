@@ -20,13 +20,15 @@ func (s *StateManager) Nest() {
 	s.activeState = s.activeState.NewChild()
 }
 
-func (s *StateManager) RollUp(merge bool) error {
+func (s *StateManager) RollUp(merge bool, mergeTouches bool) error {
 	var err error
 	// TODO merge the register touches
 	if merge {
 		err = s.activeState.parent.MergeState(s.activeState)
 	} else {
-		err = s.activeState.parent.MergeTouchLogs(s.activeState)
+		if mergeTouches {
+			err = s.activeState.parent.MergeTouchLogs(s.activeState)
+		}
 	}
 	if err != nil {
 		return err
@@ -38,12 +40,12 @@ func (s *StateManager) RollUp(merge bool) error {
 	return nil
 }
 
-func (s *StateManager) RollUpAll(merge bool) error {
+func (s *StateManager) RollUpAll(merge bool, mergeTouches bool) error {
 	for {
 		if s.activeState == s.startState || s.activeState.parent == nil {
 			break
 		}
-		err := s.RollUp(merge)
+		err := s.RollUp(merge, mergeTouches)
 		if err != nil {
 			return err
 		}
