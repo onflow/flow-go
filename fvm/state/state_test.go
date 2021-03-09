@@ -12,9 +12,6 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 	ledger := state.NewMapLedger()
 	st := state.NewState(ledger)
 
-	// TODO Test read cache (only once call from ledger)
-	// TODO test touchLog
-
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
 		key := "key1"
 		value := createByteArray(1)
@@ -81,6 +78,62 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		require.Equal(t, v, value)
 	})
 
+}
+
+func TestState_InteractionMeasuring(t *testing.T) {
+	ledger := state.NewMapLedger()
+	st := state.NewState(ledger)
+
+	key := "key1"
+	value := createByteArray(1)
+	err := st.Set("address", "controller", key, value)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), st.ReadCounter)
+	require.Equal(t, uint64(0), st.WriteCounter)
+	require.Equal(t, uint64(1), st.ToBeWrittenCounter)
+	require.Equal(t, uint64(0), st.TotalBytesRead)
+	require.Equal(t,
+		uint64(len("address")+len("controller")+len(key)+len(value)),
+		st.TotalBytesToBeWritten)
+	require.Equal(t, uint64(0), st.TotalBytesWritten)
+	require.Equal(t, uint64(0), st.TotalBytesRead)
+	require.Equal(t, len(st.Touches()), 1)
+
+	// should read from the delta
+	// addition to the touch but
+	// should not impact totalBytesRead
+	v, err := st.Get("address", "controller", key)
+	require.NoError(t, err)
+	require.Equal(t, v, value)
+	require.Equal(t, len(st.Touches()), 2)
+	require.Equal(t, uint64(0), st.TotalBytesRead)
+
+	// non existing key
+	// should be appended to touches
+	// should be counted towards reading from the ledger
+	key2 := "key2"
+	v, err = st.Get("address", "controller", key2)
+	require.NoError(t, err)
+	require.Equal(t, len(st.Touches()), 3)
+	require.Equal(t,
+		uint64(len("address")+len("controller")+len(key)),
+		st.TotalBytesRead)
+
+	// read again should be from cache
+	// but not an addition ot the ledger read
+	v, err = st.Get("address", "controller", key2)
+	require.NoError(t, err)
+	require.Equal(t, len(st.Touches()), 4)
+	require.Equal(t,
+		uint64(len("address")+len("controller")+len(key)),
+		st.TotalBytesRead)
+
+	// apply to ledger, totalBytesWritten should be updated now
+	err = st.ApplyDeltaToLedger()
+	require.NoError(t, err)
+	require.Equal(t,
+		uint64(len("address")+len("controller")+len(key)+len(value)),
+		st.TotalBytesWritten)
 }
 
 func TestState_MaxValueSize(t *testing.T) {

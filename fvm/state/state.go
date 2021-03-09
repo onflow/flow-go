@@ -92,6 +92,10 @@ func (s *State) TouchLogBytes() []byte {
 	return res
 }
 
+func (s *State) Touches() []payload {
+	return s.touchLog
+}
+
 func (s *State) logTouch(pk *payload) {
 	s.touchLog = append(s.touchLog, *pk)
 }
