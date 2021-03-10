@@ -40,46 +40,45 @@ func (s *StateManager) Nest() {
 	s.activeState = s.activeState.NewChild()
 }
 
-// RollUp merges the active state into its parent and set the parent as the
-// new active state (if any parents), if merge is set to true, it will merge
-// the delta of the state and if false it ignores the child.
-// if mergeTouches is set it merges the touches to the parent (useful for exec failure cases)
-func (s *StateManager) RollUp(merge bool, mergeTouches bool) error {
-	var err error
-
+// RollUpWithMerge merges the active state into its parent and set the parent as the
+// new active state.
+func (s *StateManager) RollUpWithMerge() error {
 	if s.activeState.parent == nil {
 		return fmt.Errorf("parent not exist for this state")
 	}
 
-	// TODO merge the register touches
-	if merge {
-		err = s.activeState.parent.MergeState(s.activeState)
-	} else {
-		if mergeTouches {
-			err = s.activeState.parent.MergeTouchLogs(s.activeState)
-		}
-	}
+	err := s.activeState.parent.MergeState(s.activeState)
 	if err != nil {
 		return err
 	}
-	// otherwise ignore for now
-	if s.activeState.parent != nil {
-		s.activeState = s.activeState.parent
-	}
+
+	s.activeState = s.activeState.parent
 	return nil
 }
 
-// RollUpAll calls the roll up until we reach to the start state
-func (s *StateManager) RollUpAll(merge bool, mergeTouches bool) error {
-	for {
-		if s.activeState == s.startState || s.activeState.parent == nil {
-			break
-		}
-		err := s.RollUp(merge, mergeTouches)
-		if err != nil {
-			return err
-		}
+// RollUpWithTouchMergeOnly merges the active state's touches into its parent and set the parent as the
+// new active state. useful for failed transactions
+func (s *StateManager) RollUpWithTouchMergeOnly() error {
+	if s.activeState.parent == nil {
+		return fmt.Errorf("parent not exist for this state")
 	}
+
+	err := s.activeState.parent.MergeTouchLogs(s.activeState)
+	if err != nil {
+		return err
+	}
+
+	s.activeState = s.activeState.parent
+	return nil
+}
+
+// RollUpNoMerge ignores the current active state
+// and sets the parent as the active state
+func (s *StateManager) RollUpNoMerge() error {
+	if s.activeState.parent == nil {
+		return fmt.Errorf("parent not exist for this state")
+	}
+	s.activeState = s.activeState.parent
 	return nil
 }
 
