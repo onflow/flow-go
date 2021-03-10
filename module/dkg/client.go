@@ -116,15 +116,16 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 	ctx := context.Background()
 
-	template := templates.GenerateGetDKGWhiteBoardMessagesScript(c.env)
+	// TODO: add fromIndex to parameter of transaction
+	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
+
 	dkgMessages, err := c.flowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{})
 	if err != nil {
 		return nil, fmt.Errorf("could not execute read broadcast script")
 	}
 
-	// TODO: convert from `cadence.Value` to `[]messages.DKGMessage`
-
-	return []messages.DKGMessage{}, nil
+	// TODO: convert from `cadence.Array` to `[]messages.DKGMessage`
+	return dkgMessages.ToGoValue().([]messages.DKGMessage), nil
 }
 
 // SubmitResult submits the final public result of the DKG protocol. This
@@ -155,10 +156,13 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		AddAuthorizer(c.accountAddress)
 
 	// create cadence array from public keys
+	// Need to make sure that the order in which these are sent to the
+	// contract are the same as when we pull them out
 	finalSubmission := make([]cadence.Value, len(publicKeys))
 	for _, publicKey := range publicKeys {
 		finalSubmission = append(finalSubmission, cadence.NewString(publicKey.String()))
 	}
+	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()))
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
 	if err != nil {
