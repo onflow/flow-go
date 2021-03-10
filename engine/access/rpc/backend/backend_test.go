@@ -250,7 +250,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		On("ByBlockID", mock.Anything).
 		Return([]*flow.ExecutionReceipt{receipt}, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
@@ -540,7 +540,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 			r := unittest.ReceiptForBlockFixture(&b)
 			suite.receipts.
-				On("ByBlockIDAllExecutionReceipts", b.ID()).
+				On("ByBlockID", b.ID()).
 				Return([]*flow.ExecutionReceipt{r}, nil).Once()
 		}
 
@@ -602,7 +602,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create receipt mocks that always returns empty
 		receipts := new(storagemock.ExecutionReceipts)
 		receipts.
-			On("ByBlockIDAllExecutionReceipts", mock.Anything).
+			On("ByBlockID", mock.Anything).
 			Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 		// create the handler
@@ -708,7 +708,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	// use the static execution node
 	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		On("ByBlockID", mock.Anything).
 		Return([]*flow.ExecutionReceipt{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
@@ -908,7 +908,7 @@ func (suite *Suite) TestGetAccount() {
 	receipt := unittest.ReceiptForBlockFixture(&block)
 	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", blockID).
+		On("ByBlockID", blockID).
 		Return([]*flow.ExecutionReceipt{receipt}, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
@@ -959,7 +959,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		Once()
 
 	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
+		On("ByBlockID", mock.Anything).
 		Return([]*flow.ExecutionReceipt{}, nil).Once()
 
 	// create the expected execution API request
@@ -1050,7 +1050,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			receipts[j] = r
 		}
 		suite.receipts.
-			On("ByBlockIDAllExecutionReceipts", block.ID()).
+			On("ByBlockID", block.ID()).
 			Return(receipts, nil).Once()
 	}
 
