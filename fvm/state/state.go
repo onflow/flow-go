@@ -12,6 +12,9 @@ const (
 	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
 )
 
+// State represents the execution state
+// it holds draft of updates and captures
+// all register touches
 type State struct {
 	ledger                Ledger
 	parent                *State
