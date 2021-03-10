@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,7 +28,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, fvm.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms())
 
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
@@ -45,7 +46,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, fvm.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms())
 
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
@@ -63,7 +64,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, fvm.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms())
 
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
@@ -81,7 +82,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, fvm.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
@@ -98,7 +99,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, fvm.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
@@ -143,7 +144,7 @@ func newMockStateManager(updatedKeys []string, ownerKeyStorageValue []OwnerKeyVa
 	return sm
 }
 
-func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateManager, _ *fvm.Programs) (func(address common.Address) (value uint64, err error), error) {
+func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateManager, _ *programs.Programs) (func(address common.Address) (value uint64, err error), error) {
 	return func(address common.Address) (value uint64, err error) {
 		return 100, nil
 	}, nil

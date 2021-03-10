@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -30,7 +31,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateManager, *Programs) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateManager, *programs.Programs) error
 }
 
 type TransactionProcedure struct {
@@ -51,7 +52,7 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 	proc.TraceSpan = traceSpan
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateManager, programs *Programs) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateManager, programs *programs.Programs) error {
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, ctx, proc, st, programs)
 		vmErr, fatalErr := handleError(err)
@@ -84,7 +85,7 @@ func (i *TransactionInvocator) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	stm *state.StateManager,
-	programs *Programs,
+	programs *programs.Programs,
 ) error {
 
 	var span opentracing.Span

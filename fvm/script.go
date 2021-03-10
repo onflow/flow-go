@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
@@ -32,7 +33,7 @@ type ScriptProcedure struct {
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateManager, *Programs) error
+	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateManager, *programs.Programs) error
 }
 
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
@@ -43,7 +44,7 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, stm *state.StateManager, programs *Programs) error {
+func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, stm *state.StateManager, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, stm, programs)
 		vmErr, fatalErr := handleError(err)
@@ -71,7 +72,7 @@ func (i ScriptInvocator) Process(
 	ctx Context,
 	proc *ScriptProcedure,
 	stm *state.StateManager,
-	programs *Programs,
+	programs *programs.Programs,
 ) error {
 	env, err := newEnvironment(ctx, vm, stm, programs)
 	if err != nil {

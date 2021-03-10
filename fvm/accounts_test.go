@@ -12,12 +12,13 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) flow.Address {
+func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
 		fvm.WithRestrictedAccountCreation(false),
@@ -48,7 +49,7 @@ func addAccountKey(
 	vm *fvm.VirtualMachine,
 	ctx fvm.Context,
 	ledger state.Ledger,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 	address flow.Address,
 ) flow.AccountPublicKey {
 	publicKeyA, cadencePublicKey := newAccountKey(t)
@@ -73,7 +74,7 @@ func addAccountCreator(
 	chain flow.Chain,
 	ctx fvm.Context,
 	ledger state.Ledger,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 	account flow.Address,
 ) {
 	script := []byte(
@@ -100,7 +101,7 @@ func removeAccountCreator(
 	chain flow.Chain,
 	ctx fvm.Context,
 	ledger state.Ledger,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 	account flow.Address,
 ) {
 	script := []byte(
@@ -237,7 +238,7 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Single account",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				txBody := flow.NewTransactionBody().
@@ -267,7 +268,7 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Multiple accounts",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				const count = 3
 
 				payer := createAccount(t, vm, chain, ctx, ledger, programs)
@@ -309,7 +310,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Unauthorized account payer",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				txBody := flow.NewTransactionBody().
@@ -327,7 +328,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Authorized account payer",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(chain.ServiceAddress())
@@ -343,7 +344,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer added to allowlist",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, ledger, programs)
 				addAccountCreator(t, vm, chain, ctx, ledger, programs, payer)
 
@@ -363,7 +364,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer removed from allowlist",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, ledger, programs)
 				addAccountCreator(t, vm, chain, ctx, ledger, programs, payer)
 
@@ -414,7 +415,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Add to empty key list",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				before, err := vm.GetAccount(ctx, address, ledger, programs)
@@ -451,7 +452,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Add to non-empty key list",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				publicKey1 := addAccountKey(t, vm, ctx, ledger, programs, address)
@@ -497,7 +498,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Invalid key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
@@ -525,7 +526,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Multiple keys",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				before, err := vm.GetAccount(ctx, address, ledger, programs)
@@ -578,7 +579,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	t.Run("Non-existent key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				const keyCount = 2
@@ -620,7 +621,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	t.Run("Existing key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				const keyCount = 2
@@ -663,7 +664,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	t.Run("Multiple keys",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, ledger, programs)
 
 				const keyCount = 2

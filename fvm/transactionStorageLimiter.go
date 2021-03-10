@@ -3,6 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -13,7 +14,7 @@ type TransactionStorageLimiter struct {
 		ctx Context,
 		tp *TransactionProcedure,
 		stm *state.StateManager,
-		programs *Programs,
+		programs *programs.Programs,
 	) (func(address common.Address) (value uint64, err error), error)
 }
 
@@ -22,7 +23,7 @@ func getStorageCapacityFuncFactory(
 	ctx Context,
 	_ *TransactionProcedure,
 	stm *state.StateManager,
-	programs *Programs,
+	programs *programs.Programs,
 ) (func(address common.Address) (value uint64, err error), error) {
 	env, err := newEnvironment(ctx, vm, stm, programs)
 	if err != nil {
@@ -44,7 +45,7 @@ func (d *TransactionStorageLimiter) Process(
 	ctx Context,
 	tp *TransactionProcedure,
 	stm *state.StateManager,
-	programs *Programs,
+	programs *programs.Programs,
 ) error {
 	if !ctx.LimitAccountStorage {
 		return nil

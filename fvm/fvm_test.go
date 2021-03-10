@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -48,7 +49,7 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 }
 
 func (vmt vmTest) run(
-	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs),
+	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		rt := runtime.NewInterpreterRuntime()
@@ -72,7 +73,7 @@ func (vmt vmTest) run(
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		}
 
-		programs := fvm.NewEmptyPrograms()
+		programs := programs.NewEmptyPrograms()
 
 		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
 
@@ -88,7 +89,7 @@ func TestPrograms(t *testing.T) {
 	t.Run(
 		"transaction execution programs are committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 
 				txCtx := fvm.NewContextFromParent(ctx)
 
@@ -136,7 +137,7 @@ func TestPrograms(t *testing.T) {
 
 	t.Run("script execution programs are not committed",
 		newVMTest().run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 
 				scriptCtx := fvm.NewContextFromParent(ctx)
 
@@ -189,7 +190,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		assert.Nil(t, tx.Err)
@@ -222,7 +223,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -246,7 +247,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		require.Len(t, tx.Logs, 2)
@@ -272,7 +273,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -306,7 +307,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
@@ -322,7 +323,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -336,7 +337,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
@@ -346,7 +347,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -363,7 +364,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
@@ -373,7 +374,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		assert.Error(t, tx.Err)
@@ -471,7 +472,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, 0)
 
-			err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+			err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -556,7 +557,7 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 			tx := fvm.Transaction(txBody, 0)
 
-			err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+			err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 			require.NoError(t, err)
 
 			tt.check(t, tx)
@@ -590,7 +591,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -625,7 +626,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
 
 				// Create an account private key.
@@ -713,7 +714,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(ctx, script, ledger, fvm.NewEmptyPrograms())
+		err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -731,7 +732,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(ctx, script, ledger, fvm.NewEmptyPrograms())
+		err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		assert.Error(t, script.Err)
@@ -750,7 +751,7 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(ctx, script, ledger, fvm.NewEmptyPrograms())
+		err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -812,7 +813,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(blockCtx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(blockCtx, tx, ledger, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -857,7 +858,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 		script := fvm.Script(code)
 
-		err := vm.Run(blockCtx, script, ledger, fvm.NewEmptyPrograms())
+		err := vm.Run(blockCtx, script, ledger, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		assert.NoError(t, script.Err)
@@ -906,7 +907,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_ = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, fvm.NewEmptyPrograms())
+			_ = vm.Run(blockCtx, fvm.Transaction(tx, 0), ledger, programs.NewEmptyPrograms())
 		})
 	})
 
@@ -923,7 +924,7 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 		assert.PanicsWithValue(t, interpreter.ExternalError{
 			Recovered: logPanic{},
 		}, func() {
-			_ = vm.Run(blockCtx, fvm.Script(script), ledger, fvm.NewEmptyPrograms())
+			_ = vm.Run(blockCtx, fvm.Script(script), ledger, programs.NewEmptyPrograms())
 		})
 	})
 }
@@ -950,7 +951,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
-	programs := fvm.NewEmptyPrograms()
+	programs := programs.NewEmptyPrograms()
 
 	createAccount := func() (flow.Address, crypto.PublicKey) {
 		privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
@@ -1070,7 +1071,7 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
@@ -1109,7 +1110,7 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err = vm.Run(ctx, tx, ledger, fvm.NewEmptyPrograms())
+	err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 	assert.NoError(t, err)
 
 	assert.NoError(t, tx.Err)
@@ -1209,7 +1210,7 @@ func TestSignatureVerification(t *testing.T) {
 	}
 
 	t.Run("Single key", newVMTest().run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 			privateKey, publicKey := createKey()
 			signableMessage, message := createMessage("foo")
 			signature := signMessage(privateKey, signableMessage)
@@ -1299,7 +1300,7 @@ func TestSignatureVerification(t *testing.T) {
 	))
 
 	t.Run("Multiple keys", newVMTest().run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
 			privateKeyA, publicKeyA := createKey()
 			privateKeyB, publicKeyB := createKey()
 			privateKeyC, publicKeyC := createKey()
@@ -1408,7 +1409,7 @@ func TestWithServiceAccount(t *testing.T) {
 	t.Run("With service account enabled", func(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 
-		err := vm.Run(ctxA, tx, ledger, fvm.NewEmptyPrograms())
+		err := vm.Run(ctxA, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		// transaction should fail on non-bootstrapped ledger
@@ -1420,7 +1421,7 @@ func TestWithServiceAccount(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err := vm.Run(ctxB, tx, ledger, fvm.NewEmptyPrograms())
+		err := vm.Run(ctxB, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		// transaction should succeed on non-bootstrapped ledger
@@ -1487,7 +1488,7 @@ func TestEventLimits(t *testing.T) {
 		SetPayer(chain.ServiceAddress()).
 		AddAuthorizer(chain.ServiceAddress())
 
-	programs := fvm.NewEmptyPrograms()
+	programs := programs.NewEmptyPrograms()
 
 	tx := fvm.Transaction(txBody, 0)
 	err := vm.Run(ctx, tx, ledger, programs)

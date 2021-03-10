@@ -1,4 +1,4 @@
-package fvm
+package programs
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 func Test_Programs(t *testing.T) {
@@ -18,6 +18,8 @@ func Test_Programs(t *testing.T) {
 		Elaboration: nil,
 	}
 	someLocation := common.IdentifierLocation("some")
+
+	newState := state.NewState(state.NewMapLedger())
 
 	addressLocation := common.AddressLocation{
 		Address: common.BytesToAddress([]byte{2, 3, 4}),
@@ -29,29 +31,38 @@ func Test_Programs(t *testing.T) {
 		parentLocation := common.IdentifierLocation("parent")
 
 		parent := NewEmptyPrograms()
-		parent.Set(parentLocation, &interpreter.Program{})
+
+		parent.Set(parentLocation, &interpreter.Program{}, newState)
 
 		programs := parent.ChildPrograms()
-		programs.Set(someLocation, someProgram)
-		programs.Set(addressLocation, &interpreter.Program{})
+		programs.Set(someLocation, someProgram, newState)
+		programs.Set(addressLocation, &interpreter.Program{}, newState)
 
-		retrieved := programs.Get(someLocation)
+		retrieved, _, has := programs.Get(someLocation)
 		require.NotNil(t, retrieved)
-		retrieved = programs.Get(addressLocation)
+		require.True(t, has)
+
+		retrieved, _, has = programs.Get(addressLocation)
 		require.NotNil(t, retrieved)
-		retrieved = programs.Get(parentLocation)
+		require.True(t, has)
+
+		retrieved, _, has = programs.Get(parentLocation)
 		require.NotNil(t, retrieved)
+		require.True(t, has)
 
 		programs.Cleanup(nil)
 
-		retrieved = programs.Get(someLocation)
+		retrieved, _, has = programs.Get(someLocation)
 		require.Nil(t, retrieved)
+		require.False(t, has)
 
-		retrieved = programs.Get(addressLocation)
+		retrieved, _, has = programs.Get(addressLocation)
 		require.NotNil(t, retrieved)
+		require.True(t, has)
 
-		retrieved = programs.Get(parentLocation)
+		retrieved, _, has = programs.Get(parentLocation)
 		require.NotNil(t, retrieved)
+		require.True(t, has)
 	})
 
 	t.Run("cleanup with changed programs", func(t *testing.T) {
@@ -59,80 +70,100 @@ func Test_Programs(t *testing.T) {
 		parentLocation := common.IdentifierLocation("parent")
 
 		parent := NewEmptyPrograms()
-		parent.Set(parentLocation, &interpreter.Program{})
+		parent.Set(parentLocation, &interpreter.Program{}, newState)
 
 		programs := parent.ChildPrograms()
-		programs.Set(someLocation, someProgram)
-		programs.Set(addressLocation, &interpreter.Program{})
+		programs.Set(someLocation, someProgram, newState)
+		programs.Set(addressLocation, &interpreter.Program{}, newState)
 
-		retrieved := programs.Get(someLocation)
+		retrieved, _, has := programs.Get(someLocation)
 		require.NotNil(t, retrieved)
-		retrieved = programs.Get(addressLocation)
+		require.True(t, has)
+
+		retrieved, _, has = programs.Get(addressLocation)
 		require.NotNil(t, retrieved)
-		retrieved = programs.Get(parentLocation)
+		require.True(t, has)
+
+		retrieved, _, has = programs.Get(parentLocation)
 		require.NotNil(t, retrieved)
+		require.True(t, has)
 
 		// we don't care about the changed program, just their amount (for now)
-		programs.Cleanup([]handler.ContractUpdateKey{{}, {}})
+		programs.Cleanup([]ContractUpdateKey{{}, {}})
 
-		retrieved = programs.Get(someLocation)
+		retrieved, _, has = programs.Get(someLocation)
 		require.Nil(t, retrieved)
-		retrieved = programs.Get(addressLocation)
+		require.False(t, has)
+
+		retrieved, _, has = programs.Get(addressLocation)
 		require.Nil(t, retrieved)
-		retrieved = programs.Get(parentLocation)
+		require.False(t, has)
+
+		retrieved, _, has = programs.Get(parentLocation)
 		require.Nil(t, retrieved)
+		require.False(t, has)
 	})
 
 	t.Run("forking", func(t *testing.T) {
 		parent := NewEmptyPrograms()
-		parent.Set(someLocation, someProgram)
+		parent.Set(someLocation, someProgram, newState)
 
 		childA := parent.ChildPrograms()
 		childB := parent.ChildPrograms()
 
 		// Both child have item
-		retrieved := childA.Get(someLocation)
+		retrieved, _, has := childA.Get(someLocation)
 		require.NotNil(t, retrieved)
-		retrieved = childB.Get(someLocation)
+		require.True(t, has)
+
+		retrieved, _, has = childB.Get(someLocation)
 		require.NotNil(t, retrieved)
+		require.True(t, has)
 
 		// changed in child don't influence other forks
-		childA.Set(someLocation, nil)
+		childA.Set(someLocation, nil, newState)
 
-		retrieved = childA.Get(someLocation)
+		retrieved, _, has = childA.Get(someLocation)
 		require.Nil(t, retrieved)
-		retrieved = childB.Get(someLocation)
+		require.True(t, has)
+
+		retrieved, _, has = childB.Get(someLocation)
 		require.NotNil(t, retrieved)
+		require.True(t, has)
 
-		childB.Set(addressLocation, &interpreter.Program{})
+		childB.Set(addressLocation, &interpreter.Program{}, newState)
 
-		retrieved = childA.Get(addressLocation)
+		retrieved, _, has = childA.Get(addressLocation)
 		require.Nil(t, retrieved)
-		retrieved = childB.Get(addressLocation)
+		require.False(t, has)
+
+		retrieved, _, has = childB.Get(addressLocation)
 		require.NotNil(t, retrieved)
+		require.True(t, has)
 	})
 
 	t.Run("changes", func(t *testing.T) {
 		parent := NewEmptyPrograms()
 		require.False(t, parent.HasChanges())
 
-		parent.Set(someLocation, someProgram)
+		parent.Set(someLocation, someProgram, newState)
 		require.True(t, parent.HasChanges())
 
 		child := parent.ChildPrograms()
 		require.False(t, child.HasChanges())
 
-		child.Cleanup([]handler.ContractUpdateKey{{}, {}})
+		child.Cleanup([]ContractUpdateKey{{}, {}})
 		require.True(t, child.HasChanges())
 
 		child = parent.ChildPrograms()
 
 		// getting values doesn't count as change
-		retrieved := child.Get(someLocation)
+		retrieved, _, has := child.Get(someLocation)
 		require.NotNil(t, retrieved)
 		require.False(t, child.HasChanges())
+		require.True(t, has)
 
-		child.Set(someLocation, someProgram)
+		child.Set(someLocation, someProgram, newState)
 
 		require.True(t, child.HasChanges())
 	})

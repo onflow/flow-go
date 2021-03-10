@@ -8,6 +8,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -16,7 +17,7 @@ func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
 	stm *state.StateManager,
-	programs *Programs,
+	programs *programs.Programs,
 	address flow.Address,
 ) (*flow.Account, error) {
 	accounts := state.NewAccounts(stm)

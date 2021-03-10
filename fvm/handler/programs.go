@@ -6,15 +6,15 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 )
 
 // ProgramsHandler manages operations using Programs storage.
 // It's separation of concern for hostEnv
 
 type stackEntry struct {
-	view     *delta.View
+	state    *state.State
 	location common.Location
 }
 
@@ -23,12 +23,21 @@ type stackEntry struct {
 // naturally, making cleanup method essentially no-op. But if something goes wrong, all nested
 // views must be merged in order to make sure they are recorded
 type ProgramsHandler struct {
-	masterView *delta.View
-	viewsStack []stackEntry
-	Programs   *fvm.Programs
+	masterState *state.StateManager
+	viewsStack  []stackEntry
+	Programs    *programs.Programs
 }
 
 func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Program) error {
+
+	fmt.Printf("Set programs: %s\n", location.ID())
+
+	// we track only for AddressLocation, so for anything other simply put a value
+	if _, is := location.(common.AddressLocation); !is {
+		h.Programs.Set(location, program, nil)
+		return nil
+	}
+
 	if len(h.viewsStack) == 0 {
 		return fmt.Errorf("views stack empty while set called, for location %s", location.String())
 	}
@@ -41,64 +50,77 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 		return fmt.Errorf("set called for type %s while last get was for %s", location.String(), last.location.String())
 	}
 
-	h.Programs.Set(location, program, last.view)
+	h.Programs.Set(location, program, last.state)
 
-	h.mergeView(last.view)
-
-	return nil
+	return h.mergeState(last.state)
 }
 
-func (h *ProgramsHandler) mergeView(view *delta.View) {
+func (h *ProgramsHandler) mergeState(state *state.State) error {
 	if len(h.viewsStack) == 0 {
-		// if this was last item, merge to the master view
-		h.masterView.MergeView(view)
+		// if this was last item, merge to the master state
+		return h.masterState.MergeStateIntoActiveState(state)
 	} else {
-		h.viewsStack[len(h.viewsStack)-1].view.MergeView(view)
+		return h.viewsStack[len(h.viewsStack)-1].state.MergeAnyState(state)
 	}
 }
 
 func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
 
+	fmt.Printf("Get programs: %s\n", location.ID())
+
 	program, view, has := h.Programs.Get(location)
 	if has {
-		h.mergeView(view)
+		if view != nil { // handle view not set (ie. for non-address locations
+			err := h.mergeState(view)
+			if err != nil {
+				panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+			}
+		}
 		return program, true
 	}
 
-	parentView := h.masterView
-	if len(h.viewsStack) > 0 {
-		parentView = h.viewsStack[len(h.viewsStack)-1].view
+	// we track only for AddressLocation
+	if _, is := location.(common.AddressLocation); !is {
+		return nil, false
 	}
 
-	childView := parentView.NewChild()
+	parentState := h.masterState.State()
+	if len(h.viewsStack) > 0 {
+		parentState = h.viewsStack[len(h.viewsStack)-1].state
+	}
+
+	childState := parentState.NewChild()
 
 	h.viewsStack = append(h.viewsStack, stackEntry{
-		view:     childView,
+		state:    childState,
 		location: location,
 	})
 
 	return nil, false
 }
 
-func (h *ProgramsHandler) Cleanup() {
+func (h *ProgramsHandler) Cleanup() error {
 
 	stackLen := len(h.viewsStack)
 
 	if stackLen == 0 {
-		return
+		return nil
 	}
 
 	for i := stackLen; i > 0; i-- {
 		entry := h.viewsStack[i]
-		h.viewsStack[i-1].view.MergeView(entry.view)
+		err := h.viewsStack[i-1].state.MergeAnyState(entry.state)
+		if err != nil {
+			return fmt.Errorf("cannot merge state while cleanup: %w", err)
+		}
 	}
-	h.masterView.MergeView(h.viewsStack[0].view)
+	return h.masterState.MergeStateIntoActiveState(h.viewsStack[0].state)
 }
 
-func NewProgramsHandler(programs *fvm.Programs, view *delta.View) *ProgramsHandler {
+func NewProgramsHandler(programs *programs.Programs, stateManager *state.StateManager) *ProgramsHandler {
 	return &ProgramsHandler{
-		masterView: nil,
-		viewsStack: nil,
-		Programs:   programs,
+		masterState: stateManager,
+		viewsStack:  nil,
+		Programs:    programs,
 	}
 }

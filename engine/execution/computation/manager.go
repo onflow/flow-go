@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -20,8 +21,8 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger, *fvm.Programs) error
-	GetAccount(fvm.Context, flow.Address, state.Ledger, *fvm.Programs) (*flow.Account, error)
+	Run(fvm.Context, fvm.Procedure, state.Ledger, *programs.Programs) error
+	GetAccount(fvm.Context, flow.Address, state.Ledger, *programs.Programs) (*flow.Account, error)
 }
 
 type ComputationManager interface {
@@ -87,12 +88,12 @@ func New(
 	return &e, nil
 }
 
-func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *fvm.Programs {
-	programs := e.programsCache.Get(blockID)
-	if programs == nil {
-		return fvm.NewEmptyPrograms()
+func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Programs {
+	blockPrograms := e.programsCache.Get(blockID)
+	if blockPrograms == nil {
+		return programs.NewEmptyPrograms()
 	}
-	return programs.ChildPrograms()
+	return blockPrograms.ChildPrograms()
 }
 
 func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
@@ -129,16 +130,16 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
 
-	var programs *fvm.Programs
+	var blockPrograms *programs.Programs
 	fromCache := e.programsCache.Get(block.ParentID())
 
 	if fromCache == nil {
-		programs = fvm.NewEmptyPrograms()
+		blockPrograms = programs.NewEmptyPrograms()
 	} else {
-		programs = fromCache.ChildPrograms()
+		blockPrograms = fromCache.ChildPrograms()
 	}
 
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, programs)
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
@@ -147,11 +148,11 @@ func (e *Manager) ComputeBlock(
 		return nil, fmt.Errorf("failed to execute block: %w", err)
 	}
 
-	toInsert := programs
+	toInsert := blockPrograms
 
 	// if we have item from cache and there were no changes
 	// insert it under new block, to prevent long chains
-	if fromCache != nil && !programs.HasChanges() {
+	if fromCache != nil && !blockPrograms.HasChanges() {
 		toInsert = fromCache
 	}
 

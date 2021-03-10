@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -27,7 +28,7 @@ func (v *TransactionSignatureVerifier) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	stm *state.StateManager,
-	programs *Programs,
+	programs *programs.Programs,
 ) error {
 	return v.verifyTransactionSignatures(proc, ctx, stm)
 }

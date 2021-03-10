@@ -18,6 +18,7 @@ import (
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -60,7 +61,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, vm *VirtualMachine, stm *state.StateManager, programs *Programs) (*hostEnv, error) {
+func newEnvironment(ctx Context, vm *VirtualMachine, stm *state.StateManager, programs *programs.Programs) (*hostEnv, error) {
 	accounts := state.NewAccounts(stm)
 	generator, err := state.NewStateBoundAddressGenerator(stm, ctx.Chain)
 	if err != nil {
@@ -74,7 +75,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, stm *state.StateManager, pr
 	uuidGenerator := state.NewUUIDGenerator(stm)
 
 	programsHandler := handler.NewProgramsHandler(
-		programs, st,
+		programs, stm,
 	)
 
 	env := &hostEnv{
@@ -114,7 +115,7 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		e.vm,
 		e.ctx,
 		e.stm,
-		//e.programs,
+		e.programs,
 		e.accounts,
 		e.contracts,
 		e.addressGenerator,
@@ -718,17 +719,17 @@ func (e *hostEnv) ValueDecoded(duration time.Duration) {
 	e.metrics.ValueDecoded(duration)
 }
 
-func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
+func (e *hostEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	// commit changes and return a list of updated keys
 	return e.contracts.Commit()
 }
 
 // Transaction Environment
 type transactionEnv struct {
-	vm  *VirtualMachine
-	ctx Context
-	stm  *state.StateManager
-	//programs         *Programs
+	vm               *VirtualMachine
+	ctx              Context
+	stm              *state.StateManager
+	programs         *handler.ProgramsHandler
 	accounts         *state.Accounts
 	contracts        *handler.ContractHandler
 	addressGenerator flow.AddressGenerator
@@ -743,7 +744,7 @@ func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
 	stm *state.StateManager,
-	//programs *Programs,
+	programs *handler.ProgramsHandler,
 	accounts *state.Accounts,
 	contracts *handler.ContractHandler,
 	addressGenerator flow.AddressGenerator,
@@ -751,10 +752,10 @@ func newTransactionEnv(
 	txIndex uint32,
 ) *transactionEnv {
 	return &transactionEnv{
-		vm:  vm,
-		ctx: ctx,
+		vm:               vm,
+		ctx:              ctx,
 		stm:              stm,
-		//programs:         programs,
+		programs:         programs,
 		accounts:         accounts,
 		contracts:        contracts,
 		addressGenerator: addressGenerator,
@@ -809,7 +810,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
 			e.stm,
-			e.programs,
+			e.programs.Programs,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202

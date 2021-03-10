@@ -1,4 +1,4 @@
-package fvm
+package programs
 
 import (
 	"sync"
@@ -6,14 +6,26 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
-	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/model/flow"
+
+	//"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
 )
+
+type ContractUpdateKey struct {
+	Address flow.Address
+	Name    string
+}
+
+type ContractUpdate struct {
+	ContractUpdateKey
+	Code []byte
+}
 
 type ProgramEntry struct {
 	Location common.Location
 	Program  *interpreter.Program
-	View     *delta.View
+	State    *state.State
 }
 
 type ProgramGetFunc func(location common.Location) (*ProgramEntry, bool)
@@ -50,14 +62,14 @@ func (p *Programs) ChildPrograms() *Programs {
 	}
 }
 
-func (p *Programs) Get(location common.Location) (*interpreter.Program, *delta.View, bool) {
+func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.State, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
 	programEntry, has := p.get(location)
 
 	if has {
-		return programEntry.Program, programEntry.View, true
+		return programEntry.Program, programEntry.State, true
 	}
 
 	return nil, nil, false
@@ -76,14 +88,14 @@ func (p *Programs) get(location common.Location) (*ProgramEntry, bool) {
 	return &programEntry, true
 }
 
-func (p *Programs) Set(location common.Location, program *interpreter.Program, view *delta.View) {
+func (p *Programs) Set(location common.Location, program *interpreter.Program, state *state.State) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.programs[location.ID()] = ProgramEntry{
 		Location: location,
 		Program:  program,
-		View:     view,
+		State:    state,
 	}
 }
 
@@ -111,7 +123,7 @@ func (p *Programs) ForceCleanup() {
 	p.programs = make(map[common.LocationID]ProgramEntry)
 }
 
-func (p *Programs) Cleanup(changedContracts []handler.ContractUpdateKey) {
+func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
