@@ -189,9 +189,21 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	log.Debug().Msg("new finalized block arrived")
 
+	resultsById := block.Payload.ResultsById()
+
+	receiptFromMeta := func(meta *flow.ExecutionReceiptMeta) *flow.ExecutionReceipt {
+		if result, ok := resultsById[meta.ResultID]; ok {
+			return flow.ExecutionReceiptFromMeta(*meta, *result)
+		}
+
+		// TODO: add fetch of result from storage.
+		return nil
+	}
+
 	// performs chunk assigment on each receipt and pushes the assigned chunks to the
 	// chunks queue.
-	for _, receipt := range block.Payload.Receipts {
+	for _, meta := range block.Payload.Receipts {
+		receipt := receiptFromMeta(meta)
 		chunkList, err := e.receiptChunkAssignmentWithTracing(ctx, receipt, blockID)
 		resultID := receipt.ExecutionResult.ID()
 		if err != nil {
