@@ -31,4 +31,6 @@ var (
 	ResultApprovalTag = tag("Result-Approval")
 	// SPOCKTag is used to generate SPoCK proofs
 	SPOCKTag = tag("SPoCK")
+	// DKGMessageTag is used for DKG messages
+	DKGMessageTag = tag("DKG-Message")
 )

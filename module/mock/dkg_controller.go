@@ -90,6 +90,20 @@ func (_m *DKGController) GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []
 	return r0, r1, r2
 }
 
+// GetIndex provides a mock function with given fields:
+func (_m *DKGController) GetIndex() int {
+	ret := _m.Called()
+
+	var r0 int
+	if rf, ok := ret.Get(0).(func() int); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	return r0
+}
+
 // Poll provides a mock function with given fields: blockReference
 func (_m *DKGController) Poll(blockReference flow.Identifier) error {
 	ret := _m.Called(blockReference)

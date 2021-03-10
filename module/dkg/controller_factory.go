@@ -1,6 +1,8 @@
 package dkg
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -9,24 +11,29 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// ControllerFactory is a factory object that creates new Controllers with the
-// same underlying tunnel to communicate with the network engine, and dkg
-// smart-contract client to relay broadcast messages.
+// ControllerFactory is a factory object that creates new Controllers for new
+// epochs. Each Controller produced by a factory shares the same underlying
+// Local object to sign broadcast messages, the same tunnel tying it to the
+// MessagingEngine, and the same client to communicate with the DKG
+// smart-contract.
 type ControllerFactory struct {
 	log               zerolog.Logger
+	me                module.Local
 	dkgContractClient module.DKGContractClient
 	tunnel            *BrokerTunnel
 }
 
 // NewControllerFactory creates a new factory that generates Controllers with
-// the specified tunnel and dkg smart-contract client.
+// the same underlying Local object, tunnel and dkg smart-contract client.
 func NewControllerFactory(
 	log zerolog.Logger,
+	me module.Local,
 	dkgContractClient module.DKGContractClient,
 	tunnel *BrokerTunnel) *ControllerFactory {
 
 	return &ControllerFactory{
 		log:               log,
+		me:                me,
 		dkgContractClient: dkgContractClient,
 		tunnel:            tunnel,
 	}
@@ -36,14 +43,25 @@ func NewControllerFactory(
 // is capable of communicating with other nodes.
 func (f *ControllerFactory) Create(
 	dkgInstanceID string,
-	participants []flow.Identifier,
-	myIndex int,
+	participants flow.IdentityList,
 	seed []byte) (*Controller, error) {
+
+	myIndex := -1
+	for i, id := range participants.NodeIDs() {
+		if id == f.me.NodeID() {
+			myIndex = i
+			break
+		}
+	}
+	if myIndex < 0 {
+		return nil, fmt.Errorf("node does not belong to dkg committee")
+	}
 
 	broker := NewBroker(
 		f.log,
 		dkgInstanceID,
 		participants,
+		f.me,
 		myIndex,
 		f.dkgContractClient,
 		f.tunnel,

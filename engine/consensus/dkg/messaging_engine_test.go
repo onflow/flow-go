@@ -62,7 +62,7 @@ func TestForwardOutgoingMessages(t *testing.T) {
 		Once()
 	engine.conduit = conduit
 
-	engine.tunnel.SendOut(msg.DKGMessageOut{
+	engine.tunnel.SendOut(msg.PrivDKGMessageOut{
 		DKGMessage: expectedMsg,
 		DestID:     destinationID,
 	})
@@ -77,7 +77,7 @@ func TestForwardIncomingMessages(t *testing.T) {
 	engine := createTestEngine(t)
 
 	originID := unittest.IdentifierFixture()
-	expectedMsg := msg.DKGMessageIn{
+	expectedMsg := msg.PrivDKGMessageIn{
 		DKGMessage: msg.NewDKGMessage(1, []byte("hello"), "dkg-123"),
 		OriginID:   originID,
 	}

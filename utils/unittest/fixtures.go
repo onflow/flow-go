@@ -645,6 +645,13 @@ func WithNodeID(b byte) func(*flow.Identity) {
 	}
 }
 
+// WithStakingPubKey adds a staking public key to the identity
+func WithStakingPubKey(pubKey crypto.PublicKey) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.StakingPubKey = pubKey
+	}
+}
+
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {

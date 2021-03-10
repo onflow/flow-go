@@ -56,6 +56,8 @@ The Broker is responsible for:
   package.
 - appending dkg instance id to messages to prevent replay attacks
 - checking the integrity of incoming messages
+- signing and verifying broadcast messages (broadcast messages are signed with
+  the staking key of the sender)
 - forwarding incoming messages (private and broadcast) to the controller via a
   channel
 - forwarding outgoing messages (private and broadcast) to other nodes.
