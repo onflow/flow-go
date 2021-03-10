@@ -132,7 +132,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	return value, s.checkMaxInteraction()
 }
 
-func (s *State) GetWithoutTracking(owner, controller, key string) (flow.RegisterValue, error) {
+func (s *State) getWithoutTracking(owner, controller, key string) (flow.RegisterValue, error) {
 	pKey := PayloadKey{owner, controller, key}
 	value, err := s.get(pKey)
 	if err != nil {
@@ -155,7 +155,7 @@ func (s *State) get(pKey PayloadKey) (flow.RegisterValue, error) {
 
 	// read from parent
 	if s.parent != nil {
-		value, err := s.parent.GetWithoutTracking(pKey.Owner, pKey.Controller, pKey.Key)
+		value, err := s.parent.getWithoutTracking(pKey.Owner, pKey.Controller, pKey.Key)
 		p := Payload{pKey, value}
 		s.readCache[pKey] = p
 		return value, err
