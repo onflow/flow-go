@@ -117,6 +117,33 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 
 	pKey := PayloadKey{owner, controller, key}
 	s.LogTouch(&Payload{pKey, nil})
+
+	value, err := s.get(pKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// update read catch
+	p := Payload{pKey, value}
+	s.readCache[pKey] = p
+	s.ReadCounter++
+	s.TotalBytesRead += p.size()
+	return value, s.checkMaxInteraction()
+}
+
+func (s *State) GetWithoutTracking(owner, controller, key string) (flow.RegisterValue, error) {
+	pKey := PayloadKey{owner, controller, key}
+	value, err := s.get(pKey)
+	if err != nil {
+		return nil, err
+	}
+	p := Payload{pKey, value}
+	s.readCache[pKey] = p
+	return value, nil
+}
+
+// Get returns a register value given owner, controller and key
+func (s *State) get(pKey PayloadKey) (flow.RegisterValue, error) {
 	// check delta first
 	if p, ok := s.delta[pKey]; ok {
 		return p.Value, nil
@@ -129,23 +156,16 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 
 	// read from parent
 	if s.parent != nil {
-		value, err := s.parent.Get(owner, controller, key)
-		s.readCache[pKey] = Payload{pKey, value}
+		value, err := s.parent.GetWithoutTracking(pKey.Owner, pKey.Controller, pKey.Key)
 		return value, err
 	}
 
 	// read from ledger
-	value, err := s.ledger.Get(owner, controller, key)
+	value, err := s.ledger.Get(pKey.Owner, pKey.Controller, pKey.Key)
 	if err != nil {
 		return nil, &LedgerFailure{err}
 	}
-
-	// update read catch
-	p := Payload{pKey, value}
-	s.readCache[pKey] = p
-	s.ReadCounter++
-	s.TotalBytesRead += p.size()
-	return value, s.checkMaxInteraction()
+	return value, nil
 }
 
 func (s *State) updateDelta(p *Payload) {
