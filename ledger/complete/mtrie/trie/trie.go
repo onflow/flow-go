@@ -151,15 +151,7 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	}
 
 	if len(rpaths) > 0 {
-		if len(lpaths) > parallelRecursionThreshold {
-			wg.Add(1)
-			go func() {
-				mt.read(&rres, head.RightChild(), rpaths)
-				wg.Done()
-			}()
-		} else {
-			mt.read(&rres, head.RightChild(), rpaths)
-		}
+		mt.read(&rres, head.RightChild(), rpaths)
 	}
 	// wait for all threads
 	wg.Wait()
@@ -337,15 +329,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 				}
 			}
 		}
-		if len(lpaths) > parallelRecursionThreshold {
-			wg.Add(1)
-			go func() {
-				mt.proofs(head.RightChild(), rpaths, rproofs)
-				wg.Done()
-			}()
-		} else {
-			mt.proofs(head.RightChild(), rpaths, rproofs)
-		}
+		mt.proofs(head.RightChild(), rpaths, rproofs)
 	}
 	wg.Wait()
 }
