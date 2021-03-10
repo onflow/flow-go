@@ -110,8 +110,9 @@ func (s *State) LogTouch(pk *Payload) {
 }
 
 func (s *State) LogTouches(pks []Payload) {
-	if len(pks) > 0 {
-		s.touchLog = append(s.touchLog, pks...)
+	// TODO make this smarter through append
+	for _, t := range pks {
+		s.LogTouch(&t)
 	}
 }
 
