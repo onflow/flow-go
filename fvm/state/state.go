@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,10 +16,10 @@ const (
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	ledger                Ledger
-	parent                *State
-	touchLog              []Payload
-	touchHasher           hash.Hasher
+	ledger   Ledger
+	parent   *State
+	touchLog []Payload
+	// touchHasher           hash.Hasher
 	delta                 map[PayloadKey]Payload
 	readCache             map[PayloadKey]Payload
 	updatedAddresses      map[flow.Address]struct{}
@@ -32,9 +31,9 @@ type State struct {
 
 func defaultState(ledger Ledger) *State {
 	return &State{
-		ledger:                ledger,
-		touchLog:              make([]Payload, 0),
-		touchHasher:           hash.NewSHA3_256(),
+		ledger:   ledger,
+		touchLog: make([]Payload, 0),
+		// touchHasher:           hash.NewSHA3_256(),
 		delta:                 make(map[PayloadKey]Payload),
 		updatedAddresses:      make(map[flow.Address]struct{}),
 		readCache:             make(map[PayloadKey]Payload),
@@ -87,24 +86,24 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-// TouchHash returns the hash of all touches
-// for read touches the value part is nil for updates
-// the value part is also included
-func (s *State) TouchHash() []byte {
-	return s.touchHasher.SumHash()
-}
+// // TouchHash returns the hash of all touches
+// // for read touches the value part is nil for updates
+// // the value part is also included
+// func (s *State) TouchHash() []byte {
+// 	return s.touchHasher.SumHash()
+// }
 
 func (s *State) Touches() []Payload {
 	return s.touchLog
 }
 
 func (s *State) LogTouch(pk *Payload) {
-	_, err := s.touchHasher.Write(pk.bytes())
-	if err != nil {
-		// TODO return error
-		panic(err)
-		// return fmt.Errorf("error updating spock secret data: %w", err)
-	}
+	// _, err := s.touchHasher.Write(pk.bytes())
+	// if err != nil {
+	// 	// TODO return error
+	// 	panic(err)
+	// 	// return fmt.Errorf("error updating spock secret data: %w", err)
+	// }
 
 	s.touchLog = append(s.touchLog, *pk)
 }
