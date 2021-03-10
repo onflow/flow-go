@@ -255,32 +255,12 @@ func (s *State) MergeAnyState(other *State) error {
 
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(child *State) error {
-	// append touches
-	s.LogTouches(child.touchLog)
-
 	// merge read cache
 	for k, v := range child.readCache {
 		s.readCache[k] = v
 	}
 
-	// apply delta
-	for _, v := range child.delta {
-		s.updateDelta(&v)
-	}
-
-	// apply address updates
-	for k, v := range child.updatedAddresses {
-		s.updatedAddresses[k] = v
-	}
-
-	// update ledger interactions
-	s.ReadCounter += child.ReadCounter
-	s.WriteCounter += child.WriteCounter
-	s.TotalBytesRead += child.TotalBytesRead
-	s.TotalBytesWritten += child.TotalBytesWritten
-
-	// check max interaction as last step
-	return s.checkMaxInteraction()
+	return s.MergeAnyState(child)
 }
 
 // ApplyDeltaToLedger should only be used for applying changes to ledger at the end of tx
