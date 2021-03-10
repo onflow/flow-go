@@ -61,11 +61,12 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 
 		if vmErr != nil {
 			proc.Err = vmErr
-			return nil
+			// TODO we should not break here we should continue for fee deductions
+			break
 		}
 	}
 
-	return nil
+	return st.State().ApplyTouchesToLedger()
 }
 
 type TransactionInvocator struct {
@@ -102,9 +103,35 @@ func (i *TransactionInvocator) Process(
 	if ctx.BlockHeader != nil {
 		blockHeight = ctx.BlockHeader.Height
 	}
+	retry := false
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 
+		if retry {
+			// rest state
+			rollUpError := stm.RollUp(false, false)
+			if rollUpError != nil {
+				return rollUpError
+			}
+			// force cleanup if retries
+			programs.ForceCleanup()
+
+			i.logger.Warn().
+				Str("txHash", proc.ID.String()).
+				Uint64("blockHeight", blockHeight).
+				Int("retries_count", numberOfRetries).
+				Uint64("ledger_interaction_used", stm.State().InteractionUsed()).
+				Msg("retrying transaction execution")
+
+			// reset error part of proc
+			// Warning right now the tx requires retry logic doesn't change
+			// anything on state but we might want to revert the state changes (or not commiting)
+			// if we decided to expand it furthur.
+			proc.Err = nil
+			proc.Logs = make([]string, 0)
+			proc.Events = make([]flow.Event, 0)
+			proc.ServiceEvents = make([]flow.Event, 0)
+		}
 		stm.Nest()
 		env, err = newEnvironment(ctx, vm, stm, programs)
 		// env construction error is fatal
@@ -132,27 +159,7 @@ func (i *TransactionInvocator) Process(
 			break
 		}
 
-		// rest state
-		stm.RollUp(false)
-
-		// force cleanup if retries
-		programs.ForceCleanup()
-
-		i.logger.Warn().
-			Str("txHash", proc.ID.String()).
-			Uint64("blockHeight", blockHeight).
-			Int("retries_count", numberOfRetries).
-			Uint64("ledger_interaction_used", stm.State().InteractionUsed()).
-			Msg("retrying transaction execution")
-
-		// reset error part of proc
-		// Warning right now the tx requires retry logic doesn't change
-		// anything on state but we might want to revert the state changes (or not commiting)
-		// if we decided to expand it furthur.
-		proc.Err = nil
-		proc.Logs = make([]string, 0)
-		proc.Events = make([]flow.Event, 0)
-		proc.ServiceEvents = make([]flow.Event, 0)
+		retry = true
 		proc.Retried++
 	}
 
@@ -161,8 +168,31 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	var txError error
+
 	// failed transaction path
 	if err != nil {
+		txError = err
+	}
+
+	// applying contract changes
+	// this writes back the contract contents to accounts
+	// if any error occurs we fail the tx
+	updatedKeys, err := env.Commit()
+	if err != nil && txError == nil {
+		txError = err
+	}
+
+	// based on the contract updates we decide how to clean up the programs
+	// for failed transactions we also do the same as
+	// transaction without any deployed contracts
+	programs.Cleanup(updatedKeys)
+
+	if txError != nil {
+		err := stm.RollUp(false, true)
+		if err != nil {
+			return err
+		}
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
 		i.logger.Info().
@@ -170,32 +200,14 @@ func (i *TransactionInvocator) Process(
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", stm.State().InteractionUsed()).
 			Msg("transaction executed with error")
-		return err
-	}
-
-	// applying contract changes
-	// this writes back the contract contents to accounts
-	// if any error occurs we fail the tx
-	updatedKeys, err := env.Commit()
-
-	// based on the contract updates we decide how to clean up the programs
-	// for failed transactions we also do the same as
-	// transaction without any deployed contracts
-	programs.Cleanup(updatedKeys)
-
-	// tx failed at update contract step
-	if err != nil {
-		stm.RollUp(false)
-		i.logger.Info().
-			Str("txHash", proc.ID.String()).
-			Uint64("blockHeight", blockHeight).
-			Uint64("ledgerInteractionUsed", stm.State().InteractionUsed()).
-			Msg("transaction executed with error")
-		return err
+		return txError
 	}
 
 	// don't roll up with true for failed tx
-	stm.RollUp(true)
+	err = stm.RollUp(true, true)
+	if err != nil {
+		return err
+	}
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()
