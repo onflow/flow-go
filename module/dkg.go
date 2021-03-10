@@ -18,7 +18,7 @@ type DKGContractClient interface {
 	// smart contract. An error is returned if the transaction has failed has
 	// failed.
 	// TBD: retry logic
-	Broadcast(msg messages.BcastDKGMessage) error
+	Broadcast(msg messages.BroadcastDKGMessage) error
 
 	// ReadBroadcast reads the broadcast messages from the smart contract.
 	// Messages are returned in the order in which they were broadcast (received
@@ -31,7 +31,7 @@ type DKGContractClient interface {
 	// DKG nodes should call ReadBroadcast one final time once they have
 	// observed the phase deadline trigger to guarantee they receive all
 	// messages for that phase.
-	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BcastDKGMessage, error)
+	ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BroadcastDKGMessage, error)
 
 	// SubmitResult submits the final public result of the DKG protocol. This
 	// represents the group public key and the node's local computation of the
@@ -66,8 +66,9 @@ type DKGController interface {
 	// received messages are processed.
 	Poll(blockReference flow.Identifier) error
 
-	// GetArtifacts returns the private and public shares, as well as the set of
-	// public keys computed by DKG.
+	// GetArtifacts returns our node's private key share, the group public key,
+	// and the list of all nodes' public keys (including ours), as computed by
+	// the DKG.
 	GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey)
 
 	// GetIndex returns the index of this node in the DKG committee list.

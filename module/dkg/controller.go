@@ -192,8 +192,9 @@ func (c *Controller) Poll(blockReference flow.Identifier) error {
 	return c.broker.Poll(blockReference)
 }
 
-// GetArtifacts returns the private and public shares, as well as the set of
-// public keys computed by DKG.
+// GetArtifacts returns our node's private key share, the group public key,
+// and the list of all nodes' public keys (including ours), as computed by
+// the DKG.
 func (c *Controller) GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey) {
 	c.artifactsLock.Lock()
 	defer c.artifactsLock.Unlock()

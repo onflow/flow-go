@@ -26,8 +26,8 @@ var (
 
 func initCommittee(n int) (identities flow.IdentityList, locals []module.Local) {
 	privateStakingKeys, _ := unittest.StakingKeys(n)
-	for i, k := range privateStakingKeys {
-		id := unittest.IdentityFixture(unittest.WithStakingPubKey(k.PublicKey()))
+	for i, key := range privateStakingKeys {
+		id := unittest.IdentityFixture(unittest.WithStakingPubKey(key.PublicKey()))
 		identities = append(identities, id)
 		local, _ := local.New(id, privateStakingKeys[i])
 		locals = append(locals, local)
@@ -247,7 +247,7 @@ func TestBroadcastMessage(t *testing.T) {
 		NewBrokerTunnel(),
 	)
 
-	expectedMsg, err := sender.prepareBcastMessage(msgb)
+	expectedMsg, err := sender.prepareBroadcastMessage(msgb)
 	require.NoError(t, err)
 
 	// check that the dkg contract client is called with the expected message
@@ -287,10 +287,10 @@ func TestPoll(t *testing.T) {
 	)
 
 	blockID := unittest.IdentifierFixture()
-	bcastMsgs := []msg.BcastDKGMessage{}
+	bcastMsgs := []msg.BroadcastDKGMessage{}
 	expectedMsgs := []msg.DKGMessage{}
 	for i := 0; i < 3; i++ {
-		bmsg, err := sender.prepareBcastMessage([]byte(fmt.Sprintf("msg%d", i)))
+		bmsg, err := sender.prepareBroadcastMessage([]byte(fmt.Sprintf("msg%d", i)))
 		require.NoError(t, err)
 		bcastMsgs = append(bcastMsgs, bmsg)
 		expectedMsgs = append(expectedMsgs, bmsg.DKGMessage)

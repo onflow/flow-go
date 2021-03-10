@@ -8,10 +8,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/hasher"
 )
 
 // Broker is an implementation of the DKGBroker interface which is intended to
@@ -86,7 +86,7 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 
 // Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
-	bcastMsg, err := b.prepareBcastMessage(data)
+	bcastMsg, err := b.prepareBroadcastMessage(data)
 	if err != nil {
 		b.log.Error().Err(err).Msg("could not create broadcast message")
 	}
@@ -130,7 +130,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		return fmt.Errorf("could not read broadcast messages: %w", err)
 	}
 	for _, msg := range msgs {
-		ok, err := b.verifyBcastMessage(msg)
+		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
 			b.log.Error().Err(err).Msg("bad broadcast message")
 			continue
@@ -203,29 +203,29 @@ func (b *Broker) checkMessageInstanceAndOrigin(msg messages.DKGMessage) error {
 	return nil
 }
 
-// prepareBcastMessage creates a BcastDKGMessage with a signature from the
+// prepareBroadcastMessage creates BroadcastDKGMessage with a signature from the
 // node's staking key.
-func (b *Broker) prepareBcastMessage(data []byte) (messages.BcastDKGMessage, error) {
+func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMessage, error) {
 	dkgMessage := messages.NewDKGMessage(
 		b.myIndex,
 		data,
 		b.dkgInstanceID,
 	)
 	sigData := flow.MakeID(dkgMessage)
-	signature, err := b.me.Sign(sigData[:], utils.NewDKGMessageHasher())
+	signature, err := b.me.Sign(sigData[:], hasher.NewDKGMessageHasher())
 	if err != nil {
-		return messages.BcastDKGMessage{}, err
+		return messages.BroadcastDKGMessage{}, err
 	}
-	bcastMsg := messages.BcastDKGMessage{
+	bcastMsg := messages.BroadcastDKGMessage{
 		DKGMessage: dkgMessage,
 		Signature:  signature,
 	}
 	return bcastMsg, nil
 }
 
-// verifySignature checks the DKG instance and Origin of a broadcast message, as
-// well as the signature against the staking key of the sender.
-func (b *Broker) verifyBcastMessage(bcastMsg messages.BcastDKGMessage) (bool, error) {
+// verifyBroadcastMessage checks the DKG instance and Origin of a broadcast
+// message, as well as the signature against the staking key of the sender.
+func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
 	err := b.checkMessageInstanceAndOrigin(bcastMsg.DKGMessage)
 	if err != nil {
 		return false, err
@@ -235,6 +235,6 @@ func (b *Broker) verifyBcastMessage(bcastMsg messages.BcastDKGMessage) (bool, er
 	return origin.StakingPubKey.Verify(
 		bcastMsg.Signature,
 		signData[:],
-		utils.NewDKGMessageHasher(),
+		hasher.NewDKGMessageHasher(),
 	)
 }

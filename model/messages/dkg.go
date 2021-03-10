@@ -35,10 +35,10 @@ type PrivDKGMessageOut struct {
 	DestID flow.Identifier
 }
 
-// BcastDKGMessage is a wrapper around a DKGMessage intended for broadcasting.
+// BroadcastDKGMessage is a wrapper around a DKGMessage intended for broadcasting.
 // It contains a signature of the DKGMessage signed with the staking key of the
 // sender.
-type BcastDKGMessage struct {
+type BroadcastDKGMessage struct {
 	DKGMessage
 	Signature crypto.Signature
 }
