@@ -93,6 +93,8 @@ func TestSafetyCheck(t *testing.T) {
 			require.Contains(t, buffer.String(), "programs")
 			require.Contains(t, buffer.String(), "codes")
 			require.Equal(t, int(context.MaxNumOfTxRetries), proc.Retried)
+			// only consider the last run and not include touches from retries
+			require.Equal(t, 3, len(stm.State().Touches()))
 
 			dumpFiles := listFilesInDir(t, tmpDir)
 

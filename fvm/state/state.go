@@ -1,6 +1,7 @@
 package state
 
 import (
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -12,10 +13,14 @@ const (
 	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
 )
 
+// State represents the execution state
+// it holds draft of updates and captures
+// all register touches
 type State struct {
 	ledger                Ledger
 	parent                *State
 	touchLog              []Payload
+	touchHasher           hash.Hasher
 	delta                 map[PayloadKey]Payload
 	readCache             map[PayloadKey]Payload
 	updatedAddresses      map[flow.Address]struct{}
@@ -29,6 +34,7 @@ func defaultState(ledger Ledger) *State {
 	return &State{
 		ledger:                ledger,
 		touchLog:              make([]Payload, 0),
+		touchHasher:           hash.NewSHA3_256(),
 		delta:                 make(map[PayloadKey]Payload),
 		updatedAddresses:      make(map[flow.Address]struct{}),
 		readCache:             make(map[PayloadKey]Payload),
@@ -81,15 +87,11 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-// TouchLogBytes returns a large byte slice of all register touches
+// TouchHash returns the hash of all touches
 // for read touches the value part is nil for updates
 // the value part is also included
-func (s *State) TouchLogBytes() []byte {
-	res := make([]byte, 0)
-	for _, p := range s.touchLog {
-		res = append(res, p.bytes()...)
-	}
-	return res
+func (s *State) TouchHash() []byte {
+	return s.touchHasher.SumHash()
 }
 
 func (s *State) Touches() []Payload {
@@ -97,12 +99,20 @@ func (s *State) Touches() []Payload {
 }
 
 func (s *State) LogTouch(pk *Payload) {
+	_, err := s.touchHasher.Write(pk.bytes())
+	if err != nil {
+		// TODO return error
+		panic(err)
+		// return fmt.Errorf("error updating spock secret data: %w", err)
+	}
+
 	s.touchLog = append(s.touchLog, *pk)
 }
 
 func (s *State) LogTouches(pks []Payload) {
-	if len(pks) > 0 {
-		s.touchLog = append(s.touchLog, pks...)
+	// TODO make this smarter through append
+	for _, t := range pks {
+		s.LogTouch(&t)
 	}
 }
 
@@ -114,6 +124,25 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 
 	pKey := PayloadKey{owner, controller, key}
 	s.LogTouch(&Payload{pKey, nil})
+
+	value, err := s.get(pKey)
+	if err != nil {
+		return nil, err
+	}
+	return value, s.checkMaxInteraction()
+}
+
+func (s *State) GetWithoutTracking(owner, controller, key string) (flow.RegisterValue, error) {
+	pKey := PayloadKey{owner, controller, key}
+	value, err := s.get(pKey)
+	if err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+// Get returns a register value given owner, controller and key
+func (s *State) get(pKey PayloadKey) (flow.RegisterValue, error) {
 	// check delta first
 	if p, ok := s.delta[pKey]; ok {
 		return p.Value, nil
@@ -126,23 +155,22 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 
 	// read from parent
 	if s.parent != nil {
-		value, err := s.parent.Get(owner, controller, key)
-		s.readCache[pKey] = Payload{pKey, value}
+		value, err := s.parent.GetWithoutTracking(pKey.Owner, pKey.Controller, pKey.Key)
+		p := Payload{pKey, value}
+		s.readCache[pKey] = p
 		return value, err
 	}
 
 	// read from ledger
-	value, err := s.ledger.Get(owner, controller, key)
+	value, err := s.ledger.Get(pKey.Owner, pKey.Controller, pKey.Key)
 	if err != nil {
 		return nil, &LedgerFailure{err}
 	}
-
-	// update read catch
 	p := Payload{pKey, value}
 	s.readCache[pKey] = p
 	s.ReadCounter++
 	s.TotalBytesRead += p.size()
-	return value, s.checkMaxInteraction()
+	return value, nil
 }
 
 func (s *State) updateDelta(p *Payload) {
@@ -232,32 +260,12 @@ func (s *State) MergeAnyState(other *State) error {
 
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(child *State) error {
-	// append touches
-	s.LogTouches(child.touchLog)
-
 	// merge read cache
 	for k, v := range child.readCache {
 		s.readCache[k] = v
 	}
 
-	// apply delta
-	for _, v := range child.delta {
-		s.updateDelta(&v)
-	}
-
-	// apply address updates
-	for k, v := range child.updatedAddresses {
-		s.updatedAddresses[k] = v
-	}
-
-	// update ledger interactions
-	s.ReadCounter += child.ReadCounter
-	s.WriteCounter += child.WriteCounter
-	s.TotalBytesRead += child.TotalBytesRead
-	s.TotalBytesWritten += child.TotalBytesWritten
-
-	// check max interaction as last step
-	return s.checkMaxInteraction()
+	return s.MergeAnyState(child)
 }
 
 // ApplyDeltaToLedger should only be used for applying changes to ledger at the end of tx
