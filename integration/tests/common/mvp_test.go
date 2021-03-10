@@ -46,16 +46,24 @@ func TestMVP_Bootstrap(t *testing.T) {
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
 
-	// TODO: finalize a few blocks
+	// TODO: Wait for a few blocks to finalize, will need to submit a few transactions
+	// and wait for it to be sealed.
 
-	// download root snapshot from Access Node
+	// download root snapshot from Access Node\
+	// TODO: replace with Transit snapshot download
 	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(t, err)
 
-	// TODO: verify root snapshot block is not for the genesis block
+	// TODO: verify root snapshot block is not for the genesis block, ensure that the
+	// blockID is not for the GenesisBlock.ID()
 
 	// TODO: overrite bootstrap public root information file with the latest snapshot
-	// Restart network and run MVP test
+
+	// Restart network
+	flowNetwork.StopContainers()
+	flowNetwork.Start(ctx)
+
+	// Run MVP tests
 	runMVPTest(t, ctx, flowNetwork)
 }
 
