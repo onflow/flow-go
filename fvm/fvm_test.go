@@ -692,8 +692,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
-			t.Skip("not ready yet")
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+			ctx.TransactionFeesEnabled = true // this is what we are testing
 
 			// Create an account private key.
 			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
@@ -734,12 +734,12 @@ func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
 
 	t.Run("Transaction fails but fees are deducted, unless account is close to 0", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(100),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithAccountCreationFee(100),
 	).
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
-				t.Skip("not ready yet")
 				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+				ctx.TransactionFeesEnabled = true // this is what we are testing
 
 				// Create an account private key.
 				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)

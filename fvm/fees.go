@@ -14,25 +14,25 @@ import FlowServiceAccount from 0x%s
 
 transaction(computationEffort: UInt64, 
 		inclusionEffort: UInt64, 
-		gasLimit: UFix64) {
+		transactionFees: UFix64) {
   prepare(account: AuthAccount) {
  	FlowServiceAccount.deductTransactionFees(
 			account: account,
             computationEffort: computationEffort,
             inclusionEffort: inclusionEffort,
-            gasLimit: gasLimit)
+            transactionFees: transactionFees)
   }
 }
 `
 
-func deductTransactionFeeTransaction(accountAddress, serviceAddress flow.Address, gasLimit uint64) *TransactionProcedure {
+func deductTransactionFeeTransaction(accountAddress, serviceAddress flow.Address, transactionFees uint64) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(deductTransactionFeeTransactionTemplate, serviceAddress))).
 			AddAuthorizer(accountAddress).
 			AddArgument(jsoncdc.MustEncode(cadence.UInt64(0))).
 			AddArgument(jsoncdc.MustEncode(cadence.UInt64(0))).
-			AddArgument(jsoncdc.MustEncode(cadence.UFix64(gasLimit))),
+			AddArgument(jsoncdc.MustEncode(cadence.UFix64(transactionFees))),
 		0,
 	)
 }
