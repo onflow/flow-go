@@ -93,8 +93,12 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 		return nil, err
 	}
 
-	s.ReadCounter++
-	s.TotalBytesRead += uint64(len(value))
+	// if not part of recent updates count them as read
+	if _, ok := s.updateSize[mapKey{owner, controller, key}]; !ok {
+		s.ReadCounter++
+		s.TotalBytesRead += uint64(len(owner) +
+			len(controller) + len(key) + len(value))
+	}
 
 	return value, s.checkMaxInteraction()
 }
@@ -115,6 +119,8 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	s.WriteCounter++
 	s.TotalBytesWritten += updateSize
 	s.updateSize[mapKey] = updateSize
+
+	s.view.Set(owner, controller, key, value)
 
 	if err := s.checkMaxInteraction(); err != nil {
 		return err
@@ -138,7 +144,7 @@ func (s *State) Touch(owner, controller, key string) error {
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
-	return NewState(s.view,
+	return NewState(s.view.NewChild(),
 		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
 		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
 		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),

@@ -1,47 +1,52 @@
 package state_test
 
-// func TestStateManager(t *testing.T) {
-// 	view := NewSimpleView()
-// 	st := state.NewState(view)
-// 	stm := state.NewStateManager(st)
+import (
+	"testing"
 
-// 	t.Run("test nesting/rollup functionality", func(t *testing.T) {
-// 		value := createByteArray(1)
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/stretchr/testify/require"
+)
 
-// 		// first child
-// 		stm.Nest()
-// 		require.Equal(t, stm.StartState(), st)
-// 		require.NotEqual(t, stm.State(), st)
+func TestStateManager(t *testing.T) {
+	view := NewSimpleView()
+	st := state.NewState(view)
+	stm := state.NewStateManager(st)
 
-// 		err := stm.State().Set("address", "controller", "key1", value)
-// 		require.NoError(t, err)
+	t.Run("test nesting/rollup functionality", func(t *testing.T) {
+		value := createByteArray(1)
 
-// 		// roll up with merge
-// 		err = stm.RollUpWithMerge()
-// 		require.NoError(t, err)
-// 		require.Equal(t, stm.State(), st)
-// 		require.Equal(t, uint64(1), st.WriteCounter)
+		// first child
+		stm.Nest()
+		require.Equal(t, stm.StartState(), st)
+		require.NotEqual(t, stm.State(), st)
 
-// 		// second child
-// 		stm.Nest()
-// 		err = stm.State().Set("address", "controller", "key2", value)
-// 		require.NoError(t, err)
+		size := uint64(len("address") + len("controller") + len("key1") + len(value))
+		err := stm.State().Set("address", "controller", "key1", value)
+		require.NoError(t, err)
+		require.Equal(t, size, stm.State().TotalBytesWritten)
 
-// 		// a grandchild
-// 		stm.Nest()
-// 		err = stm.State().Set("address", "controller", "key3", value)
-// 		require.NoError(t, err)
+		// roll up with merge
+		err = stm.RollUpWithMerge()
+		require.NoError(t, err)
+		require.Equal(t, stm.State(), st)
+		require.Equal(t, uint64(1), stm.State().WriteCounter)
+		require.Equal(t, size, stm.State().TotalBytesWritten)
 
-// 		// ignore this child
-// 		err = stm.RollUpNoMerge()
-// 		require.NoError(t, err)
-// 		require.Equal(t, 1, len(st.Touches()))
-// 		require.Equal(t, 1, len(stm.State().Touches()))
+		// second child
+		stm.Nest()
+		err = stm.State().Set("address", "controller", "key2", value)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), stm.State().WriteCounter)
 
-// 		err = stm.RollUpWithTouchMergeOnly()
-// 		require.NoError(t, err)
-// 		require.Equal(t, 2, len(st.Touches()))
-// 		require.Equal(t, 2, len(stm.State().Touches()))
+		// a grandchild
+		stm.Nest()
+		err = stm.State().Set("address", "controller", "key3", value)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), stm.State().WriteCounter)
 
-// 	})
-// }
+		// ignore this child
+		err = stm.RollUpNoMerge()
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), stm.State().WriteCounter)
+	})
+}

@@ -18,6 +18,7 @@ func NewStateManager(startState *State) *StateManager {
 	return &StateManager{
 		startState:  startState,
 		activeState: startState,
+		parents:     make(map[*State]*State),
 	}
 }
 
@@ -38,7 +39,9 @@ func (s *StateManager) MergeStateIntoActiveState(other *State) error {
 
 // Nest creates a child state and set it as the active state
 func (s *StateManager) Nest() {
-	s.activeState = s.activeState.NewChild()
+	new := s.activeState.NewChild()
+	s.parents[new] = s.activeState
+	s.activeState = new
 }
 
 // RollUpWithMerge merges the active state into its parent and set the parent as the

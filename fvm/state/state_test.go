@@ -67,13 +67,8 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		err := st.Set("address", "controller", key, value)
 		require.NoError(t, err)
 
-		// shouldn't be part of the ledger before applyToLedger call
-		v, err := view.Get("address", "controller", key)
-		require.NoError(t, err)
-		require.Equal(t, len(v), 0)
-
 		// now should be part of the ledger
-		v, err = view.Get("address", "controller", key)
+		v, err := view.Get("address", "controller", key)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})
@@ -87,18 +82,15 @@ func TestState_InteractionMeasuring(t *testing.T) {
 	key := "key1"
 	value := createByteArray(1)
 	err := st.Set("address", "controller", key, value)
+	keySize := uint64(len("address") + len("controller") + len(key))
+	size := keySize + uint64(len(value))
 	require.NoError(t, err)
 	require.Equal(t, uint64(0), st.ReadCounter)
-	require.Equal(t, uint64(0), st.WriteCounter)
 	require.Equal(t, uint64(0), st.TotalBytesRead)
-	require.Equal(t,
-		uint64(len("address")+len("controller")+len(key)+len(value)),
-		st.TotalBytesWritten)
-	require.Equal(t, uint64(0), st.TotalBytesWritten)
-	require.Equal(t, uint64(0), st.TotalBytesRead)
+	require.Equal(t, uint64(1), st.WriteCounter)
+	require.Equal(t, size, st.TotalBytesWritten)
 
 	// should read from the delta
-	// addition to the touch but
 	// should not impact totalBytesRead
 	v, err := st.Get("address", "controller", key)
 	require.NoError(t, err)
@@ -106,27 +98,11 @@ func TestState_InteractionMeasuring(t *testing.T) {
 	require.Equal(t, uint64(0), st.TotalBytesRead)
 
 	// non existing key
-	// should be appended to touches
 	// should be counted towards reading from the ledger
 	key2 := "key2"
 	_, err = st.Get("address", "controller", key2)
 	require.NoError(t, err)
-	require.Equal(t,
-		uint64(len("address")+len("controller")+len(key)),
-		st.TotalBytesRead)
-
-	// read again should be from cache
-	// but not an addition ot the ledger read
-	_, err = st.Get("address", "controller", key2)
-	require.NoError(t, err)
-	require.Equal(t,
-		uint64(len("address")+len("controller")+len(key)),
-		st.TotalBytesRead)
-
-	// apply to ledger, totalBytesWritten should be updated now
-	require.Equal(t,
-		uint64(len("address")+len("controller")+len(key)+len(value)),
-		st.TotalBytesWritten)
+	require.Equal(t, keySize, st.TotalBytesRead)
 }
 
 func TestState_MaxValueSize(t *testing.T) {
