@@ -796,13 +796,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 // we should be able to have conflicting forks with two different instances of
 // the same service event for the same epoch
 //
-//        /-->B1-->B3(R1)-->B5(S1)
-// ROOT --+
-//        \-->B2-->B4(R2)-->B6(S2)
+//         /--B1<--B3(R1)<--B5(S1)<--B7
+// ROOT <--+
+//         \--B2<--B4(R2)<--B6(S2)<--B8
 //
 func TestExtendConflictingEpochEvents(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -882,12 +883,22 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		err = state.Extend(&block6)
 		require.Nil(t, err)
 
+		// block 7 builds on block 5, contains QC for block 7
+		block7 := unittest.BlockWithParentFixture(block5.Header)
+		err = state.Extend(&block7)
+		require.Nil(t, err)
+
+		// block 8 builds on block 6, contains QC for block 6
+		block8 := unittest.BlockWithParentFixture(block6.Header)
+		err = state.Extend(&block8)
+		require.Nil(t, err)
+
 		// should be able query each epoch from the appropriate reference block
-		setup1FinalView, err := state.AtBlockID(block5.ID()).Epochs().Next().FinalView()
+		setup1FinalView, err := state.AtBlockID(block7.ID()).Epochs().Next().FinalView()
 		assert.Nil(t, err)
 		require.Equal(t, nextEpochSetup1.FinalView, setup1FinalView)
 
-		setup2FinalView, err := state.AtBlockID(block6.ID()).Epochs().Next().FinalView()
+		setup2FinalView, err := state.AtBlockID(block8.ID()).Epochs().Next().FinalView()
 		assert.Nil(t, err)
 		require.Equal(t, nextEpochSetup2.FinalView, setup2FinalView)
 	})
