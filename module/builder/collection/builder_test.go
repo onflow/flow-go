@@ -89,6 +89,7 @@ func (suite *BuilderSuite) SetupTest() {
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	seal.ResultID = result.ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(suite.T(), err)
