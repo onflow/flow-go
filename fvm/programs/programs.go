@@ -1,8 +1,10 @@
 package programs
 
 import (
+	"fmt"
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -126,6 +128,9 @@ func (p *Programs) ForceCleanup() {
 func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	fmt.Println("Cleanup:")
+	spew.Dump(changedContracts)
 
 	// In mature system, we would track dependencies between contracts
 	// and invalidate only affected ones, possibly setting them to
