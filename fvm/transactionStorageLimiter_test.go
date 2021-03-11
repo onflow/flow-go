@@ -1,6 +1,7 @@
 package fvm_test
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
@@ -9,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -129,12 +130,12 @@ func accountExists(owner string) OwnerKeyValue {
 
 func newMockStateManager(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.StateManager {
 
-	ledger := state.NewMapLedger()
-	s := state.NewState(ledger)
+	view := utils.NewSimpleView()
+	s := state.NewState(view)
 	sm := state.NewStateManager(s)
 
 	for _, okv := range ownerKeyStorageValue {
-		_ = s.Set(okv.Owner, "", okv.Key, utils.Uint64ToBinary(okv.Value))
+		_ = s.Set(okv.Owner, "", okv.Key, uint64ToBinary(okv.Value))
 	}
 
 	for _, key := range updatedKeys {
@@ -148,4 +149,11 @@ func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *
 	return func(address common.Address) (value uint64, err error) {
 		return 100, nil
 	}, nil
+}
+
+// uint64ToBinary converst a uint64 to a byte slice (big endian)
+func uint64ToBinary(integer uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, integer)
+	return b
 }

@@ -208,7 +208,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.stm.State(),
+		e.stm.State().View(),
 		e.programs.Programs,
 	)
 	if err != nil {
@@ -241,7 +241,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.stm.State(),
+		e.stm.State().View(),
 		e.programs.Programs,
 	)
 	if err != nil {

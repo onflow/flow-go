@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) flow.Address {
+func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
 		fvm.WithRestrictedAccountCreation(false),
@@ -31,7 +31,7 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err := vm.Run(ctx, tx, ledger, programs)
+	err := vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -48,7 +48,7 @@ func addAccountKey(
 	t *testing.T,
 	vm *fvm.VirtualMachine,
 	ctx fvm.Context,
-	ledger state.Ledger,
+	view state.View,
 	programs *programs.Programs,
 	address flow.Address,
 ) flow.AccountPublicKey {
@@ -61,7 +61,7 @@ func addAccountKey(
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err := vm.Run(ctx, tx, ledger, programs)
+	err := vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -73,7 +73,7 @@ func addAccountCreator(
 	vm *fvm.VirtualMachine,
 	chain flow.Chain,
 	ctx fvm.Context,
-	ledger state.Ledger,
+	view state.View,
 	programs *programs.Programs,
 	account flow.Address,
 ) {
@@ -90,7 +90,7 @@ func addAccountCreator(
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err := vm.Run(ctx, tx, ledger, programs)
+	err := vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 }
@@ -100,7 +100,7 @@ func removeAccountCreator(
 	vm *fvm.VirtualMachine,
 	chain flow.Chain,
 	ctx fvm.Context,
-	ledger state.Ledger,
+	view state.View,
 	programs *programs.Programs,
 	account flow.Address,
 ) {
@@ -118,7 +118,7 @@ func removeAccountCreator(
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err := vm.Run(ctx, tx, ledger, programs)
+	err := vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 }
@@ -238,8 +238,8 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Single account",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				payer := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				payer := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
@@ -247,7 +247,7 @@ func TestCreateAccount(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err := vm.Run(ctx, tx, ledger, programs)
+				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -260,7 +260,7 @@ func TestCreateAccount(t *testing.T) {
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
-				account, err := vm.GetAccount(ctx, address, ledger, programs)
+				account, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				require.NotNil(t, account)
 			}),
@@ -268,10 +268,10 @@ func TestCreateAccount(t *testing.T) {
 
 	t.Run("Multiple accounts",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				const count = 3
 
-				payer := createAccount(t, vm, chain, ctx, ledger, programs)
+				payer := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createMultipleAccountsTransaction)).
@@ -279,7 +279,7 @@ func TestCreateAccount(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err := vm.Run(ctx, tx, ledger, programs)
+				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -293,7 +293,7 @@ func TestCreateAccount(t *testing.T) {
 					require.NoError(t, err)
 					address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
-					account, err := vm.GetAccount(ctx, address, ledger, programs)
+					account, err := vm.GetAccount(ctx, address, view, programs)
 					require.NoError(t, err)
 					require.NotNil(t, account)
 				}
@@ -310,8 +310,8 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Unauthorized account payer",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				payer := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				payer := createAccount(t, vm, chain, ctx, view, programs)
 
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
@@ -319,7 +319,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err := vm.Run(ctx, tx, ledger, programs)
+				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.Error(t, tx.Err)
@@ -328,14 +328,14 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Authorized account payer",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err := vm.Run(ctx, tx, ledger, programs)
+				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -344,9 +344,9 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer added to allowlist",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				payer := createAccount(t, vm, chain, ctx, ledger, programs)
-				addAccountCreator(t, vm, chain, ctx, ledger, programs, payer)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				payer := createAccount(t, vm, chain, ctx, view, programs)
+				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
 
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
@@ -355,7 +355,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err := vm.Run(ctx, tx, ledger, programs)
+				err := vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
@@ -364,9 +364,9 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer removed from allowlist",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				payer := createAccount(t, vm, chain, ctx, ledger, programs)
-				addAccountCreator(t, vm, chain, ctx, ledger, programs, payer)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				payer := createAccount(t, vm, chain, ctx, view, programs)
+				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
 
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
@@ -374,16 +374,16 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 				validTx := fvm.Transaction(txBody, 0)
 
-				err := vm.Run(ctx, validTx, ledger, programs)
+				err := vm.Run(ctx, validTx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, validTx.Err)
 
-				removeAccountCreator(t, vm, chain, ctx, ledger, programs, payer)
+				removeAccountCreator(t, vm, chain, ctx, view, programs, payer)
 
 				invalidTx := fvm.Transaction(txBody, 0)
 
-				err = vm.Run(ctx, invalidTx, ledger, programs)
+				err = vm.Run(ctx, invalidTx, view, programs)
 				require.NoError(t, err)
 
 				assert.Error(t, invalidTx.Err)
@@ -415,10 +415,10 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Add to empty key list",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
+				before, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Empty(t, before.Keys)
 
@@ -431,12 +431,12 @@ func TestAddAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err = vm.Run(ctx, tx, ledger, programs)
+				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
+				after, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 
 				require.Len(t, after.Keys, 1)
@@ -452,12 +452,12 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Add to non-empty key list",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
 
-				publicKey1 := addAccountKey(t, vm, ctx, ledger, programs, address)
+				publicKey1 := addAccountKey(t, vm, ctx, view, programs, address)
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
+				before, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, 1)
 
@@ -470,12 +470,12 @@ func TestAddAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err = vm.Run(ctx, tx, ledger, programs)
+				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
+				after, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 
 				expectedKeys := []flow.AccountPublicKey{
@@ -498,8 +498,8 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Invalid key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
 				invalidPublicKeyArg, err := jsoncdc.Encode(invalidPublicKey)
@@ -512,12 +512,12 @@ func TestAddAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err = vm.Run(ctx, tx, ledger, programs)
+				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.Error(t, tx.Err)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
+				after, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 
 				assert.Empty(t, after.Keys)
@@ -526,10 +526,10 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Multiple keys",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
+				before, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Empty(t, before.Keys)
 
@@ -544,12 +544,12 @@ func TestAddAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err = vm.Run(ctx, tx, ledger, programs)
+				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
+				after, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 
 				expectedKeys := []flow.AccountPublicKey{
@@ -579,16 +579,16 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	t.Run("Non-existent key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
 
 				for i := 0; i < keyCount; i++ {
-					_ = addAccountKey(t, vm, ctx, ledger, programs, address)
+					_ = addAccountKey(t, vm, ctx, view, programs, address)
 				}
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
+				before, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -603,13 +603,13 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					tx := fvm.Transaction(txBody, uint32(i))
 
-					err = vm.Run(ctx, tx, ledger, programs)
+					err = vm.Run(ctx, tx, view, programs)
 					require.NoError(t, err)
 
 					assert.Error(t, tx.Err)
 				}
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
+				after, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Len(t, after.Keys, keyCount)
 
@@ -621,17 +621,17 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	t.Run("Existing key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
 				const keyIndex = keyCount - 1
 
 				for i := 0; i < keyCount; i++ {
-					_ = addAccountKey(t, vm, ctx, ledger, programs, address)
+					_ = addAccountKey(t, vm, ctx, view, programs, address)
 				}
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
+				before, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -645,12 +645,12 @@ func TestRemoveAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err = vm.Run(ctx, tx, ledger, programs)
+				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
+				after, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Len(t, after.Keys, keyCount)
 
@@ -664,16 +664,16 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	t.Run("Multiple keys",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *programs.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
 
 				for i := 0; i < keyCount; i++ {
-					_ = addAccountKey(t, vm, ctx, ledger, programs, address)
+					_ = addAccountKey(t, vm, ctx, view, programs, address)
 				}
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
+				before, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
@@ -690,12 +690,12 @@ func TestRemoveAccountKey(t *testing.T) {
 
 				tx := fvm.Transaction(txBody, 0)
 
-				err = vm.Run(ctx, tx, ledger, programs)
+				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
 				assert.NoError(t, tx.Err)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
+				after, err := vm.GetAccount(ctx, address, view, programs)
 				require.NoError(t, err)
 				assert.Len(t, after.Keys, keyCount)
 

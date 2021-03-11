@@ -19,7 +19,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger, *programs.Programs) error
+	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -154,7 +154,8 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 		if tx.Err == nil {
 			// if tx is successful, we apply changes to the chunk view by merging the txView into chunk view
-			chunkView.MergeView(txView)
+			err = chunkView.MergeView(txView)
+			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 	}
 

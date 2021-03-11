@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -53,7 +54,7 @@ func TestSafetyCheck(t *testing.T) {
 
 			contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-			ledger := state.NewMapLedger()
+			view := utils.NewSimpleView()
 
 			contractCode := `X`
 
@@ -63,14 +64,14 @@ func TestSafetyCheck(t *testing.T) {
 			encodedName, err := encodeContractNames([]string{"TestContract"})
 			require.NoError(t, err)
 
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"contract_names",
 				encodedName,
 			)
 			require.NoError(t, err)
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"code.TestContract",
@@ -81,7 +82,7 @@ func TestSafetyCheck(t *testing.T) {
 			context := NewContext(log)
 
 			stm := state.NewStateManager(state.NewState(
-				ledger,
+				view,
 				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
@@ -93,8 +94,6 @@ func TestSafetyCheck(t *testing.T) {
 			require.Contains(t, buffer.String(), "programs")
 			require.Contains(t, buffer.String(), "codes")
 			require.Equal(t, int(context.MaxNumOfTxRetries), proc.Retried)
-			// only consider the last run and not include touches from retries
-			require.Equal(t, 3, len(stm.State().Touches()))
 
 			dumpFiles := listFilesInDir(t, tmpDir)
 
@@ -125,7 +124,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 
 		contractCode := `pub contract TestContract: X {}`
 
@@ -135,14 +134,14 @@ func TestSafetyCheck(t *testing.T) {
 		encodedName, err := encodeContractNames([]string{"TestContract"})
 		require.NoError(t, err)
 
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"contract_names",
 			encodedName,
 		)
 		require.NoError(t, err)
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"code.TestContract",
@@ -153,7 +152,7 @@ func TestSafetyCheck(t *testing.T) {
 		context := NewContext(log)
 
 		stm := state.NewStateManager(state.NewState(
-			ledger,
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
@@ -181,11 +180,11 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		context := NewContext(log)
 
 		stm := state.NewStateManager(state.NewState(
-			ledger,
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
@@ -214,11 +213,11 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		context := NewContext(log)
 
 		stm := state.NewStateManager(state.NewState(
-			ledger,
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
@@ -265,11 +264,11 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		header := unittest.BlockHeaderFixture()
 		context := NewContext(log, WithBlockHeader(&header))
 
-		stm := state.NewStateManager(state.NewState(ledger))
+		stm := state.NewStateManager(state.NewState(view))
 
 		err := txInvocator.Process(vm, context, proc, stm, programs.NewEmptyPrograms())
 		assert.NoError(t, err)

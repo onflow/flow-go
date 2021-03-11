@@ -9,11 +9,12 @@ import (
 
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestContract_DraftFunctionality(t *testing.T) {
-	stm := state.NewStateManager(state.NewState(state.NewMapLedger()))
+	stm := state.NewStateManager(state.NewState(utils.NewSimpleView()))
 	accounts := state.NewAccounts(stm)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
@@ -65,7 +66,7 @@ func TestContract_DraftFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	stm := state.NewStateManager(state.NewState(state.NewMapLedger()))
+	stm := state.NewStateManager(state.NewState(utils.NewSimpleView()))
 	accounts := state.NewAccounts(stm)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)

@@ -105,7 +105,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
 	require.NoError(t, err)
 
-	require.NotEmpty(t, blockView.Delta())
+	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
 }

@@ -38,9 +38,9 @@ func New(rt runtime.Runtime) *VirtualMachine {
 }
 
 // Run runs a procedure against a ledger in the given context.
-func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger, programs *programs.Programs) (err error) {
+func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
 
-	st := state.NewState(ledger,
+	st := state.NewState(v,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
@@ -69,12 +69,12 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, ledger state.Ledger, 
 		return err
 	}
 
-	return st.ApplyDeltaToLedger()
+	return nil
 }
 
 // GetAccount returns an account by address or an error if none exists.
-func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger state.Ledger, programs *programs.Programs) (*flow.Account, error) {
-	st := state.NewState(ledger,
+func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
+	st := state.NewState(v,
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))

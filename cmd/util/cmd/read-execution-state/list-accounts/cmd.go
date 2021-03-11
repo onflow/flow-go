@@ -103,11 +103,6 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("cannot get current address state")
 	}
 
-	err = stm.State().ApplyDeltaToLedger()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot commit state to ledger")
-	}
-
 	finalState := finalGenerator.Bytes()
 
 	generator := chain.NewAddressGenerator()
