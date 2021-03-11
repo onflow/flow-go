@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -93,7 +94,7 @@ func (r *Snapshot) AllRegisters() []flow.RegisterID {
 }
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
-func (v *View) NewChild() *View {
+func (v *View) NewChild() state.View {
 	return NewView(v.Get)
 }
 
@@ -183,7 +184,13 @@ func (v *View) Delta() Delta {
 // TODO rename this, this is not actually a merge as we can't merge
 // readFunc s.
 
-func (v *View) MergeView(child *View) {
+func (v *View) MergeView(ch state.View) {
+
+	child, ok := ch.(*View)
+	if !ok {
+		panic("view type missmatch for merging views")
+	}
+
 	for _, id := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[id.String()] = id
 	}

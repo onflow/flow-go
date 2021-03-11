@@ -353,7 +353,8 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 		err = hashIt(expSpock2, []byte("carrot"))
 		assert.NoError(t, err)
-		assert.Equal(t, chView.SpockSecret(), []uint8(expSpock2.SumHash()))
+
+		assert.Equal(t, chView.(*delta.View).SpockSecret(), []uint8(expSpock2.SumHash()))
 
 		v.MergeView(chView)
 		err = hashIt(expSpock1, expSpock2.SumHash())
