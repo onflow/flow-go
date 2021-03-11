@@ -2,6 +2,7 @@ package badger
 
 import (
 	"fmt"
+	"github.com/rs/zerolog/log"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -15,6 +16,7 @@ type Payloads struct {
 	guarantees *Guarantees
 	seals      *Seals
 	receipts   *ExecutionReceipts
+	results    *ExecutionResults
 }
 
 func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts) *Payloads {
@@ -51,13 +53,28 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 
 		resultsById := payload.ResultsById()
 
+		// At this point we can be sure that execution result is part of the payload or it's already
+		// stored in storage. If execution result is not present in both of those places it means that there is
+		// a protocol violation and we are in inconsistent state.
+		receiptFromMeta := func(meta *flow.ExecutionReceiptMeta) *flow.ExecutionReceipt {
+			if result, ok := resultsById[meta.ResultID]; ok {
+				return flow.ExecutionReceiptFromMeta(*meta, *result)
+			}
+
+			result, err := p.results.ByID(meta.ResultID)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("could not retrieve result %v from storage", meta.ResultID)
+			}
+			return flow.ExecutionReceiptFromMeta(*meta, *result)
+		}
+
 		// store all payload receipts
 		for _, meta := range payload.Receipts {
 			// ATTENTION: this is broken from perspective if we have execution receipt which points an execution result
 			// which is not included in current payload but was incorporated in one of previous blocks.
 			// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
 			// and execution result is decoupled.
-			receipt := flow.ExecutionReceiptFromMeta(*meta, *resultsById[meta.ResultID])
+			receipt := receiptFromMeta(meta)
 			err := p.receipts.store(receipt)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)

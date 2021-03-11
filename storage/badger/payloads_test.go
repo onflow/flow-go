@@ -43,6 +43,33 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 	})
 }
 
+func TestPayloadStoreERAlreadyIncluded(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+
+		index := badgerstorage.NewIndex(metrics, db)
+		seals := badgerstorage.NewSeals(metrics, db)
+		guarantees := badgerstorage.NewGuarantees(metrics, db)
+		results := badgerstorage.NewExecutionResults(metrics, db)
+		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
+
+		result := unittest.ExecutionResultFixture()
+		receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
+		payload1 := unittest.PayloadFixture()
+		payload1.Receipts = []*flow.ExecutionReceiptMeta{receipt1.Meta()}
+		payload1.Results = []*flow.ExecutionResult{result}
+		err := store.Store(unittest.IdentifierFixture(), payload1)
+		require.NoError(t, err)
+
+		receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
+		payload2 := unittest.PayloadFixture()
+		payload2.Receipts = []*flow.ExecutionReceiptMeta{receipt2.Meta()}
+		err = store.Store(unittest.IdentifierFixture(), payload2)
+		require.NoError(t, err)
+	})
+}
+
 func TestPayloadRetreiveWithoutStore(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
