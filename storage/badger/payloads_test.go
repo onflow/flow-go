@@ -25,7 +25,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
 		results := badgerstorage.NewExecutionResults(metrics, db)
 		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
 
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture()
@@ -52,7 +52,7 @@ func TestPayloadStoreERAlreadyIncluded(t *testing.T) {
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
 		results := badgerstorage.NewExecutionResults(metrics, db)
 		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
 
 		result := unittest.ExecutionResultFixture()
 		receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
@@ -79,7 +79,7 @@ func TestPayloadRetreiveWithoutStore(t *testing.T) {
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
 		results := badgerstorage.NewExecutionResults(metrics, db)
 		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
 
 		blockID := unittest.IdentifierFixture()
 

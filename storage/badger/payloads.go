@@ -19,7 +19,8 @@ type Payloads struct {
 	results    *ExecutionResults
 }
 
-func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts) *Payloads {
+func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts,
+	results *ExecutionResults) *Payloads {
 
 	p := &Payloads{
 		db:         db,
@@ -27,6 +28,7 @@ func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Sea
 		guarantees: guarantees,
 		seals:      seals,
 		receipts:   receipts,
+		results:    results,
 	}
 
 	return p
