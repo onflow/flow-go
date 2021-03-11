@@ -3,8 +3,6 @@ package state
 import (
 	"errors"
 	"fmt"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // InvalidExtensionError is an error for invalid extension of the state
@@ -91,25 +89,4 @@ func (e NoValidChildBlockError) Error() string {
 
 func IsNoValidChildBlockError(err error) bool {
 	return errors.As(err, &NoValidChildBlockError{})
-}
-
-// UnvalidatedBlockQueryError is an error returned when we query a block by ID
-// which has not been marked valid by HotStuff. This means that we aren't yet
-// sure whether the block contains a valid quorum certificate. As a rule, the
-// protocol state returns an error for these blocks rather than returning a
-// state which may be invalid.
-type UnvalidatedBlockQueryError struct {
-	BlockID flow.Identifier
-}
-
-func (e UnvalidatedBlockQueryError) Error() string {
-	return fmt.Sprintf("invalid query for unvalidated block (id=%x)", e.BlockID)
-}
-
-func NewUnvalidatedBlockQueryError(blockID flow.Identifier) error {
-	return UnvalidatedBlockQueryError{BlockID: blockID}
-}
-
-func IsUnvalidatedBlockQueryError(err error) bool {
-	return errors.As(err, &UnvalidatedBlockQueryError{})
 }
