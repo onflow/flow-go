@@ -374,11 +374,11 @@ func (p *Payload) size() uint64 {
 	return uint64(len(p.Owner) + len(p.Controller) + len(p.Key) + len(p.Value))
 }
 
-func (p *Payload) bytes() []byte {
-	res := make([]byte, 0)
-	res = append(res, []byte(p.Owner)...)
-	res = append(res, []byte(p.Controller)...)
-	res = append(res, []byte(p.Key)...)
-	res = append(res, p.Value...)
-	return res
-}
+// func (p *Payload) bytes() []byte {
+// 	res := make([]byte, 0)
+// 	res = append(res, []byte(p.Owner)...)
+// 	res = append(res, []byte(p.Controller)...)
+// 	res = append(res, []byte(p.Key)...)
+// 	res = append(res, p.Value...)
+// 	return res
+// }
