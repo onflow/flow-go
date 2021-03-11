@@ -154,14 +154,16 @@ func Test_Programs(t *testing.T) {
 		require.False(t, hasB)
 	})
 
+	var viewB *delta.View
+
 	t.Run("contract imports other contracts", func(t *testing.T) {
 
 		// run a TX using contract B
-		procCallA := fvm.Transaction(callTx("B", addressB), 3)
+		procCallB := fvm.Transaction(callTx("B", addressB), 3)
 
-		view := mainView.NewChild()
+		viewB = mainView.NewChild()
 
-		err = vm.Run(context, procCallA, view, programs)
+		err = vm.Run(context, procCallB, viewB, programs)
 		require.NoError(t, err)
 
 		_, programAState, has := programs.Get(contractALocation)
@@ -172,10 +174,24 @@ func Test_Programs(t *testing.T) {
 		_, programBState, has := programs.Get(contractBLocation)
 		require.True(t, has)
 		// recorded state should be equal to fresh one created for this TX (as there are no other operation in a TX)
-		require.Equal(t, programBState.Ledger(), view)
+		require.Equal(t, programBState.Ledger(), viewB)
 
 		// merge it back
-		mainView.MergeView(view)
+		mainView.MergeView(viewB)
+	})
+
+	t.Run("running same transaction should result exactly the same touches", func(t *testing.T) {
+
+		// run a TX using contract B
+		procCallB := fvm.Transaction(callTx("B", addressB), 4)
+
+		view := mainView.NewChild()
+
+		err = vm.Run(context, procCallB, viewB, programs)
+		require.NoError(t, err)
+
+		//
+		require.Equal(t, viewB, view)
 	})
 
 }
