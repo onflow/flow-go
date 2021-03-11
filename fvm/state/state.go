@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -113,6 +115,18 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 		return err
 	}
 
+	if err := s.view.Set(owner, controller, key, value); err != nil {
+		return err
+	}
+
+	if err := s.checkMaxInteraction(); err != nil {
+		return err
+	}
+
+	if address, isAddress := addressFromOwner(owner); isAddress {
+		s.updatedAddresses[address] = struct{}{}
+	}
+
 	mapKey := mapKey{owner, controller, key}
 	if old, ok := s.updateSize[mapKey]; ok {
 		s.WriteCounter--
@@ -124,16 +138,6 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	s.TotalBytesWritten += updateSize
 	s.updateSize[mapKey] = updateSize
 
-	s.view.Set(owner, controller, key, value)
-
-	if err := s.checkMaxInteraction(); err != nil {
-		return err
-	}
-
-	address, isAddress := addressFromOwner(owner)
-	if isAddress {
-		s.updatedAddresses[address] = struct{}{}
-	}
 	return nil
 }
 
@@ -158,7 +162,10 @@ func (s *State) NewChild() *State {
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(other *State) error {
 
-	s.view.MergeView(other.view)
+	err := s.view.MergeView(other.view)
+	if err != nil {
+		return fmt.Errorf("can not merge the state: %w", err)
+	}
 
 	// apply address updates
 	for k, v := range other.updatedAddresses {

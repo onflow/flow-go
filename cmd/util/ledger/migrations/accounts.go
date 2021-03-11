@@ -154,16 +154,17 @@ func (v *view) DropDelta() {
 	v.Ledger.payloads = make(map[string]ledger.Payload)
 }
 
-func (v *view) MergeView(o state.View) {
+func (v *view) MergeView(o state.View) error {
 	var other *view
 	var ok bool
 	if other, ok = o.(*view); !ok {
-		panic("can't merge simple view")
+		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:Delta.View)", o)
 	}
 
 	for key, value := range other.Ledger.payloads {
 		v.Ledger.payloads[key] = value
 	}
+	return nil
 }
 
 func (v *view) Set(owner, controller, key string, value flow.RegisterValue) error {

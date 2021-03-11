@@ -188,11 +188,11 @@ func (v *View) Delta() Delta {
 // TODO rename this, this is not actually a merge as we can't merge
 // readFunc s.
 
-func (v *View) MergeView(ch state.View) {
+func (v *View) MergeView(ch state.View) error {
 
 	child, ok := ch.(*View)
 	if !ok {
-		panic("view type missmatch for merging views")
+		return fmt.Errorf("can not merge view: view type mismatch (given: %T, expected:delta.View)", ch)
 	}
 
 	for _, id := range child.Interactions().RegisterTouches() {
@@ -202,9 +202,10 @@ func (v *View) MergeView(ch state.View) {
 	// TODO return the error and handle it properly on other places
 	err := v.updateSpock(child.SpockSecret())
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("can not merge view: %w", err)
 	}
 	v.delta.MergeWith(child.delta)
+	return nil
 }
 
 // RegisterTouches returns the register IDs touched by this view (either read or write)

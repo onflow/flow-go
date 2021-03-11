@@ -140,8 +140,10 @@ func (e *blockComputer) executeBlock(
 
 		interactions[i] = collectionView.(*delta.View).Interactions()
 
-		stateView.MergeView(collectionView)
-
+		err = stateView.MergeView(collectionView)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// system chunk
@@ -171,7 +173,10 @@ func (e *blockComputer) executeBlock(
 	gasUsed += txGas
 	interactions[len(interactions)-1] = systemChunkView.(*delta.View).Interactions()
 
-	stateView.MergeView(systemChunkView)
+	err = stateView.MergeView(systemChunkView)
+	if err != nil {
+		return nil, err
+	}
 
 	return &execution.ComputationResult{
 		ExecutableBlock:   block,
@@ -325,7 +330,11 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	if tx.Err == nil {
-		collectionView.MergeView(txView)
+		err := collectionView.MergeView(txView)
+		if err != nil {
+			return nil, nil, txResult, 0, err
+		}
+
 	}
 	e.log.Info().
 		Str("txHash", tx.ID.String()).

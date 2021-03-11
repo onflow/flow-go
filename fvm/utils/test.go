@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -27,20 +28,24 @@ func (v *SimpleView) NewChild() state.View {
 	return ch
 }
 
-func (v *SimpleView) MergeView(o state.View) {
+func (v *SimpleView) MergeView(o state.View) error {
 	var other *SimpleView
 	var ok bool
 	if other, ok = o.(*SimpleView); !ok {
-		panic("can't merge simple view")
+		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:SimpleView)", o)
 	}
 
 	for _, item := range other.Ledger.Registers {
-		v.Ledger.Set(item.Key.Owner, item.Key.Controller, item.Key.Key, item.Value)
+		err := v.Ledger.Set(item.Key.Owner, item.Key.Controller, item.Key.Key, item.Value)
+		if err != nil {
+			return fmt.Errorf("can not merge: %w", err)
+		}
 	}
 
 	for k := range other.Ledger.RegisterTouches {
 		v.Ledger.RegisterTouches[k] = true
 	}
+	return nil
 }
 
 func (v *SimpleView) DropDelta() {
