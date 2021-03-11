@@ -11,11 +11,21 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// EpochHeights is a structure caching the results of building an epoch with
+// EpochBuilder. It contains the first block height for each phase of the epoch.
+type EpochHeights struct {
+	Counter   uint64 // which epoch this is
+	Staking   uint64 // first height of staking phase
+	Setup     uint64 // first height of setup phase
+	Committed uint64 // first height of committed phase
+}
+
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
 	state      protocol.MutableState
 	blocks     map[flow.Identifier]*flow.Block
+	built      map[uint64]EpochHeights
 	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
 	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
@@ -26,6 +36,7 @@ func NewEpochBuilder(t *testing.T, state protocol.MutableState) *EpochBuilder {
 		t:      t,
 		state:  state,
 		blocks: make(map[flow.Identifier]*flow.Block),
+		built:  make(map[uint64]EpochHeights),
 	}
 	return builder
 }
@@ -46,19 +57,25 @@ func (builder *EpochBuilder) UsingCommitOpts(opts ...func(*flow.EpochCommit)) *E
 	return builder
 }
 
+// EpochHeights returns heights of each phase within about a built epoch.
+func (builder *EpochBuilder) EpochHeights(counter uint64) (EpochHeights, bool) {
+	epoch, ok := builder.built[counter]
+	return epoch, ok
+}
+
 // Build builds and finalizes a sequence of blocks comprising a minimal full
 // epoch (epoch N). We assume the latest finalized block is within staking phase
 // in epoch N.
 //
-//                       |                                  EPOCH N                                  |
-//                       |                                                                           |
-//     P                 A               B               C               D             E             F
-// +------------+  +------------+  +-----------+  +--------------+  +----------+  +----------+  +----------+
-// | ER(P-1)    |->| ER(P)      |->| ~~ER(A)~~ |->| ER(B)        |->| ER(C)    |->| ER(D)    |->| ER(E)    |
-// | S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | ~~S(ER(A))~~ |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) |
-// +------------+  +------------+  +-----------+  +--------------+  +----------+  +----------+  +----------+
-//                                                                        |                          |
-//                                                                      Setup                      Commit
+//                 |                                  EPOCH N                                                      |
+//                 |                                                                                               |
+//     P                 A               B               C               D             E             F           G
+// +------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
+// | ER(P-1)    |->| ER(P)      |->| ER(A)     |->| ER(B)     |->| ER(C)    |->| ER(D)    |->| ER(E)    | ER(F)    |
+// | S(ER(P-2)) |  | S(ER(P-1)) |  | S(ER(P))  |  | S(ER(A))  |  | S(ER(B)) |  | S(ER(C)) |  | S(ER(D)) | S(ER(E)) |
+// +------------+  +------------+  +-----------+  +-----------+  +----------+  +----------+  +----------+----------+
+//                                                                             |                        |
+//                                                                             Setup                    Commit
 //
 // ER(X)    := ExecutionReceipt for block X
 // S(ER(X)) := Seal for the ExecutionResult contained in ER(X) (seals block X)
@@ -69,12 +86,18 @@ func (builder *EpochBuilder) UsingCommitOpts(opts ...func(*flow.EpochCommit)) *E
 // not contain a receipt for block A, and block C does not contain a seal for
 // block A. This is because the root block is sealed from genesis and we
 // can't insert duplicate seals.
-
+//
 // D contains a seal for block B containing the EpochSetup service event.
+// E contains a QC for D, which causes the EpochSetup to become activated.
+//
 // F contains a seal for block D containing the EpochCommit service event.
+// G contains a QC for F, which causes the EpochCommit to become activated.
 //
 // To build a sequence of epochs, we call BuildEpoch, then CompleteEpoch, and so on.
 //
+// Upon building an epoch N (preparing epoch N+1), we store some information
+// about the heights of blocks in the BUILT epoch (epoch N). These can be
+// queried with EpochHeights.
 func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
 	// prepare default values for the service events based on the current state
@@ -203,6 +226,29 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seals:    []*flow.Seal{sealForD},
 	})
 	builder.addBlock(&F)
+	// create receipt for block F
+	receiptF := ReceiptForBlockFixture(&F)
+
+	// build block G
+	// G contains a seal for block E and a receipt for block F
+	G := BlockWithParentFixture(F.Header)
+	sealForE := Seal.Fixture(
+		Seal.WithResult(&receiptE.ExecutionResult),
+	)
+	G.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receiptF},
+		Seals:    []*flow.Seal{sealForE},
+	})
+
+	builder.addBlock(&G)
+
+	// cache information about the built epoch
+	builder.built[counter] = EpochHeights{
+		Counter:   counter,
+		Staking:   A.Height,
+		Setup:     E.Header.Height,
+		Committed: G.Header.Height,
+	}
 
 	return builder
 }
