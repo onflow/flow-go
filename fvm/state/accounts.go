@@ -9,7 +9,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -410,8 +409,16 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 	} else {
 		registerID = flow.NewRegisterID(string(address.Bytes()), "", key)
 	}
-	registerKey := state.RegisterIDToKey(registerID)
-	return registerKey.Size() + len(value)
+
+	return getRegisterIDSize(registerID) + len(value)
+}
+
+func getRegisterIDSize(inp flow.RegisterID) int {
+	size := 0
+	size += len(inp.Owner) + 2
+	size += len(inp.Controller) + 2
+	size += len(inp.Key) + 2
+	return size
 }
 
 // TODO replace with touch
