@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestStateManager(t *testing.T) {
-	view := NewSimpleView()
+	view := utils.NewSimpleView()
 	st := state.NewState(view)
 	stm := state.NewStateManager(st)
 

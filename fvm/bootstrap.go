@@ -112,8 +112,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, stm *state.Sta
 	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(stm)
-	addressGenerator, err := state.NewStateBoundAddressGenerator(stm, ctx.Chain)
+	b.accounts = state.NewAccounts(b.stm)
+	addressGenerator, err := state.NewStateBoundAddressGenerator(b.stm, ctx.Chain)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
 	}

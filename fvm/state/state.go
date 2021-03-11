@@ -43,6 +43,10 @@ func defaultState(view View) *State {
 	}
 }
 
+func (s *State) View() View {
+	return s.view
+}
+
 type StateOption func(st *State) *State
 
 // NewState constructs a new state

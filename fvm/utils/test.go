@@ -1,4 +1,4 @@
-package state_test
+package utils
 
 import (
 	"strings"

@@ -6,10 +6,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 )
 
 func TestState_ChildMergeFunctionality(t *testing.T) {
-	view := NewSimpleView()
+	view := utils.NewSimpleView()
 	st := state.NewState(view)
 
 	t.Run("test read from parent state (backoff)", func(t *testing.T) {
@@ -76,7 +77,7 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestState_InteractionMeasuring(t *testing.T) {
-	view := NewSimpleView()
+	view := utils.NewSimpleView()
 	st := state.NewState(view)
 
 	key := "key1"
@@ -106,7 +107,7 @@ func TestState_InteractionMeasuring(t *testing.T) {
 }
 
 func TestState_MaxValueSize(t *testing.T) {
-	view := NewSimpleView()
+	view := utils.NewSimpleView()
 	st := state.NewState(view, state.WithMaxValueSizeAllowed(6))
 
 	// update should pass
@@ -121,7 +122,7 @@ func TestState_MaxValueSize(t *testing.T) {
 }
 
 func TestState_MaxKeySize(t *testing.T) {
-	view := NewSimpleView()
+	view := utils.NewSimpleView()
 	st := state.NewState(view, state.WithMaxKeySizeAllowed(6))
 
 	// read
@@ -143,7 +144,7 @@ func TestState_MaxKeySize(t *testing.T) {
 }
 
 func TestState_MaxInteraction(t *testing.T) {
-	view := NewSimpleView()
+	view := utils.NewSimpleView()
 	st := state.NewState(view, state.WithMaxInteractionSizeAllowed(12))
 
 	// read - interaction 3
