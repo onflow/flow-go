@@ -24,10 +24,10 @@ func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKe
 	}
 }
 
-// GetSigner returns the threshold-signer for signing objects at a given view.
-// The view determines the epoch, which determines the DKG private key
-// underlying the signer.
-func (s *EpochAwareSignerStore) GetSigner(view uint64) (module.ThresholdSigner, error) {
+// GetThresholdSigner returns the threshold-signer for signing objects at a
+// given view. The view determines the epoch, which determines the DKG private
+// key underlying the signer.
+func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
 	epoch, err := s.epochLookup.EpochForView(view)
 	if err != nil {
 		return nil, err
@@ -47,8 +47,9 @@ func (s *EpochAwareSignerStore) GetSigner(view uint64) (module.ThresholdSigner, 
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-// SingleSignerStore implements the SignerStore interface. It only keeps one
-// signer and is not epoch-aware. It is used only for the bootstrapping process.
+// SingleSignerStore implements the ThresholdSignerStore interface. It only
+// keeps one signer and is not epoch-aware. It is used only for the
+// bootstrapping process.
 type SingleSignerStore struct {
 	signer module.ThresholdSigner
 }
@@ -60,7 +61,7 @@ func NewSingleSignerStore(signer module.ThresholdSigner) *SingleSignerStore {
 	}
 }
 
-// GetSigner returns the signer.
-func (s *SingleSignerStore) GetSigner(view uint64) (module.ThresholdSigner, error) {
+// GetThresholdSigner returns the signer.
+func (s *SingleSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
 	return s.signer, nil
 }

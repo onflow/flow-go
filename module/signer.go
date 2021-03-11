@@ -26,6 +26,6 @@ type ThresholdSigner interface {
 	Sign(msg []byte) (crypto.Signature, error)
 }
 
-type SignerStore interface {
-	GetSigner(view uint64) (ThresholdSigner, error)
+type ThresholdSignerStore interface {
+	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }

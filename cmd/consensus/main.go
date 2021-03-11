@@ -446,8 +446,8 @@ func main() {
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
 
-			// initialize the verifier used to verify aggregated signatures
-			verifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			// initialize the verifier used to verify threshold signatures
+			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner()
@@ -469,7 +469,7 @@ func main() {
 			signer = verification.NewCombinedSigner(
 				committee,
 				staking,
-				verifier,
+				thresholdVerifier,
 				merger,
 				signerStore,
 				node.NodeID,
