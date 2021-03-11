@@ -113,7 +113,7 @@ func TestExtendValid(t *testing.T) {
 
 		consumer.On("BlockFinalized", extend.Header).Once()
 		err = fullState.Finalize(extend.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 		consumer.AssertExpectations(t)
 	})
 }
@@ -311,7 +311,7 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		receipt := unittest.ReceiptForBlockFixture(&block2)
 
@@ -322,7 +322,7 @@ func TestExtendReceiptsDuplicate(t *testing.T) {
 				Receipts: []*flow.ExecutionReceipt{receipt},
 			})
 			err = state.Extend(&block3)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			block4 := unittest.BlockWithParentFixture(block3.Header)
 			block4.SetPayload(flow.Payload{
@@ -363,7 +363,7 @@ func TestExtendReceiptsSealedBlock(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block2Receipt := unittest.ReceiptForBlockFixture(&block2)
 
@@ -375,7 +375,7 @@ func TestExtendReceiptsSealedBlock(t *testing.T) {
 			Receipts: []*flow.ExecutionReceipt{block2Receipt},
 		})
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// create a seal for block2
 		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
@@ -386,7 +386,7 @@ func TestExtendReceiptsSealedBlock(t *testing.T) {
 			Seals: []*flow.Seal{seal2},
 		})
 		err = state.Extend(&block4)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// insert another receipt for block 2, which is now the highest sealed
 		// block, and ensure that the receipt is rejected
@@ -411,7 +411,7 @@ func TestExtendReceiptsSealedBlock(t *testing.T) {
 			Receipts: []*flow.ExecutionReceipt{receipt},
 		})
 		err = state.Extend(&block6)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -431,13 +431,13 @@ func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
 		block2.Payload.Guarantees = nil
 		block2.Header.PayloadHash = block2.Payload.Hash()
 		err := state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// create block3
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block3Receipt := unittest.ReceiptForBlockFixture(&block3)
 
@@ -467,13 +467,13 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 		block2.Payload.Guarantees = nil
 		block2.Header.PayloadHash = block2.Payload.Hash()
 		err := state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.Payload.Guarantees = nil
 		block3.Header.PayloadHash = block3.Payload.Hash()
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// insert a block with payload receipts not sorted by block height.
 		block4 := unittest.BlockWithParentFixture(block3.Header)
@@ -501,7 +501,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// Add a receipt for block 2
 		receipt := unittest.ExecutionReceiptFixture()
@@ -527,17 +527,17 @@ func TestExtendReceiptsValid(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block4 := unittest.BlockWithParentFixture(block3.Header)
 		block4.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block4)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		receipt3a := unittest.ReceiptForBlockFixture(&block3)
 		receipt3b := unittest.ReceiptForBlockFixture(&block3)
@@ -551,7 +551,7 @@ func TestExtendReceiptsValid(t *testing.T) {
 			},
 		})
 		err = state.Extend(&block5)
-		require.Nil(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -591,16 +591,16 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should begin the epoch in the staking phase
 		phase, err := state.AtBlockID(head.ID()).Phase()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)
 
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block1.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		epoch1FinalView := epoch1Setup.FinalView
@@ -628,9 +628,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			Receipts: []*flow.ExecutionReceipt{receipt1},
 		})
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block2.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 3 contains the seal for block 1
 		block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -640,16 +640,16 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// insert the block sealing the EpochSetup event
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// insert a block with a QC pointing to block 3
 		block4 := unittest.BlockWithParentFixture(block3.Header)
 		err = state.Extend(&block4)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// now that the setup event has been emitted, we should be in the setup phase
 		phase, err = state.AtBlockID(block4.ID()).Phase()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
 
 		// we should NOT be able to query epoch 2 wrt blocks before 4
@@ -662,9 +662,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// we should be able to query epoch 2 wrt block 4
 		_, err = state.AtBlockID(block4.ID()).Epochs().Next().InitialIdentities()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		_, err = state.AtBlockID(block4.ID()).Epochs().Next().Clustering()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
 		_, err = state.AtBlockID(block4.ID()).Epochs().Next().DKG()
@@ -673,12 +673,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// ensure an epoch phase transition when we finalize block 3
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header).Once()
 		err = state.Finalize(block3.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header)
 
 		// finalize block 4 so we can finalize subsequent blocks
 		err = state.Finalize(block4.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		epoch2Commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(epoch2Setup.Counter),
@@ -698,9 +698,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		})
 
 		err = state.Extend(&block5)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block5.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 6 contains the seal for block 2
 		block6 := unittest.BlockWithParentFixture(block5.Header)
@@ -709,12 +709,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		})
 
 		err = state.Extend(&block6)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// insert a block with a QC pointing to block 6
 		block7 := unittest.BlockWithParentFixture(block6.Header)
 		err = state.Extend(&block7)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// we should NOT be able to query epoch 2 commit info wrt blocks before 7
 		for _, blockID := range []flow.Identifier{block4.ID(), block5.ID(), block6.ID()} {
@@ -724,30 +724,30 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// now epoch 2 is fully ready, we can query anything we want about it wrt block 7 (or later)
 		_, err = state.AtBlockID(block7.ID()).Epochs().Next().InitialIdentities()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		_, err = state.AtBlockID(block7.ID()).Epochs().Next().Clustering()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		_, err = state.AtBlockID(block7.ID()).Epochs().Next().DKG()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// now that the commit event has been emitted, we should be in the committed phase
 		phase, err = state.AtBlockID(block7.ID()).Phase()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
 
 		// expect epoch phase transition once we finalize block 6
 		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
 		err = state.Finalize(block6.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
 
 		// finalize block 7 so we can finalize subsequent blocks
 		err = state.Finalize(block7.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block4.ID()).Epochs().Current().Counter()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
 		// block 8 has the final view of the epoch
@@ -756,11 +756,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block8.Header.View = epoch1FinalView
 
 		err = state.Extend(&block8)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
 		epochCounter, err = state.AtBlockID(block8.ID()).Epochs().Current().Counter()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
 		// block 9 has a view > final view of epoch 1, it will be considered the first block of epoch 2
@@ -770,25 +770,25 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block9.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
 
 		err = state.Extend(&block9)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// now, at long last, we are in epoch 2
 		epochCounter, err = state.AtBlockID(block9.ID()).Epochs().Current().Counter()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Equal(t, epoch2Setup.Counter, epochCounter)
 
 		// we should begin epoch 2 in staking phase
 		// how that the commit event has been emitted, we should be in the committed phase
 		phase, err = state.AtBlockID(block9.ID()).Phase()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)
 
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
 		err = state.Finalize(block8.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block9.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
 	})
 }
@@ -813,12 +813,12 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
@@ -847,7 +847,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 			Receipts: []*flow.ExecutionReceipt{block1Receipt},
 		})
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 2 receipt contains nextEpochSetup2
 		block2Receipt := unittest.ReceiptForBlockFixture(&block2)
@@ -859,7 +859,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 			Receipts: []*flow.ExecutionReceipt{block2Receipt},
 		})
 		err = state.Extend(&block4)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// seal for block 1
 		seal1 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
@@ -873,7 +873,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 			Seals: []*flow.Seal{seal1},
 		})
 		err = state.Extend(&block5)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
 		block6 := unittest.BlockWithParentFixture(block4.Header)
@@ -881,25 +881,25 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 			Seals: []*flow.Seal{seal2},
 		})
 		err = state.Extend(&block6)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 7
 		block7 := unittest.BlockWithParentFixture(block5.Header)
 		err = state.Extend(&block7)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
 		block8 := unittest.BlockWithParentFixture(block6.Header)
 		err = state.Extend(&block8)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// should be able query each epoch from the appropriate reference block
 		setup1FinalView, err := state.AtBlockID(block7.ID()).Epochs().Next().FinalView()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		require.Equal(t, nextEpochSetup1.FinalView, setup1FinalView)
 
 		setup2FinalView, err := state.AtBlockID(block8.ID()).Epochs().Next().FinalView()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		require.Equal(t, nextEpochSetup2.FinalView, setup2FinalView)
 	})
 }
@@ -917,9 +917,9 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block1.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
@@ -998,9 +998,9 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block1.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
@@ -1052,18 +1052,18 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			Receipts: []*flow.ExecutionReceipt{setupReceipt},
 		})
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block2.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{setupSeal},
 		})
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block3.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		t.Run("inconsistent counter", func(t *testing.T) {
 			commit, receipt, _ := createCommit(&block3)
@@ -1141,9 +1141,9 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block1)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block1.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		epoch1FinalView := epoch1Setup.FinalView
@@ -1169,9 +1169,9 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 			Receipts: []*flow.ExecutionReceipt{receipt1},
 		})
 		err = state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		err = state.Finalize(block2.ID())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 3 seals block 1
 		block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -1179,7 +1179,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 			Seals: []*flow.Seal{seal1},
 		})
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// block 4 will be the first block for epoch 2
 		block4 := unittest.BlockWithParentFixture(block3.Header)
@@ -1385,12 +1385,12 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
 		err := state.Extend(&block2)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block3)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		// create seals for block2 and block3
 		seal2 := unittest.Seal.Fixture(
@@ -1409,7 +1409,7 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 			Guarantees: nil,
 		})
 		err = state.Extend(&block4)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
 		require.NoError(t, err)
@@ -1428,12 +1428,12 @@ func TestMakeValid(t *testing.T) {
 			block2 := unittest.BlockWithParentFixture(head)
 			block2.SetPayload(flow.EmptyPayload())
 			err := state.Extend(&block2)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
 			block3.SetPayload(flow.EmptyPayload())
 			err = state.Extend(&block3)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			consumer.On("BlockProcessable", mock.Anything).Return()
 
