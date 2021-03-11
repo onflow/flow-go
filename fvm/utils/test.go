@@ -43,6 +43,10 @@ func (v *SimpleView) MergeView(o state.View) {
 	}
 }
 
+func (v *SimpleView) DropDelta() {
+	v.Ledger.Registers = make(map[string]flow.RegisterEntry)
+}
+
 func (v *SimpleView) Set(owner, controller, key string, value flow.RegisterValue) error {
 	return v.Ledger.Set(owner, controller, key, value)
 }

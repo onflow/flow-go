@@ -7,6 +7,7 @@ import (
 type View interface {
 	NewChild() View
 	MergeView(child View)
+	DropDelta() // drops all the delta changes
 	Ledger
 }
 

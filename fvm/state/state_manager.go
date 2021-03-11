@@ -60,6 +60,22 @@ func (s *StateManager) RollUpWithMerge() error {
 	return nil
 }
 
+// RollUpWithMergeNoDelta merges the active state into its parent but drops the delta.
+func (s *StateManager) RollUpWithMergeNoDelta() error {
+	if s.parents[s.activeState] == nil {
+		return fmt.Errorf("parent not exist for this state")
+	}
+
+	s.activeState.View().DropDelta()
+	err := s.parents[s.activeState].MergeState(s.activeState)
+	if err != nil {
+		return err
+	}
+
+	s.activeState = s.parents[s.activeState]
+	return nil
+}
+
 // RollUpNoMerge ignores the current active state
 // and sets the parent as the active state
 func (s *StateManager) RollUpNoMerge() error {

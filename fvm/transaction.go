@@ -106,7 +106,6 @@ func (i *TransactionInvocator) Process(
 	retry := false
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-
 		if retry {
 			// rest state
 			rollUpError := stm.RollUpNoMerge()
@@ -189,6 +188,10 @@ func (i *TransactionInvocator) Process(
 	programs.Cleanup(updatedKeys)
 
 	if txError != nil {
+		err = stm.RollUpWithMergeNoDelta()
+		if err != nil {
+			return err
+		}
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
 		i.logger.Info().

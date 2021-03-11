@@ -150,6 +150,10 @@ func (v *view) NewChild() state.View {
 	return ch
 }
 
+func (v *view) DropDelta() {
+	v.Ledger.payloads = make(map[string]ledger.Payload)
+}
+
 func (v *view) MergeView(o state.View) {
 	var other *view
 	var ok bool
