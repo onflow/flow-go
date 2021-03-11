@@ -75,6 +75,7 @@ func (suite *MutatorSuite) SetupTest() {
 	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(genesis.ID()))
 	// ensure we don't enter a new epoch for tests that build many blocks
 	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = genesis.Header.View + 100000
+	seal.ResultID = result.ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(genesis, result, seal, qc)
 	require.NoError(suite.T(), err)
