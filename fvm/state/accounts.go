@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -316,7 +316,7 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 		return 0, fmt.Errorf("account %s storage used is not initialized or not initialized correctly", address.Hex())
 	}
 
-	storageUsed, _, err := utils.ReadUint64(storageUsedRegister)
+	storageUsed, _, err := readUint64(storageUsedRegister)
 	if err != nil {
 		return 0, err
 	}
@@ -324,7 +324,7 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 }
 
 func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
-	usedBinary := utils.Uint64ToBinary(used)
+	usedBinary := uint64ToBinary(used)
 	return a.setValue(address, false, KeyStorageUsed, usedBinary)
 }
 
@@ -413,14 +413,6 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 	return getRegisterIDSize(registerID) + len(value)
 }
 
-func getRegisterIDSize(inp flow.RegisterID) int {
-	size := 0
-	size += len(inp.Owner) + 2
-	size += len(inp.Controller) + 2
-	size += len(inp.Key) + 2
-	return size
-}
-
 // TODO replace with touch
 // TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
@@ -503,6 +495,29 @@ func (a *Accounts) DeleteContract(contractName string, address flow.Address) err
 	}
 	contractNames.remove(contractName)
 	return a.setContractNames(contractNames, address)
+}
+
+func getRegisterIDSize(inp flow.RegisterID) int {
+	size := 0
+	size += len(inp.Owner) + 2
+	size += len(inp.Controller) + 2
+	size += len(inp.Key) + 2
+	return size
+}
+
+// uint64ToBinary converst a uint64 to a byte slice (big endian)
+func uint64ToBinary(integer uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, integer)
+	return b
+}
+
+// readUint64 reads a uint64 from the input and returns the rest
+func readUint64(input []byte) (value uint64, rest []byte, err error) {
+	if len(input) < 8 {
+		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint64", len(input))
+	}
+	return binary.BigEndian.Uint64(input[:8]), input[8:], nil
 }
 
 // contractNames container for a list of contract names. Should always be sorted.
