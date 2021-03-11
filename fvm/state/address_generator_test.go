@@ -10,48 +10,43 @@ import (
 )
 
 func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
-	ledger := state.NewMapLedger()
+	view := NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	stm := state.NewStateManager(state.NewState(ledger))
+	stm := state.NewStateManager(state.NewState(view))
 	_, err := state.NewStateBoundAddressGenerator(stm, chain)
 	require.NoError(t, err)
 }
 
 func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
-	ledger := state.NewMapLedger()
+	view := NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	stm := state.NewStateManager(state.NewState(ledger))
+	stm := state.NewStateManager(state.NewState(view))
 	generator, err := state.NewStateBoundAddressGenerator(stm, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	err = stm.ApplyStartStateToLedger()
-	require.NoError(t, err)
-	stateBytes, err := ledger.Get("", "", "account_address_state")
+	stateBytes, err := view.Get("", "", "account_address_state")
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("01"))
 }
 
 func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
-	ledger := state.NewMapLedger()
-	err := ledger.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
+	view := NewSimpleView()
+	err := view.Set("", "", "account_address_state", flow.HexToAddress("01").Bytes())
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
-	stm := state.NewStateManager(state.NewState(ledger))
+	stm := state.NewStateManager(state.NewState(view))
 	generator, err := state.NewStateBoundAddressGenerator(stm, chain)
 	require.NoError(t, err)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
 
-	err = stm.ApplyStartStateToLedger()
-	require.NoError(t, err)
-
-	stateBytes, err := ledger.Get("", "", "account_address_state")
+	stateBytes, err := view.Get("", "", "account_address_state")
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("02"))

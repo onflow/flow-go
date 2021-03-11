@@ -182,6 +182,7 @@ func (v *View) Delta() Delta {
 // MergeView applies the changes from a the given view to this view.
 // TODO rename this, this is not actually a merge as we can't merge
 // readFunc s.
+
 func (v *View) MergeView(child *View) {
 	for _, id := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[id.String()] = id

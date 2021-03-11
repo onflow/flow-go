@@ -10,6 +10,7 @@ import "fmt"
 type StateManager struct {
 	startState  *State
 	activeState *State
+	parents     map[*State]*State
 }
 
 // NewStateManager constructs a new state manager
@@ -32,7 +33,7 @@ func (s *StateManager) StartState() *State {
 
 // MergeStateIntoActiveState allows to merge any given state into the active state
 func (s *StateManager) MergeStateIntoActiveState(other *State) error {
-	return s.activeState.MergeAnyState(other)
+	return s.activeState.MergeState(other)
 }
 
 // Nest creates a child state and set it as the active state
@@ -43,48 +44,25 @@ func (s *StateManager) Nest() {
 // RollUpWithMerge merges the active state into its parent and set the parent as the
 // new active state.
 func (s *StateManager) RollUpWithMerge() error {
-	if s.activeState.parent == nil {
+	if s.parents[s.activeState] == nil {
 		return fmt.Errorf("parent not exist for this state")
 	}
 
-	err := s.activeState.parent.MergeState(s.activeState)
+	err := s.parents[s.activeState].MergeState(s.activeState)
 	if err != nil {
 		return err
 	}
 
-	s.activeState = s.activeState.parent
-	return nil
-}
-
-// RollUpWithTouchMergeOnly merges the active state's touches into its parent and set the parent as the
-// new active state. useful for failed transactions
-func (s *StateManager) RollUpWithTouchMergeOnly() error {
-	if s.activeState.parent == nil {
-		return fmt.Errorf("parent not exist for this state")
-	}
-
-	err := s.activeState.parent.MergeTouchLogs(s.activeState)
-	if err != nil {
-		return err
-	}
-
-	s.activeState = s.activeState.parent
+	s.activeState = s.parents[s.activeState]
 	return nil
 }
 
 // RollUpNoMerge ignores the current active state
 // and sets the parent as the active state
 func (s *StateManager) RollUpNoMerge() error {
-	if s.activeState.parent == nil {
+	if s.parents[s.activeState] == nil {
 		return fmt.Errorf("parent not exist for this state")
 	}
-	s.activeState = s.activeState.parent
+	s.activeState = s.parents[s.activeState]
 	return nil
-}
-
-// ApplyStartStateToLedger applies start state deltas into the ledger
-// note that you need to make sure all of the deltas are merged into
-// the start state through roll ups before caling this
-func (s *StateManager) ApplyStartStateToLedger() error {
-	return s.startState.ApplyDeltaToLedger()
 }

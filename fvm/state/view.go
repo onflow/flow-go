@@ -6,6 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type View interface {
+	NewChild() View
+	MergeView(child View)
+	Ledger
+}
+
 // Rename this to Storage
 // remove reference to flow.RegisterValue and use byte[]
 // A Ledger is the storage interface used by the virtual machine to read and write register values.

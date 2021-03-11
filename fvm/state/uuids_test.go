@@ -9,8 +9,8 @@ import (
 )
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
-	ledger := state.NewMapLedger()
-	stm := state.NewStateManager(state.NewState(ledger))
+	view := NewSimpleView()
+	stm := state.NewStateManager(state.NewState(view))
 	uuidsA := state.NewUUIDGenerator(stm)
 
 	uuid, err := uuidsA.GetUUID() // start from zero
@@ -29,8 +29,8 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 }
 
 func Test_GenerateUUID(t *testing.T) {
-	ledger := state.NewMapLedger()
-	stm := state.NewStateManager(state.NewState(ledger))
+	view := NewSimpleView()
+	stm := state.NewStateManager(state.NewState(view))
 	genA := state.NewUUIDGenerator(stm)
 
 	uuidA, err := genA.GenerateUUID()
