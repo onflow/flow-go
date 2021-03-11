@@ -559,13 +559,30 @@ func TestExtendReceiptsValid(t *testing.T) {
 // event, then a commit event, then finalizing the first block of the next epoch.
 // Also tests that appropriate epoch transition events are fired.
 //
-// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4(R2) <- B5(S2) <- B6 <- B7
-// TODO revisit
+// Epoch information becomes available in the protocol state in the block AFTER
+// the block sealing the relevant service event. This is because the block after
+// the sealing block contains a QC certifying validity of the payload of the
+// sealing block.
+//
+// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4 <- B5(R2) <- B6(S2) <- B7 <- B8 <-|- B9
+//
+// B4 contains a QC for B3, which seals B1, in which EpochSetup is emitted.
+// * we can query the EpochSetup beginning with B4
+// * EpochSetupPhaseStarted triggered when B3 is finalized
+//
+// B7 contains a QC for B6, which seals B2, in which EpochCommitted is emitted.
+// * we can query the EpochCommit beginning with B7
+// * EpochSetupPhaseStarted triggered when B6 is finalized
+//
+// B8 is the final block of the epoch.
+// B9 is the first block of the NEXT epoch.
+//
 func TestExtendEpochTransitionValid(t *testing.T) {
 	// create a event consumer to test epoch transition events
 	consumer := new(mockprotocol.Consumer)
 	consumer.On("BlockFinalized", mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
+
 	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
@@ -603,6 +620,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// create a receipt for block 1 containing the EpochSetup event
 		receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
 		receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+		seal1.ResultID = receipt1.ExecutionResult.ID()
 
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -624,32 +642,43 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Extend(&block3)
 		require.Nil(t, err)
 
+		// insert a block with a QC pointing to block 3
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		err = state.Extend(&block4)
+		require.Nil(t, err)
+
 		// now that the setup event has been emitted, we should be in the setup phase
-		phase, err = state.AtBlockID(block3.ID()).Phase()
+		phase, err = state.AtBlockID(block4.ID()).Phase()
 		assert.Nil(t, err)
 		require.Equal(t, flow.EpochPhaseSetup, phase)
 
-		// we should NOT be able to query epoch 2 wrt block 1
-		_, err = state.AtBlockID(block1.ID()).Epochs().Next().InitialIdentities()
-		require.Error(t, err)
-		_, err = state.AtBlockID(block1.ID()).Epochs().Next().Clustering()
-		require.Error(t, err)
+		// we should NOT be able to query epoch 2 wrt blocks before 4
+		for _, blockID := range []flow.Identifier{block1.ID(), block2.ID(), block3.ID()} {
+			_, err = state.AtBlockID(blockID).Epochs().Next().InitialIdentities()
+			require.Error(t, err)
+			_, err = state.AtBlockID(blockID).Epochs().Next().Clustering()
+			require.Error(t, err)
+		}
 
-		// we should be able to query epoch 2 wrt block 3
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().InitialIdentities()
+		// we should be able to query epoch 2 wrt block 4
+		_, err = state.AtBlockID(block4.ID()).Epochs().Next().InitialIdentities()
 		assert.Nil(t, err)
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().Clustering()
+		_, err = state.AtBlockID(block4.ID()).Epochs().Next().Clustering()
 		assert.Nil(t, err)
 
 		// only setup event is finalized, not commit, so shouldn't be able to get certain info
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().DKG()
+		_, err = state.AtBlockID(block4.ID()).Epochs().Next().DKG()
 		require.Error(t, err)
 
-		// ensure an epoch phase transition when we finalize the event
+		// ensure an epoch phase transition when we finalize block 3
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header).Once()
 		err = state.Finalize(block3.ID())
 		require.Nil(t, err)
 		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header)
+
+		// finalize block 4 so we can finalize subsequent blocks
+		err = state.Finalize(block4.ID())
+		require.Nil(t, err)
 
 		epoch2Commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(epoch2Setup.Counter),
@@ -660,91 +689,107 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// the receipt for block 2 contains the EpochCommit event
 		receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
 		receipt2.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Commit.ServiceEvent()}
+		seal2.ResultID = receipt2.ExecutionResult.ID()
 
-		// block 4 contains the receipt for block 2
-		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(flow.Payload{
+		// block 5 contains the receipt for block 2
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		block5.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceipt{receipt2},
 		})
 
-		err = state.Extend(&block4)
+		err = state.Extend(&block5)
 		require.Nil(t, err)
-		err = state.Finalize(block4.ID())
+		err = state.Finalize(block5.ID())
 		require.Nil(t, err)
 
-		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.SetPayload(flow.Payload{
+		// block 6 contains the seal for block 2
+		block6 := unittest.BlockWithParentFixture(block5.Header)
+		block6.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal2},
 		})
 
-		// we should NOT be able to query epoch 2 commit info wrt block 3
-		_, err = state.AtBlockID(block3.ID()).Epochs().Next().DKG()
-		require.Error(t, err)
+		err = state.Extend(&block6)
+		require.Nil(t, err)
 
-		// now epoch 2 is fully ready, we can query anything we want about it wrt block 5 (or later)
-		_, err = state.AtBlockID(block4.ID()).Epochs().Next().InitialIdentities()
+		// insert a block with a QC pointing to block 6
+		block7 := unittest.BlockWithParentFixture(block6.Header)
+		err = state.Extend(&block7)
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block4.ID()).Epochs().Next().Clustering()
+
+		// we should NOT be able to query epoch 2 commit info wrt blocks before 7
+		for _, blockID := range []flow.Identifier{block4.ID(), block5.ID(), block6.ID()} {
+			_, err = state.AtBlockID(blockID).Epochs().Next().DKG()
+			require.Error(t, err)
+		}
+
+		// now epoch 2 is fully ready, we can query anything we want about it wrt block 7 (or later)
+		_, err = state.AtBlockID(block7.ID()).Epochs().Next().InitialIdentities()
 		require.Nil(t, err)
-		_, err = state.AtBlockID(block4.ID()).Epochs().Next().DKG()
+		_, err = state.AtBlockID(block7.ID()).Epochs().Next().Clustering()
+		require.Nil(t, err)
+		_, err = state.AtBlockID(block7.ID()).Epochs().Next().DKG()
 		assert.Nil(t, err)
 
-		// how that the commit event has been emitted, we should be in the committed phase
-		phase, err = state.AtBlockID(block4.ID()).Phase()
+		// now that the commit event has been emitted, we should be in the committed phase
+		phase, err = state.AtBlockID(block7.ID()).Phase()
 		assert.Nil(t, err)
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
 
-		// expect epoch phase transition once we finalize block 4
-		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block4.Header)
-		err = state.Finalize(block4.ID())
+		// expect epoch phase transition once we finalize block 6
+		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
+		err = state.Finalize(block6.ID())
 		require.Nil(t, err)
-		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block4.Header)
+		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
+
+		// finalize block 7 so we can finalize subsequent blocks
+		err = state.Finalize(block7.ID())
+		require.Nil(t, err)
 
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block4.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
-		// block 5 has the final view of the epoch
-		block6 := unittest.BlockWithParentFixture(block5.Header)
-		block6.SetPayload(flow.EmptyPayload())
-		block6.Header.View = epoch1FinalView
+		// block 8 has the final view of the epoch
+		block8 := unittest.BlockWithParentFixture(block7.Header)
+		block8.SetPayload(flow.EmptyPayload())
+		block8.Header.View = epoch1FinalView
 
-		err = state.Extend(&block6)
+		err = state.Extend(&block8)
 		require.Nil(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
-		epochCounter, err = state.AtBlockID(block6.ID()).Epochs().Current().Counter()
+		epochCounter, err = state.AtBlockID(block8.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
 		require.Equal(t, epoch1Setup.Counter, epochCounter)
 
-		// block 6 has a view > final view of epoch 1, it will be considered the first block of epoch 2
-		block7 := unittest.BlockWithParentFixture(block6.Header)
-		block7.SetPayload(flow.EmptyPayload())
-		// we should handle view that aren't exactly the first valid view of the epoch
-		block7.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
+		// block 9 has a view > final view of epoch 1, it will be considered the first block of epoch 2
+		block9 := unittest.BlockWithParentFixture(block8.Header)
+		block9.SetPayload(flow.EmptyPayload())
+		// we should handle views that aren't exactly the first valid view of the epoch
+		block9.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
 
-		err = state.Extend(&block7)
+		err = state.Extend(&block9)
 		require.Nil(t, err)
 
 		// now, at long last, we are in epoch 2
-		epochCounter, err = state.AtBlockID(block7.ID()).Epochs().Current().Counter()
+		epochCounter, err = state.AtBlockID(block9.ID()).Epochs().Current().Counter()
 		require.Nil(t, err)
 		require.Equal(t, epoch2Setup.Counter, epochCounter)
 
 		// we should begin epoch 2 in staking phase
 		// how that the commit event has been emitted, we should be in the committed phase
-		phase, err = state.AtBlockID(block7.ID()).Phase()
+		phase, err = state.AtBlockID(block9.ID()).Phase()
 		assert.Nil(t, err)
 		require.Equal(t, flow.EpochPhaseStaking, phase)
 
-		// expect epoch transition once we finalize block 6
-		consumer.On("EpochTransition", epoch2Setup.Counter, block6.Header).Once()
-		err = state.Finalize(block6.ID())
+		// expect epoch transition once we finalize block 9
+		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
+		err = state.Finalize(block8.ID())
 		require.Nil(t, err)
-		err = state.Finalize(block7.ID())
+		err = state.Finalize(block9.ID())
 		require.Nil(t, err)
-		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block7.Header)
+		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
 	})
 }
 
