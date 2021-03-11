@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -211,7 +212,7 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 		data,
 		b.dkgInstanceID,
 	)
-	sigData := flow.MakeID(dkgMessage)
+	sigData := fingerprint.Fingerprint(dkgMessage)
 	signature, err := b.me.Sign(sigData[:], hasher.NewDKGMessageHasher())
 	if err != nil {
 		return messages.BroadcastDKGMessage{}, err
@@ -231,7 +232,7 @@ func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (
 		return false, err
 	}
 	origin := b.committee[bcastMsg.Orig]
-	signData := flow.MakeID(bcastMsg.DKGMessage)
+	signData := fingerprint.Fingerprint(bcastMsg.DKGMessage)
 	return origin.StakingPubKey.Verify(
 		bcastMsg.Signature,
 		signData[:],
