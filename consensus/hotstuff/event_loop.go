@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/utils/crash"
 )
 
 // EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
@@ -80,7 +81,8 @@ func (el *EventLoop) loop() {
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
 
 			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process timeout")
+				el.log.Error().Err(err).Msg("could not process timeout")
+				crash.Crash()
 			}
 
 			// At this point, we have received and processed an event from the timeout channel.

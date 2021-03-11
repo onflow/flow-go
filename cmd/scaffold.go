@@ -37,6 +37,7 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	sutil "github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/utils/crash"
 	"github.com/onflow/flow-go/utils/debug"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/logging"
@@ -125,6 +126,7 @@ type FlowNodeBuilder struct {
 	Network           *p2p.Network
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
+	Crasher           *crash.Crasher
 	modules           []namedModuleFunc
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
@@ -303,6 +305,11 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	fnb.Logger = log
 }
 
+func (fnb *FlowNodeBuilder) initCrasher() {
+	fnb.Crasher = crash.New(fnb.Logger)
+	crash.Set(fnb.Crasher)
+}
+
 func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
@@ -374,6 +381,8 @@ func (fnb *FlowNodeBuilder) initDB() {
 	db, err := badger.Open(opts)
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
+
+	fnb.Crasher = fnb.Crasher.WithCleanup(db.Close)
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
