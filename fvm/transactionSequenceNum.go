@@ -82,5 +82,5 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		return err
 	}
 
-	return stm.RollUp(true, true)
+	return stm.RollUpWithMerge()
 }

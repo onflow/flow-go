@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,10 +16,10 @@ const (
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	ledger                Ledger
-	parent                *State
-	touchLog              []Payload
-	touchHasher           hash.Hasher
+	ledger   Ledger
+	parent   *State
+	touchLog []Payload
+	// touchHasher           hash.Hasher
 	delta                 map[PayloadKey]Payload
 	readCache             map[PayloadKey]Payload
 	updatedAddresses      map[flow.Address]struct{}
@@ -32,9 +31,9 @@ type State struct {
 
 func defaultState(ledger Ledger) *State {
 	return &State{
-		ledger:                ledger,
-		touchLog:              make([]Payload, 0),
-		touchHasher:           hash.NewSHA3_256(),
+		ledger:   ledger,
+		touchLog: make([]Payload, 0),
+		// touchHasher:           hash.NewSHA3_256(),
 		delta:                 make(map[PayloadKey]Payload),
 		updatedAddresses:      make(map[flow.Address]struct{}),
 		readCache:             make(map[PayloadKey]Payload),
@@ -87,24 +86,24 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-// TouchHash returns the hash of all touches
-// for read touches the value part is nil for updates
-// the value part is also included
-func (s *State) TouchHash() []byte {
-	return s.touchHasher.SumHash()
-}
+// // TouchHash returns the hash of all touches
+// // for read touches the value part is nil for updates
+// // the value part is also included
+// func (s *State) TouchHash() []byte {
+// 	return s.touchHasher.SumHash()
+// }
 
 func (s *State) Touches() []Payload {
 	return s.touchLog
 }
 
 func (s *State) LogTouch(pk *Payload) {
-	_, err := s.touchHasher.Write(pk.bytes())
-	if err != nil {
-		// TODO return error
-		panic(err)
-		// return fmt.Errorf("error updating spock secret data: %w", err)
-	}
+	// _, err := s.touchHasher.Write(pk.bytes())
+	// if err != nil {
+	// 	// TODO return error
+	// 	panic(err)
+	// 	// return fmt.Errorf("error updating spock secret data: %w", err)
+	// }
 
 	s.touchLog = append(s.touchLog, *pk)
 }
@@ -132,7 +131,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	return value, s.checkMaxInteraction()
 }
 
-func (s *State) GetWithoutTracking(owner, controller, key string) (flow.RegisterValue, error) {
+func (s *State) getWithoutTracking(owner, controller, key string) (flow.RegisterValue, error) {
 	pKey := PayloadKey{owner, controller, key}
 	value, err := s.get(pKey)
 	if err != nil {
@@ -155,7 +154,7 @@ func (s *State) get(pKey PayloadKey) (flow.RegisterValue, error) {
 
 	// read from parent
 	if s.parent != nil {
-		value, err := s.parent.GetWithoutTracking(pKey.Owner, pKey.Controller, pKey.Key)
+		value, err := s.parent.getWithoutTracking(pKey.Owner, pKey.Controller, pKey.Key)
 		p := Payload{pKey, value}
 		s.readCache[pKey] = p
 		return value, err
@@ -375,11 +374,11 @@ func (p *Payload) size() uint64 {
 	return uint64(len(p.Owner) + len(p.Controller) + len(p.Key) + len(p.Value))
 }
 
-func (p *Payload) bytes() []byte {
-	res := make([]byte, 0)
-	res = append(res, []byte(p.Owner)...)
-	res = append(res, []byte(p.Controller)...)
-	res = append(res, []byte(p.Key)...)
-	res = append(res, p.Value...)
-	return res
-}
+// func (p *Payload) bytes() []byte {
+// 	res := make([]byte, 0)
+// 	res = append(res, []byte(p.Owner)...)
+// 	res = append(res, []byte(p.Controller)...)
+// 	res = append(res, []byte(p.Key)...)
+// 	res = append(res, p.Value...)
+// 	return res
+// }
