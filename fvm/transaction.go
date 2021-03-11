@@ -66,7 +66,7 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 		}
 	}
 
-	return st.State().ApplyTouchesToLedger()
+	return nil
 }
 
 type TransactionInvocator struct {
@@ -106,7 +106,6 @@ func (i *TransactionInvocator) Process(
 	retry := false
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
-
 		if retry {
 			// rest state
 			rollUpError := stm.RollUpNoMerge()
@@ -189,7 +188,7 @@ func (i *TransactionInvocator) Process(
 	programs.Cleanup(updatedKeys)
 
 	if txError != nil {
-		err := stm.RollUpWithTouchMergeOnly()
+		err = stm.RollUpWithMergeNoDelta()
 		if err != nil {
 			return err
 		}
