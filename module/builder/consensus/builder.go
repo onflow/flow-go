@@ -293,8 +293,12 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		// corresponding IncorporatedResult an check if we have a matching seal
 		// in the mempool.
 		for _, receipt := range ancestor.Payload.Receipts {
-
-			result := resultsByID[receipt.ResultID]
+			result, ok := resultsByID[receipt.ResultID]
+			// if payload contains only receipt meta without execution result
+			// it means that we aren't interested in this particular receipt.
+			if !ok {
+				continue
+			}
 
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.

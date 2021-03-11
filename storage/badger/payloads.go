@@ -2,9 +2,9 @@ package badger
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
