@@ -3,9 +3,10 @@ package state_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStateManager(t *testing.T) {
