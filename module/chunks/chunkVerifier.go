@@ -18,7 +18,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger, *fvm.Programs) error
+	Run(fvm.Context, fvm.Procedure, state.View, *fvm.Programs) error
 }
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network

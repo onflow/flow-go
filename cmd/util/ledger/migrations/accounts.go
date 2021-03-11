@@ -11,7 +11,7 @@ import (
 )
 
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
-	l := newLed(payloads)
+	l := newView(payloads)
 	st := state.NewState(l)
 	stm := state.NewStateManager(st)
 	a := state.NewAccounts(stm)
@@ -103,11 +103,6 @@ func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error
 		return nil, err
 	}
 
-	err = stm.State().ApplyDeltaToLedger()
-	if err != nil {
-		return nil, err
-	}
-
 	return l.Payloads(), nil
 }
 
@@ -135,6 +130,68 @@ func appendKeyForAccount(accounts *state.Accounts, addressInHex string, encodedK
 		fmt.Println("warning account does not exist: ", addressInHex)
 	}
 	return nil
+}
+
+type view struct {
+	Parent *view
+	Ledger *led
+}
+
+func newView(payloads []ledger.Payload) *view {
+	return &view{
+		Ledger: newLed(payloads),
+	}
+}
+
+func (v *view) NewChild() state.View {
+	payload := make([]ledger.Payload, 0)
+	ch := newView(payload)
+	ch.Parent = v
+	return ch
+}
+
+func (v *view) MergeView(o state.View) {
+	var other *view
+	var ok bool
+	if other, ok = o.(*view); !ok {
+		panic("can't merge simple view")
+	}
+
+	for key, value := range other.Ledger.payloads {
+		v.Ledger.payloads[key] = value
+	}
+}
+
+func (v *view) Set(owner, controller, key string, value flow.RegisterValue) error {
+	return v.Ledger.Set(owner, controller, key, value)
+}
+
+func (v *view) Get(owner, controller, key string) (flow.RegisterValue, error) {
+	value, err := v.Ledger.Get(owner, controller, key)
+	if err != nil {
+		return nil, err
+	}
+	if len(value) > 0 {
+		return value, nil
+	}
+
+	if v.Parent != nil {
+		return v.Parent.Get(owner, controller, key)
+	}
+
+	return nil, nil
+}
+
+func (v *view) Touch(owner, controller, key string) error {
+	return v.Ledger.Touch(owner, controller, key)
+}
+
+func (v *view) Delete(owner, controller, key string) error {
+	return v.Ledger.Delete(owner, controller, key)
+}
+
+func (v *view) Payloads() []ledger.Payload {
+	return v.Ledger.Payloads()
 }
 
 type led struct {
