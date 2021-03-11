@@ -45,7 +45,7 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 		receipt.ExecutorSignature,
 		executor.StakingPubKey).Return(true, nil).Once()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().NoError(err, "should successfully validate receipt")
 	s.verifier.AssertExpectations(s.T())
 }
@@ -57,7 +57,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
@@ -77,7 +77,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidStake() {
 	// replace stake with invalid one
 	s.Identities[s.ExeID].Stake = 0
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid stake")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
@@ -97,7 +97,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidRole() {
 	// replace identity with invalid one
 	s.Identities[s.ExeID] = unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid identity")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
@@ -116,7 +116,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidSignature() {
 		mock.Anything,
 		executor.StakingPubKey).Return(false, nil).Once()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid signature")
 	s.Assert().True(engine.IsInvalidInputError(err))
 	s.verifier.AssertExpectations(s.T())
@@ -136,7 +136,7 @@ func (s *ReceiptValidationSuite) TestReceiptTooFewChunks() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject with invalid chunks")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
@@ -155,7 +155,7 @@ func (s *ReceiptValidationSuite) TestReceiptTooManyChunks() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject with invalid chunks")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
@@ -173,7 +173,7 @@ func (s *ReceiptValidationSuite) TestReceiptChunkInvalidBlockID() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject with invalid chunks")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
@@ -191,7 +191,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidCollectionIndex() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid collection index")
 	s.Assert().True(engine.IsInvalidInputError(err))
 }
@@ -211,7 +211,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid receipt")
 }
 
@@ -230,7 +230,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid previous result")
 }
 
@@ -248,7 +248,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 		mock.Anything,
 		mock.Anything).Return(true, nil).Maybe()
 
-	err := s.receiptValidator.Validate(one(receipt))
+	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid previous result")
 }
 
@@ -259,35 +259,37 @@ func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	// assuming signatures are all good
 	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	prepareReceipts := func() []*flow.ExecutionReceipt {
-		// G <- A <- B <- C
-		blocks, result0, _ := unittest.ChainFixture(4)
+	// G <- A <- B <- C
+	blocks, result0, seal := unittest.ChainFixture(4)
+	s.SealsIndex[blocks[0].ID()] = seal
 
-		receipts := unittest.ReceiptChainFor(blocks, result0)
-		blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
-		receiptA := receipts[1]
-		blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
-		blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
-		blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
-		blockC.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
-		// update block header so that blocks are chained together
-		unittest.ReconnectBlocksAndReceipts(blocks, receipts)
-		// assuming all receipts are executed by the correct executor
-		for _, r := range receipts {
-			r.ExecutorID = s.ExeID
-		}
+	receipts := unittest.ReceiptChainFor(blocks, result0)
+	blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
+	receiptA, receiptB, receiptC := receipts[1], receipts[2], receipts[3]
 
-		for _, b := range blocks {
-			s.Extend(b)
-		}
-		s.PersistedResults[result0.ID()] = result0
-		return receipts
+	blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+	blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
+	blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
+	blockC.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+	// update block header so that blocks are chained together
+	unittest.ReconnectBlocksAndReceipts(blocks, receipts)
+	// assuming all receipts are executed by the correct executor
+	for _, r := range receipts {
+		r.ExecutorID = s.ExeID
 	}
 
-	receipts := prepareReceipts()
-	// recieptB and receiptC
-	receiptsInNewBlock := []*flow.ExecutionReceipt{receipts[2], receipts[3]}
-	err := s.receiptValidator.Validate(receiptsInNewBlock)
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+	s.PersistedResults[result0.ID()] = result0
+
+	candidate := unittest.BlockWithParentFixture(blockC.Header)
+	candidate.Payload = &flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta(), receiptC.Meta()},
+		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult, &receiptC.ExecutionResult},
+	}
+
+	err := s.receiptValidator.ValidatePayload(&candidate)
 	s.Require().NoError(err)
 }
 
@@ -297,37 +299,40 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	// assuming signatures are all good
 	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	prepareReceipts := func() []*flow.ExecutionReceipt {
-		// G <- A <- B <- C
-		blocks, result0, _ := unittest.ChainFixture(4)
+	// G <- A <- B <- C
+	blocks, result0, _ := unittest.ChainFixture(4)
 
-		receipts := unittest.ReceiptChainFor(blocks, result0)
-		blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
-		receiptA := receipts[1]
-		blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
-		blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
-		blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
-		blockC.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
-		// update block header so that blocks are chained together
-		unittest.ReconnectBlocksAndReceipts(blocks, receipts)
-		// assuming all receipts are executed by the correct executor
-		for _, r := range receipts {
-			r.ExecutorID = s.ExeID
-		}
-
-		for _, b := range blocks {
-			s.Extend(b)
-		}
-		s.PersistedResults[result0.ID()] = result0
-		return receipts
+	receipts := unittest.ReceiptChainFor(blocks, result0)
+	blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
+	receiptA := receipts[1]
+	receiptBInvalid := receipts[2]
+	receiptC := receipts[3]
+	blockA.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+	blockB.Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptA.Meta()}
+	blockB.Payload.Results = []*flow.ExecutionResult{&receiptA.ExecutionResult}
+	blockC.Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+	// update block header so that blocks are chained together
+	unittest.ReconnectBlocksAndReceipts(blocks, receipts)
+	// assuming all receipts are executed by the correct executor
+	for _, r := range receipts {
+		r.ExecutorID = s.ExeID
 	}
 
-	receipts := prepareReceipts()
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+	s.PersistedResults[result0.ID()] = result0
+
+	candidate := unittest.BlockWithParentFixture(blockC.Header)
+	candidate.Payload = &flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receiptBInvalid.Meta(), receiptC.Meta()},
+		Results:  []*flow.ExecutionResult{&receiptBInvalid.ExecutionResult, &receiptC.ExecutionResult},
+	}
+
 	// make receipt B as bad
-	receipts[2].ExecutorID = s.VerID
+	receiptBInvalid.ExecutorID = s.VerID
 	// receiptB and receiptC
-	receiptsInNewBlock := []*flow.ExecutionReceipt{receipts[2], receipts[3]}
-	err := s.receiptValidator.Validate(receiptsInNewBlock)
+	err := s.receiptValidator.ValidatePayload(&candidate)
 	s.Require().Error(err)
 }
 
@@ -548,8 +553,4 @@ func (s *ReceiptValidationSuite) TestExtendReceiptsDuplicate() {
 		require.Error(t, err)
 		require.True(t, engine.IsInvalidInputError(err), err)
 	})
-}
-
-func one(receipt *flow.ExecutionReceipt) []*flow.ExecutionReceipt {
-	return []*flow.ExecutionReceipt{receipt}
 }

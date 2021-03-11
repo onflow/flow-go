@@ -13,11 +13,11 @@ type ReceiptValidator struct {
 }
 
 // Validate provides a mock function with given fields: receipts
-func (_m *ReceiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
+func (_m *ReceiptValidator) Validate(receipts *flow.ExecutionReceipt) error {
 	ret := _m.Called(receipts)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func([]*flow.ExecutionReceipt) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) error); ok {
 		r0 = rf(receipts)
 	} else {
 		r0 = ret.Error(0)

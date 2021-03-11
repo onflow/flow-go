@@ -536,7 +536,9 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 
 func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	bc.Blocks[block.ID()] = block
-	bc.SealsIndex[block.ID()] = bc.SealsIndex[block.Header.ParentID]
+	if seal, ok := bc.SealsIndex[block.Header.ParentID]; ok {
+		bc.SealsIndex[block.ID()] = seal
+	}
 
 	resultsByID := block.Payload.ResultsById()
 

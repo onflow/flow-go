@@ -15,6 +15,6 @@ type ReceiptValidator interface {
 	// Expected errors during normal operations:
 	// * engine.InvalidInputError
 	// * validation.MissingPreviousResultError
-	Validate(receipts []*flow.ExecutionReceipt) error
+	Validate(receipts *flow.ExecutionReceipt) error
 	ValidatePayload(candidate *flow.Block) error
 }

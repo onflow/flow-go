@@ -253,7 +253,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}
 
 	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
-	err = c.receiptValidator.Validate([]*flow.ExecutionReceipt{receipt})
+	err = c.receiptValidator.Validate(receipt)
 	childSpan.Finish()
 
 	if validation.IsUnverifiableError(err) {

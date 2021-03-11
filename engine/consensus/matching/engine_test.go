@@ -105,7 +105,7 @@ func (ms *EngineContextSuite) TestProcessValidReceipt() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 
 	// we expect that receipt is added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
@@ -137,7 +137,7 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 			unittest.WithExecutorID(originID),
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 		)
-		ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+		ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 		// we expect that receipt is added to mempool
 		ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 		// setup the results mempool to check if we attempted to add the incorporated result

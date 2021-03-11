@@ -149,44 +149,27 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // Expected errors during normal operations:
 // * engine.InvalidInputError
 // * validation.UnverifiableError
-func (v *receiptValidator) Validate(receipts []*flow.ExecutionReceipt) error {
-	// lookup cache to avoid linear search when checking for previous result that is
-	// part of payload
-	payloadExecutionResults := make(map[flow.Identifier]*flow.ExecutionResult)
-	for _, receipt := range receipts {
-		payloadExecutionResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
-	}
-	// Build a functor that performs lookup first in receipts that were passed as payload and only then in
-	// local storage. This is needed to handle a case when same block payload contains receipts that
-	// reference each other.
-	// ATTENTION: Here we assume that ER is valid, this lookup can return a result which is actually invalid.
-	// Eventually invalid result will be detected and fail the whole validation.
-	fetchResult := func(previousResultID flow.Identifier) (*flow.ExecutionResult, error) {
-		prevResult, found := payloadExecutionResults[previousResultID]
-		if found {
-			return prevResult, nil
-		}
-
-		return v.fetchResult(previousResultID)
+func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
+	// TODO: this can be optimized by checking if result was already stored and validated.
+	// This needs to be addressed later since many tests depend on this behavior.
+	prevResult, err := v.fetchResult(receipt.ExecutionResult.PreviousResultID)
+	if err != nil {
+		return err
 	}
 
-	for i, r := range receipts {
-		prevResult, err := fetchResult(r.ExecutionResult.PreviousResultID)
-		if err != nil {
-			return err
-		}
-
-		err = v.validateReceipt(r.Meta(), r.ExecutionResult.BlockID)
-		if err != nil {
-			// It's very important that we fail the whole validation if one of the receipts is invalid.
-			// It allows us to make assumptions as stated in previous comment.
-			return fmt.Errorf("could not validate receipt %v at index %d: %w", r.ID(), i, err)
-		}
-		err = v.validateResult(&r.ExecutionResult, prevResult)
-		if err != nil {
-			return fmt.Errorf("could not validate result %v at index %d: %w", r.ExecutionResult.ID(), i, err)
-		}
+	// first validate result to avoid signature check in in `validateReceipt` in case result is invalid.
+	err = v.validateResult(&receipt.ExecutionResult, prevResult)
+	if err != nil {
+		return fmt.Errorf("could not validate single result %v at index: %w", receipt.ExecutionResult.ID(), err)
 	}
+
+	err = v.validateReceipt(receipt.Meta(), receipt.ExecutionResult.BlockID)
+	if err != nil {
+		// It's very important that we fail the whole validation if one of the receipts is invalid.
+		// It allows us to make assumptions as stated in previous comment.
+		return fmt.Errorf("could not validate single receipt %v: %w", receipt.ID(), err)
+	}
+
 	return nil
 }
 
@@ -293,7 +276,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	}
 
 	// first validate all results that were included into payload
-	// if one of results is invalid we fail the whole check because it could be violationg
+	// if one of results is invalid we fail the whole check because it could be violating
 	// parent-children relationship
 	for i, result := range candidate.Payload.Results {
 		prevResult, err := fetchResult(result.PreviousResultID)

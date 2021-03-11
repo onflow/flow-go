@@ -146,7 +146,7 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
+	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// setup the results mempool to check if we attempted to insert the
 	// incorporated result, and return false as if it was already in the mempool
@@ -174,7 +174,7 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
+	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
@@ -202,7 +202,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 
 	// we expect that receipt is added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
@@ -232,12 +232,12 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	)
 
 	// check that _expected_ failure case of invalid receipt is handled without error
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputError("")).Once()
 	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "invalid receipt should be dropped but not error")
 
 	// check that _unexpected_ failure case causes the error to be escalated
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(fmt.Errorf("")).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(fmt.Errorf("")).Once()
 	_, err = ms.matching.processReceipt(receipt)
 	ms.Require().Error(err, "unexpected errors should be escalated")
 
