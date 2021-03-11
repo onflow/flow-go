@@ -185,12 +185,16 @@ func Test_Programs(t *testing.T) {
 		// run a TX using contract B
 		procCallB := fvm.Transaction(callTx("B", addressB), 4)
 
-		view := mainView.NewChild()
+		// make sure code is loaded from cache, so no read has occurred
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			require.NotEqual(t, key, "code.A")
+			require.NotEqual(t, key, "code.B")
+			return mainView.Get(owner, controller, key)
+		})
 
-		err = vm.Run(context, procCallB, viewB, programs)
+		err = vm.Run(context, procCallB, view, programs)
 		require.NoError(t, err)
 
-		//
 		require.Equal(t, viewB, view)
 	})
 
