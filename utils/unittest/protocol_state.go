@@ -68,18 +68,16 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	return &block, snapshot, state, sealedSnapshot
 }
 
-// SealBlock inserts and seals the given block with the given receipt and seal.
-// Returns the block sealing the input block.
+// SealBlock seals a block by building two blocks on it, the first containing
+// a receipt for the block, the second containing a seal for the block.
+// Returns the block containing the seal.
 func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) *flow.Header {
-
-	err := st.Extend(block)
-	require.NoError(t, err)
 
 	block2 := BlockWithParentFixture(block.Header)
 	block2.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceipt{receipt},
 	})
-	err = st.Extend(&block2)
+	err := st.Extend(&block2)
 	require.NoError(t, err)
 
 	block3 := BlockWithParentFixture(block2.Header)

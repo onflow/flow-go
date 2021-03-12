@@ -948,8 +948,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				setup.Counter = epoch1Setup.Counter
 			})
 
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			sealingBlock := unittest.SealBlock(t, state, &block2, receipt, seal)
+			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(&qcBlock)
@@ -962,8 +961,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				setup.FinalView = block1.Header.View
 			})
 
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			sealingBlock := unittest.SealBlock(t, state, &block2, receipt, seal)
+			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(&qcBlock)
@@ -976,8 +974,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 				setup.RandomSource = nil
 			})
 
-			block2 := unittest.BlockWithParentFixture(block1.Header)
-			sealingBlock := unittest.SealBlock(t, state, &block2, receipt, seal)
+			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(&qcBlock)
@@ -1002,8 +999,6 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		block1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block1)
 		require.NoError(t, err)
-		err = state.Finalize(block1.ID())
-		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
@@ -1023,105 +1018,84 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			)
 			receipt, seal := unittest.ReceiptAndSealForBlock(block)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
+			seal.ResultID = receipt.ExecutionResult.ID()
 			return setup, receipt, seal
 		}
 
-		createCommit := func(block *flow.Block) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal) {
+		createCommit := func(block *flow.Block, opts ...func(*flow.EpochCommit)) (*flow.EpochCommit, *flow.ExecutionReceipt, *flow.Seal) {
 			commit := unittest.EpochCommitFixture(
 				unittest.CommitWithCounter(epoch1Setup.Counter+1),
 				unittest.WithDKGFromParticipants(epoch2Participants),
 			)
+			for _, apply := range opts {
+				apply(commit)
+			}
 			receipt, seal := unittest.ReceiptAndSealForBlock(block)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{commit.ServiceEvent()}
+			seal.ResultID = receipt.ExecutionResult.ID()
 			return commit, receipt, seal
 		}
 
 		t.Run("without setup", func(t *testing.T) {
-			_, receipt, _ := createCommit(&block1)
+			_, receipt, seal := createCommit(&block1)
 
-			block := unittest.BlockWithParentFixture(block1.Header)
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
-			})
-			err = state.Extend(&block)
+			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
+
+			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
+			err = state.Extend(&qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
-		// insert the receipt containing the EpochSetup event and its seal
+		// seal block 1, in which EpochSetup was emitted
 		epoch2Setup, setupReceipt, setupSeal := createSetup(&block1)
-		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{setupReceipt},
-		})
-		err = state.Extend(&block2)
-		require.NoError(t, err)
-		err = state.Finalize(block2.ID())
-		require.NoError(t, err)
+		block2 := unittest.SealBlock(t, state, &block1, setupReceipt, setupSeal)
 
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{setupSeal},
-		})
+		// insert a block with a QC for block 2
+		block3 := unittest.BlockWithParentFixture(block2)
 		err = state.Extend(&block3)
-		require.NoError(t, err)
-		err = state.Finalize(block3.ID())
 		require.NoError(t, err)
 
 		t.Run("inconsistent counter", func(t *testing.T) {
-			commit, receipt, _ := createCommit(&block3)
-			commit.Counter = epoch2Setup.Counter + 1
-
-			block := unittest.BlockWithParentFixture(block3.Header)
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
+			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
+				commit.Counter = epoch2Setup.Counter + 1
 			})
-			err := state.Extend(&block)
+
+			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
+
+			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
+			err = state.Extend(&qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		t.Run("inconsistent cluster QCs", func(t *testing.T) {
-			commit, receipt, _ := createCommit(&block3)
-			commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
-
-			block := unittest.BlockWithParentFixture(block3.Header)
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
+			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
+				commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
 			})
-			err := state.Extend(&block)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
 
-		t.Run("missing dkg group key", func(t *testing.T) {
-			commit, receipt, _ := createCommit(&block3)
-			commit.DKGGroupKey = nil
+			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
 
-			block := unittest.BlockWithParentFixture(block3.Header)
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
-			})
-			err := state.Extend(&block)
+			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
+			err = state.Extend(&qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		t.Run("inconsistent DKG participants", func(t *testing.T) {
-			commit, receipt, _ := createCommit(&block3)
-
-			// add the consensus node from epoch *1*, which was removed for epoch 2
-			epoch1CONNode := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
-			commit.DKGParticipants[epoch1CONNode.NodeID] = flow.DKGParticipant{
-				KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
-				Index:    1,
-			}
-
-			block := unittest.BlockWithParentFixture(block3.Header)
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
+			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
+				// add the consensus node from epoch *1*, which was removed for epoch 2
+				epoch1CONNode := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
+				commit.DKGParticipants[epoch1CONNode.NodeID] = flow.DKGParticipant{
+					KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
+					Index:    1,
+				}
 			})
-			err := state.Extend(&block)
+
+			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
+
+			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
+			err = state.Extend(&qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
