@@ -525,36 +525,25 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
 
-		// Prepare an epoch builder, which builds epochs with 6 blocks, A,B,C,D,E,F
-		// See EpochBuilder documentation for details of these blocks.
 		epochBuilder := unittest.NewEpochBuilder(t, state)
-		// build blocks WITHIN epoch 1 - PREPARING epoch 2
-		// A - height 0 - (root block)
-		// B - height 1 - staking phase
-		// C - height 2
-		// D - height 3 - setup phase
-		// E - height 4
-		// F - height 5 - committed phase
+		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
-		// build blocks WITHIN epoch 2 - PREPARING epoch 3
-		// A - height 6  - first block of epoch 2
-		// B - height 7  - staking phase
-		// C - height 8
-		// D - height 9  - setup phase
-		// E - height 10
-		// F - height 11 - committed phase
+		// build epoch 2 (prepare epoch 3)
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
+
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(t, ok)
+		epoch2, ok := epochBuilder.EpochHeights(2)
+		require.True(t, ok)
 
 		// figure out the expected first views of the epochs
 		epoch1FirstView := head.View
 		epoch2FirstView := result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView + 1
-
-		epoch1Heights := []uint64{0, 1, 2, 3, 4, 5}
-		epoch2Heights := []uint64{6, 7, 8, 9, 10, 11}
 
 		// check first view for snapshots within epoch 1, with respect to a
 		// snapshot in either epoch 1 or epoch 2 (testing Current and Previous)
@@ -562,7 +551,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 			// test w.r.t. epoch 1 snapshot
 			t.Run("Current", func(t *testing.T) {
-				for _, height := range epoch1Heights {
+				for _, height := range epoch1.Range() {
 					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
 					require.Nil(t, err)
 					assert.Equal(t, epoch1FirstView, actualFirstView)
@@ -571,7 +560,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 			// test w.r.t. epoch 2 snapshot
 			t.Run("Previous", func(t *testing.T) {
-				for _, height := range epoch2Heights {
+				for _, height := range epoch2.Range() {
 					actualFirstView, err := state.AtHeight(height).Epochs().Previous().FirstView()
 					require.Nil(t, err)
 					assert.Equal(t, epoch1FirstView, actualFirstView)
@@ -585,7 +574,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 			// test w.r.t. epoch 1 snapshot
 			t.Run("Next", func(t *testing.T) {
-				for _, height := range epoch1Heights[3:] {
+				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
 					actualFirstView, err := state.AtHeight(height).Epochs().Next().FirstView()
 					require.Nil(t, err)
 					assert.Equal(t, epoch2FirstView, actualFirstView)
@@ -594,7 +583,7 @@ func TestSnapshot_EpochFirstView(t *testing.T) {
 
 			// test w.r.t. epoch 2 snapshot
 			t.Run("Current", func(t *testing.T) {
-				for _, height := range epoch2Heights {
+				for _, height := range epoch2.Range() {
 					actualFirstView, err := state.AtHeight(height).Epochs().Current().FirstView()
 					require.Nil(t, err)
 					assert.Equal(t, epoch2FirstView, actualFirstView)
