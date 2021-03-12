@@ -200,7 +200,19 @@ func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
 }
 
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
+
+	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
+
 	return func(owner, controller, key string) (flow.RegisterValue, error) {
+		regID := flow.RegisterID{
+			Owner:      owner,
+			Controller: controller,
+			Key:        key,
+		}
+
+		if value, ok := readCache[regID]; ok {
+			return value.Value, nil
+		}
 
 		query, err := makeSingleValueQuery(commitment, owner, controller, key)
 
@@ -217,6 +229,9 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 		if len(values) == 0 {
 			return nil, nil
 		}
+
+		// don't cache value with len zero
+		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
 
 		return values[0], nil
 	}

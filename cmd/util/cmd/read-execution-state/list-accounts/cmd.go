@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -75,8 +76,7 @@ func run(*cobra.Command, []string) {
 	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 
 		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
-		// TODO (RAMTIN) change the path finder version
-		path, err := pathfinder.KeyToPath(ledgerKey, 0)
+		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot convert key to path")
 		}

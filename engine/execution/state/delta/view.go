@@ -16,7 +16,6 @@ type GetRegisterFunc func(owner, controller, key string) (flow.RegisterValue, er
 // underlying data source.
 type View struct {
 	delta       Delta
-	readCache   map[string]flow.RegisterEntry
 	regTouchSet map[string]flow.RegisterID // contains all the registers that have been touched (either read or written to)
 	readsCount  uint64                     // contains the total number of reads
 	// SpocksSecret keeps the secret used for SPoCKs
@@ -42,7 +41,6 @@ func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:             NewDelta(),
 		regTouchSet:       make(map[string]flow.RegisterID),
-		readCache:         make(map[string]flow.RegisterEntry),
 		readFunc:          readFunc,
 		spockSecretHasher: hash.NewSHA3_256(),
 	}
@@ -114,22 +112,12 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 		return value, err
 	}
 
-	registerID := toRegisterID(owner, controller, key)
-
-	// check the read cache
-	if value, ok := v.readCache[registerID.String()]; ok {
-		return value.Value, nil
-	}
-
 	value, err := v.readFunc(owner, controller, key)
 	if err != nil {
 		return nil, err
 	}
 
-	v.readCache[registerID.String()] = flow.RegisterEntry{
-		Key:   registerID,
-		Value: value,
-	}
+	registerID := toRegisterID(owner, controller, key)
 
 	// capture register touch
 	v.regTouchSet[registerID.String()] = registerID
@@ -197,11 +185,6 @@ func (v *View) Delta() Delta {
 func (v *View) MergeView(child *View) {
 	for _, id := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[id.String()] = id
-	}
-
-	// merge read cache
-	for key, value := range v.readCache {
-		v.readCache[key] = value
 	}
 
 	// SpockSecret is order aware
