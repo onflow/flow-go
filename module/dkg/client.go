@@ -116,10 +116,8 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 	ctx := context.Background()
 
-	// TODO: add fromIndex to parameter of transaction
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
-
-	dkgMessages, err := c.flowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{})
+	dkgMessages, err := c.flowClient.ExecuteScriptAtBlockID(ctx, sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
 	if err != nil {
 		return nil, fmt.Errorf("could not execute read broadcast script")
 	}
