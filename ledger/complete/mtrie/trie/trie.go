@@ -130,7 +130,9 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 		return
 	}
 
-	// partition step to quick sort the paths
+	// partition step to quick sort the paths:
+	// lpaths contains all paths that have `0` at the partitionIndex
+	// rpaths contains all paths that have `1` at the partitionIndex
 	partitionIndex := utils.SplitPaths(paths, mt.Height()-head.Height())
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lres, rres := (*res)[:partitionIndex], (*res)[partitionIndex:]
@@ -216,7 +218,9 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 
 	// in the remaining code: len(paths)>1
 
-	// Split paths and payloads to recurse
+	// Split paths and payloads to recurse:
+	// lpaths contains all paths that have `0` at the partitionIndex
+	// rpaths contains all paths that have `1` at the partitionIndex
 	partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.Height()-nodeHeight)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
@@ -288,7 +292,9 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 		p.Steps++
 	}
 
-	// partition step to quick sort the paths
+	// partition step to quick sort the paths:
+	// lpaths contains all paths that have `0` at the partitionIndex
+	// rpaths contains all paths that have `1` at the partitionIndex
 	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, mt.Height()-head.Height())
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]

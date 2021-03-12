@@ -13,6 +13,11 @@ import (
 // with the pivot being the path with all zeros and 1 at bitIndex.
 // The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
 // equal bits from 0 to bitIndex-1
+//
+//  For instance, if `paths` contains the following 3 paths, and bitIndex is `1`:
+//  [[0,0,1,1], [0,1,0,1], [0,0,0,1]]
+//  then `SplitByPath` returns 1 and updates `paths` into:
+//  [[0,0,1,1], [0,0,0,1], [0,1,0,1]]
 func SplitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
