@@ -9,12 +9,13 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
-func customClientCodeToLevel(c codes.Code) logging.Level {
-	if c == codes.OK {
-		// log successful returns as Debug to avoid excessive logging in info mode
+func customClientCodeToLevel(code codes.Code) logging.Level {
+	switch code {
+	case codes.OK, codes.ResourceExhausted, codes.Internal:
 		return logging.DEBUG
+	default:
+		return logging.DefaultServerCodeToLevel(code)
 	}
-	return logging.DefaultServerCodeToLevel(c)
 }
 
 // loggingInterceptor creates the logging interceptors
