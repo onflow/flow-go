@@ -281,20 +281,17 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	ancestorID := parentID
 	sealedID := sealed.ID()
 	for ancestorID != sealedID {
-
 		ancestor, err := b.blocks.ByID(ancestorID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get ancestor (%x): %w", ancestorID, err)
 		}
 
-		resultsByID := ancestor.Payload.ResultsById()
-
 		// For each receipt in the block's payload, we recompose the
 		// corresponding IncorporatedResult an check if we have a matching seal
 		// in the mempool.
-		// Since we only interested in the unique unsealed results, we could just 
-		// iterate through the results in the payload. If there is a receipt referring 
-		// a result included in previous block, we anyway will reach it as long as 
+		// Since we only interested in the unique unsealed results, we could just
+		// iterate through the results in the payload. If there is a receipt referring
+		// a result included in previous block, we anyway will reach it as long as
 		// the block has not sealed yet, because we are traversing all unsealed blocks.
 		for _, result := range ancestor.Payload.Results {
 
