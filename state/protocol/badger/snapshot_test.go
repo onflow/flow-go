@@ -103,6 +103,7 @@ func TestClusters(t *testing.T) {
 	for i := 0; i < nClusters; i++ {
 		commit.ClusterQCs[i] = unittest.QuorumCertificateFixture()
 	}
+	seal.ResultID = result.ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(t, err)
