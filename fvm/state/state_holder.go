@@ -37,5 +37,5 @@ func (s *StateHolder) SetActiveState(st *State) {
 func (s *StateHolder) NewChild() *State {
 	new := s.activeState.NewChild()
 	s.activeState = new
-	return s.startState
+	return s.activeState
 }
