@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/storage/util"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -267,24 +268,24 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 	}
 
 	// build a list of all previously used guarantees on this part of the chain
-	ancestorID := header.ParentID
 	lookup := make(map[flow.Identifier]struct{})
-	for {
-		ancestor, err := m.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
-		}
-		index, err := m.index.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
-		}
-		for _, collID := range index.CollectionIDs {
-			lookup[collID] = struct{}{}
-		}
-		if ancestor.Height <= limit {
-			break
-		}
-		ancestorID = ancestor.ParentID
+	err = util.TraverseBlocksBackwards(m.headers, header.ParentID,
+		func(block *flow.Header) bool {
+			return block.Height > limit
+		},
+		func(block *flow.Header) error {
+			blockID := block.ID()
+			index, err := m.index.ByBlockID(blockID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve ancestor index (%x): %w", blockID, err)
+			}
+			for _, collID := range index.CollectionIDs {
+				lookup[collID] = struct{}{}
+			}
+			return nil
+		})
+	if err != nil {
+		return err
 	}
 
 	// check each guarantee included in the payload for duplication and expiry

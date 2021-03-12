@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/storage/util"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -216,32 +217,28 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// loop through the fork backwards, from parent to last sealed, and keep
 	// track of blocks and receipts visited on the way.
-	ancestorID := header.ParentID
-	for {
+	err = util.TraverseBlocksBackwards(v.headers, header.ParentID,
+		func(block *flow.Header) bool {
+			return block.Height > sealedHeight
+		},
+		func(block *flow.Header) error {
+			blockID := block.ID()
+			// keep track of blocks we iterate over
+			forkBlocks[blockID] = block
 
-		ancestor, err := v.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
-		}
+			// keep track of all receipts in ancestors
+			index, err := v.index.ByBlockID(blockID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve ancestor index (%x): %w", blockID, err)
+			}
+			for _, recID := range index.ReceiptIDs {
+				forkLookup[recID] = struct{}{}
+			}
 
-		// break out when we reach the sealed height
-		if ancestor.Height <= sealedHeight {
-			break
-		}
-
-		// keep track of blocks we iterate over
-		forkBlocks[ancestorID] = ancestor
-
-		// keep track of all receipts in ancestors
-		index, err := v.index.ByBlockID(ancestorID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve ancestor index (%x): %w", ancestorID, err)
-		}
-		for _, recID := range index.ReceiptIDs {
-			forkLookup[recID] = struct{}{}
-		}
-
-		ancestorID = ancestor.ParentID
+			return nil
+		})
+	if err != nil {
+		return err
 	}
 
 	// results is used to keep unique execution results that were included into

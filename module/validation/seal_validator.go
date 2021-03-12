@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/storage/util"
 
 	"github.com/rs/zerolog/log"
 
@@ -160,44 +161,43 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
-	ancestorID := header.ParentID
-	for ancestorID != sealedID {
+	err = util.TraverseBlocksBackwards(s.headers, header.ParentID,
+		func(block *flow.Header) bool {
+			return block.ID() != sealedID
+		},
+		func(block *flow.Header) error {
+			blockID := block.ID()
+			// keep track of blocks on the fork
+			blockIDs = append(blockIDs, blockID)
 
-		ancestor, err := s.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
-		}
+			payload, err := s.payloads.ByBlockID(blockID)
+			if err != nil {
+				return fmt.Errorf("could not get block payload %x: %w", blockID, err)
+			}
 
-		// keep track of blocks on the fork
-		blockIDs = append(blockIDs, ancestorID)
+			// Collect execution results from receipts.
+			for _, receipt := range payload.Receipts {
+				resultID := receipt.ResultID
+				result := fetchResult(resultID)
+				// unsealedResults should contain the _first_ appearance of the
+				// ExecutionResult. We are traversing the fork backwards, so we can
+				// overwrite any previously recorded result.
 
-		payload, err := s.payloads.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get block payload %x: %w", ancestorID, err)
-		}
-
-		// Collect execution results from receipts.
-		for _, receipt := range payload.Receipts {
-			resultID := receipt.ResultID
-			result := fetchResult(resultID)
-			// unsealedResults should contain the _first_ appearance of the
-			// ExecutionResult. We are traversing the fork backwards, so we can
-			// overwrite any previously recorded result.
-
-			// ATTENTION:
-			// Here, IncorporatedBlockID (the first argument) should be set
-			// to ancestorID, because that is the block that contains the
-			// ExecutionResult. However, in phase 2 of the sealing roadmap,
-			// we are still using a temporary sealing logic where the
-			// IncorporatedBlockID is expected to be the result's block ID.
-			unsealedResults[resultID] = flow.NewIncorporatedResult(
-				result.BlockID,
-				result,
-			)
-
-		}
-
-		ancestorID = ancestor.ParentID
+				// ATTENTION:
+				// Here, IncorporatedBlockID (the first argument) should be set
+				// to ancestorID, because that is the block that contains the
+				// ExecutionResult. However, in phase 2 of the sealing roadmap,
+				// we are still using a temporary sealing logic where the
+				// IncorporatedBlockID is expected to be the result's block ID.
+				unsealedResults[resultID] = flow.NewIncorporatedResult(
+					result.BlockID,
+					result,
+				)
+			}
+			return nil
+		})
+	if err != nil {
+		return nil, err
 	}
 
 	// We do not include the receipts in the same payload to the unsealedResults.
