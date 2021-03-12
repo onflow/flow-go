@@ -904,6 +904,112 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 	})
 }
 
+// we should be able to have conflicting forks with two duplicate instances of
+// the same service event for the same epoch
+//
+//         /--B1<--B3(R1)<--B5(S1)<--B7
+// ROOT <--+
+//         \--B2<--B4(R2)<--B6(S2)<--B8
+//
+func TestExtendDuplicateEpochEvents(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+
+		head, err := rootSnapshot.Head()
+		require.NoError(t, err)
+		result, _, err := rootSnapshot.SealedResult()
+		require.NoError(t, err)
+
+		// add two conflicting blocks for each service event to reference
+		block1 := unittest.BlockWithParentFixture(head)
+		block1.SetPayload(flow.EmptyPayload())
+		err = state.Extend(&block1)
+		require.NoError(t, err)
+
+		block2 := unittest.BlockWithParentFixture(head)
+		block2.SetPayload(flow.EmptyPayload())
+		err = state.Extend(&block2)
+		require.NoError(t, err)
+
+		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+
+		// create two conflicting epoch setup events for the next epoch (final view differs)
+		nextEpochSetup := unittest.EpochSetupFixture(
+			unittest.WithParticipants(rootSetup.Participants),
+			unittest.SetupWithCounter(rootSetup.Counter+1),
+			unittest.WithFinalView(rootSetup.FinalView+1000),
+			unittest.WithFirstView(rootSetup.FinalView+1),
+		)
+
+		// add blocks containing receipts for block1 and block2 (necessary for sealing)
+		// block 1 receipt contains nextEpochSetup1
+		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
+		block1Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{nextEpochSetup.ServiceEvent()}
+
+		// add block 1 receipt to block 3 payload
+		block3 := unittest.BlockWithParentFixture(block1.Header)
+		block3.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{block1Receipt},
+		})
+		err = state.Extend(&block3)
+		require.NoError(t, err)
+
+		// block 2 receipt contains nextEpochSetup2
+		block2Receipt := unittest.ReceiptForBlockFixture(&block2)
+		block2Receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{nextEpochSetup.ServiceEvent()}
+
+		// add block 2 receipt to block 4 payload
+		block4 := unittest.BlockWithParentFixture(block2.Header)
+		block4.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{block2Receipt},
+		})
+		err = state.Extend(&block4)
+		require.NoError(t, err)
+
+		// seal for block 1
+		seal1 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+
+		// seal for block 2
+		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
+
+		// block 5 builds on block 3, contains seal for block 1
+		block5 := unittest.BlockWithParentFixture(block3.Header)
+		block5.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal1},
+		})
+		err = state.Extend(&block5)
+		require.NoError(t, err)
+
+		// block 6 builds on block 4, contains seal for block 2
+		block6 := unittest.BlockWithParentFixture(block4.Header)
+		block6.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal2},
+		})
+		err = state.Extend(&block6)
+		require.NoError(t, err)
+
+		// block 7 builds on block 5, contains QC for block 7
+		block7 := unittest.BlockWithParentFixture(block5.Header)
+		err = state.Extend(&block7)
+		require.NoError(t, err)
+
+		// block 8 builds on block 6, contains QC for block 6
+		// at this point we are inserting the duplicate EpochSetup, should not error
+		block8 := unittest.BlockWithParentFixture(block6.Header)
+		err = state.Extend(&block8)
+		require.NoError(t, err)
+
+		// should be able query each epoch from the appropriate reference block
+		finalView, err := state.AtBlockID(block7.ID()).Epochs().Next().FinalView()
+		assert.NoError(t, err)
+		require.Equal(t, nextEpochSetup.FinalView, finalView)
+
+		finalView, err = state.AtBlockID(block8.ID()).Epochs().Next().FinalView()
+		assert.NoError(t, err)
+		require.Equal(t, nextEpochSetup.FinalView, finalView)
+	})
+}
+
 // extending protocol state with an invalid epoch setup service event should cause an error
 func TestExtendEpochSetupInvalid(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
