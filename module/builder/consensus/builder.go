@@ -464,27 +464,37 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
 
+	insertables := filterNewInsertables(receipts, includedResults, b.cfg.maxReceiptCount)
+
+	return insertables, nil
+}
+
+func filterNewInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
 	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, len(receipts))
 	results := make([]*flow.ExecutionResult, 0)
-	for _, receipt := range receipts {
-		resultID := receipt.ExecutionResult.ID()
+
+	count := uint(len(receipts))
+	// don't collect more than maxReceiptCount receipts
+	if count > maxReceiptCount {
+		count = maxReceiptCount
+	}
+
+	for i := uint(0); i < count; i++ {
+		receipt := receipts[i]
+		meta := receipt.Meta()
+		resultID := meta.ResultID
 		if _, inserted := includedResults[resultID]; !inserted {
 			results = append(results, &receipt.ExecutionResult)
 			includedResults[resultID] = struct{}{}
 		}
 
-		filteredReceipts = append(filteredReceipts, receipt.Meta())
-	}
-
-	// don't collect more than maxReceiptCount receipts
-	if uint(len(filteredReceipts)) > b.cfg.maxReceiptCount {
-		filteredReceipts = filteredReceipts[:b.cfg.maxReceiptCount]
+		filteredReceipts = append(filteredReceipts, meta)
 	}
 
 	return &InsertableReceipts{
 		receipts: filteredReceipts,
 		results:  results,
-	}, nil
+	}
 }
 
 // createProposal assembles a block with the provided header and payload
