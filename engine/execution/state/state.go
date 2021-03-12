@@ -8,13 +8,12 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
-
-	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -82,19 +81,9 @@ type ExecutionState interface {
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(context.Context, delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
 
-	// PersistStateCommitment saves a state commitment by the given block ID.
-	PersistStateCommitment(context.Context, flow.Identifier, flow.StateCommitment) error
-
-	// PersistChunkDataPack stores a chunk data pack by chunk ID.
-	PersistChunkDataPack(context.Context, *flow.ChunkDataPack, flow.Identifier) error
-
-	PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error
-
-	PersistExecutionReceipt(context.Context, *flow.ExecutionReceipt) error
-
-	PersistStateInteractions(context.Context, flow.Identifier, []*delta.Snapshot) error
-
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
+
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
 }
 
 const (
@@ -104,16 +93,20 @@ const (
 )
 
 type state struct {
-	tracer         module.Tracer
-	ls             ledger.Ledger
-	commits        storage.Commits
-	blocks         storage.Blocks
-	collections    storage.Collections
-	chunkDataPacks storage.ChunkDataPacks
-	results        storage.ExecutionResults
-	receipts       storage.ExecutionReceipts
-	headers        storage.Headers
-	db             *badger.DB
+	tracer             module.Tracer
+	ls                 ledger.Ledger
+	commits            storage.Commits
+	blocks             storage.Blocks
+	headers            storage.Headers
+	collections        storage.Collections
+	chunkDataPacks     storage.ChunkDataPacks
+	results            storage.ExecutionResults
+	receipts           storage.ExecutionReceipts
+	myReceipts         storage.MyExecutionReceipts
+	events             storage.Events
+	serviceEvents      storage.ServiceEvents
+	transactionResults storage.TransactionResults
+	db                 *badger.DB
 }
 
 func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
@@ -143,25 +136,33 @@ func NewExecutionState(
 	ls ledger.Ledger,
 	commits storage.Commits,
 	blocks storage.Blocks,
+	headers storage.Headers,
 	collections storage.Collections,
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
-	headers storage.Headers,
+	myReceipts storage.MyExecutionReceipts,
+	events storage.Events,
+	serviceEvents storage.ServiceEvents,
+	transactionResults storage.TransactionResults,
 	db *badger.DB,
 	tracer module.Tracer,
 ) ExecutionState {
 	return &state{
-		tracer:         tracer,
-		ls:             ls,
-		commits:        commits,
-		blocks:         blocks,
-		collections:    collections,
-		chunkDataPacks: chunkDataPacks,
-		results:        results,
-		receipts:       receipts,
-		headers:        headers,
-		db:             db,
+		tracer:             tracer,
+		ls:                 ls,
+		commits:            commits,
+		blocks:             blocks,
+		headers:            headers,
+		collections:        collections,
+		chunkDataPacks:     chunkDataPacks,
+		results:            results,
+		receipts:           receipts,
+		myReceipts:         myReceipts,
+		events:             events,
+		serviceEvents:      serviceEvents,
+		transactionResults: transactionResults,
+		db:                 db,
 	}
 
 }
@@ -349,20 +350,6 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 	return s.chunkDataPacks.ByChunkID(chunkID)
 }
 
-func (s *state) PersistChunkDataPack(ctx context.Context, c *flow.ChunkDataPack, blockID flow.Identifier) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
-		defer span.Finish()
-	}
-
-	err := s.chunkDataPacks.Store(c)
-	if err != nil {
-		return fmt.Errorf("cannot store chunk data pack: %w", err)
-	}
-
-	return s.headers.IndexByChunkID(blockID, c.ID())
-}
-
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
@@ -382,15 +369,9 @@ func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.Execu
 		defer span.Finish()
 	}
 
-	err := s.receipts.Store(receipt)
+	err := s.myReceipts.StoreMyReceipt(receipt)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
-	}
-	// TODO if the second operation fails we should remove stored execution result
-	// This is global execution storage problem - see TODO at the top
-	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution receipt: %w", err)
 	}
 	return nil
 }
@@ -402,6 +383,76 @@ func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Ident
 	}
 
 	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
+}
+
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+
+	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
+	defer span.Finish()
+
+	blockID := header.ID()
+
+	// Write Batch is BadgerDB feature designed for handling lots of writes
+	// in efficient and automatic manner, hence pushing all the updates we can
+	// as tightly as possible to let Badger manage it.
+	// Note, that it does not guarantee atomicity as transactions has size limit
+	// but it's the closes thing to atomicity we could have
+	batch := s.db.NewWriteBatch()
+
+	for _, chunkDataPack := range chunkDataPacks {
+		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
+		if err != nil {
+			return fmt.Errorf("cannot store chunk data pack: %w", err)
+		}
+
+		err = s.headers.BatchIndexByChunkID(header.ID(), chunkDataPack.ChunkID, batch)
+		if err != nil {
+			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
+		}
+	}
+
+	err := s.commits.BatchStore(blockID, endState, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store state commitment: %w", err)
+	}
+
+	err = s.events.BatchStore(blockID, events, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store events: %w", err)
+	}
+
+	err = s.serviceEvents.BatchStore(blockID, events, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store service events: %w", err)
+	}
+
+	err = s.transactionResults.BatchStore(blockID, results, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store transaction result: %w", err)
+	}
+
+	err = s.results.BatchStore(executionResult, batch)
+	if err != nil {
+		return fmt.Errorf("cannot store execution result: %w", err)
+	}
+
+	// it overwrites the index if exists already
+	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
+	if err != nil {
+		return fmt.Errorf("cannot index execution result: %w", err)
+	}
+
+	err = batch.Flush()
+	if err != nil {
+		return fmt.Errorf("batch flush error: %w", err)
+	}
+
+	//outside batch because it requires read access
+	err = s.UpdateHighestExecutedBlockIfHigher(childCtx, header)
+	if err != nil {
+		return fmt.Errorf("cannot update highest executed block: %w", err)
+	}
+	return nil
 }
 
 func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier) (*messages.ExecutionStateDelta, error) {

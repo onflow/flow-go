@@ -1,11 +1,14 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -60,6 +63,15 @@ func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow
 
 func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
 	return operation.RetryOnConflict(c.db.Update, c.storeTx(blockID, commit))
+}
+
+func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.BatchStorage) error {
+	// we can't cache while using batches, as it's unknown at this point when, and if
+	// the batch will be committed. Cache will be populated on read however.
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		return operation.BatchIndexStateCommitment(blockID, commit)(writeBatch)
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
 }
 
 func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
