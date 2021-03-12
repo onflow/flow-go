@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/state/protocol"
@@ -27,11 +28,18 @@ func NewEpochLookup(state protocol.State) *EpochLookup {
 // (even if the node does happen to have that stored in the underlying storage)
 // -- these queries indicate a bug in the querier.
 func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error) {
+	previous := l.state.Final().Epochs().Previous()
 	current := l.state.Final().Epochs().Current()
 	next := l.state.Final().Epochs().Next()
-	previous := l.state.Final().Epochs().Previous()
 
 	for _, epoch := range []protocol.Epoch{previous, current, next} {
+		counter, err := epoch.Counter()
+		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
+			continue
+		}
+		if err != nil {
+			return 0, err
+		}
 		firstView, err := epoch.FirstView()
 		if err != nil {
 			return 0, err
@@ -41,7 +49,7 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 			return 0, err
 		}
 		if firstView <= view && view <= finalView {
-			return epoch.Counter()
+			return counter, nil
 		}
 	}
 
