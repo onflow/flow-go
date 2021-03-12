@@ -1,22 +1,25 @@
 package unittest
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	protint "github.com/onflow/flow-go/state/protocol"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/state/protocol"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 )
 
 // FinalizedProtocolStateWithParticipants returns a protocol state with finalized participants
 func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
-	*flow.Block, *protocol.Snapshot, *protocol.State, *protocol.Snapshot) {
+	*flow.Block, *mockprotocol.Snapshot, *mockprotocol.State, *mockprotocol.Snapshot) {
 	sealed := BlockFixture()
 	block := BlockWithParentFixture(sealed.Header)
 	head := block.Header
 
 	// set up protocol snapshot mock
-	snapshot := &protocol.Snapshot{}
+	snapshot := &mockprotocol.Snapshot{}
 	snapshot.On("Identities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
 			return participants.Filter(filter)
@@ -38,7 +41,7 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 		nil,
 	)
 
-	sealedSnapshot := &protocol.Snapshot{}
+	sealedSnapshot := &mockprotocol.Snapshot{}
 	sealedSnapshot.On("Head").Return(
 		func() *flow.Header {
 			return sealed.Header
@@ -47,20 +50,44 @@ func FinalizedProtocolStateWithParticipants(participants flow.IdentityList) (
 	)
 
 	// set up protocol state mock
-	state := &protocol.State{}
+	state := &mockprotocol.State{}
 	state.On("Final").Return(
-		func() protint.Snapshot {
+		func() protocol.Snapshot {
 			return snapshot
 		},
 	)
-	state.On("Sealed").Return(func() protint.Snapshot {
+	state.On("Sealed").Return(func() protocol.Snapshot {
 		return sealedSnapshot
 	},
 	)
 	state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) protint.Snapshot {
+		func(blockID flow.Identifier) protocol.Snapshot {
 			return snapshot
 		},
 	)
 	return &block, snapshot, state, sealedSnapshot
+}
+
+// SealBlock inserts and seals the given block with the given receipt and seal.
+// Returns the block sealing the input block.
+func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receipt *flow.ExecutionReceipt, seal *flow.Seal) *flow.Header {
+
+	err := st.Extend(block)
+	require.NoError(t, err)
+
+	block2 := BlockWithParentFixture(block.Header)
+	block2.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceipt{receipt},
+	})
+	err = st.Extend(&block2)
+	require.NoError(t, err)
+
+	block3 := BlockWithParentFixture(block2.Header)
+	block3.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+	err = st.Extend(&block3)
+	require.NoError(t, err)
+
+	return block3.Header
 }

@@ -918,8 +918,6 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		block1.SetPayload(flow.EmptyPayload())
 		err = state.Extend(&block1)
 		require.NoError(t, err)
-		err = state.Finalize(block1.ID())
-		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
@@ -929,55 +927,60 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		// this function will return a VALID setup event and seal, we will modify
 		// in different ways in each test case
-		createSetup := func() (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
+		createSetup := func(opts ...func(*flow.EpochSetup)) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
 			setup := unittest.EpochSetupFixture(
 				unittest.WithParticipants(epoch2Participants),
 				unittest.SetupWithCounter(epoch1Setup.Counter+1),
 				unittest.WithFinalView(epoch1Setup.FinalView+1000),
 				unittest.WithFirstView(epoch1Setup.FinalView+1),
 			)
+			for _, apply := range opts {
+				apply(setup)
+			}
 			receipt, seal := unittest.ReceiptAndSealForBlock(&block1)
 			receipt.ExecutionResult.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent()}
+			seal.ResultID = receipt.ExecutionResult.ID()
 			return setup, receipt, seal
 		}
 
 		t.Run("wrong counter", func(t *testing.T) {
-			setup, receipt, _ := createSetup()
-			setup.Counter = epoch1Setup.Counter
-
-			block := unittest.BlockWithParentFixture(block1.Header)
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
+			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
+				setup.Counter = epoch1Setup.Counter
 			})
 
-			err = state.Extend(&block)
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			sealingBlock := unittest.SealBlock(t, state, &block2, receipt, seal)
+
+			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
+			err = state.Extend(&qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		t.Run("invalid final view", func(t *testing.T) {
-			setup, receipt, _ := createSetup()
-
-			block := unittest.BlockWithParentFixture(block1.Header)
-			setup.FinalView = block.Header.View
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
+			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
+				setup.FinalView = block1.Header.View
 			})
-			err = state.Extend(&block)
+
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			sealingBlock := unittest.SealBlock(t, state, &block2, receipt, seal)
+
+			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
+			err = state.Extend(&qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
 
 		t.Run("empty seed", func(t *testing.T) {
-			setup, receipt, _ := createSetup()
-			setup.RandomSource = nil
-
-			block := unittest.BlockWithParentFixture(block1.Header)
-			block.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
+			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
+				setup.RandomSource = nil
 			})
 
-			err = state.Extend(&block)
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			sealingBlock := unittest.SealBlock(t, state, &block2, receipt, seal)
+
+			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
+			err = state.Extend(&qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
