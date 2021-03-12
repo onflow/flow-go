@@ -2,10 +2,12 @@ package complete
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -272,6 +274,12 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		return nil, fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
+	// clean up tries to release memory
+	err = l.keepOnlyOneTrie(state)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
+	}
+
 	// TODO enable validity check of trie
 	// only check validity of the trie we are interested in
 	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
@@ -367,4 +375,27 @@ func (l *Ledger) DumpTrieAsJSON(state ledger.State, outputFilePath string) error
 	defer writer.Flush()
 
 	return trie.DumpAsJSON(writer)
+}
+
+// this operation should only be used for exporting
+func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
+	// don't write things to WALs
+	l.wal.PauseRecord()
+	defer l.wal.UnpauseRecord()
+
+	allTries, err := l.forest.GetTries()
+	if err != nil {
+		return err
+	}
+
+	targetRootHash := ledger.RootHash(state)
+	for _, trie := range allTries {
+		trieRootHash := trie.RootHash()
+		if !bytes.Equal(trieRootHash, targetRootHash) {
+			l.forest.RemoveTrie(trieRootHash)
+		}
+	}
+	// call gc to free up mem
+	runtime.GC()
+	return nil
 }
