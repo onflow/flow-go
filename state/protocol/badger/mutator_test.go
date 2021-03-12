@@ -1432,47 +1432,44 @@ func TestMakeValid(t *testing.T) {
 	})
 }
 
-// If block A is finalized and contains a seal to block B, then B is the last sealed block
+// If block B is finalized and contains a seal for block A, then A is the last sealed block
 func TestSealed(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.FollowerState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 
-		// A <- B <- C <- D <- E <- F <- G
-		blockA := unittest.BlockWithParentAndSeal(head, nil)
-		blockB := unittest.BlockWithParentAndSeal(blockA.Header, nil)
-		blockC := unittest.BlockWithParentAndSeal(blockB.Header, blockA.Header)
-		blockD := unittest.BlockWithParentAndSeal(blockC.Header, blockB.Header)
-		blockE := unittest.BlockWithParentAndSeal(blockD.Header, nil)
-		blockF := unittest.BlockWithParentAndSeal(blockE.Header, nil)
-		blockG := unittest.BlockWithParentAndSeal(blockF.Header, nil)
-		blockH := unittest.BlockWithParentAndSeal(blockG.Header, nil)
+		// block 1 will be sealed
+		block1 := unittest.BlockWithParentFixture(head)
+		err = state.Extend(&block1)
+		require.NoError(t, err)
+		err = state.Finalize(block1.ID())
+		require.NoError(t, err)
 
-		saveBlock(t, blockA, nil, state)
-		saveBlock(t, blockB, nil, state)
-		saveBlock(t, blockC, nil, state)
-		saveBlock(t, blockD, blockA, state)
-		saveBlock(t, blockE, blockB, state)
-		saveBlock(t, blockF, blockC, state)
-		saveBlock(t, blockG, blockD, state)
-		saveBlock(t, blockH, blockE, state)
+		receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+
+		// block 2 contains receipt for block 1
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		block2.SetPayload(flow.Payload{
+			Receipts: []*flow.ExecutionReceipt{receipt1},
+		})
+		err = state.Extend(&block2)
+		require.NoError(t, err)
+		err = state.Finalize(block2.ID())
+		require.NoError(t, err)
+
+		// block 3 contains seal for block 1
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{seal1},
+		})
+		err = state.Extend(&block3)
+		require.NoError(t, err)
+		err = state.Finalize(block3.ID())
+		require.NoError(t, err)
 
 		sealed, err := state.Sealed().Head()
 		require.NoError(t, err)
-		require.Equal(t, blockB.Header.Height, sealed.Height)
+		require.Equal(t, block1.ID(), sealed.ID())
 	})
-}
-
-func saveBlock(t *testing.T, block *flow.Block, finalizes *flow.Block, state *protocol.FollowerState) {
-	err := state.Extend(block)
-	require.NoError(t, err)
-
-	if finalizes != nil {
-		err = state.Finalize(finalizes.ID())
-		require.NoError(t, err)
-	}
-
-	err = state.MarkValid(block.Header.ID())
-	require.NoError(t, err)
 }
