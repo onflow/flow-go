@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module"
 )
 
 // Collection spans.
@@ -21,14 +21,14 @@ const (
 )
 
 type CollectionCollector struct {
-	tracer               *trace.OpenTracer
+	tracer               module.Tracer
 	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
 	finalizedHeight      *prometheus.GaugeVec     // tracks the finalized height
 	proposals            *prometheus.HistogramVec // tracks the number/size of PROPOSED collections
 	guarantees           *prometheus.HistogramVec // counts the number/size of FINALIZED collections
 }
 
-func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
+func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 
 	cc := &CollectionCollector{
 		tracer: tracer,
@@ -49,7 +49,7 @@ func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
 		proposals: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
-			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "proposals_size_transactions",
 			Help:      "size/number of proposed collections",
 		}, []string{LabelChain}),
@@ -57,7 +57,7 @@ func NewCollectionCollector(tracer *trace.OpenTracer) *CollectionCollector {
 		guarantees: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: namespaceCollection,
 			Subsystem: subsystemProposal,
-			Buckets:   []float64{5, 10, 50, 100}, //TODO(andrew) update once collection limits are known
+			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "guarantees_size_transactions",
 			Help:      "size/number of guaranteed/finalized collections",
 		}, []string{LabelChain}),

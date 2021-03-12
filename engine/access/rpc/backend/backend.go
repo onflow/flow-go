@@ -172,7 +172,11 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	// retrieve the collection from the collection storage
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
-		err = convertStorageError(err)
+		// Collections are retrieved asynchronously as we finalize blocks, so
+		// it is possible for a client to request a finalized block from us
+		// containing some collection, then get a not found error when requesting
+		// that collection. These clients should retry.
+		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
 		return nil, err
 	}
 
@@ -208,7 +212,7 @@ func executionNodesForBlockID(
 	state protocol.State) (flow.IdentityList, error) {
 
 	// lookup the receipts storage with the block ID
-	receipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
+	receipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}

@@ -386,23 +386,23 @@ func main() {
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			// initialize the compliance engine
-			comp, err = compliance.New(
-				node.Logger,
+			core, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
-				conMetrics,
-				node.Network,
-				node.Me,
+				node.Metrics.Compliance,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				mutableState,
-				prov,
 				proposals,
-				syncCore,
-			)
+				syncCore)
+			if err != nil {
+				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -446,8 +446,8 @@ func main() {
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
 
-			// initialize the verifier used to verify aggregated signatures
-			verifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			// initialize the verifier used to verify threshold signatures
+			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner()
@@ -469,16 +469,12 @@ func main() {
 			signer = verification.NewCombinedSigner(
 				committee,
 				staking,
-				verifier,
+				thresholdVerifier,
 				merger,
 				signerStore,
 				node.NodeID,
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
-
-			// initialize the indexer to add index for receipts by the executed block id.
-			// so that receipts can be found by block id.
-			indexer := matching.NewIndexer(node.Logger, node.Storage.Receipts, node.Storage.Payloads)
 
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
@@ -487,7 +483,6 @@ func main() {
 				node.Tracer,
 				node.Storage.Index,
 				node.RootChainID,
-				indexer,
 			)
 			// make compliance engine as a FinalizationConsumer
 			// initialize the persister

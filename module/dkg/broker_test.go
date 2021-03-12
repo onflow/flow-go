@@ -1,26 +1,39 @@
 package dkg
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // variables that are used throughout the tests
 var (
-	committee     = unittest.IdentifierListFixture(2) // dkg nodes
-	orig          = 0                                 // message sender
-	dest          = 1                                 // message destination
-	msgb          = []byte("hello world")             // message content
-	dkgInstanceID = "flow-testnet-42"                 // dkg instance identifier
+	orig          = 0                     // message sender
+	dest          = 1                     // message destination
+	msgb          = []byte("hello world") // message content
+	dkgInstanceID = "flow-testnet-42"     // dkg instance identifier
 )
+
+func initCommittee(n int) (identities flow.IdentityList, locals []module.Local) {
+	privateStakingKeys, _ := unittest.StakingKeys(n)
+	for i, key := range privateStakingKeys {
+		id := unittest.IdentityFixture(unittest.WithStakingPubKey(key.PublicKey()))
+		identities = append(identities, id)
+		local, _ := local.New(id, privateStakingKeys[i])
+		locals = append(locals, local)
+	}
+	return identities, locals
+}
 
 // TestImplementsDKGBroker ensures that Broker implements the DKGBroker
 // interface.
@@ -33,25 +46,27 @@ func TestImplementsDKGBroker(t *testing.T) {
 // public Identifier, and successfully sends a DKG message to the intended
 // recipient through the tunnel.
 func TestPrivateSend_Valid(t *testing.T) {
+	committee, locals := initCommittee(2)
 
 	// sender broker
 	sender := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
+		locals[orig],
 		orig,
 		&mock.DKGContractClient{},
 		NewBrokerTunnel(),
 	)
 
 	// expected DKGMessageOut
-	expectedMsg := msg.DKGMessageOut{
+	expectedMsg := msg.PrivDKGMessageOut{
 		DKGMessage: msg.NewDKGMessage(
 			orig,
 			msgb,
 			dkgInstanceID,
 		),
-		DestID: committee[dest],
+		DestID: committee[dest].NodeID,
 	}
 
 	// launch a background routine to capture messages sent through the tunnel,
@@ -73,12 +88,14 @@ func TestPrivateSend_Valid(t *testing.T) {
 // the message destination parameter is out of range with respect to the
 // committee list.
 func TestPrivateSend_IndexOutOfRange(t *testing.T) {
+	committee, locals := initCommittee(2)
 
 	// sender broker
 	sender := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
+		locals[orig],
 		orig,
 		&mock.DKGContractClient{},
 		NewBrokerTunnel(),
@@ -105,12 +122,14 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 // correctly matched with origin's Identifier, and that the message is forwarded
 // to the message channel.
 func TestReceivePrivateMessage_Valid(t *testing.T) {
+	committee, locals := initCommittee(2)
 
 	// receiving broker
 	receiver := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
+		locals[dest],
 		dest,
 		&mock.DKGContractClient{},
 		NewBrokerTunnel(),
@@ -136,9 +155,9 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 
 	// simulate receiving an incoming message through the broker
 	receiver.tunnel.SendIn(
-		msg.DKGMessageIn{
+		msg.PrivDKGMessageIn{
 			DKGMessage: expectedMsg,
-			OriginID:   committee[orig],
+			OriginID:   committee[orig].NodeID,
 		},
 	)
 
@@ -150,12 +169,14 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 // the origin defined in the message, and the network identifier of the origin
 // (as provided by the network utilities).
 func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
+	committee, locals := initCommittee(2)
 
 	// receiving broker
 	receiver := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
+		locals[dest],
 		dest,
 		&mock.DKGContractClient{},
 		NewBrokerTunnel(),
@@ -184,9 +205,9 @@ func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 		// simulate receiving an incoming message with bad Origin index field
 		// through the broker
 		receiver.tunnel.SendIn(
-			msg.DKGMessageIn{
+			msg.PrivDKGMessageIn{
 				DKGMessage: dkgMsg,
-				OriginID:   committee[orig],
+				OriginID:   committee[orig].NodeID,
 			},
 		)
 	}
@@ -200,7 +221,7 @@ func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 	)
 	// simulate receiving an incoming message through the broker
 	receiver.tunnel.SendIn(
-		msg.DKGMessageIn{
+		msg.PrivDKGMessageIn{
 			DKGMessage: dkgMsg,
 			OriginID:   unittest.IdentifierFixture(),
 		},
@@ -213,22 +234,21 @@ func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 // data in a DKGMessage (with origin and epochCounter), and that it calls the
 // dkg contract client.
 func TestBroadcastMessage(t *testing.T) {
+	committee, locals := initCommittee(2)
 
 	// sender
 	sender := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
+		locals[orig],
 		orig,
 		&mock.DKGContractClient{},
 		NewBrokerTunnel(),
 	)
 
-	expectedMsg := msg.NewDKGMessage(
-		orig,
-		msgb,
-		dkgInstanceID,
-	)
+	expectedMsg, err := sender.prepareBroadcastMessage(msgb)
+	require.NoError(t, err)
 
 	// check that the dkg contract client is called with the expected message
 	contractClient := &mock.DKGContractClient{}
@@ -244,57 +264,60 @@ func TestBroadcastMessage(t *testing.T) {
 // TestPoll checks that the broker correctly calls the smart contract to fetch
 // broadcast messages, and forwards the messages to the broadcast channel.
 func TestPoll(t *testing.T) {
+	committee, locals := initCommittee(2)
 
-	broker := NewBroker(
+	sender := NewBroker(
 		zerolog.Logger{},
 		dkgInstanceID,
 		committee,
+		locals[orig],
 		orig,
 		&mock.DKGContractClient{},
 		NewBrokerTunnel(),
 	)
 
+	recipient := NewBroker(
+		zerolog.Logger{},
+		dkgInstanceID,
+		committee,
+		locals[dest],
+		dest,
+		&mock.DKGContractClient{},
+		NewBrokerTunnel(),
+	)
+
 	blockID := unittest.IdentifierFixture()
-	expectedMsgs := []msg.DKGMessage{
-		msg.NewDKGMessage(
-			orig,
-			[]byte("message 1"),
-			dkgInstanceID,
-		),
-		msg.NewDKGMessage(
-			orig,
-			[]byte("message 2"),
-			dkgInstanceID,
-		),
-		msg.NewDKGMessage(
-			orig,
-			[]byte("message 3"),
-			dkgInstanceID,
-		),
+	bcastMsgs := []msg.BroadcastDKGMessage{}
+	expectedMsgs := []msg.DKGMessage{}
+	for i := 0; i < 3; i++ {
+		bmsg, err := sender.prepareBroadcastMessage([]byte(fmt.Sprintf("msg%d", i)))
+		require.NoError(t, err)
+		bcastMsgs = append(bcastMsgs, bmsg)
+		expectedMsgs = append(expectedMsgs, bmsg.DKGMessage)
 	}
 
 	// check that the dkg contract client is called correctly
 	contractClient := &mock.DKGContractClient{}
-	contractClient.On("ReadBroadcast", broker.messageOffset, blockID).
-		Return(expectedMsgs, nil).
+	contractClient.On("ReadBroadcast", recipient.messageOffset, blockID).
+		Return(bcastMsgs, nil).
 		Once()
-	broker.dkgContractClient = contractClient
+	sender.dkgContractClient = contractClient
 
 	// launch a background routine to capture messages forwarded to the msgCh
 	receivedMsgs := []msg.DKGMessage{}
 	doneCh := make(chan struct{})
 	go func() {
-		msgCh := broker.GetBroadcastMsgCh()
+		msgCh := sender.GetBroadcastMsgCh()
 		for {
 			msg := <-msgCh
 			receivedMsgs = append(receivedMsgs, msg)
-			if len(receivedMsgs) == len(expectedMsgs) {
+			if len(receivedMsgs) == len(bcastMsgs) {
 				close(doneCh)
 			}
 		}
 	}()
 
-	err := broker.Poll(blockID)
+	err := sender.Poll(blockID)
 	require.NoError(t, err)
 
 	// check that the contract has been correctly called
@@ -305,5 +328,5 @@ func TestPoll(t *testing.T) {
 	require.Equal(t, expectedMsgs, receivedMsgs)
 
 	// check that the message offset has been incremented
-	require.Equal(t, uint(len(expectedMsgs)), broker.messageOffset)
+	require.Equal(t, uint(len(bcastMsgs)), sender.messageOffset)
 }

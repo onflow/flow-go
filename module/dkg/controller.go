@@ -185,19 +185,25 @@ func (c *Controller) Shutdown() {
 	close(c.shutdownCh)
 }
 
-// GetArtifacts returns the private and public shares, as well as the set of
-// public keys computed by DKG.
+// Poll instructs the broker to read new broadcast messages, which will be
+// relayed through the message channel. The function does not return until the
+// received messages are processed.
+func (c *Controller) Poll(blockReference flow.Identifier) error {
+	return c.broker.Poll(blockReference)
+}
+
+// GetArtifacts returns our node's private key share, the group public key,
+// and the list of all nodes' public keys (including ours), as computed by
+// the DKG.
 func (c *Controller) GetArtifacts() (crypto.PrivateKey, crypto.PublicKey, []crypto.PublicKey) {
 	c.artifactsLock.Lock()
 	defer c.artifactsLock.Unlock()
 	return c.privateShare, c.groupPublicKey, c.publicKeys
 }
 
-// Poll instructs the broker to read new broadcast messages, which will be
-// relayed through the message channel. The function does not return until the
-// received messages are processed.
-func (c *Controller) Poll(blockReference flow.Identifier) error {
-	return c.broker.Poll(blockReference)
+// GetIndex returns the index of this node in the DKG committee list.
+func (c *Controller) GetIndex() int {
+	return c.broker.GetIndex()
 }
 
 // SubmitResult instructs the broker to submit DKG results. It is up to the
@@ -219,14 +225,14 @@ func (c *Controller) doBackgroundWork() {
 		select {
 		case msg := <-privateMsgCh:
 			c.dkgLock.Lock()
-			err := c.dkg.HandlePrivateMsg(msg.Orig, msg.Data)
+			err := c.dkg.HandlePrivateMsg(int(msg.Orig), msg.Data)
 			c.dkgLock.Unlock()
 			if err != nil {
 				c.log.Err(err).Msg("error processing DKG private message")
 			}
 		case msg := <-broadcastMsgCh:
 			c.dkgLock.Lock()
-			err := c.dkg.HandleBroadcastMsg(msg.Orig, msg.Data)
+			err := c.dkg.HandleBroadcastMsg(int(msg.Orig), msg.Data)
 			c.dkgLock.Unlock()
 			if err != nil {
 				c.log.Err(err).Msg("error processing DKG broadcast message")

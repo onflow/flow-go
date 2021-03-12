@@ -8,9 +8,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/hasher"
 )
 
 // Broker is an implementation of the DKGBroker interface which is intended to
@@ -20,7 +22,8 @@ type Broker struct {
 	sync.Mutex
 	log               zerolog.Logger
 	dkgInstanceID     string                   // unique identifier of the current dkg run (prevent replay attacks)
-	committee         flow.IdentifierList      // IDs of DKG members
+	committee         flow.IdentityList        // IDs of DKG members
+	me                module.Local             // used for signing bcast messages
 	myIndex           int                      // index of this instance in the committee
 	dkgContractClient module.DKGContractClient // client to communicate with the DKG smart contract
 	tunnel            *BrokerTunnel            // channels through which the broker communicates with the network engine
@@ -35,7 +38,8 @@ type Broker struct {
 func NewBroker(
 	log zerolog.Logger,
 	dkgInstanceID string,
-	committee flow.IdentifierList,
+	committee flow.IdentityList,
+	me module.Local,
 	myIndex int,
 	dkgContractClient module.DKGContractClient,
 	tunnel *BrokerTunnel) *Broker {
@@ -44,6 +48,7 @@ func NewBroker(
 		log:               log.With().Str("component", "broker").Str("dkg_instance_id", dkgInstanceID).Logger(),
 		dkgInstanceID:     dkgInstanceID,
 		committee:         committee,
+		me:                me,
 		myIndex:           myIndex,
 		dkgContractClient: dkgContractClient,
 		tunnel:            tunnel,
@@ -61,6 +66,11 @@ func NewBroker(
 Implement DKGBroker
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+// GetIndex returns the index of this node in the committee list.
+func (b *Broker) GetIndex() int {
+	return b.myIndex
+}
+
 // PrivateSend sends a DKGMessage to a destination over a private channel. It
 // appends the current DKG instance ID to the message.
 func (b *Broker) PrivateSend(dest int, data []byte) {
@@ -68,21 +78,20 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 		b.log.Error().Msgf("destination id out of range: %d", dest)
 		return
 	}
-	dkgMessageOut := messages.DKGMessageOut{
+	dkgMessageOut := messages.PrivDKGMessageOut{
 		DKGMessage: messages.NewDKGMessage(b.myIndex, data, b.dkgInstanceID),
-		DestID:     b.committee[dest],
+		DestID:     b.committee[dest].NodeID,
 	}
 	b.tunnel.SendOut(dkgMessageOut)
 }
 
-// Broadcast broadcasts a message to all participants.
+// Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
-	dkgMessage := messages.NewDKGMessage(
-		b.myIndex,
-		data,
-		b.dkgInstanceID,
-	)
-	err := b.dkgContractClient.Broadcast(dkgMessage)
+	bcastMsg, err := b.prepareBroadcastMessage(data)
+	if err != nil {
+		b.log.Error().Err(err).Msg("could not create broadcast message")
+	}
+	err = b.dkgContractClient.Broadcast(bcastMsg)
 	if err != nil {
 		b.log.Error().Err(err).Msg("could not broadcast message")
 	}
@@ -111,7 +120,7 @@ func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
 }
 
 // Poll calls the DKG smart contract to get missing DKG messages for the current
-// epoch, and forwards them to the msgCh. It should be called with the ID of
+// epoch, and forwards them to the msgCh. It should be called with the ID of a
 // block whose seal is finalized. The function doesn't return until the received
 // messages are processed by the consumer because b.msgCh is not buffered.
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
@@ -122,13 +131,17 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		return fmt.Errorf("could not read broadcast messages: %w", err)
 	}
 	for _, msg := range msgs {
-		err := b.checkMessageInstanceAndOrigin(msg)
+		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
 			b.log.Error().Err(err).Msg("bad broadcast message")
 			continue
 		}
+		if !ok {
+			b.log.Debug().Msg("invalid signature on broadcast dkg message")
+			continue
+		}
 		b.log.Debug().Msgf("forwarding broadcast message to controller")
-		b.broadcastMsgCh <- msg
+		b.broadcastMsgCh <- msg.DKGMessage
 	}
 	b.messageOffset += uint(len(msgs))
 	return nil
@@ -168,7 +181,7 @@ func (b *Broker) onPrivateMessage(originID flow.Identifier, msg messages.DKGMess
 		return
 	}
 	// check that the message's origin matches the sender's flow identifier
-	nodeID := b.committee[msg.Orig]
+	nodeID := b.committee[msg.Orig].NodeID
 	if !bytes.Equal(nodeID[:], originID[:]) {
 		b.log.Error().Msgf("bad message: OriginID (%v) does not match committee member %d (%v)", originID, msg.Orig, nodeID)
 		return
@@ -185,8 +198,44 @@ func (b *Broker) checkMessageInstanceAndOrigin(msg messages.DKGMessage) error {
 		return fmt.Errorf("wrong DKG instance. Got %s, want %s", msg.DKGInstanceID, b.dkgInstanceID)
 	}
 	// check that the message's origin is not out of range
-	if msg.Orig >= len(b.committee) || msg.Orig < 0 {
+	if msg.Orig >= uint64(len(b.committee)) {
 		return fmt.Errorf("origin id out of range: %d", msg.Orig)
 	}
 	return nil
+}
+
+// prepareBroadcastMessage creates BroadcastDKGMessage with a signature from the
+// node's staking key.
+func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMessage, error) {
+	dkgMessage := messages.NewDKGMessage(
+		b.myIndex,
+		data,
+		b.dkgInstanceID,
+	)
+	sigData := fingerprint.Fingerprint(dkgMessage)
+	signature, err := b.me.Sign(sigData[:], hasher.NewDKGMessageHasher())
+	if err != nil {
+		return messages.BroadcastDKGMessage{}, err
+	}
+	bcastMsg := messages.BroadcastDKGMessage{
+		DKGMessage: dkgMessage,
+		Signature:  signature,
+	}
+	return bcastMsg, nil
+}
+
+// verifyBroadcastMessage checks the DKG instance and Origin of a broadcast
+// message, as well as the signature against the staking key of the sender.
+func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
+	err := b.checkMessageInstanceAndOrigin(bcastMsg.DKGMessage)
+	if err != nil {
+		return false, err
+	}
+	origin := b.committee[bcastMsg.Orig]
+	signData := fingerprint.Fingerprint(bcastMsg.DKGMessage)
+	return origin.StakingPubKey.Verify(
+		bcastMsg.Signature,
+		signData[:],
+		hasher.NewDKGMessageHasher(),
+	)
 }

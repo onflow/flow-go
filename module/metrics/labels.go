@@ -44,6 +44,7 @@ const (
 	ResourceGuarantee                = "guarantee"
 	ResourceResult                   = "result"
 	ResourceReceipt                  = "receipt"
+	ResourceMyReceipt                = "my_receipt"
 	ResourceCollection               = "collection"
 	ResourceApproval                 = "approval"
 	ResourceSeal                     = "seal"
@@ -65,10 +66,12 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
+	ResourceDKGKey                   = "dkg-key"
 	ResourceApprovalQueue            = "matching_approval_queue"          // consensus node, matching engine
 	ResourceReceiptQueue             = "matching_receipt_queue"           // consensus node, matching engine
 	ResourceApprovalResponseQueue    = "matching_approval_response_queue" // consensus node, matching engine
-	ResourceDKGKey                   = "dkg-key"
+	ResourceBlockProposalQueue       = "compliance_proposal_queue"        // consensus node, compliance engine
+	ResourceBlockVoteQueue           = "compliance_vote_queue"            // consensus node, compliance engine
 )
 
 const (

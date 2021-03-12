@@ -17,11 +17,11 @@ type DKGContractClient struct {
 }
 
 // Broadcast provides a mock function with given fields: msg
-func (_m *DKGContractClient) Broadcast(msg messages.DKGMessage) error {
+func (_m *DKGContractClient) Broadcast(msg messages.BroadcastDKGMessage) error {
 	ret := _m.Called(msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(messages.DKGMessage) error); ok {
+	if rf, ok := ret.Get(0).(func(messages.BroadcastDKGMessage) error); ok {
 		r0 = rf(msg)
 	} else {
 		r0 = ret.Error(0)
@@ -31,15 +31,15 @@ func (_m *DKGContractClient) Broadcast(msg messages.DKGMessage) error {
 }
 
 // ReadBroadcast provides a mock function with given fields: fromIndex, referenceBlock
-func (_m *DKGContractClient) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.DKGMessage, error) {
+func (_m *DKGContractClient) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BroadcastDKGMessage, error) {
 	ret := _m.Called(fromIndex, referenceBlock)
 
-	var r0 []messages.DKGMessage
-	if rf, ok := ret.Get(0).(func(uint, flow.Identifier) []messages.DKGMessage); ok {
+	var r0 []messages.BroadcastDKGMessage
+	if rf, ok := ret.Get(0).(func(uint, flow.Identifier) []messages.BroadcastDKGMessage); ok {
 		r0 = rf(fromIndex, referenceBlock)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]messages.DKGMessage)
+			r0 = ret.Get(0).([]messages.BroadcastDKGMessage)
 		}
 	}
 

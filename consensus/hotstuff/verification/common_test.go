@@ -66,8 +66,8 @@ func MakeBeaconSigner(t *testing.T,
 	combiner := signature.NewCombiner()
 
 	beacon := signature.NewThresholdProvider(encoding.RandomBeaconTag, beaconKey)
-	signerStore := &module_mock.SignerStore{}
-	signerStore.On("GetSigner", mock.Anything).Return(beacon, nil)
+	signerStore := &module_mock.ThresholdSignerStore{}
+	signerStore.On("GetThresholdSigner", mock.Anything).Return(beacon, nil)
 
 	signer := NewCombinedSigner(committee, staking, verifier, combiner, signerStore, signerID)
 	return signer

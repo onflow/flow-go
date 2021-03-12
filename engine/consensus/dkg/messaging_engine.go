@@ -18,9 +18,9 @@ import (
 type MessagingEngine struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
-	me      module.Local
-	conduit network.Conduit // network conduit for sending and receiving private messages
-	tunnel  *dkg.BrokerTunnel
+	me      module.Local      // local object to identify the node
+	conduit network.Conduit   // network conduit for sending and receiving private messages
+	tunnel  *dkg.BrokerTunnel // tunnel for relaying private messages to and from controllers
 }
 
 // NewMessagingEngine returns a new engine.
@@ -94,7 +94,7 @@ func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) e
 	switch v := event.(type) {
 	case msg.DKGMessage:
 		e.tunnel.SendIn(
-			msg.DKGMessageIn{
+			msg.PrivDKGMessageIn{
 				DKGMessage: v,
 				OriginID:   originID,
 			},

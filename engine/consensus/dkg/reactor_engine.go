@@ -98,33 +98,18 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 
 	epochInfo, err := e.getNextEpochInfo(firstID)
 	if err != nil {
-		e.log.Err(err).Msg("could not retrieve epoch info")
-		panic(err)
+		e.log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
-	committee := epochInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember).NodeIDs()
-	myIndex := -1
-	for i, id := range committee {
-		if id == e.me.NodeID() {
-			myIndex = i
-			break
-		}
-	}
-	if myIndex < 0 {
-		err := fmt.Errorf("dkg-processor engine id does not belong to dkg committee")
-		e.log.Err(err).Msg("bad committee")
-		panic(err)
-	}
+	committee := epochInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
 
 	controller, err := e.controllerFactory.Create(
 		fmt.Sprintf("dkg-%d", counter),
 		committee,
-		myIndex,
 		epochInfo.seed,
 	)
 	if err != nil {
-		e.log.Err(err).Msg("could not create DKG controller")
-		panic(err)
+		e.log.Fatal().Err(err).Msg("could not create DKG controller")
 	}
 	e.controller = controller
 
@@ -132,8 +117,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 		e.log.Info().Msg("DKG Run")
 		err := e.controller.Run()
 		if err != nil {
-			e.log.Err(err).Msg("DKG Run error")
-			panic(err)
+			e.log.Fatal().Err(err).Msg("DKG Run error")
 		}
 	})
 
@@ -162,7 +146,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter, myIndex))
+	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter))
 }
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
@@ -224,7 +208,7 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 
 // registerPhaseTransition instructs the engine to change phases at the
 // specified view.
-func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule.State, callback func() error) {
+func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule.State, phaseTransition func() error) {
 	e.viewEvents.OnView(view, func(header *flow.Header) {
 		e.unit.Launch(func() {
 			e.unit.Lock()
@@ -237,10 +221,9 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 				Logger()
 
 			log.Info().Msgf("ending %s...", fromState)
-			err := callback()
+			err := phaseTransition()
 			if err != nil {
-				log.Error().Err(err).Msgf("failed to end %s", fromState)
-				panic(err)
+				log.Fatal().Err(err).Msgf("failed to end %s", fromState)
 			}
 			log.Info().Msgf("ended %s successfully", fromState)
 		})
@@ -250,7 +233,7 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 // end returns a callback that is used to end the DKG protocol, save the
 // resulting private key to storage, and publish the other results to the DKG
 // smart-contract.
-func (e *ReactorEngine) end(epochCounter uint64, myIndex int) func() error {
+func (e *ReactorEngine) end(epochCounter uint64) func() error {
 	return func() error {
 		err := e.controller.End()
 		if err != nil {
@@ -264,7 +247,7 @@ func (e *ReactorEngine) end(epochCounter uint64, myIndex int) func() error {
 			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
 				PrivateKey: privateShare,
 			},
-			GroupIndex: myIndex,
+			GroupIndex: e.controller.GetIndex(),
 		}
 		err = e.keyStorage.InsertMyDKGPrivateInfo(epochCounter, &privKeyInfo)
 		if err != nil {

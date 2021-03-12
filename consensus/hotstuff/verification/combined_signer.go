@@ -21,7 +21,7 @@ type CombinedSigner struct {
 	*CombinedVerifier
 	staking     module.AggregatingSigner
 	merger      module.Merger
-	signerStore module.SignerStore
+	signerStore module.ThresholdSignerStore
 	signerID    flow.Identifier
 }
 
@@ -37,7 +37,7 @@ func NewCombinedSigner(
 	staking module.AggregatingSigner,
 	verifier module.ThresholdVerifier,
 	merger module.Merger,
-	signerStore module.SignerStore,
+	signerStore module.ThresholdSignerStore,
 	signerID flow.Identifier) *CombinedSigner {
 
 	sc := &CombinedSigner{
@@ -197,7 +197,7 @@ func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not generate first signature: %w", err)
 	}
 
-	beacon, err := c.signerStore.GetSigner(block.View)
+	beacon, err := c.signerStore.GetThresholdSigner(block.View)
 	if err != nil {
 		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
 	}

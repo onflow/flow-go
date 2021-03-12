@@ -58,6 +58,7 @@ type BaseConfig struct {
 	profilerDir      string
 	profilerInterval time.Duration
 	profilerDuration time.Duration
+	tracerEnabled    bool
 }
 
 type Metrics struct {
@@ -114,7 +115,7 @@ type FlowNodeBuilder struct {
 	flags             *pflag.FlagSet
 	Logger            zerolog.Logger
 	Me                *local.Local
-	Tracer            *trace.OpenTracer
+	Tracer            module.Tracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
@@ -158,6 +159,9 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 		"the interval between auto-profiler runs")
 	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second,
 		"the duration to run the auto-profile for")
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
+		"whether to enable tracer")
+
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -301,11 +305,15 @@ func (fnb *FlowNodeBuilder) initLogger() {
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
-	tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
-	fnb.MustNot(err).Msg("could not initialize tracer")
-	fnb.Logger.Info().Msg("Tracer Started")
+
+	fnb.Tracer = trace.NewNoopTracer()
+	if fnb.BaseConfig.tracerEnabled {
+		tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
+		fnb.MustNot(err).Msg("could not initialize tracer")
+		fnb.Logger.Info().Msg("Tracer Started")
+		fnb.Tracer = tracer
+	}
 	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
-	fnb.Tracer = tracer
 
 	mempools := metrics.NewMempoolCollector(5 * time.Second)
 
