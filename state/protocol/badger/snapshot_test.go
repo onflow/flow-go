@@ -436,38 +436,26 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		epoch1Counter := result.ServiceEvents[0].Event.(*flow.EpochSetup).Counter
 		epoch2Counter := epoch1Counter + 1
 
-		// Prepare an epoch builder, which builds epochs with 6 blocks, A,B,C,D,E,F
-		// See EpochBuilder documentation for details of these blocks.
-		//
 		epochBuilder := unittest.NewEpochBuilder(t, state)
-		// build blocks WITHIN epoch 1 - PREPARING epoch 2
-		// A - height 0 (root block)
-		// B - height 1 - staking phase
-		// C - height 2 -
-		// D - height 3 - setup phase
-		// E - height 4 -
-		// F - height 5 - committed phase
+		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
-		// build blocks WITHIN epoch 2 - PREPARING epoch 3
-		// A - height 6 - first block of epoch 2
-		// B - height 7 - staking phase
-		// C - height 8 -
-		// D - height 9 - setup phase
-		// D - height 10 -
-		// D - height 11 - committed phase
+		// build epoch 2 (prepare epoch 3)
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
 
-		epoch1Heights := []uint64{0, 1, 2, 3, 4, 5}
-		epoch2Heights := []uint64{6, 7, 8, 9, 10, 11}
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(t, ok)
+		epoch2, ok := epochBuilder.EpochHeights(2)
+		require.True(t, ok)
 
 		// we should be able to query the current epoch from any block
 		t.Run("Current", func(t *testing.T) {
 			t.Run("epoch 1", func(t *testing.T) {
-				for _, height := range epoch1Heights {
+				for _, height := range epoch1.Range() {
 					counter, err := state.AtHeight(height).Epochs().Current().Counter()
 					require.Nil(t, err)
 					assert.Equal(t, epoch1Counter, counter)
@@ -475,7 +463,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			})
 
 			t.Run("epoch 2", func(t *testing.T) {
-				for _, height := range epoch2Heights {
+				for _, height := range epoch2.Range() {
 					counter, err := state.AtHeight(height).Epochs().Current().Counter()
 					require.Nil(t, err)
 					assert.Equal(t, epoch2Counter, counter)
@@ -487,7 +475,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		// event, afterward we should be able to query next epoch
 		t.Run("Next", func(t *testing.T) {
 			t.Run("epoch 1: before next epoch available", func(t *testing.T) {
-				for _, height := range epoch1Heights[:3] {
+				for _, height := range epoch1.StakingRange() {
 					_, err := state.AtHeight(height).Epochs().Next().Counter()
 					assert.Error(t, err)
 					assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
@@ -495,7 +483,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			})
 
 			t.Run("epoch 2: after next epoch available", func(t *testing.T) {
-				for _, height := range epoch1Heights[3:] {
+				for _, height := range append(epoch1.SetupRange(), epoch1.CommittedRange()...) {
 					counter, err := state.AtHeight(height).Epochs().Next().Counter()
 					require.Nil(t, err)
 					assert.Equal(t, epoch2Counter, counter)
@@ -508,7 +496,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 		// to query previous epoch
 		t.Run("Previous", func(t *testing.T) {
 			t.Run("epoch 1", func(t *testing.T) {
-				for _, height := range epoch1Heights {
+				for _, height := range epoch1.Range() {
 					_, err := state.AtHeight(height).Epochs().Previous().Counter()
 					assert.Error(t, err)
 					assert.True(t, errors.Is(err, protocol.ErrNoPreviousEpoch))
@@ -516,7 +504,7 @@ func TestSnapshot_EpochQuery(t *testing.T) {
 			})
 
 			t.Run("epoch 2", func(t *testing.T) {
-				for _, height := range epoch2Heights {
+				for _, height := range epoch2.Range() {
 					counter, err := state.AtHeight(height).Epochs().Previous().Counter()
 					require.Nil(t, err)
 					assert.Equal(t, epoch1Counter, counter)

@@ -20,6 +20,38 @@ type EpochHeights struct {
 	Committed uint64 // first height of committed phase
 }
 
+// Range returns the range of all heights that are in this epoch.
+func (epoch EpochHeights) Range() []uint64 {
+	var heights []uint64
+	for height := epoch.Staking; height <= epoch.Committed; height++ {
+		heights = append(heights, height)
+	}
+	return heights
+}
+
+// StakingRange returns the range of all heights in the staking phase.
+func (epoch EpochHeights) StakingRange() []uint64 {
+	var heights []uint64
+	for height := epoch.Staking; height < epoch.Setup; height++ {
+		heights = append(heights, height)
+	}
+	return heights
+}
+
+// SetupRange returns the range of all heights in the setup phase.
+func (epoch EpochHeights) SetupRange() []uint64 {
+	var heights []uint64
+	for height := epoch.Setup; height < epoch.Committed; height++ {
+		heights = append(heights, height)
+	}
+	return heights
+}
+
+// CommittedRange returns the range of all heights in the committed phase.
+func (epoch EpochHeights) CommittedRange() []uint64 {
+	return []uint64{epoch.Committed}
+}
+
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
