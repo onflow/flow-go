@@ -105,13 +105,20 @@ func (i *TransactionInvocator) Process(
 	}
 	retry := false
 	numberOfRetries := 0
+	parentState := sth.State()
+	childState := sth.NewChild()
+	defer func() {
+		if mergeError := parentState.MergeState(childState); mergeError != nil {
+			panic(mergeError)
+		}
+		sth.SetActiveState(parentState)
+	}()
+
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		if retry {
 			// rest state
-			rollUpError := sth.RollUpNoMerge()
-			if rollUpError != nil {
-				return rollUpError
-			}
+			sth.SetActiveState(parentState)
+			childState = sth.NewChild()
 			// force cleanup if retries
 			programs.ForceCleanup()
 
@@ -131,7 +138,6 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		sth.Nest()
 		env, err = newEnvironment(ctx, vm, sth, programs)
 		// env construction error is fatal
 		if err != nil {
@@ -188,10 +194,8 @@ func (i *TransactionInvocator) Process(
 	programs.Cleanup(updatedKeys)
 
 	if txError != nil {
-		err = sth.RollUpWithMergeNoDelta()
-		if err != nil {
-			return err
-		}
+		// drop delta
+		childState.View().DropDelta()
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
 		i.logger.Info().
@@ -200,12 +204,6 @@ func (i *TransactionInvocator) Process(
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
 		return txError
-	}
-
-	// don't roll up with true for failed tx
-	err = sth.RollUpWithMerge()
-	if err != nil {
-		return err
 	}
 
 	proc.Events = env.getEvents()

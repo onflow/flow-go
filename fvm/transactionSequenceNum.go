@@ -40,7 +40,15 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		defer span.Finish()
 	}
 
-	sth.Nest()
+	parentState := sth.State()
+	childState := sth.NewChild()
+	defer func() {
+		if mergeError := parentState.MergeState(childState); mergeError != nil {
+			panic(mergeError)
+		}
+		sth.SetActiveState(parentState)
+	}()
+
 	accounts := state.NewAccounts(sth)
 	proposalKey := proc.Transaction.ProposalKey
 
@@ -78,8 +86,10 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
+		// drop the changes
+		childState.View().DropDelta()
 		return err
 	}
 
-	return sth.RollUpWithMerge()
+	return nil
 }

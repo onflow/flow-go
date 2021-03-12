@@ -47,8 +47,6 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	}
 
 	tx := proc.Transaction
-
-	sth.Nest()
 	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
@@ -106,7 +104,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	return sth.RollUpWithMerge()
+	return nil
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

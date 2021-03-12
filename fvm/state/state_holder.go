@@ -1,7 +1,5 @@
 package state
 
-import "fmt"
-
 // StateHolder provides active states
 // and facilitates common state management operations
 // in order to make services such as accounts not worry about
@@ -27,61 +25,17 @@ func (s *StateHolder) State() *State {
 	return s.activeState
 }
 
-// StartState returns the start state
-func (s *StateHolder) StartState() *State {
-	return s.startState
+// SetActiveState sets active state
+func (s *StateHolder) SetActiveState(st *State) {
+	s.activeState = st
 }
 
-// MergeStateIntoActiveState allows to merge any given state into the active state
-func (s *StateHolder) MergeStateIntoActiveState(other *State) error {
-	return s.activeState.MergeState(other)
-}
-
-// Nest creates a child state and set it as the active state
-func (s *StateHolder) Nest() {
+// NewChild constructs a new child of active state
+// and set it as active state and return it
+// this is basically a utility function for common
+// operations
+func (s *StateHolder) NewChild() *State {
 	new := s.activeState.NewChild()
-	s.parents[new] = s.activeState
 	s.activeState = new
-}
-
-// RollUpWithMerge merges the active state into its parent and set the parent as the
-// new active state.
-func (s *StateHolder) RollUpWithMerge() error {
-	if s.parents[s.activeState] == nil {
-		return fmt.Errorf("parent not exist for this state")
-	}
-
-	err := s.parents[s.activeState].MergeState(s.activeState)
-	if err != nil {
-		return err
-	}
-
-	s.activeState = s.parents[s.activeState]
-	return nil
-}
-
-// RollUpWithMergeNoDelta merges the active state into its parent but drops the delta.
-func (s *StateHolder) RollUpWithMergeNoDelta() error {
-	if s.parents[s.activeState] == nil {
-		return fmt.Errorf("parent not exist for this state")
-	}
-
-	s.activeState.View().DropDelta()
-	err := s.parents[s.activeState].MergeState(s.activeState)
-	if err != nil {
-		return err
-	}
-
-	s.activeState = s.parents[s.activeState]
-	return nil
-}
-
-// RollUpNoMerge ignores the current active state
-// and sets the parent as the active state
-func (s *StateHolder) RollUpNoMerge() error {
-	if s.parents[s.activeState] == nil {
-		return fmt.Errorf("parent not exist for this state")
-	}
-	s.activeState = s.parents[s.activeState]
-	return nil
+	return s.startState
 }
