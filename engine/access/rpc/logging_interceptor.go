@@ -11,7 +11,7 @@ import (
 
 func customClientCodeToLevel(code codes.Code) logging.Level {
 	switch code {
-	case codes.OK, codes.ResourceExhausted, codes.Internal:
+	case codes.OK, codes.ResourceExhausted, codes.Internal, codes.Unknown:
 		return logging.DEBUG
 	default:
 		return logging.DefaultServerCodeToLevel(code)
