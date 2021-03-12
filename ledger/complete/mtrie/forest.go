@@ -126,11 +126,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
 	})
 
-	payloads, err := trie.UnsafeRead(sortedPaths)
-
-	if err != nil {
-		return nil, err
-	}
+	payloads := trie.UnsafeRead(sortedPaths)
 
 	totalPayloadSize := 0
 
@@ -286,10 +282,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		p.Inclusion = false
 	}
 
-	err = stateTrie.UnsafeProofs(sortedPaths, bp.Proofs)
-	if err != nil {
-		return nil, err
-	}
+	stateTrie.UnsafeProofs(sortedPaths, bp.Proofs)
 
 	// reconstruct the proofs in the same key order that called the method
 	retbp := ledger.NewTrieBatchProofWithEmptyProofs(len(r.Paths))

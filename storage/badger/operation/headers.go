@@ -16,10 +16,13 @@ func RetrieveHeader(blockID flow.Identifier, header *flow.Header) func(*badger.T
 	return retrieve(makePrefix(codeHeader, blockID), header)
 }
 
+// IndexBlockHeight indexes the height of a block. It should only be called on
+// finalized blocks.
 func IndexBlockHeight(height uint64, blockID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeHeightToBlock, height), blockID)
 }
 
+// LookupBlockHeight retrieves finalized blocks by height.
 func LookupBlockHeight(height uint64, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHeightToBlock, height), blockID)
 }
@@ -51,9 +54,23 @@ func IndexCollectionBlock(collID flow.Identifier, blockID flow.Identifier) func(
 	return insert(makePrefix(codeCollectionBlock, collID), blockID)
 }
 
+func IndexBlockIDByChunkID(chunkID, blockID flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
+}
+
+// BatchIndexBlockByChunkID indexes blockID by chunkID into a batch
+func BatchIndexBlockByChunkID(blockID, chunkID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
+}
+
 // LookupCollectionBlock looks up a block by a collection within that block.
 func LookupCollectionBlock(collID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollectionBlock, collID), blockID)
+}
+
+// LookupBlockIDByChunkID looks up a block by a collection within that block.
+func LookupBlockIDByChunkID(chunkID flow.Identifier, blockID *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexBlockByChunkID, chunkID), blockID)
 }
 
 // FindHeaders iterates through all headers, calling `filter` on each, and adding

@@ -103,18 +103,11 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
-		if i != s.currentIndex {
-			s.fvss[i].running = false
-			err := s.fvss[i].Start(seed)
-			if err != nil {
-				return fmt.Errorf("error when starting dkg: %w", err)
-			}
+		s.fvss[i].running = false
+		err := s.fvss[i].Start(seed)
+		if err != nil {
+			return fmt.Errorf("error when starting dkg: %w", err)
 		}
-	}
-	s.fvss[s.currentIndex].running = false
-	err := s.fvss[s.currentIndex].Start(seed)
-	if err != nil {
-		return fmt.Errorf("error when starting dkg: %w", err)
 	}
 	s.jointRunning = true
 	return nil
@@ -201,14 +194,29 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	return x, Y, y, nil
 }
 
-// HandleMsg processes a new message received by the current node
+// HandleBroadcastMsg processes a new broadcasted message received by the current node
 // orig is the message origin index
-func (s *JointFeldmanState) HandleMsg(orig int, msg []byte) error {
+func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
 		return errors.New("dkg protocol is not running")
 	}
 	for i := index(0); int(i) < s.size; i++ {
-		err := s.fvss[i].HandleMsg(orig, msg)
+		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
+		if err != nil {
+			return fmt.Errorf("handle message has failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// HandlePrivateMsg processes a new private message received by the current node
+// orig is the message origin index
+func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
+	if !s.jointRunning {
+		return errors.New("dkg protocol is not running")
+	}
+	for i := index(0); int(i) < s.size; i++ {
+		err := s.fvss[i].HandlePrivateMsg(orig, msg)
 		if err != nil {
 			return fmt.Errorf("handle message has failed: %w", err)
 		}
@@ -229,12 +237,12 @@ func (s *JointFeldmanState) ForceDisqualify(node int) error {
 	if !s.jointRunning {
 		return errors.New("dkg is not running")
 	}
-	for i := 0; i < s.size; i++ {
-		err := s.fvss[i].ForceDisqualify(node)
-		if err != nil {
-			return fmt.Errorf("disqualif has failed: %w", err)
-		}
+	// disqualify the node in the fvss instance where they are a leader
+	err := s.fvss[node].ForceDisqualify(node)
+	if err != nil {
+		return fmt.Errorf("disqualif has failed: %w", err)
 	}
+
 	return nil
 }
 

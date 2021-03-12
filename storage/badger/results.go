@@ -104,6 +104,21 @@ func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(result))
 }
 
+func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		return operation.BatchInsertExecutionResult(result)(writeBatch)
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
+}
+
+func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		return operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
+
+}
+
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()

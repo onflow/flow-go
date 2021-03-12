@@ -36,12 +36,18 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.InitialState()))
+	programs := fvm.NewEmptyPrograms()
 
 	vm := fvm.New(runtime.NewInterpreterRuntime())
 
 	ctx := fvm.NewContext(b.logger, fvm.WithChain(chain))
 
-	err := vm.Run(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
+	bootstrap := fvm.Bootstrap(
+		servicePublicKey,
+		fvm.WithInitialTokenSupply(initialTokenSupply),
+	)
+
+	err := vm.Run(ctx, bootstrap, view, programs)
 	if err != nil {
 		return nil, err
 	}

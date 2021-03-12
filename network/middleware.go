@@ -9,6 +9,14 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
+// Topic is the internal type of Libp2p which corresponds to the Channel in the network level.
+// It is a virtual medium enabling nodes to subscribe and communicate over epidemic dissemination.
+type Topic string
+
+func (t Topic) String() string {
+	return string(t)
+}
+
 // Middleware represents the middleware layer, which manages the connections to
 // our direct neighbours on the network. It handles the creation & teardown of
 // connections, as well as reading & writing to/from the connections.
@@ -26,7 +34,7 @@ type Middleware interface {
 	// Deprecated: Send exists for historical compatibility, and should not be used on new
 	// developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
 	// Publish are recommended instead.
-	Send(channelID string, msg *message.Message, targetIDs ...flow.Identifier) error
+	Send(channel Channel, msg *message.Message, targetIDs ...flow.Identifier) error
 
 	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
@@ -36,16 +44,16 @@ type Middleware interface {
 	// a more efficient candidate.
 	SendDirect(msg *message.Message, targetID flow.Identifier) error
 
-	// Publish publishes msg on the channel. It models a distributed broadcast where the message is meant for all or
-	// a many nodes subscribing to the channel ID. It does not guarantee the delivery though, and operates on a best
+	// Publish publishes a message on the channel. It models a distributed broadcast where the message is meant for all or
+	// a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 	// effort.
-	Publish(msg *message.Message, channelID string) error
+	Publish(msg *message.Message, channel Channel) error
 
-	// Subscribe will subscribe the middleware for a topic with the fully qualified channel ID name
-	Subscribe(channelID string) error
+	// Subscribe subscribes the middleware to a channel.
+	Subscribe(channel Channel) error
 
-	// Unsubscribe will unsubscribe the middleware for a topic with the fully qualified channel ID name
-	Unsubscribe(channelID string) error
+	// Unsubscribe unsubscribes the middleware from a channel.
+	Unsubscribe(channel Channel) error
 
 	// Ping pings the target node and returns the ping RTT or an error
 	Ping(targetID flow.Identifier) (time.Duration, error)

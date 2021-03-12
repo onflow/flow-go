@@ -7,12 +7,14 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,11 +24,12 @@ import (
 // Sporking can be supported by two ways:
 // 1. Updating the network key of a node after it is moved from the old chain to the new chain
 // 2. Updating the Flow Libp2p protocol ID suffix to prevent one-to-one messaging across sporks and
-//    updating the channel ID suffix to prevent one-to-K messaging (PubSub) across sporks.
+//    updating the channel suffix to prevent one-to-K messaging (PubSub) across sporks.
 // 1 and 2 both can independently ensure that nodes from the old chain cannot communicate with nodes on the new chain
 // These tests are just to reconfirm the network behaviour and provide a test bed for future tests for sporking, if needed
 type SporkingTestSuite struct {
-	LibP2PNodeTestSuite
+	suite.Suite
+	logger zerolog.Logger
 }
 
 func TestSporkingTestSuite(t *testing.T) {
@@ -39,14 +42,14 @@ func TestSporkingTestSuite(t *testing.T) {
 func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
-	node1, id1 := suite.NodeFixture(node1key, rootBlockID, nil, false, defaultAddress)
-	defer suite.StopNode(node1)
+	node1, id1 := NodeFixture(suite.T(), suite.logger, node1key, rootBlockID, nil, false, defaultAddress)
+	defer StopNode(suite.T(), node1)
 	suite.T().Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
 	suite.T().Logf("libp2p ID for %s: %s", node1.id.String(), node1.host.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
-	node2, id2 := suite.NodeFixture(node2key, rootBlockID, nil, false, defaultAddress)
+	node2, id2 := NodeFixture(suite.T(), suite.logger, node2key, rootBlockID, nil, false, defaultAddress)
 
 	// create stream from node 1 to node 2
 	testOneToOneMessagingSucceeds(suite.T(), node1, id2)
@@ -54,13 +57,13 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
 	// stop node 2 and start it again with a different networking key but on the same IP and port
-	suite.StopNode(node2)
+	StopNode(suite.T(), node2)
 
 	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := generateNetworkingKey(suite.T())
 	assert.False(suite.T(), node2key.Equals(node2keyNew))
-	node2, id2New := suite.NodeFixture(node2keyNew, rootBlockID, nil, false, id2.Address)
-	defer suite.StopNode(node2)
+	node2, id2New := NodeFixture(suite.T(), suite.logger, node2keyNew, rootBlockID, nil, false, id2.Address)
+	defer StopNode(suite.T(), node2)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(suite.T(), id2New.Address, id2.Address)
@@ -80,12 +83,12 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
-	node1, id1 := suite.NodeFixture(node1key, rootID1, nil, false, defaultAddress)
-	defer suite.StopNode(node1)
+	node1, id1 := NodeFixture(suite.T(), suite.logger, node1key, rootID1, nil, false, defaultAddress)
+	defer StopNode(suite.T(), node1)
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
-	node2, id2 := suite.NodeFixture(node2key, rootID1, nil, false, defaultAddress)
+	node2, id2 := NodeFixture(suite.T(), suite.logger, node2key, rootID1, nil, false, defaultAddress)
 
 	// create stream from node 2 to node 1
 	testOneToOneMessagingSucceeds(suite.T(), node2, id1)
@@ -93,14 +96,14 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
-	suite.StopNode(node2)
+	StopNode(suite.T(), node2)
 
 	// update the flow root id for node 2. node1 is still listening on the old protocol
 	rootID2 := unittest.BlockFixture().ID().String()
 
 	// start node2 with the same address and root key but different root block id
-	node2, id2New := suite.NodeFixture(node2key, rootID2, nil, false, id2.Address)
-	defer suite.StopNode(node2)
+	node2, id2New := NodeFixture(suite.T(), suite.logger, node2key, rootID2, nil, false, id2.Address)
+	defer StopNode(suite.T(), node2)
 
 	// make sure the node2 indeed came up on the old ip and port
 	assert.Equal(suite.T(), id2New.Address, id2.Address)
@@ -111,7 +114,7 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 }
 
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
-// if the channel ID is updated while the network keys are kept the same.
+// if the channel is updated while the network keys are kept the same.
 func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// root id before spork
@@ -119,19 +122,19 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
-	node1, _ := suite.NodeFixture(node1key, rootIDBeforeSpork, nil, false, defaultAddress)
-	defer suite.StopNode(node1)
+	node1, _ := NodeFixture(suite.T(), suite.logger, node1key, rootIDBeforeSpork, nil, false, defaultAddress)
+	defer StopNode(suite.T(), node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2key := generateNetworkingKey(suite.T())
-	node2, id2 := suite.NodeFixture(node2key, rootIDBeforeSpork, nil, false, defaultAddress)
-	defer suite.StopNode(node2)
+	node2, id2 := NodeFixture(suite.T(), suite.logger, node2key, rootIDBeforeSpork, nil, false, defaultAddress)
+	defer StopNode(suite.T(), node2)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// spork topic is derived by suffixing the channelID with the root block ID
-	topicBeforeSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDBeforeSpork)
+	// spork topic is derived by suffixing the channel with the root block ID
+	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDBeforeSpork)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err := node1.Subscribe(ctx, topicBeforeSpork)
@@ -153,7 +156,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	rootIDAfterSpork := unittest.BlockFixture().ID().String()
 
 	// topic after the spork
-	topicAfterSpork := engine.FullyQualifiedChannelName(engine.TestNetwork, rootIDAfterSpork)
+	topicAfterSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDAfterSpork)
 
 	// mimic that node1 now is now part of the new spork while node2 remains on the old spork
 	// by unsubscribing node1 from 'topicBeforeSpork' and subscribing it to 'topicAfterSpork'
@@ -188,7 +191,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic string) {
+	topic network.Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")
@@ -209,7 +212,7 @@ func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
 	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
-	topic string) {
+	topic network.Topic) {
 
 	// send a 1-k message from source node to destination node
 	payload := []byte("hello")

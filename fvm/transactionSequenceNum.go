@@ -3,8 +3,10 @@ package fvm
 import (
 	"errors"
 
+	"github.com/opentracing/opentracing-go/log"
+
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSequenceNumberChecker struct{}
@@ -18,17 +20,28 @@ func (c *TransactionSequenceNumberChecker) Process(
 	ctx Context,
 	proc *TransactionProcedure,
 	st *state.State,
+	programs *Programs,
 ) error {
 
-	return c.checkAndIncrementSequenceNumber(proc.Transaction, st)
+	return c.checkAndIncrementSequenceNumber(proc, ctx, st)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
-	tx *flow.TransactionBody,
+	proc *TransactionProcedure,
+	ctx Context,
 	st *state.State,
 ) error {
+
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
+		span.LogFields(
+			log.String("transaction.ID", proc.ID.String()),
+		)
+		defer span.Finish()
+	}
+
 	accounts := state.NewAccounts(st)
-	proposalKey := tx.ProposalKey
+	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
@@ -63,11 +76,6 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	accountKey.SeqNumber++
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
-	if err != nil {
-		return err
-	}
-
-	err = st.Commit()
 	if err != nil {
 		return err
 	}

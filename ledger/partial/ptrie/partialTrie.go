@@ -123,21 +123,15 @@ func NewPSMT(
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
 			v := common.GetDefaultHashForHeight(currentNode.height - 1)
-			flagIsSet, err := utils.IsBitSet(pr.Flags, j)
-			if err != nil {
-				return nil, err
-			}
-			if flagIsSet {
+			flag := utils.Bit(pr.Flags, j)
+			if flag == 1 {
 				// use the proof at index proofIndex
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bitIsSet, err := utils.IsBitSet(path, j)
-			if err != nil {
-				return nil, err
-			}
+			bit := utils.Bit(path, j)
 			// look at the bit number j (left to right) for branching
-			if bitIsSet { // right branching
+			if bit == 1 { // right branching
 				if currentNode.lChild == nil { // check left child
 					currentNode.lChild = newNode(v, currentNode.height-1)
 				}

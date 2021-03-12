@@ -56,8 +56,13 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			}
 			txResults = append(txResults, expected)
 		}
-		err := store.BatchStore(blockID, txResults)
-		require.Nil(t, err)
+		writeBatch := db.NewWriteBatch()
+		err := store.BatchStore(blockID, txResults, writeBatch)
+		require.NoError(t, err)
+
+		err = writeBatch.Flush()
+		require.NoError(t, err)
+
 		for _, txResult := range txResults {
 			actual, err := store.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 			require.Nil(t, err)

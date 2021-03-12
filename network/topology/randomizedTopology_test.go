@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -23,7 +22,6 @@ type RandomizedTopologyTestSuite struct {
 	state    protocol.State    // represents a mocked protocol state
 	all      flow.IdentityList // represents the identity list of all nodes in the system
 	clusters flow.ClusterList  // represents list of cluster ids of collection nodes
-	subMngr  []network.SubscriptionManager
 	logger   zerolog.Logger
 	edgeProb float64
 }
@@ -52,26 +50,24 @@ func (suite *RandomizedTopologyTestSuite) SetupTest() {
 	// mocks state for collector nodes topology
 	suite.state, suite.clusters = MockStateForCollectionNodes(suite.T(),
 		suite.all.Filter(filter.HasRole(flow.RoleCollection)), uint(nClusters))
-
-	suite.subMngr = MockSubscriptionManager(suite.T(), suite.all)
 }
 
 // TestUnhappyInitialization concerns initializing randomized topology with unhappy inputs.
 func (suite *RandomizedTopologyTestSuite) TestUnhappyInitialization() {
 	// initializing with zero edge probability should return an err
-	_, err := NewRandomizedTopology(suite.all[0].NodeID, suite.logger, 0, suite.state, suite.subMngr[0])
+	_, err := NewRandomizedTopology(suite.all[0].NodeID, suite.logger, 0, suite.state)
 	require.Error(suite.T(), err)
 
 	// initializing with negative edge probability should return an err
-	_, err = NewRandomizedTopology(suite.all[0].NodeID, suite.logger, -0.5, suite.state, suite.subMngr[0])
+	_, err = NewRandomizedTopology(suite.all[0].NodeID, suite.logger, -0.5, suite.state)
 	require.Error(suite.T(), err)
 
 	// initializing with zero edge probability below 0.01 should return an err
-	_, err = NewRandomizedTopology(suite.all[0].NodeID, suite.logger, 0.009, suite.state, suite.subMngr[0])
+	_, err = NewRandomizedTopology(suite.all[0].NodeID, suite.logger, 0.009, suite.state)
 	require.Error(suite.T(), err)
 
 	// initializing with zero edge probability above 1 should return an err
-	_, err = NewRandomizedTopology(suite.all[0].NodeID, suite.logger, 1.0001, suite.state, suite.subMngr[0])
+	_, err = NewRandomizedTopology(suite.all[0].NodeID, suite.logger, 1.0001, suite.state)
 	require.Error(suite.T(), err)
 }
 
@@ -93,10 +89,10 @@ func (suite *RandomizedTopologyTestSuite) TestUnhappyInitialization() {
 func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 	var previous, current []string
 
-	topics := engine.ChannelIDsByRole(flow.RoleConsensus)
+	topics := engine.ChannelsByRole(flow.RoleConsensus)
 	require.Greater(suite.T(), len(topics), 1)
 
-	for i, identity := range suite.all {
+	for _, identity := range suite.all {
 		if identity.Role != flow.RoleConsensus {
 			continue
 		}
@@ -105,7 +101,7 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 		current = nil
 
 		// creates and samples a new topic aware topology for the first topic of consensus nodes
-		top, err := NewRandomizedTopology(identity.NodeID, suite.logger, suite.edgeProb, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(identity.NodeID, suite.logger, suite.edgeProb, suite.state)
 		require.NoError(suite.T(), err)
 		ids, err := top.subsetChannel(suite.all, topics[0])
 		require.NoError(suite.T(), err)
@@ -127,56 +123,56 @@ func (suite *RandomizedTopologyTestSuite) TestUniqueness() {
 	}
 }
 
-// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
-// non-cluster channel ID are individually connected.
-func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannelID() {
-	channelID := engine.TestNetwork
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+// TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
+// non-cluster channel are individually connected.
+func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannel() {
+	channel := engine.TestNetwork
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
-	for i, id := range suite.all {
+	for _, id := range suite.all {
 		// creates a topic-based topology for node
-		top, err := NewRandomizedTopology(id.NodeID, suite.logger, suite.edgeProb, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(id.NodeID, suite.logger, suite.edgeProb, suite.state)
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, channelID)
+		subset, err := top.subsetChannel(suite.all, channel)
 		require.NoError(suite.T(), err)
 
 		uniquenessCheck(suite.T(), subset)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
-	connectednessByChannelID(suite.T(), channelIDAdjMap, suite.all, channelID)
+	connectednessByChannel(suite.T(), channelAdjMap, suite.all, channel)
 }
 
-// TestConnectedness_NonClusterChannelID checks whether graph components corresponding to a
-// cluster channel ID are individually connected.
-func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
-	// picks one cluster channel ID as sample
-	channelID := clusterChannelIDs(suite.T())[0]
+// TestConnectedness_NonClusterChannel checks whether graph components corresponding to a
+// cluster channel are individually connected.
+func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannel() {
+	// picks one cluster channel as sample
+	channel := clusterChannels(suite.T())[0]
 
-	// adjacency map keeps graph component of a single channel ID
-	channelIDAdjMap := make(map[flow.Identifier]flow.IdentityList)
+	// adjacency map keeps graph component of a single channel
+	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)
 
 	// iterates over collection nodes
-	for i, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
+	for _, id := range suite.all.Filter(filter.HasRole(flow.RoleCollection)) {
 		// creates a randomized topology for node
-		top, err := NewRandomizedTopology(id.NodeID, suite.logger, suite.edgeProb, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(id.NodeID, suite.logger, suite.edgeProb, suite.state)
 		require.NoError(suite.T(), err)
 
 		// samples subset of topology
-		subset, err := top.subsetChannel(suite.all, channelID)
+		subset, err := top.subsetChannel(suite.all, channel)
 		require.NoError(suite.T(), err)
 
 		uniquenessCheck(suite.T(), subset)
 
-		channelIDAdjMap[id.NodeID] = subset
+		channelAdjMap[id.NodeID] = subset
 	}
 
 	for _, cluster := range suite.clusters {
-		connectedByCluster(suite.T(), channelIDAdjMap, suite.all, cluster)
+		connectedByCluster(suite.T(), channelAdjMap, suite.all, cluster)
 	}
 }
 
@@ -184,7 +180,7 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannelID() {
 // is empty returns an error.
 func (suite *RandomizedTopologyTestSuite) TestSampleFanout_EmptyAllSet() {
 	// creates a topology for the node
-	top, err := NewRandomizedTopology(suite.all[0].NodeID, suite.logger, suite.edgeProb, suite.state, suite.subMngr[0])
+	top, err := NewRandomizedTopology(suite.all[0].NodeID, suite.logger, suite.edgeProb, suite.state)
 	require.NoError(suite.T(), err)
 
 	// sampling with empty `all`
@@ -200,9 +196,9 @@ func (suite *RandomizedTopologyTestSuite) TestSampleFanout_EmptyAllSet() {
 // a connected graph.
 func (suite *RandomizedTopologyTestSuite) TestSampleFanoutConnectedness() {
 	adjMap := make(map[flow.Identifier]flow.IdentityList)
-	for i, id := range suite.all {
+	for _, id := range suite.all {
 		// creates a topology for the node
-		top, err := NewRandomizedTopology(id.NodeID, suite.logger, suite.edgeProb, suite.state, suite.subMngr[i])
+		top, err := NewRandomizedTopology(id.NodeID, suite.logger, suite.edgeProb, suite.state)
 		require.NoError(suite.T(), err)
 
 		// samples a graph and stores it in adjacency map

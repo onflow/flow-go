@@ -16,10 +16,10 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
-	mock2 "github.com/onflow/flow-go/engine/testutil/mock"
+	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/utils"
-	chmodel "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -72,7 +72,7 @@ func VerificationHappyPath(t *testing.T,
 	identities = append(identities, verIdentities...)
 
 	// creates verification nodes
-	verNodes := make([]mock2.VerificationNode, 0)
+	verNodes := make([]enginemock.VerificationNode, 0)
 	assigner := &mock.ChunkAssigner{}
 	for _, verIdentity := range verIdentities {
 		verNode := testutil.VerificationNode(t,
@@ -116,13 +116,13 @@ func VerificationHappyPath(t *testing.T,
 		require.Equal(t, root, rootBlock)
 
 		// extends state of node by block of `completeER`.
-		err = node.State.Extend(completeER.Block)
+		err = node.State.Extend(completeER.ReferenceBlock)
 		assert.Nil(t, err)
 	}
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	a := chmodel.NewAssignment()
+	a := chunks.NewAssignment()
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
 		assignees := make([]flow.Identifier, 0)
 		for _, verIdentity := range verIdentities {
@@ -150,7 +150,7 @@ func VerificationHappyPath(t *testing.T,
 	verWG := sync.WaitGroup{}
 	for _, verNode := range verNodes {
 		verWG.Add(1)
-		go func(vn mock2.VerificationNode, receipt *flow.ExecutionReceipt) {
+		go func(vn enginemock.VerificationNode, receipt *flow.ExecutionReceipt) {
 			defer verWG.Done()
 			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
 			require.NoError(t, err)
@@ -170,7 +170,7 @@ func VerificationHappyPath(t *testing.T,
 		assert.True(t, ok)
 		verNet.StartConDev(requestInterval, true)
 		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-			return m.ChannelID == engine.RequestCollections
+			return m.Channel == engine.RequestCollections
 		})
 
 		verNets = append(verNets, verNet)
@@ -235,7 +235,7 @@ func SetupMockExeNode(t *testing.T,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	chainID flow.ChainID,
-	completeER utils.CompleteExecutionResult) (*mock2.GenericNode, *mocknetwork.Engine) {
+	completeER utils.CompleteExecutionResult) (*enginemock.GenericNode, *mocknetwork.Engine) {
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity, chainID)
@@ -312,7 +312,7 @@ func SetupMockConsensusNode(t *testing.T,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	completeER utils.CompleteExecutionResult,
-	chainID flow.ChainID) (*mock2.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
+	chainID flow.ChainID) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
 	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
@@ -485,7 +485,7 @@ func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecu
 
 	return &verification.VerifiableChunkData{
 		Chunk:         er.Receipt.ExecutionResult.Chunks[chunkIndex],
-		Header:        er.Block.Header,
+		Header:        er.ReferenceBlock.Header,
 		Result:        &er.Receipt.ExecutionResult,
 		Collection:    er.Collections[chunkIndex],
 		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
@@ -504,4 +504,54 @@ func IsAssigned(index uint64, chunkNum int) bool {
 // the receipt.
 func isSystemChunk(index uint64, chunkNum int) bool {
 	return int(index) == chunkNum-1
+}
+
+func CreateExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
+	result := &flow.ExecutionResult{
+		BlockID: blockID,
+		Chunks:  flow.ChunkList{},
+	}
+	assignments := chunks.NewAssignment()
+
+	for _, option := range options {
+		option(result, assignments)
+	}
+	return result, assignments
+}
+
+func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
+	return func(result *flow.ExecutionResult, assignment *chunks.Assignment) {
+		for i, setAssignee := range setAssignees {
+			chunk := setAssignee(result.BlockID, uint64(i), assignment)
+			result.Chunks.Insert(chunk)
+		}
+	}
+}
+
+func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
+	chunk := &flow.Chunk{
+		Index: uint64(index),
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: uint(index),
+			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
+			BlockID:         blockID,
+		},
+		EndState: unittest.StateCommitmentFixture(),
+	}
+	return chunk
+}
+
+func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk {
+	return func(blockID flow.Identifier, index uint64, assignment *chunks.Assignment) *flow.Chunk {
+		chunk := ChunkWithIndex(blockID, int(index))
+		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
+		assignment.Add(chunk, flow.IdentifierList{assignee})
+		return chunk
+	}
+}
+
+func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
+	return flow.ChunkDataPack{
+		ChunkID: chunkID,
+	}
 }

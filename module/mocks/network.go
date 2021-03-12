@@ -37,7 +37,7 @@ func (m *MockNetwork) EXPECT() *MockNetworkMockRecorder {
 }
 
 // Register mocks base method
-func (m *MockNetwork) Register(arg0 string, arg1 network.Engine) (network.Conduit, error) {
+func (m *MockNetwork) Register(arg0 network.Channel, arg1 network.Engine) (network.Conduit, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", arg0, arg1)
 	ret0, _ := ret[0].(network.Conduit)
@@ -191,4 +191,16 @@ func (m *MockRequester) Force() {
 func (mr *MockRequesterMockRecorder) Force() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Force", reflect.TypeOf((*MockRequester)(nil).Force))
+}
+
+// Query mocks base method
+func (m *MockRequester) Query(arg0 flow.Identifier, arg1 flow.IdentityFilter) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Query", arg0, arg1)
+}
+
+// Query indicates an expected call of Query
+func (mr *MockRequesterMockRecorder) Query(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Query", reflect.TypeOf((*MockRequester)(nil).Query), arg0, arg1)
 }

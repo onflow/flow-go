@@ -93,7 +93,7 @@ generate-proto:
 
 .PHONY: generate-mocks
 generate-mocks:
-	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Payloads,Collections,Commits,Events,TransactionResults
+	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Network,Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
 	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/state -case=underscore -output="engine/execution/state/mock" -outpkg="mock"
@@ -115,13 +115,15 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'Connector' -dir=network/p2p/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'SubscriptionManager' -dir=network/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
-	GO111MODULE=on mockery -name 'Vertex' -dir="./consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'Vertex' -dir="./module/forest" -case=underscore -output="./module/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
 	GO111MODULE=on mockery -name '.*' -dir="./engine/access/wrapper" -case=underscore -output="./engine/access/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ConnectionFactory' -dir="./engine/access/rpc/backend" -case=underscore -output="./engine/access/rpc/backend/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ExecForkActor' --structname 'ExecForkActorMock' -dir=module/mempool/consensus/mock/ -case=underscore -output="./module/mempool/consensus/mock/" -outpkg="mock"
+
+
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -220,78 +222,78 @@ docker-ci-benchmark-team-city:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=collection --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=collection --target production \
 		-t "$(CONTAINER_REGISTRY)/collection:latest" -t "$(CONTAINER_REGISTRY)/collection:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-collection-debug
 docker-build-collection-debug:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=collection --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=collection --target debug \
 		-t "$(CONTAINER_REGISTRY)/collection-debug:latest" -t "$(CONTAINER_REGISTRY)/collection-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/collection-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=consensus --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=consensus --target production \
 		-t "$(CONTAINER_REGISTRY)/consensus:latest" -t "$(CONTAINER_REGISTRY)/consensus:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-consensus-debug
 docker-build-consensus-debug:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=consensus --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=consensus --target debug \
 		-t "$(CONTAINER_REGISTRY)/consensus-debug:latest" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/consensus-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=execution --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=execution --target production \
 		-t "$(CONTAINER_REGISTRY)/execution:latest" -t "$(CONTAINER_REGISTRY)/execution:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution-debug
 docker-build-execution-debug:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=execution --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=execution --target debug \
 		-t "$(CONTAINER_REGISTRY)/execution-debug:latest" -t "$(CONTAINER_REGISTRY)/execution-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/execution-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=verification --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=verification --target production \
 		-t "$(CONTAINER_REGISTRY)/verification:latest" -t "$(CONTAINER_REGISTRY)/verification:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification-debug
 docker-build-verification-debug:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=verification --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=verification --target debug \
 		-t "$(CONTAINER_REGISTRY)/verification-debug:latest" -t "$(CONTAINER_REGISTRY)/verification-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/verification-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access
 docker-build-access:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=access --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=access --target production \
 		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=access --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=access --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost
 docker-build-ghost:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=ghost --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=ghost --target production \
 		-t "$(CONTAINER_REGISTRY)/ghost:latest" -t "$(CONTAINER_REGISTRY)/ghost:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost-debug
 docker-build-ghost-debug:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=ghost --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=ghost --target debug \
 		-t "$(CONTAINER_REGISTRY)/ghost-debug:latest" -t "$(CONTAINER_REGISTRY)/ghost-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/ghost-debug:$(IMAGE_TAG)" .
 
 PHONY: docker-build-bootstrap
 docker-build-bootstrap:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap --target production \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" -t "$(CONTAINER_REGISTRY)/bootstrap:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --no-cache \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --no-cache \
 	    --target production-transit-nocgo  \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-loader
 docker-build-loader:
-	docker build -f ./integration/loader/Dockerfile --ssh default --build-arg TARGET=loader --target production \
+	docker build -f ./integration/loader/Dockerfile  --build-arg TARGET=loader --target production \
 		-t "$(CONTAINER_REGISTRY)/loader:latest" -t "$(CONTAINER_REGISTRY)/loader:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/loader:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
@@ -371,6 +373,27 @@ docker-run-access:
 .PHONY: docker-run-ghost
 docker-run-ghost:
 	docker run -p 9000:9000 -p 3569:3569 "$(CONTAINER_REGISTRY)/ghost:latest" --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+PHONY: docker-all-tools
+docker-all-tools: tool-util tool-remove-execution-fork
+
+PHONY: docker-build-util
+docker-build-util:
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=util --target production \
+		-t "$(CONTAINER_REGISTRY)/util:latest" -t "$(CONTAINER_REGISTRY)/util:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/util:$(IMAGE_TAG)" .
+
+PHONY: tool-util
+tool-util: docker-build-util
+	docker container create --name util $(CONTAINER_REGISTRY)/util:latest;docker container cp util:/bin/app ./util;docker container rm util
+
+PHONY: docker-build-remove-execution-fork
+docker-build-remove-execution-fork:
+	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=util/cmd/remove-execution-fork --target production \
+		-t "$(CONTAINER_REGISTRY)/remove-execution-fork:latest" -t "$(CONTAINER_REGISTRY)/remove-execution-fork:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/remove-execution-fork:$(IMAGE_TAG)" .
+
+PHONY: tool-remove-execution-fork
+tool-remove-execution-fork: docker-build-remove-execution-fork
+	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
 # Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
 .PHONY: check-go-version

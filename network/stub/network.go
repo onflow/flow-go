@@ -22,12 +22,12 @@ import (
 type Network struct {
 	ctx context.Context
 	sync.Mutex
-	state        protocol.State            // used to represent full protocol state of the attached node.
-	me           module.Local              // used to represent information of the attached node.
-	hub          *Hub                      // used to attach Network layers of nodes together.
-	engines      map[string]network.Engine // used to keep track of attached engines of the node.
-	seenEventIDs sync.Map                  // used to keep track of event IDs seen by attached engines.
-	qCD          chan struct{}             // used to stop continuous delivery mode of the Network.
+	state        protocol.State                     // used to represent full protocol state of the attached node.
+	me           module.Local                       // used to represent information of the attached node.
+	hub          *Hub                               // used to attach Network layers of nodes together.
+	engines      map[network.Channel]network.Engine // used to keep track of attached engines of the node.
+	seenEventIDs sync.Map                           // used to keep track of event IDs seen by attached engines.
+	qCD          chan struct{}                      // used to stop continuous delivery mode of the Network.
 }
 
 // NewNetwork create a mocked Network.
@@ -39,7 +39,7 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 		state:   state,
 		me:      me,
 		hub:     hub,
-		engines: make(map[string]network.Engine),
+		engines: make(map[network.Channel]network.Engine),
 		qCD:     make(chan struct{}),
 	}
 	// AddNetwork the Network to a hub so that Networks can find each other.
@@ -52,42 +52,41 @@ func (n *Network) GetID() flow.Identifier {
 	return n.me.NodeID()
 }
 
-// Register registers an Engine of the attached node to the channel ID via a Conduit, and returns the
+// Register registers an Engine of the attached node to the channel via a Conduit, and returns the
 // Conduit instance.
-func (n *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
 	n.Lock()
 	defer n.Unlock()
-	_, ok := n.engines[channelID]
+	_, ok := n.engines[channel]
 	if ok {
-		return nil, errors.Errorf("engine code already taken (%s)", channelID)
+		return nil, errors.Errorf("channel already taken (%s)", channel)
 	}
 	ctx, cancel := context.WithCancel(n.ctx)
 	conduit := &Conduit{
 		ctx:       ctx,
 		cancel:    cancel,
-		channelID: channelID,
-		submit:    n.submit,
+		channel:   channel,
 		publish:   n.publish,
 		unicast:   n.unicast,
 		multicast: n.multicast,
 	}
-	n.engines[channelID] = engine
+	n.engines[channel] = engine
 	return conduit, nil
 }
 
-func (n *Network) Unregister(channelID string) error {
+func (n *Network) Unregister(channel network.Channel) error {
 	n.Lock()
 	defer n.Unlock()
-	delete(n.engines, channelID)
+	delete(n.engines, channel)
 	return nil
 }
 
-// submit is called when the attached Engine to the channel ID is sending an event to an
-// Engine attached to the same channel ID on another node or nodes.
-func (n *Network) submit(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
+// submit is called when the attached Engine to the channel is sending an event to an
+// Engine attached to the same channel on another node or nodes.
+func (n *Network) submit(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 	m := &PendingMessage{
 		From:      n.GetID(),
-		ChannelID: channelID,
+		Channel:   channel,
 		Event:     event,
 		TargetIDs: targetIDs,
 	}
@@ -97,12 +96,12 @@ func (n *Network) submit(channelID string, event interface{}, targetIDs ...flow.
 	return nil
 }
 
-// unicast is called when the attached Engine to the channel ID is sending an event to a single target
-// Engine attached to the same channel ID on another node.
-func (n *Network) unicast(channelID string, event interface{}, targetID flow.Identifier) error {
+// unicast is called when the attached Engine to the channel is sending an event to a single target
+// Engine attached to the same channel on another node.
+func (n *Network) unicast(channel network.Channel, event interface{}, targetID flow.Identifier) error {
 	m := &PendingMessage{
 		From:      n.GetID(),
-		ChannelID: channelID,
+		Channel:   channel,
 		Event:     event,
 		TargetIDs: []flow.Identifier{targetID},
 	}
@@ -112,30 +111,30 @@ func (n *Network) unicast(channelID string, event interface{}, targetID flow.Ide
 }
 
 // publish is called when the attached Engine is sending an event to a group of Engines attached to the
-// same channel ID on other nodes based on selector.
+// same channel on other nodes based on selector.
 // In this test helper implementation, publish uses submit method under the hood.
-func (n *Network) publish(channelID string, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) publish(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 
 	if len(targetIDs) == 0 {
 		return fmt.Errorf("publish found empty target ID list for the message")
 	}
 
-	return n.submit(channelID, event, targetIDs...)
+	return n.submit(channel, event, targetIDs...)
 }
 
-// multicast is called when an engine attached to the channel ID is sending an event to a number of randomly chosen
-// Engines attached to the same channel ID on other nodes. The targeted nodes are selected based on the selector.
+// multicast is called when an engine attached to the channel is sending an event to a number of randomly chosen
+// Engines attached to the same channel on other nodes. The targeted nodes are selected based on the selector.
 // In this test helper implementation, multicast uses submit method under the hood.
-func (n *Network) multicast(channelID string, event interface{}, num uint, targetIDs ...flow.Identifier) error {
+func (n *Network) multicast(channel network.Channel, event interface{}, num uint, targetIDs ...flow.Identifier) error {
 	targetIDs = flow.Sample(num, targetIDs...)
-	return n.submit(channelID, event, targetIDs...)
+	return n.submit(channel, event, targetIDs...)
 }
 
 // haveSeen returns true if the node attached to this Network instance has seen the event ID.
 // Otherwise, it returns false.
 //
-// Note: eventIDs are computed in a collision-resistant manner using channel IDs, hence, an event ID
-// is uniquely bound to a channel ID. Seeing an event ID by a node implies receiving its corresponding
+// Note: eventIDs are computed in a collision-resistant manner using channels, hence, an event ID
+// is uniquely bound to a channel. Seeing an event ID by a node implies receiving its corresponding
 // event by any of the attached engines of that node.
 func (n *Network) haveSeen(eventID string) bool {
 	seen, ok := n.seenEventIDs.Load(eventID)
@@ -148,8 +147,8 @@ func (n *Network) haveSeen(eventID string) bool {
 // seen marks the eventID as seen for the node attached to this instance of Network.
 // This method is mainly utilized for deduplicating message delivery.
 //
-// Note: eventIDs are computed in a collision-resistant manner using channel IDs, hence, an event ID
-// is uniquely bound to a channel ID. Seeing an event ID by a node implies receiving its corresponding
+// Note: eventIDs are computed in a collision-resistant manner using channels, hence, an event ID
+// is uniquely bound to a channel. Seeing an event ID by a node implies receiving its corresponding
 // event by any of the attached engines of that node.
 func (n *Network) seen(eventID string) {
 	n.seenEventIDs.Store(eventID, true)
@@ -217,7 +216,7 @@ func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error 
 	n.Lock()
 	defer n.Unlock()
 
-	key, err := eventKey(m.From, m.ChannelID, m.Event)
+	key, err := eventKey(m.From, m.Channel, m.Event)
 	if err != nil {
 		return fmt.Errorf("could not generate event key for event: %w", err)
 	}
@@ -239,9 +238,9 @@ func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error 
 		receiverNetwork.seen(key)
 
 		// finds the engine of the targeted Network
-		receiverEngine, ok := receiverNetwork.engines[m.ChannelID]
+		receiverEngine, ok := receiverNetwork.engines[m.Channel]
 		if !ok {
-			return fmt.Errorf("could find engine ID: %v for node: %v", m.ChannelID, nodeID)
+			return fmt.Errorf("could find engine ID: %v for node: %v", m.Channel, nodeID)
 		}
 
 		if syncOnProcess {
