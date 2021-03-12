@@ -1126,257 +1126,316 @@ func TestSignatureVerification(t *testing.T) {
 
 	t.Parallel()
 
-	code := []byte(`
-      import Crypto
-
-      pub fun main(
-          rawPublicKeys: [[UInt8]],
-          message: [UInt8], 
-          signatures: [[UInt8]],
-          weight: UFix64,
-      ): Bool {
-          let keyList = Crypto.KeyList()
-        
-          for rawPublicKey in rawPublicKeys {
-              keyList.add(
-                  Crypto.PublicKey(
-                      publicKey: rawPublicKey,
-                      signatureAlgorithm: Crypto.ECDSA_P256
-                  ),
-                  hashAlgorithm: Crypto.SHA3_256,
-                  weight: weight,
-              )
-          }
-
-          let signatureSet: [Crypto.KeyListSignature] = []
-
-          var i = 0
-          for signature in signatures {
-              signatureSet.append(
-                  Crypto.KeyListSignature(
-                      keyIndex: i,
-                      signature: signature
-                  )
-              )
-              i = i + 1
-          }
-
-          return keyList.isValid(
-              signatureSet: signatureSet,
-              signedData: message,
-          )
-      }
-    `)
-
-	createKey := func() (privateKey crypto.PrivateKey, publicKey cadence.Array) {
-		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-
-		var err error
-
-		_, err = rand.Read(seed)
-		require.NoError(t, err)
-
-		privateKey, err = crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-		require.NoError(t, err)
-
-		publicKey = testutil.BytesToCadenceArray(
-			privateKey.PublicKey().Encode(),
-		)
-
-		return privateKey, publicKey
+	type signatureAlgorithm struct {
+		name       string
+		seedLength int
+		algorithm  crypto.SigningAlgorithm
 	}
 
-	createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
-		signableMessage = []byte(m)
-
-		message = testutil.BytesToCadenceArray(signableMessage)
-
-		return signableMessage, message
+	signatureAlgorithms := []signatureAlgorithm{
+		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
+		{"ECDSA_Secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
 	}
 
-	signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
-		message := append(
-			flow.UserDomainTag[:],
-			m...,
-		)
-
-		signature, err := privateKey.Sign(message, hash.NewSHA3_256())
-		require.NoError(t, err)
-
-		return testutil.BytesToCadenceArray(signature)
+	type hashAlgorithm struct {
+		name      string
+		newHasher func() hash.Hasher
 	}
 
-	t.Run("Single key", newVMTest().run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
-			privateKey, publicKey := createKey()
-			signableMessage, message := createMessage("foo")
-			signature := signMessage(privateKey, signableMessage)
-			weight, _ := cadence.NewUFix64("1.0")
-
-			publicKeys := cadence.NewArray([]cadence.Value{
-				publicKey,
-			})
-
-			signatures := cadence.NewArray([]cadence.Value{
-				signature,
-			})
-
-			t.Run("Valid", func(t *testing.T) {
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(publicKeys),
-					jsoncdc.MustEncode(message),
-					jsoncdc.MustEncode(signatures),
-					jsoncdc.MustEncode(weight),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.NewBool(true), script.Value)
-			})
-
-			t.Run("Invalid message", func(t *testing.T) {
-				_, invalidRawMessage := createMessage("bar")
-
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(publicKeys),
-					jsoncdc.MustEncode(invalidRawMessage),
-					jsoncdc.MustEncode(signatures),
-					jsoncdc.MustEncode(weight),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.NewBool(false), script.Value)
-			})
-
-			t.Run("Invalid signature", func(t *testing.T) {
-				invalidPrivateKey, _ := createKey()
-				invalidRawSignature := signMessage(invalidPrivateKey, signableMessage)
-
-				invalidRawSignatures := cadence.NewArray([]cadence.Value{
-					invalidRawSignature,
-				})
-
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(publicKeys),
-					jsoncdc.MustEncode(message),
-					jsoncdc.MustEncode(invalidRawSignatures),
-					jsoncdc.MustEncode(weight),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.NewBool(false), script.Value)
-			})
-
-			t.Run("Malformed public key", func(t *testing.T) {
-				invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
-
-				invalidPublicKeys := cadence.NewArray([]cadence.Value{
-					invalidPublicKey,
-				})
-
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(invalidPublicKeys),
-					jsoncdc.MustEncode(message),
-					jsoncdc.MustEncode(signatures),
-					jsoncdc.MustEncode(weight),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				require.NoError(t, err)
-				require.Error(t, script.Err)
-			})
+	hashAlgorithms := []hashAlgorithm{
+		{
+			"SHA3_256",
+			func() hash.Hasher {
+				return hash.NewSHA3_256()
+			},
 		},
-	))
-
-	t.Run("Multiple keys", newVMTest().run(
-		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
-			privateKeyA, publicKeyA := createKey()
-			privateKeyB, publicKeyB := createKey()
-			privateKeyC, publicKeyC := createKey()
-
-			publicKeys := cadence.NewArray([]cadence.Value{
-				publicKeyA,
-				publicKeyB,
-				publicKeyC,
-			})
-
-			signableMessage, message := createMessage("foo")
-
-			signatureA := signMessage(privateKeyA, signableMessage)
-			signatureB := signMessage(privateKeyB, signableMessage)
-			signatureC := signMessage(privateKeyC, signableMessage)
-
-			weight, _ := cadence.NewUFix64("0.5")
-
-			t.Run("3 of 3", func(t *testing.T) {
-				signatures := cadence.NewArray([]cadence.Value{
-					signatureA,
-					signatureB,
-					signatureC,
-				})
-
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(publicKeys),
-					jsoncdc.MustEncode(message),
-					jsoncdc.MustEncode(signatures),
-					jsoncdc.MustEncode(weight),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.NewBool(true), script.Value)
-			})
-
-			t.Run("2 of 3", func(t *testing.T) {
-				signatures := cadence.NewArray([]cadence.Value{
-					signatureA,
-					signatureB,
-				})
-
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(publicKeys),
-					jsoncdc.MustEncode(message),
-					jsoncdc.MustEncode(signatures),
-					jsoncdc.MustEncode(weight),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.NewBool(true), script.Value)
-			})
-
-			t.Run("1 of 3", func(t *testing.T) {
-				signatures := cadence.NewArray([]cadence.Value{
-					signatureA,
-				})
-
-				script := fvm.Script(code).WithArguments(
-					jsoncdc.MustEncode(publicKeys),
-					jsoncdc.MustEncode(message),
-					jsoncdc.MustEncode(signatures),
-					jsoncdc.MustEncode(weight),
-				)
-
-				err := vm.Run(ctx, script, view, programs)
-				assert.NoError(t, err)
-				assert.NoError(t, script.Err)
-
-				assert.Equal(t, cadence.NewBool(false), script.Value)
-			})
+		{
+			"SHA2_256",
+			func() hash.Hasher {
+				return hash.NewSHA2_256()
+			},
 		},
-	))
+	}
+
+	for _, signatureAlgorithm := range signatureAlgorithms {
+		for _, hashAlgorithm := range hashAlgorithms {
+
+			code := []byte(
+				fmt.Sprintf(
+					`
+                      import Crypto
+
+                      pub fun main(
+                          rawPublicKeys: [[UInt8]],
+                          message: [UInt8],
+                          signatures: [[UInt8]],
+                          weight: UFix64,
+                      ): Bool {
+                          let keyList = Crypto.KeyList()
+
+                          for rawPublicKey in rawPublicKeys {
+                              keyList.add(
+                                  Crypto.PublicKey(
+                                      publicKey: rawPublicKey,
+                                      signatureAlgorithm: Crypto.%s
+                                  ),
+                                  hashAlgorithm: Crypto.%s,
+                                  weight: weight,
+                              )
+                          }
+
+                          let signatureSet: [Crypto.KeyListSignature] = []
+
+                          var i = 0
+                          for signature in signatures {
+                              signatureSet.append(
+                                  Crypto.KeyListSignature(
+                                      keyIndex: i,
+                                      signature: signature
+                                  )
+                              )
+                              i = i + 1
+                          }
+
+                          return keyList.isValid(
+                              signatureSet: signatureSet,
+                              signedData: message,
+                          )
+                      }
+                    `,
+					signatureAlgorithm.name,
+					hashAlgorithm.name,
+				),
+			)
+
+			t.Run(fmt.Sprintf("%s %s", signatureAlgorithm.name, hashAlgorithm.name), func(t *testing.T) {
+
+				createKey := func() (privateKey crypto.PrivateKey, publicKey cadence.Array) {
+					seed := make([]byte, signatureAlgorithm.seedLength)
+
+					var err error
+
+					_, err = rand.Read(seed)
+					require.NoError(t, err)
+
+					privateKey, err = crypto.GeneratePrivateKey(signatureAlgorithm.algorithm, seed)
+					require.NoError(t, err)
+
+					publicKey = testutil.BytesToCadenceArray(
+						privateKey.PublicKey().Encode(),
+					)
+
+					return privateKey, publicKey
+				}
+
+				createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
+					signableMessage = []byte(m)
+
+					message = testutil.BytesToCadenceArray(signableMessage)
+
+					return signableMessage, message
+				}
+
+				signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
+					message := append(
+						flow.UserDomainTag[:],
+						m...,
+					)
+
+					signature, err := privateKey.Sign(message, hashAlgorithm.newHasher())
+					require.NoError(t, err)
+
+					return testutil.BytesToCadenceArray(signature)
+				}
+
+				t.Run("Single key", newVMTest().run(
+					func(
+						t *testing.T,
+						vm *fvm.VirtualMachine,
+						chain flow.Chain,
+						ctx fvm.Context,
+						view state.View,
+						programs *fvm.Programs,
+					) {
+						privateKey, publicKey := createKey()
+						signableMessage, message := createMessage("foo")
+						signature := signMessage(privateKey, signableMessage)
+						weight, _ := cadence.NewUFix64("1.0")
+
+						publicKeys := cadence.NewArray([]cadence.Value{
+							publicKey,
+						})
+
+						signatures := cadence.NewArray([]cadence.Value{
+							signature,
+						})
+
+						t.Run("Valid", func(t *testing.T) {
+							script := fvm.Script(code).WithArguments(
+								jsoncdc.MustEncode(publicKeys),
+								jsoncdc.MustEncode(message),
+								jsoncdc.MustEncode(signatures),
+								jsoncdc.MustEncode(weight),
+							)
+
+							err := vm.Run(ctx, script, view, programs)
+							assert.NoError(t, err)
+							assert.NoError(t, script.Err)
+
+							assert.Equal(t, cadence.NewBool(true), script.Value)
+						})
+
+						t.Run("Invalid message", func(t *testing.T) {
+							_, invalidRawMessage := createMessage("bar")
+
+							script := fvm.Script(code).WithArguments(
+								jsoncdc.MustEncode(publicKeys),
+								jsoncdc.MustEncode(invalidRawMessage),
+								jsoncdc.MustEncode(signatures),
+								jsoncdc.MustEncode(weight),
+							)
+
+							err := vm.Run(ctx, script, view, programs)
+							assert.NoError(t, err)
+							assert.NoError(t, script.Err)
+
+							assert.Equal(t, cadence.NewBool(false), script.Value)
+						})
+
+						t.Run("Invalid signature", func(t *testing.T) {
+							invalidPrivateKey, _ := createKey()
+							invalidRawSignature := signMessage(invalidPrivateKey, signableMessage)
+
+							invalidRawSignatures := cadence.NewArray([]cadence.Value{
+								invalidRawSignature,
+							})
+
+							script := fvm.Script(code).WithArguments(
+								jsoncdc.MustEncode(publicKeys),
+								jsoncdc.MustEncode(message),
+								jsoncdc.MustEncode(invalidRawSignatures),
+								jsoncdc.MustEncode(weight),
+							)
+
+							err := vm.Run(ctx, script, view, programs)
+							assert.NoError(t, err)
+							assert.NoError(t, script.Err)
+
+							assert.Equal(t, cadence.NewBool(false), script.Value)
+						})
+
+						t.Run("Malformed public key", func(t *testing.T) {
+							invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
+
+							invalidPublicKeys := cadence.NewArray([]cadence.Value{
+								invalidPublicKey,
+							})
+
+							script := fvm.Script(code).WithArguments(
+								jsoncdc.MustEncode(invalidPublicKeys),
+								jsoncdc.MustEncode(message),
+								jsoncdc.MustEncode(signatures),
+								jsoncdc.MustEncode(weight),
+							)
+
+							err := vm.Run(ctx, script, view, programs)
+							require.NoError(t, err)
+							require.Error(t, script.Err)
+						})
+					},
+				))
+
+				t.Run("Multiple keys", newVMTest().run(
+					func(
+						t *testing.T,
+						vm *fvm.VirtualMachine,
+						chain flow.Chain,
+						ctx fvm.Context,
+						view state.View,
+						programs *fvm.Programs,
+					) {
+						privateKeyA, publicKeyA := createKey()
+						privateKeyB, publicKeyB := createKey()
+						privateKeyC, publicKeyC := createKey()
+
+						publicKeys := cadence.NewArray([]cadence.Value{
+							publicKeyA,
+							publicKeyB,
+							publicKeyC,
+						})
+
+						signableMessage, message := createMessage("foo")
+
+						signatureA := signMessage(privateKeyA, signableMessage)
+						signatureB := signMessage(privateKeyB, signableMessage)
+						signatureC := signMessage(privateKeyC, signableMessage)
+
+						weight, _ := cadence.NewUFix64("0.5")
+
+						t.Run("3 of 3", func(t *testing.T) {
+							signatures := cadence.NewArray([]cadence.Value{
+								signatureA,
+								signatureB,
+								signatureC,
+							})
+
+							script := fvm.Script(code).WithArguments(
+								jsoncdc.MustEncode(publicKeys),
+								jsoncdc.MustEncode(message),
+								jsoncdc.MustEncode(signatures),
+								jsoncdc.MustEncode(weight),
+							)
+
+							err := vm.Run(ctx, script, view, programs)
+							assert.NoError(t, err)
+							assert.NoError(t, script.Err)
+
+							assert.Equal(t, cadence.NewBool(true), script.Value)
+						})
+
+						t.Run("2 of 3", func(t *testing.T) {
+							signatures := cadence.NewArray([]cadence.Value{
+								signatureA,
+								signatureB,
+							})
+
+							script := fvm.Script(code).WithArguments(
+								jsoncdc.MustEncode(publicKeys),
+								jsoncdc.MustEncode(message),
+								jsoncdc.MustEncode(signatures),
+								jsoncdc.MustEncode(weight),
+							)
+
+							err := vm.Run(ctx, script, view, programs)
+							assert.NoError(t, err)
+							assert.NoError(t, script.Err)
+
+							assert.Equal(t, cadence.NewBool(true), script.Value)
+						})
+
+						t.Run("1 of 3", func(t *testing.T) {
+							signatures := cadence.NewArray([]cadence.Value{
+								signatureA,
+							})
+
+							script := fvm.Script(code).WithArguments(
+								jsoncdc.MustEncode(publicKeys),
+								jsoncdc.MustEncode(message),
+								jsoncdc.MustEncode(signatures),
+								jsoncdc.MustEncode(weight),
+							)
+
+							err := vm.Run(ctx, script, view, programs)
+							assert.NoError(t, err)
+							assert.NoError(t, script.Err)
+
+							assert.Equal(t, cadence.NewBool(false), script.Value)
+						})
+					},
+				))
+			})
+		}
+	}
 }
 
 func TestWithServiceAccount(t *testing.T) {
