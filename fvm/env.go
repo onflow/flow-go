@@ -31,7 +31,7 @@ var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx                Context
-	stm                *state.StateManager
+	sth                *state.StateHolder
 	vm                 *VirtualMachine
 	accounts           *state.Accounts
 	contracts          *handler.ContractHandler
@@ -60,9 +60,9 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, vm *VirtualMachine, stm *state.StateManager, programs *Programs) (*hostEnv, error) {
-	accounts := state.NewAccounts(stm)
-	generator, err := state.NewStateBoundAddressGenerator(stm, ctx.Chain)
+func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *Programs) (*hostEnv, error) {
+	accounts := state.NewAccounts(sth)
+	generator, err := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
@@ -71,11 +71,11 @@ func newEnvironment(ctx Context, vm *VirtualMachine, stm *state.StateManager, pr
 		ctx.RestrictedDeploymentEnabled,
 		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
 
-	uuidGenerator := state.NewUUIDGenerator(stm)
+	uuidGenerator := state.NewUUIDGenerator(sth)
 
 	env := &hostEnv{
 		ctx:                ctx,
-		stm:                stm,
+		sth:                sth,
 		vm:                 vm,
 		metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
@@ -109,7 +109,7 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	e.transactionEnv = newTransactionEnv(
 		e.vm,
 		e.ctx,
-		e.stm,
+		e.sth,
 		e.programs,
 		e.accounts,
 		e.contracts,
@@ -203,7 +203,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.stm.State().View(),
+		e.sth.State().View(),
 		e.programs,
 	)
 	if err != nil {
@@ -236,7 +236,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.stm.State().View(),
+		e.sth.State().View(),
 		e.programs,
 	)
 	if err != nil {
@@ -732,7 +732,7 @@ func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
-	stm              *state.StateManager
+	sth              *state.StateHolder
 	programs         *Programs
 	accounts         *state.Accounts
 	contracts        *handler.ContractHandler
@@ -747,7 +747,7 @@ type transactionEnv struct {
 func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
-	stm *state.StateManager,
+	sth *state.StateHolder,
 	programs *Programs,
 	accounts *state.Accounts,
 	contracts *handler.ContractHandler,
@@ -758,7 +758,7 @@ func newTransactionEnv(
 	return &transactionEnv{
 		vm:               vm,
 		ctx:              ctx,
-		stm:              stm,
+		sth:              sth,
 		programs:         programs,
 		accounts:         accounts,
 		contracts:        contracts,
@@ -813,7 +813,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				flowAddress,
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
-			e.stm,
+			e.sth,
 			e.programs,
 		)
 		if err != nil {

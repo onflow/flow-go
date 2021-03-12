@@ -30,7 +30,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateManager, *Programs) error
+	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateHolder, *Programs) error
 }
 
 type TransactionProcedure struct {
@@ -51,7 +51,7 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 	proc.TraceSpan = traceSpan
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateManager, programs *Programs) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *Programs) error {
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, ctx, proc, st, programs)
 		vmErr, fatalErr := handleError(err)
@@ -83,7 +83,7 @@ func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	stm *state.StateManager,
+	sth *state.StateHolder,
 	programs *Programs,
 ) error {
 
@@ -108,7 +108,7 @@ func (i *TransactionInvocator) Process(
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		if retry {
 			// rest state
-			rollUpError := stm.RollUpNoMerge()
+			rollUpError := sth.RollUpNoMerge()
 			if rollUpError != nil {
 				return rollUpError
 			}
@@ -119,7 +119,7 @@ func (i *TransactionInvocator) Process(
 				Str("txHash", proc.ID.String()).
 				Uint64("blockHeight", blockHeight).
 				Int("retries_count", numberOfRetries).
-				Uint64("ledger_interaction_used", stm.State().InteractionUsed()).
+				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
 				Msg("retrying transaction execution")
 
 			// reset error part of proc
@@ -131,8 +131,8 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		stm.Nest()
-		env, err = newEnvironment(ctx, vm, stm, programs)
+		sth.Nest()
+		env, err = newEnvironment(ctx, vm, sth, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
@@ -188,7 +188,7 @@ func (i *TransactionInvocator) Process(
 	programs.Cleanup(updatedKeys)
 
 	if txError != nil {
-		err = stm.RollUpWithMergeNoDelta()
+		err = sth.RollUpWithMergeNoDelta()
 		if err != nil {
 			return err
 		}
@@ -197,13 +197,13 @@ func (i *TransactionInvocator) Process(
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
-			Uint64("ledgerInteractionUsed", stm.State().InteractionUsed()).
+			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
 		return txError
 	}
 
 	// don't roll up with true for failed tx
-	err = stm.RollUpWithMerge()
+	err = sth.RollUpWithMerge()
 	if err != nil {
 		return err
 	}
@@ -215,7 +215,7 @@ func (i *TransactionInvocator) Process(
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
 		Uint64("blockHeight", blockHeight).
-		Uint64("ledgerInteractionUsed", stm.State().InteractionUsed()).
+		Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 		Int("retried", proc.Retried).
 		Msg("transaction executed successfully")
 

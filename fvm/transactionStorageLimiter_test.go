@@ -16,7 +16,7 @@ import (
 func TestTransactionStorageLimiter_Process(t *testing.T) {
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		sm := newMockStateManager(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 99),
@@ -34,7 +34,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		sm := newMockStateManager(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 100),
@@ -52,7 +52,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		sm := newMockStateManager(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -70,7 +70,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 	})
 	t.Run("non account registers are ignored", func(t *testing.T) {
 		owner := ""
-		sm := newMockStateManager(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -88,7 +88,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 	})
 	t.Run("account registers without exists are ignored", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		sm := newMockStateManager(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -127,11 +127,11 @@ func accountExists(owner string) OwnerKeyValue {
 	}
 }
 
-func newMockStateManager(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.StateManager {
+func newMockStateHolder(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.StateHolder {
 
 	view := utils.NewSimpleView()
 	s := state.NewState(view)
-	sm := state.NewStateManager(s)
+	sm := state.NewStateHolder(s)
 
 	for _, okv := range ownerKeyStorageValue {
 		_ = s.Set(okv.Owner, "", okv.Key, uint64ToBinary(okv.Value))
@@ -144,7 +144,7 @@ func newMockStateManager(updatedKeys []string, ownerKeyStorageValue []OwnerKeyVa
 	return sm
 }
 
-func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateManager, _ *fvm.Programs) (func(address common.Address) (value uint64, err error), error) {
+func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateHolder, _ *fvm.Programs) (func(address common.Address) (value uint64, err error), error) {
 	return func(address common.Address) (value uint64, err error) {
 		return 100, nil
 	}, nil
