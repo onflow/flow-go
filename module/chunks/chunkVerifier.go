@@ -155,7 +155,9 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 		if tx.Err == nil {
 			// if tx is successful, we apply changes to the chunk view by merging the txView into chunk view
 			err = chunkView.MergeView(txView)
-			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			}
 		}
 	}
 
