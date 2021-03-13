@@ -118,7 +118,7 @@ func TestCombinedQC(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, valid, "original QC should be valid")
 
-	// verification with missing identity should be invalid
+	// verification with not enough voters is invalid
 	valid, err = signers[0].VerifyQC(voterIDs[:minShares-1], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "verification of QC should fail with missing voter ID")
@@ -145,4 +145,10 @@ func TestCombinedQC(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed block view should be invalid")
 	block.View--
+
+	// verification of a QC with an unknown voter ID should fail
+	withUnknownVoter := append(voterIDs, unittest.IdentifierFixture())
+	valid, err = signers[0].VerifyQC(withUnknownVoter, qc.SigData, block)
+	require.ErrorIs(t, err, model.ErrInvalidSigner)
+	assert.False(t, valid, "QC with an unknown voter ID should be invalid")
 }

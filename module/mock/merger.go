@@ -13,7 +13,7 @@ type Merger struct {
 }
 
 // Join provides a mock function with given fields: sig1, sig2
-func (_m *Merger) Join(sig1 crypto.Signature, sig2 crypto.Signature) []byte {
+func (_m *Merger) Join(sig1 crypto.Signature, sig2 crypto.Signature) ([]byte, error) {
 	ret := _m.Called(sig1, sig2)
 
 	var r0 []byte
@@ -25,7 +25,14 @@ func (_m *Merger) Join(sig1 crypto.Signature, sig2 crypto.Signature) []byte {
 		}
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(crypto.Signature, crypto.Signature) error); ok {
+		r1 = rf(sig1, sig2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Split provides a mock function with given fields: combined

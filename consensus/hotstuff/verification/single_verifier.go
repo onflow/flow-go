@@ -62,7 +62,7 @@ func (s *SingleVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, bl
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
 	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner)
+		return false, fmt.Errorf("duplicate or invalid signer IDs in QC for block %x: %w", block.BlockID, model.ErrInvalidSigner)
 	}
 
 	// create the message we verify against and check signature

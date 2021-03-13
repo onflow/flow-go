@@ -90,6 +90,7 @@ func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 
 	// check the consistency of the votes
+	// TODO: is checking the view and block id needed? (single votes are supposed to be already checked)
 	err := checkVotesValidity(votes)
 	if err != nil {
 		return nil, fmt.Errorf("votes are not valid: %w", err)
@@ -108,7 +109,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 		return nil, fmt.Errorf("failed to check if shares are enough: %w", err)
 	}
 	if !enoughShares {
-		return nil, ErrInsufficientShares
+		return nil, signature.ErrInsufficientShares
 	}
 
 	// collect signers, staking signatures, beacon signatures and dkg indices separately
@@ -146,11 +147,14 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 	// construct the threshold signature from the shares
 	beaconThresSig, err := c.beacon.Reconstruct(dkg.Size(), beaconShares, dkgIndices)
 	if err != nil {
-		return nil, fmt.Errorf("could not aggregate second signatures: %w", err)
+		return nil, fmt.Errorf("could not reconstruct beacon signatures: %w", err)
 	}
 
 	// combine the aggregated staking signature with the threshold beacon signature
-	combinedMultiSig := c.merger.Join(stakingAggSig, beaconThresSig)
+	combinedMultiSig, err := c.merger.Join(stakingAggSig, beaconThresSig)
+	if err != nil {
+		return nil, fmt.Errorf("could not join signatures: %w", err)
+	}
 
 	// create the QC
 	qc := &flow.QuorumCertificate{
@@ -170,15 +174,18 @@ func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 	msg := makeVoteMessage(block.View, block.BlockID)
 	stakingSig, err := c.staking.Sign(msg)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate first signature: %w", err)
+		return nil, fmt.Errorf("could not generate staking signature: %w", err)
 	}
 	beaconShare, err := c.beacon.Sign(msg)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate second signature: %w", err)
+		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}
 
 	// combine the two signatures into one byte slice
-	combinedSig := c.merger.Join(stakingSig, beaconShare)
+	combinedSig, err := c.merger.Join(stakingSig, beaconShare)
+	if err != nil {
+		return nil, fmt.Errorf("could not join signatures: %w", err)
+	}
 
 	return combinedSig, nil
 }

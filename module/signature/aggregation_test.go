@@ -54,7 +54,7 @@ func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
 func TestAggregationSignVerify(t *testing.T) {
 
 	signer, priv := createAggregationT(t)
-	msg := createMSGT(t)
+	msg := randomByteSliceT(t, 128)
 
 	// create the signature
 	sig, err := signer.Sign(msg)
@@ -84,7 +84,7 @@ func TestAggregationAggregateVerifyMany(t *testing.T) {
 	// create a certain amount of signers & signatures
 	var keys []crypto.PublicKey
 	var sigs []crypto.Signature
-	msg := createMSGT(t)
+	msg := randomByteSliceT(t, 128)
 	for i := 0; i < NUM_AGG_TEST; i++ {
 		signer, priv := createAggregationT(t)
 		sig, err := signer.Sign(msg)
@@ -130,7 +130,7 @@ func BenchmarkAggregationProviderAggregation(b *testing.B) {
 
 	// create the desired number of signers
 	var signer *AggregationProvider
-	msg := createMSGB(b)
+	msg := randomByteSliceB(b)
 	sigs := make([]crypto.Signature, 0, NUM_AGG_BENCH)
 	for i := 0; i < NUM_AGG_BENCH; i++ {
 		signer, _ = createAggregationB(b)
@@ -160,7 +160,7 @@ func BenchmarkVerifyMany(b *testing.B) {
 	// create the desired number of signers
 	var signer *AggregationProvider
 	var priv crypto.PrivateKey
-	msg := createMSGB(b)
+	msg := randomByteSliceB(b)
 	sigs := make([]crypto.Signature, 0, NUM_AGG_BENCH)
 	keys := make([]crypto.PublicKey, 0, NUM_AGG_BENCH)
 	for i := 0; i < NUM_AGG_BENCH; i++ {

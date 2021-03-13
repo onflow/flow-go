@@ -113,7 +113,7 @@ func TestSingleQC(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, valid, "original QC should be valid")
 
-	// verification with missing identity should be invalid
+	// verification with with not enough voters is invalid
 	valid, err = signers[0].VerifyQC(voterIDs[:minShares-1], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "verification with missing voter ID should not work")
