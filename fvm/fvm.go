@@ -22,7 +22,7 @@ type ContractUpdate struct {
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, stm *state.StateManager, programs *programs.Programs) error
+	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
 }
 
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
@@ -44,7 +44,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
-	stm := state.NewStateManager(st)
+	sth := state.NewStateHolder(st)
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -64,7 +64,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 		}
 	}()
 
-	err = proc.Run(vm, ctx, stm, programs)
+	err = proc.Run(vm, ctx, sth, programs)
 	if err != nil {
 		return err
 	}
@@ -79,8 +79,8 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
-	stm := state.NewStateManager(st)
-	account, err := getAccount(vm, ctx, stm, programs, address)
+	sth := state.NewStateHolder(st)
+	account, err := getAccount(vm, ctx, sth, programs, address)
 	if err != nil {
 		// TODO: wrap error
 		return nil, err
@@ -92,9 +92,9 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, stm *state.StateManager, programs *programs.Programs) error {
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) error {
 	invocator := NewTransactionInvocator(zerolog.Nop())
-	err := invocator.Process(vm, ctx, tx, stm, programs)
+	err := invocator.Process(vm, ctx, tx, sth, programs)
 	if err != nil {
 		return err
 	}

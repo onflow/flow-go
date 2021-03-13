@@ -13,7 +13,7 @@ type TransactionStorageLimiter struct {
 		vm *VirtualMachine,
 		ctx Context,
 		tp *TransactionProcedure,
-		stm *state.StateManager,
+		sth *state.StateHolder,
 		programs *programs.Programs,
 	) (func(address common.Address) (value uint64, err error), error)
 }
@@ -22,10 +22,10 @@ func getStorageCapacityFuncFactory(
 	vm *VirtualMachine,
 	ctx Context,
 	_ *TransactionProcedure,
-	stm *state.StateManager,
+	sth *state.StateHolder,
 	programs *programs.Programs,
 ) (func(address common.Address) (value uint64, err error), error) {
-	env, err := newEnvironment(ctx, vm, stm, programs)
+	env, err := newEnvironment(ctx, vm, sth, programs)
 	if err != nil {
 		return nil, err
 	}
@@ -44,20 +44,20 @@ func (d *TransactionStorageLimiter) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	tp *TransactionProcedure,
-	stm *state.StateManager,
+	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
 	if !ctx.LimitAccountStorage {
 		return nil
 	}
 
-	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, stm, programs)
+	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, sth, programs)
 	if err != nil {
 		return err
 	}
-	accounts := state.NewAccounts(stm)
+	accounts := state.NewAccounts(sth)
 
-	addresses := stm.State().UpdatedAddresses()
+	addresses := sth.State().UpdatedAddresses()
 
 	for _, address := range addresses {
 

@@ -10,17 +10,17 @@ import (
 const keyUUID = "uuid"
 
 type UUIDGenerator struct {
-	stateManager *StateManager
+	stateHolder *StateHolder
 }
 
-func NewUUIDGenerator(stateManager *StateManager) *UUIDGenerator {
+func NewUUIDGenerator(stateHolder *StateHolder) *UUIDGenerator {
 	return &UUIDGenerator{
-		stateManager: stateManager,
+		stateHolder: stateHolder,
 	}
 }
 
 func (u *UUIDGenerator) GetUUID() (uint64, error) {
-	stateBytes, err := u.stateManager.State().Get("", "", keyUUID)
+	stateBytes, err := u.stateHolder.State().Get("", "", keyUUID)
 	if err != nil {
 		return 0, err
 	}
@@ -32,7 +32,7 @@ func (u *UUIDGenerator) GetUUID() (uint64, error) {
 func (u *UUIDGenerator) SetUUID(uuid uint64) error {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	return u.stateManager.State().Set("", "", keyUUID, bytes)
+	return u.stateHolder.State().Set("", "", keyUUID, bytes)
 }
 
 func (u *UUIDGenerator) GenerateUUID() (uint64, error) {

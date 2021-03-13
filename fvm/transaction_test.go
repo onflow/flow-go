@@ -81,14 +81,14 @@ func TestSafetyCheck(t *testing.T) {
 
 			context := NewContext(log)
 
-			stm := state.NewStateManager(state.NewState(
+			sth := state.NewStateHolder(state.NewState(
 				view,
 				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 			))
 
-			err = txInvocator.Process(vm, context, proc, stm, programs.NewEmptyPrograms())
+			err = txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -151,14 +151,14 @@ func TestSafetyCheck(t *testing.T) {
 
 		context := NewContext(log)
 
-		stm := state.NewStateManager(state.NewState(
+		sth := state.NewStateHolder(state.NewState(
 			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err = txInvocator.Process(vm, context, proc, stm, programs.NewEmptyPrograms())
+		err = txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -183,14 +183,14 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := NewContext(log)
 
-		stm := state.NewStateManager(state.NewState(
+		sth := state.NewStateHolder(state.NewState(
 			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, context, proc, stm, programs.NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -216,14 +216,14 @@ func TestSafetyCheck(t *testing.T) {
 		view := utils.NewSimpleView()
 		context := NewContext(log)
 
-		stm := state.NewStateManager(state.NewState(
+		sth := state.NewStateHolder(state.NewState(
 			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, context, proc, stm, programs.NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -268,9 +268,9 @@ func TestSafetyCheck(t *testing.T) {
 		header := unittest.BlockHeaderFixture()
 		context := NewContext(log, WithBlockHeader(&header))
 
-		stm := state.NewStateManager(state.NewState(view))
+		sth := state.NewStateHolder(state.NewState(view))
 
-		err := txInvocator.Process(vm, context, proc, stm, programs.NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		require.Equal(t, 1, proc.Retried)

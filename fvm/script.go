@@ -33,7 +33,7 @@ type ScriptProcedure struct {
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateManager, *programs.Programs) error
+	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
@@ -44,9 +44,9 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, stm *state.StateManager, programs *programs.Programs) error {
+func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, stm, programs)
+		err := p.Process(vm, ctx, proc, sth, programs)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -71,10 +71,10 @@ func (i ScriptInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *ScriptProcedure,
-	stm *state.StateManager,
+	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env, err := newEnvironment(ctx, vm, stm, programs)
+	env, err := newEnvironment(ctx, vm, sth, programs)
 	if err != nil {
 		return err
 	}

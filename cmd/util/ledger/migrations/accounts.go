@@ -13,8 +13,8 @@ import (
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := newView(payloads)
 	st := state.NewState(l)
-	stm := state.NewStateManager(st)
-	a := state.NewAccounts(stm)
+	sth := state.NewStateHolder(st)
+	a := state.NewAccounts(sth)
 
 	//// TestNet
 	// coreContractEncodedKey := "f847b8402b0bf247520770a4bad19e07f6d6b1e8f0542da564154087e2681b175b4432ec2c7b09a52d34dabe0a887ea0f96b067e52c6a0792dcff730fe78a6c5fbbf0a9c02038203e8"

@@ -32,12 +32,12 @@ func keyPublicKey(index uint64) string {
 }
 
 type Accounts struct {
-	stateManager *StateManager
+	stateHolder *StateHolder
 }
 
-func NewAccounts(stateManager *StateManager) *Accounts {
+func NewAccounts(stateHolder *StateHolder) *Accounts {
 	return &Accounts{
-		stateManager: stateManager,
+		stateHolder: stateHolder,
 	}
 }
 
@@ -334,9 +334,9 @@ func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValu
 
 func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.stateManager.State().Get(string(address.Bytes()), string(address.Bytes()), key)
+		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 	}
-	return a.stateManager.State().Get(string(address.Bytes()), "", key)
+	return a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -351,9 +351,9 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	}
 
 	if isController {
-		return a.stateManager.State().Set(string(address.Bytes()), string(address.Bytes()), key, value)
+		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return a.stateManager.State().Set(string(address.Bytes()), "", key, value)
+	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value)
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -417,10 +417,10 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 // TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.stateManager.State().Get(string(address.Bytes()), string(address.Bytes()), key)
+		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 		return
 	}
-	_, _ = a.stateManager.State().Get(string(address.Bytes()), "", key)
+	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {
