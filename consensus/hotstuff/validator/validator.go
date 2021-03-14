@@ -6,9 +6,9 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -58,7 +58,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
 	valid, err := v.verifier.VerifyQC(signers, qc.SigData, block)
-	if errors.Is(err, verification.ErrInvalidFormat) {
+	if errors.Is(err, signature.ErrInvalidFormat) {
 		return newInvalidBlockError(block, fmt.Errorf("QC signature has bad format: %w", err))
 	}
 	if err != nil {
@@ -143,7 +143,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	valid, err := v.verifier.VerifyVote(voter, vote.SigData, block)
 	if err != nil {
 		switch {
-		case errors.Is(err, verification.ErrInvalidFormat):
+		case errors.Is(err, signature.ErrInvalidFormat):
 			return nil, newInvalidVoteError(vote, err)
 		case errors.Is(err, model.ErrInvalidSigner):
 			return nil, newInvalidVoteError(vote, err)

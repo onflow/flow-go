@@ -51,7 +51,7 @@ func (s *SingleVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, blo
 	// compute the aggregated key of signers
 	aggrgetaedKey, err := s.keysAggregator.aggregatedStakingKey(signers)
 	if err != nil {
-		return false, fmt.Errorf("could not compute aggregated key: %w", err)
+		return false, fmt.Errorf("could not compute BLS key: %w", err)
 	}
 
 	valid, err := s.verifier.Verify(msg, sigData, aggrgetaedKey)

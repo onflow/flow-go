@@ -78,7 +78,7 @@ func (ap *AggregationProvider) Aggregate(sigs []crypto.Signature) (crypto.Signat
 	// BLS aggregation
 	sig, err := crypto.AggregateBLSSignatures(sigs)
 	if err != nil {
-		return nil, fmt.Errorf("could not aggregate signatures: %w", err)
+		return nil, fmt.Errorf("could not aggregate BLS signatures: %w", err)
 	}
 	return sig, nil
 }

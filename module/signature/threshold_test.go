@@ -37,7 +37,7 @@ func TestThresholdSignVerify(t *testing.T) {
 		signers, _ := createThresholdsT(t, n)
 		signer := signers[0]
 		altSigner := signers[1]
-		msg := createMSGT(t)
+		msg := randomByteSliceT(t, 128)
 
 		// generate the signature
 		sig, err := signer.Sign(msg)
@@ -67,7 +67,7 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 		// create signers and message to be signed
 		signers, groupKey := createThresholdsT(t, n)
 		_, altGroupKey := createThresholdsT(t, n)
-		msg := createMSGT(t)
+		msg := randomByteSliceT(t, 128)
 
 		// create a signature share for each signer and store index
 		shares := make([]crypto.Signature, 0, len(signers))
@@ -163,7 +163,7 @@ func BenchmarkThresholdReconstruction(b *testing.B) {
 	b.ResetTimer()
 
 	// generate the desired fake threshold signature participants and create signatures
-	msg := createMSGB(b)
+	msg := randomByteSliceB(b)
 	signers := createThresholdsB(b, NUM_THRES_BENCH)
 	sigs := make([]crypto.Signature, 0, len(signers))
 	indices := make([]uint, 0, len(signers))

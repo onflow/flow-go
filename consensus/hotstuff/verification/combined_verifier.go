@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedVerifier is a verifier capable of verifying two signatures for each
@@ -39,7 +40,7 @@ func NewCombinedVerifier(committee hotstuff.Committee, staking module.Aggregatin
 	return c
 }
 
-// VerifyVote verifies the validity of a combined signature on a vote.
+// VerifyVote verifies the validity of a combined signature from a vote.
 func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the to-be-signed message
@@ -48,7 +49,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	// split the two signatures from the vote
 	stakingSig, beaconShare, err := c.merger.Split(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
+		return false, fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
 	}
 
 	dkg, err := c.committee.DKG(block.BlockID)
@@ -66,14 +67,14 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := c.staking.Verify(msg, stakingSig, signer.StakingPubKey)
 	if err != nil {
-		return false, fmt.Errorf("could not verify staking signature: %w", err)
+		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
 	if !stakingValid {
 		return false, nil
 	}
 	beaconValid, err := c.beacon.Verify(msg, beaconShare, beaconPubKey)
 	if err != nil {
-		return false, fmt.Errorf("could not verify beacon signature: %w", err)
+		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
 
 	return beaconValid, nil
@@ -82,8 +83,6 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
 func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 
-	// TODO: only the aggregated public key is needed
-	// TODO: avoid computing the agg public key each time (store the public key delta in CombinedVerifier or c.staking)
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
 		return false, fmt.Errorf("could not get dkg: %w", err)
@@ -92,7 +91,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// split the aggregated staking & beacon signatures
 	stakingAggSig, beaconThresSig, err := c.merger.Split(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
+		return false, fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
 	}
 
 	msg := makeVoteMessage(block.View, block.BlockID)
@@ -101,7 +100,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// verify the beacon signature first
 	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkg.GroupKey())
 	if err != nil {
-		return false, fmt.Errorf("could not verify beacon signature: %w", err)
+		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
 	if !beaconValid {
 		return false, nil
@@ -113,13 +112,15 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
 	// as inputs. A new struct needs to be used for each epoch since the list of participants is upadted.
 
+	// TODO: check the signers identity validation, used to be:
+	// signers, err := s.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...)) where votersID:voterIDs []flow.Identifier
 	aggrgetaedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)
 	}
 	stakingValid, err := c.staking.Verify(msg, stakingAggSig, aggrgetaedKey)
 	if err != nil {
-		return false, fmt.Errorf("could not verify staking signature: %w", err)
+		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
 	return stakingValid, nil
 }

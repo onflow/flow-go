@@ -1,8 +1,6 @@
 package signature
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/crypto"
 )
 
@@ -26,21 +24,27 @@ func NewCombiner(lengthSig1, lengthSig2 uint) *Combiner {
 }
 
 // Join will concatenate the provided 2 signatures into a common byte slice.
-func (c *Combiner) Join(sig1, sig2 crypto.Signature) []byte {
+//
+// Returns ErrInvalidFormat if one of the input signature has an invalid length.
+func (c *Combiner) Join(sig1, sig2 crypto.Signature) ([]byte, error) {
+	if uint(len(sig1)) != c.lengthSig1 || uint(len(sig2)) != c.lengthSig2 {
+		return nil, ErrInvalidFormat
+	}
 
 	combined := make([]byte, 0, len(sig1)+len(sig2))
 	combined = append(combined, sig1...)
 	combined = append(combined, sig2...)
-	return combined
+	return combined, nil
 }
 
 // Split will split the given byte slice into its signature parts, using the
 // embedded length information.
+//
+// Returns ErrInvalidFormat if the combined signature length is invalid.
 func (c *Combiner) Split(combined []byte) (crypto.Signature, crypto.Signature, error) {
 
 	if uint(len(combined)) != c.lengthSig1+c.lengthSig2 {
-		return nil, nil, fmt.Errorf("input length must be %d, got %d",
-			c.lengthSig1+c.lengthSig2, len(combined))
+		return nil, nil, ErrInvalidFormat
 	}
 
 	sig1 := combined[:c.lengthSig1]

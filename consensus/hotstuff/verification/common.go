@@ -45,7 +45,6 @@ func checkVotesValidity(votes []*model.Vote) error {
 
 	// go through all votes to check their validity
 	for _, vote := range votes {
-		// TODO: is checking the view and block id needed? (single votes are supposed to be already checked)
 
 		// if we have a view mismatch, bail
 		if vote.View != view {
