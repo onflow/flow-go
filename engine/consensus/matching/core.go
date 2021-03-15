@@ -730,7 +730,7 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 	resultID := incorporatedResult.Result.ID()
 
 	// get all receipts that are known for the block
-	receipts, err := c.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	receipts, err := c.receiptsDB.ByBlockID(blockID)
 	if err != nil {
 		log.Error().Err(err).
 			Hex("block_id", logging.ID(blockID)).
