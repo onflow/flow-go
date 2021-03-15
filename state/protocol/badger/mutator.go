@@ -5,7 +5,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/storage/util"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/util"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -270,19 +270,19 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 	// build a list of all previously used guarantees on this part of the chain
 	lookup := make(map[flow.Identifier]struct{})
 	err = util.TraverseBlocksBackwards(m.headers, header.ParentID,
-		func(block *flow.Header) bool {
-			return block.Height > limit
-		},
-		func(block *flow.Header) error {
+		func(block *flow.Header) (bool, error) {
+			if block.Height <= limit {
+				return false, nil
+			}
 			blockID := block.ID()
 			index, err := m.index.ByBlockID(blockID)
 			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor index (%x): %w", blockID, err)
+				return false, fmt.Errorf("could not retrieve ancestor index (%x): %w", blockID, err)
 			}
 			for _, collID := range index.CollectionIDs {
 				lookup[collID] = struct{}{}
 			}
-			return nil
+			return true, nil
 		})
 	if err != nil {
 		return err

@@ -2,7 +2,6 @@ package validation
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/storage/util"
 
 	"github.com/rs/zerolog/log"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/util"
 )
 
 // DefaultRequiredApprovalsForSealValidation is the default number of approvals that should be
@@ -162,17 +162,18 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
 	err = util.TraverseBlocksBackwards(s.headers, header.ParentID,
-		func(block *flow.Header) bool {
-			return block.ID() != sealedID
-		},
-		func(block *flow.Header) error {
+		func(block *flow.Header) (bool, error) {
+			if block.ID() == sealedID {
+				return false, nil
+			}
+
 			blockID := block.ID()
 			// keep track of blocks on the fork
 			blockIDs = append(blockIDs, blockID)
 
 			payload, err := s.payloads.ByBlockID(blockID)
 			if err != nil {
-				return fmt.Errorf("could not get block payload %x: %w", blockID, err)
+				return false, fmt.Errorf("could not get block payload %x: %w", blockID, err)
 			}
 
 			// Collect execution results from receipts.
@@ -194,7 +195,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 					result,
 				)
 			}
-			return nil
+			return true, nil
 		})
 	if err != nil {
 		return nil, err

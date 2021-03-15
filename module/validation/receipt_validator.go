@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/storage/util"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/util"
 )
 
 // receiptValidator holds all needed context for checking
@@ -218,10 +218,11 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// loop through the fork backwards, from parent to last sealed, and keep
 	// track of blocks and receipts visited on the way.
 	err = util.TraverseBlocksBackwards(v.headers, header.ParentID,
-		func(block *flow.Header) bool {
-			return block.Height > sealedHeight
-		},
-		func(block *flow.Header) error {
+		func(block *flow.Header) (bool, error) {
+			if block.Height <= sealedHeight {
+				return false, nil
+			}
+
 			blockID := block.ID()
 			// keep track of blocks we iterate over
 			forkBlocks[blockID] = block
@@ -229,13 +230,13 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 			// keep track of all receipts in ancestors
 			index, err := v.index.ByBlockID(blockID)
 			if err != nil {
-				return fmt.Errorf("could not retrieve ancestor index (%x): %w", blockID, err)
+				return false, fmt.Errorf("could not retrieve ancestor index (%x): %w", blockID, err)
 			}
 			for _, recID := range index.ReceiptIDs {
 				forkLookup[recID] = struct{}{}
 			}
 
-			return nil
+			return true, nil
 		})
 	if err != nil {
 		return err
