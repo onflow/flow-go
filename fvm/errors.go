@@ -286,7 +286,6 @@ func (e *EncodingUnsupportedValueError) Code() uint32 {
 }
 
 func handleError(err error) (stopProcessing bool, vmErr Error, fatalErr error) {
-	// TODO: also return if it should continue
 	switch typedErr := err.(type) {
 	case runtime.Error:
 		// If the error originated from the runtime, handle separately
@@ -300,6 +299,9 @@ func handleError(err error) (stopProcessing bool, vmErr Error, fatalErr error) {
 	default:
 		// All other errors are considered fatal
 		return true, nil, err
+
+		// TODO: If there is an authorizer signature error still process fees:
+		// return false, typedErr, nil
 	}
 }
 
@@ -321,6 +323,6 @@ func handleRuntimeError(err runtime.Error) (stopProcessing bool, vmErr Error, fa
 		panic(externalErr.Recovered)
 	}
 
-	// All other errors are non-fatal Cadence errors.
+	// All other errors are non-fatal Cadence errors. Continue processing for fees.
 	return false, &ExecutionError{Err: err}, nil
 }

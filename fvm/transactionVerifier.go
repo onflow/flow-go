@@ -46,7 +46,8 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		defer span.Finish()
 	}
 
-	// TODO: separate payer and proposer errors out
+	// TODO: separate payer and proposer errors from authorizer errors.
+	// If there is an authorizer signature error, still charge fees
 
 	tx := proc.Transaction
 
