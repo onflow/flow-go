@@ -1,4 +1,4 @@
-package assigner
+package blockconsumer
 
 import (
 	"testing"

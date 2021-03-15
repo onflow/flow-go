@@ -1,6 +1,7 @@
-package assigner
+package blockconsumer
 
 import (
+	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -11,7 +12,7 @@ import (
 // the entity that the engine is expecting, and translating the id of
 // the entity back to JobID notify the consumer a job is done.
 type Worker struct {
-	engine   *Engine
+	engine   *assigner.Engine
 	consumer *BlockConsumer
 }
 

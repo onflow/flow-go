@@ -1,4 +1,4 @@
-package assigner
+package blockconsumer
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/state/protocol"
@@ -32,9 +33,14 @@ func defaultProcessedIndex(state protocol.State) (int64, error) {
 
 // NewBlockConsumer creates a new consumer and returns the default processed
 // index for initializing the processed index in storage.
-func NewBlockConsumer(log zerolog.Logger, processedHeight storage.ConsumerProgress, blocks storage.Blocks, state protocol.State, engine *Engine, maxProcessing int64) (*BlockConsumer, int64, error) {
+func NewBlockConsumer(log zerolog.Logger,
+	processedHeight storage.ConsumerProgress,
+	blocks storage.Blocks,
+	state protocol.State,
+	engine *assigner.Engine,
+	maxProcessing int64) (*BlockConsumer, int64, error) {
 	worker := &Worker{engine: engine}
-	engine.withBlockConsumerNotifier(worker)
+	engine.WithBlockConsumerNotifier(worker)
 	jobs := newFinalizedBlockReader(state, blocks)
 	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 
