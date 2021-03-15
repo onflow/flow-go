@@ -111,6 +111,11 @@ func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 }
 
 func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Path) {
+	// check for empty paths
+	if len(paths) == 0 {
+		return
+	}
+
 	// path not found
 	if head == nil {
 		for i := range paths {
@@ -133,28 +138,27 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	partitionIndex := utils.SplitPaths(paths, mt.Height()-head.Height())
+	heightIndex := mt.Height() - head.Height() // distance to the tree root
+	partitionIndex := utils.SplitPaths(paths, heightIndex)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lres, rres := (*res)[:partitionIndex], (*res)[partitionIndex:]
 
 	// read values from left and right subtrees in parallel
 	wg := sync.WaitGroup{}
 	parallelRecursionThreshold := 32 // thresold to avoid the parallelization going too deep in the recursion
-	if len(lpaths) > 0 {
-		if len(lpaths) > parallelRecursionThreshold {
-			wg.Add(1)
-			go func() {
-				mt.read(&lres, head.LeftChild(), lpaths)
-				wg.Done()
-			}()
-		} else {
+
+	if len(lpaths) > parallelRecursionThreshold {
+		wg.Add(1)
+		go func() {
 			mt.read(&lres, head.LeftChild(), lpaths)
-		}
+			wg.Done()
+		}()
+	} else {
+		mt.read(&lres, head.LeftChild(), lpaths)
 	}
 
-	if len(rpaths) > 0 {
-		mt.read(&rres, head.RightChild(), rpaths)
-	}
+	mt.read(&rres, head.RightChild(), rpaths)
+
 	// wait for all threads
 	wg.Wait()
 }
@@ -221,7 +225,8 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	partitionIndex := utils.SplitByPath(paths, payloads, parentTrie.Height()-nodeHeight)
+	heightIndex := parentTrie.Height() - nodeHeight // distance to the tree root
+	partitionIndex := utils.SplitByPath(paths, payloads, heightIndex)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
@@ -269,6 +274,11 @@ func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) {
 }
 
 func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
+	// check for empty paths
+	if len(paths) == 0 {
+		return
+	}
+
 	// we've reached the end of a trie
 	// and path is not found (noninclusion proof)
 	if head == nil {
@@ -295,48 +305,45 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, mt.Height()-head.Height())
+	heightIndex := mt.Height() - head.Height() // distance to the tree root
+	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, heightIndex)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
 	wg := sync.WaitGroup{}
 	parallelRecursionThreshold := 128 // thresold to avoid the parallelization going too deep in the recursion
 
-	if len(lpaths) > 0 {
-		if rChild := head.RightChild(); rChild != nil { // TODO: is that a sanity check?
-			nodeHash := rChild.Hash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height())) // TODO: why not rChild.RegisterCount != 0?
-			if !isDef {                                                                     // in proofs, we only provide non-default value hashes
-				for _, p := range lproofs {
-					utils.SetBit(p.Flags, mt.Height()-head.Height())
-					p.Interims = append(p.Interims, nodeHash)
-				}
+	if rChild := head.RightChild(); rChild != nil { // TODO: is that a sanity check?
+		nodeHash := rChild.Hash()
+		isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height())) // TODO: why not rChild.RegisterCount != 0?
+		if !isDef {                                                                     // in proofs, we only provide non-default value hashes
+			for _, p := range lproofs {
+				utils.SetBit(p.Flags, heightIndex)
+				p.Interims = append(p.Interims, nodeHash)
 			}
 		}
-		if len(lpaths) > parallelRecursionThreshold {
-			wg.Add(1)
-			go func() {
-				mt.proofs(head.LeftChild(), lpaths, lproofs)
-				wg.Done()
-			}()
-		} else {
+	}
+	if len(lpaths) > parallelRecursionThreshold {
+		wg.Add(1)
+		go func() {
 			mt.proofs(head.LeftChild(), lpaths, lproofs)
-		}
+			wg.Done()
+		}()
+	} else {
+		mt.proofs(head.LeftChild(), lpaths, lproofs)
 	}
 
-	if len(rpaths) > 0 {
-		if lChild := head.LeftChild(); lChild != nil {
-			nodeHash := lChild.Hash()
-			isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
-			if !isDef { // in proofs, we only provide non-default value hashes
-				for _, p := range rproofs {
-					utils.SetBit(p.Flags, mt.Height()-head.Height())
-					p.Interims = append(p.Interims, nodeHash)
-				}
+	if lChild := head.LeftChild(); lChild != nil {
+		nodeHash := lChild.Hash()
+		isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
+		if !isDef { // in proofs, we only provide non-default value hashes
+			for _, p := range rproofs {
+				utils.SetBit(p.Flags, heightIndex)
+				p.Interims = append(p.Interims, nodeHash)
 			}
 		}
-		mt.proofs(head.RightChild(), rpaths, rproofs)
 	}
+	mt.proofs(head.RightChild(), rpaths, rproofs)
 	wg.Wait()
 }
 
