@@ -118,7 +118,7 @@ func main() {
 		panic(err)
 	}
 
-	_, _, containers, err := testnet.BootstrapNetwork(conf, BootstrapDir)
+	_, _, _, containers, err := testnet.BootstrapNetwork(conf, BootstrapDir)
 	if err != nil {
 		panic(err)
 	}

@@ -24,30 +24,27 @@ func TestFromSnapshot(t *testing.T) {
 
 	util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
-		// Prepare an epoch builder, which builds epochs with 4 blocks, A,B,C,D
-		// See EpochBuilder documentation for details of these blocks.
-		//
 		epochBuilder := unittest.NewEpochBuilder(t, state)
-		// build blocks WITHIN epoch 1 - PREPARING epoch 2
-		// A - height 0 (root block)
-		// B - height 1 - staking phase
-		// C - height 2 - setup phase
-		// D - height 3 - committed phase
+		// build epoch 1 (prepare epoch 2)
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
-		// build blocks WITHIN epoch 2 - PREPARING epoch 3
-		// A - height 4
-		// B - height 5 - staking phase
-		// C - height 6 - setup phase
-		// D - height 7 - committed phase
+		// build epoch 2 (prepare epoch 3)
 		epochBuilder.
 			BuildEpoch().
 			CompleteEpoch()
 
+		// get heights of each phase in built epochs
+		epoch1, ok := epochBuilder.EpochHeights(1)
+		require.True(t, ok)
+		epoch2, ok := epochBuilder.EpochHeights(2)
+		require.True(t, ok)
+
 		// test that we are able retrieve an in-memory version of root snapshot
 		t.Run("root snapshot", func(t *testing.T) {
-			expected := state.AtHeight(0)
+			root, err := state.Params().Root()
+			require.NoError(t, err)
+			expected := state.AtHeight(root.Height)
 			actual, err := inmem.FromSnapshot(expected)
 			require.NoError(t, err)
 			assertSnapshotsEqual(t, expected, actual)
@@ -57,21 +54,21 @@ func TestFromSnapshot(t *testing.T) {
 		// test getting an in-memory snapshot for all phase of epoch 1
 		t.Run("epoch 1", func(t *testing.T) {
 			t.Run("staking phase", func(t *testing.T) {
-				expected := state.AtHeight(1)
+				expected := state.AtHeight(epoch1.Staking)
 				actual, err := inmem.FromSnapshot(expected)
 				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("setup phase", func(t *testing.T) {
-				expected := state.AtHeight(2)
+				expected := state.AtHeight(epoch1.Setup)
 				actual, err := inmem.FromSnapshot(expected)
 				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("committed phase", func(t *testing.T) {
-				expected := state.AtHeight(3)
+				expected := state.AtHeight(epoch1.Committed)
 				actual, err := inmem.FromSnapshot(expected)
 				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
@@ -82,21 +79,21 @@ func TestFromSnapshot(t *testing.T) {
 		// test getting an in-memory snapshot for all phase of epoch 2
 		t.Run("epoch 2", func(t *testing.T) {
 			t.Run("staking phase", func(t *testing.T) {
-				expected := state.AtHeight(5)
+				expected := state.AtHeight(epoch2.Staking)
 				actual, err := inmem.FromSnapshot(expected)
 				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("setup phase", func(t *testing.T) {
-				expected := state.AtHeight(6)
+				expected := state.AtHeight(epoch2.Setup)
 				actual, err := inmem.FromSnapshot(expected)
 				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)
 				testEncodeDecode(t, actual)
 			})
 			t.Run("committed phase", func(t *testing.T) {
-				expected := state.AtHeight(7)
+				expected := state.AtHeight(epoch2.Committed)
 				actual, err := inmem.FromSnapshot(expected)
 				require.NoError(t, err)
 				assertSnapshotsEqual(t, expected, actual)

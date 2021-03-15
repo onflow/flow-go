@@ -8,7 +8,6 @@ require (
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
-	github.com/coreos/etcd v3.3.10+incompatible
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
@@ -61,7 +60,6 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
-	google.golang.org/grpc/examples v0.0.0-20210217184607-1b75f7144df2 // indirect
 	gotest.tools v2.2.0+incompatible
 )
 
