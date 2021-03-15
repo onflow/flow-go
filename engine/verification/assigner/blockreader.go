@@ -15,6 +15,14 @@ type FinalizedBlockReader struct {
 	blocks storage.Blocks
 }
 
+// newFinalizedBlockReader creates and returns a FinalizedBlockReader.
+func newFinalizedBlockReader(state protocol.State, blocks storage.Blocks) *FinalizedBlockReader {
+	return &FinalizedBlockReader{
+		state:  state,
+		blocks: blocks,
+	}
+}
+
 // AtIndex returns the block job at the given index.
 // The block job at an index is just be the finalized block at that index (i.e., height).
 func (r FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
