@@ -15,6 +15,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/engine/consensus/matching/sealingtracker"
+
 	"github.com/onflow/flow-go/state"
 
 	"github.com/onflow/flow-go/engine"
@@ -575,9 +577,9 @@ func (c *Core) CheckSealing() error {
 // function. It also filters out results that have an incorrect sub-graph.
 // It specifically returns the information for the next unsealed results which will
 // be useful for debugging the potential sealing halt issue
-func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *SealingTracker, error) {
+func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.SealingTracker, error) {
 	//tracking functionality to collection information about the sealing status.
-	sealingTracker := NewSealingTracker(c.state)
+	sealingTracker := sealingtracker.NewSealingTracker(c.state)
 
 	lastFinalized, err := c.state.Final().Head()
 	if err != nil {
@@ -587,58 +589,44 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *SealingTracker, e
 	// go through the results mempool and check which ones we can construct a candidate seal for
 	var results []*flow.IncorporatedResult
 	for _, incorporatedResult := range c.incorporatedResults.All() {
-
-		// Can we seal according to the happy-path sealing protocol?
-		happySealed, failingChunkIdx, err := c.hasEnoughApprovals(incorporatedResult)
+		// Can we seal following the happy-path protocol?
+		sealingStatus, err := c.hasEnoughApprovals(incorporatedResult, sealingTracker)
 		if state.IsNoValidChildBlockError(err) {
 			continue
 		}
 		if err != nil {
 			return nil, nil, fmt.Errorf("internal error matching chunk approvals to incorporated result: %w", err)
 		}
+		happySealable := sealingStatus.SufficientApprovalsForSealing
 
-		// Fallback: can we emergency seal?
-		emergencySealed := false
-		if !happySealed {
-			emergencySealed, err = c.emergencySealable(incorporatedResult, lastFinalized)
+		// Emergency Sealing Fallback: only kicks in if we can't seal following the happy-path sealing
+		emergencySealable := false
+		if !happySealable {
+			emergencySealable, err = c.emergencySealable(incorporatedResult, lastFinalized)
 			if err != nil {
 				return nil, nil, fmt.Errorf("internal error matching chunk approvals to incorporated result: %w", err)
 			}
+			sealingStatus.SetQualifiesForEmergencySealing(emergencySealable)
 		}
 
-		if happySealed || emergencySealed {
-			if c.resultHasMultipleReceipts(incorporatedResult) {
+		// Determine sealability:
+		//  (i) the incorporatedResult must qualify for happy path sealing
+		//      or qualify for emergency sealing
+		// AND
+		// (ii) there must be at least 2 receipts from _different_ ENs
+		//      committing to the result
+		// comment: we evaluate condition (ii) only if (i) is true
+		if happySealable || emergencySealable {
+			hasMultipleReceipts := c.resultHasMultipleReceipts(incorporatedResult)
+			sealingStatus.SetHasMultipleReceipts(hasMultipleReceipts)
+			if hasMultipleReceipts {
 				// add the result to the results that should be sealed
 				results = append(results, incorporatedResult)
 			}
 		}
-
-		// not finding the block header for an incorporated result is a fatal
-		// implementation bug, as we only add results to the IncorporatedResults
-		// mempool, where _both_ the block that incorporates the result as well
-		// as the block the result pertains to are known
-		block, err := c.headersDB.ByBlockID(incorporatedResult.Result.BlockID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not retrieve block: %w", err)
-		}
-
-		if nextUnsealedIsFinalized {
-			if incorporatedResult.Result.BlockID == nextUnsealed {
-				nextUnsealeds = append(nextUnsealeds, &nextUnsealedResult{
-					BlockID:                       incorporatedResult.Result.BlockID,
-					Height:                        block.Height,
-					ResultID:                      incorporatedResult.Result.ID(),
-					IncorporatedResultID:          incorporatedResult.ID(),
-					NumberChunks:                  len(incorporatedResult.Result.Chunks),
-					FirstUnmatchedChunkIndex:      unmatchedIndex,
-					SufficientApprovalsForSealing: matched,
-					QualifiesForEmergencySealing:  emergencySealed,
-				})
-			}
-		}
 	}
 
-	return results, nextUnsealeds, nil
+	return results, sealingTracker, nil
 }
 
 // hasEnoughApprovals implements the HAPPY-PATH SEALING-logic. Details:
@@ -650,33 +638,23 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *SealingTracker, e
 // the result). Approvals from all authorized Verifiers are added to
 // IncorporatedResult (which internally de-duplicates Approvals).
 // Returns:
-// * bool: true if and only if all chunks have sufficient approvals
-// * int: This value is only set if _some_ chunks have insufficient approvals. In this case,
-//        the int holds the index of the _first_ chunk with insufficient approvals.
-//        Otherwise, this value is -1.
+// * sealingRecord: a record holding information about the incorporatedResult's sealing status
 // * error:
 //   - NoValidChildBlockError: if the block that incorporates `incorporatedResult` does _not_
 //     have a child yet. Then, the chunk assignment cannot be computed.
 //   - All other errors are unexpected and symptoms of internal bugs, uncovered edge cases,
 //     or a corrupted internal node state. These are all fatal failures.
-// Essentially, this method has 3 possible classes of returns:
-// * [false, i, nil] for i=0,1,2,...:
-//   the result has _not_ enough approvals; the first chunk with insufficient approvals has index i
-// * [true, -1, nil]:
-//   all chunks of the result have sufficient number of approvals
-// * [false, -1, err]:
-//   an error has occurred (possible error cases above)
-func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (bool, int, error) {
+func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult, sealingTracker *sealingtracker.SealingTracker) (*sealingtracker.SealingRecord, error) {
 	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return false, -1, fmt.Errorf("could not determine chunk assignment: %w", err)
+		return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
 
 	// pre-select all authorized Verifiers at the block that incorporates the result
 	authorizedVerifiers, err := c.authorizedVerifiersAtBlock(incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return false, -1, fmt.Errorf("could not determine authorized verifiers at block %v: %w", incorporatedResult.IncorporatedBlockID, err)
+		return nil, fmt.Errorf("could not determine authorized verifiers at block %v: %w", incorporatedResult.IncorporatedBlockID, err)
 	}
 
 	// Internal consistency check:
@@ -685,7 +663,7 @@ func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (
 	// should have never made it into the mempool in the first place. We explicitly check this here,
 	// so we don't have to worry about this edge case when matching approvals to chunks (below).
 	if len(incorporatedResult.Result.Chunks) == 0 {
-		return false, -1, fmt.Errorf("could not determine chunk assignment: %w", err)
+		return nil, fmt.Errorf("incorporated result with zero chunks in mempool")
 	}
 
 	// Check whether each chunk has enough approvals
@@ -717,12 +695,14 @@ func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (
 
 		// abort checking approvals for incorporatedResult if current chunk has insufficient approvals
 		if incorporatedResult.NumberSignatures(chunk.Index) < c.requiredApprovalsForSealConstruction {
-			return false, int(chunk.Index), nil
+			sealingStatus := sealingTracker.InsufficientApprovals(incorporatedResult, chunk.Index)
+			return sealingStatus, nil
 		}
 	}
 
 	// all chunks have sufficient approvals
-	return true, -1, nil
+	sealingStatus := sealingTracker.SufficientApprovals(incorporatedResult)
+	return sealingStatus, nil
 }
 
 // emergencySealable determines whether an incorporated Result qualifies for "emergency sealing".
@@ -745,10 +725,10 @@ func (c *Core) emergencySealable(result *flow.IncorporatedResult, finalized *flo
 }
 
 // resultHasMultipleReceipts implements an additional _temporary_ safety measure:
-// only consider incorporatedResult sealable if we have AT LEAST 2 RECEIPTS committing
-// to the respective result from _different_ ENs
+// only consider incorporatedResult sealable if there are at AT LEAST 2 RECEIPTS
+// from _different_ ENs committing to the result.
 func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedResult) bool {
-	blockID := incorporatedResult.Result.BlockID // block the result pertains to
+	blockID := incorporatedResult.Result.BlockID // block that was computed
 	resultID := incorporatedResult.Result.ID()
 
 	// get all receipts that are known for the block
@@ -760,8 +740,8 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 		return false
 	}
 
-	// index receipts for given incorporatedResult by their executor
-	// in case there are multiple receipts from the same executor, we keep the last one
+	// Index receipts for given incorporatedResult by their executor. In case
+	// there are multiple receipts from the same executor, we keep the last one.
 	receiptsForIncorporatedResults := receipts.GroupByResultID().GetGroup(resultID)
 	if receiptsForIncorporatedResults.GroupByExecutorID().NumberGroups() < 2 {
 		return false // too few receipts
