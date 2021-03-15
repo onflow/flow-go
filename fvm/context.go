@@ -6,19 +6,21 @@ import (
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain                            flow.Chain
-	ASTCache                         ASTCache
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
+	Tracer                           module.Tracer
 	GasLimit                         uint64
 	MaxStateKeySize                  uint64
 	MaxStateValueSize                uint64
 	MaxStateInteractionSize          uint64
 	EventCollectionByteSizeLimit     uint64
+	MaxNumOfTxRetries                uint8
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
@@ -57,20 +59,22 @@ const AccountKeyWeightThreshold = 1000
 
 const (
 	DefaultGasLimit                     = 100_000 // 100K
-	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
+	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+	DefaultMaxNumOfTxRetries            = 3
 )
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
-		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
+		Tracer:                           nil,
 		GasLimit:                         DefaultGasLimit,
 		MaxStateKeySize:                  state.DefaultMaxKeySize,
 		MaxStateValueSize:                state.DefaultMaxValueSize,
 		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
 		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:                DefaultMaxNumOfTxRetries,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
@@ -99,14 +103,6 @@ type Option func(ctx Context) Context
 func WithChain(chain flow.Chain) Option {
 	return func(ctx Context) Context {
 		ctx.Chain = chain
-		return ctx
-	}
-}
-
-// WithASTCache sets the AST cache for a virtual machine context.
-func WithASTCache(cache ASTCache) Option {
-	return func(ctx Context) Context {
-		ctx.ASTCache = cache
 		return ctx
 	}
 }
@@ -180,6 +176,14 @@ func WithBlocks(blocks Blocks) Option {
 func WithMetricsCollector(mc *MetricsCollector) Option {
 	return func(ctx Context) Context {
 		ctx.Metrics = mc
+		return ctx
+	}
+}
+
+// WithTracer sets the tracer for a virtual machine context.
+func WithTracer(tr module.Tracer) Option {
+	return func(ctx Context) Context {
+		ctx.Tracer = tr
 		return ctx
 	}
 }

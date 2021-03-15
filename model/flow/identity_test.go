@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	//"github.com/stretchr/testify/require"
 	//"github.com/vmihailenco/msgpack/v4"
 
@@ -117,5 +119,18 @@ func TestIdentityList_Union(t *testing.T) {
 			assert.False(t, dupe)
 			uniques[identity.NodeID] = struct{}{}
 		}
+	})
+
+}
+
+func TestSample(t *testing.T) {
+	t.Run("Sample max", func(t *testing.T) {
+		il := unittest.IdentityListFixture(10)
+		require.Equal(t, uint(10), il.Sample(10).Count())
+	})
+
+	t.Run("Sample oversized", func(t *testing.T) {
+		il := unittest.IdentityListFixture(10)
+		require.Equal(t, uint(10), il.Sample(11).Count())
 	})
 }

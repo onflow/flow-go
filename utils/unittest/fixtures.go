@@ -9,6 +9,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 
@@ -480,8 +481,12 @@ func ExecutionReceiptFixture(opts ...func(*flow.ExecutionReceipt)) *flow.Executi
 }
 
 func ReceiptForBlockFixture(block *flow.Block) *flow.ExecutionReceipt {
+	return ReceiptForBlockExecutorFixture(block, IdentifierFixture())
+}
+
+func ReceiptForBlockExecutorFixture(block *flow.Block, executor flow.Identifier) *flow.ExecutionReceipt {
 	result := ExecutionResultFixture(WithBlock(block))
-	receipt := ExecutionReceiptFixture(WithResult(result))
+	receipt := ExecutionReceiptFixture(WithResult(result), WithExecutorID(executor))
 	return receipt
 }
 
@@ -507,7 +512,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
-		result.Chunks = ChunksFixture(uint(chunks), block.ID())
+		result.Chunks = ChunkListFixture(uint(chunks), block.ID())
 		result.Chunks[0].StartState = startState // set start state to value before update
 		result.PreviousResultID = previousResultID
 	}
@@ -518,7 +523,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	result := &flow.ExecutionResult{
 		PreviousResultID: IdentifierFixture(),
 		BlockID:          IdentifierFixture(),
-		Chunks:           ChunksFixture(2, blockID),
+		Chunks:           ChunkListFixture(2, blockID),
 	}
 
 	for _, apply := range opts {
@@ -755,7 +760,7 @@ func ChunkFixture(blockID flow.Identifier, collectionIndex uint) *flow.Chunk {
 	}
 }
 
-func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
+func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
 	chunks := make([]*flow.Chunk, 0, n)
 	for i := uint64(0); i < uint64(n); i++ {
 		chunk := ChunkFixture(blockID, uint(i))
@@ -763,6 +768,22 @@ func ChunksFixture(n uint, blockID flow.Identifier) []*flow.Chunk {
 		chunks = append(chunks, chunk)
 	}
 	return chunks
+}
+
+func ChunkLocatorListFixture(n uint) chunks.LocatorList {
+	locators := chunks.LocatorList{}
+	resultID := IdentifierFixture()
+	for i := uint64(0); i < uint64(n); i++ {
+		locators = append(locators, ChunkLocatorFixture(resultID, i))
+	}
+	return locators
+}
+
+func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator {
+	return &chunks.Locator{
+		ResultID: resultID,
+		Index:    index,
+	}
 }
 
 func SignatureFixture() crypto.Signature {
@@ -1050,7 +1071,7 @@ func VoteFixture() *hotstuff.Vote {
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants
+		setup.Participants = participants.Order(order.ByNodeIDAsc)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
@@ -1232,6 +1253,12 @@ func ReceiptChainFor(blocks []*flow.Block, result0 *flow.ExecutionResult) []*flo
 // so that all the blocks are connected.
 // blocks' height have to be in strict increasing order.
 func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.ExecutionReceipt) {
+	blocks[0].Header.PayloadHash = blocks[0].Payload.Hash()
+	receipts[0].ExecutionResult.BlockID = blocks[0].ID()
+	for _, chunk := range receipts[0].ExecutionResult.Chunks {
+		chunk.BlockID = blocks[0].ID()
+	}
+
 	for i := 1; i < len(blocks); i++ {
 		b := blocks[i]
 		p := i - 1
@@ -1241,11 +1268,11 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 		}
 		b.Header.ParentID = prev.ID()
 		b.Header.PayloadHash = b.Payload.Hash()
-		receipts[i].ExecutionResult.BlockID = prev.ID()
+		receipts[i].ExecutionResult.BlockID = b.ID()
 		prevReceipt := receipts[p]
 		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
 		for _, c := range receipts[i].ExecutionResult.Chunks {
-			c.BlockID = prev.ID()
+			c.BlockID = b.ID()
 		}
 	}
 }

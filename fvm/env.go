@@ -5,16 +5,23 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
+	tracelog "github.com/opentracing/opentracing-go/log"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -24,13 +31,14 @@ var _ runtime.Interface = &hostEnv{}
 var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx              Context
-	st               *state.State
-	vm               *VirtualMachine
-	accounts         *state.Accounts
-	addressGenerator flow.AddressGenerator
-	uuidGenerator    *UUIDGenerator
-	runtime.Metrics
+	ctx                Context
+	st                 *state.State
+	vm                 *VirtualMachine
+	accounts           *state.Accounts
+	contracts          *handler.ContractHandler
+	addressGenerator   flow.AddressGenerator
+	uuidGenerator      *UUIDGenerator
+	metrics            runtime.Metrics
 	events             []flow.Event
 	serviceEvents      []flow.Event
 	totalEventByteSize uint64
@@ -38,10 +46,14 @@ type hostEnv struct {
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
+	programs           *Programs
 }
 
 func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
-
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
+		defer sp.Finish()
+	}
 	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
 	if err != nil {
 		panic(fmt.Errorf("cannot create hasher: %w", err))
@@ -49,12 +61,16 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
 	return hasher.ComputeHash(data), nil
 }
 
-func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv, error) {
+func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *Programs) (*hostEnv, error) {
 	accounts := state.NewAccounts(st)
 	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
+
+	contracts := handler.NewContractHandler(accounts,
+		ctx.RestrictedDeploymentEnabled,
+		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
 
 	uuids := state.NewUUIDs(st)
 	uuidGenerator := NewUUIDGenerator(uuids)
@@ -63,11 +79,13 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 		ctx:                ctx,
 		st:                 st,
 		vm:                 vm,
-		Metrics:            &noopMetricsCollector{},
+		metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
+		contracts:          contracts,
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
+		programs:           programs,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -75,7 +93,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State) (*hostEnv,
 	}
 
 	if ctx.Metrics != nil {
-		env.Metrics = &metricsCollector{ctx.Metrics}
+		env.metrics = &metricsCollector{ctx.Metrics}
 	}
 
 	return env, nil
@@ -94,11 +112,17 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		e.vm,
 		e.ctx,
 		e.st,
+		e.programs,
 		e.accounts,
+		e.contracts,
 		e.addressGenerator,
 		tx,
 		txIndex,
 	)
+}
+
+func (e *hostEnv) setTraceSpan(span opentracing.Span) {
+	e.transactionEnv.traceSpan = span
 }
 
 func (e *hostEnv) getEvents() []flow.Event {
@@ -113,7 +137,20 @@ func (e *hostEnv) getLogs() []string {
 	return e.logs
 }
 
+func (e *hostEnv) isTraceable() bool {
+	return e.ctx.Tracer != nil && e.transactionEnv != nil && e.transactionEnv.traceSpan != nil
+}
+
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetValue)
+		sp.LogFields(
+			traceLog.String("owner", string(owner)),
+			traceLog.String("key", string(key)),
+		)
+		defer sp.Finish()
+	}
+
 	v, _ := e.accounts.GetValue(
 		flow.BytesToAddress(owner),
 		string(key),
@@ -122,6 +159,11 @@ func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 }
 
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvSetValue)
+		defer sp.Finish()
+	}
+
 	return e.accounts.SetValue(
 		flow.BytesToAddress(owner),
 		string(key),
@@ -130,6 +172,11 @@ func (e *hostEnv) SetValue(owner, key, value []byte) error {
 }
 
 func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvValueExists)
+		defer sp.Finish()
+	}
+
 	v, err := e.GetValue(owner, key)
 	if err != nil {
 		return false, err
@@ -139,16 +186,27 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 }
 
 func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetStorageUsed)
+		defer sp.Finish()
+	}
+
 	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
 }
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetStorageCapacity)
+		defer sp.Finish()
+	}
+
 	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
 
 	err = e.vm.Run(
 		e.ctx,
 		script,
 		e.st,
+		e.programs,
 	)
 	if err != nil {
 		return 0, err
@@ -170,12 +228,18 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 }
 
 func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetAccountBalance)
+		defer sp.Finish()
+	}
+
 	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
 
 	err = e.vm.Run(
 		e.ctx,
 		script,
 		e.st,
+		e.programs,
 	)
 	if err != nil {
 		return 0, err
@@ -196,7 +260,10 @@ func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvResolveLocation)
+		defer sp.Finish()
+	}
 	addressLocation, isAddress := location.(common.AddressLocation)
 
 	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
@@ -216,8 +283,7 @@ func (e *hostEnv) ResolveLocation(
 	// then fetch all identifiers at this address
 
 	if len(identifiers) == 0 {
-		address := flow.Address(addressLocation.Address)
-		contractNames, err := e.accounts.GetContractNames(address)
+		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
 		if err != nil {
 			panic(err)
 		}
@@ -257,49 +323,57 @@ func (e *hostEnv) ResolveLocation(
 }
 
 func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCode)
+		defer sp.Finish()
+	}
+
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
 		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
 
-	address := flow.BytesToAddress(contractLocation.Address.Bytes())
-
-	code, err := e.accounts.GetContract(contractLocation.Name, address)
-	if err != nil {
-		return nil, err
-	}
-
-	return code, nil
+	return e.contracts.GetContract(contractLocation.Address, contractLocation.Name)
 }
 
-func (e *hostEnv) GetCachedProgram(location common.Location) (*ast.Program, error) {
-	if e.ctx.ASTCache == nil {
-		return nil, nil
+func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetProgram)
+		defer sp.Finish()
 	}
 
-	program, err := e.ctx.ASTCache.GetProgram(location)
+	program := e.programs.Get(location)
 	if program != nil {
-		// Program was found within cache, do an explicit ledger register touch
+		// Program was found, do an explicit ledger register touch
 		// to ensure consistent reads during chunk verification.
 		if addressLocation, ok := location.(common.AddressLocation); ok {
-			e.accounts.TouchContract(addressLocation.Name, flow.BytesToAddress(addressLocation.Address.Bytes()))
+			e.accounts.TouchContract(
+				addressLocation.Name,
+				flow.BytesToAddress(addressLocation.Address.Bytes()),
+			)
 		}
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return program, err
+	return program, nil
 }
 
-func (e *hostEnv) CacheProgram(location common.Location, program *ast.Program) error {
-	if e.ctx.ASTCache == nil {
-		return nil
+func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvSetProgram)
+		defer sp.Finish()
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.ctx.ASTCache.SetProgram(location, program)
+	e.programs.Set(location, program)
+
+	return nil
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvProgramLog)
+		defer sp.Finish()
+	}
+
 	if e.ctx.CadenceLoggingEnabled {
 		e.logs = append(e.logs, message)
 	}
@@ -307,6 +381,10 @@ func (e *hostEnv) ProgramLog(message string) error {
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvEmitEvent)
+		defer sp.Finish()
+	}
 
 	if e.transactionEnv == nil {
 		return errors.New("emitting events is not supported")
@@ -346,6 +424,11 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 }
 
 func (e *hostEnv) GenerateUUID() (uint64, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGenerateUUID)
+		defer sp.Finish()
+	}
+
 	// TODO add not supported
 	uuid, err := e.uuidGenerator.GenerateUUID()
 	return uuid, err
@@ -365,6 +448,11 @@ func (e *hostEnv) SetComputationUsed(used uint64) error {
 }
 
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvDecodeArgument)
+		defer sp.Finish()
+	}
+
 	return jsoncdc.Decode(b)
 }
 
@@ -384,6 +472,11 @@ func (e *hostEnv) VerifySignature(
 	rawSigAlgo string,
 	rawHashAlgo string,
 ) (bool, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvVerifySignature)
+		defer sp.Finish()
+	}
+
 	valid, err := verifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
@@ -413,6 +506,11 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 
 // GetCurrentBlockHeight returns the current block height.
 func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
+		defer sp.Finish()
+	}
+
 	if e.ctx.BlockHeader == nil {
 		return 0, errors.New("getting the current block height is not supported")
 	}
@@ -422,6 +520,11 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
 func (e *hostEnv) UnsafeRandom() (uint64, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvUnsafeRandom)
+		defer sp.Finish()
+	}
+
 	if e.rng == nil {
 		return 0, errors.New("unsafe random is not supported")
 	}
@@ -441,6 +544,11 @@ func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 
 // GetBlockAtHeight returns the block at the given height.
 func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetBlockAtHeight)
+		defer sp.Finish()
+	}
+
 	if e.ctx.Blocks == nil {
 		return runtime.Block{}, false, errors.New("getting block information is not supported")
 	}
@@ -465,6 +573,11 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 // Transaction Environment Functions
 
 func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvCreateAccount)
+		defer sp.Finish()
+	}
+
 	if e.transactionEnv == nil {
 		return runtime.Address{}, errors.New("creating accounts is not supported")
 	}
@@ -474,6 +587,11 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 }
 
 func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvAddAccountKey)
+		defer sp.Finish()
+	}
+
 	if e.transactionEnv == nil {
 		return errors.New("adding account keys is not supported")
 	}
@@ -483,6 +601,11 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 }
 
 func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvRemoveAccountKey)
+		defer sp.Finish()
+	}
+
 	if e.transactionEnv == nil {
 		return nil, errors.New("removing account keys is not supported")
 	}
@@ -492,6 +615,11 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 }
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvUpdateAccountContractCode)
+		defer sp.Finish()
+	}
+
 	if e.transactionEnv == nil {
 		return errors.New("updating account contract code is not supported")
 	}
@@ -501,6 +629,11 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetAccountContractCode)
+		defer sp.Finish()
+	}
+
 	return e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
@@ -508,6 +641,11 @@ func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (
 }
 
 func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvRemoveAccountContractCode)
+		defer sp.Finish()
+	}
+
 	if e.transactionEnv == nil {
 		return errors.New("removing account contracts is not supported")
 	}
@@ -516,31 +654,11 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	return e.transactionEnv.RemoveAccountContractCode(address, name)
 }
 
-func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
-	accountAddress := flow.Address(address)
-
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return errors.New("code deployment requires authorization from the service account")
-	}
-
-	return e.accounts.SetContract(name, accountAddress, code)
-}
-
-func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
-	accountAddress := flow.Address(address)
-
-	// must be signed by the service account
-	if e.ctx.RestrictedDeploymentEnabled && !e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress())) {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return errors.New("code deployment requires authorization from the service account")
-	}
-
-	return e.accounts.DeleteContract(name, accountAddress)
-}
-
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetSigningAccounts)
+		defer sp.Finish()
+	}
 	if e.transactionEnv == nil {
 		return nil, errors.New("getting signer accounts is not supported")
 	}
@@ -553,37 +671,99 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 	return nil
 }
 
-// Transaction Environment
+func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration) {
+	if e.isTraceable() {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
+			[]opentracing.LogRecord{{Timestamp: time.Now(),
+				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+			},
+			},
+		)
+	}
+	e.metrics.ProgramParsed(location, duration)
+}
 
+func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duration) {
+	if e.isTraceable() {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
+			[]opentracing.LogRecord{{Timestamp: time.Now(),
+				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+			},
+			},
+		)
+	}
+	e.metrics.ProgramChecked(location, duration)
+}
+
+func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
+	if e.isTraceable() {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
+			[]opentracing.LogRecord{{Timestamp: time.Now(),
+				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+			},
+			},
+		)
+	}
+	e.metrics.ProgramInterpreted(location, duration)
+}
+
+func (e *hostEnv) ValueEncoded(duration time.Duration) {
+	if e.isTraceable() {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceEncodeValue, duration,
+			[]opentracing.LogRecord{},
+		)
+	}
+	e.metrics.ValueEncoded(duration)
+}
+
+func (e *hostEnv) ValueDecoded(duration time.Duration) {
+	if e.isTraceable() {
+		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceDecodeValue, duration,
+			[]opentracing.LogRecord{},
+		)
+	}
+	e.metrics.ValueDecoded(duration)
+}
+
+func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
+	// commit changes and return a list of updated keys
+	return e.contracts.Commit()
+}
+
+// Transaction Environment
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
 	st               *state.State
+	programs         *Programs
 	accounts         *state.Accounts
+	contracts        *handler.ContractHandler
 	addressGenerator flow.AddressGenerator
-
-	tx      *flow.TransactionBody
-	txIndex uint32
-	txID    flow.Identifier
-
-	authorizers []runtime.Address
+	tx               *flow.TransactionBody
+	txIndex          uint32
+	txID             flow.Identifier
+	traceSpan        opentracing.Span
+	authorizers      []runtime.Address
 }
 
 func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
 	st *state.State,
+	programs *Programs,
 	accounts *state.Accounts,
+	contracts *handler.ContractHandler,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
 	txIndex uint32,
-
 ) *transactionEnv {
 	return &transactionEnv{
 		vm:               vm,
 		ctx:              ctx,
 		st:               st,
+		programs:         programs,
 		accounts:         accounts,
+		contracts:        contracts,
 		addressGenerator: addressGenerator,
 		tx:               tx,
 		txIndex:          txIndex,
@@ -636,6 +816,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
 			e.st,
+			e.programs,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -702,7 +883,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if keyIndex < 0 {
-		return nil, fmt.Errorf("key index must be positve, received %d", keyIndex)
+		return nil, fmt.Errorf("key index must be positive, received %d", keyIndex)
 	}
 
 	var publicKey flow.AccountPublicKey
@@ -723,11 +904,10 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	return encodedPublicKey, nil
 }
 
-func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {
-	for _, accountAddress := range e.GetSigningAccounts() {
-		if accountAddress == address {
-			return true
-		}
-	}
-	return false
+func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
+	return e.contracts.SetContract(address, name, code, e.GetSigningAccounts())
+}
+
+func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
+	return e.contracts.RemoveContract(address, name, e.GetSigningAccounts())
 }

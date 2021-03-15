@@ -10,19 +10,12 @@ jobs:
     name: Push to container registry
     runs-on: ubuntu-latest
     steps:
-    - name: Granting private modules access
-      run: |
-        git config --global url."https://${{ secrets.GO_MODULES_TOKEN }}:x-oauth-basic@github.com/onflow".insteadOf "https://github.com/onflow"
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
         go-version: '1.13'
     - name: Checkout repo
       uses: actions/checkout@v2
-    - name: Install SSH agent
-      uses: webfactory/ssh-agent@v0.4.1
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
     - name: Build relic
       run: make crypto/relic/build
     # Provide Google Service Account credentials to Github Action, allowing interaction with the Google Container Registry

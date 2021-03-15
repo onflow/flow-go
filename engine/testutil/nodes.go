@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -231,6 +232,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
+	pendingReceipts := stdmap.NewPendingReceipts(1000)
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
@@ -247,7 +249,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
-	matchingEngine, err := matching.New(
+	matchingEngine, err := matching.NewEngine(
 		node.Log,
 		node.Metrics,
 		node.Tracer,
@@ -264,6 +266,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		receipts,
 		approvals,
 		seals,
+		pendingReceipts,
 		assigner,
 		receiptValidator,
 		approvalValidator,
@@ -299,6 +302,10 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainI
 	}
 
 	return nodes
+}
+
+type CheckerMock struct {
+	notifications.NoopConsumer // satisfy the FinalizationConsumer interface
 }
 
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
@@ -339,7 +346,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, results, receipts, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, eventsStorage, serviceEventsStorage, txResultStorage, node.DB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -376,6 +383,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		vm,
 		vmCtx,
+		computation.DefaultProgramsCacheSize,
 	)
 	require.NoError(t, err)
 
@@ -388,6 +396,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	deltas, err := ingestion.NewDeltas(1000)
 	require.NoError(t, err)
+
+	checkerEngine := &CheckerMock{}
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
@@ -417,7 +427,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore, finalizer := createFollowerCore(t, &node, followerState, ingestionEngine, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, followerState, checkerEngine, rootHead, rootQC)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)

@@ -380,11 +380,11 @@ func SnapshotToBytes(snapshot protocol.Snapshot) ([]byte, error) {
 
 // BytesToInmemSnapshot converts an array of bytes to `inmem.Snapshot`
 func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
-	var snapshot inmem.Snapshot
-	err := json.Unmarshal(bytes, &snapshot)
+	var encodable inmem.EncodableSnapshot
+	err := json.Unmarshal(bytes, &encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal snapshot data retreived from access node: %w", err)
 	}
 
-	return &snapshot, nil
+	return inmem.SnapshotFromEncodable(encodable), nil
 }
