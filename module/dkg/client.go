@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/cadence"
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"google.golang.org/grpc"
 
@@ -16,25 +15,24 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
 )
 
 // Client is a client to the Flow DKG contract. Allows functionality to Broadcast,
 // read a Broadcast and submit the final result of the DKG protocol
 type Client struct {
-	accessAddress      string
 	dkgContractAddress string
 	accountAddress     sdk.Address
 	accountKeyIndex    uint
-	flowClient         *client.Client
+	flowClient         module.DKGSDKClientWrapper
 	signer             sdkcrypto.Signer
 
 	env templates.Environment // the required contract addresses to be used by the Flow SDK
 }
 
 // NewClient initializes a new client to the Flow DKG contract
-func NewClient(accessAddress, dkgContractAddress, accountAddress string, accountKeyIndex uint, flowClient *client.Client, signer sdkcrypto.Signer) *Client {
+func NewClient(flowClient module.DKGSDKClientWrapper, signer sdkcrypto.Signer, dkgContractAddress, accountAddress string, accountKeyIndex uint) *Client {
 	return &Client{
-		accessAddress:      accessAddress,
 		flowClient:         flowClient,
 		dkgContractAddress: dkgContractAddress,
 		signer:             signer,
@@ -153,14 +151,13 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		SetPayer(c.accountAddress).
 		AddAuthorizer(c.accountAddress)
 
-	// create cadence array from public keys
-	// Need to make sure that the order in which these are sent to the
-	// contract are the same as when we pull them out
+	// Note: We need to make sure that we pull the keys out in the same order that
+	// we have done here. Group Public key first followed by the individual public keys
 	finalSubmission := make([]cadence.Value, len(publicKeys))
+	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()))
 	for _, publicKey := range publicKeys {
 		finalSubmission = append(finalSubmission, cadence.NewString(publicKey.String()))
 	}
-	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()))
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
 	if err != nil {

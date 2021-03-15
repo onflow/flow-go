@@ -3,10 +3,25 @@
 package module
 
 import (
+	"context"
+
+	"github.com/onflow/cadence"
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"google.golang.org/grpc"
 )
+
+// DKGSDKClientWrapper is a temporary solution to mocking the `sdk.Client` interface from `flow-go-sdk`
+type DKGSDKClientWrapper interface {
+	GetAccount(context.Context, sdk.Address, ...grpc.CallOption) (*sdk.Account, error)
+	GetAccountAtLatestBlock(context.Context, sdk.Address, ...grpc.CallOption) (*sdk.Account, error)
+	SendTransaction(context.Context, sdk.Transaction, ...grpc.CallOption) error
+	GetLatestBlock(context.Context, bool, ...grpc.CallOption) (*sdk.Block, error)
+	GetTransactionResult(context.Context, sdk.Identifier, ...grpc.CallOption) (*sdk.TransactionResult, error)
+	ExecuteScriptAtBlockID(context.Context, flow.Identifier, []byte, []cadence.Value, ...grpc.CallOption) (cadence.Value, error)
+}
 
 // DKGContractClient enables interacting with the DKG smart contract. This
 // contract is deployed to the service account as part of a collection of
