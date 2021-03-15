@@ -3,17 +3,23 @@ package common
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
 // timeout for individual actions
@@ -46,18 +52,27 @@ func TestMVP_Bootstrap(t *testing.T) {
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
 
-	// TODO: Wait for a few blocks to finalize, will need to submit a few transactions
-	// and wait for it to be sealed.
+	tx := sdk.NewTransaction()
+	err = client.SendTransaction(ctx, tx)
+	require.NoError(t, err)
 
-	// download root snapshot from Access Node\
-	// TODO: replace with Transit snapshot download
+	// wait for transaction to be sealed
+	result, err := client.WaitForSealed(ctx, tx.ID())
+	assert.True(t, result.Status == sdk.TransactionStatusSealed)
+
+	// download root snapshot from access node
 	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(t, err)
 
-	// TODO: verify root snapshot block is not for the genesis block, ensure that the
-	// blockID is not for the GenesisBlock.ID()
+	// verify that the downloaded snapshot is not for the genesis block
+	header, err := snapshot.Head()
+	assert.True(t, header.ID() != initialRoot.Header.ID())
 
-	// TODO: overrite bootstrap public root information file with the latest snapshot
+	// overrite bootstrap public root information file with the latest snapshot
+	bytes, err := convert.SnapshotToBytes(snapshot)
+	require.NoError(t, err)
+	err = ioutils.WriteFile(filepath.Join(testnet.DefaultBootstrapDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+	require.NoError(t, err)
 
 	// Restart network
 	flowNetwork.StopContainers()

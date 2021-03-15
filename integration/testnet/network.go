@@ -637,7 +637,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
+		return nil, nil, nil, err
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot)

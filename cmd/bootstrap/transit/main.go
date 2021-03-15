@@ -142,8 +142,8 @@ func main() {
 		return
 	}
 
-	if prepare {
-		runDownloadSnapshot(ctx, bootDir, nodeID, "")
+	if downloadSnapshot {
+		RunDownloadSnapshot(ctx, bootDir, nodeID, "")
 		return
 	}
 }
@@ -257,9 +257,9 @@ func runPrepare(bootdir, nodeID string, role flow.Role) {
 	log.Printf("no preparation needed for role: %s", role.String())
 }
 
-// runDownloadSnapshot fetches the latest protocol snapshot from an access node and
+// RunDownloadSnapshot fetches the latest protocol snapshot from an access node and
 // writes it to the `root-protocol-snapshot.json` file
-func runDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress string) {
+func RunDownloadSnapshot(ctx context.Context, bootDir, nodeIDHex, accessAddress string) {
 
 	// convert the nodeID string to `flow.Identifier`
 	nodeID, err := flow.HexStringToIdentifier(nodeIDHex)
