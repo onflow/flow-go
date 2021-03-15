@@ -17,31 +17,54 @@ func TestEventStoreRetrieve(t *testing.T) {
 		store := badgerstorage.NewEvents(db)
 
 		blockID := unittest.IdentifierFixture()
-		txID := unittest.IdentifierFixture()
-		expected := []flow.Event{unittest.EventFixture(flow.EventAccountCreated, 0, 0, txID)}
+		tx1ID := unittest.IdentifierFixture()
+		tx2ID := unittest.IdentifierFixture()
+		evt1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx1ID)
+		evt2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, tx2ID)
+		evt3 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, tx2ID)
+		expected := []flow.Event{
+			evt1,
+			evt2,
+			evt3,
+		}
 
+		batch := db.NewWriteBatch()
 		// store event
-		err := store.Store(blockID, expected)
+		err := store.BatchStore(blockID, expected, batch)
+		require.NoError(t, err)
+
+		err = batch.Flush()
 		require.NoError(t, err)
 
 		// retrieve by blockID
 		actual, err := store.ByBlockID(blockID)
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Len(t, actual, 3)
+		require.Contains(t, actual, evt1)
+		require.Contains(t, actual, evt2)
+		require.Contains(t, actual, evt3)
 
 		// retrieve by blockID and event type
 		actual, err = store.ByBlockIDEventType(blockID, flow.EventAccountCreated)
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
+		require.Len(t, actual, 2)
+		require.Contains(t, actual, evt1)
+		require.Contains(t, actual, evt2)
+
+		actual, err = store.ByBlockIDEventType(blockID, flow.EventAccountUpdated)
+		require.NoError(t, err)
+		require.Len(t, actual, 1)
+		require.Contains(t, actual, evt3)
+
+		actual, err = store.ByBlockIDEventType(blockID, flow.EventEpochSetup)
+		require.NoError(t, err)
+		require.Len(t, actual, 0)
 
 		// retrieve by blockID and transaction id
-		actual, err = store.ByBlockIDTransactionID(blockID, txID)
+		actual, err = store.ByBlockIDTransactionID(blockID, tx1ID)
 		require.NoError(t, err)
-		require.Equal(t, expected, actual)
-
-		// test storing same event
-		err = store.Store(blockID, expected)
-		require.NoError(t, err)
+		require.Len(t, actual, 1)
+		require.Contains(t, actual, evt1)
 	})
 }
 

@@ -20,19 +20,6 @@ func NewEvents(db *badger.DB) *Events {
 	}
 }
 
-// Store will store events for the given block ID
-func (e *Events) Store(blockID flow.Identifier, events []flow.Event) error {
-	return operation.RetryOnConflict(e.db.Update, func(btx *badger.Txn) error {
-		for _, event := range events {
-			err := operation.SkipDuplicates(operation.InsertEvent(blockID, event))(btx)
-			if err != nil {
-				return fmt.Errorf("could not insert event: %w", err)
-			}
-		}
-		return nil
-	})
-}
-
 func (e *Events) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
 	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
 		for _, event := range events {
@@ -90,19 +77,6 @@ func NewServiceEvents(db *badger.DB) *ServiceEvents {
 	return &ServiceEvents{
 		db: db,
 	}
-}
-
-// Store will store events for the given block ID
-func (e *ServiceEvents) Store(blockID flow.Identifier, events []flow.Event) error {
-	return operation.RetryOnConflict(e.db.Update, func(btx *badger.Txn) error {
-		for _, event := range events {
-			err := operation.SkipDuplicates(operation.InsertServiceEvent(blockID, event))(btx)
-			if err != nil {
-				return fmt.Errorf("could not insert event: %w", err)
-			}
-		}
-		return nil
-	})
 }
 
 func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
