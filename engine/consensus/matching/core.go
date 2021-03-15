@@ -643,6 +643,11 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.Se
 //   - All other errors are unexpected and symptoms of internal bugs, uncovered edge cases,
 //     or a corrupted internal node state. These are all fatal failures.
 func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult, sealingTracker *sealingtracker.SealingTracker) (*sealingtracker.SealingRecord, error) {
+	// shortcut: if we don't require any approvals, any incorporatedResult has enough approvals
+	if c.requiredApprovalsForSealConstruction == 0 {
+		return sealingTracker.SufficientApprovals(incorporatedResult), nil
+	}
+
 	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
 	if err != nil {

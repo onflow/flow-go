@@ -160,14 +160,15 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
 		Return(false, nil).Once()
 
-	// Expect the receipt to be added to mempool
+	// Expect the receipt to be added to mempool and persistent storage
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 
 	_, err := ms.matching.processReceipt(receipt)
 	ms.Require().NoError(err, "should handle different receipts for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertExpectations(ms.T())
-	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
+	ms.ReceiptsDB.AssertExpectations(ms.T())
 }
 
 // TestOnReceipt_ReceiptInPersistentStorage verifies that Matching Core adds
@@ -209,8 +210,9 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
 
-	// we expect that receipt is added to mempool
+	// Expect the receipt to be added to mempool and persistent storage
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
+	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 
 	// setup the results mempool to check if we attempted to add the incorporated result
 	ms.ResultsPL.
@@ -223,6 +225,7 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
+	ms.ReceiptsDB.AssertExpectations(ms.T())
 	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
@@ -371,7 +374,7 @@ func (ms *MatchingSuite) TestSealableResultsValid() {
 	// generate two receipts for result (from different ENs)
 	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(valSubgrph.Result))
 	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(valSubgrph.Result))
-	ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", valSubgrph.Block.ID()).Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil)
+	ms.ReceiptsDB.On("ByBlockID", valSubgrph.Block.ID()).Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil)
 
 	// test output of Matching Core's sealableResults()
 	results, _, err := ms.matching.sealableResults()
@@ -420,12 +423,12 @@ func (ms *MatchingSuite) TestOutlierReceiptNotSealed() {
 
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB))
 	receiptB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB))
-	ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", ms.LatestFinalizedBlock.ID()).Return([]*flow.ExecutionReceipt{receiptA1, receiptA2, receiptB1, receiptB2}, nil)
+	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return([]*flow.ExecutionReceipt{receiptA1, receiptA2, receiptB1, receiptB2}, nil)
 
 	// test output of Matching Core's sealableResults()
 	results, _, err := ms.matching.sealableResults()
 	ms.Require().NoError(err)
-	ms.Assert().Equal([]*flow.IncorporatedResult{incResB}, results, "expecting a single return value")
+	ms.Assert().Equal(flow.IncorporatedResultList{incResB}, results, "expecting a single return value")
 }
 
 // Try to seal a result for which we don't have the block.
@@ -512,7 +515,7 @@ func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
 
 	ms.AddSubgraphFixtureToMempools(subgrph)
 
-	ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", subgrph.Block.ID()).Return(nil, nil)
+	ms.ReceiptsDB.On("ByBlockID", subgrph.Block.ID()).Return(nil, nil)
 
 	// we expect business logic to remove the approval from the unknown node
 	ms.ApprovalsPL.On("RemApproval", unittest.EntityWithID(app1.ID())).Return(true, nil).Once()
@@ -554,7 +557,7 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 		block.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceipt{receipt1, receipt2},
 		})
-		ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", result.BlockID).Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil)
+		ms.ReceiptsDB.On("ByBlockID", result.BlockID).Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil)
 		// TODO: replace this with block.ID(), for now IncoroporatedBlockID == ExecutionResult.BlockID
 		emergencySealingCandidates[i] = result.BlockID
 		ms.Extend(&block)
@@ -571,7 +574,7 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 	// setup a new finalized block which is new enough that satisfies emergency sealing condition
 	for i := 0; i < DefaultEmergencySealingThreshold; i++ {
 		block := unittest.BlockWithParentFixture(ms.LatestFinalizedBlock.Header)
-		ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", block.ID()).Return(nil, nil)
+		ms.ReceiptsDB.On("ByBlockID", block.ID()).Return(nil, nil)
 		ms.Extend(&block)
 		ms.LatestFinalizedBlock = &block
 	}
@@ -619,7 +622,7 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	ms.SealsPL.On("All").Return([]*flow.IncorporatedResultSeal{}).Maybe()
 
 	// we have no receipts
-	ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", mock.Anything).Return(nil, nil)
+	ms.ReceiptsDB.On("ByBlockID", mock.Anything).Return(nil, nil)
 
 	_, _, err := ms.matching.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
@@ -636,6 +639,8 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 //
 // TODO: this test is temporarily requires as long as matching.Core requires _two_ receipts from different ENs to seal
 func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {
+	//ms.matching.receiptsDB = &storage.ExecutionReceipts{}
+
 	ms.matching.sealingThreshold = 0 // request receipts for all unsealed finalized blocks
 
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))
@@ -658,14 +663,14 @@ func (ms *MatchingSuite) TestRequestSecondPendingReceipt() {
 	ms.ResultsPL.On("Add", incRes).Return(false, nil).Maybe()
 
 	// Situation A: we have _once_ receipt for an unsealed finalized block in storage
-	ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", ms.LatestFinalizedBlock.ID()).Return([]*flow.ExecutionReceipt{receipt1}, nil).Once()
+	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return(flow.ExecutionReceiptList{receipt1}, nil).Once()
 	ms.requester.On("Query", ms.LatestFinalizedBlock.ID(), mock.Anything).Return().Once() // Core should trigger requester to re-request a second receipt
 	_, _, err := ms.matching.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.Query(<blockID>, filter.Any) was called
 
 	// Situation B: we have _two_ receipts for an unsealed finalized block storage
-	ms.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", ms.LatestFinalizedBlock.ID()).Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil).Once()
+	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
 	_, _, err = ms.matching.requestPendingReceipts()
 	ms.Require().NoError(err, "should request results for pending blocks")
 	ms.requester.AssertExpectations(ms.T()) // asserts that requester.Query(<blockID>, filter.Any) was called

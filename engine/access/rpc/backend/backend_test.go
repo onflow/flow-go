@@ -251,7 +251,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
 		On("ByBlockID", mock.Anything).
-		Return([]*flow.ExecutionReceipt{receipt}, nil)
+		Return(flow.ExecutionReceiptList{receipt}, nil)
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
@@ -541,7 +541,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			r := unittest.ReceiptForBlockFixture(&b)
 			suite.receipts.
 				On("ByBlockID", b.ID()).
-				Return([]*flow.ExecutionReceipt{r}, nil).Once()
+				Return(flow.ExecutionReceiptList{r}, nil).Once()
 		}
 
 		return headers
@@ -603,7 +603,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		receipts := new(storagemock.ExecutionReceipts)
 		receipts.
 			On("ByBlockID", mock.Anything).
-			Return([]*flow.ExecutionReceipt{}, nil).Once()
+			Return(flow.ExecutionReceiptList{}, nil).Once()
 
 		// create the handler
 		backend := New(
@@ -709,7 +709,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	// use the static execution node
 	suite.receipts.
 		On("ByBlockID", mock.Anything).
-		Return([]*flow.ExecutionReceipt{}, nil)
+		Return(flow.ExecutionReceiptList{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -909,7 +909,7 @@ func (suite *Suite) TestGetAccount() {
 	receipt.ExecutorID = ids[0].NodeID
 	suite.receipts.
 		On("ByBlockID", blockID).
-		Return([]*flow.ExecutionReceipt{receipt}, nil).Once()
+		Return(flow.ExecutionReceiptList{receipt}, nil).Once()
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
@@ -960,7 +960,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	suite.receipts.
 		On("ByBlockID", mock.Anything).
-		Return([]*flow.ExecutionReceipt{}, nil).Once()
+		Return(flow.ExecutionReceiptList{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -1043,7 +1043,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		blockIDExecNodeMap[block.ID()] = ids
 		allExecutionIDs = append(allExecutionIDs, ids...)
 
-		receipts := make([]*flow.ExecutionReceipt, receiptPerBlock)
+		receipts := make(flow.ExecutionReceiptList, receiptPerBlock)
 		for j := 0; j < receiptPerBlock; j++ {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = ids[j].NodeID
