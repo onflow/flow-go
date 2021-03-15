@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
-	"github.com/onflow/flow-go/storage/util"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -269,7 +268,7 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 
 	// build a list of all previously used guarantees on this part of the chain
 	lookup := make(map[flow.Identifier]struct{})
-	err = util.TraverseBlocksBackwards(m.headers, header.ParentID,
+	err = state.TraverseBlocksBackwards(m.headers, header.ParentID,
 		func(block *flow.Header) (bool, error) {
 			if block.Height <= limit {
 				return false, nil

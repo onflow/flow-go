@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/util"
 )
 
 // DefaultRequiredApprovalsForSealValidation is the default number of approvals that should be
@@ -161,7 +161,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
-	err = util.TraverseBlocksBackwards(s.headers, header.ParentID,
+	err = state.TraverseBlocksBackwards(s.headers, header.ParentID,
 		func(block *flow.Header) (bool, error) {
 			if block.ID() == sealedID {
 				return false, nil

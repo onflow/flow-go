@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/util"
 )
 
 // receiptValidator holds all needed context for checking
@@ -217,7 +217,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// loop through the fork backwards, from parent to last sealed, and keep
 	// track of blocks and receipts visited on the way.
-	err = util.TraverseBlocksBackwards(v.headers, header.ParentID,
+	err = state.TraverseBlocksBackwards(v.headers, header.ParentID,
 		func(block *flow.Header) (bool, error) {
 			if block.Height <= sealedHeight {
 				return false, nil
