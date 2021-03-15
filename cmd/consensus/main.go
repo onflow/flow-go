@@ -387,10 +387,6 @@ func main() {
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
-			// initialize the indexer to add index for receipts by the executed block id.
-			// so that receipts can be found by block id.
-			indexer := matching.NewIndexer(node.Logger, node.Storage.Receipts, node.Storage.Payloads)
-
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
 				node.Logger,
@@ -398,7 +394,6 @@ func main() {
 				node.Tracer,
 				node.Storage.Index,
 				node.RootChainID,
-				indexer,
 			)
 			// make compliance engine as a FinalizationConsumer
 			// initialize the persister

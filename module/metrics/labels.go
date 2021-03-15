@@ -3,6 +3,7 @@ package metrics
 const (
 	LabelChannel     = "topic"
 	LabelChain       = "chain"
+	LabelProposer    = "proposer"
 	EngineLabel      = "engine"
 	LabelResource    = "resource"
 	LabelMessage     = "message"
@@ -44,6 +45,7 @@ const (
 	ResourceGuarantee                = "guarantee"
 	ResourceResult                   = "result"
 	ResourceReceipt                  = "receipt"
+	ResourceMyReceipt                = "my_receipt"
 	ResourceCollection               = "collection"
 	ResourceApproval                 = "approval"
 	ResourceSeal                     = "seal"

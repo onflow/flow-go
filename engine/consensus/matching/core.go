@@ -1025,8 +1025,8 @@ HEIGHT_LOOP:
 		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
 		// and that the IncorporatedResult's IncorporatedBlockID should be set
 		// correctly.
-		receipts, err := c.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
-		if err != nil {
+		receipts, err := c.receiptsDB.ByBlockID(blockID)
+		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}
 

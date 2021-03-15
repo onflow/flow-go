@@ -6,6 +6,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// ExecutionReceipts holds and indexes Execution Receipts. The storage-layer
+// abstraction is from the viewpoint of the network: there are multiple
+// execution nodes which produce several receipts for each block. By default,
+// there is no distinguished execution node (the are all equal).
 type ExecutionReceipts interface {
 
 	// Store stores an execution receipt.
@@ -14,24 +18,18 @@ type ExecutionReceipts interface {
 	// ByID retrieves an execution receipt by its ID.
 	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
 
-	// Index indexes an execution receipt by block ID.
-	Index(blockID flow.Identifier, receiptID flow.Identifier) error
+	// ByBlockID retrieves all known execution receipts for the given block
+	// (from any Execution Node).
+	ByBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error)
+}
 
-	// ByBlockID retrieves an execution receipt by block ID.
-	ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
+// MyExecutionReceipts reuses the storage.ExecutionReceipts API, but doesn't expose
+// them. Instead, it includes the "My" in the method name in order to highlight the notion
+// of "MY execution receipt", from the viewpoint of an individual Execution Node.
+type MyExecutionReceipts interface {
+	// StoreMyReceipt stores the receipt and marks it as mine (trusted).
+	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
 
-	// TODO: Index and ByBlockID assumes one block can only have one receipt,
-	// this is a valid assumption for execution node, and therefore these two
-	// functions can only be used by execution node.
-	// IndexByExecutor and ByBlockIDAllExecutionReceipts allows a block to have
-	// multiple receipts from different executors, and only stores one receipt per
-	// executor. This is from non-execution-node's perspective.
-	// We'd better split the above two use cases, and create two different receipts
-	// module to avoid misuse and confusion.
-
-	// IndexByExecutor indexes an execution receipt by block ID and execution ID
-	IndexByExecutor(receipt *flow.ExecutionReceipt) error
-
-	// ByBlockIDAllExecutionReceipts retrieves all execution receipts for a block ID
-	ByBlockIDAllExecutionReceipts(blockID flow.Identifier) (flow.ExecutionReceiptList, error)
+	// MyReceipt retrieves my receipt for the given block.
+	MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
 }

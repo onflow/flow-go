@@ -11,11 +11,14 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/sema"
+	"github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
@@ -38,9 +41,14 @@ type TransactionProcedure struct {
 	Events        []flow.Event
 	ServiceEvents []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
-	GasUsed uint64
-	Err     Error
-	Retried int
+	GasUsed   uint64
+	Err       Error
+	Retried   int
+	TraceSpan opentracing.Span
+}
+
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+	proc.TraceSpan = traceSpan
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State, programs *Programs) error {
@@ -78,13 +86,22 @@ func (i *TransactionInvocator) Process(
 	programs *Programs,
 ) error {
 
+	var span opentracing.Span
+
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
+		span.LogFields(
+			traceLog.String("transaction.ID", proc.ID.String()),
+		)
+		defer span.Finish()
+	}
+
 	var err error
 	var env *hostEnv
 	var blockHeight uint64
 	if ctx.BlockHeader != nil {
 		blockHeight = ctx.BlockHeader.Height
 	}
-
 	numberOfRetries := 0
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		env, err = newEnvironment(ctx, vm, st, programs)
@@ -93,6 +110,7 @@ func (i *TransactionInvocator) Process(
 			return err
 		}
 		env.setTransaction(proc.Transaction, proc.TxIndex)
+		env.setTraceSpan(span)
 
 		location := common.TransactionLocation(proc.ID[:])
 
