@@ -16,32 +16,6 @@ import (
 	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
-func TestStoringTransactionResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
-
-		blockID := unittest.IdentifierFixture()
-		txResults := make([]*flow.TransactionResult, 0)
-		for i := 0; i < 10; i++ {
-			txID := unittest.IdentifierFixture()
-			expected := &flow.TransactionResult{
-				TransactionID: txID,
-				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
-			}
-			txResults = append(txResults, expected)
-		}
-		for _, txResult := range txResults {
-			err := store.Store(blockID, txResult)
-			require.Nil(t, err)
-		}
-		for _, txResult := range txResults {
-			actual, err := store.ByBlockIDTransactionID(blockID, txResult.TransactionID)
-			require.Nil(t, err)
-			assert.Equal(t, txResult, actual)
-		}
-	})
-}
-
 func TestBatchStoringTransactionResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		store := bstorage.NewTransactionResults(db)
