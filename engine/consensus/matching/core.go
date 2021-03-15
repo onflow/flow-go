@@ -756,7 +756,8 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 	// However, as soon as we have at least 2 receipts, the matching Engine will produce a candidate
 	// seal and put it in the mempool. To prevent spamming the logs, we log only when there is
 	// no seal in the IncorporatedResultSeals mempool:
-	_, sealAlreadyGenerated := c.seals.ByID(incorporatedResult.ID()) // IncorporatedResultSeal has the same ID as incorporatedResult
+	incorporatedResultSealID := incorporatedResult.ID() // IncorporatedResultSeal has the same ID as incorporatedResult
+	_, sealAlreadyGenerated := c.seals.ByID(incorporatedResultSealID)
 	if !sealAlreadyGenerated {
 		header, err := c.headersDB.ByBlockID(blockID)
 		if err != nil {
