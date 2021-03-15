@@ -25,7 +25,7 @@ func TestStateManager(t *testing.T) {
 		require.NoError(t, err)
 
 		// roll up with merge
-		err = stm.RollUp(true, true)
+		err = stm.RollUpWithMerge()
 		require.NoError(t, err)
 		require.Equal(t, stm.State(), st)
 		require.Equal(t, uint64(1), st.ToBeWrittenCounter)
@@ -44,12 +44,12 @@ func TestStateManager(t *testing.T) {
 		require.Equal(t, 1, len(stm.State().Touches()))
 
 		// ignore this child
-		err = stm.RollUp(false, false)
+		err = stm.RollUpNoMerge()
 		require.NoError(t, err)
 		require.Equal(t, 1, len(st.Touches()))
 		require.Equal(t, 1, len(stm.State().Touches()))
 
-		err = stm.RollUp(false, true)
+		err = stm.RollUpWithTouchMergeOnly()
 		require.NoError(t, err)
 		require.Equal(t, 2, len(st.Touches()))
 		require.Equal(t, 2, len(stm.State().Touches()))

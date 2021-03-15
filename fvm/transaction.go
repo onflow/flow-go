@@ -109,7 +109,7 @@ func (i *TransactionInvocator) Process(
 
 		if retry {
 			// rest state
-			rollUpError := stm.RollUp(false, false)
+			rollUpError := stm.RollUpNoMerge()
 			if rollUpError != nil {
 				return rollUpError
 			}
@@ -189,7 +189,7 @@ func (i *TransactionInvocator) Process(
 	programs.Cleanup(updatedKeys)
 
 	if txError != nil {
-		err := stm.RollUp(false, true)
+		err := stm.RollUpWithTouchMergeOnly()
 		if err != nil {
 			return err
 		}
@@ -204,7 +204,7 @@ func (i *TransactionInvocator) Process(
 	}
 
 	// don't roll up with true for failed tx
-	err = stm.RollUp(true, true)
+	err = stm.RollUpWithMerge()
 	if err != nil {
 		return err
 	}
