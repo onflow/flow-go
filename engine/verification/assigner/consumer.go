@@ -32,18 +32,10 @@ func defaultProcessedIndex(state protocol.State) (int64, error) {
 
 // NewBlockConsumer creates a new consumer and returns the default processed
 // index for initializing the processed index in storage.
-func NewBlockConsumer(
-	log zerolog.Logger,
-	processedHeight storage.ConsumerProgress,
-	state protocol.State,
-	engine *Engine,
-	maxProcessing int64,
-) (*BlockConsumer, int64, error) {
+func NewBlockConsumer(log zerolog.Logger, processedHeight storage.ConsumerProgress, blocks storage.Blocks, state protocol.State, engine *Engine, maxProcessing int64) (*BlockConsumer, int64, error) {
 	worker := &Worker{engine: engine}
 	engine.withBlockConsumerNotifier(worker)
-
-	jobs := &FinalizedBlockReader{state: state}
-
+	jobs := newFinalizedBlockReader(state, blocks)
 	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 
 	defaultIndex, err := defaultProcessedIndex(state)
@@ -55,7 +47,6 @@ func NewBlockConsumer(
 		consumer:     consumer,
 		defaultIndex: defaultIndex,
 	}
-
 	worker.consumer = blockConsumer
 
 	return blockConsumer, defaultIndex, nil
