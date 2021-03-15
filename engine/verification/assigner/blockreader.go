@@ -16,7 +16,8 @@ type FinalizedBlockReader struct {
 	blocks storage.Blocks
 }
 
-// the job index would just be the finalized block height
+// AtIndex returns the block job at the given index.
+// The block job at an index is just be the finalized block at that index (i.e., height).
 func (r FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
 	block, err := r.blockByHeight(uint64(index))
 	if err != nil {
