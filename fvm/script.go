@@ -46,7 +46,7 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, stm *state.StateManager, programs *Programs) error {
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, stm, programs)
-		vmErr, fatalErr := handleError(err)
+		_, vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
 		}

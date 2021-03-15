@@ -46,6 +46,8 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		defer span.Finish()
 	}
 
+	// TODO: separate payer and proposer errors out
+
 	tx := proc.Transaction
 
 	stm.Nest()

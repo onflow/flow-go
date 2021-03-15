@@ -683,11 +683,56 @@ func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
 			require.NoError(t, tx.Err)
 
 			balanceAfter := getBalance(vm, chain, ctx, ledger, accounts[0])
-			require.Less(t, balanceAfter, balanceBefore, "Balance of the payer after the transaction should be less then before the transaction")
+			require.Equal(t, balanceAfter, balanceBefore-fvm.DefaultTransactionFees.ToGoValue().(uint64))
 		}),
 	)
 
 	t.Run("Transaction fails but fees are deducted", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+			ctx.LimitAccountStorage = true    // this test requires storage limits to be enforced
+			ctx.TransactionFeesEnabled = true // this is what we are testing
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, ledger, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			balanceBefore := getBalance(vm, chain, ctx, ledger, accounts[0])
+
+			txBody := transferTokensTx(chain).
+				AddAuthorizer(accounts[0]).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+			txBody.SetProposalKey(accounts[0], 0, 0)
+			txBody.SetPayer(accounts[0])
+
+			err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
+
+			err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+
+			err = vm.Run(ctx, tx, ledger, programs)
+			require.NoError(t, err)
+
+			require.IsType(t, &fvm.ExecutionError{}, tx.Err)
+
+			balanceAfter := getBalance(vm, chain, ctx, ledger, accounts[0])
+
+			require.Equal(t, balanceAfter, balanceBefore-fvm.DefaultTransactionFees.ToGoValue().(uint64))
+		}),
+	)
+
+	t.Run("Transaction fails because of storage, but fees are deducted", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).run(
@@ -728,11 +773,59 @@ func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
 
 			balanceAfter := getBalance(vm, chain, ctx, ledger, accounts[0])
 
-			require.Equal(t, balanceAfter, balanceBefore-fvm.DefaultAccountCreationFee.ToGoValue().(uint64))
+			require.Equal(t, balanceAfter, balanceBefore-fvm.DefaultTransactionFees.ToGoValue().(uint64))
 		}),
 	)
 
 	t.Run("Transaction fails but sequence number is incremented", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+	).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+				ctx.LimitAccountStorage = true    // this test requires storage limits to be enforced
+				ctx.TransactionFeesEnabled = true // this is what we are testing
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, ledger, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				txBody := transferTokensTx(chain).
+					AddAuthorizer(accounts[0]).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+				txBody.SetProposalKey(accounts[0], 0, 0)
+				txBody.SetPayer(accounts[0])
+
+				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, ledger, programs)
+				require.NoError(t, err)
+
+				require.IsType(t, &fvm.ExecutionError{}, tx.Err)
+
+				// send it again
+				tx = fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, ledger, programs)
+				require.NoError(t, err)
+
+				require.Equal(t, (&fvm.InvalidProposalKeySequenceNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(1), tx.Err.(*fvm.InvalidProposalKeySequenceNumberError).CurrentSeqNumber)
+			}),
+	)
+	t.Run("Transaction fails because of storage, but sequence number is incremented", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 	).
@@ -777,7 +870,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
 				require.NoError(t, err)
 
 				require.Equal(t, (&fvm.InvalidProposalKeySequenceNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, 1, tx.Err.(*fvm.InvalidProposalKeySequenceNumberError).CurrentSeqNumber)
+				require.Equal(t, uint64(1), tx.Err.(*fvm.InvalidProposalKeySequenceNumberError).CurrentSeqNumber)
 			}),
 	)
 	t.Run("Transaction fails but fees are deducted, even if the account is close to 0", newVMTest().withBootstrapProcedureOptions(
@@ -801,7 +894,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
 
 				txBody := transferTokensTx(chain).
 					AddAuthorizer(accounts[0]).
-					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
 					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
 
 				txBody.SetProposalKey(accounts[0], 0, 0)
@@ -818,12 +911,12 @@ func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
 				err = vm.Run(ctx, tx, ledger, programs)
 				require.NoError(t, err)
 
-				require.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+				require.IsType(t, &fvm.ExecutionError{}, tx.Err)
 
 				balanceAfter := getBalance(vm, chain, ctx, ledger, accounts[0])
 
 				require.Less(t, balanceAfter, balanceBefore)
-				require.Equal(t, 0, balanceAfter)
+				require.Equal(t, uint64(0), balanceAfter)
 			}),
 	)
 }
@@ -1659,7 +1752,7 @@ func TestWithServiceAccount(t *testing.T) {
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvocator(zerolog.Nop(), false),
 		),
 	)
 
@@ -1704,7 +1797,7 @@ func TestEventLimits(t *testing.T) {
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvocator(zerolog.Nop(), false),
 		),
 	)
 
@@ -1742,7 +1835,7 @@ func TestEventLimits(t *testing.T) {
 		fvm.WithChain(chain),
 		fvm.WithEventCollectionSizeLimit(2),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvocator(zerolog.Nop(), false),
 		),
 	)
 

@@ -52,7 +52,7 @@ func NewBlockComputer(
 		vmCtx,
 		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger, false)),
 	)
 
 	return &blockComputer{

@@ -54,15 +54,16 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateManager, programs *Programs) error {
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, ctx, proc, st, programs)
-		vmErr, fatalErr := handleError(err)
+		stopProcessing, vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
 		}
 
 		if vmErr != nil {
 			proc.Err = vmErr
-			// TODO we should not break here we should continue for fee deductions
-			break
+			if stopProcessing {
+				break
+			}
 		}
 	}
 
@@ -71,11 +72,13 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 
 type TransactionInvocator struct {
 	logger zerolog.Logger
+	checkStorage bool
 }
 
-func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
+func NewTransactionInvocator(logger zerolog.Logger, checkStorage bool) *TransactionInvocator {
 	return &TransactionInvocator{
 		logger: logger,
+		checkStorage: checkStorage,
 	}
 }
 
@@ -86,7 +89,11 @@ func (i *TransactionInvocator) Process(
 	stm *state.StateManager,
 	programs *Programs,
 ) error {
-
+	if proc.Err != nil {
+		i.logger.Debug().
+			Msg("skipping transaction invocation due to error in previous steps")
+		return nil
+	}
 	var span opentracing.Span
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -187,6 +194,11 @@ func (i *TransactionInvocator) Process(
 	// for failed transactions we also do the same as
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
+
+	if txError == nil && i.checkStorage {
+		// use the same state to check if accounts are over storage limit, so it can be cleaned in case of error
+		txError = NewTransactionStorageLimiter(i.logger).Process(vm, ctx, proc, stm, programs)
+	}
 
 	if txError != nil {
 		err := stm.RollUpWithTouchMergeOnly()

@@ -38,7 +38,7 @@ func TestSafetyCheck(t *testing.T) {
 
 			buffer := &bytes.Buffer{}
 			log := zerolog.New(buffer)
-			txInvocator := NewTransactionInvocator(log)
+			txInvocator := NewTransactionInvocator(log, false)
 
 			vm := New(rt)
 
@@ -110,7 +110,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := NewTransactionInvocator(log, false)
 
 		vm := New(rt)
 
@@ -172,7 +172,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := NewTransactionInvocator(log, false)
 
 		vm := New(rt)
 
@@ -205,7 +205,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := NewTransactionInvocator(log, false)
 
 		vm := New(rt)
 
@@ -257,7 +257,7 @@ func TestSafetyCheck(t *testing.T) {
 		}}
 
 		log := zerolog.Nop()
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := NewTransactionInvocator(log, false)
 
 		vm := New(rt)
 		code := `doesn't matter`

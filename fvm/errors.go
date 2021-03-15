@@ -285,21 +285,25 @@ func (e *EncodingUnsupportedValueError) Code() uint32 {
 	return errCodeEncodingUnsupportedValue
 }
 
-func handleError(err error) (vmErr Error, fatalErr error) {
+func handleError(err error) (stopProcessing bool, vmErr Error, fatalErr error) {
+	// TODO: also return if it should continue
 	switch typedErr := err.(type) {
 	case runtime.Error:
 		// If the error originated from the runtime, handle separately
 		return handleRuntimeError(typedErr)
+	case *StorageCapacityExceededError:
+		// If the error is a storage capacity exceeded error we still need to charge fees, so dont stop processing
+		return false, typedErr, nil
 	case Error:
 		// If the error is an fvm.Error, return as is
-		return typedErr, nil
+		return true, typedErr, nil
 	default:
 		// All other errors are considered fatal
-		return nil, err
+		return true, nil, err
 	}
 }
 
-func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
+func handleRuntimeError(err runtime.Error) (stopProcessing bool, vmErr Error, fatalErr error) {
 	innerErr := err.Err
 
 	// External errors are reported by the runtime but originate from the VM.
@@ -318,5 +322,5 @@ func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return &ExecutionError{Err: err}, nil
+	return false, &ExecutionError{Err: err}, nil
 }

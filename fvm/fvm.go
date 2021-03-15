@@ -82,7 +82,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, ledger s
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
 func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, stm *state.StateManager, programs *Programs) error {
-	invocator := NewTransactionInvocator(zerolog.Nop())
+	invocator := NewTransactionInvocator(zerolog.Nop(), false)
 	err := invocator.Process(vm, ctx, tx, stm, programs)
 	if err != nil {
 		return err
