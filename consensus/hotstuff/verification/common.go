@@ -71,7 +71,7 @@ func checkVotesValidity(votes []*model.Vote) error {
 // stakingKeysAggregator is a structure that aggregates the staking
 // public keys for QC verifications.
 type stakingKeysAggregator struct {
-	lastStakingSigners map[*flow.Identity]struct{}
+	lastStakingSigners map[flow.Identifier]*flow.Identity
 	lastStakingKey     crypto.PublicKey
 	sync.RWMutex
 }
@@ -79,14 +79,14 @@ type stakingKeysAggregator struct {
 // creates a new staking keys aggregator
 func newStakingKeysAggregator() *stakingKeysAggregator {
 	aggregator := &stakingKeysAggregator{
-		lastStakingSigners: map[*flow.Identity]struct{}{},
+		lastStakingSigners: map[flow.Identifier]*flow.Identity{},
 		lastStakingKey:     crypto.NeutralBLSPublicKey(),
 		RWMutex:            sync.RWMutex{},
 	}
 	return aggregator
 }
 
-// aggregatedStakingKey returns the aggregated public of the input signers.
+// aggregatedStakingKey returns the aggregated public key of the input signers.
 func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) (crypto.PublicKey, error) {
 
 	// this greedy algorithm assumes the signers set does not vary much from one call
@@ -99,21 +99,20 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 	// have 1/3 in common (the minimum common ratio).
 
 	s.RLock()
-	lastList := s.lastStakingSigners
+	lastSet := s.lastStakingSigners
 	lastKey := s.lastStakingKey
 	s.RUnlock()
 
 	// get the signers delta and update the last list for the next comparison
-	newSigners, missingSigners, updatedList := identitiesDelta(signers, lastList)
+	newSignerKeys, missingSignerKeys, updatedSignerSet := identitiesDeltaKeys(signers, lastSet)
 	// add the new keys
 	var err error
-	updatedKey, err := crypto.AggregateBLSPublicKeys(
-		append(newSigners.StakingKeys(), lastKey))
+	updatedKey, err := crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
 	if err != nil {
 		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
 	}
 	// remove the missing keys
-	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSigners.StakingKeys())
+	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
 	if err != nil {
 		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
 	}
@@ -121,37 +120,37 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 	// update the latest list and public key. The current thread may overwrite the result of another thread
 	// but the greedy algorithm remains valid.
 	s.Lock()
-	s.lastStakingSigners = updatedList
+	s.lastStakingSigners = updatedSignerSet
 	s.lastStakingKey = updatedKey
 	s.Unlock()
 	return updatedKey, nil
 }
 
-// identitiesDelta computes the delta between the reference s.lastStakingSigners
+// identitiesDeltaKeys computes the delta between the reference s.lastStakingSigners
 // and the input identity list.
-// it return the new signers, missing signers and the new map of signers.
-func identitiesDelta(signers flow.IdentityList, lastList map[*flow.Identity]struct{}) (
-	flow.IdentityList, flow.IdentityList, map[*flow.Identity]struct{}) {
+// It returns a list of the new signer keys, a list of the missing signer keys and the new map of signers.
+func identitiesDeltaKeys(signers flow.IdentityList, lastSet map[flow.Identifier]*flow.Identity) (
+	[]crypto.PublicKey, []crypto.PublicKey, map[flow.Identifier]*flow.Identity) {
 
-	var newSigners, missingSigners flow.IdentityList
+	var newSignerKeys, missingSignerKeys []crypto.PublicKey
 
 	// create a map of the input list,
 	// and check the new signers
-	signersMap := map[*flow.Identity]struct{}{}
+	signersMap := map[flow.Identifier]*flow.Identity{}
 	for _, signer := range signers {
-		signersMap[signer] = struct{}{}
-		_, ok := lastList[signer]
+		signersMap[signer.ID()] = signer
+		_, ok := lastSet[signer.ID()]
 		if !ok {
-			newSigners = append(newSigners, signer)
+			newSignerKeys = append(newSignerKeys, signer.StakingPubKey)
 		}
 	}
 
 	// look for missing signers
-	for signer := range lastList {
-		_, ok := signersMap[signer]
+	for signerID, signer := range lastSet {
+		_, ok := signersMap[signerID]
 		if !ok {
-			missingSigners = append(missingSigners, signer)
+			missingSignerKeys = append(missingSignerKeys, signer.StakingPubKey)
 		}
 	}
-	return newSigners, missingSigners, signersMap
+	return newSignerKeys, missingSignerKeys, signersMap
 }

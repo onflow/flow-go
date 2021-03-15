@@ -112,13 +112,11 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
 	// as inputs. A new struct needs to be used for each epoch since the list of participants is upadted.
 
-	// TODO: check the signers identity validation, used to be:
-	// signers, err := s.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...)) where votersID:voterIDs []flow.Identifier
-	aggrgetaedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
+	aggregatedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)
 	}
-	stakingValid, err := c.staking.Verify(msg, stakingAggSig, aggrgetaedKey)
+	stakingValid, err := c.staking.Verify(msg, stakingAggSig, aggregatedKey)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}

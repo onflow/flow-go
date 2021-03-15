@@ -346,15 +346,6 @@ func (il IdentityList) SamplePct(pct float64) IdentityList {
 	return il.Sample(size)
 }
 
-// StakingKeys returns a list of the staking public keys for the identities.
-func (il IdentityList) StakingKeys() []crypto.PublicKey {
-	keys := make([]crypto.PublicKey, 0, len(il))
-	for _, identity := range il {
-		keys = append(keys, identity.StakingPubKey)
-	}
-	return keys
-}
-
 // Union returns a new identity list containing every identity that occurs in
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.

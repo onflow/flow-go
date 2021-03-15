@@ -162,11 +162,4 @@ func TestCombinedQC(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed block view should be invalid")
 	block.View--
-
-	// verification of a QC with an unknown voter ID should fail
-	withUnknownVoter := make([]*flow.Identity, 0, minShares+1)
-	withUnknownVoter = append(identities[:minShares], unittest.IdentityFixture()) // valid voters + an unknown ID
-	valid, err = signers[0].VerifyQC(withUnknownVoter, qc.SigData, block)
-	require.ErrorIs(t, err, model.ErrInvalidSigner)
-	assert.False(t, valid, "QC with an unknown voter ID should be invalid")
 }
