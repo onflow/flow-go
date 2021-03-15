@@ -8,7 +8,7 @@ import (
 )
 
 // SealingRecord is a record of the sealing status for a specific
-// incorporated Result. It holds information whether the result is sealable,
+// incorporated result. It holds information whether the result is sealable,
 // or what is missing to be sealable.
 // Not concurrency safe.
 type SealingRecord struct {
