@@ -21,10 +21,6 @@ func blockIDToJobID(blockID flow.Identifier) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", blockID))
 }
 
-func blockToJob(block *flow.Block) *BlockJob {
-	return &BlockJob{Block: block}
-}
-
 func jobToBlock(job module.Job) *flow.Block {
 	blockJob, _ := job.(*BlockJob)
 	return blockJob.Block
