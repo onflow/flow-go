@@ -1,9 +1,19 @@
 package assigner
 
-import "testing"
+import (
+	"testing"
 
-// block can convert to job and converted back
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
+)
+
+// TestBlockToJob evaluates that a block can be converted to a job,
+// and its corresponding job can be converted back to the same block.
 func TestBlockToJob(t *testing.T) {
+	block := unittest.BlockFixture()
+	actual := jobToBlock(blockToJob(&block))
+	require.Equal(t, &block, actual)
 }
 
 // 1. if pushing 10 jobs to chunks queue, then engine will
