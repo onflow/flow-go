@@ -10,6 +10,7 @@ import (
 // SealingRecord is a record of the sealing status for a specific
 // incorporated Result. It holds information whether the result is sealable,
 // or what is missing to be sealable.
+// Not concurrency safe.
 type SealingRecord struct {
 	ExecutedBlock      *flow.Header             // block the incorporated Result is for
 	IncorporatedResult *flow.IncorporatedResult // the incorporated result
@@ -35,9 +36,29 @@ func (rs *SealingRecord) String() string {
 	if rs == nil {
 		return ""
 	}
-	bytes, err := json.Marshal(rs)
+
+	result := rs.IncorporatedResult.Result
+	kvps := map[string]interface{}{
+		"block_id":                         result.BlockID.String(),
+		"height":                           rs.ExecutedBlock.Height,
+		"result_id":                        result.ID().String(),
+		"incorporated_result_id":           rs.IncorporatedResult.ID().String(),
+		"number_chunks":                    len(result.Chunks),
+		"sufficient_approvals_for_sealing": rs.SufficientApprovalsForSealing,
+	}
+	if rs.FirstUnmatchedChunkIndex != nil {
+		kvps["first_unmatched_chunk_index"] = *rs.FirstUnmatchedChunkIndex
+	}
+	if rs.QualifiesForEmergencySealing != nil {
+		kvps["qualifies_for_emergency_sealing"] = *rs.QualifiesForEmergencySealing
+	}
+	if rs.HasMultipleReceipts != nil {
+		kvps["has_multiple_receipts"] = *rs.HasMultipleReceipts
+	}
+
+	bytes, err := json.Marshal(kvps)
 	if err != nil {
-		return fmt.Sprintf("can not convert next unsealeds to json: %s", err.Error())
+		return fmt.Sprintf("internal error converting SealingRecord to json: %s", err.Error())
 	}
 	return string(bytes)
 }

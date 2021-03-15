@@ -1,12 +1,15 @@
 package sealingtracker
 
 import (
+	"strings"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
 // SealingTracker is an auxiliary component for tracking sealing progress
+// Not concurrency safe.
 type SealingTracker struct {
 	state      protocol.State
 	isRelevant flow.IdentifierFilter
@@ -18,6 +21,21 @@ func NewSealingTracker(state protocol.State) *SealingTracker {
 		state:      state,
 		isRelevant: nextUnsealedFinalizedBlock(state),
 	}
+}
+
+func (st *SealingTracker) String() string {
+	rcrds := make([]string, 0, len(st.records))
+	for _, r := range st.records {
+		rcrds = append(rcrds, r.String())
+	}
+	return "[" + strings.Join(rcrds, ", ") + "]"
+}
+
+// SealingRecords returns the internally stored slice of SealingRecords.
+// Caution: modifying the slice will write through and change the
+//          SealingTracker's internal state.
+func (st *SealingTracker) Records() []*SealingRecord {
+	return st.records
 }
 
 // SufficientApprovals creates a sealing record for an incorporated result

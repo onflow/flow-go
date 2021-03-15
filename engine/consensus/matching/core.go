@@ -444,19 +444,14 @@ func (c *Core) CheckSealing() error {
 	sealableResultsSpan := c.tracer.StartSpanFromParent(sealingSpan, trace.CONMatchCheckSealingSealableResults)
 
 	// get all results that have collected enough approvals on a per-chunk basis
-	sealableResults, nextUnsealeds, err := c.sealableResults()
+	sealableResults, sealingTracker, err := c.sealableResults()
 	if err != nil {
-		return fmt.Errorf("could not get sealable execution results: %w", err)
+		return fmt.Errorf("internal error evaluating sealing conditions: %w", err)
 	}
-
-	lg := c.log.With().
-		Int("sealable_results_count", len(sealableResults)).
-		Str("next_unsealed_results", nextUnsealeds.String()).
-		Logger()
 
 	// log warning if we are going to overflow the seals mempool
 	if space := c.seals.Limit() - c.seals.Size(); len(sealableResults) > int(space) {
-		lg.Warn().
+		c.log.Warn().
 			Int("space", int(space)).
 			Msg("overflowing seals mempool")
 	}
@@ -544,21 +539,18 @@ func (c *Core) CheckSealing() error {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
 	}
 
-	mempoolHasNextSeal := false
-
 	// check if we end up created a seal in mempool for the next unsealed block
-	for _, unsealed := range nextUnsealeds {
-		_, mempoolHasNextSeal = c.seals.ByID(unsealed.IncorporatedResultID)
+	mempoolHasNextSeal := false
+	for _, nextUnsealed := range sealingTracker.Records() {
+		_, mempoolHasNextSeal = c.seals.ByID(nextUnsealed.IncorporatedResult.ID())
 		if mempoolHasNextSeal {
 			break
 		}
 	}
-
-	lg.WithContext()
-
-	lg.Info().
+	c.log.Info().
+		Int("sealable_results_count", len(sealableResults)).
 		Int("sealable_incorporated_results", len(sealedBlockIDs)).
-		Int64("duration_ms", time.Since(startTime).Milliseconds()).
+		Str("next_unsealed_results", sealingTracker.String()).
 		Bool("mempool_has_seal_for_next_height", mempoolHasNextSeal).
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
@@ -567,6 +559,7 @@ func (c *Core) CheckSealing() error {
 		Uint("approval_size", c.approvals.Size()).
 		Int("pending_receipt_requests", pendingReceiptRequests).
 		Int("pending_approval_requests", pendingApprovalRequests).
+		Int64("duration_ms", time.Since(startTime).Milliseconds()).
 		Msg("checking sealing finished successfully")
 
 	return nil
@@ -617,6 +610,11 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.Se
 		//      committing to the result
 		// comment: we evaluate condition (ii) only if (i) is true
 		if happySealable || emergencySealable {
+			// TODO for sealing Phase 3: optimize resultHasMultipleReceipts calls
+			// During Phase 2: for every result, there is only one incorporatedResult, as
+			// incorporatedResult.IncorporatedBlockID is set to the executed block. Without an
+			// execution fork, there is only one incorporatedResult for each block, and the
+			// following code makes the minimum number of resultHasMultipleReceipts calls.
 			hasMultipleReceipts := c.resultHasMultipleReceipts(incorporatedResult)
 			sealingStatus.SetHasMultipleReceipts(hasMultipleReceipts)
 			if hasMultipleReceipts {
