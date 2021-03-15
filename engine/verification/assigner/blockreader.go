@@ -9,8 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// FinalizedBlockReader provides an abstraction for consumers to read blocks
-// as job
+// FinalizedBlockReader provides an abstraction for consumers to read blocks as job.
 type FinalizedBlockReader struct {
 	state  protocol.State
 	blocks storage.Blocks
@@ -42,11 +41,17 @@ func (r FinalizedBlockReader) blockByHeight(height uint64) (*flow.Block, error) 
 	return block, nil
 }
 
+// blockToJob converts the block to a BlockJob.
 func blockToJob(block *flow.Block) *BlockJob {
 	return &BlockJob{Block: block}
 }
 
-// Head returns the last finalized height as job index
+// Head returns the last finalized height as job index.
 func (r *FinalizedBlockReader) Head() (int64, error) {
-	return 0, fmt.Errorf("return the last finalized height")
+	header, err := r.state.Final().Head()
+	if err != nil {
+		return 0, fmt.Errorf("could not get header of last finalized block: %w", err)
+	}
+
+	return int64(header.Height), nil
 }
