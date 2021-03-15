@@ -904,7 +904,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 	})
 }
 
-// we should be able to have conflicting forks with two duplicate instances of
+// we should be able to have conflicting forks with two DUPLICATE instances of
 // the same service event for the same epoch
 //
 //         /--B1<--B3(R1)<--B5(S1)<--B7
@@ -933,7 +933,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 
-		// create two conflicting epoch setup events for the next epoch (final view differs)
+		// create an epoch setup event to insert to BOTH forks
 		nextEpochSetup := unittest.EpochSetupFixture(
 			unittest.WithParticipants(rootSetup.Participants),
 			unittest.SetupWithCounter(rootSetup.Counter+1),
