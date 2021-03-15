@@ -107,9 +107,6 @@ func (l ExecutionReceiptList) Size() int {
 // GetGroup returns the receipts that were mapped to the same identifier by the
 // grouping function. Returns an empty (nil) ExecutionReceiptList if groupID does not exist.
 func (g ExecutionReceiptGroupedList) GetGroup(groupID Identifier) ExecutionReceiptList {
-	//if g == nil {
-	//	return nil
-	//}
 	return g[groupID]
 }
 
