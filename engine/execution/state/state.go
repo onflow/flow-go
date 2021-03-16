@@ -83,7 +83,7 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
 }
 
 const (
@@ -348,19 +348,6 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistExecutionResult)
-		defer span.Finish()
-	}
-
-	err := s.myReceipts.StoreMyReceipt(receipt)
-	if err != nil {
-		return fmt.Errorf("could not persist execution result: %w", err)
-	}
-	return nil
-}
-
 func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {
 	if s.tracer != nil {
 		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateInteractions)
@@ -370,7 +357,7 @@ func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Ident
 	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
 }
 
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
 
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -411,6 +398,8 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
 
+	executionResult := &executionReceipt.ExecutionResult
+
 	err = s.transactionResults.BatchStore(blockID, results, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
@@ -430,6 +419,12 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	err = batch.Flush()
 	if err != nil {
 		return fmt.Errorf("batch flush error: %w", err)
+	}
+
+	// TODO: move to the same batch write
+	err = s.myReceipts.StoreMyReceipt(executionReceipt)
+	if err != nil {
+		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	//outside batch because it requires read access
