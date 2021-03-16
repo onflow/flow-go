@@ -1071,14 +1071,20 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	// Prepare the account key to return
 
-	signAlgo, err := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
-	if err != nil {
-		return key, fmt.Errorf("failed to revoke account key: %w", err)
+	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
+	if signAlgo == runtime.SignatureAlgorithmUnknown {
+		return key, fmt.Errorf(
+			"failed to revoke account key: failed to convert signature algorithm: %s",
+			publicKey.SignAlgo,
+		)
 	}
 
-	hashAlgo, err := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
-	if err != nil {
-		return key, fmt.Errorf("failed to revoke account key: %w", err)
+	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
+	if hashAlgo == runtime.HashAlgorithmUnknown {
+		return key, fmt.Errorf(
+			"failed to revoke account key: failed to convert hash algorithm: %s",
+			publicKey.HashAlgo,
+		)
 	}
 
 	key = &runtime.AccountKey{
@@ -1130,14 +1136,20 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (k
 
 	// Prepare the account key to return
 
-	signAlgo, err := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
-	if err != nil {
-		return key, fmt.Errorf("failed to get account key: %w", err)
+	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
+	if signAlgo == runtime.SignatureAlgorithmUnknown {
+		return key, fmt.Errorf(
+			"failed to get account key: failed to convert signature algorithm: %s",
+			publicKey.SignAlgo,
+		)
 	}
 
-	hashAlgo, err := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
-	if err != nil {
-		return key, fmt.Errorf("failed to get account key: %w", err)
+	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
+	if hashAlgo == runtime.HashAlgorithmUnknown {
+		return key, fmt.Errorf(
+			"failed to get account key: failed to convert hash algorithm: %s",
+			publicKey.HashAlgo,
+		)
 	}
 
 	key = &runtime.AccountKey{
