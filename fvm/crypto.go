@@ -10,15 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// NOTE: these constant *must* match the constants used in the Cadence Crypto contract!
-//
-const (
-	ECDSA_P256      = "ECDSA_P256"
-	ECDSA_Secp256k1 = "ECDSA_Secp256k1"
-	SHA2_256        = "SHA2_256"
-	SHA3_256        = "SHA3_256"
-)
-
 type SignatureVerifier interface {
 	Verify(
 		signature []byte,
