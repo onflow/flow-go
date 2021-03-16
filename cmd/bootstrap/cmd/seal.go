@@ -50,8 +50,8 @@ func constructRootResultAndSeal(
 		DKGParticipants: dkgLookup,
 	}
 
-	result := run.GenerateRootResult(block, stateCommit)
-	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
+	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
+	seal := run.GenerateRootSeal(result)
 
 	return result, seal
 }

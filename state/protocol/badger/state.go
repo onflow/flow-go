@@ -422,7 +422,7 @@ func (s *State) AtHeight(height uint64) protocol.Snapshot {
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not look up block by height: %w", err))
 	}
-	return s.AtBlockID(blockID)
+	return NewSnapshot(s, blockID)
 }
 
 func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {

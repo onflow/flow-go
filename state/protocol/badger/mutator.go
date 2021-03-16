@@ -580,7 +580,11 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// track protocol events that should be emitted
 	var events []func()
 	for _, seal := range payload.Seals {
-		for _, event := range seal.ServiceEvents {
+		result, err := m.results.ByID(seal.ResultID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+		}
+		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
@@ -709,14 +713,32 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 	return status, err
 }
 
-// handleServiceEvents checks the service events within the seals of a block.
-// It returns an error if there are any invalid, malformed, or duplicate events,
-// in which case this block should be rejected.
+// handleServiceEvents handles applying state changes which occur as a result
+// of service events being included in a block payload.
 //
-// If the service events are valid, or there are no service events, it returns
-// a slice of Badger operations to apply while storing the block. This includes
-// an operation to index the epoch status for every block, and operations to
-// insert service events for blocks that include them.
+// Consider a chain where a service event is emitted during execution of block A.
+// Block B contains a receipt for A. Block C contains a seal for block A. Block
+// D contains a QC for C.
+//
+// A <- B(RA) <- C(SA) <- D
+//
+// Service events are included within execution results, which are stored
+// opaquely as part of the block payload in block B. We only validate and insert
+// the typed service event to storage once we have received a valid QC for the
+// block containing the seal for A. This occurs once we mark block D as valid
+// with MarkValid. Because of this, any change to the protocol state introduced
+// by a service event emitted in A would only become visible when querying D or
+// later (D's children).
+//
+// This method will only apply service-event-induced state changes when the
+// input block has the form of block D (ie. has a parent, which contains a seal
+// for a block in which a service event was emitted).
+//
+// If the service events are valid, or there are no service events, this method
+// returns a slice of Badger operations to apply while storing the block. This
+// includes an operation to index the epoch status for every block, and
+// operations to insert service events for blocks that include them.
+//
 func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) error, error) {
 
 	// Determine epoch status for block's CURRENT epoch.
@@ -738,14 +760,25 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 	// keep track of DB operations to apply when inserting this block
 	var ops []func(*badger.Txn) error
 
+	// we will apply service events from blocks which are sealed by this block's PARENT
+	parent, err := m.blocks.ByID(block.Header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get parent (id=%x): %w", block.Header.ParentID, err)
+	}
+
 	// The payload might contain epoch preparation service events for the next
 	// epoch. In this case, we need to update the tentative protocol state.
 	// We need to validate whether all information is available in the protocol
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
-	for _, seal := range block.Payload.Seals {
-		for _, event := range seal.ServiceEvents {
+	for _, seal := range parent.Payload.Seals {
+		result, err := m.results.ByID(seal.ResultID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
+		}
+
+		for _, event := range result.ServiceEvents {
 
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:

@@ -15,8 +15,8 @@ var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
 
 func TestEpochSetupValidity(t *testing.T) {
 	t.Run("invalid first/final view", func(t *testing.T) {
-		_, _, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		// set an invalid final view for the first epoch
 		setup.FinalView = setup.FirstView
 
@@ -25,8 +25,8 @@ func TestEpochSetupValidity(t *testing.T) {
 	})
 
 	t.Run("invalid cluster assignments", func(t *testing.T) {
-		_, _, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		// create an invalid cluster assignment (node appears in multiple clusters)
 		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
 		setup.Assignments = append(setup.Assignments, []flow.Identifier{collector.NodeID})
@@ -36,8 +36,8 @@ func TestEpochSetupValidity(t *testing.T) {
 	})
 
 	t.Run("short seed", func(t *testing.T) {
-		_, _, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		setup.RandomSource = unittest.SeedFixture(crypto.SeedMinLenDKG - 1)
 
 		err := isValidEpochSetup(setup)
@@ -47,9 +47,9 @@ func TestEpochSetupValidity(t *testing.T) {
 
 func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	t.Run("inconsistent counter", func(t *testing.T) {
-		_, _, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		// use a different counter for the commit
 		commit.Counter = setup.Counter + 1
 
@@ -58,9 +58,9 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 
 	t.Run("inconsistent cluster QCs", func(t *testing.T) {
-		_, _, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		// add an extra QC to commit
 		commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
 
@@ -69,9 +69,9 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 
 	t.Run("missing dkg group key", func(t *testing.T) {
-		_, _, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		commit.DKGGroupKey = nil
 
 		err := isValidEpochCommit(commit, setup)
@@ -79,9 +79,9 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 	})
 
 	t.Run("inconsistent DKG participants", func(t *testing.T) {
-		_, _, seal := unittest.BootstrapFixture(participants)
-		setup := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
-		commit := seal.ServiceEvents[1].Event.(*flow.EpochCommit)
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		// add an invalid DKG participant
 		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
 		commit.DKGParticipants[collector.NodeID] = flow.DKGParticipant{

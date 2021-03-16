@@ -562,6 +562,12 @@ func WithChunk(chunkIdx uint64) func(*flow.ResultApproval) {
 	}
 }
 
+func WithServiveEvents(events ...flow.ServiceEvent) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.ServiceEvents = events
+	}
+}
+
 func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultApproval {
 	attestation := flow.Attestation{
 		BlockID:           IdentifierFixture(),
@@ -1174,7 +1180,6 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 	for _, apply := range opts {
 		apply(root)
 	}
-	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
 
 	counter := uint64(1)
 	setup := EpochSetupFixture(
@@ -1184,10 +1189,11 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithFinalView(root.Header.View+1000),
 	)
 	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
-	seal := Seal.Fixture(
-		Seal.WithResult(result),
-		Seal.WithServiceEvents(setup.ServiceEvent(), commit.ServiceEvent()),
-	)
+
+	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
+	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
+
+	seal := Seal.Fixture(Seal.WithResult(result))
 
 	return root, result, seal
 }
