@@ -147,12 +147,45 @@ transaction(key: [UInt8]) {
   }
 }
 `
+const addAccountKeyTransactionV2 = `
+transaction(key: [UInt8]) {
+  prepare(signer: AuthAccount) {
+    let publicKey = PublicKey(
+	  publicKey: key,
+	  signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+	)
+    signer.keys.add(
+      publicKey: newPublicKey,
+      hashAlgorithm: HashAlgorithm.SHA3_256,
+      weight: 100.0
+    )
+  }
+}
+`
 
 const addMultipleAccountKeysTransaction = `
 transaction(key1: [UInt8], key2: [UInt8]) {
   prepare(signer: AuthAccount) {
     signer.addPublicKey(key1)
     signer.addPublicKey(key2)
+  }
+}
+`
+
+const addMultipleAccountKeysTransactionV2 = `
+transaction(key1: [UInt8], key2: [UInt8]) {
+  prepare(signer: AuthAccount) {
+    for key in [key1, key2] {
+      let publicKey = PublicKey(
+	    publicKey: key,
+	    signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+	  )
+      signer.keys.add(
+        publicKey: newPublicKey,
+        hashAlgorithm: HashAlgorithm.SHA3_256,
+        weight: 100.0
+      )
+    }
   }
 }
 `
@@ -165,11 +198,29 @@ transaction(key: Int) {
 }
 `
 
+const revokeAccountKeyTransaction = `
+transaction(keyIndex: Int) {
+  prepare(signer: AuthAccount) {
+    signer.keys.revoke(keyIndex: keyIndex)
+  }
+}
+`
+
 const removeMultipleAccountKeysTransaction = `
 transaction(key1: Int, key2: Int) {
   prepare(signer: AuthAccount) {
     signer.removePublicKey(key1)
     signer.removePublicKey(key2)
+  }
+}
+`
+
+const revokeMultipleAccountKeysTransaction = `
+transaction(keyIndex1: Int, keyIndex2: Int) {
+  prepare(signer: AuthAccount) {
+    for keyIndex in [keyIndex1, keyIndex2] {
+      signer.keys.revoke(keyIndex: keyIndex)
+    }
   }
 }
 `
