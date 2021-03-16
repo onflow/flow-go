@@ -17,6 +17,8 @@ var rootCmd = &cobra.Command{
 	Short: "read storage data",
 }
 
+var RootCmd = rootCmd
+
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

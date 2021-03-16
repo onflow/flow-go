@@ -8,6 +8,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// NOTE: these constant *must* match the constants used in the Cadence Crypto contract!
+//
+const (
+	ECDSA_P256      = "ECDSA_P256"
+	ECDSA_Secp256k1 = "ECDSA_Secp256k1"
+	SHA2_256        = "SHA2_256"
+	SHA3_256        = "SHA3_256"
+)
+
 type SignatureVerifier interface {
 	Verify(
 		signature []byte,
@@ -59,9 +68,9 @@ func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 // StringToSigningAlgorithm converts a string to a SigningAlgorithm.
 func StringToSigningAlgorithm(s string) crypto.SigningAlgorithm {
 	switch s {
-	case crypto.ECDSAP256.String():
+	case ECDSA_P256:
 		return crypto.ECDSAP256
-	case crypto.ECDSASecp256k1.String():
+	case ECDSA_Secp256k1:
 		return crypto.ECDSASecp256k1
 	default:
 		return crypto.UnknownSigningAlgorithm
@@ -71,9 +80,9 @@ func StringToSigningAlgorithm(s string) crypto.SigningAlgorithm {
 // StringToHashingAlgorithm converts a string to a HashingAlgorithm.
 func StringToHashingAlgorithm(s string) hash.HashingAlgorithm {
 	switch s {
-	case hash.SHA2_256.String():
+	case SHA2_256:
 		return hash.SHA2_256
-	case hash.SHA3_256.String():
+	case SHA3_256:
 		return hash.SHA3_256
 	default:
 		return hash.UnknownHashingAlgorithm
