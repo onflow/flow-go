@@ -12,7 +12,7 @@ import (
 type ComplianceCollector struct {
 	finalizedHeight          prometheus.Gauge
 	sealedHeight             prometheus.Gauge
-	finalizedBlocks          prometheus.Counter
+	finalizedBlocks          *prometheus.CounterVec
 	sealedBlocks             prometheus.Counter
 	finalizedPayload         *prometheus.CounterVec
 	sealedPayload            *prometheus.CounterVec
@@ -38,12 +38,12 @@ func NewComplianceCollector() *ComplianceCollector {
 			Help:      "the last sealed height",
 		}),
 
-		finalizedBlocks: promauto.NewCounter(prometheus.CounterOpts{
+		finalizedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "finalized_blocks_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of finalized blocks",
-		}),
+		}, []string{LabelProposer}),
 
 		sealedBlocks: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "sealed_blocks_total",
@@ -100,7 +100,7 @@ func (cc *ComplianceCollector) BlockFinalized(block *flow.Block) {
 	}
 	cc.lastBlockFinalizedAt = now
 
-	cc.finalizedBlocks.Inc()
+	cc.finalizedBlocks.With(prometheus.Labels{LabelProposer: block.Header.ProposerID.String()}).Inc()
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
 }
