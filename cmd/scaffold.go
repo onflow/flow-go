@@ -792,13 +792,13 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 		return nil, err
 	}
 
-	var snapshot inmem.Snapshot
-	err = json.Unmarshal(data, &snapshot)
+	var encodable inmem.EncodableSnapshot
+	err = json.Unmarshal(data, &encodable)
 	if err != nil {
 		return nil, err
 	}
 
-	return &snapshot, nil
+	return inmem.SnapshotFromEncodable(encodable), nil
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
