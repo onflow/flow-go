@@ -106,10 +106,10 @@ func (ms *MatchingEngineSuite) TestProcessValidReceipt() {
 	)
 
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
-
+	// we expect that receipt is persisted in storage
+	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 	// we expect that receipt is added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
-
 	// setup the results mempool to check if we attempted to add the incorporated result
 	ms.ResultsPL.
 		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
@@ -138,6 +138,8 @@ func (ms *MatchingEngineSuite) TestMultipleProcessingItems() {
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 		)
 		ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+		// we expect that receipt is persisted in storage
+		ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 		// we expect that receipt is added to mempool
 		ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 		// setup the results mempool to check if we attempted to add the incorporated result
