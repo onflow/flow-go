@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// SimpleView provides a simple view for testing purposes.
 type SimpleView struct {
 	Parent *SimpleView
 	Ledger *MapLedger
@@ -88,6 +89,7 @@ type MapLedger struct {
 	RegisterTouches map[string]bool
 }
 
+// NewMapLedger returns an instance of map ledger (should only be used for testing)
 func NewMapLedger() *MapLedger {
 	return &MapLedger{
 		Registers:       make(map[string]flow.RegisterEntry),
