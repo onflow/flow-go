@@ -223,8 +223,9 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 				}
 				return true
 			}),
-			mock.MatchedBy(func(executionResult *flow.ExecutionResult) bool {
-				return executionResult.BlockID == executableBlock.Block.ID() && executionResult.PreviousResultID == previousExecutionResultID
+			mock.MatchedBy(func(executionReceipt *flow.ExecutionReceipt) bool {
+				return executionReceipt.ExecutionResult.BlockID == executableBlock.Block.ID() &&
+					executionReceipt.ExecutionResult.PreviousResultID == previousExecutionResultID
 			}),
 			mock.Anything,
 			mock.Anything,

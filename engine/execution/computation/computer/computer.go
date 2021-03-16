@@ -22,12 +22,12 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger, *fvm.Programs) error
+	Run(fvm.Context, fvm.Procedure, state.View, *fvm.Programs) error
 }
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, *delta.View, *fvm.Programs) (*execution.ComputationResult, error)
+	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *fvm.Programs) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -69,7 +69,7 @@ func NewBlockComputer(
 func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	stateView *delta.View,
+	stateView state.View,
 	program *fvm.Programs,
 ) (*execution.ComputationResult, error) {
 
@@ -97,7 +97,7 @@ func (e *blockComputer) ExecuteBlock(
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	stateView *delta.View,
+	stateView state.View,
 	programs *fvm.Programs,
 ) (*execution.ComputationResult, error) {
 
@@ -138,10 +138,12 @@ func (e *blockComputer) executeBlock(
 		serviceEvents = append(serviceEvents, collServiceEvents...)
 		blockTxResults = append(blockTxResults, txResults...)
 
-		interactions[i] = collectionView.Interactions()
+		interactions[i] = collectionView.(*delta.View).Interactions()
 
-		stateView.MergeView(collectionView)
-
+		err = stateView.MergeView(collectionView)
+		if err != nil {
+			return nil, fmt.Errorf("cannot merge view: %w", err)
+		}
 	}
 
 	// system chunk
@@ -169,9 +171,12 @@ func (e *blockComputer) executeBlock(
 	serviceEvents = append(serviceEvents, txServiceEvents...)
 	blockTxResults = append(blockTxResults, txResult)
 	gasUsed += txGas
-	interactions[len(interactions)-1] = systemChunkView.Interactions()
+	interactions[len(interactions)-1] = systemChunkView.(*delta.View).Interactions()
 
-	stateView.MergeView(systemChunkView)
+	err = stateView.MergeView(systemChunkView)
+	if err != nil {
+		return nil, err
+	}
 
 	return &execution.ComputationResult{
 		ExecutableBlock:   block,
@@ -180,7 +185,7 @@ func (e *blockComputer) executeBlock(
 		ServiceEvents:     serviceEvents,
 		TransactionResult: blockTxResults,
 		GasUsed:           gasUsed,
-		StateReads:        stateView.ReadsCount(),
+		StateReads:        stateView.(*delta.View).ReadsCount(),
 	}, nil
 }
 
@@ -188,7 +193,7 @@ func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
 	blockCtx fvm.Context,
-	collectionView *delta.View,
+	collectionView state.View,
 	programs *fvm.Programs,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
@@ -249,7 +254,7 @@ func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
 	colSpan opentracing.Span,
 	txMetrics *fvm.MetricsCollector,
-	collectionView *delta.View,
+	collectionView state.View,
 	programs *fvm.Programs,
 	ctx fvm.Context,
 	txIndex uint32,
@@ -325,7 +330,11 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	if tx.Err == nil {
-		collectionView.MergeView(txView)
+		err := collectionView.MergeView(txView)
+		if err != nil {
+			return nil, nil, txResult, 0, err
+		}
+
 	}
 	e.log.Info().
 		Str("txHash", tx.ID.String()).

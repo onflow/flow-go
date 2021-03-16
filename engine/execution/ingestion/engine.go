@@ -1108,7 +1108,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionResult, events, serviceEvents, txResults)
+	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionReceipt, events, serviceEvents, txResults)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}

@@ -296,7 +296,7 @@ func (r *Finalizer) updateLockedQc(ancestryChain *ancestryChain) {
 }
 
 // updateFinalizedBlockQc updates `lastFinalizedBlockQC`
-// We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
+// We use the finalization rule from 'Event-driven HotStuff Protocol' where the condition is:
 //    * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
 //    * The 'Last finalized Block' is the block in S with the _highest view number_ (newest);
 // Calling this method with previously-processed blocks leaves consensus state invariant.
