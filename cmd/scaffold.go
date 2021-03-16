@@ -757,29 +757,13 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 		return nil, err
 	}
 
-<<<<<<< HEAD
-// loadRootProtocolSnapshot loads the root protocol snapshot from disk
-func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot))
-=======
 	var snapshot inmem.EncodableSnapshot
 	err = json.Unmarshal(data, &snapshot)
->>>>>>> jordan/5286-bootstrap-snapshot
 	if err != nil {
 		return nil, err
 	}
 
-<<<<<<< HEAD
-	var encodable inmem.EncodableSnapshot
-	err = json.Unmarshal(data, &encodable)
-	if err != nil {
-		return nil, err
-	}
-
-	return inmem.SnapshotFromEncodable(encodable), nil
-=======
 	return inmem.SnapshotFromEncodable(snapshot), nil
->>>>>>> jordan/5286-bootstrap-snapshot
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
