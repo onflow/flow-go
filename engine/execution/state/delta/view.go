@@ -110,7 +110,7 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	value, exists := v.delta.Get(owner, controller, key)
 	if exists {
 		// every time we read a value (order preserving) we update spock
-		var err error = nil
+		var err error
 		if value != nil {
 			err = v.updateSpock(value)
 		}
@@ -198,6 +198,7 @@ func (v *View) MergeView(ch state.View) error {
 	for _, id := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[id.String()] = id
 	}
+
 	// SpockSecret is order aware
 	// TODO return the error and handle it properly on other places
 	err := v.updateSpock(child.SpockSecret())
