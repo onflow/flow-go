@@ -27,7 +27,10 @@ type ExecutionReceipts interface {
 // them. Instead, it includes the "My" in the method name in order to highlight the notion
 // of "MY execution receipt", from the viewpoint of an individual Execution Node.
 type MyExecutionReceipts interface {
-	// StoreMyReceipt stores the receipt and marks it as mine (trusted).
+	// StoreMyReceipt stores the receipt and marks it as mine (trusted). My
+	// receipts are indexed by the block whose result they compute. Currently,
+	// we only support indexing a _single_ receipt per block. Attempting to
+	// store conflicting receipts for the same block will error.
 	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
 
 	// MyReceipt retrieves my receipt for the given block.
