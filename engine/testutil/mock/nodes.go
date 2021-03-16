@@ -134,20 +134,21 @@ func (c *ComputerWrap) ComputeBlock(
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	MutableState    protocol.MutableState
-	IngestionEngine *ingestion.Engine
-	ExecutionEngine *ComputerWrap
-	RequestEngine   *requester.Engine
-	ReceiptsEngine  *executionprovider.Engine
-	FollowerEngine  *followereng.Engine
-	SyncEngine      *synchronization.Engine
-	BadgerDB        *badger.DB
-	VM              *fvm.VirtualMachine
-	ExecutionState  state.ExecutionState
-	Ledger          ledger.Ledger
-	LevelDbDir      string
-	Collections     storage.Collections
-	Finalizer       *consensus.Finalizer
+	MutableState        protocol.MutableState
+	IngestionEngine     *ingestion.Engine
+	ExecutionEngine     *ComputerWrap
+	RequestEngine       *requester.Engine
+	ReceiptsEngine      *executionprovider.Engine
+	FollowerEngine      *followereng.Engine
+	SyncEngine          *synchronization.Engine
+	BadgerDB            *badger.DB
+	VM                  *fvm.VirtualMachine
+	ExecutionState      state.ExecutionState
+	Ledger              ledger.Ledger
+	LevelDbDir          string
+	Collections         storage.Collections
+	Finalizer           *consensus.Finalizer
+	MyExecutionReceipts storage.MyExecutionReceipts
 }
 
 func (en ExecutionNode) Ready() {

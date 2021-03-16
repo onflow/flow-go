@@ -357,6 +357,7 @@ func TestExecuteOneBlock(t *testing.T) {
 
 		_, ok := commits[blockB.ID()]
 		require.True(t, ok)
+
 	})
 }
 
