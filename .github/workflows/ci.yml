@@ -4,11 +4,9 @@ on:
   push:
     branches: 
       - master
-      - feature/serializable-snapshots
   pull_request:
     branches:
       - master
-      - feature/serializable-snapshots
 
 jobs:
   golangci:
