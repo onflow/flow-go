@@ -708,10 +708,10 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	type removeKeyTest struct {
-	source      string
-	apiVersion  accountKeyAPIVersion
-	expectError bool
-}
+		source      string
+		apiVersion  accountKeyAPIVersion
+		expectError bool
+	}
 
 	// Remove a single key
 
@@ -953,7 +953,7 @@ func TestGetAccountKey(t *testing.T) {
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
-				for i, keyIndex := range []int{keyCount, keyCount + 1} {
+				for i, keyIndex := range []int{-1, keyCount, keyCount + 1} {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
