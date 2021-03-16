@@ -117,7 +117,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := executionNodesForBlockID(lastBlockID, b.executionReceipts, b.state)
+	execNodes, err := executionNodesForBlockID(lastBlockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
 	}

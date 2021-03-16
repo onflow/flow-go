@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
+	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -148,17 +149,17 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 // CreateAccounts inserts accounts into the ledger using the provided private keys.
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
-	ledger state.Ledger,
+	view state.View,
 	programs *fvm.Programs,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
-	return CreateAccountsWithSimpleAddresses(vm, ledger, programs, privateKeys, chain)
+	return CreateAccountsWithSimpleAddresses(vm, view, programs, privateKeys, chain)
 }
 
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
-	ledger state.Ledger,
+	view state.View,
 	programs *fvm.Programs,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
@@ -196,7 +197,7 @@ func CreateAccountsWithSimpleAddresses(
 			AddAuthorizer(serviceAddress)
 
 		tx := fvm.Transaction(txBody, uint32(i))
-		err := vm.Run(ctx, tx, ledger, programs)
+		err := vm.Run(ctx, tx, view, programs)
 		if err != nil {
 			return nil, err
 		}
@@ -226,8 +227,8 @@ func CreateAccountsWithSimpleAddresses(
 	return accounts, nil
 }
 
-func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *state.MapLedger {
-	ledger := state.NewMapLedger()
+func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) state.View {
+	view := fvmUtils.NewSimpleView()
 	programs := fvm.NewEmptyPrograms()
 
 	bootstrap := fvm.Bootstrap(
@@ -238,11 +239,11 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) *state.MapL
 	_ = vm.Run(
 		ctx,
 		bootstrap,
-		ledger,
+		view,
 		programs,
 	)
 
-	return ledger
+	return view
 }
 
 func BytesToCadenceArray(l []byte) cadence.Array {
