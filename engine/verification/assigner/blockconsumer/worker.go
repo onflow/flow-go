@@ -12,11 +12,11 @@ import (
 // the entity that the engine is expecting, and translating the id of
 // the entity back to JobID notify the consumer a job is done.
 type Worker struct {
-	blockWorker assigner.FinalizedBlockWorker
+	blockWorker assigner.FinalizedBlockProcessor
 	consumer    *BlockConsumer
 }
 
-func newWorker(blockWorker assigner.FinalizedBlockWorker) *Worker {
+func newWorker(blockWorker assigner.FinalizedBlockProcessor) *Worker {
 	return &Worker{blockWorker: blockWorker}
 }
 
