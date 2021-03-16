@@ -1,14 +1,20 @@
 package sealingtracker
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// SealingTracker is an auxiliary component for tracking sealing progress
+// SealingTracker is an auxiliary component for tracking sealing progress.
+// Its primary purpose is to decide which SealingRecords should be tracked
+// and to store references to them.
+// A SealingTracker is intended to track progress for a _single run_
+// of the sealing algorithm, i.e. Core.CheckSealing().
 // Not concurrency safe.
 type SealingTracker struct {
 	state      protocol.State
@@ -23,55 +29,75 @@ func NewSealingTracker(state protocol.State) *SealingTracker {
 	}
 }
 
+// String converts the most relevant information from the SealingRecords
+// to key-value pairs (in json format).
 func (st *SealingTracker) String() string {
 	rcrds := make([]string, 0, len(st.records))
 	for _, r := range st.records {
-		rcrds = append(rcrds, r.String())
+		s, err := st.sealingRecord2String(r)
+		if err != nil {
+			continue
+		}
+		rcrds = append(rcrds, s)
 	}
 	return "[" + strings.Join(rcrds, ", ") + "]"
 }
 
-// SealingRecords returns the internally stored slice of SealingRecords.
-// Caution: modifying the slice will write through and change the
-//          SealingTracker's internal state.
-func (st *SealingTracker) Records() []*SealingRecord {
-	return st.records
-}
-
-// SufficientApprovals creates a sealing record for an incorporated result
-// with sufficient approvals for sealing.
-func (st *SealingTracker) SufficientApprovals(ir *flow.IncorporatedResult) *SealingRecord {
-	return st.recordSealingStatus(ir).setSufficientApprovals()
-}
-
-// InsufficientApprovals creates a sealing record for an incorporated result
-// that has insufficient approvals to be sealed. firstUnmatchedChunkIndex
-// specifies the index of first chunk that hasn't received sufficient approval.
-func (st *SealingTracker) InsufficientApprovals(ir *flow.IncorporatedResult, firstUnmatchedChunkIndex uint64) *SealingRecord {
-	return st.recordSealingStatus(ir).setInsufficientApprovals(firstUnmatchedChunkIndex)
-}
-
-// recordSealingStatus checks whether the sealing status of the provided
-// incorporatedResult should be tracked. It creates a new record, if the
-// result should be tracked, or returns nil otherwise.
-func (st *SealingTracker) recordSealingStatus(
-	incorporatedResult *flow.IncorporatedResult,
-) *SealingRecord {
-
-	executedBlockID := incorporatedResult.Result.BlockID
-	if !st.isRelevant(executedBlockID) {
-		return nil
+// MempoolHasNextSeal returns true iff the seals mempool contains a candidate seal
+// for the next block
+func (st *SealingTracker) MempoolHasNextSeal(seals mempool.IncorporatedResultSeals) bool {
+	for _, nextUnsealed := range st.records {
+		_, mempoolHasNextSeal := seals.ByID(nextUnsealed.IncorporatedResult.ID())
+		if mempoolHasNextSeal {
+			return true
+		}
 	}
-	executedBlock, err := st.state.AtBlockID(executedBlockID).Head()
+	return false
+}
+
+// Track tracks the given SealingRecord, provided the it should be tracked
+// according to the SealingTracker's internal policy.
+func (st *SealingTracker) Track(sealingRecord *SealingRecord) {
+	executedBlockID := sealingRecord.IncorporatedResult.Result.BlockID
+	if st.isRelevant(executedBlockID) {
+		st.records = append(st.records, sealingRecord)
+	}
+}
+
+// sealingRecord2String generates a string representation of a sealing record.
+// We specifically attach this method to the SealingTracker, as it is the Tracker's
+// responsibility to decide what information from the record should be captured
+// and what additional details (like block height), should be added.
+func (st *SealingTracker) sealingRecord2String(record *SealingRecord) (string, error) {
+	result := record.IncorporatedResult.Result
+	executedBlock, err := st.state.AtBlockID(result.BlockID).Head()
 	if err != nil {
-		return nil
+		return "", err
 	}
-	record := &SealingRecord{
-		executedBlock:      executedBlock,
-		incorporatedResult: incorporatedResult,
+
+	kvps := map[string]interface{}{
+		"executed_block_id":                result.BlockID.String(),
+		"executed_block_height":            executedBlock.Height,
+		"result_id":                        result.ID().String(),
+		"incorporated_result_id":           record.IncorporatedResult.ID().String(),
+		"number_chunks":                    len(result.Chunks),
+		"sufficient_approvals_for_sealing": record.SufficientApprovalsForSealing,
 	}
-	st.records = append(st.records, record)
-	return record
+	if record.firstUnmatchedChunkIndex != nil {
+		kvps["first_unmatched_chunk_index"] = *record.firstUnmatchedChunkIndex
+	}
+	if record.qualifiesForEmergencySealing != nil {
+		kvps["qualifies_for_emergency_sealing"] = *record.qualifiesForEmergencySealing
+	}
+	if record.hasMultipleReceipts != nil {
+		kvps["has_multiple_receipts"] = *record.hasMultipleReceipts
+	}
+
+	bytes, err := json.Marshal(kvps)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }
 
 // nextUnsealedFinalizedBlock determines the ID of the finalized but unsealed
