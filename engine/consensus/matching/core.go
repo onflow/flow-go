@@ -733,11 +733,7 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 	// Index receipts for given incorporatedResult by their executor. In case
 	// there are multiple receipts from the same executor, we keep the last one.
 	receiptsForIncorporatedResults := receipts.GroupByResultID().GetGroup(resultID)
-	if receiptsForIncorporatedResults.GroupByExecutorID().NumberGroups() < 2 {
-		return false // too few receipts
-	}
-
-	return true
+	return receiptsForIncorporatedResults.GroupByExecutorID().NumberGroups() >= 2
 }
 
 // authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
