@@ -12,8 +12,16 @@ import (
 // the entity that the engine is expecting, and translating the id of
 // the entity back to JobID notify the consumer a job is done.
 type Worker struct {
-	engine   *assigner.Engine
-	consumer *BlockConsumer
+	blockWorker assigner.FinalizedBlockWorker
+	consumer    *BlockConsumer
+}
+
+func newWorker(blockWorker assigner.FinalizedBlockWorker) *Worker {
+	return &Worker{blockWorker: blockWorker}
+}
+
+func (w *Worker) withBlockConsumer(consumer *BlockConsumer) {
+	w.consumer = consumer
 }
 
 // Run is a block worker that receives a job corresponding to a finalized block.
@@ -21,7 +29,7 @@ type Worker struct {
 // for processing.
 func (w *Worker) Run(job module.Job) {
 	block := jobToBlock(job)
-	w.engine.ProcessFinalizedBlock(block)
+	w.blockWorker.ProcessFinalizedBlock(block)
 }
 
 // Notify is a callback for engine to notify a block has been
