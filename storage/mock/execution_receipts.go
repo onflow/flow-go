@@ -13,15 +13,15 @@ type ExecutionReceipts struct {
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *ExecutionReceipts) ByBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+func (_m *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	ret := _m.Called(blockID)
 
-	var r0 []*flow.ExecutionReceipt
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []*flow.ExecutionReceipt); ok {
+	var r0 flow.ExecutionReceiptList
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.ExecutionReceiptList); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.ExecutionReceipt)
+			r0 = ret.Get(0).(flow.ExecutionReceiptList)
 		}
 	}
 
