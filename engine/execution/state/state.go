@@ -102,6 +102,7 @@ type state struct {
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
 	receipts           storage.ExecutionReceipts
+	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
@@ -140,6 +141,7 @@ func NewExecutionState(
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
+	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
@@ -156,6 +158,7 @@ func NewExecutionState(
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
 		receipts:           receipts,
+		myReceipts:         myReceipts,
 		events:             events,
 		serviceEvents:      serviceEvents,
 		transactionResults: transactionResults,
@@ -351,15 +354,9 @@ func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.Execu
 		defer span.Finish()
 	}
 
-	err := s.receipts.Store(receipt)
+	err := s.myReceipts.StoreMyReceipt(receipt)
 	if err != nil {
 		return fmt.Errorf("could not persist execution result: %w", err)
-	}
-	// TODO if the second operation fails we should remove stored execution result
-	// This is global execution storage problem - see TODO at the top
-	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution receipt: %w", err)
 	}
 	return nil
 }
