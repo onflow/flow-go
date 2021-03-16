@@ -178,7 +178,7 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
 	// write snapshot to disk
-	writeJSON(model.PathRootProtocolStateSnapshot, snapshot)
+	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
 
 	// copy files only if the directories differ
