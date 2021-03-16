@@ -37,10 +37,11 @@ func NewBlockConsumer(log zerolog.Logger,
 	processedHeight storage.ConsumerProgress,
 	blocks storage.Blocks,
 	state protocol.State,
-	engine *assigner.Engine,
+	blockProcessor assigner.FinalizedBlockProcessor,
 	maxProcessing int64) (*BlockConsumer, int64, error) {
-	worker := &Worker{blockWorker: engine}
-	engine.WithBlockConsumerNotifier(worker)
+
+	worker := newWorker(blockProcessor)
+	blockProcessor.WithBlockConsumerNotifier(worker)
 	jobs := newFinalizedBlockReader(state, blocks)
 	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 
