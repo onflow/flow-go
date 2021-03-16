@@ -708,20 +708,23 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	type removeKeyTest struct {
-		source     string
-		apiVersion accountKeyAPIVersion
-	}
+	source      string
+	apiVersion  accountKeyAPIVersion
+	expectError bool
+}
 
 	// Remove a single key
 
 	singleKeyTests := []removeKeyTest{
 		{
-			source:     removeAccountKeyTransaction,
-			apiVersion: accountKeyAPIVersionV1,
+			source:      removeAccountKeyTransaction,
+			apiVersion:  accountKeyAPIVersionV1,
+			expectError: true,
 		},
 		{
-			source:     revokeAccountKeyTransaction,
-			apiVersion: accountKeyAPIVersionV2,
+			source:      revokeAccountKeyTransaction,
+			apiVersion:  accountKeyAPIVersionV2,
+			expectError: false,
 		},
 	}
 
@@ -756,7 +759,11 @@ func TestRemoveAccountKey(t *testing.T) {
 						err = vm.Run(ctx, tx, view, programs)
 						require.NoError(t, err)
 
-						assert.Error(t, tx.Err)
+						if test.expectError {
+							assert.Error(t, tx.Err)
+						} else {
+							assert.NoError(t, tx.Err)
+						}
 					}
 
 					after, err := vm.GetAccount(ctx, address, view, programs)
