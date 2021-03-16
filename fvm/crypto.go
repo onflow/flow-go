@@ -3,6 +3,8 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
@@ -65,25 +67,33 @@ func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 	return nil
 }
 
-// StringToSigningAlgorithm converts a string to a SigningAlgorithm.
-func StringToSigningAlgorithm(s string) crypto.SigningAlgorithm {
+// RuntimeToCryptoSigningAlgorithm converts a runtime signature algorithm to a crypto signature algorithm.
+func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.SigningAlgorithm {
 	switch s {
-	case ECDSA_P256:
+	case runtime.SignatureAlgorithmECDSA_P256:
 		return crypto.ECDSAP256
-	case ECDSA_Secp256k1:
+	case runtime.SignatureAlgorithmECDSA_Secp256k1:
 		return crypto.ECDSASecp256k1
+	case runtime.SignatureAlgorithmBLS_BLS12381:
+		return crypto.BLSBLS12381
 	default:
 		return crypto.UnknownSigningAlgorithm
 	}
 }
 
-// StringToHashingAlgorithm converts a string to a HashingAlgorithm.
-func StringToHashingAlgorithm(s string) hash.HashingAlgorithm {
+// RuntimeToCryptoHashingAlgorithm converts a runtime hash algorithm to a crypto hashing algorithm.
+func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgorithm {
 	switch s {
-	case SHA2_256:
+	case runtime.HashAlgorithmSHA2_256:
 		return hash.SHA2_256
-	case SHA3_256:
+	case runtime.HashAlgorithmSHA3_256:
 		return hash.SHA3_256
+	case runtime.HashAlgorithmSHA2_384:
+		return hash.SHA2_384
+	case runtime.HashAlgorithmSHA3_384:
+		return hash.SHA3_384
+	case runtime.HashAlgorithmKMAC_128:
+		return hash.KMAC128
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
@@ -97,11 +107,18 @@ func verifySignatureFromRuntime(
 	rawTag string,
 	message []byte,
 	rawPublicKey []byte,
-	rawSigAlgo string,
-	rawHashAlgo string,
+	signatureAlgorithm runtime.SignatureAlgorithm,
+	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
-	sigAlgo := StringToSigningAlgorithm(rawSigAlgo)
-	hashAlgo := StringToHashingAlgorithm(rawHashAlgo)
+	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
+	if sigAlgo == crypto.UnknownSigningAlgorithm {
+		return false, fmt.Errorf("invalid signature algorithm: %s", signatureAlgorithm)
+	}
+
+	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
+	if hashAlgo == hash.UnknownHashingAlgorithm {
+		return false, fmt.Errorf("invalid hashing algorithm: %s", hashAlgorithm)
+	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
@@ -112,7 +129,7 @@ func verifySignatureFromRuntime(
 	tag := parseRuntimeDomainTag(rawTag)
 	if tag == nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return false, fmt.Errorf("invalid domain tag")
+		return false, fmt.Errorf("invalid domain tag: %s", rawTag)
 	}
 
 	valid, err := verifier.Verify(
