@@ -10,9 +10,17 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 )
 
+func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHolder) *ProgramsHandler {
+	return &ProgramsHandler{
+		masterState:  stateHolder,
+		viewsStack:   nil,
+		Programs:     programs,
+		initialState: stateHolder.State(),
+	}
+}
+
 // ProgramsHandler manages operations using Programs storage.
 // It's separation of concern for hostEnv
-
 type stackEntry struct {
 	state    *state.State
 	location common.Location
@@ -23,9 +31,10 @@ type stackEntry struct {
 // naturally, making cleanup method essentially no-op. But if something goes wrong, all nested
 // views must be merged in order to make sure they are recorded
 type ProgramsHandler struct {
-	masterState *state.StateManager
-	viewsStack  []stackEntry
-	Programs    *programs.Programs
+	masterState  *state.StateHolder
+	viewsStack   []stackEntry
+	Programs     *programs.Programs
+	initialState *state.State
 }
 
 func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Program) error {
@@ -52,16 +61,28 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 
 	h.Programs.Set(location, program, last.state)
 
-	return h.mergeState(last.state)
+	err := h.mergeState(last.state)
+
+	return err
 }
 
 func (h *ProgramsHandler) mergeState(state *state.State) error {
 	if len(h.viewsStack) == 0 {
 		// if this was last item, merge to the master state
-		return h.masterState.MergeStateIntoActiveState(state)
+
+		fmt.Printf("Restoring active view NOOP from %p to: %p\n", h.masterState.State().View(), h.initialState.View())
+		h.masterState.SetActiveState(h.initialState)
+		//return h.masterState.State().MergeState(state)
 	} else {
-		return h.viewsStack[len(h.viewsStack)-1].state.MergeAnyState(state)
+		fmt.Printf("Restoring active view from %p to: %p\n", h.masterState.State().View(), h.viewsStack[len(h.viewsStack)-1].state.View())
+
+		h.masterState.SetActiveState(h.viewsStack[len(h.viewsStack)-1].state)
+		//return h.viewsStack[len(h.viewsStack)-1].state.MergeState(state)
 	}
+	fmt.Printf("Merging %p to: %p\n", state.View(), h.masterState.State().View())
+
+	return h.masterState.State().MergeState(state)
+
 }
 
 func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
@@ -96,6 +117,9 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 		location: location,
 	})
 
+	fmt.Printf("Setting new active view from %p to: %p\n", h.masterState.State().View(), childState.View())
+	h.masterState.SetActiveState(childState)
+
 	return nil, false
 }
 
@@ -109,18 +133,10 @@ func (h *ProgramsHandler) Cleanup() error {
 
 	for i := stackLen; i > 0; i-- {
 		entry := h.viewsStack[i]
-		err := h.viewsStack[i-1].state.MergeAnyState(entry.state)
+		err := h.viewsStack[i-1].state.MergeState(entry.state)
 		if err != nil {
 			return fmt.Errorf("cannot merge state while cleanup: %w", err)
 		}
 	}
-	return h.masterState.MergeStateIntoActiveState(h.viewsStack[0].state)
-}
-
-func NewProgramsHandler(programs *programs.Programs, stateManager *state.StateManager) *ProgramsHandler {
-	return &ProgramsHandler{
-		masterState: stateManager,
-		viewsStack:  nil,
-		Programs:    programs,
-	}
+	return h.masterState.State().MergeState(h.viewsStack[0].state)
 }

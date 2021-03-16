@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 )
 
 func Test_Programs(t *testing.T) {
@@ -19,7 +20,7 @@ func Test_Programs(t *testing.T) {
 	}
 	someLocation := common.IdentifierLocation("some")
 
-	newState := state.NewState(state.NewMapLedger())
+	newState := state.NewState(utils.NewSimpleView())
 
 	addressLocation := common.AddressLocation{
 		Address: common.BytesToAddress([]byte{2, 3, 4}),

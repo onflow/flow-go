@@ -225,7 +225,7 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	return a.setPublicKeyCount(address, count+1)
 }
 
-func contractKey(contractName string) string {
+func ContractKey(contractName string) string {
 	return fmt.Sprintf("%s.%s", KeyCode, contractName)
 }
 
@@ -233,7 +233,7 @@ func (a *Accounts) getContract(contractName string, address flow.Address) ([]byt
 
 	contract, err := a.getValue(address,
 		true,
-		contractKey(contractName))
+		ContractKey(contractName))
 	if err != nil {
 		return nil, newLedgerGetError(contractName, address, err)
 	}
@@ -252,7 +252,7 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	}
 
 	var prevContract []byte
-	prevContract, err = a.getValue(address, true, contractKey(contractName))
+	prevContract, err = a.getValue(address, true, ContractKey(contractName))
 	if err != nil {
 		return fmt.Errorf("cannot retreive previous contract: %w", err)
 	}
@@ -262,7 +262,7 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 		return nil
 	}
 
-	err = a.setValue(address, true, contractKey(contractName), contract)
+	err = a.setValue(address, true, ContractKey(contractName), contract)
 	if err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ func (a *Accounts) TouchContract(contractName string, address flow.Address) {
 	if contractNames.Has(contractName) {
 		a.touch(address,
 			true,
-			contractKey(contractName))
+			ContractKey(contractName))
 	}
 }
 

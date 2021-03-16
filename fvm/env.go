@@ -75,7 +75,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 	uuidGenerator := state.NewUUIDGenerator(sth)
 
 	programsHandler := handler.NewProgramsHandler(
-		programs, stm,
+		programs, sth,
 	)
 
 	env := &hostEnv{
