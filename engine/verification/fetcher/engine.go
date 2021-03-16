@@ -209,7 +209,7 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 
 func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.Identifier) error {
 	blockID := c.ChunkBody.BlockID
-	receiptsData, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
 	}
@@ -503,7 +503,7 @@ func (e *Engine) validateChunkDataPack(
 }
 
 func (e *Engine) getResultByID(blockID flow.Identifier, resultID flow.Identifier) (*flow.ExecutionResult, error) {
-	receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	receipts, err := e.receiptsDB.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get receipts by block ID: %w", err)
 	}
