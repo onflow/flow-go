@@ -144,7 +144,7 @@ func verifySignatureFromRuntime(
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
-		return false, fmt.Errorf("invalid hashing algorithm: %s", hashAlgorithm)
+		return false, fmt.Errorf("invalid hash algorithm: %s", hashAlgorithm)
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)

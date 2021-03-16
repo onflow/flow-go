@@ -1089,6 +1089,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, fmt.Errorf(
 			"failed to revoke account key: failed to convert signature algorithm: %s",
 			publicKey.SignAlgo,
@@ -1097,6 +1098,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, fmt.Errorf(
 			"failed to revoke account key: failed to convert hash algorithm: %s",
 			publicKey.HashAlgo,
@@ -1120,20 +1122,23 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 // This function returns a nil key with no errors, if a key doesn't exist at the given index.
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key retrieval fails.
-func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (key *runtime.AccountKey, err error) {
+func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
 	accountAddress := flow.Address(address)
 
 	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
-		return key, err
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
 	}
 
 	if !ok {
-		return key, fmt.Errorf("account with address %s does not exist", address)
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("account with address %s does not exist", address)
 	}
 
+	// Don't return an error for invalid key indices
 	if keyIndex < 0 {
-		return key, fmt.Errorf("key index must be positive, received %d", keyIndex)
+		return nil, nil
 	}
 
 	var publicKey flow.AccountPublicKey
@@ -1143,16 +1148,19 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (k
 		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
 		// distinguish between a 'key not found error' vs other internal errors.
 		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
-			return key, nil
+			return nil, nil
 		}
-		return key, err
+
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
 	}
 
 	// Prepare the account key to return
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		return key, fmt.Errorf(
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf(
 			"failed to get account key: failed to convert signature algorithm: %s",
 			publicKey.SignAlgo,
 		)
@@ -1160,13 +1168,14 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (k
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		return key, fmt.Errorf(
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf(
 			"failed to get account key: failed to convert hash algorithm: %s",
 			publicKey.HashAlgo,
 		)
 	}
 
-	key = &runtime.AccountKey{
+	return &runtime.AccountKey{
 		KeyIndex: publicKey.Index,
 		PublicKey: &runtime.PublicKey{
 			PublicKey: publicKey.PublicKey.Encode(),
@@ -1175,7 +1184,5 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (k
 		HashAlgo:  hashAlgo,
 		Weight:    publicKey.Weight,
 		IsRevoked: publicKey.Revoked,
-	}
-
-	return key, nil
+	}, nil
 }
