@@ -17,6 +17,7 @@ package flow
 // assignment cannot be computed) and its integrity is not protected by a
 // signature of a node that is authorized to generate it. A seal should only
 // be processed in the context of the block, which contains it.
+//
 // (2) Even though seals are not strictly entities, they still implement the
 // Entity interface. This allows us to store and retrieve seals individually.
 // CAUTION: As seals are part of the block payload, their _exact_ content must
@@ -24,13 +25,16 @@ package flow
 // signatures (incl. order). While it is possible to construct different valid
 // seals for the same result (using different subsets of assigned verifiers),
 // they cannot be treated as equivalent for the following reason:
+//
 //  * Swapping a seal in a block with a different once changes the binary
 //    representation of the block payload containing the seal.
 //  * Changing the binary block representation would invalidate the block
 //    proposer's signature.
+//
 // Therefore, to retrieve valid blocks from storage, it is required that
 // the Seal.ID includes all fields with independent degrees of freedom
 // (such as AggregatedApprovalSigs).
+//
 type Seal struct {
 	BlockID                Identifier
 	ResultID               Identifier

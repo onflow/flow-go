@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -68,7 +69,7 @@ func (suite *BuilderSuite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, _ := sutil.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses, results := sutil.StorageLayer(suite.T(), suite.db)
 	consumer := events.NewNoop()
 	suite.headers = headers
 	suite.blocks = blocks
@@ -85,13 +86,15 @@ func (suite *BuilderSuite) SetupTest() {
 	// just bootstrap with a genesis block, we'll use this as reference
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	root, result, seal := unittest.BootstrapFixture(participants)
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
 	// ensure we don't enter a new epoch for tests that build many blocks
-	seal.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	result.ServiceEvents[0].Event.(*flow.EpochSetup).FinalView = root.Header.View + 100000
+	seal.ResultID = result.ID()
 
-	stateRoot, err := pbadger.NewStateRoot(root, result, seal, 0)
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	require.NoError(suite.T(), err)
 
-	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, blocks, setups, commits, statuses, stateRoot)
+	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
 	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer)

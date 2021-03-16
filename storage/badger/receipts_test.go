@@ -22,14 +22,12 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 		})
 	}
 
-	var empty []*flow.ExecutionReceipt
-
 	t.Run("get empty", func(t *testing.T) {
 		withStore(t, func(store *bstorage.ExecutionReceipts) {
 			block := unittest.BlockFixture()
 			receipts, err := store.ByBlockID(block.ID())
 			require.NoError(t, err)
-			require.Equal(t, empty, receipts)
+			require.Equal(t, 0, len(receipts))
 		})
 	})
 
@@ -49,7 +47,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			receipts, err := store.ByBlockID(block.ID())
 			require.NoError(t, err)
 
-			require.Equal(t, []*flow.ExecutionReceipt{receipt1}, receipts)
+			require.Equal(t, flow.ExecutionReceiptList{receipt1}, receipts)
 		})
 	})
 
