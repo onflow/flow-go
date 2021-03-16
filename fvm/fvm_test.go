@@ -1177,11 +1177,11 @@ func TestSignatureVerification(t *testing.T) {
 
                           for rawPublicKey in rawPublicKeys {
                               keyList.add(
-                                  Crypto.PublicKey(
+                                  PublicKey(
                                       publicKey: rawPublicKey,
-                                      signatureAlgorithm: Crypto.%s
+                                      signatureAlgorithm: SignatureAlgorithm.%s
                                   ),
-                                  hashAlgorithm: Crypto.%s,
+                                  hashAlgorithm: HashAlgorithm.%s,
                                   weight: weight,
                               )
                           }
