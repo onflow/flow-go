@@ -539,19 +539,11 @@ func (c *Core) CheckSealing() error {
 		return fmt.Errorf("could not request pending result approvals: %w", err)
 	}
 
-	// check if we end up created a seal in mempool for the next unsealed block
-	mempoolHasNextSeal := false
-	for _, nextUnsealed := range sealingTracker.Records() {
-		_, mempoolHasNextSeal = c.seals.ByID(nextUnsealed.IncorporatedResult.ID())
-		if mempoolHasNextSeal {
-			break
-		}
-	}
 	c.log.Info().
 		Int("sealable_results_count", len(sealableResults)).
 		Int("sealable_incorporated_results", len(sealedBlockIDs)).
 		Str("next_unsealed_results", sealingTracker.String()).
-		Bool("mempool_has_seal_for_next_height", mempoolHasNextSeal).
+		Bool("mempool_has_seal_for_next_height", sealingTracker.MempoolHasNextSeal(c.seals)).
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
 		Uint("receipts_size", c.receipts.Size()).
@@ -571,7 +563,7 @@ func (c *Core) CheckSealing() error {
 // It specifically returns the information for the next unsealed results which will
 // be useful for debugging the potential sealing halt issue
 func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.SealingTracker, error) {
-	//tracking functionality to collection information about the sealing status.
+	// tracker to collection information about the _current_ sealing check.
 	sealingTracker := sealingtracker.NewSealingTracker(c.state)
 
 	lastFinalized, err := c.state.Final().Head()
@@ -583,18 +575,18 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.Se
 	var results []*flow.IncorporatedResult
 	for _, incorporatedResult := range c.incorporatedResults.All() {
 		// Can we seal following the happy-path protocol?
-		sealingStatus, err := c.hasEnoughApprovals(incorporatedResult, sealingTracker)
+		sealingStatus, err := c.hasEnoughApprovals(incorporatedResult)
 		if state.IsNoValidChildBlockError(err) {
 			continue
 		}
 		if err != nil {
 			return nil, nil, fmt.Errorf("internal error matching chunk approvals to incorporated result: %w", err)
 		}
-		happySealable := sealingStatus.SufficientApprovalsForSealing
+		sealableWithEnoughApprovals := sealingStatus.SufficientApprovalsForSealing
 
 		// Emergency Sealing Fallback: only kicks in if we can't seal following the happy-path sealing
 		emergencySealable := false
-		if !happySealable {
+		if !sealableWithEnoughApprovals {
 			emergencySealable, err = c.emergencySealable(incorporatedResult, lastFinalized)
 			if err != nil {
 				return nil, nil, fmt.Errorf("internal error matching chunk approvals to incorporated result: %w", err)
@@ -609,7 +601,7 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.Se
 		// (ii) there must be at least 2 receipts from _different_ ENs
 		//      committing to the result
 		// comment: we evaluate condition (ii) only if (i) is true
-		if happySealable || emergencySealable {
+		if sealableWithEnoughApprovals || emergencySealable {
 			// TODO for sealing Phase 3: optimize resultHasMultipleReceipts calls
 			// During Phase 2: for every result, there is only one incorporatedResult, as
 			// incorporatedResult.IncorporatedBlockID is set to the executed block. Without an
@@ -642,10 +634,10 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.Se
 //     have a child yet. Then, the chunk assignment cannot be computed.
 //   - All other errors are unexpected and symptoms of internal bugs, uncovered edge cases,
 //     or a corrupted internal node state. These are all fatal failures.
-func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult, sealingTracker *sealingtracker.SealingTracker) (*sealingtracker.SealingRecord, error) {
+func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (*sealingtracker.SealingRecord, error) {
 	// shortcut: if we don't require any approvals, any incorporatedResult has enough approvals
 	if c.requiredApprovalsForSealConstruction == 0 {
-		return sealingTracker.SufficientApprovals(incorporatedResult), nil
+		return sealingtracker.NewRecordWithSufficientApprovals(incorporatedResult), nil
 	}
 
 	// chunk assigment is based on the first block in the fork that incorporates the result
@@ -698,14 +690,12 @@ func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult, s
 
 		// abort checking approvals for incorporatedResult if current chunk has insufficient approvals
 		if incorporatedResult.NumberSignatures(chunk.Index) < c.requiredApprovalsForSealConstruction {
-			sealingStatus := sealingTracker.InsufficientApprovals(incorporatedResult, chunk.Index)
-			return sealingStatus, nil
+			return sealingtracker.NewRecordWithInsufficientApprovals(incorporatedResult, chunk.Index), nil
 		}
 	}
 
 	// all chunks have sufficient approvals
-	sealingStatus := sealingTracker.SufficientApprovals(incorporatedResult)
-	return sealingStatus, nil
+	return sealingtracker.NewRecordWithSufficientApprovals(incorporatedResult), nil
 }
 
 // emergencySealable determines whether an incorporated Result qualifies for "emergency sealing".
