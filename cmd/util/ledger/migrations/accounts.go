@@ -158,7 +158,7 @@ func (v *view) MergeView(o state.View) error {
 	var other *view
 	var ok bool
 	if other, ok = o.(*view); !ok {
-		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:Delta.View)", o)
+		return fmt.Errorf("view type mismatch (given: %T, expected:Delta.View)", o)
 	}
 
 	for key, value := range other.Ledger.payloads {
