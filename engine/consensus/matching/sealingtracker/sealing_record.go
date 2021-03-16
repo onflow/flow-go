@@ -11,49 +11,53 @@ import (
 // incorporated result. It holds information whether the result is sealable,
 // or what is missing to be sealable.
 // Not concurrency safe.
+// A SealingRecord for an incorporatedResult that we do _not_ want to track
+// can be represented by nil. All methods of SealingRecord accept a nil
+// receiver and in this case are NoOps.
 type SealingRecord struct {
-	ExecutedBlock      *flow.Header             // block the incorporated Result is for
-	IncorporatedResult *flow.IncorporatedResult // the incorporated result
+	executedBlock      *flow.Header             // block the incorporated Result is for
+	incorporatedResult *flow.IncorporatedResult // the incorporated result
 
-	// SufficientApprovalsForSealing: True iff all chunks in the result have
+	// sufficientApprovalsForSealing: True iff all chunks in the result have
 	// sufficient approvals
-	SufficientApprovalsForSealing bool
-	// FirstUnmatchedChunkIndex: Index of first chunk that hasn't received
+	sufficientApprovalsForSealing bool
+	// firstUnmatchedChunkIndex: Index of first chunk that hasn't received
 	// sufficient approval (ordered by chunk index). Optional value: only set
 	// if SufficientApprovalsForSealing == False and nil otherwise.
-	FirstUnmatchedChunkIndex *uint64
-	// QualifiesForEmergencySealing: True iff result qualifies for emergency
+	firstUnmatchedChunkIndex *uint64
+	// qualifiesForEmergencySealing: True iff result qualifies for emergency
 	// sealing. Optional value: only set if
 	// SufficientApprovalsForSealing == False and nil otherwise.
-	QualifiesForEmergencySealing *bool
-	// HasHasMultipleReceipts: True iff there are at least 2 receipts from
+	qualifiesForEmergencySealing *bool
+	// hasMultipleReceipts: True iff there are at least 2 receipts from
 	// _different_ ENs committing to the result. Optional value: only set if
 	// SufficientApprovalsForSealing == True and nil otherwise.
-	HasMultipleReceipts *bool
+	hasMultipleReceipts *bool
 }
 
+// String returns a json representation of the sealing record.
 func (rs *SealingRecord) String() string {
 	if rs == nil {
 		return ""
 	}
 
-	result := rs.IncorporatedResult.Result
+	result := rs.incorporatedResult.Result
 	kvps := map[string]interface{}{
 		"block_id":                         result.BlockID.String(),
-		"height":                           rs.ExecutedBlock.Height,
+		"height":                           rs.executedBlock.Height,
 		"result_id":                        result.ID().String(),
-		"incorporated_result_id":           rs.IncorporatedResult.ID().String(),
+		"incorporated_result_id":           rs.incorporatedResult.ID().String(),
 		"number_chunks":                    len(result.Chunks),
-		"sufficient_approvals_for_sealing": rs.SufficientApprovalsForSealing,
+		"sufficient_approvals_for_sealing": rs.sufficientApprovalsForSealing,
 	}
-	if rs.FirstUnmatchedChunkIndex != nil {
-		kvps["first_unmatched_chunk_index"] = *rs.FirstUnmatchedChunkIndex
+	if rs.firstUnmatchedChunkIndex != nil {
+		kvps["first_unmatched_chunk_index"] = *rs.firstUnmatchedChunkIndex
 	}
-	if rs.QualifiesForEmergencySealing != nil {
-		kvps["qualifies_for_emergency_sealing"] = *rs.QualifiesForEmergencySealing
+	if rs.qualifiesForEmergencySealing != nil {
+		kvps["qualifies_for_emergency_sealing"] = *rs.qualifiesForEmergencySealing
 	}
-	if rs.HasMultipleReceipts != nil {
-		kvps["has_multiple_receipts"] = *rs.HasMultipleReceipts
+	if rs.hasMultipleReceipts != nil {
+		kvps["has_multiple_receipts"] = *rs.hasMultipleReceipts
 	}
 
 	bytes, err := json.Marshal(kvps)
@@ -69,7 +73,7 @@ func (rs *SealingRecord) SetHasMultipleReceipts(hasMultipleReceipts bool) {
 	if rs == nil {
 		return
 	}
-	rs.HasMultipleReceipts = &hasMultipleReceipts
+	rs.hasMultipleReceipts = &hasMultipleReceipts
 }
 
 // SetQualifiesForEmergencySealing specifies whether the incorporated result
@@ -78,20 +82,20 @@ func (rs *SealingRecord) SetQualifiesForEmergencySealing(qualifiesForEmergencySe
 	if rs == nil {
 		return
 	}
-	rs.QualifiesForEmergencySealing = &qualifiesForEmergencySealing
+	rs.qualifiesForEmergencySealing = &qualifiesForEmergencySealing
 }
 
 func (rs *SealingRecord) setSufficientApprovals() *SealingRecord {
 	if rs != nil {
-		rs.SufficientApprovalsForSealing = true
+		rs.sufficientApprovalsForSealing = true
 	}
 	return rs
 }
 
 func (rs *SealingRecord) setInsufficientApprovals(firstUnmatchedChunkIndex uint64) *SealingRecord {
 	if rs != nil {
-		rs.SufficientApprovalsForSealing = false
-		rs.FirstUnmatchedChunkIndex = &firstUnmatchedChunkIndex
+		rs.sufficientApprovalsForSealing = false
+		rs.firstUnmatchedChunkIndex = &firstUnmatchedChunkIndex
 	}
 	return rs
 }

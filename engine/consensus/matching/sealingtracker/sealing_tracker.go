@@ -67,8 +67,8 @@ func (st *SealingTracker) recordSealingStatus(
 		return nil
 	}
 	record := &SealingRecord{
-		ExecutedBlock:      executedBlock,
-		IncorporatedResult: incorporatedResult,
+		executedBlock:      executedBlock,
+		incorporatedResult: incorporatedResult,
 	}
 	st.records = append(st.records, record)
 	return record
