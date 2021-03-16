@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,6 +44,13 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 	return address
 }
 
+type accountKeyAPIVersion string
+
+const (
+	accountKeyAPIVersionV1 accountKeyAPIVersion = "V1"
+	accountKeyAPIVersionV2 accountKeyAPIVersion = "V2"
+)
+
 func addAccountKey(
 	t *testing.T,
 	vm *fvm.VirtualMachine,
@@ -50,11 +58,20 @@ func addAccountKey(
 	ledger state.Ledger,
 	programs *fvm.Programs,
 	address flow.Address,
+	apiVersion accountKeyAPIVersion,
 ) flow.AccountPublicKey {
-	publicKeyA, cadencePublicKey := newAccountKey(t)
+
+	publicKeyA, cadencePublicKey := newAccountKey(t, apiVersion)
+
+	var addAccountKeyTx accountKeyAPIVersion
+	if apiVersion == accountKeyAPIVersionV1 {
+		addAccountKeyTx = addAccountKeyTransaction
+	} else {
+		addAccountKeyTx = addAccountKeyTransactionV2
+	}
 
 	txBody := flow.NewTransactionBody().
-		SetScript([]byte(addAccountKeyTransaction)).
+		SetScript([]byte(addAccountKeyTx)).
 		AddArgument(cadencePublicKey).
 		AddAuthorizer(address)
 
@@ -155,9 +172,9 @@ transaction(key: [UInt8]) {
 	  signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
 	)
     signer.keys.add(
-      publicKey: newPublicKey,
+      publicKey: publicKey,
       hashAlgorithm: HashAlgorithm.SHA3_256,
-      weight: 100.0
+      weight: 1000.0
     )
   }
 }
@@ -181,9 +198,9 @@ transaction(key1: [UInt8], key2: [UInt8]) {
 	    signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
 	  )
       signer.keys.add(
-        publicKey: newPublicKey,
+        publicKey: publicKey,
         hashAlgorithm: HashAlgorithm.SHA3_256,
-        weight: 100.0
+        weight: 1000.0
       )
     }
   }
@@ -265,14 +282,40 @@ transaction {
 }
 `
 
-func newAccountKey(t *testing.T) (flow.AccountPublicKey, []byte) {
+const getAccountKeyTransaction = `
+transaction(keyIndex: Int) {
+  prepare(signer: AuthAccount) {
+    var key :AccountKey? = signer.keys.get(keyIndex: keyIndex)
+    log(key)
+  }
+}
+`
+
+const getMultipleAccountKeysTransaction = `
+transaction(keyIndex1: Int, keyIndex2: Int) {
+  prepare(signer: AuthAccount) {
+    for keyIndex in [keyIndex1, keyIndex2] {
+      var key :AccountKey? = signer.keys.get(keyIndex: keyIndex)
+      log(key)
+    }
+  }
+}
+`
+
+func newAccountKey(t *testing.T, apiVersion accountKeyAPIVersion) (flow.AccountPublicKey, []byte) {
 	privateKey, _ := unittest.AccountKeyFixture()
 	publicKeyA := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 
-	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(publicKeyA)
-	require.NoError(t, err)
+	var publicKeyBytes []byte
+	if apiVersion == accountKeyAPIVersionV1 {
+		var err error
+		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKeyA)
+		require.NoError(t, err)
+	} else {
+		publicKeyBytes = publicKeyA.PublicKey.Encode()
+	}
 
-	cadencePublicKey := testutil.BytesToCadenceArray(encodedPublicKey)
+	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
 	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
 	require.NoError(t, err)
 
@@ -463,161 +506,198 @@ func TestAddAccountKey(t *testing.T) {
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
-	t.Run("Add to empty key list",
-		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+	type addKeyTest struct {
+		source     string
+		apiVersion accountKeyAPIVersion
+	}
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
-				assert.Empty(t, before.Keys)
+	// Add a single key
 
-				publicKeyA, cadencePublicKey := newAccountKey(t)
+	singleKeyTests := []addKeyTest{
+		{
+			source:     addAccountKeyTransaction,
+			apiVersion: accountKeyAPIVersionV1,
+		},
+		{
+			source:     addAccountKeyTransactionV2,
+			apiVersion: accountKeyAPIVersionV2,
+		},
+	}
 
-				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addAccountKeyTransaction)).
-					AddArgument(cadencePublicKey).
-					AddAuthorizer(address)
+	for _, test := range singleKeyTests {
 
-				tx := fvm.Transaction(txBody, 0)
+		t.Run(fmt.Sprintf("Add to empty key list %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
 
-				err = vm.Run(ctx, tx, ledger, programs)
-				require.NoError(t, err)
+					before, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Empty(t, before.Keys)
 
-				assert.NoError(t, tx.Err)
+					publicKeyA, cadencePublicKey := newAccountKey(t, test.apiVersion)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(test.source)).
+						AddArgument(cadencePublicKey).
+						AddAuthorizer(address)
 
-				require.Len(t, after.Keys, 1)
+					tx := fvm.Transaction(txBody, 0)
 
-				publicKeyB := after.Keys[0]
+					err = vm.Run(ctx, tx, ledger, programs)
+					require.NoError(t, err)
 
-				assert.Equal(t, publicKeyA.PublicKey, publicKeyB.PublicKey)
-				assert.Equal(t, publicKeyA.SignAlgo, publicKeyB.SignAlgo)
-				assert.Equal(t, publicKeyA.HashAlgo, publicKeyB.HashAlgo)
-				assert.Equal(t, publicKeyA.Weight, publicKeyB.Weight)
-			}),
-	)
+					assert.NoError(t, tx.Err)
 
-	t.Run("Add to non-empty key list",
-		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
 
-				publicKey1 := addAccountKey(t, vm, ctx, ledger, programs, address)
+					require.Len(t, after.Keys, 1)
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
-				assert.Len(t, before.Keys, 1)
+					publicKeyB := after.Keys[0]
 
-				publicKey2, publicKey2Arg := newAccountKey(t)
+					assert.Equal(t, publicKeyA.PublicKey, publicKeyB.PublicKey)
+					assert.Equal(t, publicKeyA.SignAlgo, publicKeyB.SignAlgo)
+					assert.Equal(t, publicKeyA.HashAlgo, publicKeyB.HashAlgo)
+					assert.Equal(t, publicKeyA.Weight, publicKeyB.Weight)
+				}),
+		)
 
-				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addAccountKeyTransaction)).
-					AddArgument(publicKey2Arg).
-					AddAuthorizer(address)
+		t.Run(fmt.Sprintf("Add to non-empty key list %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
 
-				tx := fvm.Transaction(txBody, 0)
+					publicKey1 := addAccountKey(t, vm, ctx, ledger, programs, address, test.apiVersion)
 
-				err = vm.Run(ctx, tx, ledger, programs)
-				require.NoError(t, err)
+					before, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, before.Keys, 1)
 
-				assert.NoError(t, tx.Err)
+					publicKey2, publicKey2Arg := newAccountKey(t, test.apiVersion)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(test.source)).
+						AddArgument(publicKey2Arg).
+						AddAuthorizer(address)
 
-				expectedKeys := []flow.AccountPublicKey{
-					publicKey1,
-					publicKey2,
-				}
+					tx := fvm.Transaction(txBody, 0)
 
-				require.Len(t, after.Keys, len(expectedKeys))
+					err = vm.Run(ctx, tx, ledger, programs)
+					require.NoError(t, err)
 
-				for i, expectedKey := range expectedKeys {
-					actualKey := after.Keys[i]
-					assert.Equal(t, i, actualKey.Index)
-					assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
-					assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
-					assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)
-					assert.Equal(t, expectedKey.Weight, actualKey.Weight)
-				}
-			}),
-	)
+					assert.NoError(t, tx.Err)
 
-	t.Run("Invalid key",
-		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
 
-				invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
-				invalidPublicKeyArg, err := jsoncdc.Encode(invalidPublicKey)
-				require.NoError(t, err)
+					expectedKeys := []flow.AccountPublicKey{
+						publicKey1,
+						publicKey2,
+					}
 
-				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addAccountKeyTransaction)).
-					AddArgument(invalidPublicKeyArg).
-					AddAuthorizer(address)
+					require.Len(t, after.Keys, len(expectedKeys))
 
-				tx := fvm.Transaction(txBody, 0)
+					for i, expectedKey := range expectedKeys {
+						actualKey := after.Keys[i]
+						assert.Equal(t, i, actualKey.Index)
+						assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
+						assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
+						assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)
+						assert.Equal(t, expectedKey.Weight, actualKey.Weight)
+					}
+				}),
+		)
 
-				err = vm.Run(ctx, tx, ledger, programs)
-				require.NoError(t, err)
+		t.Run(fmt.Sprintf("Invalid key %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
 
-				assert.Error(t, tx.Err)
+					invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
+					invalidPublicKeyArg, err := jsoncdc.Encode(invalidPublicKey)
+					require.NoError(t, err)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(test.source)).
+						AddArgument(invalidPublicKeyArg).
+						AddAuthorizer(address)
 
-				assert.Empty(t, after.Keys)
-			}),
-	)
+					tx := fvm.Transaction(txBody, 0)
 
-	t.Run("Multiple keys",
-		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
-				address := createAccount(t, vm, chain, ctx, ledger, programs)
+					err = vm.Run(ctx, tx, ledger, programs)
+					require.NoError(t, err)
 
-				before, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
-				assert.Empty(t, before.Keys)
+					assert.Error(t, tx.Err)
 
-				publicKey1, publicKey1Arg := newAccountKey(t)
-				publicKey2, publicKey2Arg := newAccountKey(t)
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
 
-				txBody := flow.NewTransactionBody().
-					SetScript([]byte(addMultipleAccountKeysTransaction)).
-					AddArgument(publicKey1Arg).
-					AddArgument(publicKey2Arg).
-					AddAuthorizer(address)
+					assert.Empty(t, after.Keys)
+				}),
+		)
+	}
 
-				tx := fvm.Transaction(txBody, 0)
+	// Add multiple keys
 
-				err = vm.Run(ctx, tx, ledger, programs)
-				require.NoError(t, err)
+	multipleKeysTests := []addKeyTest{
+		{
+			source:     addMultipleAccountKeysTransaction,
+			apiVersion: accountKeyAPIVersionV1,
+		},
+		{
+			source:     addMultipleAccountKeysTransactionV2,
+			apiVersion: accountKeyAPIVersionV2,
+		},
+	}
 
-				assert.NoError(t, tx.Err)
+	for _, test := range multipleKeysTests {
+		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
+					before, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Empty(t, before.Keys)
 
-				expectedKeys := []flow.AccountPublicKey{
-					publicKey1,
-					publicKey2,
-				}
+					publicKey1, publicKey1Arg := newAccountKey(t, test.apiVersion)
+					publicKey2, publicKey2Arg := newAccountKey(t, test.apiVersion)
 
-				require.Len(t, after.Keys, len(expectedKeys))
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(test.source)).
+						AddArgument(publicKey1Arg).
+						AddArgument(publicKey2Arg).
+						AddAuthorizer(address)
 
-				for i, expectedKey := range expectedKeys {
-					actualKey := after.Keys[i]
-					assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
-					assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
-					assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)
-					assert.Equal(t, expectedKey.Weight, actualKey.Weight)
-				}
-			}),
-	)
+					tx := fvm.Transaction(txBody, 0)
+
+					err = vm.Run(ctx, tx, ledger, programs)
+					require.NoError(t, err)
+
+					assert.NoError(t, tx.Err)
+
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+
+					expectedKeys := []flow.AccountPublicKey{
+						publicKey1,
+						publicKey2,
+					}
+
+					require.Len(t, after.Keys, len(expectedKeys))
+
+					for i, expectedKey := range expectedKeys {
+						actualKey := after.Keys[i]
+						assert.Equal(t, expectedKey.PublicKey, actualKey.PublicKey)
+						assert.Equal(t, expectedKey.SignAlgo, actualKey.SignAlgo)
+						assert.Equal(t, expectedKey.HashAlgo, actualKey.HashAlgo)
+						assert.Equal(t, expectedKey.Weight, actualKey.Weight)
+					}
+				}),
+		)
+
+	}
 }
 
 func TestRemoveAccountKey(t *testing.T) {
@@ -625,6 +705,230 @@ func TestRemoveAccountKey(t *testing.T) {
 	options := []fvm.Option{
 		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+	}
+
+	type removeKeyTest struct {
+		source     string
+		apiVersion accountKeyAPIVersion
+	}
+
+	// Remove a single key
+
+	singleKeyTests := []removeKeyTest{
+		{
+			source:     removeAccountKeyTransaction,
+			apiVersion: accountKeyAPIVersionV1,
+		},
+		{
+			source:     revokeAccountKeyTransaction,
+			apiVersion: accountKeyAPIVersionV2,
+		},
+	}
+
+	for _, test := range singleKeyTests {
+
+		t.Run(fmt.Sprintf("Non-existent key %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
+
+					const keyCount = 2
+
+					for i := 0; i < keyCount; i++ {
+						_ = addAccountKey(t, vm, ctx, ledger, programs, address, test.apiVersion)
+					}
+
+					before, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, before.Keys, keyCount)
+
+					for i, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
+						require.NoError(t, err)
+
+						txBody := flow.NewTransactionBody().
+							SetScript([]byte(test.source)).
+							AddArgument(keyIndexArg).
+							AddAuthorizer(address)
+
+						tx := fvm.Transaction(txBody, uint32(i))
+
+						err = vm.Run(ctx, tx, ledger, programs)
+						require.NoError(t, err)
+
+						assert.Error(t, tx.Err)
+					}
+
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, after.Keys, keyCount)
+
+					for _, publicKey := range after.Keys {
+						assert.False(t, publicKey.Revoked)
+					}
+				}),
+		)
+
+		t.Run(fmt.Sprintf("Existing key %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
+
+					const keyCount = 2
+					const keyIndex = keyCount - 1
+
+					for i := 0; i < keyCount; i++ {
+						_ = addAccountKey(t, vm, ctx, ledger, programs, address, test.apiVersion)
+					}
+
+					before, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, before.Keys, keyCount)
+
+					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
+					require.NoError(t, err)
+
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(test.source)).
+						AddArgument(keyIndexArg).
+						AddAuthorizer(address)
+
+					tx := fvm.Transaction(txBody, 0)
+
+					err = vm.Run(ctx, tx, ledger, programs)
+					require.NoError(t, err)
+
+					assert.NoError(t, tx.Err)
+
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, after.Keys, keyCount)
+
+					for _, publicKey := range after.Keys[:len(after.Keys)-1] {
+						assert.False(t, publicKey.Revoked)
+					}
+
+					assert.True(t, after.Keys[keyIndex].Revoked)
+				}),
+		)
+
+		t.Run(fmt.Sprintf("Key added by a different api version %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
+
+					const keyCount = 2
+					const keyIndex = keyCount - 1
+
+					// Use one version of API to add the keys, and a different version of the API to revoke the keys.
+					var apiVersionForAdding accountKeyAPIVersion
+					if test.apiVersion == accountKeyAPIVersionV1 {
+						apiVersionForAdding = accountKeyAPIVersionV2
+					} else {
+						apiVersionForAdding = accountKeyAPIVersionV1
+					}
+
+					for i := 0; i < keyCount; i++ {
+						_ = addAccountKey(t, vm, ctx, ledger, programs, address, apiVersionForAdding)
+					}
+
+					before, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, before.Keys, keyCount)
+
+					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
+					require.NoError(t, err)
+
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(test.source)).
+						AddArgument(keyIndexArg).
+						AddAuthorizer(address)
+
+					tx := fvm.Transaction(txBody, 0)
+
+					err = vm.Run(ctx, tx, ledger, programs)
+					require.NoError(t, err)
+
+					assert.NoError(t, tx.Err)
+
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, after.Keys, keyCount)
+
+					for _, publicKey := range after.Keys[:len(after.Keys)-1] {
+						assert.False(t, publicKey.Revoked)
+					}
+
+					assert.True(t, after.Keys[keyIndex].Revoked)
+				}),
+		)
+	}
+
+	// Remove multiple keys
+
+	multipleKeysTests := []removeKeyTest{
+		{
+			source:     removeMultipleAccountKeysTransaction,
+			apiVersion: accountKeyAPIVersionV1,
+		},
+		{
+			source:     revokeMultipleAccountKeysTransaction,
+			apiVersion: accountKeyAPIVersionV2,
+		},
+	}
+
+	for _, test := range multipleKeysTests {
+		t.Run(fmt.Sprintf("Multiple keys %s", test.apiVersion),
+			newVMTest().withContextOptions(options...).
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+					address := createAccount(t, vm, chain, ctx, ledger, programs)
+
+					const keyCount = 2
+
+					for i := 0; i < keyCount; i++ {
+						_ = addAccountKey(t, vm, ctx, ledger, programs, address, test.apiVersion)
+					}
+
+					before, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, before.Keys, keyCount)
+
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(test.source)).
+						AddAuthorizer(address)
+
+					for i := 0; i < keyCount; i++ {
+						keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(i))
+						require.NoError(t, err)
+
+						txBody.AddArgument(keyIndexArg)
+					}
+
+					tx := fvm.Transaction(txBody, 0)
+
+					err = vm.Run(ctx, tx, ledger, programs)
+					require.NoError(t, err)
+
+					assert.NoError(t, tx.Err)
+
+					after, err := vm.GetAccount(ctx, address, ledger, programs)
+					require.NoError(t, err)
+					assert.Len(t, after.Keys, keyCount)
+
+					for _, publicKey := range after.Keys {
+						assert.True(t, publicKey.Revoked)
+					}
+				}),
+		)
+	}
+}
+
+func TestGetAccountKey(t *testing.T) {
+
+	options := []fvm.Option{
+		fvm.WithRestrictedAccountCreation(false),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithCadenceLogging(true),
 	}
 
 	t.Run("Non-existent key",
@@ -635,19 +939,19 @@ func TestRemoveAccountKey(t *testing.T) {
 				const keyCount = 2
 
 				for i := 0; i < keyCount; i++ {
-					_ = addAccountKey(t, vm, ctx, ledger, programs, address)
+					_ = addAccountKey(t, vm, ctx, ledger, programs, address, accountKeyAPIVersionV2)
 				}
 
 				before, err := vm.GetAccount(ctx, address, ledger, programs)
 				require.NoError(t, err)
 				assert.Len(t, before.Keys, keyCount)
 
-				for i, keyIndex := range []int{-1, keyCount, keyCount + 1} {
+				for i, keyIndex := range []int{keyCount, keyCount + 1} {
 					keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
 					require.NoError(t, err)
 
 					txBody := flow.NewTransactionBody().
-						SetScript([]byte(removeAccountKeyTransaction)).
+						SetScript([]byte(getAccountKeyTransaction)).
 						AddArgument(keyIndexArg).
 						AddAuthorizer(address)
 
@@ -655,16 +959,10 @@ func TestRemoveAccountKey(t *testing.T) {
 
 					err = vm.Run(ctx, tx, ledger, programs)
 					require.NoError(t, err)
+					require.NoError(t, tx.Err)
 
-					assert.Error(t, tx.Err)
-				}
-
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
-				assert.Len(t, after.Keys, keyCount)
-
-				for _, publicKey := range after.Keys {
-					assert.False(t, publicKey.Revoked)
+					require.Len(t, tx.Logs, 1)
+					assert.Equal(t, "nil", tx.Logs[0])
 				}
 			}),
 	)
@@ -677,8 +975,9 @@ func TestRemoveAccountKey(t *testing.T) {
 				const keyCount = 2
 				const keyIndex = keyCount - 1
 
+				keys := make([]flow.AccountPublicKey, keyCount)
 				for i := 0; i < keyCount; i++ {
-					_ = addAccountKey(t, vm, ctx, ledger, programs, address)
+					keys[i] = addAccountKey(t, vm, ctx, ledger, programs, address, accountKeyAPIVersionV2)
 				}
 
 				before, err := vm.GetAccount(ctx, address, ledger, programs)
@@ -689,7 +988,7 @@ func TestRemoveAccountKey(t *testing.T) {
 				require.NoError(t, err)
 
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(removeAccountKeyTransaction)).
+					SetScript([]byte(getAccountKeyTransaction)).
 					AddArgument(keyIndexArg).
 					AddAuthorizer(address)
 
@@ -697,18 +996,75 @@ func TestRemoveAccountKey(t *testing.T) {
 
 				err = vm.Run(ctx, tx, ledger, programs)
 				require.NoError(t, err)
+				require.NoError(t, tx.Err)
 
-				assert.NoError(t, tx.Err)
+				require.Len(t, tx.Logs, 1)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
-				assert.Len(t, after.Keys, keyCount)
+				key := keys[keyIndex]
 
-				for _, publicKey := range after.Keys[:len(after.Keys)-1] {
-					assert.False(t, publicKey.Revoked)
+				expected := fmt.Sprintf(
+					"AccountKey("+
+						"keyIndex: %d, "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 0)), "+
+						"hashAlgorithm: HashAlgorithm(rawValue: 2), "+
+						"weight: 1000.00000000, "+
+						"isRevoked: false)",
+					keyIndex,
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+				)
+
+				assert.Equal(t, expected, tx.Logs[0])
+			}),
+	)
+
+	t.Run("Key added by a different api version",
+		newVMTest().withContextOptions(options...).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, ledger state.Ledger, programs *fvm.Programs) {
+				address := createAccount(t, vm, chain, ctx, ledger, programs)
+
+				const keyCount = 2
+				const keyIndex = keyCount - 1
+
+				keys := make([]flow.AccountPublicKey, keyCount)
+				for i := 0; i < keyCount; i++ {
+					// Use the old version of API to add the key
+					keys[i] = addAccountKey(t, vm, ctx, ledger, programs, address, accountKeyAPIVersionV1)
 				}
 
-				assert.True(t, after.Keys[keyIndex].Revoked)
+				before, err := vm.GetAccount(ctx, address, ledger, programs)
+				require.NoError(t, err)
+				assert.Len(t, before.Keys, keyCount)
+
+				keyIndexArg, err := jsoncdc.Encode(cadence.NewInt(keyIndex))
+				require.NoError(t, err)
+
+				txBody := flow.NewTransactionBody().
+					SetScript([]byte(getAccountKeyTransaction)).
+					AddArgument(keyIndexArg).
+					AddAuthorizer(address)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, ledger, programs)
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				require.Len(t, tx.Logs, 1)
+
+				key := keys[keyIndex]
+
+				expected := fmt.Sprintf(
+					"AccountKey("+
+						"keyIndex: %d, "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 0)), "+
+						"hashAlgorithm: HashAlgorithm(rawValue: 2), "+
+						"weight: 1000.00000000, "+
+						"isRevoked: false)",
+					keyIndex,
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+				)
+
+				assert.Equal(t, expected, tx.Logs[0])
 			}),
 	)
 
@@ -719,8 +1075,9 @@ func TestRemoveAccountKey(t *testing.T) {
 
 				const keyCount = 2
 
+				keys := make([]flow.AccountPublicKey, keyCount)
 				for i := 0; i < keyCount; i++ {
-					_ = addAccountKey(t, vm, ctx, ledger, programs, address)
+					keys[i] = addAccountKey(t, vm, ctx, ledger, programs, address, accountKeyAPIVersionV2)
 				}
 
 				before, err := vm.GetAccount(ctx, address, ledger, programs)
@@ -728,7 +1085,7 @@ func TestRemoveAccountKey(t *testing.T) {
 				assert.Len(t, before.Keys, keyCount)
 
 				txBody := flow.NewTransactionBody().
-					SetScript([]byte(removeMultipleAccountKeysTransaction)).
+					SetScript([]byte(getMultipleAccountKeysTransaction)).
 					AddAuthorizer(address)
 
 				for i := 0; i < keyCount; i++ {
@@ -742,16 +1099,25 @@ func TestRemoveAccountKey(t *testing.T) {
 
 				err = vm.Run(ctx, tx, ledger, programs)
 				require.NoError(t, err)
+				require.NoError(t, tx.Err)
 
-				assert.NoError(t, tx.Err)
+				assert.Len(t, tx.Logs, 2)
 
-				after, err := vm.GetAccount(ctx, address, ledger, programs)
-				require.NoError(t, err)
-				assert.Len(t, after.Keys, keyCount)
+				for i := 0; i < keyCount; i++ {
+					expected := fmt.Sprintf(
+						"AccountKey("+
+							"keyIndex: %d, "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 0)), "+
+							"hashAlgorithm: HashAlgorithm(rawValue: 2), "+
+							"weight: 1000.00000000, "+
+							"isRevoked: false)",
+						i,
+						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()),
+					)
 
-				for _, publicKey := range after.Keys {
-					assert.True(t, publicKey.Revoked)
+					assert.Equal(t, expected, tx.Logs[i])
 				}
+
 			}),
 	)
 }
