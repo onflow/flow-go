@@ -562,7 +562,7 @@ func (c *Core) CheckSealing() error {
 // function. It also filters out results that have an incorrect sub-graph.
 // It specifically returns the information for the next unsealed results which will
 // be useful for debugging the potential sealing halt issue
-func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.SealingTracker, error) {
+func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.SealingTracker, error) {
 	// tracker to collection information about the _current_ sealing check.
 	sealingTracker := sealingtracker.NewSealingTracker(c.state)
 
@@ -614,6 +614,8 @@ func (c *Core) sealableResults() ([]*flow.IncorporatedResult, *sealingtracker.Se
 				results = append(results, incorporatedResult)
 			}
 		}
+
+		sealingTracker.Track(sealingStatus)
 	}
 
 	return results, sealingTracker, nil
@@ -649,7 +651,7 @@ func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (
 	// pre-select all authorized Verifiers at the block that incorporates the result
 	authorizedVerifiers, err := c.authorizedVerifiersAtBlock(incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not determine authorized verifiers at block %v: %w", incorporatedResult.IncorporatedBlockID, err)
+		return nil, fmt.Errorf("could not determine authorized verifiers: %w", err)
 	}
 
 	// Internal consistency check:
@@ -790,7 +792,10 @@ func (c *Core) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Ide
 			filter.Not(filter.Ejected),
 		))
 	if err != nil {
-		return nil, fmt.Errorf("could not determine authorized verifiers at block %v: %w", blockID, err)
+		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)
+	}
+	if len(authorizedVerifierList) == 0 {
+		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
 	}
 	return authorizedVerifierList.Lookup(), nil
 }

@@ -369,12 +369,15 @@ func (ms *MatchingSuite) TestSealableResultsEmptyMempools() {
 // Method Core.sealableResults() should return R as an element of the sealable results
 func (ms *MatchingSuite) TestSealableResultsValid() {
 	valSubgrph := ms.ValidSubgraphFixture()
+	// [temporary for Sealing Phase 2] we are still using a temporary sealing logic
+	// where the IncorporatedBlockID is expected to be the result's block ID.
+	valSubgrph.IncorporatedResult.IncorporatedBlockID = valSubgrph.IncorporatedResult.Result.BlockID
 	ms.AddSubgraphFixtureToMempools(valSubgrph)
 
 	// generate two receipts for result (from different ENs)
 	receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(valSubgrph.Result))
 	receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(valSubgrph.Result))
-	ms.ReceiptsDB.On("ByBlockID", valSubgrph.Block.ID()).Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil)
+	ms.ReceiptsDB.On("ByBlockID", valSubgrph.Block.ID()).Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil)
 
 	// test output of Matching Core's sealableResults()
 	results, _, err := ms.matching.sealableResults()
@@ -423,7 +426,7 @@ func (ms *MatchingSuite) TestOutlierReceiptNotSealed() {
 
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB))
 	receiptB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB))
-	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return([]*flow.ExecutionReceipt{receiptA1, receiptA2, receiptB1, receiptB2}, nil)
+	ms.ReceiptsDB.On("ByBlockID", ms.LatestFinalizedBlock.ID()).Return(flow.ExecutionReceiptList{receiptA1, receiptA2, receiptB1, receiptB2}, nil)
 
 	// test output of Matching Core's sealableResults()
 	results, _, err := ms.matching.sealableResults()
@@ -450,6 +453,9 @@ func (ms *MatchingSuite) TestSealableResultsMissingBlock() {
 // only considers approvals from assigned verifiers
 func (ms *MatchingSuite) TestSealableResultsUnassignedVerifiers() {
 	subgrph := ms.ValidSubgraphFixture()
+	// [temporary for Sealing Phase 2] we are still using a temporary sealing logic
+	// where the IncorporatedBlockID is expected to be the result's block ID.
+	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.IncorporatedResult.Result.BlockID
 
 	assignedVerifiersPerChunk := uint(len(ms.Approvers) / 2)
 	assignment := chunks.NewAssignment()
@@ -496,42 +502,15 @@ func (ms *MatchingSuite) TestSealableResults_ApprovalsForUnknownBlockRemain() {
 	ms.ApprovalsPL.AssertNumberOfCalls(ms.T(), "RemChunk", 0)
 }
 
-// TestRemoveApprovalsFromInvalidVerifiers tests that matching.Core.sealableResults():
-//   * removes approvals from invalid verification nodes from mempool
-// This may occur when the block wasn't know when the node received the approval.
-// Note: we test a scenario here, were result is sealable; it just has additional
-//      approvals from invalid nodes
-func (ms *MatchingSuite) TestRemoveApprovalsFromInvalidVerifiers() {
-	subgrph := ms.ValidSubgraphFixture()
-
-	// add invalid approvals to leading chunk:
-	app1 := unittest.ApprovalFor(subgrph.IncorporatedResult.Result, 0, unittest.IdentifierFixture()) // from unknown node
-	app2 := unittest.ApprovalFor(subgrph.IncorporatedResult.Result, 0, ms.ExeID)                     // from known but non-VerificationNode
-	ms.Identities[ms.VerID].Stake = 0
-	app3 := unittest.ApprovalFor(subgrph.IncorporatedResult.Result, 0, ms.VerID) // from zero-weight VerificationNode
-	subgrph.Approvals[0][app1.Body.ApproverID] = app1
-	subgrph.Approvals[0][app2.Body.ApproverID] = app2
-	subgrph.Approvals[0][app3.Body.ApproverID] = app3
-
-	ms.AddSubgraphFixtureToMempools(subgrph)
-
-	ms.ReceiptsDB.On("ByBlockID", subgrph.Block.ID()).Return(nil, nil)
-
-	// we expect business logic to remove the approval from the unknown node
-	ms.ApprovalsPL.On("RemApproval", unittest.EntityWithID(app1.ID())).Return(true, nil).Once()
-	ms.ApprovalsPL.On("RemApproval", unittest.EntityWithID(app2.ID())).Return(true, nil).Once()
-	ms.ApprovalsPL.On("RemApproval", unittest.EntityWithID(app3.ID())).Return(true, nil).Once()
-
-	_, _, err := ms.matching.sealableResults()
-	ms.Require().NoError(err)
-	ms.ApprovalsPL.AssertExpectations(ms.T()) // asserts that ResultsPL.Rem(incorporatedResult.ID()) was called
-}
-
 // TestSealableResultsInsufficientApprovals tests matching.Core.sealableResults():
 //  * a result where at least one chunk has not enough approvals (require
 //    currently at least one) should not be sealable
 func (ms *MatchingSuite) TestSealableResultsInsufficientApprovals() {
 	subgrph := ms.ValidSubgraphFixture()
+	// [temporary for Sealing Phase 2] we are still using a temporary sealing logic
+	// where the IncorporatedBlockID is expected to be the result's block ID.
+	subgrph.IncorporatedResult.IncorporatedBlockID = subgrph.IncorporatedResult.Result.BlockID
+
 	delete(subgrph.Approvals, uint64(len(subgrph.Result.Chunks)-1))
 	ms.AddSubgraphFixtureToMempools(subgrph)
 
@@ -557,7 +536,7 @@ func (ms *MatchingSuite) TestSealableResultsEmergencySealingMultipleCandidates()
 		block.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceipt{receipt1, receipt2},
 		})
-		ms.ReceiptsDB.On("ByBlockID", result.BlockID).Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil)
+		ms.ReceiptsDB.On("ByBlockID", result.BlockID).Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil)
 		// TODO: replace this with block.ID(), for now IncoroporatedBlockID == ExecutionResult.BlockID
 		emergencySealingCandidates[i] = result.BlockID
 		ms.Extend(&block)

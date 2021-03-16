@@ -55,7 +55,7 @@ func (st *SealingTracker) MempoolHasNextSeal(seals mempool.IncorporatedResultSea
 	return false
 }
 
-// Track tracks the given SealingRecord, provided the it should be tracked
+// Track tracks the given SealingRecord, provided it should be tracked
 // according to the SealingTracker's internal policy.
 func (st *SealingTracker) Track(sealingRecord *SealingRecord) {
 	executedBlockID := sealingRecord.IncorporatedResult.Result.BlockID
