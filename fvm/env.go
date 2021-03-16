@@ -49,18 +49,6 @@ type hostEnv struct {
 	programs           *Programs
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
-		defer sp.Finish()
-	}
-	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
-	if err != nil {
-		panic(fmt.Errorf("cannot create hasher: %w", err))
-	}
-	return hasher.ComputeHash(data), nil
-}
-
 func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *Programs) (*hostEnv, error) {
 	accounts := state.NewAccounts(st)
 	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
@@ -464,13 +452,32 @@ func (e *hostEnv) Logs() []string {
 	return e.logs
 }
 
+func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
+		defer sp.Finish()
+	}
+
+	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
+	if hashAlgo == crypto.UnknownHashAlgorithm {
+		panic(fmt.Errorf("unknown hash algorithm: %s", hashAlgorithm))
+	}
+
+	hasher, err := crypto.NewHasher(hashAlgo)
+	if err != nil {
+		panic(fmt.Errorf("cannot create hasher: %w", err))
+	}
+
+	return hasher.ComputeHash(data), nil
+}
+
 func (e *hostEnv) VerifySignature(
 	signature []byte,
 	tag string,
-	message []byte,
-	rawPublicKey []byte,
-	rawSigAlgo string,
-	rawHashAlgo string,
+	signedData []byte,
+	publicKey []byte,
+	signatureAlgorithm runtime.SignatureAlgorithm,
+	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvVerifySignature)
@@ -481,10 +488,10 @@ func (e *hostEnv) VerifySignature(
 		e.ctx.SignatureVerifier,
 		signature,
 		tag,
-		message,
-		rawPublicKey,
-		rawSigAlgo,
-		rawHashAlgo,
+		signedData,
+		publicKey,
+		signatureAlgorithm,
+		hashAlgorithm,
 	)
 
 	if err != nil {
@@ -586,7 +593,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 	return e.transactionEnv.CreateAccount(payer)
 }
 
-func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error {
+func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvAddAccountKey)
 		defer sp.Finish()
@@ -600,7 +607,7 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 	return e.transactionEnv.AddAccountKey(address, publicKey)
 }
 
-func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvRemoveAccountKey)
 		defer sp.Finish()
@@ -613,6 +620,22 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.RemoveAccountKey(address, index)
 }
+
+func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey *runtime.PublicKey, hashAlgo runtime.HashAlgorithm, weight int) (*runtime.AccountKey, error) {
+	// TODO:
+	panic("TODO")
+}
+
+func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
+	// TODO:
+	panic("TODO")
+}
+
+func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
+	// TODO:
+	panic("TODO")
+}
+
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	if e.isTraceable() {
