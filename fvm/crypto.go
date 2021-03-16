@@ -54,6 +54,10 @@ func newHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 		return hash.NewSHA2_256()
 	case hash.SHA3_256:
 		return hash.NewSHA3_256()
+	case hash.SHA2_384:
+		return hash.NewSHA2_384()
+	case hash.SHA3_384:
+		return hash.NewSHA3_384()
 	}
 	return nil
 }
