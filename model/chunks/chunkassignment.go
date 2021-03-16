@@ -6,6 +6,7 @@ import (
 
 // Assignment is assignment map of the chunks to the list of the verifier nodes
 type Assignment struct {
+	// TODO: use a slice here instead of a map, which will be more performant
 	verifiersForChunk map[uint64]map[flow.Identifier]struct{}
 }
 
@@ -25,8 +26,14 @@ func (a *Assignment) Verifiers(chunk *flow.Chunk) flow.IdentifierList {
 }
 
 // HasVerifier checks if a chunk is assigned to the given verifier
+// TODO: method should probably error if chunk has unknown index
 func (a *Assignment) HasVerifier(chunk *flow.Chunk, identifier flow.Identifier) bool {
-	assignedVerifiers := a.verifiersForChunk[chunk.Index]
+	assignedVerifiers, found := a.verifiersForChunk[chunk.Index]
+	if !found {
+		// is verifier assigned to this chunk?
+		// No, because we only assign verifiers to existing chunks
+		return false
+	}
 	_, isAssigned := assignedVerifiers[identifier]
 	return isAssigned
 }
