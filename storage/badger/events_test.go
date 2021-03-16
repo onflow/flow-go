@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
@@ -14,7 +15,8 @@ import (
 
 func TestEventStoreRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := badgerstorage.NewEvents(db)
+		metrics := metrics.NewNoopCollector()
+		store := badgerstorage.NewEvents(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
@@ -28,7 +30,7 @@ func TestEventStoreRetrieve(t *testing.T) {
 			evt3,
 		}
 
-		batch := db.NewWriteBatch()
+		batch := badgerstorage.NewBatch(db)
 		// store event
 		err := store.BatchStore(blockID, expected, batch)
 		require.NoError(t, err)
@@ -70,7 +72,8 @@ func TestEventStoreRetrieve(t *testing.T) {
 
 func TestEventRetrieveWithoutStore(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := badgerstorage.NewEvents(db)
+		metrics := metrics.NewNoopCollector()
+		store := badgerstorage.NewEvents(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()

@@ -169,8 +169,6 @@ func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
 }
 
 func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {
-	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
-		return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
-	}
-	return fmt.Errorf("unsupported BatchStore type %T", batch)
+	writeBatch := batch.GetWriter()
+	return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
 }

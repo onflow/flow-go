@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -18,7 +19,8 @@ import (
 
 func TestBatchStoringTransactionResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewTransactionResults(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
@@ -30,7 +32,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			}
 			txResults = append(txResults, expected)
 		}
-		writeBatch := db.NewWriteBatch()
+		writeBatch := bstorage.NewBatch(db)
 		err := store.BatchStore(blockID, txResults, writeBatch)
 		require.NoError(t, err)
 
@@ -47,7 +49,8 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 
 func TestReadingNotStoreTransaction(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewTransactionResults(metrics, db)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()

@@ -42,7 +42,6 @@ func (e *Events) BatchStore(blockID flow.Identifier, events []flow.Event, batch 
 			return fmt.Errorf("cannot batch insert event: %w", err)
 		}
 	}
-	return nil
 
 	callback := func() {
 		e.cache.Put(blockID, events)
