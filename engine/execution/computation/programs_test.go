@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
@@ -182,7 +183,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111, block12, block121, block1211 *flow.Block
 
 		block1View, block11View, block111View, block112View, block1121View,
-		block1111View, block12View, block121View, block1211View *delta.View
+		block1111View, block12View, block121View, block1211View state.View
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
@@ -332,7 +333,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 }
 
-func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Block, col flow.Collection, view *delta.View) (*flow.Block, *execution.ComputationResult) {
+func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Block, col flow.Collection, view state.View) (*flow.Block, *execution.ComputationResult) {
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,

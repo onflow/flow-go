@@ -96,16 +96,11 @@ func run(*cobra.Command, []string) {
 		return payload[0].Value, nil
 	})
 
-	st := state.NewState(ldg)
-	accounts := state.NewAccounts(st)
-	finalGenerator, err := state.NewStateBoundAddressGenerator(st, chain)
+	sth := state.NewStateHolder(state.NewState(ldg))
+	accounts := state.NewAccounts(sth)
+	finalGenerator, err := state.NewStateBoundAddressGenerator(sth, chain)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot get current address state")
-	}
-
-	err = st.Commit()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot commit state to ledger")
 	}
 
 	finalState := finalGenerator.Bytes()
