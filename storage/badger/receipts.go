@@ -126,7 +126,7 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 	return r.byID(receiptID)(tx)
 }
 
-func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
 	return r.byBlockId(blockID)(tx)

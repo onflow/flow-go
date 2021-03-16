@@ -540,7 +540,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			receipt1.ExecutionResult = receipt2.ExecutionResult
 			suite.receipts.
 				On("ByBlockID", b.ID()).
-				Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil).Once()
+				Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
 		}
 
 		return headers
@@ -602,7 +602,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		receipts := new(storagemock.ExecutionReceipts)
 		receipts.
 			On("ByBlockID", mock.Anything).
-			Return([]*flow.ExecutionReceipt{}, nil).Once()
+			Return(flow.ExecutionReceiptList{}, nil).Once()
 
 		// create the handler
 		backend := New(
@@ -708,7 +708,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	// use the static execution node
 	suite.receipts.
 		On("ByBlockID", mock.Anything).
-		Return([]*flow.ExecutionReceipt{}, nil)
+		Return(flow.ExecutionReceiptList{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -952,7 +952,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	suite.receipts.
 		On("ByBlockID", mock.Anything).
-		Return([]*flow.ExecutionReceipt{}, nil).Once()
+		Return(flow.ExecutionReceiptList{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -1037,7 +1037,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 
 		// same execution result for all receipts for this block
 		executionResult := unittest.ExecutionResultFixture()
-		receipts := make([]*flow.ExecutionReceipt, receiptPerBlock)
+		receipts := make(flow.ExecutionReceiptList, receiptPerBlock)
 		for j := 0; j < receiptPerBlock; j++ {
 			r := unittest.ReceiptForBlockFixture(block)
 			r.ExecutorID = ids[j].NodeID
@@ -1087,7 +1087,7 @@ func (suite *Suite) setupReceipts(block *flow.Block) []*flow.ExecutionReceipt {
 	receipt2.ExecutorID = ids[1].NodeID
 	receipt1.ExecutionResult = receipt2.ExecutionResult
 
-	receipts := []*flow.ExecutionReceipt{receipt1, receipt2}
+	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
 	suite.receipts.
 		On("ByBlockID", block.ID()).
 		Return(receipts, nil)
