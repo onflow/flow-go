@@ -3,9 +3,14 @@ package id
 
 import "github.com/onflow/flow-go/model/flow"
 
-// Any will always be true.
-func Any(*flow.Identifier) bool {
+// Any is a flow.IdentifierFilter. It accepts all identifiers.
+func Any(flow.Identifier) bool {
 	return true
+}
+
+// False is a flow.IdentifierFilter. It accepts no identifier.
+func False(flow.Identifier) bool {
+	return false
 }
 
 // And combines two or more filters that all need to be true.

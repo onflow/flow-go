@@ -1108,7 +1108,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionResult, events, serviceEvents, txResults)
+	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionReceipt, events, serviceEvents, txResults)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -1191,11 +1191,21 @@ func (e *Engine) generateExecutionResultForBlock(
 			block.Header.ParentID, err)
 	}
 
+	// convert Cadence service event representation to flow-go representation
+	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
+	for _, event := range serviceEvents {
+		converted, err := flow.ConvertServiceEvent(event)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert service event: %w", err)
+		}
+		convertedServiceEvents = append(convertedServiceEvents, *converted)
+	}
+
 	er := &flow.ExecutionResult{
 		PreviousResultID: previousErID,
 		BlockID:          block.ID(),
 		Chunks:           chunks,
-		ServiceEvents:    serviceEvents,
+		ServiceEvents:    convertedServiceEvents,
 	}
 
 	return er, nil

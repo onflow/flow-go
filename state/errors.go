@@ -30,8 +30,7 @@ func (e InvalidExtensionError) Error() string {
 
 // IsInvalidExtensionError returns whether the given error is an InvalidExtensionError error
 func IsInvalidExtensionError(err error) bool {
-	var errInvalidExtensionError InvalidExtensionError
-	return errors.As(err, &errInvalidExtensionError)
+	return errors.As(err, &InvalidExtensionError{})
 }
 
 // OutdatedExtensionError is an error for the extension of the state being outdated.
@@ -61,11 +60,10 @@ func (e OutdatedExtensionError) Error() string {
 }
 
 func IsOutdatedExtensionError(err error) bool {
-	var errOutdatedExtensionError OutdatedExtensionError
-	return errors.As(err, &errOutdatedExtensionError)
+	return errors.As(err, &OutdatedExtensionError{})
 }
 
-// NoValidChildBlockError is a sentinal error when the case where a certain block has
+// NoValidChildBlockError is a sentinel error when the case where a certain block has
 // no valid child.
 type NoValidChildBlockError struct {
 	err error
@@ -77,6 +75,10 @@ func NewNoValidChildBlockError(msg string) error {
 	}
 }
 
+func NewNoValidChildBlockErrorf(msg string, args ...interface{}) error {
+	return NewNoValidChildBlockError(fmt.Sprintf(msg, args...))
+}
+
 func (e NoValidChildBlockError) Unwrap() error {
 	return e.err
 }
@@ -86,6 +88,5 @@ func (e NoValidChildBlockError) Error() string {
 }
 
 func IsNoValidChildBlockError(err error) bool {
-	var errNoValidChildBlockError NoValidChildBlockError
-	return errors.As(err, &errNoValidChildBlockError)
+	return errors.As(err, &NoValidChildBlockError{})
 }

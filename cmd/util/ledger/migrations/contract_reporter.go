@@ -48,9 +48,10 @@ func (r ContractReporter) Report(payload []ledger.Payload) error {
 		}
 	}()
 
-	l := newLed(payload)
+	l := newView(payload)
 	st := state.NewState(l)
-	accounts := state.NewAccounts(st)
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
 
 	for _, p := range payload {
 		id, err := keyToRegisterID(p.Key)
