@@ -183,6 +183,7 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := PayloadFixture(WithoutSeals)
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
+	header.Height = parent.Height + 1
 	return flow.Block{
 		Header:  &header,
 		Payload: payload,
@@ -1132,11 +1133,11 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 	return root, result, seal
 }
 
-// ChainFixture creates a list of blocks that forms a chain
-func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+// ChainFixtureWithParticipants creates a list of blocks that forms a chain by bootstrapping the chain
+// with the participant list.
+func ChainFixtureWithParticipants(nonGenesisCount int, participants flow.IdentityList) ([]*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 	chain := make([]*flow.Block, 0, nonGenesisCount+1)
 
-	participants := IdentityListFixture(5, WithAllRoles())
 	genesis, result, seal := BootstrapFixture(participants)
 	chain = append(chain, genesis)
 
@@ -1145,8 +1146,14 @@ func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *f
 	return chain, result, seal
 }
 
+// ChainFixture creates a list of blocks that forms a chain.
+func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	participants := IdentityListFixture(5, WithAllRoles())
+	return ChainFixtureWithParticipants(nonGenesisCount, participants)
+}
+
 // ChainFixtureFrom creates a chain of blocks starting from a given parent block,
-// the total number of blocks in the chain is specified by the given count
+// the total number of blocks in the chain is specified by the given count.
 func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	blocks := make([]*flow.Block, 0, count)
 
