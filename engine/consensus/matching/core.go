@@ -574,7 +574,7 @@ func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.S
 	// go through the results mempool and check which ones we can construct a candidate seal for
 	var results []*flow.IncorporatedResult
 	for _, incorporatedResult := range c.incorporatedResults.All() {
-		// Can we seal following the happy-path protocol?
+		// Can we seal following the happy-path protocol, i.e. do we have sufficient approvals?
 		sealingStatus, err := c.hasEnoughApprovals(incorporatedResult)
 		if state.IsNoValidChildBlockError(err) {
 			continue
@@ -583,6 +583,7 @@ func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.S
 			return nil, nil, fmt.Errorf("internal error matching chunk approvals to incorporated result: %w", err)
 		}
 		sealableWithEnoughApprovals := sealingStatus.SufficientApprovalsForSealing
+		sealingTracker.Track(sealingStatus)
 
 		// Emergency Sealing Fallback: only kicks in if we can't seal following the happy-path sealing
 		emergencySealable := false
@@ -601,21 +602,15 @@ func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.S
 		// (ii) there must be at least 2 receipts from _different_ ENs
 		//      committing to the result
 		// comment: we evaluate condition (ii) only if (i) is true
-		if sealableWithEnoughApprovals || emergencySealable {
-			// TODO for sealing Phase 3: optimize resultHasMultipleReceipts calls
-			// During Phase 2: for every result, there is only one incorporatedResult, as
-			// incorporatedResult.IncorporatedBlockID is set to the executed block. Without an
-			// execution fork, there is only one incorporatedResult for each block, and the
-			// following code makes the minimum number of resultHasMultipleReceipts calls.
-			hasMultipleReceipts := c.resultHasMultipleReceipts(incorporatedResult)
-			sealingStatus.SetHasMultipleReceipts(hasMultipleReceipts)
-			if hasMultipleReceipts {
-				// add the result to the results that should be sealed
-				results = append(results, incorporatedResult)
-			}
+		if !(sealableWithEnoughApprovals || emergencySealable) { // condition (i) is false
+			continue
 		}
-
-		sealingTracker.Track(sealingStatus)
+		hasMultipleReceipts := c.resultHasMultipleReceipts(incorporatedResult)
+		sealingStatus.SetHasMultipleReceipts(hasMultipleReceipts)
+		if !hasMultipleReceipts { // condition (ii) is false
+			continue
+		}
+		results = append(results, incorporatedResult) // add the result to the results that should be sealed
 	}
 
 	return results, sealingTracker, nil
@@ -742,39 +737,6 @@ func (c *Core) resultHasMultipleReceipts(incorporatedResult *flow.IncorporatedRe
 		return false // too few receipts
 	}
 
-	// At this point, we have at least two receipts from different executors and should be able to
-	// generate a candidate seal. We log information about all receipts for the result as evidence.
-	// Note that this code is probably run many times (until the seal has been finalized).
-	// However, as soon as we have at least 2 receipts, the matching Engine will produce a candidate
-	// seal and put it in the mempool. To prevent spamming the logs, we log only when there is
-	// no seal in the IncorporatedResultSeals mempool:
-	incorporatedResultSealID := incorporatedResult.ID() // IncorporatedResultSeal has the same ID as incorporatedResult
-	_, sealAlreadyGenerated := c.seals.ByID(incorporatedResultSealID)
-	if !sealAlreadyGenerated {
-		header, err := c.headersDB.ByBlockID(blockID)
-		if err != nil {
-			log.Fatal().Err(err).
-				Hex("block_id", logging.ID(blockID)).
-				Msg("could not header for block")
-			return false
-		}
-
-		l := c.log.Info().
-			Str("block_id", incorporatedResult.Result.BlockID.String()).
-			Uint64("block_height", header.Height).
-			Str("result_id", resultID.String())
-
-		// add information about each receipt to log message
-		count := 0
-		for _, receipt := range receiptsForIncorporatedResults {
-			keyPrefix := fmt.Sprintf("receipt_%d", count)
-			l = l.Str(keyPrefix+"_id", receipt.ID().String()).
-				Str(keyPrefix+"_executor", receipt.ExecutorID.String())
-			count++
-		}
-
-		l.Msg("multiple-receipts sealing condition satisfied")
-	}
 	return true
 }
 
