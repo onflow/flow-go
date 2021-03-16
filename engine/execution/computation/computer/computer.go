@@ -142,7 +142,7 @@ func (e *blockComputer) executeBlock(
 
 		err = stateView.MergeView(collectionView)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
 	}
 
