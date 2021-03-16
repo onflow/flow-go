@@ -421,6 +421,24 @@ func (fnb *FlowNodeBuilder) initStorage() {
 func (fnb *FlowNodeBuilder) initState() {
 	fnb.ProtocolEvents = events.NewDistributor()
 
+	// load the root protocol state snapshot from disk
+	rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
+	fnb.MustNot(err).Msg("failed to read protocol snapshot from disk")
+
+	fnb.RootResult, fnb.RootSeal, err = rootSnapshot.SealedResult()
+	fnb.MustNot(err).Msg("failed to read root sealed result")
+	sealingSegment, err := rootSnapshot.SealingSegment()
+	fnb.MustNot(err).Msg("failed to read root sealing segment")
+	fnb.RootBlock = sealingSegment[0]
+	fnb.RootQC, err = rootSnapshot.QuorumCertificate()
+	fnb.MustNot(err).Msg("failed to read root qc")
+	// set the chain ID based on the root header
+	// TODO: as the root header can now be loaded from protocol state, we should
+	// not use a global variable for chain ID anymore, but rely on the protocol
+	// state as final authority on what the chain ID is
+	// => https://github.com/dapperlabs/flow-go/issues/4167
+	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
 	if isBootStrapped {
@@ -443,48 +461,16 @@ func (fnb *FlowNodeBuilder) initState() {
 		// but the protocol state is not updated, so they don't match
 		// when this happens during a spork, we could try deleting the protocol state database.
 		// TODO: revisit this check when implementing Epoch
-		rootBlockFromBootstrap, err := loadRootBlock(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root block from disk")
-
-		rootBlock, err := state.Params().Root()
+		rootBlockFromState, err := state.Params().Root()
 		fnb.MustNot(err).Msg("could not load root block from protocol state")
-		if rootBlockFromBootstrap.ID() != rootBlock.ID() {
+		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
 			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
-				rootBlockFromBootstrap.ID(),
+				fnb.RootBlock.ID(),
 				fnb.RootBlock.ID())
 		}
-		fnb.RootBlock = rootBlockFromBootstrap
-
-		// TODO: we shouldn't have to load any files again after bootstrapping; in
-		// order to make it unnecessary, we need to changes:
-		// 1) persist the root QC along the root block so it can be loaded from DB
-		// => https://github.com/dapperlabs/flow-go/issues/4166
-		// 2) bootstrap and persist DKG state in a similar fashion to protocol state
-		// => https://github.com/dapperlabs/flow-go/issues/4165
-
-		// set the chain ID based on the root header
-		// TODO: as the root header can now be loaded from protocol state, we should
-		// not use a global variable for chain ID anymore, but rely on the protocol
-		// state as final authority on what the chain ID is
-		// => https://github.com/dapperlabs/flow-go/issues/4167
-		fnb.RootChainID = rootBlock.ChainID
-
-		// load the root QC data from bootstrap files
-		// TODO: get from protocol state
-		fnb.RootQC, err = loadRootQC(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("could not load root QC")
-
-		result, seal, err := state.AtBlockID(rootBlock.ID()).SealedResult()
-		fnb.MustNot(err).Msg("could not get sealed result")
-		fnb.RootResult = result
-		fnb.RootSeal = seal
 	} else {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
-
-		// load the root protocol state snapshot from disk
-		rootSnapshot, err := loadRootProtocolSnapshot(fnb.BaseConfig.BootstrapDir)
-		fnb.MustNot(err).Msg("failed to read protocol snapshot from disk")
 
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
@@ -764,27 +750,6 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func loadRootBlock(dir string) (*flow.Block, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootBlock))
-	if err != nil {
-		return nil, err
-	}
-	var block flow.Block
-	err = json.Unmarshal(data, &block)
-	return &block, err
-
-}
-
-func loadRootQC(dir string) (*flow.QuorumCertificate, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootQC))
-	if err != nil {
-		return nil, err
-	}
-	var qc flow.QuorumCertificate
-	err = json.Unmarshal(data, &qc)
-	return &qc, err
-}
-
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk
 func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot))
@@ -792,13 +757,13 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 		return nil, err
 	}
 
-	var snapshot inmem.Snapshot
+	var snapshot inmem.EncodableSnapshot
 	err = json.Unmarshal(data, &snapshot)
 	if err != nil {
 		return nil, err
 	}
 
-	return &snapshot, nil
+	return inmem.SnapshotFromEncodable(snapshot), nil
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
