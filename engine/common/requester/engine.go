@@ -84,6 +84,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	selector = filter.And(
 		selector,
 		filter.HasStake(true),
+		filter.Not(filter.Ejected),
 		filter.Not(filter.HasNodeID(me.NodeID())),
 	)
 
