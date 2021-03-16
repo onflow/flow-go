@@ -60,7 +60,7 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 			Buckets:   []float64{1, 2, 5, 10, 20},
 			Name:      "guarantees_size_transactions",
 			Help:      "size/number of guaranteed/finalized collections",
-		}, []string{LabelChain}),
+		}, []string{LabelChain, LabelProposer}),
 	}
 
 	return cc
@@ -100,12 +100,16 @@ func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
 func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
 	collection := block.Payload.Collection.Light()
 	chainID := block.Header.ChainID
+	proposer := block.Header.ProposerID
 
 	cc.finalizedHeight.
 		With(prometheus.Labels{LabelChain: chainID.String()}).
 		Set(float64(block.Header.Height))
 	cc.guarantees.
-		With(prometheus.Labels{LabelChain: block.Header.ChainID.String()}).
+		With(prometheus.Labels{
+			LabelChain:    chainID.String(),
+			LabelProposer: proposer.String(),
+		}).
 		Observe(float64(collection.Len()))
 
 	for _, txID := range collection.Transactions {
