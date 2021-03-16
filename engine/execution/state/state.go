@@ -109,20 +109,6 @@ type state struct {
 	db                 *badger.DB
 }
 
-func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
-
-	err := s.results.Store(executionResult)
-	if err != nil {
-		return fmt.Errorf("could not store result: %w", err)
-	}
-
-	err = s.results.Index(executionResult.BlockID, executionResult.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution result: %w", err)
-	}
-	return nil
-}
-
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
 	return ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(KeyPartOwner, []byte(reg.Owner)),
@@ -319,15 +305,6 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) PersistStateCommitment(ctx context.Context, blockID flow.Identifier, commit flow.StateCommitment) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
-		defer span.Finish()
-	}
-
-	return s.commits.Store(blockID, commit)
-}
-
 func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	defer span.Finish()
@@ -346,15 +323,6 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 		return flow.ZeroID, err
 	}
 	return result.ID(), nil
-}
-
-func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateInteractions)
-		defer span.Finish()
-	}
-
-	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
 }
 
 func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
