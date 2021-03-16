@@ -81,6 +81,23 @@ func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.Signin
 	}
 }
 
+// CryptoToRuntimeSigningAlgorithm converts a crypto signature algorithm to a runtime signature algorithm.
+func CryptoToRuntimeSigningAlgorithm(s crypto.SigningAlgorithm) (algo runtime.SignatureAlgorithm, err error) {
+	switch s {
+	case crypto.ECDSAP256:
+		algo = runtime.SignatureAlgorithmECDSA_P256
+	case crypto.ECDSASecp256k1:
+		algo = runtime.SignatureAlgorithmECDSA_Secp256k1
+	case crypto.BLSBLS12381:
+		algo = runtime.SignatureAlgorithmBLS_BLS12381
+	default:
+		algo = runtime.SignatureAlgorithm(-1)
+		err = fmt.Errorf("invalid signature algorithm: %s", s.String())
+	}
+
+	return algo, err
+}
+
 // RuntimeToCryptoHashingAlgorithm converts a runtime hash algorithm to a crypto hashing algorithm.
 func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgorithm {
 	switch s {
@@ -97,6 +114,27 @@ func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgori
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
+}
+
+// CryptoToRuntimeHashingAlgorithm converts a crypto hashing algorithm to a runtime hash algorithm.
+func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) (algo runtime.HashAlgorithm, err error) {
+	switch h {
+	case hash.SHA2_256:
+		algo = runtime.HashAlgorithmSHA2_256
+	case hash.SHA3_256:
+		algo = runtime.HashAlgorithmSHA3_256
+	case hash.SHA2_384:
+		algo = runtime.HashAlgorithmSHA2_384
+	case hash.SHA3_384:
+		algo = runtime.HashAlgorithmSHA3_384
+	case hash.KMAC128:
+		algo = runtime.HashAlgorithmKMAC_128
+	default:
+		algo = runtime.HashAlgorithm(-1)
+		err = fmt.Errorf("invalid hashing algorithm: %s", h.String())
+	}
+
+	return algo, err
 }
 
 // verifySignatureFromRuntime is an adapter that performs signature verification using
