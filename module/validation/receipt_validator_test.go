@@ -311,7 +311,8 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// G <- A <- B <- C
-	blocks, result0, _ := unittest.ChainFixture(4)
+	blocks, result0, seal := unittest.ChainFixture(4)
+	s.SealsIndex[blocks[0].ID()] = seal
 
 	receipts := unittest.ReceiptChainFor(blocks, result0)
 	blockA, blockB, blockC := blocks[1], blocks[2], blocks[3]
@@ -334,17 +335,19 @@ func (s *ReceiptValidationSuite) TestMultiReceiptInvalidParent() {
 	}
 	s.PersistedResults[result0.ID()] = result0
 
+	// make receipt B as bad
+	receiptBInvalid.ExecutorID = unittest.IdentifierFixture()
+
 	candidate := unittest.BlockWithParentFixture(blockC.Header)
 	candidate.Payload = &flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receiptBInvalid.Meta(), receiptC.Meta()},
 		Results:  []*flow.ExecutionResult{&receiptBInvalid.ExecutionResult, &receiptC.ExecutionResult},
 	}
 
-	// make receipt B as bad
-	receiptBInvalid.ExecutorID = s.VerID
 	// receiptB and receiptC
 	err := s.receiptValidator.ValidatePayload(&candidate)
 	s.Require().Error(err)
+	require.True(s.T(), engine.IsInvalidInputError(err), err)
 }
 
 // Test that `ValidatePayload` will refuse payloads that contain receipts for blocks that
