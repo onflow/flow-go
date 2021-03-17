@@ -47,20 +47,19 @@ const notSet = "not set"
 
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
-	nodeIDHex           string
-	bindAddr            string
-	nodeRole            string
-	timeout             time.Duration
-	datadir             string
-	level               string
-	metricsPort         uint
-	BootstrapDir        string
-	profilerEnabled     bool
-	profilerDir         string
-	profilerInterval    time.Duration
-	profilerDuration    time.Duration
-	tracerEnabled       bool
-	storageLimitEnabled bool
+	nodeIDHex        string
+	bindAddr         string
+	nodeRole         string
+	timeout          time.Duration
+	datadir          string
+	level            string
+	metricsPort      uint
+	BootstrapDir     string
+	profilerEnabled  bool
+	profilerDir      string
+	profilerInterval time.Duration
+	profilerDuration time.Duration
+	tracerEnabled    bool
 }
 
 type Metrics struct {
@@ -162,8 +161,6 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
 		"whether to enable tracer")
-	fnb.flags.BoolVar(&fnb.BaseConfig.storageLimitEnabled, "storage-enabled", false,
-		"whether to enable limiting storage used to storage capacity")
 
 }
 
@@ -552,7 +549,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
-			fvm.WithAccountStorageLimit(fnb.BaseConfig.storageLimitEnabled),
+			fvm.WithAccountStorageLimit(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts
