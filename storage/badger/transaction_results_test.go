@@ -59,3 +59,13 @@ func TestReadingNotStoreTransaction(t *testing.T) {
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
+
+func TestKeyConversion(t *testing.T) {
+	blockID := unittest.IdentifierFixture()
+	txID := unittest.IdentifierFixture()
+	key := bstorage.KeyFromBlockIDTransactionID(blockID, txID)
+	bID, tID, err := bstorage.KeyToBlockIDTransactionID(key)
+	require.NoError(t, err)
+	require.Equal(t, blockID, bID)
+	require.Equal(t, txID, tID)
+}

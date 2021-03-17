@@ -21,13 +21,13 @@ type BlockIDTransactionID struct {
 	TransactionID flow.Identifier
 }
 
-func keyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
+func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
 	return fmt.Sprintf("%x%x", blockID, txID)
 }
 
-func keyToBlockIDTransactionID(key string) (flow.Identifier, flow.Identifier, error) {
-	blockIDStr := key[:32]
-	txIDStr := key[32:]
+func KeyToBlockIDTransactionID(key string) (flow.Identifier, flow.Identifier, error) {
+	blockIDStr := key[:64]
+	txIDStr := key[64:]
 	blockID, err := flow.HexStringToIdentifier(blockIDStr)
 	if err != nil {
 		return flow.ZeroID, flow.ZeroID, fmt.Errorf("could not get block ID: %w", err)
@@ -46,7 +46,7 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB) *Transa
 		var txResult flow.TransactionResult
 		return func(tx *badger.Txn) (interface{}, error) {
 
-			blockID, txID, err := keyToBlockIDTransactionID(key.(string))
+			blockID, txID, err := KeyToBlockIDTransactionID(key.(string))
 			if err != nil {
 				return nil, fmt.Errorf("could not convert key: %w", err)
 			}
@@ -80,7 +80,7 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 
 	batch.OnSucceed(func() {
 		for _, result := range transactionResults {
-			key := keyFromBlockIDTransactionID(blockID, result.TransactionID)
+			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
 			tr.cache.Put(key, result)
 		}
@@ -92,7 +92,8 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 func (tr *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) (*flow.TransactionResult, error) {
 	tx := tr.db.NewTransaction(false)
 	defer tx.Discard()
-	val, err := tr.cache.Get(blockID)(tx)
+	key := KeyFromBlockIDTransactionID(blockID, txID)
+	val, err := tr.cache.Get(key)(tx)
 	if err != nil {
 		return nil, err
 	}
