@@ -1,7 +1,6 @@
 package fetcher
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -486,7 +485,7 @@ func (e *Engine) validateChunkDataPack(
 	}
 
 	// 2. start state must match
-	if !bytes.Equal(chunkDataPack.StartState, chunk.ChunkBody.StartState) {
+	if chunkDataPack.StartState != chunk.ChunkBody.StartState {
 		return engine.NewInvalidInputErrorf(
 			"expecting chunk data pakc's start state: %v, but got: %v",
 			chunk.ChunkBody.StartState, chunkDataPack.StartState)

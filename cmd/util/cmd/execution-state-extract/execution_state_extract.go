@@ -31,7 +31,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	newState, err := led.ExportCheckpointAt(targetHash,
+	newState, err := led.ExportCheckpointAt(ledger.State(targetHash),
 		[]ledger.Migration{},
 		[]ledger.Reporter{migrations.StorageReporter{Log: log, OutputDir: outputDir}},
 		complete.DefaultPathFinderVersion,

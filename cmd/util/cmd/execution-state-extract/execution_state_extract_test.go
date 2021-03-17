@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
@@ -84,15 +83,15 @@ func TestExtractExecutionState(t *testing.T) {
 
 			//saved data after updates
 			keysValuesByCommit := make(map[string]map[string]keyPair)
-			commitsByBlocks := make(map[flow.Identifier][]byte)
+			commitsByBlocks := make(map[flow.Identifier]ledger.State)
 			blocksInOrder := make([]flow.Identifier, size)
 
 			for i := 0; i < size; i++ {
 				//keys := utils.GetRandomRegisterIDs(4)
 				//values := utils.GetRandomValues(len(keys), 10, valueMaxByteSize)
 
-				keys := utils.RandomUniqueKeys(4, 3, 10, keyMaxByteSize)
-				values := utils.RandomValues(len(keys), 10, valueMaxByteSize)
+				keys := ledger.RandomUniqueKeys(4, 3, 10, keyMaxByteSize)
+				values := ledger.RandomValues(len(keys), 10, valueMaxByteSize)
 
 				update, err := ledger.NewUpdate(stateCommitment, keys, values)
 				require.NoError(t, err)
@@ -103,7 +102,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 				// generate random block and map it to state commitment
 				blockID := unittest.IdentifierFixture()
-				err = commits.Store(blockID, stateCommitment)
+				err = commits.Store(blockID, flow.StateCommitment(stateCommitment))
 				require.NoError(t, err)
 
 				data := make(map[string]keyPair, len(keys))
@@ -114,7 +113,7 @@ func TestExtractExecutionState(t *testing.T) {
 					}
 				}
 
-				keysValuesByCommit[string(stateCommitment)] = data
+				keysValuesByCommit[string(stateCommitment[:])] = data
 				commitsByBlocks[blockID] = stateCommitment
 				blocksInOrder[i] = blockID
 			}
@@ -142,7 +141,7 @@ func TestExtractExecutionState(t *testing.T) {
 					//storage, err := oldLedger.NewMTrieStorage(outdir, 1000, metr, nil)
 					require.NoError(t, err)
 
-					data := keysValuesByCommit[string(stateCommitment)]
+					data := keysValuesByCommit[string(stateCommitment[:])]
 
 					keys := make([]ledger.Key, 0, len(data))
 					for _, v := range data {

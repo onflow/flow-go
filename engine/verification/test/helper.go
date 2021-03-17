@@ -1,7 +1,6 @@
 package test
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 	"testing"
@@ -454,7 +453,7 @@ func SetupMockVerifierEng(t testing.TB,
 					// mark it as seen and decrement the waitgroup
 					receivedChunks[vID] = struct{}{}
 					// checks end states match as expected
-					if !bytes.Equal(vchunk.EndState, vc.EndState) {
+					if vchunk.EndState != vc.EndState {
 						t.Logf("end states are not equal: expected %x got %x", vchunk.EndState, chunk.EndState)
 						t.Fail()
 					}

@@ -37,7 +37,7 @@ func GenerateExecutionState(
 
 	ledgerStorage, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, ledger.DefaultPathFinderVersion)
 	if err != nil {
-		return nil, err
+		return flow.EmptyStateCommitment, err
 	}
 	defer ledgerStorage.CloseStorage()
 

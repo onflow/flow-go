@@ -119,7 +119,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
 
-	var commit []byte
+	var commit flow.StateCommitment
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		log.Info().Msg("generating empty execution state")
 
@@ -137,7 +137,7 @@ func finalize(cmd *cobra.Command, args []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("unable to generate execution state")
 		}
-		flagRootCommit = hex.EncodeToString(commit)
+		flagRootCommit = hex.EncodeToString(commit[:])
 		log.Info().Msg("")
 	}
 

@@ -58,14 +58,16 @@ func run(*cobra.Command, []string) {
 
 	forest := stateLoader()
 
-	stateCommitment, err := hex.DecodeString(flagStateCommitment)
+	stateCommitmentBytes, err := hex.DecodeString(flagStateCommitment)
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid flag, cannot decode")
 	}
 
-	if len(stateCommitment) != 32 {
-		log.Fatal().Err(err).Msgf("invalid number of bytes, got %d expected %d", len(stateCommitment), 32)
+	if len(stateCommitmentBytes) != 32 {
+		log.Fatal().Err(err).Msgf("invalid number of bytes, got %d expected %d", len(stateCommitmentBytes), 32)
 	}
+	var stateCommitment flow.StateCommitment
+	copy(stateCommitment[:], stateCommitmentBytes)
 
 	chain, err := getChain(flagChain)
 	if err != nil {
@@ -82,7 +84,7 @@ func run(*cobra.Command, []string) {
 		}
 
 		read := &ledger.TrieRead{
-			RootHash: stateCommitment,
+			RootHash: ledger.RootHash(stateCommitment),
 			Paths: []ledger.Path{
 				path,
 			},
