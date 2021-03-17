@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification"
@@ -18,7 +19,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *fvm.Programs) error
+	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -103,7 +104,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 	// transactions in chunk can reuse the same cache, but its unknown
 	// if there were changes between chunks, so we always start with a new one
-	programs := fvm.NewEmptyPrograms()
+	programs := programs.NewEmptyPrograms()
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which

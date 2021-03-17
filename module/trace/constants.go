@@ -167,6 +167,7 @@ const (
 	FVMEnvGetBlockAtHeight          SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvCreateAccount             SpanName = "fvm.env.createAccount"
 	FVMEnvAddAccountKey             SpanName = "fvm.env.addAccountKey"
+	FVMEnvGetAccountKey             SpanName = "fvm.env.getAccountKey"
 	FVMEnvRemoveAccountKey          SpanName = "fvm.env.removeAccountKey"
 	FVMEnvUpdateAccountContractCode SpanName = "fvm.env.updateAccountContractCode"
 	FVMEnvGetAccountContractCode    SpanName = "fvm.env.getAccountContractCode"
