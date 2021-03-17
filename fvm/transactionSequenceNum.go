@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -19,17 +20,17 @@ func (c *TransactionSequenceNumberChecker) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	st *state.State,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
 
-	return c.checkAndIncrementSequenceNumber(proc, ctx, st)
+	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proc *TransactionProcedure,
 	ctx Context,
-	st *state.State,
+	sth *state.StateHolder,
 ) error {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -40,7 +41,16 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		defer span.Finish()
 	}
 
-	accounts := state.NewAccounts(st)
+	parentState := sth.State()
+	childState := sth.NewChild()
+	defer func() {
+		if mergeError := parentState.MergeState(childState); mergeError != nil {
+			panic(mergeError)
+		}
+		sth.SetActiveState(parentState)
+	}()
+
+	accounts := state.NewAccounts(sth)
 	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
@@ -77,6 +87,8 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
+		// drop the changes
+		childState.View().DropDelta()
 		return err
 	}
 

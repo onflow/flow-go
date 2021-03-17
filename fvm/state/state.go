@@ -1,8 +1,7 @@
 package state
 
 import (
-	"sort"
-	"sync"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -15,40 +14,46 @@ const (
 	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
 )
 
-type StateOption func(st *State) *State
+type mapKey struct {
+	owner, controller, key string
+}
 
+// State represents the execution state
+// it holds draft of updates and captures
+// all register touches
 type State struct {
-	ledger Ledger
-	// reason for using mutex instead of channel
-	// state doesn't have to be thread safe and right now
-	// is only used in a single thread but a mutex has been added
-	// here to prevent accidental multi-thread use in the future
-	lock                  sync.Mutex
-	draft                 map[string]payload
+	view                  View
 	updatedAddresses      map[flow.Address]struct{}
-	readCache             map[string]payload
-	interactionUsed       uint64
+	updateSize            map[mapKey]uint64
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
+	ReadCounter           uint64
+	WriteCounter          uint64
+	TotalBytesRead        uint64
+	TotalBytesWritten     uint64
 }
 
-func defaultState(ledger Ledger) *State {
+func defaultState(view View) *State {
 	return &State{
-		ledger:                ledger,
-		interactionUsed:       uint64(0),
-		draft:                 make(map[string]payload),
+		view:                  view,
 		updatedAddresses:      make(map[flow.Address]struct{}),
-		readCache:             make(map[string]payload),
+		updateSize:            make(map[mapKey]uint64),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
 	}
 }
 
+func (s *State) View() View {
+	return s.view
+}
+
+type StateOption func(st *State) *State
+
 // NewState constructs a new state
-func NewState(ledger Ledger, opts ...StateOption) *State {
-	ctx := defaultState(ledger)
+func NewState(view View, opts ...StateOption) *State {
+	ctx := defaultState(view)
 	for _, applyOption := range opts {
 		ctx = applyOption(ctx)
 	}
@@ -79,137 +84,107 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
-func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (s *State) InteractionUsed() uint64 {
+	return s.TotalBytesRead + s.TotalBytesWritten
+}
 
+// Get returns a register value given owner, controller and key
+func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	if err := s.checkSize(owner, controller, key, []byte{}); err != nil {
 		return nil, err
 	}
 
-	// check draft first
-	if p, ok := s.draft[fullKey(owner, controller, key)]; ok {
-		// just call the ledger get for tracking touches
-		_, err := s.ledger.Get(owner, controller, key)
-		if err != nil {
-			return nil, &LedgerFailure{err}
-		}
-		return p.value, nil
-	}
-
-	// return from draft
-	if p, ok := s.draft[fullKey(owner, controller, key)]; ok {
-		// just call the ledger get for tracking touches
-		_, err := s.ledger.Get(owner, controller, key)
-		if err != nil {
-			return nil, &LedgerFailure{err}
-		}
-		return p.value, nil
-	}
-
-	// return from read cache
-	if p, ok := s.readCache[fullKey(owner, controller, key)]; ok {
-		// just call the ledger get for tracking touches
-		_, err := s.ledger.Get(owner, controller, key)
-		if err != nil {
-			return nil, &LedgerFailure{err}
-		}
-		return p.value, nil
-	}
-
-	// read from ledger
-	value, err := s.ledger.Get(owner, controller, key)
+	value, err := s.view.Get(owner, controller, key)
 	if err != nil {
-		return nil, &LedgerFailure{err}
+		return nil, err
 	}
 
-	// update read catch
-	s.readCache[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
+	// if not part of recent updates count them as read
+	if _, ok := s.updateSize[mapKey{owner, controller, key}]; !ok {
+		s.ReadCounter++
+		s.TotalBytesRead += uint64(len(owner) +
+			len(controller) + len(key) + len(value))
+	}
 
-	return value, s.updateInteraction(owner, controller, key, value, []byte{})
+	return value, s.checkMaxInteraction()
 }
 
+// Set updates state delta with a register update
 func (s *State) Set(owner, controller, key string, value flow.RegisterValue) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	if err := s.checkSize(owner, controller, key, value); err != nil {
 		return err
 	}
 
-	s.draft[fullKey(owner, controller, key)] = payload{owner, controller, key, value}
-	address, isAddress := addressFromOwner(owner)
-	if isAddress {
+	if err := s.view.Set(owner, controller, key, value); err != nil {
+		return err
+	}
+
+	if err := s.checkMaxInteraction(); err != nil {
+		return err
+	}
+
+	if address, isAddress := addressFromOwner(owner); isAddress {
 		s.updatedAddresses[address] = struct{}{}
 	}
-	return nil
-}
 
-func (s *State) Touch(owner, controller, key string) error {
-	_, err := s.Get(owner, controller, key)
-	return err
+	mapKey := mapKey{owner, controller, key}
+	if old, ok := s.updateSize[mapKey]; ok {
+		s.WriteCounter--
+		s.TotalBytesWritten -= old
+	}
+
+	updateSize := uint64(len(owner) + len(controller) + len(key) + len(value))
+	s.WriteCounter++
+	s.TotalBytesWritten += updateSize
+	s.updateSize[mapKey] = updateSize
+
+	return nil
 }
 
 func (s *State) Delete(owner, controller, key string) error {
-	err := s.Set(owner, controller, key, nil)
-	return err
+	return s.Set(owner, controller, key, nil)
 }
 
-func (s *State) Commit() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+// We don't need this later, it should be invisible to the cadence
+func (s *State) Touch(owner, controller, key string) error {
+	return s.view.Touch(owner, controller, key)
+}
 
-	// TODO right now we sort keys to minimize
-	// the impact on the spock, but later we might
-	// expose interactionFingerprint as a separate
-	// parameters, this preserve number of reads and
-	// order of reads as extra layer of entropy
+// NewChild generates a new child state
+func (s *State) NewChild() *State {
+	return NewState(s.view.NewChild(),
+		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
+		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
+		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+	)
+}
 
-	keys := make([]string, 0)
-	for k := range s.draft {
-		keys = append(keys, k)
+// MergeState applies the changes from a the given view to this view.
+func (s *State) MergeState(other *State) error {
+
+	err := s.view.MergeView(other.view)
+	if err != nil {
+		return fmt.Errorf("can not merge the state: %w", err)
 	}
 
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		p := s.draft[k]
-		oldValue, err := s.ledger.Get(p.owner, p.controller, p.key)
-		if err != nil {
-			return err
-		}
-		// update interaction
-		err = s.updateInteraction(p.owner, p.controller, p.key, oldValue, p.value)
-		if err != nil {
-			return err
-		}
-		err = s.ledger.Set(p.owner, p.controller, p.key, p.value)
-		if err != nil {
-			return err
-		}
-
-		// update read cache
-		s.readCache[fullKey(p.owner, p.controller, p.key)] = p
+	// apply address updates
+	for k, v := range other.updatedAddresses {
+		s.updatedAddresses[k] = v
 	}
 
-	// reset draft
-	s.draft = make(map[string]payload)
-	s.updatedAddresses = make(map[flow.Address]struct{})
+	// apply update sizes
+	for k, v := range other.updateSize {
+		s.updateSize[k] = v
+	}
 
-	return nil
-}
+	// update ledger interactions
+	s.ReadCounter += other.ReadCounter
+	s.WriteCounter += other.WriteCounter
+	s.TotalBytesRead += other.TotalBytesRead
+	s.TotalBytesWritten += other.TotalBytesWritten
 
-func (s *State) Rollback() error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	s.draft = make(map[string]payload)
-	s.updatedAddresses = make(map[flow.Address]struct{})
-	return nil
-}
-
-func (s *State) Ledger() Ledger {
-	return s.ledger
+	// check max interaction as last step
+	return s.checkMaxInteraction()
 }
 
 func (s *State) UpdatedAddresses() []flow.Address {
@@ -220,20 +195,10 @@ func (s *State) UpdatedAddresses() []flow.Address {
 	return addresses
 }
 
-func (s *State) InteractionUsed() uint64 {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	return s.interactionUsed
-}
-
-func (s *State) updateInteraction(owner, controller, key string, oldValue, newValue flow.RegisterValue) error {
-	keySize := uint64(len(owner) + len(controller) + len(key))
-	oldValueSize := uint64(len(oldValue))
-	newValueSize := uint64(len(newValue))
-	s.interactionUsed += keySize + oldValueSize + newValueSize
-	if s.interactionUsed > s.maxInteractionAllowed {
+func (s *State) checkMaxInteraction() error {
+	if s.InteractionUsed() > s.maxInteractionAllowed {
 		return &StateInteractionLimitExceededError{
-			Used:  s.interactionUsed,
+			Used:  s.InteractionUsed(),
 			Limit: s.maxInteractionAllowed}
 	}
 	return nil
@@ -265,11 +230,4 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	}
 	address := flow.BytesToAddress(ownerBytes)
 	return address, true
-}
-
-type payload struct {
-	owner      string
-	controller string
-	key        string
-	value      flow.RegisterValue
 }

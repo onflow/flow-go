@@ -54,7 +54,7 @@ type Suite struct {
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
-// and using a real badger storage.
+// and using a real badger storage
 func TestAccess(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
@@ -502,7 +502,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.backend = backend.New(
 			suite.state,
-			nil,
+			suite.execClient,
 			suite.collClient,
 			nil,
 			blocks,

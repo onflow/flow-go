@@ -15,6 +15,7 @@ import (
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 var (
@@ -146,7 +147,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QC")
-	constructRootQC(
+	rootQC := constructRootQC(
 		block,
 		model.FilterByRole(stakingNodes, flow.RoleConsensus),
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
@@ -167,7 +168,17 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root execution result and block seal")
-	constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	result, seal := constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	log.Info().Msg("")
+
+	// construct serializable root protocol snapshot
+	log.Info().Msg("constructing root procotol snapshot")
+	snapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, rootQC)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
+	}
+	// write snapshot to disk
+	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
 
 	// copy files only if the directories differ
