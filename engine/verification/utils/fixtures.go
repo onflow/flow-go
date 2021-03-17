@@ -37,6 +37,17 @@ type CompleteExecutionResult struct {
 	SpockSecrets   [][]byte
 }
 
+type ExecutionResultTestCaseList []*CompleteExecutionResult
+
+func (e ExecutionResultTestCaseList) ReferenceBlocks() []*flow.Block {
+	blocks := make([]*flow.Block, 0)
+	for _, tc := range e {
+		blocks = append(blocks, tc.ReferenceBlock, tc.ContainerBlock)
+	}
+
+	return blocks
+}
+
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
 // chunkCount determines the number of chunks inside each receipt.
@@ -248,7 +259,7 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 
 	// container block contains the execution receipt and points back to reference block
 	// as its parent.
-	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
+	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header, unittest.WithoutGuarantee)
 	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
 
 	return CompleteExecutionResult{
@@ -357,4 +368,15 @@ func executeCollection(
 	}
 
 	return chunk, chunkDataPack, endStateCommitment, spock
+}
+
+func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count int) ExecutionResultTestCaseList {
+	results := make([]*CompleteExecutionResult, 0, count)
+	parent := root
+	for i := 0; i < count; i++ {
+		result := CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain(), parent)
+		results = append(results, &result)
+	}
+
+	return results
 }
