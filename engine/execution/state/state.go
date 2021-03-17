@@ -399,15 +399,14 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}
 
+	err = s.myReceipts.BatchStoreMyReceipt(executionReceipt, batch)
+	if err != nil {
+		return fmt.Errorf("could not persist execution result: %w", err)
+	}
+
 	err = batch.Flush()
 	if err != nil {
 		return fmt.Errorf("batch flush error: %w", err)
-	}
-
-	// TODO: move to the same batch write
-	err = s.myReceipts.StoreMyReceipt(executionReceipt)
-	if err != nil {
-		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	//outside batch because it requires read access

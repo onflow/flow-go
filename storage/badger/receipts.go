@@ -120,6 +120,29 @@ func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(receipt))
 }
 
+func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+
+		err := r.results.BatchStore(&receipt.ExecutionResult, batch)
+		if err != nil {
+			return fmt.Errorf("cannot batch store execution result inside execution receipt batch store: %w", err)
+		}
+
+		err = operation.BatchInsertExecutionReceiptMeta(receipt.ID(), receipt.Meta())(writeBatch)
+		if err != nil {
+			return fmt.Errorf("cannot batch store execution meta inside execution receipt batch store: %w", err)
+		}
+
+		err = operation.BatchIndexExecutionReceipts(receipt.ExecutionResult.BlockID, receipt.ID())(writeBatch)
+		if err != nil {
+			return fmt.Errorf("cannot batch index execution receipt inside execution receipt batch store: %w", err)
+		}
+
+		return nil
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
+}
+
 func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
