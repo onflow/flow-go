@@ -41,14 +41,14 @@ var DefaultScriptLogThreshold = 1 * time.Second
 
 // Manager manages computation and execution
 type Manager struct {
-	log               zerolog.Logger
-	me                module.Local
-	protoState        protocol.State
-	vm                VirtualMachine
-	vmCtx             fvm.Context
-	blockComputer     computer.BlockComputer
-	programsCache     *ProgramsCache
-	criptLogThreshold time.Duration
+	log                zerolog.Logger
+	me                 module.Local
+	protoState         protocol.State
+	vm                 VirtualMachine
+	vmCtx              fvm.Context
+	blockComputer      computer.BlockComputer
+	programsCache      *ProgramsCache
+	scriptLogThreshold time.Duration
 }
 
 func New(

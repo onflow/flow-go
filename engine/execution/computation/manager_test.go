@@ -190,7 +190,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, 1*time.Millisecond)
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, 1*time.Millisecond)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -214,7 +214,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, 1*time.Second)
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, 1*time.Second)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -238,7 +238,7 @@ type LongRunningVM struct {
 	duration time.Duration
 }
 
-func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, ledger state.Ledger) error {
+func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
 	time.Sleep(l.duration)
 	// satisfy value marshaller
 	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
@@ -248,6 +248,6 @@ func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, ledger state
 	return nil
 }
 
-func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, ledger state.Ledger) (*flow.Account, error) {
+func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
 	panic("not expected")
 }
