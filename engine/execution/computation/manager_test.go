@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
@@ -171,14 +172,12 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	require.Contains(t, buffer.String(), "Verunsicherung")
 }
 
-type PanickingVM struct {
-}
+type PanickingVM struct{}
 
-func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, ledger state.Ledger, programs *fvm.Programs) error {
+func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
 	panic("panic, but expected with sentinel for test: Verunsicherung ")
 }
 
-func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, ledger state.Ledger, programs *fvm.Programs) (*flow.Account, error) {
+func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
 	panic("not expected")
-
 }
