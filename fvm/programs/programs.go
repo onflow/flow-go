@@ -1,16 +1,13 @@
 package programs
 
 import (
-	"fmt"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/model/flow"
 
-	//"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -64,6 +61,8 @@ func (p *Programs) ChildPrograms() *Programs {
 	}
 }
 
+// Get returns stored program, state which contains changes which correspond to loading this program,
+// and boolean indicating if the value was found
 func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.State, bool) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -128,9 +127,6 @@ func (p *Programs) ForceCleanup() {
 func (p *Programs) Cleanup(changedContracts []ContractUpdateKey) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-
-	fmt.Println("Cleanup:")
-	spew.Dump(changedContracts)
 
 	// In mature system, we would track dependencies between contracts
 	// and invalidate only affected ones, possibly setting them to

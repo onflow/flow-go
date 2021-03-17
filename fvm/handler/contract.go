@@ -11,16 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-//type ContractUpdateKey struct {
-//	address flow.Address
-//	name    string
-//}
-//
-//type ContractUpdate struct {
-//	ContractUpdateKey
-//	Code []byte
-//}
-
 // ContractHandler handles all interaction
 // with smart contracts such as get/set/update
 // it also captures all changes as deltas and

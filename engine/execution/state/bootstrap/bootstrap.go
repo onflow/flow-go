@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	programs2 "github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -37,7 +37,7 @@ func (b *Bootstrapper) BootstrapLedger(
 	chain flow.Chain,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.InitialState()))
-	programs := programs2.NewEmptyPrograms()
+	programs := programs.NewEmptyPrograms()
 
 	vm := fvm.New(runtime.NewInterpreterRuntime())
 

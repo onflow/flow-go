@@ -1,7 +1,6 @@
 package delta
 
 import (
-	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -117,7 +116,6 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 		// every time we read a value (order preserving) we update spock
 		var err error = nil
 		if value != nil {
-			fmt.Printf("Updating spock GET [%x/%x/%s] on %p %s\n", owner, controller, key, v, hex.EncodeToString(value))
 			err = v.updateSpock(value)
 		}
 		return value, err
@@ -136,8 +134,6 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	// increase reads
 	v.readsCount++
 
-	fmt.Printf("Updating spock GET [%x/%x/%s] on %p %s\n", owner, controller, key, v, hex.EncodeToString(value))
-
 	// every time we read a value (order preserving) we update spock
 	err = v.updateSpock(value)
 	return value, err
@@ -147,12 +143,7 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 func (v *View) Peek(owner, controller, key string) (flow.RegisterValue, error) {
 	value, exists := v.delta.Get(owner, controller, key)
 	if exists {
-		// every time we read a value (order preserving) we update spock
-		var err error = nil
-		if value != nil {
-			fmt.Printf("GETfromCHILD on %p %s\n", v, hex.EncodeToString(value))
-		}
-		return value, err
+		return value, nil
 	}
 
 	return v.readFunc(owner, controller, key)
@@ -162,8 +153,6 @@ func (v *View) Peek(owner, controller, key string) (flow.RegisterValue, error) {
 func (v *View) Set(owner, controller, key string, value flow.RegisterValue) error {
 	// every time we write something to delta (order preserving) we update spock
 	// TODO return the error and handle it properly on other places
-
-	fmt.Printf("Updating spock SET [%x/%x/%s] on %p %s\n", owner, controller, key, v, hex.EncodeToString(value))
 
 	err := v.updateSpock(value)
 	if err != nil {
@@ -228,7 +217,6 @@ func (v *View) MergeView(ch state.View) error {
 	// TODO return the error and handle it properly on other places
 
 	spockSecret := child.SpockSecret()
-	fmt.Printf("Updating spock MERGE on %p %s\n", v, hex.EncodeToString(spockSecret))
 
 	err := v.updateSpock(spockSecret)
 	if err != nil {

@@ -19,13 +19,13 @@ func NewProgramsHandler(programs *programs.Programs, stateHolder *state.StateHol
 	}
 }
 
-// ProgramsHandler manages operations using Programs storage.
-// It's separation of concern for hostEnv
 type stackEntry struct {
 	state    *state.State
 	location common.Location
 }
 
+// ProgramsHandler manages operations using Programs storage.
+// It's separation of concern for hostEnv
 // Cadence contract guarantees that Get/Set methods will be called in a LIFO manner,
 // so we use stack based approach here. During successful execution stack should be cleared
 // naturally, making cleanup method essentially no-op. But if something goes wrong, all nested
@@ -38,8 +38,6 @@ type ProgramsHandler struct {
 }
 
 func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Program) error {
-
-	fmt.Printf("Set programs: %s\n", location.ID())
 
 	// we track only for AddressLocation, so for anything other simply put a value
 	if _, is := location.(common.AddressLocation); !is {
@@ -69,26 +67,15 @@ func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Pro
 func (h *ProgramsHandler) mergeState(state *state.State) error {
 	if len(h.viewsStack) == 0 {
 		// if this was last item, merge to the master state
-
-		fmt.Printf("Restoring active view NOOP from %p to: %p\n", h.masterState.State().View(), h.initialState.View())
 		h.masterState.SetActiveState(h.initialState)
-		//return h.masterState.State().MergeState(state)
 	} else {
-		fmt.Printf("Restoring active view from %p to: %p\n", h.masterState.State().View(), h.viewsStack[len(h.viewsStack)-1].state.View())
-
 		h.masterState.SetActiveState(h.viewsStack[len(h.viewsStack)-1].state)
-		//return h.viewsStack[len(h.viewsStack)-1].state.MergeState(state)
 	}
-	fmt.Printf("Merging %p to: %p\n", state.View(), h.masterState.State().View())
 
 	return h.masterState.State().MergeState(state)
-
 }
 
 func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
-
-	fmt.Printf("Get programs: %s\n", location.ID())
-
 	program, view, has := h.Programs.Get(location)
 	if has {
 		if view != nil { // handle view not set (ie. for non-address locations
@@ -117,7 +104,6 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 		location: location,
 	})
 
-	fmt.Printf("Setting new active view from %p to: %p\n", h.masterState.State().View(), childState.View())
 	h.masterState.SetActiveState(childState)
 
 	return nil, false
