@@ -220,26 +220,39 @@ func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := PayloadFixture()
-func WithoutGuarantee(payload *flow.Payload) {
-	payload.Guarantees = nil
-}
-
-func BlockWithParentFixture(parent *flow.Header, options ...func(*flow.Payload)) flow.Block {
-	payload := PayloadFixture(WithoutSeals)
 	header := BlockHeaderWithParentFixture(parent)
-	header.Height = parent.Height + 1
-
-	for _, apply := range options {
-		apply(payload)
-	}
-
 	header.PayloadHash = payload.Hash()
-
 	return flow.Block{
 		Header:  &header,
 		Payload: &payload,
 	}
 }
+
+//func BlockWithParentFixture(parent *flow.Header) flow.Block {
+//	payload := PayloadFixture()
+//}
+
+func WithoutGuarantee(payload *flow.Payload) {
+	payload.Guarantees = nil
+}
+
+//
+//func BlockWithParentFixture(parent *flow.Header, options ...func(*flow.Payload)) flow.Block {
+//	payload := PayloadFixture(WithoutSeals)
+//	header := BlockHeaderWithParentFixture(parent)
+//	header.Height = parent.Height + 1
+//
+//	for _, apply := range options {
+//		apply(payload)
+//	}
+//
+//	header.PayloadHash = payload.Hash()
+//
+//	return flow.Block{
+//		Header:  &header,
+//		Payload: &payload,
+//	}
+//}
 
 func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
@@ -1236,18 +1249,13 @@ func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Bloc
 func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 	chain := make([]*flow.Block, 0, nonGenesisCount+1)
 
+	participants := IdentityListFixture(5, WithAllRoles())
 	genesis, result, seal := BootstrapFixture(participants)
 	chain = append(chain, genesis)
 
 	children := ChainFixtureFrom(nonGenesisCount, genesis.Header)
 	chain = append(chain, children...)
 	return chain, result, seal
-}
-
-// ChainFixture creates a list of blocks that forms a chain.
-func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *flow.Seal) {
-	participants := IdentityListFixture(5, WithAllRoles())
-	return ChainFixtureWithParticipants(nonGenesisCount, participants)
 }
 
 // ChainFixtureFrom creates a chain of blocks starting from a given parent block,
