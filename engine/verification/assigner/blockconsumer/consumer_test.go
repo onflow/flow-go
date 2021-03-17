@@ -70,16 +70,19 @@ func WithConsumer(
 		require.NoError(t, err)
 
 		resultTestCases := utils.CompleteExecutionResultChainFixture(t, root, blockCount)
+		blocks := make([]*flow.Block, 0)
 
 		for _, result := range resultTestCases {
 			err := s.State.Extend(result.ReferenceBlock)
 			require.NoError(t, err)
+			blocks = append(blocks, result.ReferenceBlock)
 
 			err = s.State.Extend(result.ContainerBlock)
 			require.NoError(t, err)
+			blocks = append(blocks, result.ContainerBlock)
 		}
 
-		withConsumer(consumer, s.Storage.Blocks, resultTestCases.ReferenceBlocks())
+		withConsumer(consumer, s.Storage.Blocks, blocks)
 	})
 }
 

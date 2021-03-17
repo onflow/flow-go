@@ -186,11 +186,13 @@ func WithoutGuarantee(payload *flow.Payload) {
 func BlockWithParentFixture(parent *flow.Header, options ...func(*flow.Payload)) flow.Block {
 	payload := PayloadFixture(WithoutSeals)
 	header := BlockHeaderWithParentFixture(parent)
-	header.PayloadHash = payload.Hash()
 	header.Height = parent.Height + 1
+
 	for _, apply := range options {
 		apply(payload)
 	}
+
+	header.PayloadHash = payload.Hash()
 
 	return flow.Block{
 		Header:  &header,
