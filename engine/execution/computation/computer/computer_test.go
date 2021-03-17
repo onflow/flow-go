@@ -376,7 +376,6 @@ func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
 }
 
-
 type RandomAddressGenerator struct{}
 
 func (r *RandomAddressGenerator) NextAddress() (flow.Address, error) {

@@ -14,29 +14,27 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []flow.AccountPublicKey) (flow.Address, flow.Address, *state.State) {
+func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []flow.AccountPublicKey) (flow.Address, flow.Address, *state.StateHolder) {
 
-	ledger := state.NewMapLedger()
-	st := state.NewState(ledger)
+	ledger := utils.NewSimpleView()
+	sth := state.NewStateHolder(state.NewState(ledger))
 
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
 
 	//create accounts
-	accounts := state.NewAccounts(st)
+	accounts := state.NewAccounts(sth)
 	err := accounts.Create(aPubKeys, a)
 	require.NoError(t, err)
 	err = accounts.Create(bPubKeys, b)
 	require.NoError(t, err)
 
-	err = st.Commit()
-	require.NoError(t, err)
-
-	return a, b, st
+	return a, b, sth
 }
 
 func TestAccountFreezing(t *testing.T) {
@@ -391,7 +389,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := state.NewAccounts(state.NewState(ledger))
+		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(ledger)))
 
 		frozen, err := accountsService.GetAccountFrozen(address)
 		require.NoError(t, err)
@@ -419,7 +417,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = state.NewAccounts(state.NewState(ledger))
+		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(ledger)))
 
 		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
 		require.NoError(t, err)
