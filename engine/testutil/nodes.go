@@ -147,11 +147,8 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	s := storage.InitAll(metric, db)
 	consumer := events.NewNoop()
 
-	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := badgerstate.NewStateRoot(root, result, seal, 0)
-	require.NoError(t, err)
-
-	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
 	require.NoError(t, err)
 
 	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
@@ -323,6 +320,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
@@ -349,7 +347,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, results, receipts, node.Headers, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.DB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -453,21 +451,22 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	return testmock.ExecutionNode{
-		GenericNode:     node,
-		MutableState:    followerState,
-		IngestionEngine: ingestionEngine,
-		FollowerEngine:  followerEng,
-		SyncEngine:      syncEngine,
-		ExecutionEngine: computation,
-		RequestEngine:   requestEngine,
-		ReceiptsEngine:  pusherEngine,
-		BadgerDB:        node.DB,
-		VM:              vm,
-		ExecutionState:  execState,
-		Ledger:          ls,
-		LevelDbDir:      dbDir,
-		Collections:     collectionsStorage,
-		Finalizer:       finalizer,
+		GenericNode:         node,
+		MutableState:        followerState,
+		IngestionEngine:     ingestionEngine,
+		FollowerEngine:      followerEng,
+		SyncEngine:          syncEngine,
+		ExecutionEngine:     computation,
+		RequestEngine:       requestEngine,
+		ReceiptsEngine:      pusherEngine,
+		BadgerDB:            node.DB,
+		VM:                  vm,
+		ExecutionState:      execState,
+		Ledger:              ls,
+		LevelDbDir:          dbDir,
+		Collections:         collectionsStorage,
+		Finalizer:           finalizer,
+		MyExecutionReceipts: myReceipts,
 	}
 }
 

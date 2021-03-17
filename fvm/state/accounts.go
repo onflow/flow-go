@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/big"
@@ -9,8 +10,8 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -44,12 +45,12 @@ func keyPublicKey(index uint64) string {
 }
 
 type Accounts struct {
-	state *State
+	stateHolder *StateHolder
 }
 
-func NewAccounts(state *State) *Accounts {
+func NewAccounts(stateHolder *StateHolder) *Accounts {
 	return &Accounts{
-		state: state,
+		stateHolder: stateHolder,
 	}
 }
 
@@ -224,6 +225,15 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 }
 
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
+
+	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
+		return fmt.Errorf("invalid account key hash algorithm: %s", publicKey.HashAlgo)
+	}
+
+	if !IsValidAccountKeySignAlgo(publicKey.SignAlgo) {
+		return fmt.Errorf("invalid account key signature algorithm: %s", publicKey.SignAlgo)
+	}
+
 	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
 		return err
@@ -235,6 +245,24 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	}
 
 	return a.setPublicKeyCount(address, count+1)
+}
+
+func IsValidAccountKeySignAlgo(algo crypto.SigningAlgorithm) bool {
+	switch algo {
+	case crypto.ECDSAP256, crypto.ECDSASecp256k1:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidAccountKeyHashAlgo(algo hash.HashingAlgorithm) bool {
+	switch algo {
+	case hash.SHA2_256, hash.SHA3_256:
+		return true
+	default:
+		return false
+	}
 }
 
 func contractKey(contractName string) string {
@@ -328,7 +356,7 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 		return 0, fmt.Errorf("account %s storage used is not initialized or not initialized correctly", address.Hex())
 	}
 
-	storageUsed, _, err := utils.ReadUint64(storageUsedRegister)
+	storageUsed, _, err := readUint64(storageUsedRegister)
 	if err != nil {
 		return 0, err
 	}
@@ -336,7 +364,7 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 }
 
 func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
-	usedBinary := utils.Uint64ToBinary(used)
+	usedBinary := uint64ToBinary(used)
 	return a.setValue(address, false, KeyStorageUsed, usedBinary)
 }
 
@@ -346,9 +374,9 @@ func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValu
 
 func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
+		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 	}
-	return a.state.Get(string(address.Bytes()), "", key)
+	return a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -363,9 +391,9 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	}
 
 	if isController {
-		return a.state.Set(string(address.Bytes()), string(address.Bytes()), key, value)
+		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return a.state.Set(string(address.Bytes()), "", key, value)
+	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value)
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -421,18 +449,18 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 	} else {
 		registerID = flow.NewRegisterID(string(address.Bytes()), "", key)
 	}
-	registerKey := state.RegisterIDToKey(registerID)
-	return registerKey.Size() + len(value)
+
+	return getRegisterIDSize(registerID) + len(value)
 }
 
 // TODO replace with touch
 // TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
+		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 		return
 	}
-	_, _ = a.state.Get(string(address.Bytes()), "", key)
+	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {
@@ -507,6 +535,32 @@ func (a *Accounts) DeleteContract(contractName string, address flow.Address) err
 	}
 	contractNames.remove(contractName)
 	return a.setContractNames(contractNames, address)
+}
+
+// This tries to compute the amount bytes that will be used by the ledger
+// plus 2 on each part of the register id is due to header byte size needed
+// for encoding and decoding
+func getRegisterIDSize(inp flow.RegisterID) int {
+	size := 0
+	size += 2 + len(inp.Owner)
+	size += 2 + len(inp.Controller)
+	size += 2 + len(inp.Key)
+	return size
+}
+
+// uint64ToBinary converst a uint64 to a byte slice (big endian)
+func uint64ToBinary(integer uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, integer)
+	return b
+}
+
+// readUint64 reads a uint64 from the input and returns the rest
+func readUint64(input []byte) (value uint64, rest []byte, err error) {
+	if len(input) < 8 {
+		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint64", len(input))
+	}
+	return binary.BigEndian.Uint64(input[:8]), input[8:], nil
 }
 
 func (a *Accounts) GetAccountFrozen(address flow.Address) (bool, error) {
