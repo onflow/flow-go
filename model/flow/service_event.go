@@ -12,6 +12,16 @@ const (
 	ServiceEventCommit = "commit"
 )
 
+// ConvertServiceEvent converts a service event encoded as the generic
+// flow.Event type to a ServiceEvent type for use within protocol software
+// and protocol state. This acts as the conversion from the Cadence type to
+// the flow-go type.
+//
+// TODO implement once Cadence types are defined
+func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
+	return nil, fmt.Errorf("ConvertServiceEvent not implemented")
+}
+
 // ServiceEvent represents a service event, which is a special event that when
 // emitted from a service account smart contract, is propagated to the protocol
 // and included in blocks. Service events typically cause changes to the

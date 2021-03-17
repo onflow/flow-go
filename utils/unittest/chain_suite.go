@@ -41,9 +41,7 @@ type BaseChainSuite struct {
 
 	// MEMPOOLS and STORAGE which are injected into Matching Engine
 	// mock storage.ExecutionReceipts: backed by in-memory map PersistedReceipts
-	ReceiptsDB             *storage.ExecutionReceipts
-	PersistedReceipts      map[flow.Identifier]*flow.ExecutionReceipt
-	PersistedReceiptsIndex map[flow.Identifier]flow.Identifier // index ExecutionResult.BlockID -> ExecutionReceipt.ID
+	ReceiptsDB *storage.ExecutionReceipts
 
 	ResultsDB        *storage.ExecutionResults
 	PersistedResults map[flow.Identifier]*flow.ExecutionResult
@@ -208,65 +206,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		},
 	).Maybe() // this call is optional
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
-	bc.PersistedReceipts = make(map[flow.Identifier]*flow.ExecutionReceipt)
-	bc.PersistedReceiptsIndex = make(map[flow.Identifier]flow.Identifier)
 	bc.ReceiptsDB = &storage.ExecutionReceipts{}
-	bc.ReceiptsDB.On("ByID", mock.Anything).Return(
-		func(receiptID flow.Identifier) *flow.ExecutionReceipt {
-			return bc.PersistedReceipts[receiptID]
-		},
-		func(receiptID flow.Identifier) error {
-			_, found := bc.PersistedReceipts[receiptID]
-			if !found {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	).Maybe()
-	bc.ReceiptsDB.On("Index", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, receiptID flow.Identifier) error {
-			_, found := bc.PersistedReceiptsIndex[receiptID]
-			if found {
-				return storerr.ErrAlreadyExists
-			}
-			bc.PersistedReceiptsIndex[blockID] = receiptID
-			return nil
-		},
-	)
-	bc.ReceiptsDB.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.ExecutionReceipt {
-			receiptID, found := bc.PersistedReceiptsIndex[blockID]
-			if !found {
-				return nil
-			}
-			return bc.PersistedReceipts[receiptID]
-		},
-		func(blockID flow.Identifier) error {
-			_, found := bc.PersistedReceiptsIndex[blockID]
-			if !found {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	).Maybe()
-	bc.ReceiptsDB.On("Store", mock.Anything).Return(
-		func(receipt *flow.ExecutionReceipt) error {
-			_, found := bc.PersistedReceipts[receipt.ID()]
-			if found {
-				return storerr.ErrAlreadyExists
-			}
-			return nil
-		},
-	).Maybe() // this call is optional
-	bc.ReceiptsDB.On("ByBlockIDAllExecutionReceipts", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.ExecutionReceipt {
-			var receipts []*flow.ExecutionReceipt
-			return receipts
-		},
-		func(blockID flow.Identifier) error {
-			return nil
-		},
-	).Maybe()
 
 	// ~~~~~~~~~~~~~~~~~~~~ SETUP BLOCK HEADER STORAGE ~~~~~~~~~~~~~~~~~~~~~ //
 	bc.HeadersDB = &storage.Headers{}
@@ -388,8 +328,8 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.ResultsPL = &mempool.IncorporatedResults{}
 	bc.ResultsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 	bc.ResultsPL.On("All").Return(
-		func() []*flow.IncorporatedResult {
-			results := make([]*flow.IncorporatedResult, 0, len(bc.PendingResults))
+		func() flow.IncorporatedResultList {
+			results := make(flow.IncorporatedResultList, 0, len(bc.PendingResults))
 			for _, result := range bc.PendingResults {
 				results = append(results, result)
 			}
@@ -425,6 +365,15 @@ func (bc *BaseChainSuite) SetupChain() {
 			return found
 		},
 	).Maybe()
+	bc.SealsPL.On("All").Return(
+		func() []*flow.IncorporatedResultSeal {
+			seals := make([]*flow.IncorporatedResultSeal, 0, len(bc.PendingSeals))
+			for _, seal := range bc.PendingSeals {
+				seals = append(seals, seal)
+			}
+			return seals
+		},
+	).Maybe()
 
 	bc.Assigner = &module.ChunkAssigner{}
 	bc.Assignments = make(map[flow.Identifier]*chunks.Assignment)
@@ -433,6 +382,9 @@ func (bc *BaseChainSuite) SetupChain() {
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
+		nil, storerr.ErrNotFound,
+	)
+	snapshot.On("Identities", mock.Anything).Return(
 		nil, storerr.ErrNotFound,
 	)
 	snapshot.On("Head", mock.Anything).Return(
@@ -452,6 +404,20 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 			if !found {
 				return realproto.IdentityNotFoundError{NodeID: nodeID}
 			}
+			return nil
+		},
+	)
+	snapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			var idts flow.IdentityList
+			for _, i := range identities {
+				if selector(i) {
+					idts = append(idts, i)
+				}
+			}
+			return idts
+		},
+		func(selector flow.IdentityFilter) error {
 			return nil
 		},
 	)
@@ -506,7 +472,9 @@ type subgraphFixture struct {
 func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	// BLOCKS: <- previousBlock <- block
 	parentBlock := BlockFixture()
+	parentBlock.SetPayload(PayloadFixture(WithGuarantees(CollectionGuaranteesFixture(12)...)))
 	block := BlockWithParentFixture(parentBlock.Header)
+	block.SetPayload(PayloadFixture(WithGuarantees(CollectionGuaranteesFixture(12)...)))
 
 	// RESULTS for Blocks:
 	previousResult := ExecutionResultFixture(WithBlock(&parentBlock))

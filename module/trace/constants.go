@@ -115,6 +115,13 @@ const (
 
 	// Verification node
 	//
+	// assigner engine
+	VERProcessFinalizedBlock SpanName = "ver.processFinalizedBlock"
+	// children of VERProcessFinalizedBlock
+	VERAssignerHandleFinalizedBlock   SpanName = "ver.assigner.handleFinalizedBlock"
+	VERAssignerHandleExecutionReceipt SpanName = "ver.assigner.handleExecutionReceipt"
+	VERAssignerChunkAssignment        SpanName = "ver.assigner.chunkAssignment"
+	VERAssignerProcessChunk           SpanName = "ver.assigner.processChunk"
 
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
@@ -160,6 +167,7 @@ const (
 	FVMEnvGetBlockAtHeight          SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvCreateAccount             SpanName = "fvm.env.createAccount"
 	FVMEnvAddAccountKey             SpanName = "fvm.env.addAccountKey"
+	FVMEnvGetAccountKey             SpanName = "fvm.env.getAccountKey"
 	FVMEnvRemoveAccountKey          SpanName = "fvm.env.removeAccountKey"
 	FVMEnvUpdateAccountContractCode SpanName = "fvm.env.updateAccountContractCode"
 	FVMEnvGetAccountContractCode    SpanName = "fvm.env.getAccountContractCode"

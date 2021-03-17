@@ -2,13 +2,11 @@ package badger_test
 
 import (
 	"errors"
-
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -28,21 +26,20 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
 
 		blockID := unittest.IdentifierFixture()
-		expected := unittest.PayloadFixture()
-		expected.Receipts = make([]*flow.ExecutionReceipt, 0)
+		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
 
 		// store payload
-		err := store.Store(blockID, expected)
+		err := store.Store(blockID, &expected)
 		require.NoError(t, err)
 
 		// fetch payload
 		payload, err := store.ByBlockID(blockID)
 		require.NoError(t, err)
-		require.Equal(t, expected, payload)
+		require.Equal(t, expected.Hash(), payload.Hash())
 	})
 }
 
-func TestPayloadRetreiveWithoutStore(t *testing.T) {
+func TestPayloadRetrieveWithoutStore(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 
