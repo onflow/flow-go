@@ -91,7 +91,7 @@ func Test_Compactor(t *testing.T) {
 
 				return from == 10 && to == 10 //make sure there is
 				// this is disk-based operation after all, so give it big timeout
-			}, 15*time.Second, 100*time.Millisecond)
+			}, 20*time.Second, 100*time.Millisecond)
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))

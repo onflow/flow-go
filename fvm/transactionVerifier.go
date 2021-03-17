@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -26,16 +27,16 @@ func (v *TransactionSignatureVerifier) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	st *state.State,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc, ctx, st)
+	return v.verifyTransactionSignatures(proc, ctx, sth)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	proc *TransactionProcedure,
 	ctx Context,
-	st *state.State,
+	sth *state.StateHolder,
 ) (err error) {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -47,8 +48,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	}
 
 	tx := proc.Transaction
-	accounts := state.NewAccounts(st)
-
+	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -105,7 +105,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	return st.Commit()
+	return nil
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

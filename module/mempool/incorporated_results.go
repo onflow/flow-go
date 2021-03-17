@@ -9,7 +9,7 @@ type IncorporatedResults interface {
 	Add(result *flow.IncorporatedResult) (bool, error)
 
 	// All returns all the IncorporatedResults in the mempool
-	All() []*flow.IncorporatedResult
+	All() flow.IncorporatedResultList
 
 	// ByResultID returns all the IncorporatedResults that contain a specific
 	// ExecutionResult, indexed by IncorporatedBlockID, along with the
