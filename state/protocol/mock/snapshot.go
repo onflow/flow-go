@@ -15,15 +15,15 @@ type Snapshot struct {
 }
 
 // Commit provides a mock function with given fields:
-func (_m *Snapshot) Commit() ([]byte, error) {
+func (_m *Snapshot) Commit() (flow.StateCommitment, error) {
 	ret := _m.Called()
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func() []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func() flow.StateCommitment); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 

@@ -1,7 +1,6 @@
 package validation
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -131,7 +130,7 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 	if !isOK {
 		return fmt.Errorf("missing initial state commitment in execution result %v", result.ID())
 	}
-	if !bytes.Equal(initialState, finalState) {
+	if initialState != finalState {
 		return engine.NewInvalidInputErrorf("execution results do not form chain: expecting init state %x, but got %x",
 			finalState, initialState)
 	}
@@ -228,12 +227,16 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.StateCommitment, error) {
 	final, ok := receipt.ExecutionResult.FinalStateCommitment()
 	if !ok {
-		return nil, nil, fmt.Errorf("execution receipt without FinalStateCommit: %x", receipt.ID())
+		return flow.EmptyStateCommitment,
+			flow.EmptyStateCommitment,
+			fmt.Errorf("execution receipt without FinalStateCommit: %x", receipt.ID())
 	}
 
 	init, ok := receipt.ExecutionResult.InitialStateCommit()
 	if !ok {
-		return nil, nil, fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
+		return flow.EmptyStateCommitment,
+			flow.EmptyStateCommitment,
+			fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
 	}
 	return init, final, nil
 }

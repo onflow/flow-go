@@ -334,7 +334,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			consensusNode.Log.Debug().
 				Hex("origin", originID[:]).
 				Hex("block", receipt.ExecutionResult.BlockID[:]).
-				Hex("commit", finalState).
+				Hex("commit", finalState[:]).
 				Msg("execution receipt delivered")
 		}).Return(nil)
 

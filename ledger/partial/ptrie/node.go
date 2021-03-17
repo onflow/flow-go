@@ -7,10 +7,11 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
 
-type Root []byte
+// Root hash of a node
+type Root hash.Hash
 
 func (r Root) String() string {
-	return hex.EncodeToString(r)
+	return hex.EncodeToString(r[:])
 }
 
 // node is a struct for constructing our Tree.

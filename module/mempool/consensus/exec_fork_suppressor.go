@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -301,7 +300,7 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 	irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
 	irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
 
-	if !bytes.Equal(irSeal1InitialState, irSeal2InitialState) || !bytes.Equal(irSeal1FinalState, irSeal2FinalState) {
+	if irSeal1InitialState != irSeal2InitialState || irSeal1FinalState != irSeal2FinalState {
 		log.Error().Msg("inconsistent seals for the same block")
 		s.seals.Clear()
 		s.execForkDetected = true

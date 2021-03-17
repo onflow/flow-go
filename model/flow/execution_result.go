@@ -27,7 +27,7 @@ func (er ExecutionResult) Checksum() Identifier {
 // TODO: change bool to error return with a sentinel error
 func (er ExecutionResult) FinalStateCommitment() (StateCommitment, bool) {
 	if er.Chunks.Len() == 0 {
-		return nil, false
+		return EmptyStateCommitment, false
 	}
 	s := er.Chunks[er.Chunks.Len()-1].EndState
 	return s, len(s) > 0
@@ -42,7 +42,7 @@ func (er ExecutionResult) FinalStateCommitment() (StateCommitment, bool) {
 // TODO: change bool to error return with a sentinel error
 func (er ExecutionResult) InitialStateCommit() (StateCommitment, bool) {
 	if er.Chunks.Len() == 0 {
-		return nil, false
+		return EmptyStateCommitment, false
 	}
 	s := er.Chunks[0].StartState
 	return s, len(s) > 0

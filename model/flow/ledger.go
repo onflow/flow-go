@@ -2,6 +2,8 @@ package flow
 
 import (
 	"fmt"
+
+	ledgerHash "github.com/onflow/flow-go/ledger/common/hash"
 )
 
 type RegisterID struct {
@@ -70,4 +72,8 @@ func (d RegisterEntries) Values() []RegisterValue {
 type StorageProof = []byte
 
 // StateCommitment holds the root hash of the tree (Snapshot)
-type StateCommitment = []byte
+// TODO: solve the circular dependency and define StateCommitment as ledger.State
+type StateCommitment ledgerHash.Hash
+
+// EmptyStateCommitment represents an empty state commitment
+var EmptyStateCommitment = StateCommitment(ledgerHash.EmptyHash)

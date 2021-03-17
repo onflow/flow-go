@@ -35,7 +35,7 @@ func (b *Bootstrapper) BootstrapLedger(
 	initialTokenSupply cadence.UFix64,
 	chain flow.Chain,
 ) (flow.StateCommitment, error) {
-	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.InitialState()))
+	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
 
 	vm := fvm.New(runtime.NewInterpreterRuntime())
 
@@ -48,12 +48,12 @@ func (b *Bootstrapper) BootstrapLedger(
 
 	err := vm.Run(ctx, bootstrap, view)
 	if err != nil {
-		return nil, err
+		return flow.EmptyStateCommitment, err
 	}
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.InitialState())
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
-		return nil, err
+		return flow.EmptyStateCommitment, err
 	}
 
 	return newStateCommitment, nil
@@ -74,11 +74,11 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 	})
 
 	if errors.Is(err, storage.ErrNotFound) {
-		return nil, false, nil
+		return flow.EmptyStateCommitment, false, nil
 	}
 
 	if err != nil {
-		return nil, false, err
+		return flow.EmptyStateCommitment, false, err
 	}
 
 	return commit, true, nil

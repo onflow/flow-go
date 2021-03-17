@@ -557,8 +557,8 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 }
 
 func StateCommitmentFixture() flow.StateCommitment {
-	var state = make([]byte, 20)
-	_, _ = crand.Read(state[0:20])
+	var state flow.StateCommitment
+	_, _ = crand.Read(state[:])
 	return state
 }
 

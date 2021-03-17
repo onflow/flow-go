@@ -1,7 +1,6 @@
 package chunks
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -94,7 +93,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	}
 
 	// constructing a partial trie given chunk data package
-	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunkDataPack.StartState, partial.DefaultPathFinderVersion)
+	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
 
 	if err != nil {
 		// TODO provide more details based on the error type
@@ -112,7 +111,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 		registerKey := executionState.RegisterIDToKey(registerID)
 
-		query, err := ledger.NewQuery(chunkDataPack.StartState, []ledger.Key{registerKey})
+		query, err := ledger.NewQuery(ledger.State(chunkDataPack.StartState), []ledger.Key{registerKey})
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create query: %w", err)
@@ -169,7 +168,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	regs, values := chunkView.Delta().RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
-		chunkDataPack.StartState,
+		ledger.State(chunkDataPack.StartState),
 		executionState.RegisterIDSToKeys(regs),
 		executionState.RegisterValuesToValues(values),
 	)
@@ -194,8 +193,8 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// TODO check if exec node provided register touches that was not used (no read and no update)
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
-	if !bytes.Equal(expEndStateComm, endState) {
-		return nil, chmodels.NewCFNonMatchingFinalState(expEndStateComm, endState, chIndex, execResID), nil
+	if flow.StateCommitment(expEndStateComm) != endState {
+		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID), nil
 	}
 	return chunkView.SpockSecret(), nil, nil
 }

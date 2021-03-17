@@ -229,7 +229,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("final_state", finalState).
+		Hex("final_state", finalState[:]).
 		Msg("broadcasting execution receipt")
 
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,

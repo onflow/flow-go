@@ -1,7 +1,6 @@
 package ingestion
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	mathRand "math/rand"
@@ -205,7 +204,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(executableBlock *ent
 
 		ctx.executionState.
 			On("PersistChunkDataPack", mock.Anything, mock.MatchedBy(func(f *flow.ChunkDataPack) bool {
-				return bytes.Equal(f.StartState, executableBlock.StartState)
+				return f.StartState == executableBlock.StartState
 			})).
 			Return(nil)
 	}

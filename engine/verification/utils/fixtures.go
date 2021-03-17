@@ -300,7 +300,7 @@ func executeCollection(
 	keys := state.RegisterIDSToKeys(ids)
 	flowValues := state.RegisterValuesToValues(values)
 
-	update, err := ledger.NewUpdate(startStateCommitment, keys, flowValues)
+	update, err := ledger.NewUpdate(ledger.State(startStateCommitment), keys, flowValues)
 	require.NoError(t, err)
 
 	// TODO: update CommitDelta to also return proofs
@@ -320,14 +320,14 @@ func executeCollection(
 			NumberOfTransactions: 0,
 		},
 		Index:    uint64(chunkIndex),
-		EndState: endStateCommitment,
+		EndState: flow.StateCommitment(endStateCommitment),
 	}
 
 	// chunkDataPack
 	allRegisters := view.Interactions().AllRegisters()
 	allKeys := state.RegisterIDSToKeys(allRegisters)
 
-	query, err := ledger.NewQuery(chunk.StartState, allKeys)
+	query, err := ledger.NewQuery(ledger.State(chunk.StartState), allKeys)
 	require.NoError(t, err)
 
 	//values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
@@ -341,5 +341,5 @@ func executeCollection(
 		CollectionID: collection.ID(),
 	}
 
-	return chunk, chunkDataPack, endStateCommitment, spock
+	return chunk, chunkDataPack, flow.StateCommitment(endStateCommitment), spock
 }

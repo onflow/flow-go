@@ -569,8 +569,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("parent_block", executableBlock.Block.Header.ParentID[:]).
 		Uint64("block_height", executableBlock.Block.Header.Height).
 		Int("collections", len(executableBlock.Block.Payload.Guarantees)).
-		Hex("start_state", executableBlock.StartState).
-		Hex("final_state", finalState).
+		Hex("start_state", executableBlock.StartState[:]).
+		Hex("final_state", finalState[:]).
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Bool("sealed", isExecutedBlockSealed).
@@ -965,7 +965,7 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 		e.log.Debug().
 			Hex("block_id", logging.ID(blockID)).
 			Uint64("block_height", block.Height).
-			Hex("state_commitment", stateCommit).
+			Hex("state_commitment", stateCommit[:]).
 			Hex("script_hex", script).
 			Str("args", strings.Join(args[:], ",")).
 			Msg("extensive log: executed script content")
@@ -1017,12 +1017,12 @@ func (e *Engine) handleComputationResult(
 		startState,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not save execution results: %w", err)
+		return flow.EmptyStateCommitment, nil, fmt.Errorf("could not save execution results: %w", err)
 	}
 
 	receipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate execution receipt: %w", err)
+		return flow.EmptyStateCommitment, nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
 	err = func() error {
@@ -1036,7 +1036,7 @@ func (e *Engine) handleComputationResult(
 		return nil
 	}()
 	if err != nil {
-		return nil, nil, err
+		return flow.EmptyStateCommitment, nil, err
 	}
 
 	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
@@ -1183,8 +1183,8 @@ func (e *Engine) saveExecutionResults(
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(executableBlock)).
-		Hex("start_state", originalState).
-		Hex("final_state", endState).
+		Hex("start_state", originalState[:]).
+		Hex("final_state", endState[:]).
 		Msg("saved computation results")
 
 	return executionResult, nil
@@ -1213,7 +1213,7 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 				Int("tx_index", j).
 				Hex("collection_id", logging.ID(col.Guarantee.CollectionID)).
 				Hex("tx_hash", logging.Entity(tx)).
-				Hex("start_state_commitment", eb.StartState).
+				Hex("start_state_commitment", eb.StartState[:]).
 				RawJSON("transaction", logging.AsJSON(tx)).
 				Msg("extensive log: executed tx content")
 		}

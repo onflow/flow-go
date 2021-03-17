@@ -222,8 +222,8 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}
 
 	log = log.With().
-		Hex("initial_state", initialState).
-		Hex("final_state", finalState).Logger()
+		Hex("initial_state", initialState[:]).
+		Hex("final_state", finalState[:]).Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
