@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -84,18 +83,4 @@ func WithConsumer(
 
 		withConsumer(consumer, s.Storage.Blocks, blocks)
 	})
-}
-
-// extendStateWithBlocks is a test helper that extends mutable state with specified number of blocks, and returns the list of blocks.
-func extendStateWithBlocks(t *testing.T, state protocol.MutableState, count int) []*flow.Block {
-	root, err := state.Params().Root()
-	require.NoError(t, err)
-
-	blocks := unittest.ChainFixtureFrom(count, root)
-	for _, b := range blocks {
-		err := state.Extend(b)
-		require.NoError(t, err)
-	}
-
-	return blocks
 }
