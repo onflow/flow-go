@@ -63,7 +63,7 @@ WORKDIR /app
 RUN --mount=type=ssh \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static"  -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags "relic,netgo" -ldflags "-extldflags -static"  -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
 
 RUN chmod a+x /app/app
 
@@ -73,7 +73,7 @@ RUN go get -u github.com/go-delve/delve/cmd/dlv
 
 COPY --from=build-debug /app/app /bin/app
 
-ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/bin/app"]
+ENTRYPOINT ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/bin/app", "--"]
 
 FROM build-env as build-transit-production-nocgo
 WORKDIR /app

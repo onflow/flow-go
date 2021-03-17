@@ -7,10 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/partial"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -63,6 +66,57 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, len(e.Keys), 1)
 		require.True(t, e.Keys[0].Equals(&keys[2]))
+
+	})
+}
+
+func TestProofsForEmptyRegisters(t *testing.T) {
+	unittest.RunWithTempDir(t, func(dbDir string) {
+
+		l, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		// create empty update
+		emptyState := l.InitialState()
+
+		view := delta.NewView(executionState.LedgerGetRegister(l, emptyState))
+
+		registerID := flow.NewRegisterID("b", "o", "nk")
+
+		v, err := view.Get(registerID.Owner, registerID.Controller, registerID.Key)
+		require.NoError(t, err)
+		require.Empty(t, v)
+
+		ids, values := view.Delta().RegisterUpdates()
+		updated, err := ledger.NewUpdate(
+			emptyState,
+			executionState.RegisterIDSToKeys(ids),
+			executionState.RegisterValuesToValues(values),
+		)
+		require.NoError(t, err)
+
+		allRegisters := view.Interactions().AllRegisters()
+		allKeys := executionState.RegisterIDSToKeys(allRegisters)
+		newState := updated.State()
+
+		proofQuery, err := ledger.NewQuery(newState, allKeys)
+		require.NoError(t, err)
+
+		proof, err := l.Prove(proofQuery)
+		require.NoError(t, err)
+
+		pled, err := partial.NewLedger(proof, newState, partial.DefaultPathFinderVersion)
+		assert.NoError(t, err)
+		assert.Equal(t, pled.InitialState(), emptyState)
+
+		query, err := ledger.NewQuery(newState, []ledger.Key{executionState.RegisterIDToKey(registerID)})
+		require.NoError(t, err)
+
+		results, err := pled.Get(query)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		require.Empty(t, results[0])
 
 	})
 }

@@ -284,6 +284,10 @@ docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap --target production \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" -t "$(CONTAINER_REGISTRY)/bootstrap:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
 
+PHONY: tool-bootstrap
+tool-bootstrap: docker-build-bootstrap
+	docker container create --name bootstrap $(CONTAINER_REGISTRY)/bootstrap:latest;docker container cp bootstrap:/bin/app ./bootstrap;docker container rm bootstrap
+
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --no-cache \
