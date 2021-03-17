@@ -3,6 +3,7 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -18,7 +19,7 @@ func (c *TransactionAccountFrozenChecker) Process(
 	_ *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	_ *Programs,
+	_ *programs.Programs,
 ) error {
 	return c.checkAccountNotFrozen(proc.Transaction, sth)
 }
@@ -60,7 +61,7 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	ctx *Context,
 	proc *TransactionProcedure,
 	_ *state.StateHolder,
-	_ *Programs,
+	_ *programs.Programs,
 ) error {
 
 	serviceAddress := ctx.Chain.ServiceAddress()

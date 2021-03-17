@@ -19,12 +19,14 @@ import (
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -421,42 +423,62 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
 
+	rt := runtime.NewInterpreterRuntime()
+	vm := fvm.New(rt)
 	execCtx := fvm.NewContext(zerolog.Nop())
 
-	rt := runtime.NewInterpreterRuntime()
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 
-	vm := fvm.New(rt)
+	key, err := unittest.AccountKeyDefaultFixture()
+	require.NoError(t, err)
+
+	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return ledger.Get(owner, controller, key)
+	})
+	sth := state.NewStateHolder(state.NewState(view))
+	accounts := state.NewAccounts(sth)
+
+	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
+	// as freeze check should happen before a transaction signature is checked
+	// but we currently discard all the touches if it fails and any point
+	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
+	require.NoError(t, err)
 
 	exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 	require.NoError(t, err)
 
-	block := generateBlock(1, 1, fag)
-
-	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		return nil, nil
+	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
+		err := testutil.SignTransaction(txBody, txBody.Payer, *key, 0)
+		require.NoError(t, err)
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view, fvm.NewEmptyPrograms())
+	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()
 
 	// make sure check for frozen account has been registered
-	require.Contains(t, registerTouches, flow.RegisterID{
+	id := flow.RegisterID{
 		Owner:      string(address.Bytes()),
 		Controller: "",
 		Key:        state.KeyAccountFrozen,
-	})
+	}
+
+	require.Contains(t, registerTouches, id.String())
+	require.Equal(t, id, registerTouches[id.String()])
 
 }
-
 func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
+	return generateBlockWithVisitor(collectionCount, transactionCount, addressGenerator, nil)
+}
+
+func generateBlockWithVisitor(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator, visitor func(body *flow.TransactionBody)) *entity.ExecutableBlock {
 	collections := make([]*entity.CompleteCollection, collectionCount)
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
 
 	for i := 0; i < collectionCount; i++ {
-		collection := generateCollection(transactionCount, addressGenerator)
+		collection := generateCollection(transactionCount, addressGenerator, visitor)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
 		completeCollections[collection.Guarantee.ID()] = collection
@@ -477,7 +499,7 @@ func generateBlock(collectionCount, transactionCount int, addressGenerator flow.
 	}
 }
 
-func generateCollection(transactionCount int, addressGenerator flow.AddressGenerator) *entity.CompleteCollection {
+func generateCollection(transactionCount int, addressGenerator flow.AddressGenerator, visitor func(body *flow.TransactionBody)) *entity.CompleteCollection {
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
 	for i := 0; i < transactionCount; i++ {
@@ -485,10 +507,14 @@ func generateCollection(transactionCount int, addressGenerator flow.AddressGener
 		if err != nil {
 			panic(fmt.Errorf("cannot generate next address in test: %w", err))
 		}
-		transactions[i] = &flow.TransactionBody{
+		txBody := &flow.TransactionBody{
 			Payer:  nextAddress, // a unique payer for each tx to generate a unique id
 			Script: []byte("transaction { execute {} }"),
 		}
+		if visitor != nil {
+			visitor(txBody)
+		}
+		transactions[i] = txBody
 	}
 
 	collection := flow.Collection{Transactions: transactions}

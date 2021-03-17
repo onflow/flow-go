@@ -365,9 +365,6 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 	return nil, nil
 }
 
-	return nil, nil
-}
-
 func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvSetProgram)
