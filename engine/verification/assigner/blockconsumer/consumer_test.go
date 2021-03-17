@@ -68,9 +68,14 @@ func WithConsumer(
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
 
+		// generates 2 * blockCount chain of blocks in the form of R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
+		// Container blocks only contain receipts of their preceding reference blocks. But they do not
+		// hold any guarantees.
 		resultTestCases := utils.CompleteExecutionResultChainFixture(t, root, blockCount)
 		blocks := make([]*flow.Block, 0)
 
+		// extends protocol state with the chain of blocks.
 		for _, result := range resultTestCases {
 			err := s.State.Extend(result.ReferenceBlock)
 			require.NoError(t, err)
