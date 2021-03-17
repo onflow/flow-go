@@ -103,7 +103,7 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
 		// find the block for the transaction
 		block, err := r.backend.lookupBlock(txID)
 		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound){
+			if !errors.Is(err, storage.ErrNotFound) {
 				continue
 			}
 			block = nil
