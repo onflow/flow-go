@@ -67,6 +67,16 @@ func TestEventStoreRetrieve(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, actual, 1)
 		require.Contains(t, actual, evt1)
+
+		// test loading from database
+
+		newStore := badgerstorage.NewEvents(metrics, db)
+		actual, err = newStore.ByBlockID(blockID)
+		require.NoError(t, err)
+		require.Len(t, actual, 3)
+		require.Contains(t, actual, evt1)
+		require.Contains(t, actual, evt2)
+		require.Contains(t, actual, evt3)
 	})
 }
 

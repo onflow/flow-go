@@ -44,6 +44,14 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			require.Nil(t, err)
 			assert.Equal(t, txResult, *actual)
 		}
+
+		// test loading from database
+		newStore := bstorage.NewTransactionResults(metrics, db)
+		for _, txResult := range txResults {
+			actual, err := newStore.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+			require.Nil(t, err)
+			assert.Equal(t, txResult, *actual)
+		}
 	})
 }
 
