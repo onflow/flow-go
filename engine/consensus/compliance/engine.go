@@ -2,11 +2,9 @@ package compliance
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
@@ -23,15 +21,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-type Event struct {
-	OriginID flow.Identifier
-	Msg      interface{}
-}
-
-type (
-	EventSink chan *Event // Channel to push pending events
-)
-
 // defaultBlockQueueCapacity maximum capacity of block proposals queue
 const defaultBlockQueueCapacity = 10000
 
@@ -41,23 +30,22 @@ const defaultVoteQueueCapacity = 1000
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit             *engine.Unit
-	log              zerolog.Logger
-	mempool          module.MempoolMetrics
-	metrics          module.EngineMetrics
-	me               module.Local
-	headers          storage.Headers
-	payloads         storage.Payloads
-	tracer           module.Tracer
-	state            protocol.State
-	prov             network.Engine
-	core             *Core
-	pendingEventSink EventSink
-	blockSink        EventSink
-	voteSink         EventSink
-	pendingBlocks    *fifoqueue.FifoQueue
-	pendingVotes     *fifoqueue.FifoQueue
-	con              network.Conduit
+	unit           *engine.Unit
+	log            zerolog.Logger
+	mempool        module.MempoolMetrics
+	metrics        module.EngineMetrics
+	me             module.Local
+	headers        storage.Headers
+	payloads       storage.Payloads
+	tracer         module.Tracer
+	state          protocol.State
+	prov           network.Engine
+	core           *Core
+	pendingBlocks  *fifoqueue.FifoQueue
+	pendingVotes   *fifoqueue.FifoQueue
+	notify         <-chan struct{} // when new message is added to queue
+	messageHandler *engine.MessageHandler
+	con            network.Conduit
 }
 
 func NewEngine(
@@ -66,49 +54,118 @@ func NewEngine(
 	me module.Local,
 	prov network.Engine,
 	core *Core) (*Engine, error) {
-	e := &Engine{
-		unit:             engine.NewUnit(),
-		log:              log.With().Str("compliance", "engine").Logger(),
-		me:               me,
-		mempool:          core.mempool,
-		metrics:          core.metrics,
-		headers:          core.headers,
-		payloads:         core.payloads,
-		state:            core.state,
-		tracer:           core.tracer,
-		prov:             prov,
-		core:             core,
-		pendingEventSink: make(EventSink),
-		blockSink:        make(EventSink),
-		voteSink:         make(EventSink),
-	}
 
-	var err error
-	// register the core with the network layer and store the conduit
-	e.con, err = net.Register(engine.ConsensusCommittee, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register core: %w", err)
-	}
+	notify := make(chan struct{})
 
 	// FIFO queue for block proposals
-	e.pendingBlocks, err = fifoqueue.NewFifoQueue(
+	pendingBlocks, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { e.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
 
 	// FIFO queue for block votes
-	e.pendingVotes, err = fifoqueue.NewFifoQueue(
+	pendingVotes, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { e.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
 	}
 
-	return e, nil
+	// define message queueing behaviour
+	handler := engine.NewMessageHandler(
+		log,
+		notify,
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				switch msg.Payload.(type) {
+				case *messages.BlockProposal:
+					return true
+				default:
+					return false
+				}
+			},
+			OnStore: []engine.OnMessageFunc{
+				func(_ *engine.Message) {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+				},
+			},
+			Store: pendingBlocks,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				switch msg.Payload.(type) {
+				case *events.SyncedBlock:
+					return true
+				default:
+					return false
+				}
+			},
+			Map: []engine.MapFunc{
+				func(msg *engine.Message) *engine.Message {
+					syncedBlock := msg.Payload.(*events.SyncedBlock)
+					return &engine.Message{
+						OriginID: msg.OriginID,
+						Payload: &messages.BlockProposal{
+							Payload: syncedBlock.Block.Payload,
+							Header:  syncedBlock.Block.Header,
+						},
+					}
+				},
+			},
+			OnStore: []engine.OnMessageFunc{
+				func(_ *engine.Message) {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+				},
+			},
+			Store: pendingBlocks,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				switch msg.Payload.(type) {
+				case *messages.BlockVote:
+					return true
+				default:
+					return false
+				}
+			},
+			OnStore: []engine.OnMessageFunc{
+				func(_ *engine.Message) {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+				},
+			},
+			Store: pendingVotes,
+		},
+	)
+
+	eng := &Engine{
+		unit:           engine.NewUnit(),
+		log:            log.With().Str("compliance", "engine").Logger(),
+		me:             me,
+		mempool:        core.mempool,
+		metrics:        core.metrics,
+		headers:        core.headers,
+		payloads:       core.payloads,
+		pendingBlocks:  pendingBlocks,
+		pendingVotes:   pendingVotes,
+		state:          core.state,
+		tracer:         core.tracer,
+		prov:           prov,
+		core:           core,
+		notify:         notify,
+		messageHandler: handler,
+	}
+
+	// register the core with the network layer and store the conduit
+	eng.con, err = net.Register(engine.ConsensusCommittee, handler)
+	if err != nil {
+		return nil, fmt.Errorf("could not register core: %w", err)
+	}
+
+	return eng, nil
 }
 
 // WithConsensus adds the consensus algorithm to the engine. This must be
@@ -125,19 +182,9 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.core.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
-	var wg sync.WaitGroup
-	wg.Add(2)
-	e.unit.Launch(func() {
-		wg.Done()
-		e.processEvents()
-	})
-	e.unit.Launch(func() {
-		wg.Done()
-		e.consumeEvents()
-	})
+	e.unit.Launch(e.loop)
 	return e.unit.Ready(func() {
 		<-e.core.hotstuff.Ready()
-		wg.Wait()
 	})
 }
 
@@ -174,107 +221,38 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	e.pendingEventSink <- &Event{
-		OriginID: originID,
-		Msg:      event,
-	}
-	return nil
+	return e.messageHandler.Process(originID, event)
 }
 
-// processEvents is processor of pending events which drives events from networking layer to business logic in `Core`.
-// Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
-// Should be run as a separate goroutine.
-func (e *Engine) processEvents() {
-	// takes pending event from one of the queues
-	// nil sink means nothing to send, this prevents blocking on select
-	fetchEvent := func() (*Event, EventSink, *fifoqueue.FifoQueue) {
-		if val, ok := e.pendingBlocks.Front(); ok {
-			return val.(*Event), e.blockSink, e.pendingBlocks
+func (e *Engine) loop() {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-e.notify:
+			e.processAvailableMessages()
 		}
-		if val, ok := e.pendingVotes.Front(); ok {
-			return val.(*Event), e.voteSink, e.pendingVotes
-		}
-		return nil, nil, nil
 	}
+}
+
+func (e *Engine) processAvailableMessages() {
 
 	for {
-		pendingEvent, sink, fifo := fetchEvent()
-		select {
-		case event := <-e.pendingEventSink:
-			e.processPendingEvent(event)
-		case sink <- pendingEvent:
-			fifo.Pop()
+		// TODO prioritization
+		// eg: msg := engine.SelectNextMessage()
+		msg, ok := e.pendingBlocks.Get()
+		if ok {
+			e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
 			continue
-		case <-e.unit.Quit():
-			return
 		}
-	}
-}
 
-// processPendingEvent saves pending event in corresponding queue for further processing by `Core`.
-// While this function runs in separate goroutine it shouldn't do heavy processing to maintain efficient data polling/pushing.
-func (e *Engine) processPendingEvent(event *Event) {
-	// skip any message as long as we don't have the dependencies
-	if e.core.hotstuff == nil || e.core.sync == nil {
+		msg, ok = e.pendingVotes.Get()
+		if ok {
+			e.core.OnBlockVote(msg.OriginID, msg.Payload.(*messages.BlockVote))
+			continue
+		}
+
 		return
-	}
-
-	switch event.Msg.(type) {
-	case *events.SyncedBlock:
-		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
-		// a block that is synced has to come locally, from the synchronization engine
-		// the block itself will contain the proposer to indicate who created it
-		if event.OriginID != e.me.NodeID() {
-			log.Warn().Msgf("synced block with non-local origin (local: %x, origin: %x)", e.me.NodeID(), event.OriginID)
-			return
-		}
-		e.pendingBlocks.Push(event)
-	case *messages.BlockProposal:
-		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-		e.pendingBlocks.Push(event)
-	case *messages.BlockVote:
-		e.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
-		e.pendingVotes.Push(event)
-	}
-}
-
-// consumeEvents consumes events that are ready to be processed.
-func (e *Engine) consumeEvents() {
-	processBlock := func(event *Event) error {
-		var err error
-		switch t := event.Msg.(type) {
-		case *events.SyncedBlock:
-			proposal := &messages.BlockProposal{
-				Header:  t.Block.Header,
-				Payload: t.Block.Payload,
-			}
-			err = e.core.OnBlockProposal(event.OriginID, proposal)
-			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageSyncedBlock)
-
-		case *messages.BlockProposal:
-			err = e.core.OnBlockProposal(event.OriginID, t)
-			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockProposal)
-		}
-		return err
-	}
-
-	for {
-		var err error
-		select {
-		case event := <-e.blockSink:
-			err = processBlock(event)
-		case event := <-e.voteSink:
-			err = e.core.OnBlockVote(event.OriginID, event.Msg.(*messages.BlockVote))
-			e.metrics.MessageHandled(metrics.EngineCompliance, metrics.MessageBlockVote)
-		case <-e.unit.Quit():
-			return
-		}
-		if err != nil {
-			// Public methods of `Core` are supposed to handle all errors internally.
-			// Here if error happens it means that internal state is corrupted or we have caught
-			// exception while processing. In such case best just to abort the node.
-			e.log.Fatal().Err(err).Msgf("fatal internal error in matching core logic")
-		}
 	}
 }
 

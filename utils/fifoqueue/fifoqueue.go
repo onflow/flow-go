@@ -5,6 +5,8 @@ import (
 	mathbits "math/bits"
 
 	"github.com/ef-ds/deque"
+
+	"github.com/onflow/flow-go/engine"
 )
 
 // FifoQueue implements a FIFO queue with max capacity and length observer.
@@ -109,4 +111,17 @@ func (q *FifoQueue) Pop() (interface{}, bool) {
 // Len returns the current length of the queue.
 func (q *FifoQueue) Len() int {
 	return q.queue.Len()
+}
+
+func (q *FifoQueue) Put(msg *engine.Message) bool {
+	q.Push(msg)
+	return true // TODO update Push to actually return whether item was stored
+}
+
+func (q *FifoQueue) Get() (*engine.Message, bool) {
+	msgint, ok := q.Pop()
+	if !ok {
+		return nil, false
+	}
+	return msgint.(*engine.Message), true
 }
