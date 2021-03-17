@@ -103,7 +103,7 @@ func main() {
 			return err
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
+			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("cached execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {

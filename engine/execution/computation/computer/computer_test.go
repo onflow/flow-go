@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/event"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
@@ -39,7 +40,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
@@ -47,7 +48,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 
@@ -65,8 +66,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create an empty block
 		block := generateBlock(0, 0)
+		programs := programs.NewEmptyPrograms()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
 			Return(nil).
 			Once() // just system chunk
 
@@ -74,7 +76,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResult, 1)
@@ -98,8 +100,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection)
+		programs := programs.NewEmptyPrograms()
 
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
@@ -114,7 +117,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
@@ -230,7 +233,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		// all events should have been collected
@@ -255,7 +258,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		rt := &testRuntime{
 			executeTransaction: func(script runtime.Script, r runtime.Context) error {
 
-				err := r.Interface.SetProgram(
+				program, err := r.Interface.GetProgram(contractLocation)
+				require.NoError(t, err)
+				require.Nil(t, program)
+
+				err = r.Interface.SetProgram(
 					contractLocation,
 					contractProgram,
 				)
@@ -278,7 +285,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -313,16 +320,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 				// NOTE: set a program and revert all transactions but the system chunk transaction
 
+				program, err := r.Interface.GetProgram(contractLocation)
+				require.NoError(t, err)
+
 				if executionCalls > collectionCount*transactionCount {
 					return nil
 				}
+				if program == nil {
 
-				err := r.Interface.SetProgram(
-					contractLocation,
-					contractProgram,
-				)
-				require.NoError(t, err)
+					err = r.Interface.SetProgram(
+						contractLocation,
+						contractProgram,
+					)
+					require.NoError(t, err)
 
+				}
 				return runtime.Error{
 					Err: fmt.Errorf("TX reverted"),
 				}
@@ -340,7 +352,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -359,12 +371,16 @@ func (e *testRuntime) ExecuteTransaction(script runtime.Script, context runtime.
 	return e.executeTransaction(script, context)
 }
 
-func (e *testRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
+func (*testRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
 	panic("ParseAndCheckProgram not expected")
 }
 
-func (e *testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
+func (*testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 	panic("SetCoverageReport not expected")
+}
+
+func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
+	panic("SetContractUpdateValidationEnabled not expected")
 }
 
 func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBlock {

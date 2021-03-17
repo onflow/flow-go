@@ -55,9 +55,11 @@ func main() {
 		followerState         protocol.MutableState
 		ledgerStorage         *ledger.Ledger
 		events                *storage.Events
+		serviceEvents         *storage.ServiceEvents
 		txResults             *storage.TransactionResults
 		results               *storage.ExecutionResults
 		receipts              *storage.ExecutionReceipts
+		myReceipts            *storage.MyExecutionReceipts
 		providerEngine        *exeprovider.Engine
 		checkerEng            *checker.Engine
 		syncCore              *chainsync.Core
@@ -77,6 +79,7 @@ func main() {
 		checkpointDistance    uint
 		checkpointsToKeep     uint
 		stateDeltasLimit      uint
+		cadenceExecutionCache uint
 		requestInterval       time.Duration
 		preferredExeNodeIDStr string
 		syncByBlocks          bool
@@ -97,6 +100,7 @@ func main() {
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 10, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
+			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
@@ -142,6 +146,7 @@ func main() {
 				node.State,
 				vm,
 				vmCtx,
+				cadenceExecutionCache,
 			)
 			computationManager = manager
 
@@ -158,6 +163,7 @@ func main() {
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
 			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, receipts)
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -228,11 +234,15 @@ func main() {
 				ledgerStorage,
 				stateCommitments,
 				node.Storage.Blocks,
+				node.Storage.Headers,
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
 				receipts,
-				node.Storage.Headers,
+				myReceipts,
+				events,
+				serviceEvents,
+				txResults,
 				node.DB,
 				node.Tracer,
 			)
@@ -377,9 +387,7 @@ func main() {
 			return collectionRequester, nil
 		}).
 		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
-				return receipts.ByBlockID(blockID)
-			}
+			retrieve := func(blockID flow.Identifier) (flow.Entity, error) { return myReceipts.MyReceipt(blockID) }
 			eng, err := provider.New(
 				node.Logger,
 				node.Metrics.Engine,

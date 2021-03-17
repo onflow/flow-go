@@ -3,8 +3,12 @@ package fvm
 import (
 	"errors"
 
+	"github.com/opentracing/opentracing-go/log"
+
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSignatureVerifier struct {
@@ -23,18 +27,28 @@ func (v *TransactionSignatureVerifier) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *TransactionProcedure,
-	st *state.State,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc.Transaction, st)
+	return v.verifyTransactionSignatures(proc, ctx, sth)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
-	tx *flow.TransactionBody,
-	st *state.State,
+	proc *TransactionProcedure,
+	ctx Context,
+	sth *state.StateHolder,
 ) (err error) {
 
-	accounts := state.NewAccounts(st)
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
+		span.LogFields(
+			log.String("transaction.ID", proc.ID.String()),
+		)
+		defer span.Finish()
+	}
 
+	tx := proc.Transaction
+	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -91,7 +105,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	return st.Commit()
+	return nil
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

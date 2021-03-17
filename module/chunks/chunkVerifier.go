@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification"
@@ -18,7 +19,7 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger) error
+	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
@@ -95,12 +96,15 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunkDataPack.StartState, partial.DefaultPathFinderVersion)
-
 	if err != nil {
 		// TODO provide more details based on the error type
 		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
 			nil
 	}
+
+	// transactions in chunk can reuse the same cache, but its unknown
+	// if there were changes between chunks, so we always start with a new one
+	programs := programs.NewEmptyPrograms()
 
 	// chunk view construction
 	// unknown register tracks access to parts of the partial trie which
@@ -141,7 +145,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 		// tx := fvm.Transaction(txBody, uint32(i))
 
-		err := fcv.vm.Run(blockCtx, tx, txView)
+		err := fcv.vm.Run(blockCtx, tx, txView, programs)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
@@ -150,7 +154,10 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 		if tx.Err == nil {
 			// if tx is successful, we apply changes to the chunk view by merging the txView into chunk view
-			chunkView.MergeView(txView)
+			err = chunkView.MergeView(txView)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			}
 		}
 	}
 

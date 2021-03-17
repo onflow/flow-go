@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -30,6 +31,19 @@ func (e *Events) Store(blockID flow.Identifier, events []flow.Event) error {
 		}
 		return nil
 	})
+}
+
+func (e *Events) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		for _, event := range events {
+			err := operation.BatchInsertEvent(blockID, event)(writeBatch)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert event: %w", err)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
 }
 
 // ByBlockID returns the events for the given block ID
@@ -89,6 +103,19 @@ func (e *ServiceEvents) Store(blockID flow.Identifier, events []flow.Event) erro
 		}
 		return nil
 	})
+}
+
+func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		for _, event := range events {
+			err := operation.BatchInsertServiceEvent(blockID, event)(writeBatch)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert service event: %w", err)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
 }
 
 // ByBlockID returns the events for the given block ID
