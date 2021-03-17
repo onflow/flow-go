@@ -39,6 +39,8 @@ type API interface {
 
 	GetEventsForHeightRange(ctx context.Context, eventType string, startHeight, endHeight uint64) ([]flow.BlockEvents, error)
 	GetEventsForBlockIDs(ctx context.Context, eventType string, blockIDs []flow.Identifier) ([]flow.BlockEvents, error)
+
+	GetLatestProtocolStateSnapshot(ctx context.Context) ([]byte, error)
 }
 
 // TODO: Combine this with flow.TransactionResult?

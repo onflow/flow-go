@@ -19,7 +19,7 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
 		id := key.(flow.Identifier)
 		commit := val.(*flow.EpochCommit)
-		return operation.InsertEpochCommit(id, commit)
+		return operation.SkipDuplicates(operation.InsertEpochCommit(id, commit))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {

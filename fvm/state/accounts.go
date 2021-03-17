@@ -497,11 +497,14 @@ func (a *Accounts) DeleteContract(contractName string, address flow.Address) err
 	return a.setContractNames(contractNames, address)
 }
 
+// This tries to compute the amount bytes that will be used by the ledger
+// plus 2 on each part of the register id is due to header byte size needed
+// for encoding and decoding
 func getRegisterIDSize(inp flow.RegisterID) int {
 	size := 0
-	size += len(inp.Owner) + 2
-	size += len(inp.Controller) + 2
-	size += len(inp.Key) + 2
+	size += 2 + len(inp.Owner)
+	size += 2 + len(inp.Controller)
+	size += 2 + len(inp.Key)
 	return size
 }
 

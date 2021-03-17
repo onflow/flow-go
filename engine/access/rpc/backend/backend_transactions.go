@@ -438,7 +438,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID,
 	}
 
-	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state)
+	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
 	}
