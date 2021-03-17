@@ -220,24 +220,20 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, txErr
 	}
 
-	blockID := flow.ZeroID
 	// find the block for the transaction
 	block, err := b.lookupBlock(txID)
 	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, convertStorageError(err)
 	}
 
-	// access node may not have the block if it hasn't yet been finalized, hence block can be nil
-	if block != nil {
-		blockID = block.ID()
-	}
-
+	var blockID flow.Identifier
 	var transactionWasExecuted bool
 	var events []flow.Event
 	var txError string
 	var statusCode uint32
-	// get events for the transaction if block was found
-	if blockID != flow.ZeroID {
+	// access node may not have the block if it hasn't yet been finalized, hence block can be nil at this point
+	if block != nil {
+		blockID = block.ID()
 		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
 		if err != nil {
 			return nil, convertStorageError(err)
