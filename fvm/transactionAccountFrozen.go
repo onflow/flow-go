@@ -17,17 +17,17 @@ func (c *TransactionAccountFrozenChecker) Process(
 	_ *VirtualMachine,
 	_ *Context,
 	proc *TransactionProcedure,
-	st *state.State,
-	programs *Programs,
+	sth *state.StateHolder,
+	_ *Programs,
 ) error {
-	return c.checkAccountNotFrozen(proc.Transaction, st)
+	return c.checkAccountNotFrozen(proc.Transaction, sth)
 }
 
 func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 	tx *flow.TransactionBody,
-	st *state.State,
+	sth *state.StateHolder,
 ) error {
-	accounts := state.NewAccounts(st)
+	accounts := state.NewAccounts(sth)
 
 	for _, authorizer := range tx.Authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)
@@ -59,7 +59,7 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	_ *VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
-	_ *state.State,
+	_ *state.StateHolder,
 	_ *Programs,
 ) error {
 

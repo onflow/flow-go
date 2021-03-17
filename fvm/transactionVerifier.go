@@ -24,12 +24,12 @@ func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatu
 
 func (v *TransactionSignatureVerifier) Process(
 	_ *VirtualMachine,
-	_ *Context,
+	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc, ctx, sth)
+	return v.verifyTransactionSignatures(proc, *ctx, sth)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(

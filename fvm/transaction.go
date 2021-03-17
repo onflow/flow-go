@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
-	"github.com/onflow/cadence/runtime/trampoline"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/extralog"
@@ -122,7 +121,7 @@ func (i *TransactionInvocator) Process(
 					{
 						Label:          sema.ArgumentLabelNotRequired,
 						Identifier:     "frozen",
-						TypeAnnotation: sema.NewTypeAnnotation(&sema.BoolType{}),
+						TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
 					},
 				},
 				ReturnTypeAnnotation: &sema.TypeAnnotation{
@@ -133,7 +132,7 @@ func (i *TransactionInvocator) Process(
 			IsConstant:     true,
 			ArgumentLabels: nil,
 			Value: interpreter.NewHostFunctionValue(
-				func(invocation interpreter.Invocation) trampoline.Trampoline {
+				func(invocation interpreter.Invocation) interpreter.Value {
 					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 					if !ok {
 						panic(errors.New("first argument must be an address"))
@@ -149,7 +148,7 @@ func (i *TransactionInvocator) Process(
 						panic(fmt.Errorf("cannot set account frozen: %w", err))
 					}
 
-					return trampoline.Done{Result: interpreter.VoidValue{}}
+					return interpreter.VoidValue{}
 				},
 			),
 		}
@@ -193,8 +192,7 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		env, err = newEnvironment(ctx, vm, sth, programs)
-		env, err = newEnvironment(*ctx, vm, st, programs)
+		env, err = newEnvironment(*ctx, vm, sth, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
