@@ -8,22 +8,22 @@ import (
 )
 
 // functor that will be get called on each block header when traversing blocks.
-type onBlockTraverse = func(header *flow.Header) (bool, error)
+type onVisitBlock = func(header *flow.Header) (bool, error)
 
-// TraverseBlocksBackwards traverses a chain segment beginning with the start block (inclusive)
+// Traverse traverses a chain segment beginning with the start block (inclusive)
 // Blocks are traversed in reverse
 // height order, meaning the end block must be an ancestor of the start block.
 // The callback is called for each block in this segment.
 // Return value of callback is used to decide if it should continue or not.
-func TraverseBlocksBackwards(headers storage.Headers, startBlockID flow.Identifier, traverse onBlockTraverse) error {
+func Traverse(headers storage.Headers, startBlockID flow.Identifier, visitor onVisitBlock) error {
 	ancestorID := startBlockID
 	for {
-		ancestor, err := headers.ByBlockID(startBlockID)
+		ancestor, err := headers.ByBlockID(ancestorID)
 		if err != nil {
 			return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
 		}
 
-		shouldContinue, err := traverse(ancestor)
+		shouldContinue, err := visitor(ancestor)
 		if !shouldContinue {
 			break
 		}
@@ -31,6 +31,35 @@ func TraverseBlocksBackwards(headers storage.Headers, startBlockID flow.Identifi
 			return err
 		}
 		ancestorID = ancestor.ParentID
+	}
+	return nil
+}
+
+// TraverseParentFirst traverses a chain segment beginning with the last block (non inclusive)
+// and ending with start block
+// Implements a recursive descend to last block identified by `stopBlockID` and then calling
+// visitor callback for every block way back up to `startBlockID`
+func TraverseParentFirst(headers storage.Headers, startBlockID, stopBlockID flow.Identifier,
+	visitor func(header *flow.Header) error) error {
+	ancestor, err := headers.ByBlockID(startBlockID)
+	if err != nil {
+		return fmt.Errorf("could not get ancestor header (%x): %w", startBlockID, err)
+	}
+
+	if ancestor.ID() == stopBlockID {
+		return nil
+	}
+
+	// descend further down the chain
+	err = TraverseParentFirst(headers, ancestor.ParentID, stopBlockID, visitor)
+	if err != nil {
+		return err
+	}
+
+	// now we are on our way back up
+	err = visitor(ancestor)
+	if err != nil {
+		return err
 	}
 	return nil
 }

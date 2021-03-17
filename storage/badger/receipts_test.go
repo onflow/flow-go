@@ -12,66 +12,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestMyExecutionReceiptsStorage(t *testing.T) {
-	withStore := func(t *testing.T, f func(store *bstorage.MyExecutionReceipts)) {
-		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-			metrics := metrics.NewNoopCollector()
-			results := bstorage.NewExecutionResults(metrics, db)
-			receipts := bstorage.NewExecutionReceipts(metrics, db, results)
-			store := bstorage.NewMyExecutionReceipts(metrics, db, receipts)
-
-			f(store)
-		})
-	}
-
-	t.Run("store one get one", func(t *testing.T) {
-		withStore(t, func(store *bstorage.MyExecutionReceipts) {
-			block := unittest.BlockFixture()
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
-
-			err := store.StoreMyReceipt(receipt1)
-			require.NoError(t, err)
-
-			actual, err := store.MyReceipt(receipt1.ID())
-			require.NoError(t, err)
-
-			require.Equal(t, receipt1, actual)
-		})
-	})
-
-	t.Run("store same for the same block", func(t *testing.T) {
-		withStore(t, func(store *bstorage.MyExecutionReceipts) {
-			block := unittest.BlockFixture()
-
-			receipt1 := unittest.ReceiptForBlockFixture(&block)
-
-			err := store.StoreMyReceipt(receipt1)
-			require.NoError(t, err)
-
-			err = store.StoreMyReceipt(receipt1)
-			require.NoError(t, err)
-		})
-	})
-
-	t.Run("store different receipt for same block should fail", func(t *testing.T) {
-		withStore(t, func(store *bstorage.MyExecutionReceipts) {
-			block := unittest.BlockFixture()
-
-			executor1 := unittest.IdentifierFixture()
-			executor2 := unittest.IdentifierFixture()
-
-			receipt1 := unittest.ReceiptForBlockExecutorFixture(&block, executor1)
-			receipt2 := unittest.ReceiptForBlockExecutorFixture(&block, executor2)
-
-			err := store.StoreMyReceipt(receipt1)
-			require.NoError(t, err)
-
-			err = store.StoreMyReceipt(receipt2)
-			require.Error(t, err)
-		})
-	})
-}
-
 func TestExecutionReceiptsStorage(t *testing.T) {
 	withStore := func(t *testing.T, f func(store *bstorage.ExecutionReceipts)) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -82,14 +22,12 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 		})
 	}
 
-	var empty []*flow.ExecutionReceipt
-
 	t.Run("get empty", func(t *testing.T) {
 		withStore(t, func(store *bstorage.ExecutionReceipts) {
 			block := unittest.BlockFixture()
 			receipts, err := store.ByBlockID(block.ID())
 			require.NoError(t, err)
-			require.Equal(t, empty, receipts)
+			require.Equal(t, 0, len(receipts))
 		})
 	})
 
@@ -109,7 +47,7 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 			receipts, err := store.ByBlockID(block.ID())
 			require.NoError(t, err)
 
-			require.Equal(t, []*flow.ExecutionReceipt{receipt1}, receipts)
+			require.Equal(t, flow.ExecutionReceiptList{receipt1}, receipts)
 		})
 	})
 

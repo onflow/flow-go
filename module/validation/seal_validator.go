@@ -161,7 +161,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
-	err = state.TraverseBlocksBackwards(s.headers, header.ParentID,
+	err = state.Traverse(s.headers, header.ParentID,
 		func(block *flow.Header) (bool, error) {
 			if block.ID() == sealedID {
 				return false, nil

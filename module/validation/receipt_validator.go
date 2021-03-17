@@ -140,7 +140,7 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 	return nil
 }
 
-// Validate performs verifies that the ExecutionReceipt satisfies
+// Validate verifies that the ExecutionReceipt satisfies
 // the following conditions:
 // 	* is from Execution node with positive weight
 //	* has valid signature
@@ -149,13 +149,13 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // Returns nil if all checks passed successfully.
 // Expected errors during normal operations:
 // * engine.InvalidInputError
-// * validation.UnverifiableError
+// * engine.UnverifiableInputError
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	// TODO: this can be optimized by checking if result was already stored and validated.
 	// This needs to be addressed later since many tests depend on this behavior.
 	prevResult, err := v.fetchResult(receipt.ExecutionResult.PreviousResultID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error fetching parent result of receipt %v: %w", receipt.ID(), err)
 	}
 
 	// first validate result to avoid signature check in in `validateReceipt` in case result is invalid.
@@ -174,131 +174,148 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	return nil
 }
 
+// ValidatePayload verifies the ExecutionReceipts and ExecutionResults
+// in the payload for compliance with the protocol:
+// Receipts:
+// 	* are from Execution node with positive weight
+//	* have valid signature
+//	* chunks are in correct format
+//  * no duplicates in fork
+// Results:
+// 	* have valid parents and satisfy the subgraph check
+//  * extend the execution tree, where the tree root is the latest finalized
+//    block and only results from this fork are included
+//  * no duplicates in fork
+// Expected errors during normal operations:
+// * engine.InvalidInputError
+// * engine.UnverifiableInputError
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
-	// lookup cache to avoid linear search when checking for previous result that is
-	// part of payload
-	payloadExecutionResults := candidate.Payload.ResultsById()
-	// Build a functor that performs lookup first in receipts that were passed as payload and only then in
-	// local storage. This is needed to handle a case when same block payload contains receipts that
-	// reference each other.
-	// ATTENTION: Here we assume that ER is valid, this lookup can return a result which is actually invalid.
-	// Eventually invalid result will be detected and fail the whole validation.
-	fetchResult := func(previousResultID flow.Identifier) (*flow.ExecutionResult, error) {
-		prevResult, found := payloadExecutionResults[previousResultID]
-		if found {
-			return prevResult, nil
-		}
-
-		return v.fetchResult(previousResultID)
-	}
-
 	header := candidate.Header
 	payload := candidate.Payload
 
-	// Get the latest sealed block on this fork, ie the highest block for which
-	// there is a seal in this fork. This block is not necessarily finalized.
-	last, err := v.seals.ByBlockID(header.ParentID)
+	// Get the latest sealed result on this fork and the corresponding block,
+	// whose result is sealed. This block is not necessarily finalized.
+	lastSeal, err := v.seals.ByBlockID(header.ParentID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve parent seal (%x): %w", header.ParentID, err)
+		return fmt.Errorf("could not retrieve latest seal for fork with head %x: %w", header.ParentID, err)
 	}
-	sealed, err := v.headers.ByBlockID(last.BlockID)
+	latestSealedResult, err := v.results.ByID(lastSeal.ResultID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+		return fmt.Errorf("could not retrieve latest sealed result %x: %w", lastSeal.ResultID, err)
 	}
-	sealedHeight := sealed.Height
+	sealedBlock, err := v.headers.ByBlockID(lastSeal.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve sealed block (%x): %w", lastSeal.BlockID, err)
+	}
 
-	// forkBlocks is used to keep the IDs of the blocks we iterate through. We
+	// forkBlocks is the set of all _unsealed_ blocks on the fork. We
 	// use it to identify receipts that are for blocks not in the fork.
-	forkBlocks := make(map[flow.Identifier]*flow.Header)
+	forkBlocks := make(map[flow.Identifier]struct{})
 
-	// Create a lookup table of all the receipts that are already included in
-	// blocks on the fork.
-	forkLookup := make(map[flow.Identifier]struct{})
+	// Set of the execution tree with root latestSealedResult.
+	// Used for detecting duplicates and results with invalid parent results.
+	executionTree := make(map[flow.Identifier]*flow.ExecutionResult)
+	executionTree[lastSeal.ResultID] = latestSealedResult
 
-	// loop through the fork backwards, from parent to last sealed, and keep
-	// track of blocks and receipts visited on the way.
-	err = state.TraverseBlocksBackwards(v.headers, header.ParentID,
-		func(block *flow.Header) (bool, error) {
-			if block.Height <= sealedHeight {
-				return false, nil
-			}
+	// Set of previously included results. Used for detecting duplicates.
+	forkReceipts := make(map[flow.Identifier]struct{})
 
-			blockID := block.ID()
-			// keep track of blocks we iterate over
-			forkBlocks[blockID] = block
+	// Start from the lowest unfinalized block and walk the chain upwards until we
+	// hit the candidate's parent. For each visited block track:
+	bookKeeper := func(block *flow.Header) error {
+		blockID := block.ID()
+		payloadIndex, err := v.index.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve payload index for block %x: %w", blockID, err)
+		}
 
-			// keep track of all receipts in ancestors
-			index, err := v.index.ByBlockID(blockID)
+		// track encountered blocks
+		forkBlocks[blockID] = struct{}{}
+
+		// track encountered receipts
+		for _, recID := range payloadIndex.ReceiptIDs {
+			forkReceipts[recID] = struct{}{}
+		}
+
+		// extend execution tree
+		for _, resultID := range payloadIndex.ResultIDs {
+			result, err := v.results.ByID(resultID)
 			if err != nil {
-				return false, fmt.Errorf("could not retrieve ancestor index (%x): %w", blockID, err)
+				return fmt.Errorf("could not retrieve result %v: %w", resultID, err)
 			}
-			for _, recID := range index.ReceiptIDs {
-				forkLookup[recID] = struct{}{}
+			if _, ok := executionTree[result.PreviousResultID]; !ok {
+				// We only collect results that directly descend from the last sealed result.
+				// Because Results are listed in an order that satisfies the parent-first
+				// relationship, we can skip all results whose parent are unknown.
+				continue
 			}
-
-			return true, nil
-		})
-	if err != nil {
-		return err
+			executionTree[resultID] = result
+		}
+		return nil
 	}
+	err = state.TraverseParentFirst(v.headers, header.ParentID, sealedBlock.ID(), bookKeeper)
 
-	// results is used to keep unique execution results that were included into
-	// payload
-	results := make(map[flow.Identifier]*flow.ExecutionResult)
-
-	// check each receipt included in the payload for duplication
-	for _, receipt := range payload.Receipts {
-		result, found := results[receipt.ResultID]
-		// usually we will have many receipts for same result, let's collect results by their
-		// ids for easy lookup.
-		if !found {
-			result, err = fetchResult(receipt.ResultID)
-			if err != nil {
-				return err
-			}
-			results[receipt.ResultID] = result
-		}
-
-		// error if the receipt was already included in an other block on the
-		// fork
-		_, duplicated := forkLookup[receipt.ID()]
-		if duplicated {
-			return engine.NewInvalidInputErrorf("payload includes duplicate receipt (%x)", receipt.ID())
-		}
-		forkLookup[receipt.ID()] = struct{}{}
-
-		// if the receipt is not for a block on this fork, error
-		if _, forBlockOnFork := forkBlocks[result.BlockID]; !forBlockOnFork {
-			return engine.NewInvalidInputErrorf("payload includes receipt for block not on fork (%x)", result.BlockID)
-		}
+	if err != nil {
+		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
 
 	// first validate all results that were included into payload
 	// if one of results is invalid we fail the whole check because it could be violating
 	// parent-children relationship
-	for i, result := range candidate.Payload.Results {
-		prevResult, err := fetchResult(result.PreviousResultID)
-		if err != nil {
-			return err
+	for i, result := range payload.Results {
+		resultID := result.ID()
+
+		// check for duplicated results
+		if _, isDuplicate := executionTree[resultID]; isDuplicate {
+			return engine.NewInvalidInputErrorf("duplicate result %v at index %d", resultID, i)
 		}
 
+		// any result must extend the execution tree with root latestSealedResult
+		prevResult, extendsTree := executionTree[result.PreviousResultID]
+		if !extendsTree {
+			return engine.NewInvalidInputErrorf("results %v at index %d does not extend execution tree", resultID, i)
+		}
+
+		// result must be for block on fork
+		if _, forBlockOnFork := forkBlocks[result.BlockID]; !forBlockOnFork {
+			return engine.NewInvalidInputErrorf("results %v at index %d is for block not on fork (%x)", resultID, i, result.BlockID)
+		}
+
+		// validate result
 		err = v.validateResult(result, prevResult)
 		if err != nil {
-			return fmt.Errorf("could not validate result %v at index %d: %w", result.ID(), i, err)
+			return fmt.Errorf("could not validate result %v at index %d: %w", resultID, i, err)
+		}
+		executionTree[resultID] = result
+	}
+
+	// check receipts:
+	// * no duplicates
+	// * must commit to a result in the execution tree with root latestSealedResult,
+	//   but not latestSealedResult
+	// It's very important that we fail the whole validation if one of the receipts is invalid.
+	delete(executionTree, lastSeal.ResultID)
+	for i, receipt := range payload.Receipts {
+		receiptID := receipt.ID()
+
+		// error if the result is not part of the execution tree with root latestSealedResult
+		result, isForLegitimateResult := executionTree[receipt.ResultID]
+		if !isForLegitimateResult {
+			return engine.NewInvalidInputErrorf("receipt %v at index %d commits to unexpected result", receiptID, i)
+		}
+
+		// error if the receipt is duplicated in the fork
+		if _, isDuplicate := forkReceipts[receiptID]; isDuplicate {
+			return engine.NewInvalidInputErrorf("duplicate receipt %v at index %d", receiptID, i)
+		}
+		forkReceipts[receiptID] = struct{}{}
+
+		err = v.validateReceipt(receipt, result.BlockID)
+		if err != nil {
+			return fmt.Errorf("receipt %v at index %d failed validation: %w", receiptID, i, err)
 		}
 	}
 
-	// after results are validated we need to check if metas of receipts
-	// are valid
-	for i, r := range candidate.Payload.Receipts {
-		result := results[r.ResultID]
-		err = v.validateReceipt(r, result.BlockID)
-		if err != nil {
-			// It's very important that we fail the whole validation if one of the receipts is invalid.
-			// It allows us to make assumptions as stated in previous comment.
-			return fmt.Errorf("could not validate receipt %v at index %d: %w", r.ID(), i, err)
-		}
-	}
 	return nil
 }
 

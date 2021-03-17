@@ -379,7 +379,7 @@ func SetupMockConsensusNode(t *testing.T,
 			}
 			require.True(t, found)
 
-			// verifies proof
+			// verifies spocks
 			valid, err := crypto.SPOCKVerifyAgainstData(
 				pk,
 				resultApproval.Body.Spock,
