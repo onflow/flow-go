@@ -124,6 +124,7 @@ func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event,
 			return fmt.Errorf("cannot batch insert service event: %w", err)
 		}
 	}
+
 	callback := func() {
 		e.cache.Put(blockID, events)
 	}

@@ -1,6 +1,8 @@
 package badger
 
-import "github.com/dgraph-io/badger/v2"
+import (
+	"github.com/dgraph-io/badger/v2"
+)
 
 type Batch struct {
 	writer    *badger.WriteBatch

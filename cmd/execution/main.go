@@ -231,6 +231,11 @@ func main() {
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
+			// Needed for gRPC server, make sure to assign to main scoped vars
+			events = storage.NewEvents(node.Metrics.Cache, node.DB)
+			serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
+			txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB)
+
 			executionState = state.NewExecutionState(
 				ledgerStorage,
 				stateCommitments,
@@ -288,10 +293,6 @@ func main() {
 				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 			}
 
-			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = storage.NewEvents(node.Metrics.Cache, node.DB)
-			serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-			txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB)
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
