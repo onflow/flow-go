@@ -10,6 +10,8 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -212,6 +214,15 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 }
 
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
+
+	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
+		return fmt.Errorf("invalid account key hash algorithm: %s", publicKey.HashAlgo)
+	}
+
+	if !IsValidAccountKeySignAlgo(publicKey.SignAlgo) {
+		return fmt.Errorf("invalid account key signature algorithm: %s", publicKey.SignAlgo)
+	}
+
 	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
 		return err
@@ -223,6 +234,24 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	}
 
 	return a.setPublicKeyCount(address, count+1)
+}
+
+func IsValidAccountKeySignAlgo(algo crypto.SigningAlgorithm) bool {
+	switch algo {
+	case crypto.ECDSAP256, crypto.ECDSASecp256k1:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidAccountKeyHashAlgo(algo hash.HashingAlgorithm) bool {
+	switch algo {
+	case hash.SHA2_256, hash.SHA3_256:
+		return true
+	default:
+		return false
+	}
 }
 
 func ContractKey(contractName string) string {
