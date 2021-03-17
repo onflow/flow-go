@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -63,9 +62,8 @@ func (s *SingleVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, bl
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
 	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner)
+		return false, fmt.Errorf("duplicate or invalid signer IDs in QC for block %x: %w", block.BlockID, model.ErrInvalidSigner)
 	}
-	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
 	// create the message we verify against and check signature
 	msg := makeVoteMessage(block.View, block.BlockID)

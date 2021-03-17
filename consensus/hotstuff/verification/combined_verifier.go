@@ -7,8 +7,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedVerifier is a verifier capable of verifying two signatures for each
@@ -39,7 +39,7 @@ func NewCombinedVerifier(committee hotstuff.Committee, staking module.Aggregatin
 	return c
 }
 
-// VerifyVote verifies the validity of a combined signature on a vote.
+// VerifyVote verifies the validity of a combined signature from a vote.
 func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the to-be-signed message
@@ -58,19 +58,10 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	}
 
 	// split the two signatures from the vote
-	splitSigs, err := c.merger.Split(sigData)
+	stakingSig, beaconShare, err := c.merger.Split(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
+		return false, fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
 	}
-
-	// check if we have two signature
-	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("wrong number of combined signatures: %w", ErrInvalidFormat)
-	}
-
-	// assign the signtures
-	stakingSig := splitSigs[0]
-	beaconShare := splitSigs[1]
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -84,30 +75,36 @@ func (c *CombinedVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, b
 	}
 
 	// verify each signature against the message
+	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := c.staking.Verify(msg, stakingSig, signer.StakingPubKey)
 	if err != nil {
-		return false, fmt.Errorf("could not verify staking signature: %w", err)
+		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+	}
+	if !stakingValid {
+		return false, nil
 	}
 	beaconValid, err := c.beacon.Verify(msg, beaconShare, beaconPubKey)
 	if err != nil {
-		return false, fmt.Errorf("could not verify beacon signature: %w", err)
+		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
 
-	return stakingValid && beaconValid, nil
+	return beaconValid, nil
 }
 
-// VerifyQC verifies the validity of a combined signature on a quorum certificate.
+// VerifyQC verifies the validity of a combined signature from a quorum certificate.
 func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+	// TODO: The lookup votersID to identities is done in ValidatQC just before calling
+	// VerifyQC. Why not passing Identities to VerifyQC?
 
 	// get the full Identities of the signers
 	signers, err := c.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...))
 	if err != nil {
 		return false, fmt.Errorf("could not get signer identities: %w", err)
 	}
-	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("some signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner)
+	if len(signers) != len(voterIDs) { // check we have valid consensus member Identities for all signers
+		return false, fmt.Errorf("some signers are not valid consensus participants, or some signers are duplicate, at block %x: %w",
+			block.BlockID, model.ErrInvalidSigner)
 	}
-	signers = signers.Order(order.ByReferenceOrder(voterIDs)) // re-arrange Identities into the same order as in voterIDs
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
@@ -115,30 +112,28 @@ func (c *CombinedVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, 
 	}
 
 	// split the aggregated staking & beacon signatures
-	splitSigs, err := c.merger.Split(sigData)
+	stakingAggSig, beaconThresSig, err := c.merger.Split(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", ErrInvalidFormat)
+		return false, fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
 	}
 
-	// check we have the right amount of split sigs
-	if len(splitSigs) != 2 {
-		return false, fmt.Errorf("invalid number of split signatures: %w", ErrInvalidFormat)
-	}
-
-	// assign the signatures
-	stakingAggSig := splitSigs[0]
-	beaconThresSig := splitSigs[1]
-
-	// verify the aggregated staking signature first
 	msg := makeVoteMessage(block.View, block.BlockID)
-	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
-	if err != nil {
-		return false, fmt.Errorf("could not verify staking signature: %w", err)
-	}
+	// TODO: verify if batch verification is faster
+
+	// verify the beacon signature first
 	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkg.GroupKey())
 	if err != nil {
-		return false, fmt.Errorf("could not verify beacon signature: %w", err)
+		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
-
-	return stakingValid && beaconValid, nil
+	if !beaconValid {
+		return false, nil
+	}
+	// verify the aggregated staking signature next (more costly)
+	// TODO: eventually VerifyMany will be replaced by Verify from Verifier
+	// TODO: the agg public key would be computed outside verify() based on the delta
+	stakingValid, err := c.staking.VerifyMany(msg, stakingAggSig, signers.StakingKeys())
+	if err != nil {
+		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+	}
+	return stakingValid, nil
 }
