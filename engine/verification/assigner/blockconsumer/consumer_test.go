@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -44,10 +43,10 @@ func TestProduceConsume(t *testing.T) {
 			received = append(received, block)
 		}
 
-		WithConsumer(t, 10, neverFinish, func(consumer *BlockConsumer, blocks storage.Blocks, chain []*flow.Block) {
+		WithConsumer(t, 10, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
 			<-consumer.Ready()
 
-			for i := 0; i < len(chain); i++ {
+			for i := 0; i < len(blocks); i++ {
 				consumer.OnFinalizedBlock(&model.Block{})
 			}
 
@@ -55,7 +54,7 @@ func TestProduceConsume(t *testing.T) {
 
 			// expect the mock engine receive only the first 3 calls (since it is blocked on those, hence no
 			// new block is fetched to process).
-			require.Equal(t, chain[:3], received)
+			require.Equal(t, blocks[:3], received)
 		})
 
 	})
@@ -66,7 +65,7 @@ func WithConsumer(
 	t *testing.T,
 	blockCount int,
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
-	withConsumer func(*BlockConsumer, storage.Blocks, []*flow.Block),
+	withConsumer func(*BlockConsumer, []*flow.Block),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
@@ -110,7 +109,7 @@ func WithConsumer(
 			blocks = append(blocks, result.ContainerBlock)
 		}
 
-		withConsumer(consumer, s.Storage.Blocks, blocks)
+		withConsumer(consumer, blocks)
 	})
 }
 
