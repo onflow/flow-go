@@ -179,11 +179,19 @@ func WithoutSeals(payload *flow.Payload) {
 	payload.Seals = nil
 }
 
-func BlockWithParentFixture(parent *flow.Header) flow.Block {
+func WithoutGuarantee(payload *flow.Payload) {
+	payload.Guarantees = nil
+}
+
+func BlockWithParentFixture(parent *flow.Header, options ...func(*flow.Payload)) flow.Block {
 	payload := PayloadFixture(WithoutSeals)
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
 	header.Height = parent.Height + 1
+	for _, apply := range options {
+		apply(payload)
+	}
+
 	return flow.Block{
 		Header:  &header,
 		Payload: payload,
