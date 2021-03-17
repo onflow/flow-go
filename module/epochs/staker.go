@@ -28,10 +28,14 @@ func NewSealedStateStaker(log zerolog.Logger, state protocol.State, local module
 }
 
 func (s *SealedStateStaker) AmIStakedAt(blockID flow.Identifier) bool {
-	staked, err := protocol.IsNodeStakedAtBlockID(s.state, blockID, s.local.NodeID())
+
+	identity, err := s.state.AtBlockID(blockID).Identity(s.local.NodeID())
 	if err != nil {
-		s.log.Warn().Err(err).Hex("block_id", logging.ID(blockID)).Msgf("cannot check is node is staked at block")
+		s.log.Warn().Err(err).Hex("block_id", logging.ID(blockID)).Msgf("could not retrieve my own identity while checking for being staked")
 		return false
 	}
+
+	staked := identity.Stake > 0
+
 	return staked
 }

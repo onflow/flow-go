@@ -252,7 +252,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 
 	mocked.ReturnArguments = mock.Arguments{nil}
 
-
 	broadcastMock := ctx.providerEngine.
 		On(
 			"BroadcastExecutionReceipt",
@@ -592,9 +591,11 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		commits[blocks["A"].Block.Header.ParentID] = blocks["A"].StartState
 
 		wg := sync.WaitGroup{}
-		ctx.mockStateCommitsWithMap(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
+		ctx.mockStateCommitsWithMap(commits)
+
+		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
-		})
+		}
 
 		// make sure the seal height won't trigger state syncing, so that all blocks
 		// will be executed.
@@ -606,10 +607,10 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 			Staked: true,
 		}
 
-		ctx.assertSuccessfulBlockComputation(blocks["A"], unittest.IdentifierFixture(), true)
-		ctx.assertSuccessfulBlockComputation(blocks["B"], unittest.IdentifierFixture(), false)
-		ctx.assertSuccessfulBlockComputation(blocks["C"], unittest.IdentifierFixture(), true)
-		ctx.assertSuccessfulBlockComputation(blocks["D"], unittest.IdentifierFixture(), false)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["C"], unittest.IdentifierFixture(), true)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), false)
 
 		wg.Add(1)
 		ctx.staker.Staked = true
