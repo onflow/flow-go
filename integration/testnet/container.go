@@ -38,6 +38,7 @@ type ContainerConfig struct {
 	LogLevel        zerolog.Level
 	Ghost           bool
 	AdditionalFlags []string
+	Debug           bool
 }
 
 // ImageName returns the Docker image name for the given config.
@@ -45,7 +46,11 @@ func (c *ContainerConfig) ImageName() string {
 	if c.Ghost {
 		return defaultRegistry + "/ghost:latest"
 	}
-	return fmt.Sprintf("%s/%s:latest", defaultRegistry, c.Role.String())
+	debugSuffix := ""
+	if c.Debug {
+		debugSuffix = "-debug"
+	}
+	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), debugSuffix)
 }
 
 // Container represents a test Docker container for a generic Flow node.

@@ -16,18 +16,29 @@ import (
 )
 
 const (
-	KeyExists         = "exists"
-	KeyCode           = "code"
-	KeyContractNames  = "contract_names"
-	KeyPublicKeyCount = "public_key_count"
-	KeyStorageUsed    = "storage_used"
-	uint64StorageSize = 8
+	KeyExists             = "exists"
+	KeyCode               = "code"
+	KeyContractNames      = "contract_names"
+	KeyPublicKeyCount     = "public_key_count"
+	KeyStorageUsed        = "storage_used"
+	KeyAccountFrozen      = "frozen"
+	uint64StorageSize     = 8
+	AccountFrozenValue    = 1
+	AccountNotFrozenValue = 0
 )
 
 var (
 	ErrAccountNotFound          = errors.New("account not found")
 	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
 )
+
+type AccountFrozenError struct {
+	Address flow.Address
+}
+
+func (e *AccountFrozenError) Error() string {
+	return fmt.Sprintf("account %s is frozen", e.Address)
+}
 
 func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
@@ -550,6 +561,41 @@ func readUint64(input []byte) (value uint64, rest []byte, err error) {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint64", len(input))
 	}
 	return binary.BigEndian.Uint64(input[:8]), input[8:], nil
+}
+
+func (a *Accounts) GetAccountFrozen(address flow.Address) (bool, error) {
+	frozen, err := a.getValue(address, false, KeyAccountFrozen)
+	if err != nil {
+		return false, newLedgerGetError(KeyAccountFrozen, address, err)
+	}
+
+	if len(frozen) == 0 {
+		return false, err
+	}
+
+	return frozen[0] != AccountNotFrozenValue, nil
+}
+
+func (a *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
+
+	val := make([]byte, 1) //zero value for byte is 0
+	if frozen {
+		val[0] = AccountFrozenValue
+	}
+
+	return a.setValue(address, false, KeyAccountFrozen, val)
+}
+
+// handy function to error out if account is frozen
+func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
+	frozen, err := a.GetAccountFrozen(address)
+	if err != nil {
+		return fmt.Errorf("cannot check acount freeze status: %w", err)
+	}
+	if frozen {
+		return &AccountFrozenError{Address: address}
+	}
+	return nil
 }
 
 // contractNames container for a list of contract names. Should always be sorted.
