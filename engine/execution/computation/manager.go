@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,18 +21,18 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger, *fvm.Programs) error
-	GetAccount(fvm.Context, flow.Address, state.Ledger, *fvm.Programs) (*flow.Account, error)
+	Run(fvm.Context, fvm.Procedure, state.View, *fvm.Programs) error
+	GetAccount(fvm.Context, flow.Address, state.View, *fvm.Programs) (*flow.Account, error)
 }
 
 type ComputationManager interface {
-	ExecuteScript([]byte, [][]byte, *flow.Header, *delta.View) ([]byte, error)
+	ExecuteScript([]byte, [][]byte, *flow.Header, state.View) ([]byte, error)
 	ComputeBlock(
 		ctx context.Context,
 		block *entity.ExecutableBlock,
-		view *delta.View,
+		view state.View,
 	) (*execution.ComputationResult, error)
-	GetAccount(addr flow.Address, header *flow.Header, view *delta.View) (*flow.Account, error)
+	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
 }
 
 // Manager manages computation and execution
@@ -97,7 +96,7 @@ func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *fvm.Programs
 	return programs.ChildPrograms()
 }
 
-func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view *delta.View) ([]byte, error) {
+func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view state.View) ([]byte, error) {
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 
 	script := fvm.Script(code).WithArguments(arguments...)
@@ -143,7 +142,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 func (e *Manager) ComputeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	view *delta.View,
+	view state.View,
 ) (*execution.ComputationResult, error) {
 
 	e.log.Debug().
@@ -185,7 +184,7 @@ func (e *Manager) ComputeBlock(
 	return result, nil
 }
 
-func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view *delta.View) (*flow.Account, error) {
+func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())

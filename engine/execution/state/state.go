@@ -83,7 +83,7 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
 }
 
 const (
@@ -102,24 +102,11 @@ type state struct {
 	chunkDataPacks     storage.ChunkDataPacks
 	results            storage.ExecutionResults
 	receipts           storage.ExecutionReceipts
+	myReceipts         storage.MyExecutionReceipts
 	events             storage.Events
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
-}
-
-func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
-
-	err := s.results.Store(executionResult)
-	if err != nil {
-		return fmt.Errorf("could not store result: %w", err)
-	}
-
-	err = s.results.Index(executionResult.BlockID, executionResult.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution result: %w", err)
-	}
-	return nil
 }
 
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
@@ -140,6 +127,7 @@ func NewExecutionState(
 	chunkDataPacks storage.ChunkDataPacks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
+	myReceipts storage.MyExecutionReceipts,
 	events storage.Events,
 	serviceEvents storage.ServiceEvents,
 	transactionResults storage.TransactionResults,
@@ -156,6 +144,7 @@ func NewExecutionState(
 		chunkDataPacks:     chunkDataPacks,
 		results:            results,
 		receipts:           receipts,
+		myReceipts:         myReceipts,
 		events:             events,
 		serviceEvents:      serviceEvents,
 		transactionResults: transactionResults,
@@ -198,7 +187,19 @@ func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
 }
 
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
+
+	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
+
 	return func(owner, controller, key string) (flow.RegisterValue, error) {
+		regID := flow.RegisterID{
+			Owner:      owner,
+			Controller: controller,
+			Key:        key,
+		}
+
+		if value, ok := readCache[regID]; ok {
+			return value.Value, nil
+		}
 
 		query, err := makeSingleValueQuery(commitment, owner, controller, key)
 
@@ -215,6 +216,9 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 		if len(values) == 0 {
 			return nil, nil
 		}
+
+		// don't cache value with len zero
+		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
 
 		return values[0], nil
 	}
@@ -316,15 +320,6 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) PersistStateCommitment(ctx context.Context, blockID flow.Identifier, commit flow.StateCommitment) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
-		defer span.Finish()
-	}
-
-	return s.commits.Store(blockID, commit)
-}
-
 func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	defer span.Finish()
@@ -345,35 +340,7 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistExecutionResult)
-		defer span.Finish()
-	}
-
-	err := s.receipts.Store(receipt)
-	if err != nil {
-		return fmt.Errorf("could not persist execution result: %w", err)
-	}
-	// TODO if the second operation fails we should remove stored execution result
-	// This is global execution storage problem - see TODO at the top
-	err = s.receipts.Index(receipt.ExecutionResult.BlockID, receipt.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution receipt: %w", err)
-	}
-	return nil
-}
-
-func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateInteractions)
-		defer span.Finish()
-	}
-
-	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
-}
-
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
 
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -414,6 +381,8 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
 
+	executionResult := &executionReceipt.ExecutionResult
+
 	err = s.transactionResults.BatchStore(blockID, results, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
@@ -433,6 +402,12 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	err = batch.Flush()
 	if err != nil {
 		return fmt.Errorf("batch flush error: %w", err)
+	}
+
+	// TODO: move to the same batch write
+	err = s.myReceipts.StoreMyReceipt(executionReceipt)
+	if err != nil {
+		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	//outside batch because it requires read access
