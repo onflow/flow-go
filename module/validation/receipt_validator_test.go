@@ -213,6 +213,7 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid receipt")
+	s.Assert().True(engine.IsUnverifiableInputError(err), err)
 }
 
 // TestReceiptInvalidPreviousResult tests that we reject receipt with invalid previous result
@@ -236,6 +237,8 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 	s.Assert().True(engine.IsInvalidInputError(err), err)
 }
 
+// TestReceiptInvalidResultChain tests that we reject receipts,
+// where the start state does not match the parent result's end state
 func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 	valSubgrph := s.ValidSubgraphFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
@@ -256,9 +259,13 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 	s.Assert().True(engine.IsInvalidInputError(err), err)
 }
 
-// say B(A) means block B has receipt for A:
-// we have such chain in storage: G <- A <- B(A) <- C
-// if a block payload contains (B,C), they should be valid.
+// TestMultiReceiptValidResultChain tests that multiple within one block payload
+// are accepted, where the receipts are building on top of each other
+// (i.e. their results form a chain).
+// Say B(A) means block B has receipt for A:
+// * we have such chain in storage: G <- A <- B(A) <- C
+// * if a child block of C payload contains receipts and results for (B,C)
+//   it should be accepted as valid
 func (s *ReceiptValidationSuite) TestMultiReceiptValidResultChain() {
 	// assuming signatures are all good
 	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
@@ -405,7 +412,7 @@ func (s *ReceiptValidationSuite) TestValidationReceiptsForSealedBlock() {
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 	err = s.receiptValidator.ValidatePayload(&block6)
-	require.Nil(s.T(), err)
+	require.NoError(s.T(), err)
 }
 
 // Test that validator will accept payloads with receipts that are referring execution results
@@ -453,33 +460,47 @@ func (s *ReceiptValidationSuite) TestValidationReceiptForIncorporatedResult() {
 	require.NoError(s.T(), err)
 }
 
-// Test that validator will refuse payloads that contain receipts that contain
-// execution result which wasn't incorporated into fork or present in payload.
+// TestValidationReceiptWithoutIncorporatedResult verifies that receipts must commit
+// to results that are included in the respective fork. Specifically, we test that
+// the counter-example is rejected:
+//  * we have the chain in storage: G <- A <- B
+//                                        ^- C(Result[A], ReceiptMeta[A])
+//    here, block C contains the result _and_ the receipt Meta-data for block A
+//  * now receive the new block X: G <- A <- B <- X(ReceiptMeta[A])
+//    Note that X only contains the receipt for A, but _not_ the result.
+// Block X must be considered invalid, because confirming validity of
+// ReceiptMeta[A] requires information _not_ included in the fork.
 func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult() {
 	// assuming signatures are all good
 	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	// create block2
-	block2 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
-	block2.SetPayload(flow.Payload{})
-	s.Extend(&block2)
+	// create block A
+	blockA := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header) // for block G, we use the LatestSealedBlock
+	s.Extend(&blockA)
 
-	executionResult := unittest.ExecutionResultFixture(unittest.WithBlock(&block2),
-		unittest.WithPreviousResult(*s.LatestExecutionResult))
-	receipt := unittest.ExecutionReceiptFixture(
-		unittest.WithResult(executionResult),
-		unittest.WithExecutorID(s.ExeID))
+	// result for A; and receipt for A
+	resultA := unittest.ExecutionResultFixture(unittest.WithBlock(&blockA), unittest.WithPreviousResult(*s.LatestExecutionResult))
+	receiptA := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA), unittest.WithExecutorID(s.ExeID))
 
-	// B1<--B2<--B3{R{B2)}<--B4{(R'(B2))}
-
-	// create block3 with a receipt for block2
-	block3 := unittest.BlockWithParentFixture(block2.Header)
-	block3.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+	// create block B and block C
+	blockB := unittest.BlockWithParentFixture(blockA.Header)
+	blockC := unittest.BlockWithParentFixture(blockA.Header)
+	blockC.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receiptA.Meta()},
+		Results:  []*flow.ExecutionResult{resultA},
 	})
-	err := s.receiptValidator.ValidatePayload(&block3)
+	s.Extend(&blockB)
+	s.Extend(&blockC)
+
+	// create block X:
+	blockX := unittest.BlockWithParentFixture(blockB.Header)
+	blockX.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receiptA.Meta()},
+	})
+
+	err := s.receiptValidator.ValidatePayload(&blockX)
 	require.Error(s.T(), err)
-	require.True(s.T(), engine.IsUnverifiableInputError(err), err)
+	require.True(s.T(), engine.IsInvalidInputError(err), err)
 }
 
 // Test that validator will reject payloads that contain receipts for blocks that
