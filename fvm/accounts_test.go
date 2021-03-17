@@ -728,7 +728,7 @@ func TestAddAccountKey(t *testing.T) {
 
 			t.Run(hashAlgo,
 				newVMTest().withContextOptions(options...).
-					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 						address := createAccount(t, vm, chain, ctx, view, programs)
 
 						privateKey, err := unittest.AccountKeyDefaultFixture()
@@ -781,7 +781,7 @@ func TestAddAccountKey(t *testing.T) {
 
 			t.Run(signingAlgo,
 				newVMTest().withContextOptions(options...).
-					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 						address := createAccount(t, vm, chain, ctx, view, programs)
 
 						privateKey, err := unittest.AccountKeyFixture(
@@ -955,7 +955,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Key added by a different api version %s", test.apiVersion),
 			newVMTest().withContextOptions(options...).
-				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+				run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 					address := createAccount(t, vm, chain, ctx, view, programs)
 
 					const keyCount = 2
@@ -1074,7 +1074,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Non-existent key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
@@ -1110,7 +1110,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Existing key",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
@@ -1160,7 +1160,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Key added by a different api version",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
@@ -1212,7 +1212,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Run("Multiple keys",
 		newVMTest().withContextOptions(options...).
-			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				address := createAccount(t, vm, chain, ctx, view, programs)
 
 				const keyCount = 2
