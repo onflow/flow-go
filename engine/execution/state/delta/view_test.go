@@ -392,10 +392,15 @@ func TestView_MergeView(t *testing.T) {
 		reads := v.Interactions().Reads
 
 		require.Len(t, reads, 3)
-		assert.ElementsMatch(t, []flow.RegisterID{
-			flow.NewRegisterID(registerID1, "", ""),
-			flow.NewRegisterID(registerID2, "", ""),
-			flow.NewRegisterID(registerID3, "", ""),
+
+		r1 := flow.NewRegisterID(registerID1, "", "")
+		r2 := flow.NewRegisterID(registerID2, "", "")
+		r3 := flow.NewRegisterID(registerID3, "", "")
+
+		assert.Equal(t, map[string]flow.RegisterID{
+			r1.String(): r1,
+			r2.String(): r2,
+			r3.String(): r3,
 		}, reads)
 	})
 
@@ -545,9 +550,13 @@ func TestView_Reads(t *testing.T) {
 
 		touches := v.Interactions().Reads
 		require.Len(t, touches, 2)
-		assert.ElementsMatch(t, []flow.RegisterID{
-			flow.NewRegisterID(registerID1, "", ""),
-			flow.NewRegisterID(registerID2, "", ""),
+
+		r1 := flow.NewRegisterID(registerID1, "", "")
+		r2 := flow.NewRegisterID(registerID2, "", "")
+
+		assert.Equal(t, map[string]flow.RegisterID{
+			r1.String(): r1,
+			r2.String(): r2,
 		}, touches)
 	})
 }

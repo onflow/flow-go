@@ -187,6 +187,11 @@ func TestExecutionFlow(t *testing.T) {
 	// check that the block has been executed.
 	exeNode.AssertHighestExecutedBlock(t, block.Header)
 
+	myReceipt, err := exeNode.MyExecutionReceipts.MyReceipt(block.ID())
+	require.NoError(t, err)
+	require.NotNil(t, myReceipt)
+	require.Equal(t, exeNode.Me.NodeID(), myReceipt.ExecutorID)
+
 	providerEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)

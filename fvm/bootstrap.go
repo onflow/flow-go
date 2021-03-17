@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -19,7 +20,7 @@ type BootstrapProcedure struct {
 	vm       *VirtualMachine
 	ctx      Context
 	sth      *state.StateHolder
-	programs *Programs
+	programs *programs.Programs
 	accounts *state.Accounts
 
 	// genesis parameters
@@ -105,7 +106,7 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *Programs) error {
+func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
 	b.sth = sth

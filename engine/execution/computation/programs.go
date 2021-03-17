@@ -5,7 +5,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -25,14 +25,14 @@ func NewProgramsCache(size uint) (*ProgramsCache, error) {
 	}, nil
 }
 
-func (pc *ProgramsCache) Get(blockID flow.Identifier) *fvm.Programs {
+func (pc *ProgramsCache) Get(blockID flow.Identifier) *programs.Programs {
 	get, ok := pc.cache.Get(blockID)
 	if !ok {
 		return nil
 	}
-	return get.(*fvm.Programs)
+	return get.(*programs.Programs)
 }
 
-func (pc *ProgramsCache) Set(blockId flow.Identifier, programs *fvm.Programs) {
+func (pc *ProgramsCache) Set(blockId flow.Identifier, programs *programs.Programs) {
 	pc.cache.Add(blockId, programs)
 }
