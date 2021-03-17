@@ -31,6 +31,9 @@ func (p *Payload) MarshalJSON() ([]byte, error) {
 	if len(dup.Seals) == 0 {
 		dup.Seals = nil
 	}
+	if len(dup.Results) == 0 {
+		dup.Results = nil
+	}
 
 	return json.Marshal(dup)
 }
@@ -40,7 +43,8 @@ func (p Payload) Hash() Identifier {
 	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
 	sealHash := MerkleRoot(GetIDs(p.Seals)...)
 	recHash := MerkleRoot(GetIDs(p.Receipts)...)
-	return ConcatSum(collHash, sealHash, recHash)
+	resHash := MerkleRoot(GetIDs(p.Results)...)
+	return ConcatSum(collHash, sealHash, recHash, resHash)
 }
 
 // Index returns the index for the payload.
