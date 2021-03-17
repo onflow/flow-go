@@ -10,16 +10,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ContractUpdateKey struct {
-	address flow.Address
-	name    string
-}
-
-type ContractUpdate struct {
-	ContractUpdateKey
-	Code []byte
-}
-
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
 type Procedure interface {
 	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
