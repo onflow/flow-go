@@ -1,5 +1,9 @@
 package flow
 
+import (
+	"encoding/json"
+)
+
 // Payload is the actual content of each block.
 type Payload struct {
 	Guarantees []*CollectionGuarantee
@@ -11,6 +15,24 @@ type Payload struct {
 // EmptyPayload returns an empty block payload.
 func EmptyPayload() Payload {
 	return Payload{}
+}
+
+// JSONMarshal defines the JSON marshalling for block payloads. Enforce a
+// consistent representation for empty slices.
+func (p *Payload) MarshalJSON() ([]byte, error) {
+	dup := *p // copy p
+
+	if len(dup.Guarantees) == 0 {
+		dup.Guarantees = nil
+	}
+	if len(dup.Receipts) == 0 {
+		dup.Receipts = nil
+	}
+	if len(dup.Seals) == 0 {
+		dup.Seals = nil
+	}
+
+	return json.Marshal(dup)
 }
 
 // Hash returns the root hash of the payload.

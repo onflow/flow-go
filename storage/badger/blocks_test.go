@@ -51,6 +51,7 @@ func TestBlockStoreAndRetrieve(t *testing.T) {
 		// verify after storing a block should be able to retrieve it back
 		blocks := badgerstorage.InitAll(cacheMetrics, db).Blocks
 		block := unittest.FullBlockFixture()
+		block.SetPayload(unittest.PayloadFixture(unittest.WithAllTheFixins))
 
 		err := blocks.Store(&block)
 		require.NoError(t, err)
