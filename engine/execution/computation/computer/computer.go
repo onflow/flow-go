@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -22,12 +23,12 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.View, *fvm.Programs) error
+	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *fvm.Programs) (*execution.ComputationResult, error)
+	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -70,7 +71,7 @@ func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	program *fvm.Programs,
+	program *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
 	if e.tracer != nil {
@@ -98,7 +99,7 @@ func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	stateView state.View,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
@@ -194,7 +195,7 @@ func (e *blockComputer) executeCollection(
 	txIndex uint32,
 	blockCtx fvm.Context,
 	collectionView state.View,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 
@@ -255,7 +256,7 @@ func (e *blockComputer) executeTransaction(
 	colSpan opentracing.Span,
 	txMetrics *fvm.MetricsCollector,
 	collectionView state.View,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 	ctx fvm.Context,
 	txIndex uint32,
 ) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {

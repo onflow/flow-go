@@ -18,6 +18,7 @@ import (
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -35,6 +36,7 @@ type hostEnv struct {
 	vm                 *VirtualMachine
 	accounts           *state.Accounts
 	contracts          *handler.ContractHandler
+	programs           *handler.ProgramsHandler
 	addressGenerator   flow.AddressGenerator
 	uuidGenerator      *state.UUIDGenerator
 	metrics            runtime.Metrics
@@ -45,10 +47,9 @@ type hostEnv struct {
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
-	programs           *Programs
 }
 
-func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *Programs) (*hostEnv, error) {
+func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) (*hostEnv, error) {
 	accounts := state.NewAccounts(sth)
 	generator, err := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	if err != nil {
@@ -61,6 +62,10 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 
 	uuidGenerator := state.NewUUIDGenerator(sth)
 
+	programsHandler := handler.NewProgramsHandler(
+		programs, sth,
+	)
+
 	env := &hostEnv{
 		ctx:                ctx,
 		sth:                sth,
@@ -71,7 +76,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
-		programs:           programs,
+		programs:           programsHandler,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -192,7 +197,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 		e.ctx,
 		script,
 		e.sth.State().View(),
-		e.programs,
+		e.programs.Programs,
 	)
 	if err != nil {
 		return 0, err
@@ -225,7 +230,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 		e.ctx,
 		script,
 		e.sth.State().View(),
-		e.programs,
+		e.programs.Programs,
 	)
 	if err != nil {
 		return 0, err
@@ -342,24 +347,25 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 		defer sp.Finish()
 	}
 
-	program := e.programs.Get(location)
-	if program != nil {
-		// Program was found, do an explicit ledger register touch
-		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(common.AddressLocation); ok {
-			address := flow.BytesToAddress(addressLocation.Address.Bytes())
+	if addressLocation, ok := location.(common.AddressLocation); ok {
+		address := flow.BytesToAddress(addressLocation.Address.Bytes())
 
-			freezeError := e.accounts.CheckAccountNotFrozen(address)
+		freezeError := e.accounts.CheckAccountNotFrozen(address)
 
-			if freezeError != nil {
-				return nil, freezeError
-			}
-
-			e.accounts.TouchContract(addressLocation.Name, address)
+		if freezeError != nil {
+			return nil, freezeError
 		}
 	}
 
-	return program, nil
+	program, has := e.programs.Get(location)
+	if has {
+		return program, nil
+	}
+
+	return nil, nil
+}
+
+	return nil, nil
 }
 
 func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
@@ -368,9 +374,7 @@ func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Prog
 		defer sp.Finish()
 	}
 
-	e.programs.Set(location, program)
-
-	return nil
+	return e.programs.Set(location, program)
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
@@ -833,7 +837,7 @@ func (e *hostEnv) ValueDecoded(duration time.Duration) {
 	e.metrics.ValueDecoded(duration)
 }
 
-func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
+func (e *hostEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	// commit changes and return a list of updated keys
 	return e.contracts.Commit()
 }
@@ -843,7 +847,7 @@ type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
 	sth              *state.StateHolder
-	programs         *Programs
+	programs         *handler.ProgramsHandler
 	accounts         *state.Accounts
 	contracts        *handler.ContractHandler
 	addressGenerator flow.AddressGenerator
@@ -858,7 +862,7 @@ func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
 	sth *state.StateHolder,
-	programs *Programs,
+	programs *handler.ProgramsHandler,
 	accounts *state.Accounts,
 	contracts *handler.ContractHandler,
 	addressGenerator flow.AddressGenerator,
@@ -924,7 +928,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
 			e.sth,
-			e.programs,
+			e.programs.Programs,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202

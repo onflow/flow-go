@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
@@ -32,7 +33,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NoError(t, err)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
