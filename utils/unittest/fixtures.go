@@ -1185,12 +1185,6 @@ func ReceiptChainFor(blocks []*flow.Block, result0 *flow.ExecutionResult) []*flo
 // so that all the blocks are connected.
 // blocks' height have to be in strict increasing order.
 func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.ExecutionReceipt) {
-	blocks[0].Header.PayloadHash = blocks[0].Payload.Hash()
-	receipts[0].ExecutionResult.BlockID = blocks[0].ID()
-	for _, chunk := range receipts[0].ExecutionResult.Chunks {
-		chunk.BlockID = blocks[0].ID()
-	}
-
 	for i := 1; i < len(blocks); i++ {
 		b := blocks[i]
 		p := i - 1

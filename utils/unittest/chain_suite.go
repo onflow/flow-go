@@ -320,7 +320,8 @@ func (bc *BaseChainSuite) SetupChain() {
 	)
 
 	bc.SealsIndex = make(map[flow.Identifier]*flow.Seal)
-	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.Header))
+	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.Header),
+		Seal.WithResult(bc.LatestExecutionResult))
 	for id, block := range bc.Blocks {
 		if id != bc.RootBlock.ID() {
 			bc.SealsIndex[block.ID()] = firtSeal

@@ -8,9 +8,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/model/flow/filter/id"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
@@ -373,10 +372,10 @@ type InsertableReceipts struct {
 }
 
 // getInsertableReceipts constructs:
-//  (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta) 
+//  (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
 //       that should be inserted in the next payload
 //  (ii) the ExecutionResults the receipts from step (i) commit to
-//       (deduplicated w.r.t. the block under construction as well as ancestor blocks) 
+//       (deduplicated w.r.t. the block under construction as well as ancestor blocks)
 // It looks in the receipts mempool and applies the following filter:
 //
 // 1) If it doesn't correspond to an unsealed block on the fork, skip it.
