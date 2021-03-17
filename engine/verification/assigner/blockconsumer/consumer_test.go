@@ -1,15 +1,14 @@
 package blockconsumer
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/engine/verification/assigner"
-	mockassigner "github.com/onflow/flow-go/engine/verification/assigner/mock"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -36,16 +35,37 @@ func TestBlockToJob(t *testing.T) {
 // 3. pushing 100 jobs concurrently, could end up having 100
 // jobs processed by the consumer
 func TestProduceConsume(t *testing.T) {
-	withConsumer := func(*BlockConsumer, storage.Blocks, []*flow.Block) {}
-	processor := &mockassigner.FinalizedBlockProcessor{}
-	processor.On("WithBlockConsumerNotifier", mock.Anything).Return()
-	WithConsumer(t, 1, processor, withConsumer)
+	t.Run("pushing 10 blocks, receives 3", func(t *testing.T) {
+		received := make([]*flow.Block, 0)
+		lock := &sync.Mutex{}
+		neverFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
+			lock.Lock()
+			defer lock.Unlock()
+			received = append(received, block)
+		}
+
+		WithConsumer(t, 10, neverFinish, func(consumer *BlockConsumer, blocks storage.Blocks, chain []*flow.Block) {
+			<-consumer.Ready()
+
+			for i := 0; i < len(chain); i++ {
+				consumer.OnFinalizedBlock(&model.Block{})
+			}
+
+			<-consumer.Done()
+
+			// expect the mock engine receive only the first 3 calls (since it is blocked on those, hence no
+			// new block is fetched to process).
+			require.Equal(t, chain[:3], received)
+		})
+
+	})
+
 }
 
 func WithConsumer(
 	t *testing.T,
 	blockCount int,
-	blockProcessor assigner.FinalizedBlockProcessor,
+	process func(notifier module.ProcessingNotifier, block *flow.Block),
 	withConsumer func(*BlockConsumer, storage.Blocks, []*flow.Block),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -57,11 +77,15 @@ func WithConsumer(
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		s := testutil.CompleteStateFixture(t, collector, tracer, participants)
 
+		engine := &MockAssignerEngine{
+			process: process,
+		}
+
 		consumer, _, err := NewBlockConsumer(unittest.Logger(),
 			processedHeight,
 			s.Storage.Blocks,
 			s.State,
-			blockProcessor,
+			engine,
 			maxProcessing)
 		require.NoError(t, err)
 
@@ -88,4 +112,17 @@ func WithConsumer(
 
 		withConsumer(consumer, s.Storage.Blocks, blocks)
 	})
+}
+
+type MockAssignerEngine struct {
+	notifier module.ProcessingNotifier
+	process  func(module.ProcessingNotifier, *flow.Block)
+}
+
+func (e *MockAssignerEngine) ProcessFinalizedBlock(block *flow.Block) {
+	e.process(e.notifier, block)
+}
+
+func (e *MockAssignerEngine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
+	e.notifier = notifier
 }

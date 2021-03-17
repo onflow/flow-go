@@ -63,7 +63,7 @@ func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
 	c.consumer.NotifyJobIsDone(jobID)
 }
 
-func (c *BlockConsumer) OnFinalizedBlock(block *model.Block) {
+func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
 	c.consumer.Check()
 }
 
