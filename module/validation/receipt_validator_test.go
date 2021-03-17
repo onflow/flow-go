@@ -219,12 +219,13 @@ func (s *ReceiptValidationSuite) TestReceiptNoPreviousResult() {
 // TestReceiptInvalidPreviousResult tests that we reject receipt with invalid previous result
 func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 	valSubgrph := s.ValidSubgraphFixture()
-	// invalidate prev execution result blockID, this should fail because
-	// prev result points to wrong block
-	valSubgrph.PreviousResult.BlockID = unittest.IdentifierFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	// invalidate prev execution result blockID, this should fail because
+	// prev result points to wrong block
+	valSubgrph.PreviousResult.BlockID = unittest.IdentifierFixture()
 
 	s.verifier.On("Verify",
 		mock.Anything,
@@ -240,12 +241,13 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 // where the start state does not match the parent result's end state
 func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 	valSubgrph := s.ValidSubgraphFixture()
-	// invalidate prev execution result blockID, this should fail because
-	// prev result points to wrong block
-	valSubgrph.PreviousResult.Chunks[len(valSubgrph.Result.Chunks)-1].EndState = unittest.StateCommitmentFixture()
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(valSubgrph.Result))
 	s.AddSubgraphFixtureToMempools(valSubgrph)
+
+	// invalidate prev execution result blockID, this should fail because
+	// prev result points to wrong block
+	valSubgrph.PreviousResult.Chunks[len(valSubgrph.Result.Chunks)-1].EndState = unittest.StateCommitmentFixture()
 
 	s.verifier.On("Verify",
 		mock.Anything,
