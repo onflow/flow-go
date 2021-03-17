@@ -106,10 +106,6 @@ func (v *View) DropDelta() {
 	v.delta = NewDelta()
 }
 
-func (v *View) DropDelta() {
-	v.delta = NewDelta()
-}
-
 // Get gets a register value from this view.
 //
 // This function will return an error if it fails to read from the underlying
