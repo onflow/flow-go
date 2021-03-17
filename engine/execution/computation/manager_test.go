@@ -1,6 +1,7 @@
 package computation
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
@@ -144,4 +146,38 @@ func TestExecuteScript(t *testing.T) {
 	header := unittest.BlockHeaderFixture()
 	_, err = engine.ExecuteScript(script, nil, &header, scriptView)
 	require.NoError(t, err)
+}
+
+func TestExecuteScripPanicsAreHandled(t *testing.T) {
+
+	ctx := fvm.NewContext(zerolog.Nop())
+
+	vm := &PanickingVM{}
+
+	buffer := &bytes.Buffer{}
+	log := zerolog.New(buffer)
+
+	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+	header := unittest.BlockHeaderFixture()
+
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize)
+	require.NoError(t, err)
+
+	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+
+	require.Error(t, err)
+
+	require.Contains(t, buffer.String(), "Verunsicherung")
+}
+
+type PanickingVM struct{}
+
+func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	panic("panic, but expected with sentinel for test: Verunsicherung ")
+}
+
+func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
 }
