@@ -365,8 +365,12 @@ func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count 
 	results := make([]*CompleteExecutionResult, 0, count)
 	parent := root
 	for i := 0; i < count; i++ {
+		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
+		// and C is a container block containing execution receipt for R.
 		result := CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain(), parent)
 		results = append(results, &result)
+
+		parent = result.ContainerBlock.Header
 	}
 
 	return results
