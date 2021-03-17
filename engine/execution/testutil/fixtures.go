@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -150,7 +151,7 @@ func GenerateAccountPrivateKey() (flow.AccountPrivateKey, error) {
 func CreateAccounts(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -160,7 +161,7 @@ func CreateAccounts(
 func CreateAccountsWithSimpleAddresses(
 	vm *fvm.VirtualMachine,
 	view state.View,
-	programs *fvm.Programs,
+	programs *programs.Programs,
 	privateKeys []flow.AccountPrivateKey,
 	chain flow.Chain,
 ) ([]flow.Address, error) {
@@ -229,7 +230,7 @@ func CreateAccountsWithSimpleAddresses(
 
 func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) state.View {
 	view := fvmUtils.NewSimpleView()
-	programs := fvm.NewEmptyPrograms()
+	programs := programs.NewEmptyPrograms()
 
 	bootstrap := fvm.Bootstrap(
 		unittest.ServiceAccountPublicKey,

@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -87,7 +88,7 @@ func TestSafetyCheck(t *testing.T) {
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 			))
 
-			err = txInvocator.Process(vm, context, proc, sth, NewEmptyPrograms())
+			err = txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -157,7 +158,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err = txInvocator.Process(vm, context, proc, sth, NewEmptyPrograms())
+		err = txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -189,7 +190,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, context, proc, sth, NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -222,7 +223,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, context, proc, sth, NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -269,7 +270,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(view))
 
-		err := txInvocator.Process(vm, context, proc, sth, NewEmptyPrograms())
+		err := txInvocator.Process(vm, context, proc, sth, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		require.Equal(t, 1, proc.Retried)
