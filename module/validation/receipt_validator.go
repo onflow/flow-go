@@ -154,7 +154,7 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	// This needs to be addressed later since many tests depend on this behavior.
 	prevResult, err := v.fetchResult(receipt.ExecutionResult.PreviousResultID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error fetching parent result of receipt %v: %w", receipt.ID(), err)
 	}
 
 	// first validate result to avoid signature check in in `validateReceipt` in case result is invalid.

@@ -232,6 +232,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidPreviousResult() {
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid previous result")
+	s.Assert().True(engine.IsInvalidInputError(err), err)
 }
 
 func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
@@ -250,6 +251,7 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 
 	err := s.receiptValidator.Validate(receipt)
 	s.Require().Error(err, "should reject invalid previous result")
+	s.Assert().True(engine.IsInvalidInputError(err), err)
 }
 
 // say B(A) means block B has receipt for A:
