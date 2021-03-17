@@ -379,18 +379,15 @@ func SetupMockConsensusNode(t *testing.T,
 			}
 			require.True(t, found)
 
-			// TODO comment me out again when SPoCKs are back
-			_ = pk
-			_ = hasher
-			// // verifies spocks
-			// valid, err := crypto.SPOCKVerifyAgainstData(
-			// 	pk,
-			// 	resultApproval.Body.Spock,
-			// 	completeER.SpockSecrets[resultApproval.Body.ChunkIndex],
-			// 	hasher,
-			// )
-			// assert.NoError(t, err)
-			// assert.True(t, valid)
+			// verifies spocks
+			valid, err := crypto.SPOCKVerifyAgainstData(
+				pk,
+				resultApproval.Body.Spock,
+				completeER.SpockSecrets[resultApproval.Body.ChunkIndex],
+				hasher,
+			)
+			assert.NoError(t, err)
+			assert.True(t, valid)
 
 			wg.Done()
 		}).Return(nil)
