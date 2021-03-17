@@ -37,17 +37,6 @@ type CompleteExecutionResult struct {
 	SpockSecrets   [][]byte
 }
 
-type ExecutionResultTestCaseList []*CompleteExecutionResult
-
-func (e ExecutionResultTestCaseList) ReferenceBlocks() []*flow.Block {
-	blocks := make([]*flow.Block, 0)
-	for _, tc := range e {
-		blocks = append(blocks, tc.ReferenceBlock, tc.ContainerBlock)
-	}
-
-	return blocks
-}
-
 // CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
 // chunkCount determines the number of chunks inside each receipt.
@@ -370,7 +359,7 @@ func executeCollection(
 	return chunk, chunkDataPack, endStateCommitment, spock
 }
 
-func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count int) ExecutionResultTestCaseList {
+func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count int) []*CompleteExecutionResult {
 	results := make([]*CompleteExecutionResult, 0, count)
 	parent := root
 	for i := 0; i < count; i++ {
