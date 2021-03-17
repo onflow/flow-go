@@ -98,7 +98,12 @@ func (r *Retry) retryTxsAtHeight(heightToRetry uint64) {
 	defer r.mu.Unlock()
 	txsAtHeight := r.transactionByReferencBlockHeight[heightToRetry]
 	for txID, tx := range txsAtHeight {
-		status, err := r.backend.deriveTransactionStatus(tx, false)
+		// find the block for the transaction
+		block, err := r.backend.lookupBlock(txID)
+		if err != nil {
+			continue
+		}
+		status, err := r.backend.deriveTransactionStatus(tx, false, block)
 		if err != nil {
 			continue
 		}

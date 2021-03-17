@@ -220,25 +220,42 @@ func (b *backendTransactions) GetTransactionResult(
 		return nil, txErr
 	}
 
-	// get events for the transaction
-	executed, events, statusCode, txError, err := b.lookupTransactionResult(ctx, txID)
-	if err != nil {
+	blockID := flow.ZeroID
+	// find the block for the transaction
+	block, err := b.lookupBlock(txID)
+	if err != nil && !errors.Is(err, storage.ErrNotFound) {
 		return nil, convertStorageError(err)
+	}
+
+	// access node may not have the block if it hasn't yet been finalized, hence block can be nil
+	if block != nil {
+		blockID = block.ID()
+	}
+
+	var transactionWasExecuted bool
+	var events []flow.Event
+	var txError string
+	var statusCode uint32
+	// get events for the transaction if block was found
+	if blockID != flow.ZeroID {
+		transactionWasExecuted, events, statusCode, txError, err = b.lookupTransactionResult(ctx, txID, blockID)
+		if err != nil {
+			return nil, convertStorageError(err)
+		}
 	}
 
 	// derive status of the transaction
-	status, err := b.deriveTransactionStatus(tx, executed)
+	status, err := b.deriveTransactionStatus(tx, transactionWasExecuted, block)
 	if err != nil {
 		return nil, convertStorageError(err)
 	}
-
-	// TODO: Set correct values for StatusCode and ErrorMessage
 
 	return &access.TransactionResult{
 		Status:       status,
 		StatusCode:   uint(statusCode),
 		Events:       events,
 		ErrorMessage: txError,
+		BlockID:      blockID,
 	}, nil
 }
 
@@ -246,10 +263,10 @@ func (b *backendTransactions) GetTransactionResult(
 func (b *backendTransactions) deriveTransactionStatus(
 	tx *flow.TransactionBody,
 	executed bool,
+	block *flow.Block,
 ) (flow.TransactionStatus, error) {
 
-	block, err := b.lookupBlock(tx.ID())
-	if errors.Is(err, storage.ErrNotFound) {
+	if block == nil {
 		// Not in a block, let's see if it's expired
 		referenceBlock, err := b.state.AtBlockID(tx.ReferenceBlockID).Head()
 		if err != nil {
@@ -291,9 +308,6 @@ func (b *backendTransactions) deriveTransactionStatus(
 		// However, this will not happen as of now since the ingestion engine doesn't subscribe
 		// for collections
 		return flow.TransactionStatusPending, nil
-	}
-	if err != nil {
-		return flow.TransactionStatusUnknown, err
 	}
 
 	if !executed {
@@ -345,19 +359,8 @@ func (b *backendTransactions) lookupBlock(txID flow.Identifier) (*flow.Block, er
 func (b *backendTransactions) lookupTransactionResult(
 	ctx context.Context,
 	txID flow.Identifier,
+	blockID flow.Identifier,
 ) (bool, []flow.Event, uint32, string, error) {
-
-	// find the block ID for the transaction
-	block, err := b.lookupBlock(txID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			// access node may not have the block if it hasn't yet been finalized
-			return false, nil, 0, "", nil
-		}
-		return false, nil, 0, "", convertStorageError(err)
-	}
-
-	blockID := block.ID()
 
 	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:])
 	if err != nil {
