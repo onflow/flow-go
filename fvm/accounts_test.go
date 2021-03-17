@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
@@ -61,7 +63,10 @@ func addAccountKey(
 	apiVersion accountKeyAPIVersion,
 ) flow.AccountPublicKey {
 
-	publicKeyA, cadencePublicKey := newAccountKey(t, apiVersion)
+	privateKey, err := unittest.AccountKeyDefaultFixture()
+	require.NoError(t, err)
+
+	publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, apiVersion)
 
 	var addAccountKeyTx accountKeyAPIVersion
 	if apiVersion == accountKeyAPIVersionV1 {
@@ -77,7 +82,7 @@ func addAccountKey(
 
 	tx := fvm.Transaction(txBody, 0)
 
-	err := vm.Run(ctx, tx, view, programs)
+	err = vm.Run(ctx, tx, view, programs)
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
@@ -302,24 +307,30 @@ transaction(keyIndex1: Int, keyIndex2: Int) {
 }
 `
 
-func newAccountKey(t *testing.T, apiVersion accountKeyAPIVersion) (flow.AccountPublicKey, []byte) {
-	privateKey, _ := unittest.AccountKeyFixture()
-	publicKeyA := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
+func newAccountKey(
+	t *testing.T,
+	privateKey *flow.AccountPrivateKey,
+	apiVersion accountKeyAPIVersion,
+) (
+	publicKey flow.AccountPublicKey,
+	encodedCadencePublicKey []byte,
+) {
+	publicKey = privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 
 	var publicKeyBytes []byte
 	if apiVersion == accountKeyAPIVersionV1 {
 		var err error
-		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKeyA)
+		publicKeyBytes, err = flow.EncodeRuntimeAccountPublicKey(publicKey)
 		require.NoError(t, err)
 	} else {
-		publicKeyBytes = publicKeyA.PublicKey.Encode()
+		publicKeyBytes = publicKey.PublicKey.Encode()
 	}
 
 	cadencePublicKey := testutil.BytesToCadenceArray(publicKeyBytes)
 	encodedCadencePublicKey, err := jsoncdc.Encode(cadencePublicKey)
 	require.NoError(t, err)
 
-	return publicKeyA, encodedCadencePublicKey
+	return publicKey, encodedCadencePublicKey
 }
 
 func TestCreateAccount(t *testing.T) {
@@ -535,7 +546,10 @@ func TestAddAccountKey(t *testing.T) {
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
-					publicKeyA, cadencePublicKey := newAccountKey(t, test.apiVersion)
+					privateKey, err := unittest.AccountKeyDefaultFixture()
+					require.NoError(t, err)
+
+					publicKeyA, cadencePublicKey := newAccountKey(t, privateKey, test.apiVersion)
 
 					txBody := flow.NewTransactionBody().
 						SetScript([]byte(test.source)).
@@ -574,7 +588,10 @@ func TestAddAccountKey(t *testing.T) {
 					require.NoError(t, err)
 					assert.Len(t, before.Keys, 1)
 
-					publicKey2, publicKey2Arg := newAccountKey(t, test.apiVersion)
+					privateKey, err := unittest.AccountKeyDefaultFixture()
+					require.NoError(t, err)
+
+					publicKey2, publicKey2Arg := newAccountKey(t, privateKey, test.apiVersion)
 
 					txBody := flow.NewTransactionBody().
 						SetScript([]byte(test.source)).
@@ -661,8 +678,14 @@ func TestAddAccountKey(t *testing.T) {
 					require.NoError(t, err)
 					assert.Empty(t, before.Keys)
 
-					publicKey1, publicKey1Arg := newAccountKey(t, test.apiVersion)
-					publicKey2, publicKey2Arg := newAccountKey(t, test.apiVersion)
+					privateKey1, err := unittest.AccountKeyDefaultFixture()
+					require.NoError(t, err)
+
+					privateKey2, err := unittest.AccountKeyDefaultFixture()
+					require.NoError(t, err)
+
+					publicKey1, publicKey1Arg := newAccountKey(t, privateKey1, test.apiVersion)
+					publicKey2, publicKey2Arg := newAccountKey(t, privateKey2, test.apiVersion)
 
 					txBody := flow.NewTransactionBody().
 						SetScript([]byte(test.source)).
@@ -696,8 +719,118 @@ func TestAddAccountKey(t *testing.T) {
 					}
 				}),
 		)
-
 	}
+
+	t.Run("Invalid hash algorithms", func(t *testing.T) {
+
+		for _, hashAlgo := range []string{"SHA2_384", "SHA3_384", "KMAC_128"} {
+
+			t.Run(hashAlgo,
+				newVMTest().withContextOptions(options...).
+					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+						address := createAccount(t, vm, chain, ctx, view, programs)
+
+						privateKey, err := unittest.AccountKeyDefaultFixture()
+						require.NoError(t, err)
+
+						_, publicKeyArg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
+
+						txBody := flow.NewTransactionBody().
+							SetScript([]byte(fmt.Sprintf(
+								`
+								transaction(key: [UInt8]) {
+								  prepare(signer: AuthAccount) {
+								    let publicKey = PublicKey(
+									  publicKey: key,
+									  signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
+									)
+								    signer.keys.add(
+								      publicKey: publicKey,
+								      hashAlgorithm: HashAlgorithm.%s,
+								      weight: 1000.0
+								    )
+								  }
+								}
+								`,
+								hashAlgo,
+							))).
+							AddArgument(publicKeyArg).
+							AddAuthorizer(address)
+
+						tx := fvm.Transaction(txBody, 0)
+
+						err = vm.Run(ctx, tx, view, programs)
+						require.NoError(t, err)
+
+						require.Error(t, tx.Err)
+						assert.Contains(t, tx.Err.Error(), "invalid account key hash algorithm")
+
+						after, err := vm.GetAccount(ctx, address, view, programs)
+						require.NoError(t, err)
+
+						assert.Empty(t, after.Keys)
+					}),
+			)
+		}
+	})
+
+	t.Run("Invalid signing algorithms", func(t *testing.T) {
+
+		for _, signingAlgo := range []string{"BLS_BLS12381"} {
+
+			t.Run(signingAlgo,
+				newVMTest().withContextOptions(options...).
+					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *fvm.Programs) {
+						address := createAccount(t, vm, chain, ctx, view, programs)
+
+						privateKey, err := unittest.AccountKeyFixture(
+							crypto.KeyGenSeedMaxLenBLSBLS12381,
+							crypto.BLSBLS12381,
+							hash.SHA3_256,
+						)
+
+						require.NoError(t, err)
+
+						_, publicKeyArg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
+
+						txBody := flow.NewTransactionBody().
+							SetScript([]byte(fmt.Sprintf(
+								`
+								transaction(key: [UInt8]) {
+								  prepare(signer: AuthAccount) {
+								    let publicKey = PublicKey(
+									  publicKey: key,
+									  signatureAlgorithm: SignatureAlgorithm.%s
+									)
+								    signer.keys.add(
+								      publicKey: publicKey,
+								      hashAlgorithm: HashAlgorithm.SHA2_256,
+								      weight: 1000.0
+								    )
+								  }
+								}
+								`,
+								signingAlgo,
+							))).
+							AddArgument(publicKeyArg).
+							AddAuthorizer(address)
+
+						tx := fvm.Transaction(txBody, 0)
+
+						err = vm.Run(ctx, tx, view, programs)
+						require.NoError(t, err)
+
+						require.Error(t, tx.Err)
+						assert.Contains(t, tx.Err.Error(), "invalid account key signature algorithm")
+
+						after, err := vm.GetAccount(ctx, address, view, programs)
+						require.NoError(t, err)
+
+						assert.Empty(t, after.Keys)
+					}),
+			)
+		}
+	})
 }
 
 func TestRemoveAccountKey(t *testing.T) {

@@ -82,16 +82,25 @@ func ProposalKeyFixture() flow.ProposalKey {
 	}
 }
 
-// AccountKeyFixture returns a randomly generated ECDSA/SHA3 account key.
-func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+// AccountKeyDefaultFixture returns a randomly generated ECDSA/SHA3 account key.
+func AccountKeyDefaultFixture() (*flow.AccountPrivateKey, error) {
+	return AccountKeyFixture(crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256, hash.SHA3_256)
+}
+
+// AccountKeyFixture returns a randomly generated account key.
+func AccountKeyFixture(
+	seedLength int,
+	signingAlgo crypto.SigningAlgorithm,
+	hashAlgo hash.HashingAlgorithm,
+) (*flow.AccountPrivateKey, error) {
+	seed := make([]byte, seedLength)
 
 	_, err := crand.Read(seed)
 	if err != nil {
 		return nil, err
 	}
 
-	key, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+	key, err := crypto.GeneratePrivateKey(signingAlgo, seed)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +108,7 @@ func AccountKeyFixture() (*flow.AccountPrivateKey, error) {
 	return &flow.AccountPrivateKey{
 		PrivateKey: key,
 		SignAlgo:   key.Algorithm(),
-		HashAlgo:   hash.SHA3_256,
+		HashAlgo:   hashAlgo,
 	}, nil
 }
 
