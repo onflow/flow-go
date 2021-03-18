@@ -38,12 +38,12 @@ func TestMVP_Network(t *testing.T) {
 	net := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
@@ -129,6 +129,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			newAccountAddress = accountCreatedEvent.Address()
 		}
 	}
+	
+	fmt.Printf("new account address: %s\n", newAccountAddress)
 
 	// Generate the account creation transaction
 	fundAccountTx := sdk.NewTransaction().

@@ -43,7 +43,7 @@ type PartnerStakes map[flow.Identifier]uint64
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
-	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon 
+	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon
 	keys and generating the root block, QC, execution result and block seal.`,
 	Run: finalize,
 }
@@ -224,7 +224,11 @@ func assemblePartnerNodes() []model.NodeInfo {
 		nodeID := validateNodeID(partner.NodeID)
 		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
 		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
-		stake := validateStake(stakes[partner.NodeID])
+		stake, valid := validateStake(stakes[partner.NodeID])
+		if !valid {
+			log.Error().Msgf("stakes: %v", stakes)
+			log.Fatal().Msgf("partner node id %v has no stake", nodeID)
+		}
 
 		node := model.NewPublicNodeInfo(
 			nodeID,
@@ -277,7 +281,11 @@ func assembleInternalNodes() []model.NodeInfo {
 
 		// validate every single internal node
 		nodeID := validateNodeID(internal.NodeID)
-		stake := validateStake(stakes[internal.Address])
+		stake, valid := validateStake(stakes[internal.Address])
+		if !valid {
+			log.Error().Msgf("stakes: %v", stakes)
+			log.Fatal().Msgf("internal node %v has no stake. Did you forget to update the node address?", internal)
+		}
 
 		node := model.NewPrivateNodeInfo(
 			nodeID,
@@ -387,9 +395,6 @@ func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey 
 	return key
 }
 
-func validateStake(stake uint64) uint64 {
-	if stake == 0 {
-		log.Fatal().Msg("Stake must be bigger than 0")
-	}
-	return stake
+func validateStake(stake uint64) (uint64, bool) {
+	return stake, stake > 0
 }
