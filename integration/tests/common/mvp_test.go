@@ -152,7 +152,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			  }
 			}`,
 			fvm.FungibleTokenAddress(chain).Hex(),
-			fvm.FungibleTokenAddress(chain).Hex()))).
+			fvm.FlowTokenAddress(chain).Hex()))).
 		AddAuthorizer(serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(root.ID())).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).

@@ -80,8 +80,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
-			unittest.GenesisTokenSupply,
 			chain,
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		)
 		require.NoError(t, err)
 
