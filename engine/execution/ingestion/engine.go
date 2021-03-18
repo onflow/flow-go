@@ -562,7 +562,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
 	broadcasted := false
-	if !isExecutedBlockSealed && e.staker.AmIStakedAt(executableBlock.Block.ID()) {
+	if !isExecutedBlockSealed && e.staker.AmIStakedAt(executableBlock.ID()) {
 		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
 		if err != nil {
 			e.log.Err(err).Msg("critical: failed to broadcast the receipt")
