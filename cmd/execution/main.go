@@ -85,6 +85,7 @@ func main() {
 		syncFast              bool
 		syncThreshold         int
 		extensiveLog          bool
+		checkStakedAtBlock    func(blockID flow.Identifier) (bool, error)
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -172,6 +173,12 @@ func main() {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
+		Module("stake checking function", func(node *cmd.FlowNodeBuilder) error {
+			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
+				return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+			}
+			return nil
+		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
@@ -249,6 +256,7 @@ func main() {
 				node.Me,
 				executionState,
 				collector,
+				checkStakedAtBlock,
 			)
 
 			return providerEngine, err
@@ -284,6 +292,7 @@ func main() {
 			events = storage.NewEvents(node.DB)
 			serviceEvents := storage.NewServiceEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
+
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -305,6 +314,7 @@ func main() {
 				deltas,
 				syncThreshold,
 				syncFast,
+				checkStakedAtBlock,
 			)
 
 			// TODO: we should solve these mutual dependencies better
