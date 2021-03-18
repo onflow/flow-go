@@ -420,7 +420,7 @@ func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wgPut.Wait()
 			wg.Done()
-		}, blockB, unittest.IdentifierFixture())
+		}, blockB, unittest.IdentifierFixture(), true)
 
 		times := 4
 
