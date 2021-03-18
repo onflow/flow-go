@@ -15,7 +15,7 @@ type onVisitBlock = func(header *flow.Header) (bool, error)
 // height order, meaning the end block must be an ancestor of the start block.
 // The callback is called for each block in this segment.
 // Return value of callback is used to decide if it should continue or not.
-func TraverseBackwards(headers storage.Headers, startBlockID flow.Identifier, visitor onVisitBlock) error {
+func TraverseBackward(headers storage.Headers, startBlockID flow.Identifier, visitor onVisitBlock) error {
 	blockID := startBlockID
 	for {
 		block, err := headers.ByBlockID(blockID)
@@ -36,10 +36,9 @@ func TraverseBackwards(headers storage.Headers, startBlockID flow.Identifier, vi
 }
 
 // TraverseForward traverses a chain segment in forward order.
-// Implements a recursive descend to genesis block or till `shouldContinue` returns true and then calls
-// visitor callback for every block way back up to `startBlockID`
+// Implements a recursive descend starting at the `forkHead` towards the genesis block. The descend continues as long as `shouldContinue` returns true. All visited blocks, which `shouldContinue` returned true for, are fed into the `visitor` callback starting from the block with the lowest height, in order of increasing height. The last block that is fed into `visitor` is the `forkHead`.
 func TraverseForward(headers storage.Headers,
-	startBlockID flow.Identifier,
+   forkHead flow.Identifier,
 	visitor func(header *flow.Header) error,
 	shouldContinue func(header *flow.Header) bool,
 ) error {
