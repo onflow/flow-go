@@ -36,13 +36,14 @@ require (
 	github.com/onflow/cadence v0.13.5-no-id-caching
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2-0.20210205222047-2db423e9837e
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.2-0.20210205222047-2db423e9837e
-	github.com/onflow/flow-emulator v0.14.0
+	github.com/onflow/flow-emulator v0.16.2-0.20210316005351-fc20f3094878
 	github.com/onflow/flow-go-sdk v0.15.0
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.1.9
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
+	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85 // indirect
 	github.com/rs/zerolog v1.19.0
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3

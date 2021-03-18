@@ -12,6 +12,8 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -65,7 +67,7 @@ func (s *ClientSuite) deployDKGContract() {
 	require.NoError(s.T(), err)
 
 	env := templates.Environment{
-		QuorumCertificateAddress: dkgAddress.Hex(),
+		DkgAddress: dkgAddress.Hex(),
 	}
 
 	s.env = env
@@ -88,4 +90,18 @@ func (s *ClientSuite) TestReadBroadcast() {
 }
 
 func (s *ClientSuite) TestSubmitResult() {
+	numberOfKeys := 5
+
+	// generate list of public keys
+	publicKeys := make([]crypto.PublicKey, numberOfKeys)
+	for i := 0; i < numberOfKeys; i++ {
+		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
+		publicKeys = append(publicKeys, privateKey.PublicKey())
+	}
+
+	// create a group public key
+	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
+
+	err := s.client.SubmitResult(groupPublicKey, publicKeys)
+	require.NoError(s.T(), err)
 }

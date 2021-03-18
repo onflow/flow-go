@@ -20,7 +20,7 @@ type DKGSDKClientWrapper interface {
 	SendTransaction(context.Context, sdk.Transaction, ...grpc.CallOption) error
 	GetLatestBlock(context.Context, bool, ...grpc.CallOption) (*sdk.Block, error)
 	GetTransactionResult(context.Context, sdk.Identifier, ...grpc.CallOption) (*sdk.TransactionResult, error)
-	ExecuteScriptAtBlockID(context.Context, flow.Identifier, []byte, []cadence.Value, ...grpc.CallOption) (cadence.Value, error)
+	ExecuteScriptAtBlockID(context.Context, sdk.Identifier, []byte, []cadence.Value, ...grpc.CallOption) (cadence.Value, error)
 }
 
 // DKGContractClient enables interacting with the DKG smart contract. This

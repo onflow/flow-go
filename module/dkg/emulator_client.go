@@ -58,7 +58,7 @@ func (c *EmulatorClient) GetTransactionResult(ctx context.Context, txID sdk.Iden
 	return c.blockchain.GetTransactionResult(txID)
 }
 
-func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
+func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk.Identifier, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
 
 	arguments := [][]byte{}
 	for _, arg := range args {
