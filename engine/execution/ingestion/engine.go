@@ -561,16 +561,19 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
 	broadcasted := false
-	stakedAtBlock, err := e.checkStakedAtBlock(executableBlock.ID())
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not check staking status")
-	}
-	if !isExecutedBlockSealed && stakedAtBlock {
-		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+
+	if !isExecutedBlockSealed {
+		stakedAtBlock, err := e.checkStakedAtBlock(executableBlock.ID())
 		if err != nil {
-			e.log.Err(err).Msg("critical: failed to broadcast the receipt")
-		} else {
-			broadcasted = true
+			e.log.Fatal().Err(err).Msg("could not check staking status")
+		}
+		if stakedAtBlock {
+			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+			if err != nil {
+				e.log.Err(err).Msg("critical: failed to broadcast the receipt")
+			} else {
+				broadcasted = true
+			}
 		}
 	}
 
