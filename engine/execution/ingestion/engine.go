@@ -563,7 +563,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	broadcasted := false
 	stakedAtBlock, err := e.checkStakedAtBlock(executableBlock.ID())
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could check staking status")
+		e.log.Fatal().Err(err).Msg("could not check staking status")
 	}
 	if !isExecutedBlockSealed && stakedAtBlock {
 		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
