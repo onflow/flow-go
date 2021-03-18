@@ -42,7 +42,6 @@ func TestTraverse(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		child := unittest.BlockHeaderWithParentFixture(parent)
 		byID[child.ID()] = &child
-		t.Log(child.Height)
 		byHeight[child.Height] = &child
 
 		parent = &child
@@ -150,7 +149,6 @@ func TestTraverseParentFirst(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		child := unittest.BlockHeaderWithParentFixture(parent)
 		byID[child.ID()] = &child
-		t.Log(child.Height)
 		byHeight[child.Height] = &child
 
 		parent = &child

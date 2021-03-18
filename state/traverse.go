@@ -16,21 +16,21 @@ type onVisitBlock = func(header *flow.Header) (bool, error)
 // The callback is called for each block in this segment.
 // Return value of callback is used to decide if it should continue or not.
 func Traverse(headers storage.Headers, startBlockID flow.Identifier, visitor onVisitBlock) error {
-	ancestorID := startBlockID
+	blockID := startBlockID
 	for {
-		ancestor, err := headers.ByBlockID(ancestorID)
+		block, err := headers.ByBlockID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not get block header (%x): %w", blockID, err)
 		}
 
-		shouldContinue, err := visitor(ancestor)
+		shouldContinue, err := visitor(block)
 		if !shouldContinue {
 			break
 		}
 		if err != nil {
 			return err
 		}
-		ancestorID = ancestor.ParentID
+		blockID = block.ParentID
 	}
 	return nil
 }
@@ -47,19 +47,19 @@ func TraverseParentFirst(headers storage.Headers, startBlockID, stopBlockID flow
 		return nil
 	}
 
-	ancestor, err := headers.ByBlockID(startBlockID)
+	block, err := headers.ByBlockID(startBlockID)
 	if err != nil {
-		return fmt.Errorf("could not get ancestor header (%x): %w", startBlockID, err)
+		return fmt.Errorf("could not get block header (%x): %w", startBlockID, err)
 	}
 
 	// descend further down the chain
-	err = TraverseParentFirst(headers, ancestor.ParentID, stopBlockID, visitor)
+	err = TraverseParentFirst(headers, block.ParentID, stopBlockID, visitor)
 	if err != nil {
 		return err
 	}
 
 	// now we are on our way back up
-	err = visitor(ancestor)
+	err = visitor(block)
 	if err != nil {
 		return err
 	}
