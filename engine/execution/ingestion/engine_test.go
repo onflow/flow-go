@@ -385,6 +385,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		// create blocks with the following relations
 		// A <- B
 		// A <- C <- D
+
 		blockSealed := unittest.BlockHeaderFixture()
 
 		blocks := make(map[string]*entity.ExecutableBlock)
@@ -392,7 +393,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blocks["A"].StartState = unittest.StateCommitmentFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
-		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
+		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests

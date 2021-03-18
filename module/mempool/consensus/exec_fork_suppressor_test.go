@@ -172,9 +172,8 @@ func Test_RejectInvalidSeals(t *testing.T) {
 		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 			irSeal := unittest.IncorporatedResultSeal.Fixture()
 			chunks := irSeal.IncorporatedResult.Result.Chunks
-			emptyState := make([]byte, 0)
-			chunks[len(chunks)-1].EndState = emptyState
-			irSeal.Seal.FinalState = emptyState
+			chunks[len(chunks)-1].EndState = flow.EmptyStateCommitment
+			irSeal.Seal.FinalState = flow.EmptyStateCommitment
 
 			added, err := wrapper.Add(irSeal)
 			assert.Error(t, err)
@@ -187,7 +186,7 @@ func Test_RejectInvalidSeals(t *testing.T) {
 		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
 			irSeal := unittest.IncorporatedResultSeal.Fixture()
 			irSeal.IncorporatedResult.Result.Chunks = make(flow.ChunkList, 0)
-			irSeal.Seal.FinalState = make([]byte, 0)
+			irSeal.Seal.FinalState = flow.EmptyStateCommitment
 
 			added, err := wrapper.Add(irSeal)
 			assert.Error(t, err)

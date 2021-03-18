@@ -102,7 +102,7 @@ func (b *ExecutableBlock) HasAllTransactions() bool {
 // HasStartState returns whether the block has StartState, which
 // indicates whether its parent has been executed.
 func (b *ExecutableBlock) HasStartState() bool {
-	return len(b.StartState) > 0
+	return b.StartState != flow.EmptyStateCommitment
 }
 
 // IsComplete returns whether all the data needed to executed the block are
