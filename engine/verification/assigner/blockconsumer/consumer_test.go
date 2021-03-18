@@ -103,6 +103,46 @@ func TestProduceConsume(t *testing.T) {
 		})
 	})
 
+	// pushing 100 finalized blocks concurrently to block reader, with 3 workers on consumer and the assigner engine finishes processing
+	// all blocks immediately, results in engine receiving all 100 blocks (in any order).
+	t.Run("pushing 100 blocks concurrently, non-blocking, receives 100", func(t *testing.T) {
+		received := make([]*flow.Block, 0)
+		lock := &sync.Mutex{}
+		var processAll sync.WaitGroup
+		alwaysFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
+			lock.Lock()
+			defer lock.Unlock()
+
+			received = append(received, block)
+
+			go func() {
+				notifier.Notify(block.ID())
+				processAll.Done()
+			}()
+		}
+
+		WithConsumer(t, 100, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+			<-consumer.Ready()
+			processAll.Add(len(blocks))
+
+			for i := 0; i < len(blocks); i++ {
+				go func() {
+					// consumer is only required to be "notified" that a new finalized block available.
+					// It keeps track of the last finalized block it has read, and read the next height upon
+					// getting notified as follows:
+					consumer.OnFinalizedBlock(&model.Block{})
+				}()
+			}
+
+			// waits until all finished
+			unittest.RequireReturnsBefore(t, processAll.Wait, 1*time.Second, "could not process all blocks on time")
+			<-consumer.Done()
+
+			// expects the mock engine receive all 100 blocks.
+			requireBlockListsEqualIgnoreOrder(t, received, blocks)
+		})
+	})
+
 }
 
 func WithConsumer(
