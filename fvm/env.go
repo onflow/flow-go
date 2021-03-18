@@ -144,15 +144,24 @@ func (e *hostEnv) getLogs() []string {
 }
 
 func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
+	var valueByteSize int
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetValue)
-		defer sp.Finish()
+		defer func() {
+			sp.LogFields(
+				tracelog.String("owner", string(owner)),
+				tracelog.String("key", string(key)),
+				tracelog.Int("valueByteSize", valueByteSize),
+			)
+			sp.Finish()
+		}()
 	}
 
 	v, _ := e.accounts.GetValue(
 		flow.BytesToAddress(owner),
 		string(key),
 	)
+	valueByteSize = len(v)
 	return v, nil
 }
 
