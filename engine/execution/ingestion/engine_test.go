@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"fmt"
 	mathRand "math/rand"
 	"sync"
 	"testing"
@@ -191,7 +192,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 	}
 
 	ctx.computationManager.
-		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).
+		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).Run(func(args mock.Arguments) {
+		time.Sleep(1000 * time.Millisecond)
+		fmt.Printf("run\n")
+	}).
 		Return(computationResult, nil).Once()
 
 	for _, view := range computationResult.StateSnapshots {
@@ -350,6 +354,53 @@ func TestExecuteOneBlock(t *testing.T) {
 		wg.Add(1) // wait for block B to be executed
 		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
 		require.NoError(t, err)
+
+		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+
+		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
+		require.False(t, more)
+
+		_, ok := commits[blockB.ID()]
+		require.True(t, ok)
+
+	})
+}
+
+func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
+	runWithEngine(t, func(ctx testingContext) {
+
+		// A <- B
+		blockA := unittest.BlockHeaderFixture()
+		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
+		blockB.StartState = unittest.StateCommitmentFixture()
+
+		// blockA's start state is its parent's state commitment,
+		// and blockA's parent has been executed.
+		commits := make(map[flow.Identifier]flow.StateCommitment)
+		commits[blockB.Block.Header.ParentID] = blockB.StartState
+		wg := sync.WaitGroup{}
+		ctx.mockStateCommitsWithMap(commits)
+
+		ctx.state.On("Sealed").Return(ctx.snapshot)
+		ctx.snapshot.On("Head").Return(&blockA, nil)
+
+		// wait finishing execution until all the blocks are sent to execution
+		wgPut := sync.WaitGroup{}
+		wgPut.Add(1)
+
+		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
+			wgPut.Wait()
+			wg.Done()
+		}, blockB, unittest.IdentifierFixture())
+
+		times := 4
+
+		wg.Add(1) // wait for block B to be executed
+		for i := 0; i < times; i++ {
+			err := ctx.engine.handleBlock(context.Background(), blockB.Block)
+			require.NoError(t, err)
+		}
+		wgPut.Done()
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 
