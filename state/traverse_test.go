@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestTraverse tests different scenarios for reverse block traversing
 func TestTraverse(t *testing.T) {
 
 	// create a storage.Headers mock with a backing map
@@ -41,7 +42,6 @@ func TestTraverse(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		child := unittest.BlockHeaderWithParentFixture(parent)
 		byID[child.ID()] = &child
-		t.Log(child.Height)
 		byHeight[child.Height] = &child
 
 		parent = &child
@@ -50,11 +50,10 @@ func TestTraverse(t *testing.T) {
 	// should return error and not call callback when start block doesn't exist
 	t.Run("non-existent start block", func(t *testing.T) {
 		start := unittest.IdentifierFixture()
-		end := byHeight[3].ID()
-		err := Traverse(headers, start, end, func(_ *flow.Header) error {
+		err := TraverseBackwards(headers, start, func(_ *flow.Header) (bool, error) {
 			// should not be called
 			t.Fail()
-			return nil
+			return false, nil
 		})
 		assert.Error(t, err)
 	})
@@ -62,9 +61,8 @@ func TestTraverse(t *testing.T) {
 	// should return error when end block doesn't exist
 	t.Run("non-existent end block", func(t *testing.T) {
 		start := byHeight[8].ID()
-		end := unittest.IdentifierFixture()
-		err := Traverse(headers, start, end, func(_ *flow.Header) error {
-			return nil
+		err := TraverseBackwards(headers, start, func(_ *flow.Header) (bool, error) {
+			return true, nil
 		})
 		assert.Error(t, err)
 	})
@@ -72,9 +70,8 @@ func TestTraverse(t *testing.T) {
 	// should return error if the callback returns an error
 	t.Run("callback error", func(t *testing.T) {
 		start := byHeight[8].ID()
-		end := byHeight[5].ID()
-		err := Traverse(headers, start, end, func(_ *flow.Header) error {
-			return fmt.Errorf("callback error")
+		err := TraverseBackwards(headers, start, func(_ *flow.Header) (bool, error) {
+			return true, fmt.Errorf("callback error")
 		})
 		assert.Error(t, err)
 	})
@@ -82,15 +79,18 @@ func TestTraverse(t *testing.T) {
 	// should call the callback exactly once and not return an error when start == end
 	t.Run("single-block traversal", func(t *testing.T) {
 		start := byHeight[5].ID()
-		end := start
+		end := byHeight[4].ID()
 
 		called := 0
-		err := Traverse(headers, start, end, func(header *flow.Header) error {
+		err := TraverseBackwards(headers, start, func(header *flow.Header) (bool, error) {
+			if header.ID() == end {
+				return false, nil
+			}
 			// should call callback for single block in traversal path
 			assert.Equal(t, start, header.ID())
 			// track calls - should only be called once
 			called++
-			return nil
+			return true, nil
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, 1, called)
@@ -103,15 +103,17 @@ func TestTraverse(t *testing.T) {
 		endHeight := uint64(4)
 
 		start := byHeight[startHeight].ID()
-		end := byHeight[endHeight].ID()
 
 		// assert that we are receiving the correct block at each height
 		height := startHeight
-		err := Traverse(headers, start, end, func(header *flow.Header) error {
+		err := TraverseBackwards(headers, start, func(header *flow.Header) (bool, error) {
+			if header.Height < endHeight {
+				return false, nil
+			}
 			expectedID := byHeight[height].ID()
 			assert.Equal(t, expectedID, header.ID())
 			height--
-			return nil
+			return true, nil
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, endHeight, height+1)
