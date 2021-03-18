@@ -238,7 +238,7 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 	}
 	ref, err := e.headers.ByBlockID(guarantee.ReferenceBlockID)
 	if errors.Is(err, storage.ErrNotFound) {
-		return engine.NewInvalidInputErrorf("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
+		return engine.NewUnverifiableInputError("collection guarantee refers to an unknown block: %x", guarantee.ReferenceBlockID)
 	}
 
 	// if head has advanced beyond the block referenced by the collection guarantee by more than 'expiry' number of blocks,
@@ -249,7 +249,7 @@ func (e *Engine) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 		diff = 0
 	}
 	if diff > flow.DefaultTransactionExpiry {
-		return engine.NewInvalidInputErrorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, final.Height)
+		return engine.NewOutdatedInputErrorf("collection guarantee expired ref_height=%d final_height=%d", ref.Height, final.Height)
 	}
 
 	return nil
