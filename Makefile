@@ -123,6 +123,8 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ExecForkActor' --structname 'ExecForkActorMock' -dir=module/mempool/consensus/mock/ -case=underscore -output="./module/mempool/consensus/mock/" -outpkg="mock"
 
+
+
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
 tidy:
