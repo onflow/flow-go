@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
@@ -37,13 +38,12 @@ func TestBlockToJob(t *testing.T) {
 func TestProduceConsume(t *testing.T) {
 	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the assigner engine blocking on the blocks,
 	// results in engine only receiving the first three finalized blocks (in any order).
-	t.Run("pushing 10 blocks, receives 3", func(t *testing.T) {
+	t.Run("pushing 10 blocks, blocking, receives 3", func(t *testing.T) {
 		received := make([]*flow.Block, 0)
 		lock := &sync.Mutex{}
 		neverFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
 			lock.Lock()
 			defer lock.Unlock()
-			fmt.Println("received height", block.Header.Height)
 			received = append(received, block)
 		}
 
@@ -63,7 +63,42 @@ func TestProduceConsume(t *testing.T) {
 			// new block is fetched to process).
 			requireBlockListsEqualIgnoreOrder(t, received, blocks[:3])
 		})
+	})
 
+	t.Run("pushing 10 blocks, non-blocking, receives 10", func(t *testing.T) {
+		received := make([]*flow.Block, 0)
+		lock := &sync.Mutex{}
+		var processAll sync.WaitGroup
+		alwaysFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
+			lock.Lock()
+			defer lock.Unlock()
+
+			received = append(received, block)
+
+			go func() {
+				notifier.Notify(block.ID())
+				processAll.Done()
+			}()
+		}
+
+		WithConsumer(t, 10, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+			<-consumer.Ready()
+			processAll.Add(len(blocks))
+
+			for i := 0; i < len(blocks); i++ {
+				// consumer is only required to be "notified" that a new finalized block available.
+				// It keeps track of the last finalized block it has read, and read the next height upon
+				// getting notified as follows:
+				consumer.OnFinalizedBlock(&model.Block{})
+			}
+
+			// waits until all finished
+			unittest.RequireReturnsBefore(t, processAll.Wait, 1*time.Second, "could not process all blocks on time")
+			<-consumer.Done()
+
+			// expects the mock engine receive all 10 blocks.
+			requireBlockListsEqualIgnoreOrder(t, received, blocks)
+		})
 	})
 
 }
