@@ -202,8 +202,8 @@ func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
 	receipt := ExecutionReceiptFixture()
-	payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
-	payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+	payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
+	payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 }
 
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {

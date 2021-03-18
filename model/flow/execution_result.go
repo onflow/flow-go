@@ -47,3 +47,59 @@ func (er ExecutionResult) InitialStateCommit() (StateCommitment, bool) {
 	s := er.Chunks[0].StartState
 	return s, len(s) > 0
 }
+
+/*******************************************************************************
+GROUPING allows to split a list of results by some property
+*******************************************************************************/
+
+// ExecutionResultList is a slice of ExecutionResults with the additional
+// functionality to group them by various properties
+type ExecutionResultList []*ExecutionResult
+
+// ExecutionResultGroupedList is a partition of an ExecutionResultList
+type ExecutionResultGroupedList map[Identifier]ExecutionResultList
+
+// ExecutionResultGroupingFunction is a function that assigns an identifier to each ExecutionResult
+type ExecutionResultGroupingFunction func(*ExecutionResult) Identifier
+
+// GroupBy partitions the ExecutionResultList. All ExecutionResults that are
+// mapped by the grouping function to the same identifier are placed in the same group.
+// Within each group, the order and multiplicity of the ExecutionResults is preserved.
+func (l ExecutionResultList) GroupBy(grouper ExecutionResultGroupingFunction) ExecutionResultGroupedList {
+	groups := make(map[Identifier]ExecutionResultList)
+	for _, r := range l {
+		groupID := grouper(r)
+		groups[groupID] = append(groups[groupID], r)
+	}
+	return groups
+}
+
+// GroupByPreviousResultID partitions the ExecutionResultList by the their PreviousResultIDs.
+// Within each group, the order and multiplicity of the ExecutionResults is preserved.
+func (l ExecutionResultList) GroupByPreviousResultID() ExecutionResultGroupedList {
+	grouper := func(r *ExecutionResult) Identifier { return r.PreviousResultID }
+	return l.GroupBy(grouper)
+}
+
+// GroupByExecutedBlockID partitions the ExecutionResultList by the IDs of the executed blocks.
+// Within each group, the order and multiplicity of the ExecutionResults is preserved.
+func (l ExecutionResultList) GroupByExecutedBlockID() ExecutionResultGroupedList {
+	grouper := func(r *ExecutionResult) Identifier { return r.BlockID }
+	return l.GroupBy(grouper)
+}
+
+// Size returns the number of ExecutionResults in the list
+func (l ExecutionResultList) Size() int {
+	return len(l)
+}
+
+// GetGroup returns the ExecutionResults that were mapped to the same identifier by the
+// grouping function. Returns an empty (nil) ExecutionResultList if groupID does not exist.
+func (g ExecutionResultGroupedList) GetGroup(groupID Identifier) ExecutionResultList {
+	return g[groupID]
+}
+
+// NumberGroups returns the number of groups
+func (g ExecutionResultGroupedList) NumberGroups() int {
+	return len(g)
+}

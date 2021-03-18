@@ -8,8 +8,8 @@ import (
 type Payload struct {
 	Guarantees []*CollectionGuarantee
 	Seals      []*Seal
-	Receipts   []*ExecutionReceiptMeta
-	Results    []*ExecutionResult
+	Receipts   ExecutionReceiptMetaList
+	Results    ExecutionResultList
 }
 
 // EmptyPayload returns an empty block payload.
