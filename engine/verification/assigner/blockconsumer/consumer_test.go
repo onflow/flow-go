@@ -35,6 +35,8 @@ func TestBlockToJob(t *testing.T) {
 // 3. pushing 100 jobs concurrently, could end up having 100
 // jobs processed by the consumer
 func TestProduceConsume(t *testing.T) {
+	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the assigner engine blocking on the blocks,
+	// results in engine only receiving the first three finalized blocks (in any order).
 	t.Run("pushing 10 blocks, receives 3", func(t *testing.T) {
 		received := make([]*flow.Block, 0)
 		lock := &sync.Mutex{}
@@ -45,10 +47,13 @@ func TestProduceConsume(t *testing.T) {
 			received = append(received, block)
 		}
 
-		WithConsumer(t, 10, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+		WithConsumer(t, 10, 3, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
 			<-consumer.Ready()
 
 			for i := 0; i < len(blocks); i++ {
+				// consumer is only required to be "notified" that a new finalized block available.
+				// It keeps track of the last finalized block it has read, and read the next height upon
+				// getting notified as follows:
 				consumer.OnFinalizedBlock(&model.Block{})
 			}
 
@@ -66,11 +71,12 @@ func TestProduceConsume(t *testing.T) {
 func WithConsumer(
 	t *testing.T,
 	blockCount int,
+	workerCount int,
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
 	withConsumer func(*BlockConsumer, []*flow.Block),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		maxProcessing := int64(3)
+		maxProcessing := int64(workerCount)
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}
@@ -97,8 +103,11 @@ func WithConsumer(
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
-		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount)
+		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2)
 		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
+		// makes sure that we generated a block chain of requested length.
+		require.Len(t, blocks, blockCount)
+
 		withConsumer(consumer, blocks)
 	})
 }
