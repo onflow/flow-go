@@ -36,7 +36,7 @@ func TraverseBackwards(headers storage.Headers, startBlockID flow.Identifier, vi
 }
 
 // TraverseForward traverses a chain segment in forward order.
-// Implements a recursive descend to genesis block or till we and then calling
+// Implements a recursive descend to genesis block or till `shouldContinue` returns true and then calls
 // visitor callback for every block way back up to `startBlockID`
 func TraverseForward(headers storage.Headers,
 	startBlockID flow.Identifier,
