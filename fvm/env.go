@@ -15,10 +15,10 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
-	tracelog "github.com/opentracing/opentracing-go/log"
 
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -32,12 +32,13 @@ var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx                Context
-	st                 *state.State
+	sth                *state.StateHolder
 	vm                 *VirtualMachine
 	accounts           *state.Accounts
 	contracts          *handler.ContractHandler
+	programs           *handler.ProgramsHandler
 	addressGenerator   flow.AddressGenerator
-	uuidGenerator      *UUIDGenerator
+	uuidGenerator      *state.UUIDGenerator
 	metrics            runtime.Metrics
 	events             []flow.Event
 	serviceEvents      []flow.Event
@@ -46,24 +47,11 @@ type hostEnv struct {
 	totalGasUsed       uint64
 	transactionEnv     *transactionEnv
 	rng                *rand.Rand
-	programs           *Programs
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm string) ([]byte, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
-		defer sp.Finish()
-	}
-	hasher, err := crypto.NewHasher(crypto.StringToHashAlgorithm(hashAlgorithm))
-	if err != nil {
-		panic(fmt.Errorf("cannot create hasher: %w", err))
-	}
-	return hasher.ComputeHash(data), nil
-}
-
-func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *Programs) (*hostEnv, error) {
-	accounts := state.NewAccounts(st)
-	generator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
+func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) (*hostEnv, error) {
+	accounts := state.NewAccounts(sth)
+	generator, err := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	if err != nil {
 		return nil, err
 	}
@@ -72,12 +60,15 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *
 		ctx.RestrictedDeploymentEnabled,
 		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
 
-	uuids := state.NewUUIDs(st)
-	uuidGenerator := NewUUIDGenerator(uuids)
+	uuidGenerator := state.NewUUIDGenerator(sth)
+
+	programsHandler := handler.NewProgramsHandler(
+		programs, sth,
+	)
 
 	env := &hostEnv{
 		ctx:                ctx,
-		st:                 st,
+		sth:                sth,
 		vm:                 vm,
 		metrics:            &noopMetricsCollector{},
 		accounts:           accounts,
@@ -85,7 +76,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, st *state.State, programs *
 		addressGenerator:   generator,
 		uuidGenerator:      uuidGenerator,
 		totalEventByteSize: uint64(0),
-		programs:           programs,
+		programs:           programsHandler,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -111,7 +102,7 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	e.transactionEnv = newTransactionEnv(
 		e.vm,
 		e.ctx,
-		e.st,
+		e.sth,
 		e.programs,
 		e.accounts,
 		e.contracts,
@@ -205,8 +196,8 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.st,
-		e.programs,
+		e.sth.State().View(),
+		e.programs.Programs,
 	)
 	if err != nil {
 		return 0, err
@@ -238,8 +229,8 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 	err = e.vm.Run(
 		e.ctx,
 		script,
-		e.st,
-		e.programs,
+		e.sth.State().View(),
+		e.programs.Programs,
 	)
 	if err != nil {
 		return 0, err
@@ -283,6 +274,13 @@ func (e *hostEnv) ResolveLocation(
 	// then fetch all identifiers at this address
 
 	if len(identifiers) == 0 {
+		address := flow.Address(addressLocation.Address)
+
+		err := e.accounts.CheckAccountNotFrozen(address)
+		if err != nil {
+			return nil, fmt.Errorf("resolve location: %w", err)
+		}
+
 		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
 		if err != nil {
 			panic(err)
@@ -333,6 +331,13 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
 
+	address := flow.BytesToAddress(contractLocation.Address.Bytes())
+
+	err := e.accounts.CheckAccountNotFrozen(address)
+	if err != nil {
+		return nil, fmt.Errorf("get code: %w", err)
+	}
+
 	return e.contracts.GetContract(contractLocation.Address, contractLocation.Name)
 }
 
@@ -342,19 +347,22 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 		defer sp.Finish()
 	}
 
-	program := e.programs.Get(location)
-	if program != nil {
-		// Program was found, do an explicit ledger register touch
-		// to ensure consistent reads during chunk verification.
-		if addressLocation, ok := location.(common.AddressLocation); ok {
-			e.accounts.TouchContract(
-				addressLocation.Name,
-				flow.BytesToAddress(addressLocation.Address.Bytes()),
-			)
+	if addressLocation, ok := location.(common.AddressLocation); ok {
+		address := flow.BytesToAddress(addressLocation.Address.Bytes())
+
+		freezeError := e.accounts.CheckAccountNotFrozen(address)
+
+		if freezeError != nil {
+			return nil, freezeError
 		}
 	}
 
-	return program, nil
+	program, has := e.programs.Get(location)
+	if has {
+		return program, nil
+	}
+
+	return nil, nil
 }
 
 func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Program) error {
@@ -363,9 +371,7 @@ func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Prog
 		defer sp.Finish()
 	}
 
-	e.programs.Set(location, program)
-
-	return nil
+	return e.programs.Set(location, program)
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
@@ -447,6 +453,25 @@ func (e *hostEnv) SetComputationUsed(used uint64) error {
 	return nil
 }
 
+func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+
+	flowAddress := flow.Address(address)
+
+	if flowAddress == e.ctx.Chain.ServiceAddress() {
+		return fmt.Errorf("cannot freeze service account")
+	}
+
+	if !e.transactionEnv.isAuthorizerServiceAccount() {
+		return fmt.Errorf("SetAccountFrozen can only be used in transactions authorized by service account")
+	}
+
+	err := e.accounts.SetAccountFrozen(flowAddress, frozen)
+	if err != nil {
+		return fmt.Errorf("cannot set account [%s] frozen [%t]: %w", flowAddress, frozen, err)
+	}
+	return nil
+}
+
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvDecodeArgument)
@@ -464,13 +489,32 @@ func (e *hostEnv) Logs() []string {
 	return e.logs
 }
 
+func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
+		defer sp.Finish()
+	}
+
+	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
+	if hashAlgo == crypto.UnknownHashAlgorithm {
+		panic(fmt.Errorf("unknown hash algorithm: %s", hashAlgorithm))
+	}
+
+	hasher, err := crypto.NewHasher(hashAlgo)
+	if err != nil {
+		panic(fmt.Errorf("cannot create hasher: %w", err))
+	}
+
+	return hasher.ComputeHash(data), nil
+}
+
 func (e *hostEnv) VerifySignature(
 	signature []byte,
 	tag string,
-	message []byte,
-	rawPublicKey []byte,
-	rawSigAlgo string,
-	rawHashAlgo string,
+	signedData []byte,
+	publicKey []byte,
+	signatureAlgorithm runtime.SignatureAlgorithm,
+	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvVerifySignature)
@@ -481,10 +525,10 @@ func (e *hostEnv) VerifySignature(
 		e.ctx.SignatureVerifier,
 		signature,
 		tag,
-		message,
-		rawPublicKey,
-		rawSigAlgo,
-		rawHashAlgo,
+		signedData,
+		publicKey,
+		signatureAlgorithm,
+		hashAlgorithm,
 	)
 
 	if err != nil {
@@ -586,7 +630,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 	return e.transactionEnv.CreateAccount(payer)
 }
 
-func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error {
+func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvAddAccountKey)
 		defer sp.Finish()
@@ -596,11 +640,16 @@ func (e *hostEnv) AddAccountKey(address runtime.Address, publicKey []byte) error
 		return errors.New("adding account keys is not supported")
 	}
 
+	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return fmt.Errorf("add count key: %w", err)
+	}
+
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.AddAccountKey(address, publicKey)
+	return e.transactionEnv.AddEncodedAccountKey(address, publicKey)
 }
 
-func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
+func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvRemoveAccountKey)
 		defer sp.Finish()
@@ -610,8 +659,58 @@ func (e *hostEnv) RemoveAccountKey(address runtime.Address, index int) (publicKe
 		return nil, errors.New("removing account keys is not supported")
 	}
 
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return nil, fmt.Errorf("remove account key: %w", err)
+	}
+
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.RemoveAccountKey(address, index)
+}
+
+func (e *hostEnv) AddAccountKey(
+	address runtime.Address,
+	publicKey *runtime.PublicKey,
+	hashAlgo runtime.HashAlgorithm,
+	weight int,
+) (*runtime.AccountKey, error) {
+
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvAddAccountKey)
+		defer sp.Finish()
+	}
+
+	if e.transactionEnv == nil {
+		return nil, errors.New("adding account keys is not supported")
+	}
+
+	return e.transactionEnv.AddAccountKey(address, publicKey, hashAlgo, weight)
+}
+
+func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetAccountKey)
+		defer sp.Finish()
+	}
+
+	if e.transactionEnv == nil {
+		return nil, errors.New("getting account keys is not supported")
+	}
+
+	return e.transactionEnv.GetAccountKey(address, index)
+}
+
+func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvRemoveAccountKey)
+		defer sp.Finish()
+	}
+
+	if e.transactionEnv == nil {
+		return nil, errors.New("revoking account keys is not supported")
+	}
+
+	return e.transactionEnv.RevokeAccountKey(address, index)
 }
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
@@ -622,6 +721,11 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 
 	if e.transactionEnv == nil {
 		return errors.New("updating account contract code is not supported")
+	}
+
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return fmt.Errorf("update account contract code: %w", err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -650,6 +754,11 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 		return errors.New("removing account contracts is not supported")
 	}
 
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return fmt.Errorf("remove account contract code: %w", err)
+	}
+
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.RemoveAccountContractCode(address, name)
 }
@@ -675,7 +784,7 @@ func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration
 	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", location.String())},
 			},
 			},
 		)
@@ -687,7 +796,7 @@ func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duratio
 	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", location.String())},
 			},
 			},
 		)
@@ -699,7 +808,7 @@ func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Dur
 	if e.isTraceable() {
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []tracelog.Field{tracelog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", location.String())},
 			},
 			},
 		)
@@ -725,7 +834,7 @@ func (e *hostEnv) ValueDecoded(duration time.Duration) {
 	e.metrics.ValueDecoded(duration)
 }
 
-func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
+func (e *hostEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	// commit changes and return a list of updated keys
 	return e.contracts.Commit()
 }
@@ -734,8 +843,8 @@ func (e *hostEnv) Commit() ([]handler.ContractUpdateKey, error) {
 type transactionEnv struct {
 	vm               *VirtualMachine
 	ctx              Context
-	st               *state.State
-	programs         *Programs
+	sth              *state.StateHolder
+	programs         *handler.ProgramsHandler
 	accounts         *state.Accounts
 	contracts        *handler.ContractHandler
 	addressGenerator flow.AddressGenerator
@@ -749,8 +858,8 @@ type transactionEnv struct {
 func newTransactionEnv(
 	vm *VirtualMachine,
 	ctx Context,
-	st *state.State,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *handler.ProgramsHandler,
 	accounts *state.Accounts,
 	contracts *handler.ContractHandler,
 	addressGenerator flow.AddressGenerator,
@@ -760,7 +869,7 @@ func newTransactionEnv(
 	return &transactionEnv{
 		vm:               vm,
 		ctx:              ctx,
-		st:               st,
+		sth:              sth,
 		programs:         programs,
 		accounts:         accounts,
 		contracts:        contracts,
@@ -815,8 +924,8 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 				flowAddress,
 				e.ctx.Chain.ServiceAddress(),
 				e.ctx.RestrictedAccountCreationEnabled),
-			e.st,
-			e.programs,
+			e.sth,
+			e.programs.Programs,
 		)
 		if err != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -827,16 +936,14 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	return runtime.Address(flowAddress), nil
 }
 
-// AddAccountKey adds a public key to an existing account.
+// AddEncodedAccountKey adds an encoded public key to an existing account.
 //
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
-func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
+func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
 	accountAddress := flow.Address(address)
 
-	var ok bool
-
-	ok, err = e.accounts.Exists(accountAddress)
+	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return err
@@ -851,11 +958,13 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("cannot decode runtime public account key: %w", err)
 	}
 
 	err = e.accounts.AppendPublicKey(accountAddress, publicKey)
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return fmt.Errorf("failed to add public key to account: %w", err)
 	}
 
@@ -869,9 +978,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address, encodedPublicKey
 func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int) (encodedPublicKey []byte, err error) {
 	accountAddress := flow.Address(address)
 
-	var ok bool
-
-	ok, err = e.accounts.Exists(accountAddress)
+	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
 		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, err
@@ -883,12 +990,14 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if keyIndex < 0 {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, fmt.Errorf("key index must be positive, received %d", keyIndex)
 	}
 
 	var publicKey flow.AccountPublicKey
 	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
 	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return nil, err
 	}
 
@@ -904,10 +1013,248 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	return encodedPublicKey, nil
 }
 
+func (e *transactionEnv) isAuthorizerServiceAccount() bool {
+	return e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress()))
+}
+
+func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {
+	for _, accountAddress := range e.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+	return false
+}
+
 func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
 	return e.contracts.SetContract(address, name, code, e.GetSigningAccounts())
 }
 
 func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	return e.contracts.RemoveContract(address, name, e.GetSigningAccounts())
+}
+
+// AddAccountKey adds a public key to an existing account.
+//
+// This function returns an error if the specified account does not exist or
+// if the key insertion fails.
+func (e *transactionEnv) AddAccountKey(address runtime.Address,
+	publicKey *runtime.PublicKey,
+	hashAlgo runtime.HashAlgorithm,
+	weight int,
+) (
+	*runtime.AccountKey,
+	error,
+) {
+	accountAddress := flow.Address(address)
+
+	ok, err := e.accounts.Exists(accountAddress)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
+	}
+
+	if !ok {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("account with address %s does not exist", address)
+	}
+
+	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
+	if signAlgorithm == crypto.UnknownSignatureAlgorithm {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("cannot decode public key: invalid signature algorithm: %s", publicKey.SignAlgo)
+	}
+
+	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
+	if hashAlgorithm == crypto.UnknownHashAlgorithm {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("cannot decode public key: invalid hash algorithm: %s", hashAlgo)
+	}
+
+	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("cannot decode public key: %w", err)
+	}
+
+	keyIndex, err := e.accounts.GetPublicKeyCount(accountAddress)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
+	}
+
+	accountPublicKey := flow.AccountPublicKey{
+		Index:     int(keyIndex),
+		PublicKey: decodedPublicKey,
+		SignAlgo:  signAlgorithm,
+		HashAlgo:  hashAlgorithm,
+		SeqNumber: 0,
+		Weight:    weight,
+		Revoked:   false,
+	}
+
+	err = e.accounts.AppendPublicKey(accountAddress, accountPublicKey)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("failed to add public key to account: %w", err)
+	}
+
+	return &runtime.AccountKey{
+		KeyIndex:  accountPublicKey.Index,
+		PublicKey: publicKey,
+		HashAlgo:  hashAlgo,
+		Weight:    accountPublicKey.Weight,
+		IsRevoked: accountPublicKey.Revoked,
+	}, nil
+}
+
+// RevokeAccountKey revokes a public key by index from an existing account,
+// and returns the revoked key.
+//
+// This function returns a nil key with no errors, if a key doesn't exist at the given index.
+// An error is returned if the specified account does not exist, the provided index is not valid,
+// or if the key revoking fails.
+func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
+	accountAddress := flow.Address(address)
+
+	ok, err := e.accounts.Exists(accountAddress)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
+	}
+
+	if !ok {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("account with address %s does not exist", address)
+	}
+
+	// Don't return an error for invalid key indices
+	if keyIndex < 0 {
+		return nil, nil
+	}
+
+	var publicKey flow.AccountPublicKey
+	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
+	if err != nil {
+		// If a key is not found at a given index, then return a nil key with no errors.
+		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
+		// distinguish between a 'key not found error' vs other internal errors.
+
+		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
+			return nil, nil
+		}
+
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
+	}
+
+	// mark this key as revoked
+	publicKey.Revoked = true
+
+	_, err = e.accounts.SetPublicKey(accountAddress, uint64(keyIndex), publicKey)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("failed to revoke account key: %w", err)
+	}
+
+	// Prepare the account key to return
+
+	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
+	if signAlgo == runtime.SignatureAlgorithmUnknown {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf(
+			"failed to revoke account key: failed to convert signature algorithm: %s",
+			publicKey.SignAlgo,
+		)
+	}
+
+	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
+	if hashAlgo == runtime.HashAlgorithmUnknown {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf(
+			"failed to revoke account key: failed to convert hash algorithm: %s",
+			publicKey.HashAlgo,
+		)
+	}
+
+	return &runtime.AccountKey{
+		KeyIndex: publicKey.Index,
+		PublicKey: &runtime.PublicKey{
+			PublicKey: publicKey.PublicKey.Encode(),
+			SignAlgo:  signAlgo,
+		},
+		HashAlgo:  hashAlgo,
+		Weight:    publicKey.Weight,
+		IsRevoked: publicKey.Revoked,
+	}, nil
+}
+
+// GetAccountKey retrieves a public key by index from an existing account.
+//
+// This function returns a nil key with no errors, if a key doesn't exist at the given index.
+// An error is returned if the specified account does not exist, the provided index is not valid,
+// or if the key retrieval fails.
+func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
+	accountAddress := flow.Address(address)
+
+	ok, err := e.accounts.Exists(accountAddress)
+	if err != nil {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
+	}
+
+	if !ok {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf("account with address %s does not exist", address)
+	}
+
+	// Don't return an error for invalid key indices
+	if keyIndex < 0 {
+		return nil, nil
+	}
+
+	var publicKey flow.AccountPublicKey
+	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
+	if err != nil {
+		// If a key is not found at a given index, then return a nil key with no errors.
+		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
+		// distinguish between a 'key not found error' vs other internal errors.
+		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
+			return nil, nil
+		}
+
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, err
+	}
+
+	// Prepare the account key to return
+
+	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
+	if signAlgo == runtime.SignatureAlgorithmUnknown {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf(
+			"failed to get account key: failed to convert signature algorithm: %s",
+			publicKey.SignAlgo,
+		)
+	}
+
+	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
+	if hashAlgo == runtime.HashAlgorithmUnknown {
+		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+		return nil, fmt.Errorf(
+			"failed to get account key: failed to convert hash algorithm: %s",
+			publicKey.HashAlgo,
+		)
+	}
+
+	return &runtime.AccountKey{
+		KeyIndex: publicKey.Index,
+		PublicKey: &runtime.PublicKey{
+			PublicKey: publicKey.PublicKey.Encode(),
+			SignAlgo:  signAlgo,
+		},
+		HashAlgo:  hashAlgo,
+		Weight:    publicKey.Weight,
+		IsRevoked: publicKey.Revoked,
+	}, nil
 }

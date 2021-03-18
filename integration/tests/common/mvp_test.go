@@ -175,6 +175,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		}
 	}
 
+	fmt.Printf("new account address: %s\n", newAccountAddress)
+
 	accountClient, err := testnet.NewClientWithKey(
 		fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]),
 		newAccountAddress,

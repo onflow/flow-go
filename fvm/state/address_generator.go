@@ -12,42 +12,66 @@ const keyAddressState = "account_address_state"
 // It uses the underlying generator it gets from the chain.
 // The only change is that when next address is called the state is updated as well.
 type StateBoundAddressGenerator struct {
-	generator flow.AddressGenerator
-	state     *State
+	stateHolder *StateHolder
+	chain       flow.Chain
 }
 
-func NewStateBoundAddressGenerator(state *State, chain flow.Chain) (*StateBoundAddressGenerator, error) {
-	stateBytes, err := state.Get("", "", keyAddressState)
-	if err != nil {
-		return nil, err
-	}
-
-	addressGenerator := chain.BytesToAddressGenerator(stateBytes)
+func NewStateBoundAddressGenerator(stateHolder *StateHolder, chain flow.Chain) (*StateBoundAddressGenerator, error) {
 	return &StateBoundAddressGenerator{
-		state:     state,
-		generator: addressGenerator,
+		stateHolder: stateHolder,
+		chain:       chain,
 	}, nil
 }
 
+// TODO return error instead of a panic
+// this requires changes outside of fvm since the type is defined on flow model
+func (g *StateBoundAddressGenerator) Bytes() []byte {
+	stateBytes, err := g.stateHolder.State().Get("", "", keyAddressState)
+	if err != nil {
+		panic(err)
+	}
+	return stateBytes
+}
+
+func (g *StateBoundAddressGenerator) constructAddressGen() (flow.AddressGenerator, error) {
+	st := g.stateHolder.State()
+	stateBytes, err := st.Get("", "", keyAddressState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read address generator state from the state: %w", err)
+	}
+	return g.chain.BytesToAddressGenerator(stateBytes), nil
+}
+
 func (g *StateBoundAddressGenerator) NextAddress() (flow.Address, error) {
-	address, err := g.generator.NextAddress()
+
+	var address flow.Address
+	addressGenerator, err := g.constructAddressGen()
+	if err != nil {
+		return address, err
+	}
+
+	address, err = addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
 	}
 
 	// update the ledger state
-	stateBytes := g.generator.Bytes()
-	err = g.state.Set("", "", keyAddressState, stateBytes)
+	err = g.stateHolder.State().Set("", "", keyAddressState, addressGenerator.Bytes())
 	if err != nil {
-		return address, fmt.Errorf("failed to update the ledger: %w", err)
+		return address, fmt.Errorf("failed to update the state with address generator state: %w", err)
 	}
 	return address, nil
 }
 
 func (g *StateBoundAddressGenerator) CurrentAddress() flow.Address {
-	return g.generator.CurrentAddress()
-}
 
-func (g *StateBoundAddressGenerator) Bytes() []byte {
-	return g.generator.Bytes()
+	var address flow.Address
+	addressGenerator, err := g.constructAddressGen()
+	if err != nil {
+		// TODO update CurrentAddress to return an error if needed
+		panic(err)
+	}
+
+	address = addressGenerator.CurrentAddress()
+	return address
 }
