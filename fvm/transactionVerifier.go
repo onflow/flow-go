@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -23,13 +24,13 @@ func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatu
 }
 
 func (v *TransactionSignatureVerifier) Process(
-	vm *VirtualMachine,
-	ctx Context,
+	_ *VirtualMachine,
+	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *Programs,
+	programs *programs.Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc, ctx, sth)
+	return v.verifyTransactionSignatures(proc, *ctx, sth)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(

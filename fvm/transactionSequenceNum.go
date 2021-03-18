@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
 )
@@ -16,11 +17,11 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 }
 
 func (c *TransactionSequenceNumberChecker) Process(
-	vm *VirtualMachine,
-	ctx Context,
+	_ *VirtualMachine,
+	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *Programs,
+	programs *programs.Programs,
 ) error {
 
 	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
@@ -28,7 +29,7 @@ func (c *TransactionSequenceNumberChecker) Process(
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proc *TransactionProcedure,
-	ctx Context,
+	ctx *Context,
 	sth *state.StateHolder,
 ) error {
 
