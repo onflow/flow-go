@@ -10,7 +10,7 @@ import (
 // functor that will be get called on each block header when traversing blocks.
 type onVisitBlock = func(header *flow.Header) (bool, error)
 
-// TraverseBackwards traverses a chain segment beginning with the start block (inclusive)
+// TraverseBackward traverses a chain segment beginning with the start block (inclusive)
 // Blocks are traversed in reverse
 // height order, meaning the end block must be an ancestor of the start block.
 // The callback is called for each block in this segment.
@@ -38,29 +38,28 @@ func TraverseBackward(headers storage.Headers, startBlockID flow.Identifier, vis
 // TraverseForward traverses a chain segment in forward order.
 // Implements a recursive descend starting at the `forkHead` towards the genesis block. The descend continues as long as `shouldContinue` returns true. All visited blocks, which `shouldContinue` returned true for, are fed into the `visitor` callback starting from the block with the lowest height, in order of increasing height. The last block that is fed into `visitor` is the `forkHead`.
 func TraverseForward(headers storage.Headers,
-   forkHead flow.Identifier,
+	forkHead flow.Identifier,
 	visitor func(header *flow.Header) error,
 	shouldContinue func(header *flow.Header) bool,
 ) error {
-	block, err := headers.ByBlockID(startBlockID)
-	if err != nil {
-		return fmt.Errorf("could not get block header (%x): %w", startBlockID, err)
-	}
-
-	if !shouldContinue(block) {
-		return nil
-	}
-
-	// descend further down the chain
-	err = TraverseForward(headers, block.ParentID, visitor, shouldContinue)
+	var blocks []*flow.Header
+	err := TraverseBackward(headers, forkHead, func(header *flow.Header) (bool, error) {
+		ok := shouldContinue(header)
+		if !ok {
+			return false, nil
+		}
+		blocks = append(blocks, header)
+		return true, nil
+	})
 	if err != nil {
 		return err
 	}
 
-	// now we are on our way back up
-	err = visitor(block)
-	if err != nil {
-		return err
+	for i := range blocks {
+		err = visitor(blocks[len(blocks)-i-1])
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

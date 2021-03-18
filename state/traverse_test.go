@@ -14,7 +14,7 @@ import (
 )
 
 // TestTraverse tests different scenarios for reverse block traversing
-func TestTraverseBackwards(t *testing.T) {
+func TestTraverseBackward(t *testing.T) {
 
 	// create a storage.Headers mock with a backing map
 	byID := make(map[flow.Identifier]*flow.Header)
@@ -50,7 +50,7 @@ func TestTraverseBackwards(t *testing.T) {
 	// should return error and not call callback when start block doesn't exist
 	t.Run("non-existent start block", func(t *testing.T) {
 		start := unittest.IdentifierFixture()
-		err := TraverseBackwards(headers, start, func(_ *flow.Header) (bool, error) {
+		err := TraverseBackward(headers, start, func(_ *flow.Header) (bool, error) {
 			// should not be called
 			t.Fail()
 			return false, nil
@@ -61,7 +61,7 @@ func TestTraverseBackwards(t *testing.T) {
 	// should return error when end block doesn't exist
 	t.Run("non-existent end block", func(t *testing.T) {
 		start := byHeight[8].ID()
-		err := TraverseBackwards(headers, start, func(_ *flow.Header) (bool, error) {
+		err := TraverseBackward(headers, start, func(_ *flow.Header) (bool, error) {
 			return true, nil
 		})
 		assert.Error(t, err)
@@ -70,7 +70,7 @@ func TestTraverseBackwards(t *testing.T) {
 	// should return error if the callback returns an error
 	t.Run("callback error", func(t *testing.T) {
 		start := byHeight[8].ID()
-		err := TraverseBackwards(headers, start, func(_ *flow.Header) (bool, error) {
+		err := TraverseBackward(headers, start, func(_ *flow.Header) (bool, error) {
 			return true, fmt.Errorf("callback error")
 		})
 		assert.Error(t, err)
@@ -82,7 +82,7 @@ func TestTraverseBackwards(t *testing.T) {
 		end := byHeight[4].ID()
 
 		called := 0
-		err := TraverseBackwards(headers, start, func(header *flow.Header) (bool, error) {
+		err := TraverseBackward(headers, start, func(header *flow.Header) (bool, error) {
 			if header.ID() == end {
 				return false, nil
 			}
@@ -106,7 +106,7 @@ func TestTraverseBackwards(t *testing.T) {
 
 		// assert that we are receiving the correct block at each height
 		height := startHeight
-		err := TraverseBackwards(headers, start, func(header *flow.Header) (bool, error) {
+		err := TraverseBackward(headers, start, func(header *flow.Header) (bool, error) {
 			if header.Height < endHeight {
 				return false, nil
 			}
