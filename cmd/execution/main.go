@@ -223,7 +223,7 @@ func main() {
 			return compactor, nil
 		}).
 		Module("staked", func(node *cmd.FlowNodeBuilder) error {
-			staker = epochs.NewSealedStateStaker(node.Logger.With().Str("subcompontent", "staker").Logger(), node.State, node.Me)
+			staker = epochs.NewSealedStateStaker(node.Logger.With().Str("subcomponent", "staker").Logger(), node.State, node.Me)
 			return nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
