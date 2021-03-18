@@ -225,13 +225,13 @@ func (_m *ExecutionState) NewView(_a0 []byte) *delta.View {
 	return r0
 }
 
-// PersistExecutionState provides a mock function with given fields: ctx, header, endState, chunkDataPacks, executionResult, events, serviceEvents, results
-func (_m *ExecutionState) PersistExecutionState(ctx context.Context, header *flow.Header, endState []byte, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
-	ret := _m.Called(ctx, header, endState, chunkDataPacks, executionResult, events, serviceEvents, results)
+// PersistExecutionState provides a mock function with given fields: ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results
+func (_m *ExecutionState) PersistExecutionState(ctx context.Context, header *flow.Header, endState []byte, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+	ret := _m.Called(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, []byte, []*flow.ChunkDataPack, *flow.ExecutionResult, []flow.Event, []flow.Event, []flow.TransactionResult) error); ok {
-		r0 = rf(ctx, header, endState, chunkDataPacks, executionResult, events, serviceEvents, results)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, []byte, []*flow.ChunkDataPack, *flow.ExecutionReceipt, []flow.Event, []flow.Event, []flow.TransactionResult) error); ok {
+		r0 = rf(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
 	} else {
 		r0 = ret.Error(0)
 	}
