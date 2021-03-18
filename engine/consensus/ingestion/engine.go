@@ -269,6 +269,9 @@ func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// get the clusters to assign the guarantee and check if the guarantor is part of it
 	snapshot := e.state.AtBlockID(guarantee.ReferenceBlockID)
 	clusters, err := snapshot.Epochs().Current().Clustering()
+	if errors.Is(err, storage.ErrNotFound) {
+		return engine.NewUnverifiableInputError("could not get clusters for unknown reference block (id=%x): %w", guarantee.ReferenceBlockID, err)
+	}
 	if err != nil {
 		return fmt.Errorf("could not get clusters: %w", err)
 	}
@@ -304,14 +307,21 @@ func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 // Returns the origin identity as validated if validation passes.
 func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.CollectionGuarantee) (*flow.Identity, error) {
 
-	// get the origin identity w.r.t. the collection reference block
-	origin, err := e.state.AtBlockID(guarantee.ReferenceBlockID).Identity(originID)
-	if err != nil && !protocol.IsIdentityNotFound(err) {
-		return nil, engine.NewInvalidInputErrorf("could not get origin (id=%x) identity w.r.t. reference block : %w", originID, err)
-	}
+	refBlock := guarantee.ReferenceBlockID
 
-	// if it is a collection node and a valid epoch participant, it is a valid origin
-	if err == nil {
+	// get the origin identity w.r.t. the collection reference block
+	origin, err := e.state.AtBlockID(refBlock).Identity(originID)
+	if err != nil {
+		// an unknown block is unverifiable
+		if errors.Is(err, storage.ErrNotFound) {
+			return nil, engine.NewUnverifiableInputError("could not get origin (id=%x) for unknown reference block (id=%x): %w", originID, refBlock, err)
+		}
+		// in case of identity not found, we continue and check the other case - all other errors are unexpected
+		if !protocol.IsIdentityNotFound(err) {
+			return nil, fmt.Errorf("could not get origin (id=%x) identity w.r.t. reference block (id=%x) : %w", originID, refBlock, err)
+		}
+	} else {
+		// if it is a collection node and a valid epoch participant, it is a valid origin
 		if filter.And(
 			filter.IsValidCurrentEpochParticipant,
 			filter.HasRole(flow.RoleCollection),
@@ -331,8 +341,11 @@ func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.Collec
 
 	// get the origin identity w.r.t. the latest finalized block
 	origin, err = e.state.Final().Identity(originID)
+	if protocol.IsIdentityNotFound(err) {
+		return nil, engine.NewInvalidInputErrorf("unknown origin (id=%x): %w", originID, err)
+	}
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("could not get origin (id=%x) identity w.r.t. finalized block: %w", originID, err)
+		return nil, fmt.Errorf("could not get origin (id=%x) w.r.t. finalized state: %w", originID, err)
 	}
 
 	if filter.And(
