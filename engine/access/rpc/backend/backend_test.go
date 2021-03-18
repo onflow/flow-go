@@ -326,6 +326,9 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	// status should be finalized since the sealed blocks is smaller in height
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
 
+	// block ID should be included in the response
+	suite.Assert().Equal(blockID, result.BlockID)
+
 	// Successfully return empty event list from here on
 	suite.execClient.
 		On("GetTransactionResult", ctx, &exeEventReq).
