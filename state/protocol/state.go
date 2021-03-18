@@ -66,7 +66,7 @@ type MutableState interface {
 // IsNodeStakedAtBlockID returns true if the `identifier` is staked at `blockID` according to `state`.
 func IsNodeStakedAtBlockID(state State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
 	identity, err := state.AtBlockID(blockID).Identity(identifier)
-	if protocol.IsIdentityNotFound(err) {
+	if IsIdentityNotFound(err) {
 		return false, nil
 	}
 	if err != nil {
