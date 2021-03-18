@@ -65,6 +65,8 @@ func TestProduceConsume(t *testing.T) {
 		})
 	})
 
+	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the assigner engine finishes processing
+	// all blocks immediately, results in engine receiving all 10 blocks (in any order).
 	t.Run("pushing 10 blocks, non-blocking, receives 10", func(t *testing.T) {
 		received := make([]*flow.Block, 0)
 		lock := &sync.Mutex{}
