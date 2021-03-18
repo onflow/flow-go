@@ -27,7 +27,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -63,7 +63,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -99,7 +99,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -138,7 +138,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(nil, errors.New("not found!"))
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector()}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -163,7 +163,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector()}
+		e := Engine{state: ps, chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -202,6 +202,74 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		assert.NoError(t, err)
+
+		ps.AssertExpectations(t)
+		ss.AssertExpectations(t)
+		con.AssertExpectations(t)
+		execState.AssertExpectations(t)
+	})
+
+	t.Run("reply to chunk data pack request only when staked", func(t *testing.T) {
+
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
+		con := new(mocknetwork.Conduit)
+
+		execState := new(state.ExecutionState)
+
+		currentStakedState := true
+		checkStakedAtBlock := func(_ flow.Identifier) (bool, error) { return currentStakedState, nil }
+
+		e := Engine{
+			state:              ps,
+			chunksConduit:      con,
+			execState:          execState,
+			metrics:            metrics.NewNoopCollector(),
+			checkStakedAtBlock: checkStakedAtBlock,
+		}
+
+		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+		chunkID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+		collection := unittest.CollectionFixture(1)
+		blockID := unittest.IdentifierFixture()
+
+		execState.
+			On("GetBlockIDByChunkID", chunkID).
+			Return(blockID, nil)
+		//ps.On("Final").Return(ss).Once()
+		ps.On("AtBlockID", blockID).Return(ss)
+
+		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
+		con.On("Unicast", mock.Anything, originIdentity.NodeID).
+			Run(func(args mock.Arguments) {
+				res, ok := args[0].(*messages.ChunkDataResponse)
+				require.True(t, ok)
+
+				actualChunkID := res.ChunkDataPack.ChunkID
+				assert.Equal(t, chunkID, actualChunkID)
+			}).
+			Return(nil).Once()
+
+		execState.
+			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
+			Return(chunkDataPack, nil).Twice()
+
+		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
+
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+
+		err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+		assert.NoError(t, err)
+
+		currentStakedState = false
+
+		err = e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+		assert.Error(t, err)
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
