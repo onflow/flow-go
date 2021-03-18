@@ -7,11 +7,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	engmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -54,10 +56,7 @@ func createNodes(
 
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
-	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	identities := append(conIdentities, colIdentity, exeIdentity, verIdentity)
+	identities := unittest.CompleteIdentitySet(conIdentities...)
 
 	nodes := []*node{}
 	for _, id := range conIdentities {
@@ -120,9 +119,7 @@ func createNode(
 		core.Me,
 		brokerTunnel,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
@@ -235,14 +232,42 @@ func TestDKG(t *testing.T) {
 	}
 
 	// check that all nodes have published the same DKG result
-	require.Equal(t, 1, len(whiteboard.resultSubmitters))
-	for _, signers := range whiteboard.resultSubmitters {
-		require.Equal(t, 10, len(signers))
+	require.Equal(t, 1, len(whiteboard.results))
+	var dkgResult result
+	for _, res := range whiteboard.results {
+		dkgResult = res
+		break
 	}
 
-	// check that each node has saved a private key
-	for _, n := range nodes {
-		_, err := n.keyStorage.RetrieveMyDKGPrivateInfo(epochSetup.Counter)
+	// check that the result was submitted by all participants
+	require.Equal(t, 1, len(whiteboard.resultSubmitters))
+	require.Equal(t, 10, len(whiteboard.resultSubmitters[flow.MakeID(dkgResult)]))
+
+	// create and test a threshold signature with the keys computed by dkg
+	sigData := []byte("message to be signed")
+	signers := []*signature.ThresholdProvider{}
+	signatures := []crypto.Signature{}
+	indices := []uint{}
+	for i, n := range nodes {
+		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(epochSetup.Counter)
 		require.NoError(t, err)
+
+		signer := signature.NewThresholdProvider("XXXTAG", priv.RandomBeaconPrivKey.PrivateKey)
+		signers = append(signers, signer)
+
+		signature, err := signer.Sign(sigData)
+		require.NoError(t, err)
+		signatures = append(signatures, signature)
+
+		indices = append(indices, uint(i))
+	}
+
+	groupSignature, err := signature.CombineThresholdShares(uint(len(nodes)), signatures, indices)
+	require.NoError(t, err)
+
+	for _, signer := range signers {
+		ok, err := signer.Verify(sigData, groupSignature, dkgResult.groupKey)
+		require.NoError(t, err)
+		require.True(t, ok)
 	}
 }
