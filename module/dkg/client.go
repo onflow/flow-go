@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/cadence"
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"

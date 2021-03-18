@@ -1,13 +1,17 @@
 package dkg
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	emulator "github.com/onflow/flow-emulator"
+
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
-	emulator "github.com/onflow/flow-emulator"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
@@ -30,6 +34,10 @@ type ClientSuite struct {
 	dkgAddress    sdk.Address
 	dkgAccountKey *sdk.AccountKey
 	dkgSigner     sdkcrypto.Signer
+}
+
+func TestDKGClient(t *testing.T) {
+	suite.Run(t, new(ClientSuite))
 }
 
 // Setup Test creates the blockchain client, the emulated blockchain and deploys

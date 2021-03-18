@@ -5,12 +5,15 @@ package module
 import (
 	"context"
 
+	"google.golang.org/grpc"
+
 	"github.com/onflow/cadence"
+
 	sdk "github.com/onflow/flow-go-sdk"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"google.golang.org/grpc"
 )
 
 // DKGSDKClientWrapper is a temporary solution to mocking the `sdk.Client` interface from `flow-go-sdk`
