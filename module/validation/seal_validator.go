@@ -163,7 +163,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	sealedID := last.BlockID
 	err = state.Traverse(s.headers, header.ParentID,
 		func(block *flow.Header) (bool, error) {
-			if block.ID() == sealedID {
+   		blockID := block.ID()
+   		if blockID == sealedID {
 				return false, nil
 			}
 

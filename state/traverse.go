@@ -40,14 +40,16 @@ func Traverse(headers storage.Headers, startBlockID flow.Identifier, visitor onV
 // Implements a recursive descend to last block identified by `stopBlockID` and then calling
 // visitor callback for every block way back up to `startBlockID`
 func TraverseParentFirst(headers storage.Headers, startBlockID, stopBlockID flow.Identifier,
-	visitor func(header *flow.Header) error) error {
+	visitor func(header *flow.Header) error,
+) error {
+
+	if startBlockID == stopBlockID {
+		return nil
+	}
+
 	ancestor, err := headers.ByBlockID(startBlockID)
 	if err != nil {
 		return fmt.Errorf("could not get ancestor header (%x): %w", startBlockID, err)
-	}
-
-	if ancestor.ID() == stopBlockID {
-		return nil
 	}
 
 	// descend further down the chain
