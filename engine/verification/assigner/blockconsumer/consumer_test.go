@@ -1,6 +1,7 @@
 package blockconsumer
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -40,6 +41,7 @@ func TestProduceConsume(t *testing.T) {
 		neverFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
 			lock.Lock()
 			defer lock.Unlock()
+			fmt.Println("received height", block.Header.Height)
 			received = append(received, block)
 		}
 
@@ -54,7 +56,7 @@ func TestProduceConsume(t *testing.T) {
 
 			// expect the mock engine receive only the first 3 calls (since it is blocked on those, hence no
 			// new block is fetched to process).
-			require.Equal(t, blocks[:3], received)
+			requireBlockListsEqualIgnoreOrder(t, received, blocks[:3])
 		})
 
 	})
@@ -95,22 +97,28 @@ func WithConsumer(
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
-		resultTestCases := utils.CompleteExecutionResultChainFixture(t, root, blockCount)
-		blocks := make([]*flow.Block, 0)
-
-		// extends protocol state with the chain of blocks.
-		for _, result := range resultTestCases {
-			err := s.State.Extend(result.ReferenceBlock)
-			require.NoError(t, err)
-			blocks = append(blocks, result.ReferenceBlock)
-
-			err = s.State.Extend(result.ContainerBlock)
-			require.NoError(t, err)
-			blocks = append(blocks, result.ContainerBlock)
-		}
-
+		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount)
+		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
 		withConsumer(consumer, blocks)
 	})
+}
+
+func requireContainBlock(t *testing.T, block *flow.Block, blocks []*flow.Block) {
+	blockID := block.ID()
+	for _, b := range blocks {
+		if b.ID() == blockID {
+			return
+		}
+	}
+
+	require.Fail(t, fmt.Sprintf("block %x is not in the list %v", blockID, blocks))
+}
+
+func requireBlockListsEqualIgnoreOrder(t *testing.T, src []*flow.Block, dst []*flow.Block) {
+	require.Equal(t, len(src), len(dst), fmt.Sprintf("block lists are not of same length src: %d, dst: %d", len(src), len(dst)))
+	for _, e := range src {
+		requireContainBlock(t, e, dst)
+	}
 }
 
 type MockAssignerEngine struct {
