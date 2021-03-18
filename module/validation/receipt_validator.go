@@ -247,7 +247,10 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 		return nil
 	}
-	err = v.forkCrawler(header.ParentID, sealedHeight+1, bookKeeper)
+
+	// Demonstration that order of block traversal is critical for correctness of algorithm:
+	//err = v.forkCrawler(header.ParentID, sealedHeight+1, bookKeeper)  // crawling bottom up works
+	err = v.topDownCrawler(header.ParentID, sealedHeight+1, bookKeeper) // crawling top-down does NOT WORK
 	if err != nil {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
@@ -403,5 +406,42 @@ func (v *receiptValidator) forkCrawler(
 	if err != nil {
 		return fmt.Errorf("error in consumer function at height %d (block %x): %w", head.Height, headID, err)
 	}
+	return nil
+}
+
+// topDownCrawler traverses the fork with the provided head.
+//
+// DIFFERENCE to forkCrawler: here, we work top down (consuming the fork's head first
+// and then consuming the block decremented height) while in forkCrawler we work bottom-up
+// (consuming at the lowest height first and then consuming blocks with increasing height)
+func (v *receiptValidator) topDownCrawler(
+	headID flow.Identifier,
+	lowestHeight uint64,
+	blockConsumer func(blockID flow.Identifier, payloadIndex *flow.Index) error,
+) error {
+	head, err := v.headers.ByBlockID(headID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve header for block %x: %w", headID, err)
+	}
+	if head.Height < lowestHeight {
+		return nil
+	}
+
+	// First, consume the block
+	index, err := v.index.ByBlockID(headID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve payload index for block %x: %w", headID, err)
+	}
+	err = blockConsumer(headID, index)
+	if err != nil {
+		return fmt.Errorf("error in consumer function at height %d (block %x): %w", head.Height, headID, err)
+	}
+
+	// descend further down the chain
+	err = v.forkCrawler(head.ParentID, lowestHeight, blockConsumer)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
