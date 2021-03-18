@@ -14,14 +14,30 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestBlockReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
+// protocol state.
 func TestBlockReader(t *testing.T) {
 	WithTestSetup(t, 10, func(reader *FinalizedBlockReader, blocks []*flow.Block) {
+		// head of block reader should be the same height as the last block on the chain.
 		head, err := reader.Head()
 		require.NoError(t, err)
 		require.Equal(t, uint64(head), blocks[len(blocks)-1].Header.Height)
+
+		// retrieved blocks from block reader should be the same as the original blocks stored in it.
+		for _, actual := range blocks {
+			index := int64(actual.Header.Height)
+			job, err := reader.AtIndex(index)
+			require.NoError(t, err)
+
+			retrieved := jobToBlock(job)
+			require.Equal(t, actual.ID(), retrieved.ID())
+		}
 	})
 }
 
+// WithTestSetup is a test helper that provides the implementation of its `withReader` with an instance of FinalizedBlockReader that is connected
+// to blocks storage and protocol state. The protocol state has been extended with `blockCount` finalized blocks and those
+// blocks are also provided for the `withReader` function body.
 func WithTestSetup(
 	t *testing.T,
 	blockCount int,
