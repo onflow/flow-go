@@ -69,7 +69,13 @@ func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk
 		arguments = append(arguments, val)
 	}
 
-	scriptResult, err := c.blockchain.ExecuteScript(script, arguments)
+	// get block by ID
+	block, err := c.blockchain.GetBlockByID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	scriptResult, err := c.blockchain.ExecuteScriptAtBlock(script, arguments, block.Header.Height)
 	if err != nil {
 		return nil, err
 	}
