@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"fmt"
 	mathRand "math/rand"
 	"sync"
 	"testing"
@@ -201,8 +200,6 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 
 	ctx.computationManager.
 		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).Run(func(args mock.Arguments) {
-		time.Sleep(1000 * time.Millisecond)
-		fmt.Printf("run\n")
 	}).
 		Return(computationResult, nil).Once()
 
