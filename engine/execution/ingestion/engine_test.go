@@ -29,6 +29,7 @@ import (
 	module "github.com/onflow/flow-go/module/mocks"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	stateProtocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
@@ -63,7 +64,6 @@ type testingContext struct {
 	executionState      *state.ExecutionState
 	snapshot            *protocol.Snapshot
 	identity            *flow.Identity
-	staker              *unittest.FixedStaker
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 }
 
@@ -143,7 +143,10 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	deltas, err := NewDeltas(1000)
 	require.NoError(t, err)
 
-	fixedStaker := unittest.NewFixedStaker(true)
+	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return stateProtocol.IsNodeStakedAtBlockID(protocolState, blockID, myIdentity.NodeID)
+	}
+
 	engine, err = New(
 		log,
 		net,
@@ -165,7 +168,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		deltas,
 		10,
 		false,
-		fixedStaker,
+		checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 
@@ -182,7 +185,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		executionState:      executionState,
 		snapshot:            snapshot,
 		identity:            myIdentity,
-		staker:              fixedStaker,
 		broadcastedReceipts: make(map[flow.Identifier]*flow.ExecutionReceipt),
 	})
 
@@ -295,10 +297,23 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 		}).
 		Return(nil)
 
+	ctx.mockStakedAtBlockID(executableBlock.ID(), expectBroadcast)
+
 	if !expectBroadcast {
 		broadcastMock.Maybe()
 	}
 
+}
+
+func (ctx testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bool) {
+	identity := *ctx.identity
+	identity.Stake = 0
+	if staked {
+		identity.Stake = 100
+	}
+	snap := new(protocol.Snapshot)
+	snap.On("Identity", identity.NodeID).Return(&identity, nil)
+	ctx.state.On("AtBlockID", blockID).Return(snap)
 }
 
 func (ctx *testingContext) stateCommitmentExist(blockID flow.Identifier, commit flow.StateCommitment) {
@@ -344,6 +359,8 @@ func TestExecuteOneBlock(t *testing.T) {
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentFixture()
+
+		ctx.mockStakedAtBlockID(blockB.ID(), true)
 
 		// blockA's start state is its parent's state commitment,
 		// and blockA's parent has been executed.
@@ -603,9 +620,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		// a receipt for sealed block won't be broadcasted
 		ctx.snapshot.On("Head").Return(&blockSealed, nil)
 
-		ctx.engine.staker = &AlternatingStaker{
-			Staked: true,
-		}
+		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
 
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true)
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false)
@@ -613,22 +628,26 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), false)
 
 		wg.Add(1)
-		ctx.staker.Staked = true
+		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
+
 		err := ctx.engine.handleBlock(context.Background(), blocks["A"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
-		ctx.staker.Staked = false
+		ctx.mockStakedAtBlockID(blocks["B"].ID(), false)
+
 		err = ctx.engine.handleBlock(context.Background(), blocks["B"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
-		ctx.staker.Staked = true
+		ctx.mockStakedAtBlockID(blocks["C"].ID(), true)
+
 		err = ctx.engine.handleBlock(context.Background(), blocks["C"].Block)
 		require.NoError(t, err)
 
 		wg.Add(1)
-		ctx.staker.Staked = false
+		ctx.mockStakedAtBlockID(blocks["D"].ID(), false)
+
 		err = ctx.engine.handleBlock(context.Background(), blocks["D"].Block)
 		require.NoError(t, err)
 
@@ -710,6 +729,10 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	deltas, err := NewDeltas(10)
 	require.NoError(t, err)
 
+	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return stateProtocol.IsNodeStakedAtBlockID(ps, blockID, myIdentity.NodeID)
+	}
+
 	engine, err = New(
 		log,
 		net,
@@ -731,7 +754,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		deltas,
 		10,
 		false,
-		unittest.NewFixedStaker(true),
+		checkStakedAtBlock,
 	)
 
 	require.NoError(t, err)
@@ -1013,13 +1036,4 @@ func TestChunkifyEvents(t *testing.T) {
 	ret = ChunkifyEvents(events, 12)
 	assert.Equal(t, len(ret), 1)
 	assert.Equal(t, ret[0], events[:])
-}
-
-type AlternatingStaker struct {
-	Staked bool
-}
-
-func (a *AlternatingStaker) AmIStakedAt(_ flow.Identifier) bool {
-	a.Staked = !a.Staked
-	return !a.Staked
 }

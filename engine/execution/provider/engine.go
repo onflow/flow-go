@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -30,16 +29,16 @@ type ProviderEngine interface {
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
 type Engine struct {
-	unit          *engine.Unit
-	log           zerolog.Logger
-	tracer        module.Tracer
-	receiptCon    network.Conduit
-	state         protocol.State
-	execState     state.ReadOnlyExecutionState
-	me            module.Local
-	chunksConduit network.Conduit
-	metrics       module.ExecutionMetrics
-	staker        epochs.Staker
+	unit               *engine.Unit
+	log                zerolog.Logger
+	tracer             module.Tracer
+	receiptCon         network.Conduit
+	state              protocol.State
+	execState          state.ReadOnlyExecutionState
+	me                 module.Local
+	chunksConduit      network.Conduit
+	metrics            module.ExecutionMetrics
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
 }
 
 func New(
@@ -50,20 +49,20 @@ func New(
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
-	staker epochs.Staker,
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
-		unit:      engine.NewUnit(),
-		log:       log,
-		tracer:    tracer,
-		state:     state,
-		me:        me,
-		execState: execState,
-		metrics:   metrics,
-		staker:    staker,
+		unit:               engine.NewUnit(),
+		log:                log,
+		tracer:             tracer,
+		state:              state,
+		me:                 me,
+		execState:          execState,
+		metrics:            metrics,
+		checkStakedAtBlock: checkStakedAtBlock,
 	}
 
 	var err error
@@ -206,7 +205,10 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
 	}
 
-	stakedAt := e.staker.AmIStakedAt(blockID)
+	stakedAt, err := e.checkStakedAtBlock(blockID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
+	}
 	if !stakedAt {
 		return nil, engine.NewInvalidInputErrorf("this node is not staked at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
 	}

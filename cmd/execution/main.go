@@ -39,7 +39,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
-	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -86,7 +85,7 @@ func main() {
 		syncFast              bool
 		syncThreshold         int
 		extensiveLog          bool
-		staker                epochs.Staker
+		checkStakedAtBlock    func(blockID flow.Identifier) (bool, error)
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -174,6 +173,12 @@ func main() {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
+		Module("stake checking function", func(node *cmd.FlowNodeBuilder) error {
+			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
+				return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+			}
+			return nil
+		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
@@ -222,10 +227,6 @@ func main() {
 
 			return compactor, nil
 		}).
-		Module("staked", func(node *cmd.FlowNodeBuilder) error {
-			staker = epochs.NewSealedStateStaker(node.Logger.With().Str("subcompontent", "staker").Logger(), node.State, node.Me)
-			return nil
-		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
@@ -255,7 +256,7 @@ func main() {
 				node.Me,
 				executionState,
 				collector,
-				staker,
+				checkStakedAtBlock,
 			)
 
 			return providerEngine, err
@@ -291,6 +292,7 @@ func main() {
 			events = storage.NewEvents(node.DB)
 			serviceEvents := storage.NewServiceEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
+
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -312,7 +314,7 @@ func main() {
 				deltas,
 				syncThreshold,
 				syncFast,
-				staker,
+				checkStakedAtBlock,
 			)
 
 			// TODO: we should solve these mutual dependencies better

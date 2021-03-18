@@ -27,7 +27,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), staker: unittest.NewFixedStaker(true)}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -58,13 +58,12 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("unstaked (0 stake) origin", func(t *testing.T) {
-		staker := &unittest.FixedStaker{Staked: true}
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), staker: staker}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -95,13 +94,12 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 	})
 
 	t.Run("unstaked (not found origin) origin", func(t *testing.T) {
-		staker := &unittest.FixedStaker{Staked: true}
 		ps := new(mockprotocol.State)
 		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), staker: staker}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -140,7 +138,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(nil, errors.New("not found!"))
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), staker: unittest.NewFixedStaker(true)}
+		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -165,7 +163,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector(), staker: unittest.NewFixedStaker(true)}
+		e := Engine{state: ps, chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -219,8 +217,16 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		staker := unittest.NewFixedStaker(true)
-		e := Engine{state: ps, chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector(), staker: staker}
+		currentStakedState := true
+		checkStakedAtBlock := func(_ flow.Identifier) (bool, error) { return currentStakedState, nil }
+
+		e := Engine{
+			state:              ps,
+			chunksConduit:      con,
+			execState:          execState,
+			metrics:            metrics.NewNoopCollector(),
+			checkStakedAtBlock: checkStakedAtBlock,
+		}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -260,7 +266,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		assert.NoError(t, err)
 
-		staker.Staked = false
+		currentStakedState = false
 
 		err = e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
 		assert.Error(t, err)
