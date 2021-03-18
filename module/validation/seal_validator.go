@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/state"
 
 	"github.com/rs/zerolog/log"
 
@@ -145,20 +146,18 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
-	ancestorID := header.ParentID
-	for ancestorID != sealedID {
-
-		ancestor, err := s.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
+	err = state.TraverseBackward(s.headers, header.ParentID, func(header *flow.Header) (bool, error) {
+		blockID := header.ID()
+		if sealedID == blockID {
+			return false, nil
 		}
 
 		// keep track of blocks on the fork
-		blockIDs = append(blockIDs, ancestorID)
+		blockIDs = append(blockIDs, blockID)
 
-		payload, err := s.payloads.ByBlockID(ancestorID)
+		payload, err := s.payloads.ByBlockID(blockID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block payload %x: %w", ancestorID, err)
+			return false, fmt.Errorf("could not get block payload %x: %w", blockID, err)
 		}
 
 		// Collect execution results from receipts.
@@ -180,8 +179,10 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			)
 
 		}
-
-		ancestorID = ancestor.ParentID
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// We do not include the receipts in the same payload to the unsealedResults.
