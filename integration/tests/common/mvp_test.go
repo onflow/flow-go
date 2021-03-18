@@ -132,7 +132,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	
 	fmt.Printf("new account address: %s\n", newAccountAddress)
 
-	// Generate the account creation transaction
+	// Generate the fund account transaction (so account can be used as a payer)
 	fundAccountTx := sdk.NewTransaction().
 		SetScript([]byte(fmt.Sprintf(`
 			import FungibleToken from 0x%s
@@ -170,8 +170,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 
 	cancel()
-
-	// wait for account to be created
+	
 	fundCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), fundAccountTx.ID())
 	require.NoError(t, err)
 	t.Log(fundCreationTxRes)
