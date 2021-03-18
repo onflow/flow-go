@@ -20,7 +20,7 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
 		id := key.(flow.Identifier)
 		setup := val.(*flow.EpochSetup)
-		return operation.InsertEpochSetup(id, setup)
+		return operation.SkipDuplicates(operation.InsertEpochSetup(id, setup))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {

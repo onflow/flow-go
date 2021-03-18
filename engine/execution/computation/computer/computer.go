@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -22,12 +23,12 @@ import (
 )
 
 type VirtualMachine interface {
-	Run(fvm.Context, fvm.Procedure, state.Ledger, *fvm.Programs) error
+	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, *delta.View, *fvm.Programs) (*execution.ComputationResult, error)
+	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -69,8 +70,8 @@ func NewBlockComputer(
 func (e *blockComputer) ExecuteBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	stateView *delta.View,
-	program *fvm.Programs,
+	stateView state.View,
+	program *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
 	if e.tracer != nil {
@@ -97,8 +98,8 @@ func (e *blockComputer) ExecuteBlock(
 func (e *blockComputer) executeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	stateView *delta.View,
-	programs *fvm.Programs,
+	stateView state.View,
+	programs *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
@@ -138,10 +139,12 @@ func (e *blockComputer) executeBlock(
 		serviceEvents = append(serviceEvents, collServiceEvents...)
 		blockTxResults = append(blockTxResults, txResults...)
 
-		interactions[i] = collectionView.Interactions()
+		interactions[i] = collectionView.(*delta.View).Interactions()
 
-		stateView.MergeView(collectionView)
-
+		err = stateView.MergeView(collectionView)
+		if err != nil {
+			return nil, fmt.Errorf("cannot merge view: %w", err)
+		}
 	}
 
 	// system chunk
@@ -169,9 +172,12 @@ func (e *blockComputer) executeBlock(
 	serviceEvents = append(serviceEvents, txServiceEvents...)
 	blockTxResults = append(blockTxResults, txResult)
 	gasUsed += txGas
-	interactions[len(interactions)-1] = systemChunkView.Interactions()
+	interactions[len(interactions)-1] = systemChunkView.(*delta.View).Interactions()
 
-	stateView.MergeView(systemChunkView)
+	err = stateView.MergeView(systemChunkView)
+	if err != nil {
+		return nil, err
+	}
 
 	return &execution.ComputationResult{
 		ExecutableBlock:   block,
@@ -180,7 +186,7 @@ func (e *blockComputer) executeBlock(
 		ServiceEvents:     serviceEvents,
 		TransactionResult: blockTxResults,
 		GasUsed:           gasUsed,
-		StateReads:        stateView.ReadsCount(),
+		StateReads:        stateView.(*delta.View).ReadsCount(),
 	}, nil
 }
 
@@ -188,8 +194,8 @@ func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
 	blockCtx fvm.Context,
-	collectionView *delta.View,
-	programs *fvm.Programs,
+	collectionView state.View,
+	programs *programs.Programs,
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 
@@ -249,8 +255,8 @@ func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
 	colSpan opentracing.Span,
 	txMetrics *fvm.MetricsCollector,
-	collectionView *delta.View,
-	programs *fvm.Programs,
+	collectionView state.View,
+	programs *programs.Programs,
 	ctx fvm.Context,
 	txIndex uint32,
 ) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {
@@ -325,7 +331,11 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	if tx.Err == nil {
-		collectionView.MergeView(txView)
+		err := collectionView.MergeView(txView)
+		if err != nil {
+			return nil, nil, txResult, 0, err
+		}
+
 	}
 	e.log.Info().
 		Str("txHash", tx.ID.String()).

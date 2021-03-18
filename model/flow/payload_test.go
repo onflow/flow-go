@@ -22,7 +22,7 @@ func TestPayloadEncodeJSON(t *testing.T) {
 	require.NoError(t, err)
 	decodedHash := decoded.Hash()
 	assert.Equal(t, payloadHash, decodedHash)
-	assert.Equal(t, payload, &decoded)
+	assert.Equal(t, payload, decoded)
 }
 
 func TestPayloadEncodingMsgpack(t *testing.T) {
@@ -35,5 +35,5 @@ func TestPayloadEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	decodedHash := decoded.Hash()
 	assert.Equal(t, payloadHash, decodedHash)
-	assert.Equal(t, payload, &decoded)
+	assert.Equal(t, payload, decoded)
 }

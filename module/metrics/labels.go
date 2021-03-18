@@ -3,6 +3,7 @@ package metrics
 const (
 	LabelChannel     = "topic"
 	LabelChain       = "chain"
+	LabelProposer    = "proposer"
 	EngineLabel      = "engine"
 	LabelResource    = "resource"
 	LabelMessage     = "message"
