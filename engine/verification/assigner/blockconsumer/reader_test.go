@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -61,24 +62,34 @@ func WithTestSetup(
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
 		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2)
-		blocks := make([]*flow.Block, 0)
-
-		// extends protocol state with the chain of blocks.
-		for _, result := range results {
-			err := s.State.Extend(result.ReferenceBlock)
-			require.NoError(t, err)
-			err = s.State.Finalize(result.ReferenceBlock.ID())
-			require.NoError(t, err)
-
-			blocks = append(blocks, result.ReferenceBlock)
-
-			err = s.State.Extend(result.ContainerBlock)
-			require.NoError(t, err)
-			blocks = append(blocks, result.ContainerBlock)
-			err = s.State.Finalize(result.ContainerBlock.ID())
-			require.NoError(t, err)
-		}
+		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
 
 		withReader(reader, blocks)
 	})
+}
+
+// extendStateWithFinalizedBlocks is a test helper to extend the execution state and return the list of blocks.
+// It receives a list of complete execution result fixtures in the form of (R1 <- C1) <- (R2 <- C2) <- .....
+// Where R and C are the reference and container blocks of a complete execution result fixture.
+// Reference blocks contain guarantees, and container blocks contain execution receipt for their preceding reference block.
+// Note: for sake of simplicity we do not include guarantees in the container blocks for now.
+func extendStateWithFinalizedBlocks(t *testing.T, results []*utils.CompleteExecutionResult, state protocol.MutableState) []*flow.Block {
+	blocks := make([]*flow.Block, 0)
+
+	// extends protocol state with the chain of blocks.
+	for _, result := range results {
+		err := state.Extend(result.ReferenceBlock)
+		require.NoError(t, err)
+		err = state.Finalize(result.ReferenceBlock.ID())
+		require.NoError(t, err)
+		blocks = append(blocks, result.ReferenceBlock)
+
+		err = state.Extend(result.ContainerBlock)
+		require.NoError(t, err)
+		err = state.Finalize(result.ContainerBlock.ID())
+		require.NoError(t, err)
+		blocks = append(blocks, result.ContainerBlock)
+	}
+
+	return blocks
 }
