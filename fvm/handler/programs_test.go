@@ -95,8 +95,8 @@ func Test_Programs(t *testing.T) {
 
 	sth := state.NewStateHolder(state.NewState(mainView))
 
-	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
 	programs := programsStorage.NewEmptyPrograms()
 
 	accounts := state.NewAccounts(sth)

@@ -265,8 +265,8 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rt := runtime.NewInterpreterRuntime()
-			vm := fvm.New(rt)
+			rt := fvm.NewInterpreterRuntime()
+			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)

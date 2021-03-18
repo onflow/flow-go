@@ -36,13 +36,13 @@ func TestSafetyCheck(t *testing.T) {
 
 			extralog.ExtraLogDumpPath = tmpDir
 
-			rt := runtime.NewInterpreterRuntime()
+			rt := fvm.NewInterpreterRuntime()
 
 			buffer := &bytes.Buffer{}
 			log := zerolog.New(buffer)
 			txInvocator := NewTransactionInvocator(log)
 
-			vm := New(rt)
+			vm := NewVirtualMachine(rt)
 
 			code := `
 				import 0x0b2a3299cc857e29
@@ -106,13 +106,13 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("checking error in imported contract", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
 		txInvocator := NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := NewVirtualMachine(rt)
 
 		code := `
 			import 0x0b2a3299cc857e29
@@ -168,13 +168,13 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("parsing error in transaction", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
 		txInvocator := NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := NewVirtualMachine(rt)
 
 		code := `X`
 
@@ -201,13 +201,13 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("checking error in transaction", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
 		txInvocator := NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := NewVirtualMachine(rt)
 
 		code := `transaction(arg: X) { }`
 
@@ -259,7 +259,7 @@ func TestSafetyCheck(t *testing.T) {
 		log := zerolog.Nop()
 		txInvocator := NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := NewVirtualMachine(rt)
 		code := `doesn't matter`
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)

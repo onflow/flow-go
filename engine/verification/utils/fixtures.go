@@ -85,9 +85,9 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		)
 		require.NoError(t, err)
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		blocks := new(fvmMock.Blocks)
 

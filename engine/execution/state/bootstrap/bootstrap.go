@@ -39,7 +39,8 @@ func (b *Bootstrapper) BootstrapLedger(
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.InitialState()))
 	programs := programs.NewEmptyPrograms()
 
-	vm := fvm.New(runtime.NewInterpreterRuntime())
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(b.logger, fvm.WithChain(chain))
 
