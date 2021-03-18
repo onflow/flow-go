@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
-	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -14,10 +14,10 @@ import (
 func constructRootResultAndSeal(
 	rootCommit string,
 	block *flow.Block,
-	participantNodes []model.NodeInfo,
+	participantNodes []bootstrap.NodeInfo,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
-	dkgData model.DKGData,
+	dkgData dkg.DKGData,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
 	stateCommit, err := hex.DecodeString(rootCommit)
@@ -25,7 +25,7 @@ func constructRootResultAndSeal(
 		log.Fatal().Err(err).Msg("could not decode state commitment")
 	}
 
-	participants := model.ToIdentityList(participantNodes)
+	participants := bootstrap.ToIdentityList(participantNodes)
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err = rand.Read(randomSource)

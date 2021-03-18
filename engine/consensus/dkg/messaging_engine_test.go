@@ -67,6 +67,8 @@ func TestForwardOutgoingMessages(t *testing.T) {
 		DestID:     destinationID,
 	})
 
+	time.Sleep(5 * time.Millisecond)
+
 	conduit.AssertExpectations(t)
 }
 
