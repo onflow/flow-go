@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -16,6 +17,7 @@ type TransactionStorageLimiter struct {
 		sth *state.StateHolder,
 		programs *programs.Programs,
 	) (func(address common.Address) (value uint64, err error), error)
+	logger zerolog.Logger
 }
 
 func getStorageCapacityFuncFactory(
@@ -34,9 +36,10 @@ func getStorageCapacityFuncFactory(
 	}, nil
 }
 
-func NewTransactionStorageLimiter() *TransactionStorageLimiter {
+func NewTransactionStorageLimiter(logger zerolog.Logger) *TransactionStorageLimiter {
 	return &TransactionStorageLimiter{
 		GetStorageCapacityFuncFactory: getStorageCapacityFuncFactory,
+		logger:                        logger,
 	}
 }
 
@@ -47,6 +50,7 @@ func (d *TransactionStorageLimiter) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
+
 	if !ctx.LimitAccountStorage {
 		return nil
 	}
