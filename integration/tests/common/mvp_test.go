@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,18 +28,20 @@ func TestMVP_Network(t *testing.T) {
 	}
 
 	consensusConfigs := append(collectionConfigs,
-		testnet.WithAdditionalFlag("--require-one-approval=true"), // require one approval per chunk when sealing)
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 	)
 
 	net := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
@@ -114,6 +117,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// wait for account to be created
 	accountCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), createAccountTx.ID())
 	require.NoError(t, err)
+	t.Log(accountCreationTxRes)
 
 	var newAccountAddress sdk.Address
 	for _, event := range accountCreationTxRes.Events {
@@ -122,6 +126,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			newAccountAddress = accountCreatedEvent.Address()
 		}
 	}
+
+	fmt.Printf("new account address: %s\n", newAccountAddress)
 
 	accountClient, err := testnet.NewClientWithKey(
 		fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]),
@@ -164,7 +170,6 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		counter, err = readCounter(ctx, serviceAccountClient, newAccountAddress)
 		cancel()
 
-		t.Logf("read counter: counter=%d, err=%v", counter, err)
 		return err == nil && counter == 2
 	}, 30*time.Second, time.Second)
 }

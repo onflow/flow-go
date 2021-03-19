@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -28,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/extralog"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	wal "github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
@@ -51,10 +54,13 @@ func main() {
 		followerState         protocol.MutableState
 		ledgerStorage         *ledger.Ledger
 		events                *storage.Events
+		serviceEvents         *storage.ServiceEvents
 		txResults             *storage.TransactionResults
 		results               *storage.ExecutionResults
 		receipts              *storage.ExecutionReceipts
+		myReceipts            *storage.MyExecutionReceipts
 		providerEngine        *exeprovider.Engine
+		checkerEng            *checker.Engine
 		syncCore              *chainsync.Core
 		pendingBlocks         *buffer.PendingBlocks // used in follower engine
 		deltas                *ingestion.Deltas
@@ -70,13 +76,16 @@ func main() {
 		collector             module.ExecutionMetrics
 		mTrieCacheSize        uint32
 		checkpointDistance    uint
+		checkpointsToKeep     uint
 		stateDeltasLimit      uint
+		cadenceExecutionCache uint
 		requestInterval       time.Duration
 		preferredExeNodeIDStr string
 		syncByBlocks          bool
 		syncFast              bool
 		syncThreshold         int
 		extensiveLog          bool
+		checkStakedAtBlock    func(blockID flow.Identifier) (bool, error)
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -88,7 +97,9 @@ func main() {
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 10, "number of WAL segments between checkpoints")
+			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
+			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
@@ -113,6 +124,14 @@ func main() {
 			return err
 		}).
 		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
+			extraLogPath := path.Join(triedir, "extralogs")
+			err := os.MkdirAll(extraLogPath, 0777)
+			if err != nil {
+				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
+			}
+
+			extralog.ExtraLogDumpPath = extraLogPath
+
 			rt := runtime.NewInterpreterRuntime()
 
 			vm := fvm.New(rt)
@@ -126,6 +145,7 @@ func main() {
 				node.State,
 				vm,
 				vmCtx,
+				cadenceExecutionCache,
 			)
 			computationManager = manager
 
@@ -140,8 +160,9 @@ func main() {
 			return err
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
-			results = storage.NewExecutionResults(node.DB)
-			receipts = storage.NewExecutionReceipts(node.DB, results)
+			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
+			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, receipts)
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -151,6 +172,12 @@ func main() {
 		Module("state deltas mempool", func(node *cmd.FlowNodeBuilder) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
+		}).
+		Module("stake checking function", func(node *cmd.FlowNodeBuilder) error {
+			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
+				return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+			}
+			return nil
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -196,7 +223,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
 
 			return compactor, nil
 		}).
@@ -208,10 +235,15 @@ func main() {
 				ledgerStorage,
 				stateCommitments,
 				node.Storage.Blocks,
+				node.Storage.Headers,
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
 				receipts,
+				myReceipts,
+				events,
+				serviceEvents,
+				txResults,
 				node.DB,
 				node.Tracer,
 			)
@@ -224,9 +256,19 @@ func main() {
 				node.Me,
 				executionState,
 				collector,
+				checkStakedAtBlock,
 			)
 
 			return providerEngine, err
+		}).
+		Component("checker engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			checkerEng = checker.New(
+				node.Logger,
+				node.State,
+				executionState,
+				node.Storage.Seals,
+			)
+			return checkerEng, nil
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
@@ -248,7 +290,9 @@ func main() {
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
 			events = storage.NewEvents(node.DB)
+			serviceEvents := storage.NewServiceEvents(node.DB)
 			txResults = storage.NewTransactionResults(node.DB)
+
 			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
@@ -258,6 +302,7 @@ func main() {
 				node.Storage.Blocks,
 				node.Storage.Collections,
 				events,
+				serviceEvents,
 				txResults,
 				computationManager,
 				providerEngine,
@@ -269,6 +314,7 @@ func main() {
 				deltas,
 				syncThreshold,
 				syncFast,
+				checkStakedAtBlock,
 			)
 
 			// TODO: we should solve these mutual dependencies better
@@ -311,7 +357,7 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, ingestionEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, checkerEng, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -343,9 +389,7 @@ func main() {
 			return collectionRequester, nil
 		}).
 		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			retrieve := func(blockID flow.Identifier) (flow.Entity, error) {
-				return receipts.ByBlockID(blockID)
-			}
+			retrieve := func(blockID flow.Identifier) (flow.Entity, error) { return myReceipts.MyReceipt(blockID) }
 			eng, err := provider.New(
 				node.Logger,
 				node.Metrics.Engine,

@@ -31,16 +31,57 @@ import (
 // #include "bls_include.h"
 import "C"
 
+// prefix for all application tags (any non PoP tag)
+const applicationTagPrefix = "APP"
+
+// prefix only for the PoP tag
+const popTagPrefix = "POP"
+
+// the PoP hasher, used to generate and verify PoPs
+var popKMAC = internalBLSKMAC(popTagPrefix)
+
+// BLSGeneratePOP returns a proof of possession (PoP) for the receiver private key.
+//
+// The KMAC hasher used in the function is guaranted to be orthogonal to all hashers used
+// for signatures or SPoCK proofs. This means a specific domain tag is used to generate PoP
+// and is not used by any other application.
+func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
+	_, ok := sk.(*PrKeyBLSBLS12381)
+	if !ok {
+		return nil, fmt.Errorf("key is not a BLS key")
+	}
+	// sign the public key
+	return sk.Sign(sk.PublicKey().Encode(), popKMAC)
+}
+
+// BLSVerifyPOP verifies a proof of possession (PoP) for the receiver public key.
+//
+// The function uses the same KMAC hasher used to generate the PoP.
+func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
+	_, ok := pk.(*PubKeyBLSBLS12381)
+	if !ok {
+		return false, fmt.Errorf("key is not a BLS key")
+	}
+	// verify the signature against the public key
+	return pk.Verify(s, pk.Encode(), popKMAC)
+}
+
 // AggregateBLSSignatures aggregate multiple BLS signatures into one.
 //
 // Signatures could be generated from the same or distinct messages, they
 // could also be the aggregation of other signatures.
 // The order of the signatures in the slice does not matter since the aggregation
-// is commutative.
+// is commutative. The slice should not be empty.
 // No subgroup membership check is performed on the input signatures.
 func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	// set BLS context
 	blsInstance.reInit()
+
+	// check for empty list
+	if len(sigs) == 0 {
+		return nil, fmt.Errorf("signature list should not be empty")
+	}
+
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	for i, sig := range sigs {
@@ -51,17 +92,10 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	}
 	aggregatedSig := make([]byte, signatureLengthBLSBLS12381)
 
-	var sigsPointer *C.uchar
-	if len(sigs) != 0 {
-		sigsPointer = (*C.uchar)(&flatSigs[0])
-	} else {
-		sigsPointer = (*C.uchar)(nil)
-	}
-
 	// add the points in the C layer
 	if C.ep_sum_vector_byte(
 		(*C.uchar)(&aggregatedSig[0]),
-		sigsPointer,
+		(*C.uchar)(&flatSigs[0]),
 		(C.int)(len(sigs)),
 	) != valid {
 		return nil, fmt.Errorf("decoding BLS signatures has failed")
@@ -72,11 +106,17 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 // AggregateBLSPrivateKeys aggregate multiple BLS private keys into one.
 //
 // The order of the keys in the slice does not matter since the aggregation
-// is commutative. The slice can be empty.
+// is commutative. The slice should not be empty.
 // No check is performed on the input private keys.
 func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	// set BLS context
 	blsInstance.reInit()
+
+	// check for empty list
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("keys list should not be empty")
+	}
+
 	scalars := make([]scalar, 0, len(keys))
 	for i, sk := range keys {
 		skBls, ok := sk.(*PrKeyBLSBLS12381)
@@ -87,13 +127,7 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	}
 
 	var sum scalar
-	var scalarPointer *C.bn_st
-	if len(keys) != 0 {
-		scalarPointer = (*C.bn_st)(&scalars[0])
-	} else {
-		scalarPointer = (*C.bn_st)(nil)
-	}
-	C.bn_sum_vector((*C.bn_st)(&sum), scalarPointer,
+	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
 		(C.int)(len(scalars)))
 	return &PrKeyBLSBLS12381{
 		pk:     nil,
@@ -104,11 +138,17 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 // AggregateBLSPublicKeys aggregate multiple BLS public keys into one.
 //
 // The order of the keys in the slice does not matter since the aggregation
-// is commutative. The slice can be empty.
+// is commutative. The slice should not be empty.
 // No check is performed on the input public keys.
 func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	// set BLS context
 	blsInstance.reInit()
+
+	// check for empty list
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("keys list should not be empty")
+	}
+
 	points := make([]pointG2, 0, len(keys))
 	for i, pk := range keys {
 		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
@@ -119,13 +159,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	}
 
 	var sum pointG2
-	var pointsPointer *C.ep2_st
-	if len(keys) != 0 {
-		pointsPointer = (*C.ep2_st)(&points[0])
-	} else {
-		pointsPointer = (*C.ep2_st)(nil)
-	}
-	C.ep2_sum_vector((*C.ep2_st)(&sum), pointsPointer,
+	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
 		(C.int)(len(points)))
 	return &PubKeyBLSBLS12381{
 		point: sum,
@@ -158,16 +192,14 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 		pointsToSubtract = append(pointsToSubtract, pkBLS.point)
 	}
 
-	var pointsPointer *C.ep2_st
-	if len(pointsToSubtract) != 0 {
-		pointsPointer = (*C.ep2_st)(&pointsToSubtract[0])
-	} else {
-		pointsPointer = (*C.ep2_st)(nil)
+	// check for empty list to avoid a cgo edge case
+	if len(keysToRemove) == 0 {
+		return aggKey, nil
 	}
 
 	var resultKey pointG2
 	C.ep2_subtract_vector((*C.ep2_st)(&resultKey), (*C.ep2_st)(&aggPKBLS.point),
-		pointsPointer, (C.int)(len(pointsToSubtract)))
+		(*C.ep2_st)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
 	return &PubKeyBLSBLS12381{
 		point: resultKey,
@@ -343,9 +375,14 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	// set BLS context
 	blsInstance.reInit()
 
-	// public keys check
-	if len(pks) == 0 || len(pks) != len(sigs) {
-		return []bool{}, fmt.Errorf("key list length is not valid")
+	// empty list check
+	if len(pks) == 0 {
+		return []bool{}, fmt.Errorf("key list should not be empty")
+	}
+
+	if len(pks) != len(sigs) {
+		return []bool{}, fmt.Errorf("keys length %d and signatures length %d are mismatching",
+			len(pks), len(sigs))
 	}
 
 	verifBool := make([]bool, len(sigs))

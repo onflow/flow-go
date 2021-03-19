@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -45,8 +47,11 @@ func main() {
 		collectionLimit              uint
 		receiptLimit                 uint
 		collectionGRPCPort           uint
+		executionGRPCPort            uint
 		pingEnabled                  bool
 		nodeInfoFile                 string
+		apiRatelimits                map[string]int
+		apiBurstlimits               map[string]int
 		followerState                protocol.MutableState
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
@@ -78,11 +83,14 @@ func main() {
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
 			flags.UintVar(&collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
+			flags.UintVar(&executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
 			flags.StringVarP(&rpcConf.GRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
+			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
+			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
@@ -90,6 +98,8 @@ func main() {
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
 			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -110,14 +120,19 @@ func main() {
 		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic collection node address")
 				return nil
 			}
-			node.Logger.Info().Err(err).Msgf("Collection node Addr: %s", rpcConf.CollectionAddr)
+
+			node.Logger.Info().
+				Str("collection_node", rpcConf.CollectionAddr).
+				Msg("using the static collection node address")
 
 			collectionRPCConn, err := grpc.Dial(
 				rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure())
+				grpc.WithInsecure(),
+				backend.WithClientUnaryInterceptor(rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
 			}
@@ -125,12 +140,20 @@ func main() {
 			return nil
 		}).
 		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
-			node.Logger.Info().Err(err).Msgf("Execution node Addr: %s", rpcConf.ExecutionAddr)
+			// execution node address is optional (if not specified, execution nodes will be chosen at random based on blockID)
+			if strings.TrimSpace(rpcConf.ExecutionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic execution node address")
+				return nil
+			}
+			node.Logger.Info().
+				Str("execution_node", rpcConf.ExecutionAddr).
+				Msg("using the static execution node address")
 
 			executionRPCConn, err := grpc.Dial(
 				rpcConf.ExecutionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure())
+				grpc.WithInsecure(),
+				backend.WithClientUnaryInterceptor(rpcConf.ExecutionClientTimeout))
 			if err != nil {
 				return err
 			}
@@ -204,11 +227,15 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Collections,
 				node.Storage.Transactions,
+				node.Storage.Receipts,
 				node.RootChainID,
 				transactionMetrics,
 				collectionGRPCPort,
+				executionGRPCPort,
 				retryEnabled,
 				rpcMetricsEnabled,
+				apiRatelimits,
+				apiBurstlimits,
 			)
 			return rpcEng, nil
 		}).
@@ -226,7 +253,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, transactionMetrics,
+			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, transactionMetrics,
 				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err

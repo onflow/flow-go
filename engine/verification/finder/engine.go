@@ -17,21 +17,37 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// Engine receives receipts and passes them to the match engine if the block of the receipt is available
+// and the verification node is staked at the block ID of the result part of receipt.
+//
+// A receipt follows a lifecycle in this engine:
+// cached: the receipt is received but not handled yet.
+// pending: the receipt is handled, but its corresponding block has not received at this node yet.
+// discarded: the receipt's block has received, but this verification node has not staked at block of the receipt.
+// ready: the receipt's block has received, and this verification node is staked for that block,
+// hence receipt's result is  ready to be forwarded to match engine
+// processed: the receipt's result has been forwarded to matching engine.
+//
+// This engine ensures that each (ready) result is passed to match engine only once.
+// Hence, among concurrent ready receipts with shared result, only one instance of result is passed to match engine.
 type Engine struct {
 	unit                     *engine.Unit
 	log                      zerolog.Logger
 	metrics                  module.VerificationMetrics
 	me                       module.Local
 	match                    network.Engine
+	state                    protocol.State
 	cachedReceipts           mempool.ReceiptDataPacks // used to keep incoming receipts before checking
 	pendingReceipts          mempool.ReceiptDataPacks // used to keep the receipts pending for a block as mempool
 	readyReceipts            mempool.ReceiptDataPacks // used to keep the receipts ready for process
 	headerStorage            storage.Headers          // used to check block existence before verifying
 	processedResultIDs       mempool.Identifiers      // used to keep track of the processed results
+	discardedResultIDs       mempool.Identifiers      // used to keep track of discarded results while node was not staked for epoch
 	blockIDsCache            mempool.Identifiers      // used as a cache to keep track of new finalized blocks
 	pendingReceiptIDsByBlock mempool.IdentifierMap    // used as a mapping to keep track of receipts associated with a block
 	receiptIDsByResult       mempool.IdentifierMap    // used as a mapping to keep track of receipts with the same result
@@ -45,12 +61,14 @@ func New(
 	tracer module.Tracer,
 	net module.Network,
 	me module.Local,
+	state protocol.State,
 	match network.Engine,
 	cachedReceipts mempool.ReceiptDataPacks,
 	pendingReceipts mempool.ReceiptDataPacks,
 	readyReceipts mempool.ReceiptDataPacks,
 	headerStorage storage.Headers,
 	processedResultIDs mempool.Identifiers,
+	discardedResultIDs mempool.Identifiers,
 	pendingReceiptIDsByBlock mempool.IdentifierMap,
 	receiptsIDsByResult mempool.IdentifierMap,
 	blockIDsCache mempool.Identifiers,
@@ -61,12 +79,14 @@ func New(
 		log:                      log.With().Str("engine", "finder").Logger(),
 		metrics:                  metrics,
 		me:                       me,
+		state:                    state,
 		match:                    match,
 		headerStorage:            headerStorage,
 		cachedReceipts:           cachedReceipts,
 		pendingReceipts:          pendingReceipts,
 		readyReceipts:            readyReceipts,
 		processedResultIDs:       processedResultIDs,
+		discardedResultIDs:       discardedResultIDs,
 		pendingReceiptIDsByBlock: pendingReceiptIDsByBlock,
 		receiptIDsByResult:       receiptsIDsByResult,
 		blockIDsCache:            blockIDsCache,
@@ -132,27 +152,18 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	var err error
-
 	switch resource := event.(type) {
 	case *flow.ExecutionReceipt:
-		err = e.handleExecutionReceipt(originID, resource)
+		e.handleExecutionReceiptWithTracing(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
-	}
-
-	if err != nil {
-		// logs the error instead of returning that.
-		// returning error would be projected at a higher level by network layer.
-		// however, this is an engine-level error, and not network layer error.
-		e.log.Debug().Err(err).Msg("engine could not process event successfully")
 	}
 
 	return nil
 }
 
-// handleExecutionReceipt receives an execution receipt and adds it to the cached receipt mempool.
-func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+// handleExecutionReceiptWithTracing receives an execution receipt and adds it to the cached receipt mempool.
+func (e *Engine) handleExecutionReceiptWithTracing(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
 	span, ok := e.tracer.GetSpan(receipt.ID(), trace.VERProcessExecutionReceipt)
 	ctx := context.Background()
 	if !ok {
@@ -161,14 +172,19 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		defer span.Finish()
 	}
 	ctx = opentracing.ContextWithSpan(ctx, span)
-	childSpan, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindHandleExecutionReceipt)
-	defer childSpan.Finish()
+
+	e.tracer.WithSpanFromContext(ctx, trace.VERFindHandleExecutionReceipt, func() {
+		e.handleExecutionReceipt(ctx, originID, receipt)
+	})
+}
+
+// handleExecutionReceipt adds the execution receipt to the cached receipt mempool.
+func (e *Engine) handleExecutionReceipt(ctx context.Context, originID flow.Identifier, receipt *flow.ExecutionReceipt) {
 
 	receiptID := receipt.ID()
 	resultID := receipt.ExecutionResult.ID()
 
 	log := e.log.With().
-		Str("engine", "finder").
 		Hex("origin_id", logging.ID(originID)).
 		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).Logger()
@@ -185,14 +201,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		Ctx:      ctx,
 	}
 
-	ok = e.cachedReceipts.Add(rdp)
-	if !ok {
-		return fmt.Errorf("duplicate execution receipt. receipt_id: %x", logging.ID(receiptID))
-	}
+	ok := e.cachedReceipts.Add(rdp)
 	log.Debug().
+		Bool("added_to_cached_receipts", ok).
 		Msg("execution receipt successfully handled")
-
-	return nil
 }
 
 // To implement FinalizationConsumer
@@ -238,20 +250,22 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 	defer span.Finish()
 
 	resultID := result.ID()
+	log := e.log.With().Hex("result_id", logging.ID(resultID)).Logger()
 	if e.processedResultIDs.Has(resultID) {
-		e.log.Debug().
-			Hex("result_id", logging.ID(resultID)).
-			Msg("result already processed")
+		log.Debug().Msg("result already processed")
 		return false, nil
 	}
+	if e.discardedResultIDs.Has(resultID) {
+		e.log.Debug().Msg("drops handling already discarded result")
+		return false, nil
+	}
+
 	err := e.match.Process(originID, result)
 	if err != nil {
 		return false, fmt.Errorf("submission error to match engine: %w", err)
 	}
 
-	e.log.Info().
-		Hex("result_id", logging.ID(resultID)).
-		Msg("result submitted to match engine")
+	log.Info().Msg("result submitted to match engine")
 
 	// monitoring: increases number of execution results sent
 	e.metrics.OnExecutionResultSent()
@@ -259,16 +273,22 @@ func (e *Engine) processResult(ctx context.Context, originID flow.Identifier, re
 	return true, nil
 }
 
-// onResultProcessed is called whenever a result is processed completely and
+// onResultProcessedWithTracing is called whenever a result is processed completely and
 // is passed to the match engine. It marks the result as processed, and removes
 // all receipts with the same result from mempool.
-func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier) {
-	span, _ := e.tracer.StartSpanFromContext(ctx, trace.VERFindOnResultProcessed)
-	defer span.Finish()
+func (e *Engine) onResultProcessedWithTracing(ctx context.Context, resultID flow.Identifier) {
+	e.tracer.WithSpanFromContext(ctx, trace.VERFindOnResultProcessed, func() {
+		e.onResultProcessed(resultID)
+	})
+}
 
+// onResultProcessed marks the result as processed, and removes
+// all receipts with the same result from mempool.
+func (e *Engine) onResultProcessed(resultID flow.Identifier) {
 	log := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Logger()
+
 	// marks result as processed
 	added := e.processedResultIDs.Add(resultID)
 	if added {
@@ -282,207 +302,342 @@ func (e *Engine) onResultProcessed(ctx context.Context, resultID flow.Identifier
 	}
 
 	// removes indices of all receipts associated with processed result
-	ok = e.receiptIDsByResult.Rem(resultID)
-	if !ok {
-		log.Debug().Msg("could not remove processed result from receipt-ids-by-result")
-	}
+	removed := e.receiptIDsByResult.Rem(resultID)
+	log.Debug().
+		Bool("removed", removed).
+		Msg("removes processed result id from receipt-ids-by-result")
 
 	// drops all receipts with the same result
 	for _, receiptID := range receiptIDs {
 		// removes receipt from mempool
 		removed := e.readyReceipts.Rem(receiptID)
-		if removed {
-			log.Debug().
-				Hex("receipt_id", logging.ID(receiptID)).
-				Msg("receipt with processed result cleaned up")
-		}
+		log.Debug().
+			Bool("removed", removed).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Msg("removes receipt with process result")
 	}
 }
 
-// checkCachedReceipts iterates over the newly cached receipts and moves them
+// checkCachedReceiptsWithTracing iterates over the newly cached receipts and moves them
 // further in the pipeline depending on whether they are processable or not.
-func (e *Engine) checkCachedReceipts() {
+func (e *Engine) checkCachedReceiptsWithTracing() {
 	for _, rdp := range e.cachedReceipts.All() {
-		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-		func() {
-			var span opentracing.Span
-			span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckCachedReceipts)
-			defer span.Finish()
-
-			receiptID := rdp.Receipt.ID()
-			resultID := rdp.Receipt.ExecutionResult.ID()
-
-			log := e.log.With().
-				Str("engine", "finder").
-				Hex("origin_id", logging.ID(rdp.OriginID)).
-				Hex("receipt_id", logging.ID(receiptID)).
-				Hex("result_id", logging.ID(resultID)).Logger()
-
-			// removes receipt from cache
-			ok := e.cachedReceipts.Rem(receiptID)
-			if !ok {
-				log.Debug().Msg("cached receipt has been removed")
-				return
-			}
-
-			// checks if the result has already been handled
-			if e.processedResultIDs.Has(resultID) {
-				log.Debug().Msg("drops handling already processed result")
-				return
-			}
-
-			// adds receipt to pending or ready mempools depending on its processable status
-			ready := e.isProcessable(&rdp.Receipt.ExecutionResult)
-			if ready {
-				// block for the receipt is available,
-				// receipt is ready for process
-				ok := e.readyReceipts.Add(rdp)
-				if !ok {
-					log.Debug().Msg("drops adding duplicate receipt to ready mempool")
-					return
-				}
-			} else {
-				// block for the receipt is not available
-				// receipt moves to pending mempool
-				ok := e.pendingReceipts.Add(rdp)
-				if !ok {
-					log.Debug().Msg("drops adding duplicate receipt to pending mempool")
-					return
-				}
-
-				// marks receipt pending for its block ID
-				err := e.pendingReceiptIDsByBlock.Append(rdp.Receipt.ExecutionResult.BlockID, receiptID)
-				if err != nil {
-					e.log.Error().
-						Err(err).
-						Hex("block_id", logging.ID(rdp.Receipt.ExecutionResult.BlockID)).
-						Hex("receipt_id", logging.ID(receiptID)).
-						Msg("could not append receipt to receipt-ids-by-block mempool")
-				}
-			}
-
-			// records the execution receipt id based on its result id
-			err := e.receiptIDsByResult.Append(resultID, receiptID)
-			if err != nil {
-				log.Debug().Err(err).Msg("could not add receipt id to receipt-ids-by-result mempool")
-				return
-			}
-
-			log.Info().
-				Bool("ready", ready).
-				Msg("cached execution receipt moved to proper mempool")
-		}()
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckCachedReceipts, func() {
+			e.checkCachedReceipt(rdp)
+		})
 	}
 }
 
-// checkReceipts iterates over the new cached finalized blocks. It moves
-// their corresponding receipt from pending to ready mempools.
+// checkCachedReceipt moves the receipt data pack further in the pipeline depending on whether it is processable or not.
+// A receipt is processable if its corresponding block has been finalized.
+func (e *Engine) checkCachedReceipt(rdp *verification.ReceiptDataPack) {
+	receiptID := rdp.Receipt.ID()
+	resultID := rdp.Receipt.ExecutionResult.ID()
+
+	log := e.log.With().
+		Hex("origin_id", logging.ID(rdp.OriginID)).
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("block_id", logging.ID(rdp.Receipt.ExecutionResult.BlockID)).
+		Hex("result_id", logging.ID(resultID)).Logger()
+
+	// removes receipt from cache
+	removed := e.cachedReceipts.Rem(receiptID)
+	log.Debug().
+		Bool("removed", removed).
+		Msg("cached receipt has been removed")
+
+	// checks if the result has already been processed or discarded
+	if e.processedResultIDs.Has(resultID) {
+		log.Debug().Msg("drops handling already processed result")
+		return
+	}
+	if e.discardedResultIDs.Has(resultID) {
+		log.Debug().Msg("drops handling already discarded result")
+		return
+	}
+
+	ready := e.isProcessable(&rdp.Receipt.ExecutionResult)
+	if !ready {
+		// adds receipt to pending mempool
+		added, err := e.addToPending(rdp)
+		if err != nil {
+			log.Debug().Err(err).Msg("could not add receipt to pending mempool")
+			return
+		}
+		log.Debug().
+			Bool("added_to_pending_mempool", added).
+			Msg("cached receipt checked for adding to pending mempool")
+		return
+	}
+
+	// adds receipt to ready mempool
+	added, discarded, err := e.addToReady(rdp)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not add receipt to ready mempool")
+		return
+	}
+	log.Debug().
+		Bool("added_to_discarded_mempool", discarded).
+		Bool("added_to_ready_mempool", added).
+		Msg("cached receipt checked for adding to ready mempool")
+}
+
+// addToReady encapsulates the logic around adding a ReceiptDataPack to ready receipts mempool.
+// The ReceiptDataPack is however discarded it if finder engine is not staked at its block id.
+//
+// When no errors occurred, the first return value indicates
+// whether or not the receipt has been added to the ready mempool, and the second return value indicates
+// whether or not the receipt has been discarded due to the node being unstaked at the receipt block ID.
+func (e *Engine) addToReady(receiptDataPack *verification.ReceiptDataPack) (bool, bool, error) {
+	receiptID := receiptDataPack.Receipt.ID()
+	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
+	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
+
+	// checks whether verification node is staked at snapshot of this result's block.
+	ok, err := stakedAsVerification(e.state, blockID, e.me.NodeID())
+	if err != nil {
+		return false, false, fmt.Errorf("could not verify stake of verification node for result: %w", err)
+	}
+
+	if !ok {
+		discarded := e.discardedResultIDs.Add(resultID)
+		return false, discarded, nil
+	}
+
+	// adds the receipt to the ready mempool
+	ok = e.readyReceipts.Add(receiptDataPack)
+	if !ok {
+		return false, false, nil
+	}
+
+	// records the execution receipt id based on its result id
+	err = e.receiptIDsByResult.Append(resultID, receiptID)
+	if err != nil {
+		return false, false, nil
+	}
+
+	return true, false, nil
+}
+
+// addToPending encapsulates the logic around adding a ReceiptDataPack to pending receipts mempool.
+//
+// When no errors occurred, the first return value indicates
+// whether or not the receipt has been added to the pending mempool.
+func (e *Engine) addToPending(receiptDataPack *verification.ReceiptDataPack) (bool, error) {
+	receiptID := receiptDataPack.Receipt.ID()
+	resultID := receiptDataPack.Receipt.ExecutionResult.ID()
+	blockID := receiptDataPack.Receipt.ExecutionResult.BlockID
+
+	ok := e.pendingReceipts.Add(receiptDataPack)
+	if !ok {
+		return false, nil
+	}
+
+	// marks receipt pending for its block ID
+	err := e.pendingReceiptIDsByBlock.Append(blockID, receiptID)
+	if err != nil {
+		return false, fmt.Errorf("could not append receipt to receipt-ids-by-block mempool: %w", err)
+	}
+
+	// records the execution receipt id based on its result id
+	err = e.receiptIDsByResult.Append(resultID, receiptID)
+	if err != nil {
+		return false, fmt.Errorf("could not append receipt to receipt-ids-by-result mempool: %w", err)
+	}
+
+	return true, nil
+}
+
+// pendingToReady receives a list of receipt identifiers and moves all their corresponding receipts
+// from pending to ready mempools.
+// blockID is the block identifier that all receipts are pointing to.
+func (e *Engine) pendingToReady(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
+	for _, receiptID := range receiptIDs {
+		// retrieves receipt from pending mempool
+		rdp, ok := e.pendingReceipts.Get(receiptID)
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Logger()
+		if !ok {
+			log.Debug().Msg("could not retrieve receipt from pending receipts mempool")
+			continue
+		}
+
+		resultID := rdp.Receipt.ExecutionResult.ID()
+		log = log.With().
+			Hex("result_id", logging.ID(resultID)).
+			Logger()
+
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts, func() {
+			// moves receipt from pending to ready mempool
+			removed := e.pendingReceipts.Rem(receiptID)
+			log.Debug().
+				Bool("removed", removed).
+				Msg("removes receipt from pending receipts")
+
+			added := e.readyReceipts.Add(rdp)
+			log.Debug().
+				Bool("added", added).
+				Msg("adds receipt to ready receipts")
+		})
+	}
+}
+
+// discardReceiptsFromPending receives a list of receipt ids, and removes
+// all receipts from the pending receipts mempool and marks their execution result as discarded.
+// blockID is the block identifier that all receipts are pointing to.
+//
+// finder engine discards a receipt if it is not staked at block id of that receipt.
+func (e *Engine) discardReceiptsFromPending(receiptIDs flow.IdentifierList, blockID flow.Identifier) {
+	for _, receiptID := range receiptIDs {
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Logger()
+		// retrieves receipt from pending mempool
+		rdp, ok := e.pendingReceipts.Get(receiptID)
+		if !ok {
+			log.Debug().Msg("could not retrieve receipt from pending receipts mempool")
+			continue
+		}
+
+		resultID := rdp.Receipt.ExecutionResult.ID()
+		log = log.With().
+			Hex("result_id", logging.ID(resultID)).
+			Logger()
+
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts, func() {
+			// marks result id of receipt as discarded.
+			added := e.discardedResultIDs.Add(resultID)
+			log.Debug().
+				Bool("added_to_discard_pool", added).
+				Msg("execution result marks discarded")
+
+			// removes receipt from pending receipt
+			removed := e.pendingReceipts.Rem(receiptID)
+			log.Debug().
+				Bool("removed", removed).
+				Msg("removes receipt from pending receipts")
+		})
+	}
+}
+
+// checkPendingReceipts iterates over the new cached finalized blocks. It moves
+// their corresponding receipt from pending to ready memory pool.
 func (e *Engine) checkPendingReceipts() {
 	for _, blockID := range e.blockIDsCache.All() {
 		// removes blockID from new blocks mempool
-		ok := e.blockIDsCache.Rem(blockID)
-		if !ok {
-			e.log.Debug().
-				Hex("block_id", logging.ID(blockID)).
-				Msg("could not remove block ID from cache")
-		}
+		removed := e.blockIDsCache.Rem(blockID)
+		log := e.log.With().
+			Hex("block_id", logging.ID(blockID)).
+			Logger()
+
+		log.Debug().
+			Bool("removed", removed).
+			Msg("removes block id from cached block ids")
 
 		// retrieves all receipts that are pending for this block
 		receiptIDs, ok := e.pendingReceiptIDsByBlock.Get(blockID)
 		if !ok {
 			// no pending receipt for this block
+			log.Debug().Msg("no pending receipt for block")
 			continue
 		}
+		log.Debug().
+			Int("receipt_num", len(receiptIDs)).
+			Msg("retrieved receipt ids pending for block")
+
 		// removes list of receipt ids for this block
-		ok = e.pendingReceiptIDsByBlock.Rem(blockID)
-		if !ok {
+		removed = e.pendingReceiptIDsByBlock.Rem(blockID)
+		log.Debug().
+			Bool("removed", removed).
+			Msg("removes all receipt ids pending for block")
+
+		// checks whether verification node is staked at snapshot of this block id/
+		ok, err := stakedAsVerification(e.state, blockID, e.me.NodeID())
+		if err != nil {
 			e.log.Debug().
-				Hex("block_id", logging.ID(blockID)).
-				Msg("could not remove receipt id from receipt-ids-by-block mempool for block")
+				Err(err).
+				Msg("could verify stake of verification node for result")
+			continue
+		}
+
+		if !ok {
+			// node is not staked at block id
+			// discards all pending receipts for this block id.
+			e.discardReceiptsFromPending(receiptIDs, blockID)
+			continue
 		}
 
 		// moves receipts from pending to ready
-		for _, receiptID := range receiptIDs {
-			// retrieves receipt from pending mempool
-			rdp, ok := e.pendingReceipts.Get(receiptID)
-			if !ok {
-				e.log.Debug().
-					Hex("receipt_id", logging.ID(receiptID)).
-					Msg("could not retrieve receipt from pending receipts mempool")
-				continue
-			}
-
-			// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-			// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-			func() {
-				var span opentracing.Span
-				span, _ = e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckPendingReceipts)
-				defer span.Finish()
-
-				// removes receipt from pending mempool
-				ok = e.pendingReceipts.Rem(receiptID)
-				if !ok {
-					e.log.Debug().
-						Hex("receipt_id", logging.ID(receiptID)).
-						Msg("could not remove receipt from pending receipts mempool")
-					return
-				}
-
-				// adds receipt to ready mempoool
-				ok = e.readyReceipts.Add(rdp)
-				if !ok {
-					e.log.Debug().
-						Hex("receipt_id", logging.ID(receiptID)).
-						Msg("could not add receipt to ready mempool")
-					return
-				}
-
-				e.log.Debug().
-					Hex("receipt_id", logging.ID(receiptID)).
-					Hex("block_id", logging.ID(blockID)).
-					Msg("pending receipt moved to ready successfully")
-			}()
-		}
+		e.pendingToReady(receiptIDs, blockID)
 	}
 }
 
-// checkReadyReceipts iterates over receipts ready for process and processes them.
-func (e *Engine) checkReadyReceipts() {
+// checkReadyReceiptsWithTracing iterates over receipts ready for process and processes them.
+func (e *Engine) checkReadyReceiptsWithTracing() {
 	for _, rdp := range e.readyReceipts.All() {
-		// NOTE: this anonymous function is solely for sake of encapsulating a block of code
-		// for tracing. To avoid closure, it should NOT encompass any goroutine involving rdp.
-		func() {
-			span, ctx := e.tracer.StartSpanFromContext(rdp.Ctx, trace.VERFindCheckReadyReceipts)
-			defer span.Finish()
-
-			receiptID := rdp.Receipt.ID()
-			resultID := rdp.Receipt.ExecutionResult.ID()
-
-			ok, err := e.processResult(ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
-			if err != nil {
-				e.log.Error().
-					Err(err).
-					Hex("receipt_id", logging.ID(receiptID)).
-					Hex("result_id", logging.ID(resultID)).
-					Msg("could not process result")
-				return
-			}
-
-			if !ok {
-				// result has already been processed, no cleanup is needed
-				return
-			}
-
-			// performs clean up
-			e.onResultProcessed(ctx, resultID)
-
-			e.log.Debug().
-				Hex("receipt_id", logging.ID(receiptID)).
-				Hex("result_id", logging.ID(resultID)).
-				Msg("result processed successfully")
-		}()
+		e.tracer.WithSpanFromContext(rdp.Ctx, trace.VERFindCheckReadyReceipts, func() {
+			e.checkReadyReceipt(rdp)
+		})
 	}
+}
+
+// checkReadyReceipt iterates over receipts ready for process and processes them.
+func (e *Engine) checkReadyReceipt(rdp *verification.ReceiptDataPack) {
+	receiptID := rdp.Receipt.ID()
+	resultID := rdp.Receipt.ExecutionResult.ID()
+
+	ok, err := e.processResult(rdp.Ctx, rdp.OriginID, &rdp.Receipt.ExecutionResult)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Hex("receipt_id", logging.ID(receiptID)).
+			Hex("result_id", logging.ID(resultID)).
+			Msg("could not process result")
+		return
+	}
+
+	if !ok {
+		// result has already been processed, no cleanup is needed
+		return
+	}
+
+	// performs clean up
+	e.onResultProcessedWithTracing(rdp.Ctx, resultID)
+
+	e.log.Debug().
+		Hex("receipt_id", logging.ID(receiptID)).
+		Hex("result_id", logging.ID(resultID)).
+		Msg("result processed successfully")
+}
+
+// stakedAsVerification checks whether this instance of verification node has staked at specified block ID.
+// It returns true and nil if verification node is staked at referenced block ID, and returns false and nil otherwise.
+// It returns false and error if it could not extract the stake of node as a verification node at the specified block.
+func stakedAsVerification(state protocol.State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
+	identity, err := state.AtBlockID(blockID).Identity(identifier)
+	if err != nil {
+		return false, nil
+	}
+
+	// checks role of node is verification
+	if identity.Role != flow.RoleVerification {
+		return false, fmt.Errorf("node is staked for an invalid role. expected: %s, got: %s", flow.RoleVerification, identity.Role)
+	}
+
+	// checks identity has not been ejected
+	if identity.Ejected {
+		return false, nil
+	}
+
+	// checks identity has stake
+	if identity.Stake == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // onTimer is called periodically by the unit module of Finder engine.
@@ -494,7 +649,7 @@ func (e *Engine) onTimer() {
 
 	// moves receipts from cache to either ready or pending mempools
 	go func() {
-		e.checkCachedReceipts()
+		e.checkCachedReceiptsWithTracing()
 		wg.Done()
 	}()
 
@@ -506,10 +661,9 @@ func (e *Engine) onTimer() {
 
 	// processes ready receipts
 	go func() {
-		e.checkReadyReceipts()
+		e.checkReadyReceiptsWithTracing()
 		wg.Done()
 	}()
 
 	wg.Wait()
-
 }

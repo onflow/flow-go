@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // HandleFunc is a function provided to the requester engine to handle an entity
@@ -39,7 +40,7 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	channel  string
+	channel  network.Channel
 	selector flow.IdentityFilter
 	create   CreateFunc
 	handle   HandleFunc
@@ -51,7 +52,7 @@ type Engine struct {
 // within the set obtained by applying the provided selector filter. The options allow customization of the parameters
 // related to the batch and retry logic.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel string, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
+	channel network.Channel, selector flow.IdentityFilter, create CreateFunc, options ...OptionFunc) (*Engine, error) {
 
 	// initialize the default config
 	cfg := Config{
@@ -83,6 +84,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	selector = filter.And(
 		selector,
 		filter.HasStake(true),
+		filter.Not(filter.Ejected),
 		filter.Not(filter.HasNodeID(me.NodeID())),
 	)
 
@@ -103,7 +105,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(channel, e)
+	con, err := net.Register(network.Channel(channel), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -177,9 +179,21 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // of the global selector injected upon construction. It allows for finer-grained
 // control over which subset of providers to request a given entity from, such as
 // selection of a collection cluster. Use `filter.Any` if no additional selection
-// is required.
+// is required. Checks integrity of response to make sure that we got entity that we were requesting.
 func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilter) {
+	e.addEntityRequest(entityID, selector, true)
+}
 
+// Query will request data through the request engine backing the interface.
+//The additional selector will be applied to the subset
+// of valid providers for the data and allows finer-grained control
+// over which providers to request data from. Doesn't perform integrity check
+// can be used to get entities without knowing their ID.
+func (e *Engine) Query(key flow.Identifier, selector flow.IdentityFilter) {
+	e.addEntityRequest(key, selector, false)
+}
+
+func (e *Engine) addEntityRequest(entityID flow.Identifier, selector flow.IdentityFilter, checkIntegrity bool) {
 	e.unit.Lock()
 	defer e.unit.Unlock()
 
@@ -191,11 +205,12 @@ func (e *Engine) EntityByID(entityID flow.Identifier, selector flow.IdentityFilt
 
 	// otherwise, add a new item to the list
 	item := &Item{
-		EntityID:      entityID,
-		NumAttempts:   0,
-		LastRequested: time.Time{},
-		RetryAfter:    e.cfg.RetryInitial,
-		ExtraSelector: selector,
+		EntityID:       entityID,
+		NumAttempts:    0,
+		LastRequested:  time.Time{},
+		RetryAfter:     e.cfg.RetryInitial,
+		ExtraSelector:  selector,
+		checkIntegrity: checkIntegrity,
 	}
 	e.items[entityID] = item
 }
@@ -350,7 +365,7 @@ func (e *Engine) dispatchRequest() (bool, error) {
 		delete(e.requests, req.Nonce)
 	}()
 
-	e.metrics.MessageSent(e.channel, metrics.MessageEntityRequest)
+	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityRequest)
 
 	return true, nil
 }
@@ -358,8 +373,8 @@ func (e *Engine) dispatchRequest() (bool, error) {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(e.channel, metrics.MessageEntityResponse)
-	defer e.metrics.MessageHandled(e.channel, metrics.MessageEntityResponse)
+	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityResponse)
+	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityResponse)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
@@ -410,7 +425,7 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		entityID := res.EntityIDs[i]
 
 		// the entity might already have been returned in another response
-		_, exists := e.items[entityID]
+		item, exists := e.items[entityID]
 		if !exists {
 			continue
 		}
@@ -420,6 +435,19 @@ func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.Entity
 		err := msgpack.Unmarshal(blob, &entity)
 		if err != nil {
 			return fmt.Errorf("could not decode entity: %w", err)
+		}
+
+		if item.checkIntegrity {
+			actualEntityID := entity.ID()
+			// validate that we got correct entity, exactly what we were expecting
+			if entityID != actualEntityID {
+				e.log.Error().
+					Hex("origin", logging.ID(originID)).
+					Hex("stated_entity_id", logging.ID(entityID)).
+					Hex("provided_entity", logging.ID(actualEntityID)).
+					Msg("provided entity does not match stated ID")
+				continue
+			}
 		}
 
 		// remove from needed items and pending items

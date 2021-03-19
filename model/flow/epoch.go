@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/vmihailenco/msgpack"
+	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
@@ -38,38 +38,20 @@ func (p EpochPhase) String() string {
 	}[p]
 }
 
+// EpochSetupRandomSourceLength is the required length of the random source
+// included in an EpochSetup service event.
+const EpochSetupRandomSourceLength = crypto.SignatureLenBLSBLS12381
+
 // EpochSetup is a service event emitted when the network is ready to set up
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
 	Counter      uint64         // the number of the epoch
+	FirstView    uint64         // the first view of the epoch
 	FinalView    uint64         // the final view of the epoch
 	Participants IdentityList   // all participants of the epoch
 	Assignments  AssignmentList // cluster assignment for the epoch
 	RandomSource []byte         // source of randomness for epoch-specific setup tasks
-
-	// FirstView is the first view of the epoch. It is NOT included in the service
-	// event, but is cached here when stored to simplify epoch queries.
-	// TODO separate this more explicitly from canonical service event
-	FirstView uint64
-}
-
-// Body returns the canonical body of the EpochSetup event (notably omitting
-// the FirstView which is a computed property).
-func (setup *EpochSetup) Body() interface{} {
-	return struct {
-		Counter      uint64
-		FinalView    uint64
-		Participants IdentityList
-		Assignments  AssignmentList
-		RandomSource []byte
-	}{
-		Counter:      setup.Counter,
-		FinalView:    setup.FinalView,
-		Participants: setup.Participants,
-		Assignments:  setup.Assignments,
-		RandomSource: setup.RandomSource,
-	}
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -81,7 +63,7 @@ func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 
 // ID returns the hash of the event contents.
 func (setup *EpochSetup) ID() Identifier {
-	return MakeID(setup.Body())
+	return MakeID(setup)
 }
 
 // EpochCommit is a service event emitted when epoch setup has been completed.
@@ -263,9 +245,9 @@ func (part DKGParticipant) EncodeRLP(w io.Writer) error {
 // service events emitted as of the reference block. Events not yet emitted are
 // represented by ZeroID.
 type EpochStatus struct {
-	FirstBlockID Identifier // ID of the first block in current epoch
-	CurrentEpoch EventIDs   // EpochSetup and EpochCommit events for the current epoch
-	NextEpoch    EventIDs   // EpochSetup and EpochCommit events for the next epoch
+	PreviousEpoch EventIDs // EpochSetup and EpochCommit events for the previous epoch
+	CurrentEpoch  EventIDs // EpochSetup and EpochCommit events for the current epoch
+	NextEpoch     EventIDs // EpochSetup and EpochCommit events for the next epoch
 }
 
 // EventIDs is a container for IDs of epoch service events.
@@ -276,9 +258,12 @@ type EventIDs struct {
 	CommitID Identifier
 }
 
-func NewEpochStatus(firstBlockID, currentSetup, currentCommit, nextSetup, nextCommit Identifier) (*EpochStatus, error) {
+func NewEpochStatus(previousSetup, previousCommit, currentSetup, currentCommit, nextSetup, nextCommit Identifier) (*EpochStatus, error) {
 	status := &EpochStatus{
-		FirstBlockID: firstBlockID,
+		PreviousEpoch: EventIDs{
+			SetupID:  previousSetup,
+			CommitID: previousCommit,
+		},
 		CurrentEpoch: EventIDs{
 			SetupID:  currentSetup,
 			CommitID: currentCommit,
@@ -289,22 +274,22 @@ func NewEpochStatus(firstBlockID, currentSetup, currentCommit, nextSetup, nextCo
 		},
 	}
 
-	err := status.check()
+	err := status.Check()
 	if err != nil {
 		return nil, err
 	}
 	return status, nil
 }
 
-// check checks that the status is well-formed, returning an error if it is not.
-func (es *EpochStatus) check() error {
+// Check checks that the status is well-formed, returning an error if it is not.
+func (es *EpochStatus) Check() error {
 
 	if es == nil {
 		return fmt.Errorf("nil epoch status")
 	}
-	// must reference first block of current epoch
-	if es.FirstBlockID == ZeroID {
-		return fmt.Errorf("epoch status with empty first block")
+	// must reference either both or neither event IDs for previous epoch
+	if (es.PreviousEpoch.SetupID == ZeroID) != (es.PreviousEpoch.CommitID == ZeroID) {
+		return fmt.Errorf("epoch status with only setup or only commit service event")
 	}
 	// must reference event IDs for current epoch
 	if es.CurrentEpoch.SetupID == ZeroID || es.CurrentEpoch.CommitID == ZeroID {
@@ -320,7 +305,7 @@ func (es *EpochStatus) check() error {
 // Phase returns the phase for the CURRENT epoch, given this epoch status.
 func (es *EpochStatus) Phase() (EpochPhase, error) {
 
-	err := es.check()
+	err := es.Check()
 	if err != nil {
 		return EpochPhaseUndefined, err
 	}
@@ -331,4 +316,8 @@ func (es *EpochStatus) Phase() (EpochPhase, error) {
 		return EpochPhaseSetup, nil
 	}
 	return EpochPhaseCommitted, nil
+}
+
+func (es *EpochStatus) HasPrevious() bool {
+	return es.PreviousEpoch.SetupID != ZeroID && es.PreviousEpoch.CommitID != ZeroID
 }

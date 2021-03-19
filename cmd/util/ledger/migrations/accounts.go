@@ -11,9 +11,10 @@ import (
 )
 
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
-	l := newLed(payloads)
+	l := newView(payloads)
 	st := state.NewState(l)
-	a := state.NewAccounts(st)
+	sth := state.NewStateHolder(st)
+	a := state.NewAccounts(sth)
 
 	//// TestNet
 	// coreContractEncodedKey := "f847b8402b0bf247520770a4bad19e07f6d6b1e8f0542da564154087e2681b175b4432ec2c7b09a52d34dabe0a887ea0f96b067e52c6a0792dcff730fe78a6c5fbbf0a9c02038203e8"
@@ -131,6 +132,73 @@ func appendKeyForAccount(accounts *state.Accounts, addressInHex string, encodedK
 	return nil
 }
 
+type view struct {
+	Parent *view
+	Ledger *led
+}
+
+func newView(payloads []ledger.Payload) *view {
+	return &view{
+		Ledger: newLed(payloads),
+	}
+}
+
+func (v *view) NewChild() state.View {
+	payload := make([]ledger.Payload, 0)
+	ch := newView(payload)
+	ch.Parent = v
+	return ch
+}
+
+func (v *view) DropDelta() {
+	v.Ledger.payloads = make(map[string]ledger.Payload)
+}
+
+func (v *view) MergeView(o state.View) error {
+	var other *view
+	var ok bool
+	if other, ok = o.(*view); !ok {
+		return fmt.Errorf("view type mismatch (given: %T, expected:Delta.View)", o)
+	}
+
+	for key, value := range other.Ledger.payloads {
+		v.Ledger.payloads[key] = value
+	}
+	return nil
+}
+
+func (v *view) Set(owner, controller, key string, value flow.RegisterValue) error {
+	return v.Ledger.Set(owner, controller, key, value)
+}
+
+func (v *view) Get(owner, controller, key string) (flow.RegisterValue, error) {
+	value, err := v.Ledger.Get(owner, controller, key)
+	if err != nil {
+		return nil, err
+	}
+	if len(value) > 0 {
+		return value, nil
+	}
+
+	if v.Parent != nil {
+		return v.Parent.Get(owner, controller, key)
+	}
+
+	return nil, nil
+}
+
+func (v *view) Touch(owner, controller, key string) error {
+	return v.Ledger.Touch(owner, controller, key)
+}
+
+func (v *view) Delete(owner, controller, key string) error {
+	return v.Ledger.Delete(owner, controller, key)
+}
+
+func (v *view) Payloads() []ledger.Payload {
+	return v.Ledger.Payloads()
+}
+
 type led struct {
 	payloads map[string]ledger.Payload
 }
@@ -147,10 +215,6 @@ func (l *led) Set(owner, controller, key string, value flow.RegisterValue) error
 func (l *led) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	fk := fullKey(owner, controller, key)
 	return flow.RegisterValue(l.payloads[fk].Value), nil
-}
-
-func (l *led) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
-	panic("this method shouldn't be used here")
 }
 
 func (l *led) Delete(owner, controller, key string) error {

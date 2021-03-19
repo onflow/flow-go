@@ -3,8 +3,11 @@ package fvm
 import (
 	"errors"
 
+	"github.com/opentracing/opentracing-go/log"
+
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionSequenceNumberChecker struct{}
@@ -14,21 +17,41 @@ func NewTransactionSequenceNumberChecker() *TransactionSequenceNumberChecker {
 }
 
 func (c *TransactionSequenceNumberChecker) Process(
-	vm *VirtualMachine,
-	ctx Context,
+	_ *VirtualMachine,
+	ctx *Context,
 	proc *TransactionProcedure,
-	st *state.State,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
 
-	return c.checkAndIncrementSequenceNumber(proc.Transaction, st)
+	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
-	tx *flow.TransactionBody,
-	st *state.State,
+	proc *TransactionProcedure,
+	ctx *Context,
+	sth *state.StateHolder,
 ) error {
-	accounts := state.NewAccounts(st)
-	proposalKey := tx.ProposalKey
+
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
+		span.LogFields(
+			log.String("transaction.ID", proc.ID.String()),
+		)
+		defer span.Finish()
+	}
+
+	parentState := sth.State()
+	childState := sth.NewChild()
+	defer func() {
+		if mergeError := parentState.MergeState(childState); mergeError != nil {
+			panic(mergeError)
+		}
+		sth.SetActiveState(parentState)
+	}()
+
+	accounts := state.NewAccounts(sth)
+	proposalKey := proc.Transaction.ProposalKey
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
@@ -64,11 +87,8 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
-		return err
-	}
-
-	err = st.Commit()
-	if err != nil {
+		// drop the changes
+		childState.View().DropDelta()
 		return err
 	}
 

@@ -50,10 +50,11 @@ type Engine struct {
 
 	// storage
 	// FIX: remove direct DB access by substituting indexer module
-	blocks       storage.Blocks
-	headers      storage.Headers
-	collections  storage.Collections
-	transactions storage.Transactions
+	blocks            storage.Blocks
+	headers           storage.Headers
+	collections       storage.Collections
+	transactions      storage.Transactions
+	executionReceipts storage.ExecutionReceipts
 
 	// metrics
 	transactionMetrics         module.TransactionMetrics
@@ -75,6 +76,7 @@ func New(
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	executionReceipts storage.ExecutionReceipts,
 	transactionMetrics module.TransactionMetrics,
 	collectionsToMarkFinalized *stdmap.Times,
 	collectionsToMarkExecuted *stdmap.Times,
@@ -93,6 +95,7 @@ func New(
 		headers:                    headers,
 		collections:                collections,
 		transactions:               transactions,
+		executionReceipts:          executionReceipts,
 		transactionMetrics:         transactionMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
 		collectionsToMarkExecuted:  collectionsToMarkExecuted,
@@ -251,6 +254,12 @@ func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 }
 
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.ExecutionReceipt) error {
+	// persist the execution receipt locally, storing will also index the receipt
+	err := e.executionReceipts.Store(r)
+	if err != nil {
+		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
 	e.trackExecutedMetricForReceipt(r)
 	return nil
 }

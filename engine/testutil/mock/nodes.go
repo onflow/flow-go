@@ -22,10 +22,10 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/fvm"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -41,6 +41,16 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// StateFixture is a test helper struct that encapsulates a flow protocol state
+// as well as all of its backend dependencies.
+type StateFixture struct {
+	DB             *badger.DB
+	Storage        *storage.All
+	DBDir          string
+	ProtocolEvents *events.Distributor
+	State          protocol.MutableState
+}
+
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
 	Log            zerolog.Logger
@@ -53,7 +63,7 @@ type GenericNode struct {
 	Seals          storage.Seals
 	Payloads       storage.Payloads
 	Blocks         storage.Blocks
-	State          protocol.State
+	State          protocol.MutableState
 	Index          storage.Index
 	Me             module.Local
 	Net            *stub.Network
@@ -89,7 +99,7 @@ type ConsensusNode struct {
 	GenericNode
 	Guarantees      mempool.Guarantees
 	Approvals       mempool.Approvals
-	Receipts        mempool.Receipts
+	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
 	MatchingEngine  *matching.Engine
@@ -107,13 +117,13 @@ func (cn ConsensusNode) Done() {
 
 type ComputerWrap struct {
 	*computation.Manager
-	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View)
+	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view fvmState.View)
 }
 
 func (c *ComputerWrap) ComputeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	view *delta.View,
+	view fvmState.View,
 ) (*execution.ComputationResult, error) {
 	if c.OnComputeBlock != nil {
 		c.OnComputeBlock(ctx, block, view)
@@ -124,20 +134,21 @@ func (c *ComputerWrap) ComputeBlock(
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	MutableState    protocol.MutableState
-	IngestionEngine *ingestion.Engine
-	ExecutionEngine *ComputerWrap
-	RequestEngine   *requester.Engine
-	ReceiptsEngine  *executionprovider.Engine
-	FollowerEngine  *followereng.Engine
-	SyncEngine      *synchronization.Engine
-	BadgerDB        *badger.DB
-	VM              *fvm.VirtualMachine
-	ExecutionState  state.ExecutionState
-	Ledger          ledger.Ledger
-	LevelDbDir      string
-	Collections     storage.Collections
-	Finalizer       *consensus.Finalizer
+	MutableState        protocol.MutableState
+	IngestionEngine     *ingestion.Engine
+	ExecutionEngine     *ComputerWrap
+	RequestEngine       *requester.Engine
+	ReceiptsEngine      *executionprovider.Engine
+	FollowerEngine      *followereng.Engine
+	SyncEngine          *synchronization.Engine
+	BadgerDB            *badger.DB
+	VM                  *fvm.VirtualMachine
+	ExecutionState      state.ExecutionState
+	Ledger              ledger.Ledger
+	LevelDbDir          string
+	Collections         storage.Collections
+	Finalizer           *consensus.Finalizer
+	MyExecutionReceipts storage.MyExecutionReceipts
 }
 
 func (en ExecutionNode) Ready() {
@@ -176,18 +187,18 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
-	GenericNode
+	*GenericNode
 	CachedReceipts           mempool.ReceiptDataPacks
 	ReadyReceipts            mempool.ReceiptDataPacks
 	PendingReceipts          mempool.ReceiptDataPacks
 	PendingResults           mempool.ResultDataPacks
 	ProcessedResultIDs       mempool.Identifiers
+	DiscardedResultIDs       mempool.Identifiers
 	BlockIDsCache            mempool.Identifiers
 	PendingReceiptIDsByBlock mempool.IdentifierMap
 	ReceiptIDsByResult       mempool.IdentifierMap
 	ChunkIDsByResult         mempool.IdentifierMap
 	PendingChunks            *match.Chunks
-	HeaderStorage            storage.Headers
 	VerifierEngine           network.Engine
 	FinderEngine             *finder.Engine
 	MatchEngine              network.Engine

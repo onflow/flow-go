@@ -6,10 +6,10 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
-	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer/forest"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/forest"
 )
 
 // Finalizer implements HotStuff finalization logic
@@ -30,7 +30,7 @@ type ancestryChain struct {
 }
 
 // ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
-var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestry")
+var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestor")
 
 func New(trustedRoot *forks.BlockQC, finalizationCallback module.Finalizer, notifier hotstuff.FinalizationConsumer) (*Finalizer, error) {
 	if (trustedRoot.Block.BlockID != trustedRoot.QC.BlockID) || (trustedRoot.Block.View != trustedRoot.QC.View) {
@@ -94,8 +94,8 @@ func (r *Finalizer) IsKnownBlock(block *model.Block) bool {
 	return hasBlock
 }
 
-// isProcessingNeeded performs basic checks whether or not block needs processing
-// only considering the block's height and Hash
+// IsProcessingNeeded performs basic checks whether or not block needs processing
+// only considering the block's height and hash
 // Returns false if any of the following conditions applies
 //  * block view is _below_ the most recently finalized block
 //  * known block
@@ -296,7 +296,7 @@ func (r *Finalizer) updateLockedQc(ancestryChain *ancestryChain) {
 }
 
 // updateFinalizedBlockQc updates `lastFinalizedBlockQC`
-// We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
+// We use the finalization rule from 'Event-driven HotStuff Protocol' where the condition is:
 //    * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
 //    * The 'Last finalized Block' is the block in S with the _highest view number_ (newest);
 // Calling this method with previously-processed blocks leaves consensus state invariant.

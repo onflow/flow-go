@@ -14,12 +14,6 @@ type ConduitSendWrapperFunc func(msg interface{}, conduit network.Conduit, targe
 
 type ConduitWrapper struct{}
 
-// Submit defines a function that receives a message, conduit of an engine instance, and
-// a set of target IDa. It then sends the message to the target IDs using the Submit method of conduit.
-func (c *ConduitWrapper) Submit(msg interface{}, conduit network.Conduit, targetIDs ...flow.Identifier) error {
-	return conduit.Submit(msg, targetIDs...)
-}
-
 // Publish defines a function that receives a message, conduit of an engine instance, and
 // a set target IDs. It then sends the message to the target IDs using the Publish method of conduit.
 func (c *ConduitWrapper) Publish(msg interface{}, conduit network.Conduit, targetIDs ...flow.Identifier) error {

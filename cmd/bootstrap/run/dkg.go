@@ -12,10 +12,28 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
+// RunDKG simulates a distributed DKG protocol by running the protocol locally
+// and generating the DKG output info
 func RunDKG(n int, seeds [][]byte) (model.DKGData, error) {
 
 	if n != len(seeds) {
 		return model.DKGData{}, fmt.Errorf("n needs to match the number of seeds (%v != %v)", n, len(seeds))
+	}
+
+	// separate the case whith one node
+	if n == 1 {
+		sk, pk, pkGroup, err := thresholdSignKeyGenOneNode(seeds[0])
+		if err != nil {
+			return model.DKGData{}, fmt.Errorf("run dkg failed: %w", err)
+		}
+
+		dkgData := model.DKGData{
+			PrivKeyShares: sk,
+			PubGroupKey:   pkGroup,
+			PubKeyShares:  pk,
+		}
+
+		return dkgData, nil
 	}
 
 	processors := make([]localDKGProcessor, 0, n)
@@ -99,20 +117,26 @@ type localDKGProcessor struct {
 	pubkeys     []crypto.PublicKey
 }
 
+const (
+	broadcast int = iota
+	private
+)
+
 type message struct {
-	orig int
-	data []byte
+	orig    int
+	channel int
+	data    []byte
 }
 
 // PrivateSend sends a message from one node to another
 func (proc *localDKGProcessor) PrivateSend(dest int, data []byte) {
-	newMsg := &message{proc.current, data}
+	newMsg := &message{proc.current, private, data}
 	proc.chans[dest] <- newMsg
 }
 
 // Broadcast a message from one node to all nodes
 func (proc *localDKGProcessor) Broadcast(data []byte) {
-	newMsg := &message{proc.current, data}
+	newMsg := &message{proc.current, broadcast, data}
 	for i := 0; i < len(proc.chans); i++ {
 		if i != proc.current {
 			proc.chans[i] <- newMsg
@@ -134,7 +158,12 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 	for {
 		select {
 		case newMsg := <-proc.chans[proc.current]:
-			err := proc.dkg.HandleMsg(newMsg.orig, newMsg.data)
+			var err error
+			if newMsg.channel == private {
+				err = proc.dkg.HandlePrivateMsg(newMsg.orig, newMsg.data)
+			} else {
+				err = proc.dkg.HandleBroadcastMsg(newMsg.orig, newMsg.data)
+			}
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to receive DKG mst")
 			}
@@ -168,4 +197,49 @@ func dkgRunChan(proc *localDKGProcessor, sync *sync.WaitGroup, phase int) {
 			return
 		}
 	}
+}
+
+// RunFastKG is an alternative to RunDKG that runs much faster by using a centralized threshold signature key generation.
+func RunFastKG(n int, seed []byte) (model.DKGData, error) {
+
+	if n == 1 {
+		sk, pk, pkGroup, err := thresholdSignKeyGenOneNode(seed)
+		if err != nil {
+			return model.DKGData{}, fmt.Errorf("fast KeyGen failed: %w", err)
+		}
+
+		dkgData := model.DKGData{
+			PrivKeyShares: sk,
+			PubGroupKey:   pkGroup,
+			PubKeyShares:  pk,
+		}
+		return dkgData, nil
+	}
+
+	skShares, pkShares, pkGroup, err := crypto.ThresholdSignKeyGen(int(n),
+		signature.RandomBeaconThreshold(int(n)), seed)
+	if err != nil {
+		return model.DKGData{}, fmt.Errorf("fast KeyGen failed: %w", err)
+	}
+
+	dkgData := model.DKGData{
+		PrivKeyShares: skShares,
+		PubGroupKey:   pkGroup,
+		PubKeyShares:  pkShares,
+	}
+
+	return dkgData, nil
+}
+
+// simulates DKG with one single node
+func thresholdSignKeyGenOneNode(seed []byte) ([]crypto.PrivateKey, []crypto.PublicKey, crypto.PublicKey, error) {
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("KeyGen with one node failed: %w", err)
+	}
+	pk := sk.PublicKey()
+	return []crypto.PrivateKey{sk},
+		[]crypto.PublicKey{pk},
+		pk,
+		nil
 }

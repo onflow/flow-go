@@ -34,8 +34,8 @@ type Engine struct {
 	mempoolMetrics module.MempoolMetrics
 	conduit        network.Conduit
 	me             module.Local
-	protoState     protocol.State  // flow-wide protocol chain state
-	clusterState   clusterkv.State // cluster-specific chain state
+	protoState     protocol.State         // flow-wide protocol chain state
+	clusterState   clusterkv.MutableState // cluster-specific chain state
 	transactions   storage.Transactions
 	headers        storage.Headers
 	payloads       storage.ClusterPayloads
@@ -55,7 +55,7 @@ func New(
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
-	clusterState clusterkv.State,
+	clusterState clusterkv.MutableState,
 	transactions storage.Transactions,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
@@ -473,7 +473,7 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 		Payload: proposal.Payload,
 	}
 
-	err := e.clusterState.Mutate().Extend(block)
+	err := e.clusterState.Extend(block)
 	// if the error is a known invalid extension of the cluster state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

@@ -165,3 +165,45 @@ func TestKmac128(t *testing.T) {
 	assert.Error(t, err)
 
 }
+
+// TestHashersAPI tests the expected definition of the hashers APIs
+func TestHashersAPI(t *testing.T) {
+	kmac128, err := NewKMAC_128([]byte("test_key________"), []byte("test_custommizer"), 32)
+	require.Nil(t, err)
+
+	hashers := []Hasher{
+		NewSHA2_256(),
+		NewSHA2_384(),
+		NewSHA3_256(),
+		NewSHA3_384(),
+		kmac128,
+	}
+	for _, h := range hashers {
+		// Reset should empty the state
+		expectedEmptyHash := h.SumHash()
+		h.Write([]byte("data"))
+		h.Reset()
+		emptyHash := h.SumHash()
+		assert.Equal(t, expectedEmptyHash, emptyHash)
+
+		// ComputeHash output does not depend on the hasher state
+		h.Write([]byte("data"))
+		emptyHash = h.ComputeHash([]byte(""))
+		assert.Equal(t, expectedEmptyHash, emptyHash)
+
+		// ComputeHash does not update the state (only for KMAC128)
+		hash := h.SumHash()
+		expectedHash := h.ComputeHash([]byte("data"))
+		if h.Algorithm() == KMAC128 {
+			assert.Equal(t, expectedHash, hash)
+		}
+
+		// SumHash does not reset the hasher state and allows writing more data
+		h.Reset()
+		h.Write([]byte("da"))
+		_ = h.SumHash()
+		h.Write([]byte("ta"))
+		hash = h.SumHash()
+		assert.Equal(t, expectedHash, hash)
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -30,6 +31,19 @@ func (e *Events) Store(blockID flow.Identifier, events []flow.Event) error {
 		}
 		return nil
 	})
+}
+
+func (e *Events) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		for _, event := range events {
+			err := operation.BatchInsertEvent(blockID, event)(writeBatch)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert event: %w", err)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
 }
 
 // ByBlockID returns the events for the given block ID
@@ -61,6 +75,54 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, event flow.EventTyp
 
 	var events []flow.Event
 	err := e.db.View(operation.LookupEventsByBlockIDEventType(blockID, event, &events))
+	if err != nil {
+		return nil, handleError(err, flow.Event{})
+	}
+
+	return events, nil
+}
+
+type ServiceEvents struct {
+	db *badger.DB
+}
+
+func NewServiceEvents(db *badger.DB) *ServiceEvents {
+	return &ServiceEvents{
+		db: db,
+	}
+}
+
+// Store will store events for the given block ID
+func (e *ServiceEvents) Store(blockID flow.Identifier, events []flow.Event) error {
+	return operation.RetryOnConflict(e.db.Update, func(btx *badger.Txn) error {
+		for _, event := range events {
+			err := operation.SkipDuplicates(operation.InsertServiceEvent(blockID, event))(btx)
+			if err != nil {
+				return fmt.Errorf("could not insert event: %w", err)
+			}
+		}
+		return nil
+	})
+}
+
+func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		for _, event := range events {
+			err := operation.BatchInsertServiceEvent(blockID, event)(writeBatch)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert service event: %w", err)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
+}
+
+// ByBlockID returns the events for the given block ID
+func (e *ServiceEvents) ByBlockID(blockID flow.Identifier) ([]flow.Event, error) {
+
+	var events []flow.Event
+	err := e.db.View(operation.LookupServiceEventsByBlockID(blockID, &events))
 	if err != nil {
 		return nil, handleError(err, flow.Event{})
 	}

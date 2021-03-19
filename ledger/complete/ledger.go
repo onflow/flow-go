@@ -2,6 +2,7 @@ package complete
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -54,7 +55,7 @@ func NewLedger(dbDir string,
 	reg prometheus.Registerer,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
+	w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
@@ -262,7 +263,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
-	outputFilePath string) (ledger.State, error) {
+	outputDir, outputFile string) (ledger.State, error) {
 
 	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
 
@@ -270,6 +271,12 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
 		return nil, fmt.Errorf("cannot get try at the given state commitment: %w", err)
+	}
+
+	// clean up tries to release memory
+	err = l.keepOnlyOneTrie(state)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
 	// TODO enable validity check of trie
@@ -326,7 +333,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
-	writer, err := wal.CreateCheckpointWriterForFile(outputFilePath)
+	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
@@ -367,4 +374,25 @@ func (l *Ledger) DumpTrieAsJSON(state ledger.State, outputFilePath string) error
 	defer writer.Flush()
 
 	return trie.DumpAsJSON(writer)
+}
+
+// this operation should only be used for exporting
+func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
+	// don't write things to WALs
+	l.wal.PauseRecord()
+	defer l.wal.UnpauseRecord()
+
+	allTries, err := l.forest.GetTries()
+	if err != nil {
+		return err
+	}
+
+	targetRootHash := ledger.RootHash(state)
+	for _, trie := range allTries {
+		trieRootHash := trie.RootHash()
+		if !bytes.Equal(trieRootHash, targetRootHash) {
+			l.forest.RemoveTrie(trieRootHash)
+		}
+	}
+	return nil
 }

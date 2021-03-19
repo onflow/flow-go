@@ -1,15 +1,17 @@
 package metrics
 
 const (
-	LabelChannel  = "topic"
-	LabelChain    = "chain"
-	EngineLabel   = "engine"
-	LabelResource = "resource"
-	LabelMessage  = "message"
-	LabelNodeID   = "nodeid"
-	LabelNodeRole = "noderole"
-	LabelNodeInfo = "nodeinfo"
-	LabelPriority = "priority"
+	LabelChannel     = "topic"
+	LabelChain       = "chain"
+	LabelProposer    = "proposer"
+	EngineLabel      = "engine"
+	LabelResource    = "resource"
+	LabelMessage     = "message"
+	LabelNodeID      = "nodeid"
+	LabelNodeAddress = "nodeaddress"
+	LabelNodeRole    = "noderole"
+	LabelNodeInfo    = "nodeinfo"
+	LabelPriority    = "priority"
 )
 
 const (
@@ -43,6 +45,7 @@ const (
 	ResourceGuarantee                = "guarantee"
 	ResourceResult                   = "result"
 	ResourceReceipt                  = "receipt"
+	ResourceMyReceipt                = "my_receipt"
 	ResourceCollection               = "collection"
 	ResourceApproval                 = "approval"
 	ResourceSeal                     = "seal"
@@ -50,7 +53,8 @@ const (
 	ResourceTransaction              = "transaction"
 	ResourceClusterPayload           = "cluster_payload"
 	ResourceClusterProposal          = "cluster_proposal"
-	ResourceProcessedResultID        = "processed_result_ids"         // verification node, finder engine
+	ResourceProcessedResultID        = "processed_result_id"          // verification node, finder engine
+	ResourceDiscardedResultID        = "discarded_result_id"          // verification node, finder engine
 	ResourcePendingReceipt           = "pending_receipt"              // verification node, finder engine
 	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
 	ResourcePendingReceiptIDsByBlock = "pending_receipt_ids_by_block" // verification node, finder engine
@@ -63,6 +67,11 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
+	ResourceApprovalQueue            = "matching_approval_queue"          // consensus node, matching engine
+	ResourceReceiptQueue             = "matching_receipt_queue"           // consensus node, matching engine
+	ResourceApprovalResponseQueue    = "matching_approval_response_queue" // consensus node, matching engine
+	ResourceBlockProposalQueue       = "compliance_proposal_queue"        // consensus node, compliance engine
+	ResourceBlockVoteQueue           = "compliance_vote_queue"            // consensus node, compliance engine
 )
 
 const (

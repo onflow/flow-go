@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -53,9 +54,9 @@ func main() {
 	var (
 		guaranteeLimit                         uint
 		resultLimit                            uint
-		receiptLimit                           uint
 		approvalLimit                          uint
 		sealLimit                              uint
+		pendngReceiptsLimit                    uint
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
 		maxSealPerBlock                        uint
@@ -66,32 +67,38 @@ func main() {
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
-		requireOneApproval                     bool
 		chunkAlpha                             uint
+		requiredApprovalsForSealVerification   uint
+		requiredApprovalsForSealConstruction   uint
+		emergencySealing                       bool
 
-		err            error
-		mutableState   protocol.MutableState
-		privateDKGData *bootstrap.DKGParticipantPriv
-		guarantees     mempool.Guarantees
-		results        mempool.IncorporatedResults
-		receipts       mempool.Receipts
-		approvals      mempool.Approvals
-		seals          mempool.IncorporatedResultSeals
-		prov           *provider.Engine
-		requesterEng   *requester.Engine
-		syncCore       *synchronization.Core
-		comp           *compliance.Engine
-		conMetrics     module.ConsensusMetrics
-		mainMetrics    module.HotstuffMetrics
+		err               error
+		mutableState      protocol.MutableState
+		privateDKGData    *bootstrap.DKGParticipantPriv
+		guarantees        mempool.Guarantees
+		results           mempool.IncorporatedResults
+		receipts          mempool.ExecutionTree
+		approvals         mempool.Approvals
+		seals             mempool.IncorporatedResultSeals
+		pendingReceipts   mempool.PendingReceipts
+		prov              *provider.Engine
+		receiptRequester  *requester.Engine
+		syncCore          *synchronization.Core
+		comp              *compliance.Engine
+		conMetrics        module.ConsensusMetrics
+		mainMetrics       module.HotstuffMetrics
+		receiptValidator  module.ReceiptValidator
+		approvalValidator module.ApprovalValidator
+		chunkAssigner     *chmodule.ChunkAssigner
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
-			flags.UintVar(&receiptLimit, "receipt-limit", 10000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
+			flags.UintVar(&pendngReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
@@ -102,8 +109,14 @@ func main() {
 			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
 			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-			flags.BoolVar(&requireOneApproval, "require-one-approval", false, "require one approval per chunk when sealing execution results")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
+			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", matching.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+			flags.BoolVar(&emergencySealing, "emergency-sealing-active", matching.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+		}).
+		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
+			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+			return nil
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -112,13 +125,50 @@ func main() {
 			if !ok {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
+
+			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
+			if requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealVerification > requiredApprovalsForSealConstruction")
+			}
+			if requiredApprovalsForSealConstruction > chunkAlpha {
+				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
+			}
+
+			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
+			if err != nil {
+				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
+			}
+
+			receiptValidator = validation.NewReceiptValidator(
+				node.State,
+				node.Storage.Index,
+				node.Storage.Results,
+				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+
+			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+
+			approvalValidator = validation.NewApprovalValidator(
+				node.State,
+				resultApprovalSigVerifier)
+
+			sealValidator := validation.NewSealValidator(
+				node.State,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.Storage.Seals,
+				chunkAssigner,
+				resultApprovalSigVerifier,
+				requiredApprovalsForSealVerification,
+				conMetrics)
+
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
-			)
+				receiptValidator,
+				sealValidator)
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
@@ -134,18 +184,13 @@ func main() {
 			return err
 		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			receipts, err = stdmap.NewReceipts(receiptLimit)
-			if err != nil {
-				return err
-			}
-
+			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, receipts.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
-
-			return err
+			return nil
 		}).
 		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {
 			approvals, err = stdmap.NewApprovals(approvalLimit)
@@ -162,8 +207,8 @@ func main() {
 			}
 			return nil
 		}).
-		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingReceipts = stdmap.NewPendingReceipts(pendngReceiptsLimit)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -175,8 +220,8 @@ func main() {
 			return err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			sealedResultsDB := bstorage.NewExecutionResults(node.DB)
-			requesterEng, err = requester.New(
+
+			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -185,18 +230,14 @@ func main() {
 				engine.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
-				// requester.WithBatchThreshold(100),
+				requester.WithRetryInitial(2*time.Second),
+				requester.WithRetryMaximum(30*time.Second),
 			)
 			if err != nil {
 				return nil, err
 			}
 
-			assigner, err := chmodule.NewPublicAssignment(int(chunkAlpha), node.State)
-			if err != nil {
-				return nil, fmt.Errorf("could not create public assignment: %w", err)
-			}
-
-			match, err := matching.New(
+			match, err := matching.NewEngine(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
@@ -205,17 +246,24 @@ func main() {
 				node.Network,
 				node.State,
 				node.Me,
-				requesterEng,
-				sealedResultsDB,
+				receiptRequester,
+				node.Storage.Receipts,
 				node.Storage.Headers,
 				node.Storage.Index,
 				results,
+				receipts,
 				approvals,
 				seals,
-				assigner,
-				requireOneApproval,
+				pendingReceipts,
+				chunkAssigner,
+				receiptValidator,
+				approvalValidator,
+				requiredApprovalsForSealConstruction,
+				emergencySealing,
 			)
-			requesterEng.WithHandle(match.HandleReceipt)
+
+			receiptRequester.WithHandle(match.HandleReceipt)
+
 			return match, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -254,23 +302,23 @@ func main() {
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			// initialize the compliance engine
-			comp, err = compliance.New(
-				node.Logger,
+			core, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
-				conMetrics,
-				node.Network,
-				node.Me,
+				node.Metrics.Compliance,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				mutableState,
-				prov,
 				proposals,
-				syncCore,
-			)
+				syncCore)
+			if err != nil {
+				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -284,8 +332,11 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Seals,
 				node.Storage.Index,
+				node.Storage.Blocks,
+				node.Storage.Results,
 				guarantees,
 				seals,
+				receipts,
 				node.Tracer,
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
@@ -337,7 +388,14 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index, node.RootChainID)
+			notifier := createNotifier(
+				node.Logger,
+				mainMetrics,
+				node.Tracer,
+				node.Storage.Index,
+				node.RootChainID,
+			)
+			// make compliance engine as a FinalizationConsumer
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
@@ -394,9 +452,9 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// created with matching engine
-			return requesterEng, nil
+			return receiptRequester, nil
 		}).
 		Run()
 }

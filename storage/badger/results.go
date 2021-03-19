@@ -7,34 +7,57 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 // ExecutionResults implements persistent storage for execution results.
 type ExecutionResults struct {
-	db *badger.DB
+	db    *badger.DB
+	cache *Cache
 }
 
-func NewExecutionResults(db *badger.DB) *ExecutionResults {
-	return &ExecutionResults{
-		db: db,
+func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *ExecutionResults {
+
+	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		result := val.(*flow.ExecutionResult)
+		return operation.SkipDuplicates(operation.InsertExecutionResult(result))
 	}
+
+	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		resultID := key.(flow.Identifier)
+		var result flow.ExecutionResult
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := operation.RetrieveExecutionResult(resultID, &result)(tx)
+			return &result, err
+		}
+	}
+
+	res := &ExecutionResults{
+		db: db,
+		cache: newCache(collector,
+			withLimit(flow.DefaultTransactionExpiry+100),
+			withStore(store),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceResult)),
+	}
+
+	return res
 }
 
 func (r *ExecutionResults) store(result *flow.ExecutionResult) func(*badger.Txn) error {
-	return operation.SkipDuplicates(operation.InsertExecutionResult(result))
+	return r.cache.Put(result.ID(), result)
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*flow.ExecutionResult, error) {
 	return func(tx *badger.Txn) (*flow.ExecutionResult, error) {
-		var result flow.ExecutionResult
-		err := operation.RetrieveExecutionResult(resultID, &result)(tx)
+		val, err := r.cache.Get(resultID)(tx)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve execution result: %w", err)
+			return nil, err
 		}
-
-		return &result, nil
+		return val.(*flow.ExecutionResult), nil
 	}
 }
 
@@ -79,6 +102,21 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(result))
+}
+
+func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		return operation.BatchInsertExecutionResult(result)(writeBatch)
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
+}
+
+func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
+	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+		return operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
+	}
+	return fmt.Errorf("unsupported BatchStore type %T", batch)
+
 }
 
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {

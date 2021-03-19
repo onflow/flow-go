@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
+
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -33,6 +35,8 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -129,20 +133,22 @@ func createNode(
 	guaranteesDB := storage.NewGuarantees(metrics, db)
 	sealsDB := storage.NewSeals(metrics, db)
 	indexDB := storage.NewIndex(metrics, db)
-	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB)
+	resultsDB := storage.NewExecutionResults(metrics, db)
+	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB)
+	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
 	statusesDB := storage.NewEpochStatuses(metrics, db)
 	consumer := events.NewNoop()
 
-	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, rootQC)
 	require.NoError(t, err)
 
-	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, blocksDB, setupsDB, commitsDB, statusesDB, stateRoot)
+	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
-	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer)
+	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -190,10 +196,13 @@ func createNode(
 	guarantees, err := stdmap.NewGuarantees(guaranteeLimit)
 	require.NoError(t, err)
 
+	receipts := consensusMempools.NewExecutionTree()
+
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, guarantees, seals, tracer)
+	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB,
+		guarantees, seals, receipts, tracer)
 
 	signer := &Signer{identity.ID()}
 
@@ -219,7 +228,10 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the compliance engine
-	comp, err := compliance.New(log, metrics, tracer, metrics, metrics, net, local, cleaner, headersDB, payloadsDB, fullState, prov, cache, syncCore)
+	compCore, err := compliance.NewCore(log, metrics, tracer, metrics, metrics, cleaner, headersDB, payloadsDB, fullState, cache, syncCore)
+	require.NoError(t, err)
+
+	comp, err := compliance.NewEngine(log, net, local, prov, compCore)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine

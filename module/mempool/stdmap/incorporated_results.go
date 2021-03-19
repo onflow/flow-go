@@ -75,7 +75,7 @@ func (ir *IncorporatedResults) Add(incorporatedResult *flow.IncorporatedResult) 
 }
 
 // All returns all the items in the mempool.
-func (ir *IncorporatedResults) All() []*flow.IncorporatedResult {
+func (ir *IncorporatedResults) All() flow.IncorporatedResultList {
 	// To guarantee concurrency safety, we need to copy the map via a locked operation in the backend.
 	// Otherwise, another routine might concurrently modify the maps stored as mempool entities.
 	res := make([]*flow.IncorporatedResult, 0)

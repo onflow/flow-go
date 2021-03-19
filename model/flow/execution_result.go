@@ -1,25 +1,16 @@
 package flow
 
-import (
-	"github.com/onflow/flow-go/crypto"
-)
-
-// ExecutionResultBody ...
-type ExecutionResultBody struct {
+// ExecutionResult ...
+type ExecutionResult struct {
 	PreviousResultID Identifier // commit of the previous ER
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
-}
-
-// ExecutionResult ...
-type ExecutionResult struct {
-	ExecutionResultBody
-	Signatures []crypto.Signature
+	ServiceEvents    []ServiceEvent
 }
 
 // ID returns the hash of the execution result body
 func (er ExecutionResult) ID() Identifier {
-	return MakeID(er.ExecutionResultBody)
+	return MakeID(er)
 }
 
 // Checksum ...
