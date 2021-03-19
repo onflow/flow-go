@@ -1,4 +1,4 @@
-package blockconsumer
+package processor
 
 import (
 	"github.com/onflow/flow-go/engine/verification/assigner"
