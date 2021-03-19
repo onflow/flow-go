@@ -21,7 +21,7 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 		blockID := key.(flow.Identifier)
 		var events []flow.Event
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.LookupEventsByBlockID(blockID, &events))
+			err := operation.LookupEventsByBlockID(blockID, &events)(tx)
 			return events, handleError(err, flow.Event{})
 		}
 	}
@@ -103,7 +103,7 @@ func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEven
 		blockID := key.(flow.Identifier)
 		var events []flow.Event
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.LookupServiceEventsByBlockID(blockID, &events))
+			err := operation.LookupServiceEventsByBlockID(blockID, &events)(tx)
 			return events, handleError(err, flow.Event{})
 		}
 	}

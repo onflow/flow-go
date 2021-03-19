@@ -51,7 +51,7 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB) *Transa
 				return nil, fmt.Errorf("could not convert key: %w", err)
 			}
 
-			err = db.View(operation.RetrieveTransactionResult(blockID, txID, &txResult))
+			err = operation.RetrieveTransactionResult(blockID, txID, &txResult)(tx)
 			if err != nil {
 				return nil, handleError(err, flow.TransactionResult{})
 			}

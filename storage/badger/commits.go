@@ -27,7 +27,7 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 		blockID := key.(flow.Identifier)
 		var commit flow.StateCommitment
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.LookupStateCommitment(blockID, &commit))
+			err := operation.LookupStateCommitment(blockID, &commit)(tx)
 			return commit, err
 		}
 	}
