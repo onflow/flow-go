@@ -14,7 +14,8 @@ import (
 )
 
 // BlockConsumer listens to the OnFinalizedBlock event
-// and notify the consumer to Check in the job queue
+// and notifies the consumer to check in the job queue
+// (i.e., its block reader) for new block jobs.
 type BlockConsumer struct {
 	consumer     module.JobConsumer
 	defaultIndex int64
@@ -22,8 +23,8 @@ type BlockConsumer struct {
 
 // defaultProcessedIndex returns the last sealed block height from the protocol state.
 //
-// The BlockConsumer utilizes this return height to fetch and consume BlockJob from jobs queue the first time it
-// initializes.
+// The BlockConsumer utilizes this return height to fetch and consume block jobs from
+// jobs queue the first time it initializes.
 func defaultProcessedIndex(state protocol.State) (int64, error) {
 	final, err := state.Sealed().Head()
 	if err != nil {
