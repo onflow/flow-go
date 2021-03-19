@@ -66,8 +66,19 @@ func Test5Nodes(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-// with 5 nodes, one has no weight - should not vote and should never be leader
+// should be able to reach consensus when identity table contains nodes with 0 weight.
 func TestUnweightedNode(t *testing.T) {}
+
+// test consensus across an epoch boundary, where both epochs have the same identity table.
+func TestStaticEpochTransition(t *testing.T) {}
+
+// test consensus across an epoch boundary, where the identity table changes
+// but the new epoch overlaps with the previous epoch.
+func TestEpochTransition_IdentitiesOverlap(t *testing.T) {}
+
+// test consensus across an epoch boundary, where the identity table in the new
+// epoch is disjoint from the identity table in the first epoch.
+func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {}
 
 // TODO: verify if each receiver lost 50% messages, the network can't reach consensus
 
