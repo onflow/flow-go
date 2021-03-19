@@ -1,7 +1,6 @@
 package blockconsumer
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -59,7 +58,7 @@ func TestProduceConsume(t *testing.T) {
 
 			// expects the processor receive only the first 3 blocks (since it is blocked on those, hence no
 			// new block is fetched to process).
-			requireBlockListsEqualIgnoreOrder(t, received, blocks[:3])
+			unittest.RequireBlockListsMatchElements(t, received, blocks[:3])
 		})
 	})
 
@@ -99,7 +98,7 @@ func TestProduceConsume(t *testing.T) {
 			<-consumer.Done()
 
 			// expects the mock engine receive all 10 blocks.
-			requireBlockListsEqualIgnoreOrder(t, received, blocks)
+			unittest.RequireBlockListsMatchElements(t, received, blocks)
 		})
 	})
 
@@ -142,7 +141,7 @@ func TestProduceConsume(t *testing.T) {
 			<-consumer.Done()
 
 			// expects the mock engine receive all 100 blocks.
-			requireBlockListsEqualIgnoreOrder(t, received, blocks)
+			unittest.RequireBlockListsMatchElements(t, received, blocks)
 		})
 	})
 
@@ -192,24 +191,6 @@ func withConsumer(
 
 		withBlockConsumer(consumer, blocks)
 	})
-}
-
-func requireContainBlock(t *testing.T, block *flow.Block, blocks []*flow.Block) {
-	blockID := block.ID()
-	for _, b := range blocks {
-		if b.ID() == blockID {
-			return
-		}
-	}
-
-	require.Fail(t, fmt.Sprintf("block %x is not in the list %v", blockID, blocks))
-}
-
-func requireBlockListsEqualIgnoreOrder(t *testing.T, src []*flow.Block, dst []*flow.Block) {
-	require.Equal(t, len(src), len(dst), fmt.Sprintf("block lists are not of same length src: %d, dst: %d", len(src), len(dst)))
-	for _, e := range src {
-		requireContainBlock(t, e, dst)
-	}
 }
 
 type MockAssignerEngine struct {
