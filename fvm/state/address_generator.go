@@ -16,11 +16,11 @@ type StateBoundAddressGenerator struct {
 	chain       flow.Chain
 }
 
-func NewStateBoundAddressGenerator(stateHolder *StateHolder, chain flow.Chain) (*StateBoundAddressGenerator, error) {
+func NewStateBoundAddressGenerator(stateHolder *StateHolder, chain flow.Chain) *StateBoundAddressGenerator {
 	return &StateBoundAddressGenerator{
 		stateHolder: stateHolder,
 		chain:       chain,
-	}, nil
+	}
 }
 
 // TODO return error instead of a panic
