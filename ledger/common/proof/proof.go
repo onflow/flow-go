@@ -17,10 +17,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		return false
 	}
 	// We start with the leaf and hash our way upwards towards the root
-	proofIndex := len(p.Interims) - 1
-	var computed hash.Hash                                                   // the index of the last non-default value furthest down the tree (-1 if there is none)
-	hash.ComputeCompactValue(&computed, p.Path, p.Payload.Value, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
-	for h := leafHeight + 1; h <= treeHeight; h++ {                          // then, we hash our way upwards until we hit the root (at height `treeHeight`)
+	proofIndex := len(p.Interims) - 1                                         // the index of the last non-default value furthest down the tree (-1 if there is none)
+	computed := hash.ComputeCompactValue(p.Path, p.Payload.Value, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
+	for h := leafHeight + 1; h <= treeHeight; h++ {                           // then, we hash our way upwards until we hit the root (at height `treeHeight`)
 		// we are currently at a node n (initially the leaf). In this iteration, we want to compute the
 		// parent's hash. Here, h is the height of the parent, whose hash want to compute.
 		// The parent has two children: child n, whose hash we have already computed (aka `computed`);
@@ -42,9 +41,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		bit := utils.Bit(p.Path, treeHeight-h)
 		// hashing is order dependant
 		if bit == 1 { // we hash our way up to the parent along the parent's right branch
-			hash.HashInterNodeIn(&computed, siblingHash, computed)
+			computed = hash.HashInterNodeIn(siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
-			hash.HashInterNodeIn(&computed, computed, siblingHash)
+			computed = hash.HashInterNodeIn(computed, siblingHash)
 		}
 	}
 	return (computed == hash.Hash(expectedState)) == p.Inclusion

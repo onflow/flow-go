@@ -67,19 +67,8 @@ func GetDefaultHashForHeight(height int) Hash {
 // note that we don't include the keys here as they are already included in the path
 // TODO: delete this function after refactoring ptrie
 func HashLeaf(path []byte, value []byte) Hash {
-	var out Hash
-	// TODO: this is a sanity check and should be removed soon
-	if len(path) != HashLen {
-		log.Warn().Msgf("HashLeaf path input should be 32 bytes, got %d", len(path))
-		hasher := hash.NewSHA3_256()
-		_, _ = hasher.Write(path)
-		_, _ = hasher.Write(value)
-		copy(out[:], hasher.SumHash())
-		return out
-	}
 	hasher := new256()
-	hasher.hash256Plus(&out, path, value) // path is always 256 bits
-	return out
+	return hasher.hash256Plus(path, value) // path is always 256 bits
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
@@ -87,10 +76,8 @@ func HashLeaf(path []byte, value []byte) Hash {
 // hash1 and hash2 must each be a 32 byte slice.
 // TODO: delete this function after refactoring ptrie
 func HashInterNode(hash1 Hash, hash2 Hash) Hash {
-	var out Hash
 	hasher := new256()
-	hasher.hash256plus256(&out, hash1, hash2) // hash1 and hash2 are 256 bits
-	return out
+	return hasher.hash256plus256(hash1, hash2) // hash1 and hash2 are 256 bits
 }
 
 // HashLeafIn generates hash value for leaf nodes (SHA3-256)
@@ -98,18 +85,9 @@ func HashInterNode(hash1 Hash, hash2 Hash) Hash {
 //
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
-func HashLeafIn(out *Hash, path []byte, value []byte) {
-	// TODO: this is a sanity check and should be removed soon
-	if len(path) != HashLen {
-		log.Warn().Msgf("HashLeaf path input should be 32 bytes, got %d", len(path))
-		hasher := hash.NewSHA3_256()
-		_, _ = hasher.Write(path)
-		_, _ = hasher.Write(value)
-		copy((*out)[:], hasher.SumHash())
-		return
-	}
+func HashLeafIn(path []byte, value []byte) Hash {
 	hasher := new256()
-	hasher.hash256Plus(out, path, value) // path is always 256 bits
+	return hasher.hash256Plus(path, value) // path is always 256 bits
 }
 
 // HashInterNodeIn generates hash value for intermediate nodes (SHA3-256)
@@ -118,33 +96,34 @@ func HashLeafIn(out *Hash, path []byte, value []byte) {
 // result slice can be equal to hash1 or hash2.
 // hash1 and hash2 must each be a 32 byte slice.
 // TODO : should hash1 and hash2 be pointers?
-func HashInterNodeIn(out *Hash, hash1 Hash, hash2 Hash) {
+func HashInterNodeIn(hash1 Hash, hash2 Hash) Hash {
 	hasher := new256()
-	hasher.hash256plus256(out, hash1, hash2) // hash1 and hash2 are 256 bits
+	return hasher.hash256plus256(hash1, hash2) // hash1 and hash2 are 256 bits
 }
 
 // ComputeCompactValue computes the value for the node considering the sub tree
 // to only include this value and default values. It writes the hash result to the result input.
 // UNCHECKED: payload!= nil
-func ComputeCompactValue(out *Hash, path []byte, value []byte, nodeHeight int) {
+func ComputeCompactValue(path []byte, value []byte, nodeHeight int) Hash {
 	// if register is unallocated: return default hash
 	if len(value) == 0 {
-		*out = GetDefaultHashForHeight(nodeHeight)
-		return
+		return GetDefaultHashForHeight(nodeHeight)
 	}
 
 	// register is allocated
 	treeHeight := 8 * len(path)
 
-	HashLeafIn(out, path, value)       // we first compute the hash of the fully-expanded leaf
+	var out Hash
+	out = HashLeafIn(path, value)      // we first compute the hash of the fully-expanded leaf
 	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
 		bit := utils.Bit(path, treeHeight-h)
 		if bit == 1 { // right branching
-			HashInterNodeIn(out, GetDefaultHashForHeight(h-1), *out)
+			out = HashInterNodeIn(GetDefaultHashForHeight(h-1), out)
 		} else { // left branching
-			HashInterNodeIn(out, *out, GetDefaultHashForHeight(h-1))
+			out = HashInterNodeIn(out, GetDefaultHashForHeight(h-1))
 		}
 	}
+	return out
 }

@@ -41,8 +41,7 @@ func Test_ComputeCompactValue(t *testing.T) {
 	l1 := hash.HashInterNode(hash.GetDefaultHashForHeight(l), h)
 	l2 := hash.HashInterNode(l1, hash.GetDefaultHashForHeight(l+1))
 	l3 := hash.HashInterNode(hash.GetDefaultHashForHeight(l+2), l2)
-	var result hash.Hash
-	hash.ComputeCompactValue(&result, path, v, nodeHeight)
+	result := hash.ComputeCompactValue(path, v, nodeHeight)
 	assert.Equal(t, l3, result)
 }
 

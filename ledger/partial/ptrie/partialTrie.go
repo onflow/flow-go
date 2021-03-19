@@ -68,7 +68,7 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (hash.Has
 			failedKeys = append(failedKeys, payload.Key)
 			continue
 		}
-		hash.ComputeCompactValue(&node.hashValue, path, payload.Value, node.height)
+		node.hashValue = hash.ComputeCompactValue(path, payload.Value, node.height)
 	}
 	if len(failedKeys) > 0 {
 		return hash.EmptyHash, &ledger.ErrMissingKeys{Keys: failedKeys}
@@ -159,7 +159,7 @@ func NewPSMT(
 		currentNode.path = path
 		// update node's hashvalue only for inclusion proofs (for others we assume default value)
 		if pr.Inclusion {
-			hash.ComputeCompactValue(&currentNode.hashValue, path, payload.Value, currentNode.height)
+			currentNode.hashValue = hash.ComputeCompactValue(path, payload.Value, currentNode.height)
 		}
 		// keep a reference to this node by path (for update purpose)
 		psmt.pathLookUp[string(path)] = currentNode
