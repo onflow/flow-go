@@ -53,8 +53,6 @@ type TransactionValidationError interface {
 	// Code returns the code for this error
 	Code() uint32
 	// Error returns an string describing the details of the error
-	Error() string
-	// and anything else that an error needs
 	error
 }
 

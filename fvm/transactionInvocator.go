@@ -116,10 +116,12 @@ func (i *TransactionInvocator) Process(
 				PredeclaredValues: predeclaredValues,
 			},
 		)
-		// TODO ExecuteTransaction returns both txErr and vmErr
-		txError, vmError = i.handleRuntimeError(err.(runtime.Error))
-		if vmError != nil {
-			return nil, vmError
+		if err != nil {
+			// TODO ExecuteTransaction returns both txErr and vmErr
+			txError, vmError = i.handleRuntimeError(err)
+			if vmError != nil {
+				return nil, vmError
+			}
 		}
 
 		// break the loop
@@ -318,8 +320,15 @@ func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error, proced
 		Msg("checking failed")
 }
 
-func (i *TransactionInvocator) handleRuntimeError(err runtime.Error) (txError error, vmErr error) {
-	innerErr := err.Err
+func (i *TransactionInvocator) handleRuntimeError(err error) (txError error, vmErr error) {
+	var runErr runtime.Error
+	var ok bool
+	// if not a runtime error return as vm error
+	if runErr, ok = err.(runtime.Error); !ok {
+		return nil, runErr
+	}
+	innerErr := runErr.Err
+
 	// External errors are reported by the runtime but originate from the VM.
 	//
 	// External errors may be fatal or non-fatal, so additional handling
@@ -343,5 +352,5 @@ func (i *TransactionInvocator) handleRuntimeError(err runtime.Error) (txError er
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return &ExecutionError{Err: err}, nil
+	return &ExecutionError{Err: runErr}, nil
 }

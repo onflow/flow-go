@@ -40,14 +40,13 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.TransactionProcessors {
 		// TODO (ramtin) fix me
-		err, _ := p.Process(vm, &ctx, proc, st, programs)
-		vmErr, fatalErr := handleError(err)
-		if fatalErr != nil {
-			return fatalErr
+		txErr, vmErr := p.Process(vm, &ctx, proc, st, programs)
+		if vmErr != nil {
+			return vmErr
 		}
 
-		if vmErr != nil {
-			proc.Err = vmErr
+		if txErr != nil {
+			proc.Err = txErr.(Error)
 			// TODO we should not break here we should continue for fee deductions
 			break
 		}

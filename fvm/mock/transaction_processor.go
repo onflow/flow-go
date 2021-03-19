@@ -17,7 +17,7 @@ type TransactionProcessor struct {
 }
 
 // Process provides a mock function with given fields: _a0, _a1, _a2, _a3, _a4
-func (_m *TransactionProcessor) Process(_a0 *fvm.VirtualMachine, _a1 *fvm.Context, _a2 *fvm.TransactionProcedure, _a3 *state.StateHolder, _a4 *programs.Programs) error {
+func (_m *TransactionProcessor) Process(_a0 *fvm.VirtualMachine, _a1 *fvm.Context, _a2 *fvm.TransactionProcedure, _a3 *state.StateHolder, _a4 *programs.Programs) (error, error) {
 	ret := _m.Called(_a0, _a1, _a2, _a3, _a4)
 
 	var r0 error
@@ -27,5 +27,12 @@ func (_m *TransactionProcessor) Process(_a0 *fvm.VirtualMachine, _a1 *fvm.Contex
 		r0 = ret.Error(0)
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*fvm.VirtualMachine, *fvm.Context, *fvm.TransactionProcedure, *state.StateHolder, *programs.Programs) error); ok {
+		r1 = rf(_a0, _a1, _a2, _a3, _a4)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
