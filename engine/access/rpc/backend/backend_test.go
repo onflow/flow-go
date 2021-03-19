@@ -537,12 +537,16 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		On("ByCollectionID", collection.ID()).
 		Return(&block, nil)
 
-	ids := unittest.IdentityListFixture(1)
-	receipt := unittest.ReceiptForBlockFixture(&block)
-	receipt.ExecutorID = ids[0].NodeID
+	ids := unittest.IdentityListFixture(2)
+	receipt1 := unittest.ReceiptForBlockFixture(&block)
+	receipt1.ExecutorID = ids[0].NodeID
+	receipt2 := unittest.ReceiptForBlockFixture(&block)
+	receipt2.ExecutorID = ids[1].NodeID
+	receipt1.ExecutionResult = receipt2.ExecutionResult
 	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]flow.ExecutionReceipt{*receipt}, nil)
+		On("ByBlockID", blockID).
+		Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
+
 	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
