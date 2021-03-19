@@ -322,6 +322,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
+	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
@@ -361,7 +364,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 
@@ -423,6 +426,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		deltas,
 		syncThreshold,
 		false,
+		checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
