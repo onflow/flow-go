@@ -13,7 +13,7 @@ import (
 )
 
 type Worker interface {
-	Run(job module.Job)
+	Run(job module.Job) error
 }
 
 type Consumer struct {
@@ -204,7 +204,10 @@ func (c *Consumer) run() (int64, error) {
 
 		c.runningJobs.Add(1)
 		go func(j *jobAtIndex) {
-			c.worker.Run(j.job)
+			err := c.worker.Run(j.job)
+			if err != nil {
+				c.log.Fatal().Err(err).Msg("could not run the job")
+			}
 			c.runningJobs.Done()
 		}(indexedJob)
 	}
