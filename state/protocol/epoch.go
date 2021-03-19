@@ -52,6 +52,9 @@ type Epoch interface {
 	// FinalView returns the largest view number which still belongs to this epoch.
 	FinalView() (uint64, error)
 
+	// RandomSource returns the underlying random source of this epoch.
+	RandomSource() ([]byte, error)
+
 	// Seed generates a random seed using the source of randomness for this
 	// epoch, specified in the EpochSetup service event.
 	Seed(indices ...uint32) ([]byte, error)

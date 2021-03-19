@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,8 +16,6 @@ func constructRootBlock(rootChain string, rootParent string, rootHeight uint64, 
 	timestamp := parseRootTimestamp(rootTimestamp)
 
 	block := run.GenerateRootBlock(chainID, parentID, height, timestamp)
-
-	writeJSON(model.PathRootBlock, block)
 
 	return block
 }
