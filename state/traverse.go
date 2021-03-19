@@ -56,7 +56,7 @@ func TraverseForward(headers storage.Headers,
 		return err
 	}
 
-         i := len(blocks) -1
+	i := len(blocks) - 1
 	for i >= 0 {
 		err = visitor(blocks[i])
 		i--
