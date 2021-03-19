@@ -18,7 +18,7 @@ import (
 // TestBlockReader evaluates that block reader correctly reads stored finalized blocks from the blocks storage and
 // protocol state.
 func TestBlockReader(t *testing.T) {
-	WithTestSetup(t, 10, func(reader *FinalizedBlockReader, blocks []*flow.Block) {
+	withReader(t, 10, func(reader *FinalizedBlockReader, blocks []*flow.Block) {
 		// head of block reader should be the same height as the last block on the chain.
 		head, err := reader.Head()
 		require.NoError(t, err)
@@ -37,13 +37,13 @@ func TestBlockReader(t *testing.T) {
 	})
 }
 
-// WithTestSetup is a test helper that provides the implementation of its `withReader` with an instance of FinalizedBlockReader that is connected
+// withReader is a test helper that provides the implementation of its `withReader` with an instance of FinalizedBlockReader that is connected
 // to blocks storage and protocol state. The protocol state has been extended with `blockCount` finalized blocks and those
 // blocks are also provided for the `withReader` function body.
-func WithTestSetup(
+func withReader(
 	t *testing.T,
 	blockCount int,
-	withReader func(*FinalizedBlockReader, []*flow.Block),
+	withBlockReader func(*FinalizedBlockReader, []*flow.Block),
 ) {
 	require.Equal(t, blockCount%2, 0, "block count for this test should be even")
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -65,7 +65,7 @@ func WithTestSetup(
 		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2)
 		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
 
-		withReader(reader, blocks)
+		withBlockReader(reader, blocks)
 	})
 }
 
