@@ -166,7 +166,7 @@ func withConsumer(
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		s := testutil.CompleteStateFixture(t, collector, tracer, participants)
 
-		engine := &MockAssignerEngine{
+		engine := &mockFinalizedBlockProcessor{
 			process: process,
 		}
 
@@ -193,15 +193,16 @@ func withConsumer(
 	})
 }
 
-type MockAssignerEngine struct {
+// mockFinalizedBlockProcessor provides a FinalizedBlockProcessor with a plug-and-play process method.
+type mockFinalizedBlockProcessor struct {
 	notifier module.ProcessingNotifier
 	process  func(module.ProcessingNotifier, *flow.Block)
 }
 
-func (e *MockAssignerEngine) ProcessFinalizedBlock(block *flow.Block) {
+func (e *mockFinalizedBlockProcessor) ProcessFinalizedBlock(block *flow.Block) {
 	e.process(e.notifier, block)
 }
 
-func (e *MockAssignerEngine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
+func (e *mockFinalizedBlockProcessor) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.notifier = notifier
 }
