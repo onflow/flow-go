@@ -316,6 +316,14 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 	}
 }
 
+// CompleteExecutionResultChainFixture is a test fixture that creates a chain of blocks of size `count`.
+// The chain is in the form of root <- R1 <- C1 <- R2 <- C2 <- ...
+// In this chain Ri refers to reference blocks that contain guarantees.
+// Ci refers to a container block that contains an execution receipt for its preceding reference block Ri.
+// e.g., C1 contains an execution receipt for R1, C2 contains a receipt for R2, etc.
+// For sake of simplicity and test, container blocks (i.e., Cis) do not contain any guarantee.
+//
+// It returns a slice of CompleteExecutionResult fixtures that contains a pair of (Ri <- Ci).
 func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count int) []*CompleteExecutionResult {
 	results := make([]*CompleteExecutionResult, 0, count)
 	parent := root
