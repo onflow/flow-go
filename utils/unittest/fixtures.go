@@ -228,31 +228,9 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
-//func BlockWithParentFixture(parent *flow.Header) flow.Block {
-//	payload := PayloadFixture()
-//}
-
 func WithoutGuarantee(payload *flow.Payload) {
 	payload.Guarantees = nil
 }
-
-//
-//func BlockWithParentFixture(parent *flow.Header, options ...func(*flow.Payload)) flow.Block {
-//	payload := PayloadFixture(WithoutSeals)
-//	header := BlockHeaderWithParentFixture(parent)
-//	header.Height = parent.Height + 1
-//
-//	for _, apply := range options {
-//		apply(payload)
-//	}
-//
-//	header.PayloadHash = payload.Hash()
-//
-//	return flow.Block{
-//		Header:  &header,
-//		Payload: &payload,
-//	}
-//}
 
 func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
@@ -1259,7 +1237,7 @@ func ChainFixture(nonGenesisCount int) ([]*flow.Block, *flow.ExecutionResult, *f
 }
 
 // ChainFixtureFrom creates a chain of blocks starting from a given parent block,
-// the total number of blocks in the chain is specified by the given count.
+// the total number of blocks in the chain is specified by the given count
 func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 	blocks := make([]*flow.Block, 0, count)
 
