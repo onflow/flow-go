@@ -66,6 +66,11 @@ func (cl ChunkList) Items() []*Chunk {
 	return cl
 }
 
+// Empty returns true if the chunk list is empty. Otherwise it returns false.
+func (cl ChunkList) Empty() bool {
+	return len(cl) == 0
+}
+
 func (cl ChunkList) Indices() []uint64 {
 	indices := make([]uint64, len(cl))
 	for i, chunk := range cl {

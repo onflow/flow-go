@@ -27,11 +27,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		// and the sibling to node n, whose hash (aka `siblingHash`) must be defined by the Proof.
 
 		var siblingHash []byte
-		flagIsSet, err := utils.IsBitSet(p.Flags, treeHeight-h)
-		if err != nil {
-			return false
-		}
-		if flagIsSet { // if flag is set, siblingHash is stored in the proof
+		flag := utils.Bit(p.Flags, treeHeight-h)
+
+		if flag == 1 { // if flag is set, siblingHash is stored in the proof
 			if proofIndex < 0 { // proof invalid: too few values
 				return false
 			}
@@ -41,12 +39,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 			siblingHash = GetDefaultHashForHeight(h - 1)
 		}
 
-		bitIsSet, err := utils.IsBitSet(p.Path, treeHeight-h)
-		if err != nil {
-			return false
-		}
+		bit := utils.Bit(p.Path, treeHeight-h)
 		// hashing is order dependant
-		if bitIsSet { // we hash our way up to the parent along the parent's right branch
+		if bit == 1 { // we hash our way up to the parent along the parent's right branch
 			computed = HashInterNode(siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
 			computed = HashInterNode(computed, siblingHash)

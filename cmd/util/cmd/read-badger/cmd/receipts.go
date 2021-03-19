@@ -33,12 +33,14 @@ var receiptsCmd = &cobra.Command{
 			}
 
 			log.Info().Msgf("getting receipt by block id: %v", blockID)
-			receipt, err := storages.Receipts.ByBlockID(blockID)
+			receipts, err := storages.Receipts.ByBlockID(blockID)
 			if err != nil {
 				log.Error().Err(err).Msgf("could not get receipt for block id: %v", blockID)
 			}
 
-			common.PrettyPrintEntity(receipt)
+			if len(receipts) > 0 {
+				common.PrettyPrintEntity(receipts[0])
+			}
 			return
 		}
 
