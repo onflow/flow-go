@@ -25,7 +25,7 @@ func jobID(blockID flow.Identifier) module.JobID {
 	return module.JobID(fmt.Sprintf("%v", blockID))
 }
 
-// block converts a block job into its corresponding block.
+// toBlock converts a block job into its corresponding block.
 func toBlock(job module.Job) (*flow.Block, error) {
 	blockJob, ok := job.(*BlockJob)
 	if !ok {
