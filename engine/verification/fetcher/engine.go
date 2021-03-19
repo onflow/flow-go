@@ -183,14 +183,14 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 
 	if err != nil {
 		lg.Error().Err(err).Msg("could not check if block is sealed")
-		e.finishProcessing.FinishProcessing(chunkID)
+		e.finishProcessing.Notify(chunkID)
 		return
 	}
 
 	// skip sealed blocks
 	if sealed {
 		lg.Debug().Msg("skip sealed chunk")
-		e.finishProcessing.FinishProcessing(chunkID)
+		e.finishProcessing.Notify(chunkID)
 		return
 	}
 
@@ -201,7 +201,7 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 	if err != nil {
 		lg.Error().Err(err).Msg("could not process chunk")
 		// we report finish processing this chunk even if it failed
-		e.finishProcessing.FinishProcessing(chunkID)
+		e.finishProcessing.Notify(chunkID)
 	} else {
 		lg.Info().Msgf("processing chunk")
 	}
@@ -209,7 +209,7 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 
 func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.Identifier) error {
 	blockID := c.ChunkBody.BlockID
-	receiptsData, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
 	}
@@ -237,10 +237,10 @@ func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.
 	}
 
 	// requesting a chunk data pack is async, when we receive it
-	// we will resume processing, and eventually call FinishProcessing
+	// we will resume processing, and eventually call Notify
 	// again.
 	// in case we never receive the chunk data pack response, we need
-	// to make sure FinishProcessing is still called, because the
+	// to make sure Notify is still called, because the
 	// consumer is still waiting for it to report finish processing,
 	return nil
 }
@@ -423,7 +423,7 @@ func (e *Engine) onChunkDataPack(
 
 	// whenever we removed a chunk from pending chunks, we need to
 	// report that the job has been finished eventually
-	defer e.finishProcessing.FinishProcessing(chunkID)
+	defer e.finishProcessing.Notify(chunkID)
 
 	resultID := status.ExecutionResultID
 	err = e.verifyChunkWithChunkDataPack(chunk, resultID, chunkDataPack, collection)
@@ -503,7 +503,7 @@ func (e *Engine) validateChunkDataPack(
 }
 
 func (e *Engine) getResultByID(blockID flow.Identifier, resultID flow.Identifier) (*flow.ExecutionResult, error) {
-	receipts, err := e.receiptsDB.ByBlockIDAllExecutionReceipts(blockID)
+	receipts, err := e.receiptsDB.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get receipts by block ID: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -62,6 +63,7 @@ type Engine struct {
 	syncConduit        network.Conduit     // sending state syncing requests
 	syncDeltas         mempool.Deltas      // storing the synced state deltas
 	syncFast           bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
 }
 
 func New(
@@ -85,6 +87,7 @@ func New(
 	syncDeltas mempool.Deltas,
 	syncThreshold int,
 	syncFast bool,
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -114,6 +117,7 @@ func New(
 		syncThreshold:      syncThreshold,
 		syncDeltas:         syncDeltas,
 		syncFast:           syncFast,
+		checkStakedAtBlock: checkStakedAtBlock,
 	}
 
 	// move to state syncing engine
@@ -518,6 +522,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("block_id", logging.Entity(executableBlock)).
 		Msg("executing block")
 
+	startedAt := time.Now()
+
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.Finish()
 
@@ -555,12 +561,19 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
 	broadcasted := false
+
 	if !isExecutedBlockSealed {
-		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+		stakedAtBlock, err := e.checkStakedAtBlock(executableBlock.ID())
 		if err != nil {
-			e.log.Err(err).Msg("critical: failed to broadcast the receipt")
-		} else {
-			broadcasted = true
+			e.log.Fatal().Err(err).Msg("could not check staking status")
+		}
+		if stakedAtBlock {
+			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+			if err != nil {
+				e.log.Err(err).Msg("critical: failed to broadcast the receipt")
+			} else {
+				broadcasted = true
+			}
 		}
 	}
 
@@ -575,6 +588,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Bool("sealed", isExecutedBlockSealed).
 		Bool("broadcasted", broadcasted).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
 	err = e.onBlockExecuted(executableBlock, finalState)
@@ -1007,10 +1021,10 @@ func (e *Engine) handleComputationResult(
 		snapshots[i] = &stateSnapshot.Snapshot
 	}
 
-	executionResult, err := e.saveExecutionResults(
+	receipt, err := e.saveExecutionResults(
 		ctx,
 		result.ExecutableBlock,
-		snapshots,
+		result.StateSnapshots,
 		result.Events,
 		result.ServiceEvents,
 		result.TransactionResult,
@@ -1018,25 +1032,6 @@ func (e *Engine) handleComputationResult(
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not save execution results: %w", err)
-	}
-
-	receipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate execution receipt: %w", err)
-	}
-
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionReceipt)
-		defer span.Finish()
-
-		err = e.execState.PersistExecutionReceipt(ctx, receipt)
-		if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
-			return fmt.Errorf("could not persist execution receipt: %w", err)
-		}
-		return nil
-	}()
-	if err != nil {
-		return nil, nil, err
 	}
 
 	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
@@ -1051,12 +1046,12 @@ func (e *Engine) handleComputationResult(
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
 	executableBlock *entity.ExecutableBlock,
-	stateInteractions []*delta.Snapshot,
+	spockSnapshots []*delta.SpockSnapshot,
 	events []flow.Event,
 	serviceEvents []flow.Event,
 	txResults []flow.TransactionResult,
 	startState flow.StateCommitment,
-) (*flow.ExecutionResult, error) {
+) (*flow.ExecutionReceipt, error) {
 
 	span, childCtx := e.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -1067,12 +1062,13 @@ func (e *Engine) saveExecutionResults(
 	// no need to persist the state interactions, since they are used only by state
 	// syncing, which is currently disabled
 
-	chunks := make([]*flow.Chunk, len(stateInteractions))
+	chunks := make([]*flow.Chunk, len(spockSnapshots))
+	chdps := make([]*flow.ChunkDataPack, len(spockSnapshots))
 
 	// TODO: check current state root == startState
 	var endState flow.StateCommitment = startState
 
-	for i, view := range stateInteractions {
+	for i, view := range spockSnapshots {
 		// TODO: deltas should be applied to a particular state
 		var err error
 		endState, err = e.execState.CommitDelta(childCtx, view.Delta, startState)
@@ -1083,7 +1079,7 @@ func (e *Engine) saveExecutionResults(
 		var collectionID flow.Identifier
 
 		// account for system chunk being last
-		if i < len(stateInteractions)-1 {
+		if i < len(spockSnapshots)-1 {
 			collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
 			completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collectionID = completeCollection.Collection().ID()
@@ -1106,19 +1102,10 @@ func (e *Engine) saveExecutionResults(
 
 		chdp := generateChunkDataPack(chunk, collectionID, proof)
 
-		err = e.execState.PersistChunkDataPack(childCtx, chdp, blockID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to save chunk data pack: %w", err)
-		}
-
+		chdps[i] = chdp
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
-	}
-
-	err := e.execState.PersistStateCommitment(childCtx, blockID, endState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
 
 	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState, serviceEvents)
@@ -1126,59 +1113,14 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	err = e.execState.PersistExecutionResult(childCtx, executionResult)
+	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, spockSnapshots)
 	if err != nil {
-		return nil, fmt.Errorf("could not persist execution result: %w", err)
+		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	// not update the highest executed until the result and receipts are saved.
-	// TODO: better to save result, receipt and the latest height in one transaction
-	err = e.execState.UpdateHighestExecutedBlockIfHigher(childCtx, executableBlock.Block.Header)
+	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionReceipt, events, serviceEvents, txResults)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update highest executed block: %w", err)
-	}
-
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionEvents)
-		defer span.Finish()
-
-		// store events 1K in each batch
-		chunkSize := uint(1000)
-		eventChunks := ChunkifyEvents(events, chunkSize)
-		for _, ch := range eventChunks {
-			err = e.events.Store(blockID, ch)
-			if err != nil {
-				return fmt.Errorf("failed to store events: %w", err)
-			}
-		}
-		// store service events events in 1K batches
-		chunkSize = uint(1000)
-		serviceEventChunks := ChunkifyEvents(serviceEvents, chunkSize)
-		for _, ch := range serviceEventChunks {
-			err = e.events.Store(blockID, ch)
-			if err != nil {
-				return fmt.Errorf("failed to store service events: %w", err)
-			}
-		}
-
-		return nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-
-	err = func() error {
-		span, _ := e.tracer.StartSpanFromContext(childCtx, trace.EXESaveTransactionResults)
-		defer span.Finish()
-
-		err = e.transactionResults.BatchStore(blockID, txResults)
-		if err != nil {
-			return fmt.Errorf("failed to store transaction result error: %w", err)
-		}
-		return nil
-	}()
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
 	e.log.Debug().
@@ -1187,7 +1129,7 @@ func (e *Engine) saveExecutionResults(
 		Hex("final_state", endState).
 		Msg("saved computation results")
 
-	return executionResult, nil
+	return executionReceipt, nil
 }
 
 // logExecutableBlock logs all data about an executable block
@@ -1259,11 +1201,21 @@ func (e *Engine) generateExecutionResultForBlock(
 			block.Header.ParentID, err)
 	}
 
+	// convert Cadence service event representation to flow-go representation
+	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
+	for _, event := range serviceEvents {
+		converted, err := flow.ConvertServiceEvent(event)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert service event: %w", err)
+		}
+		convertedServiceEvents = append(convertedServiceEvents, *converted)
+	}
+
 	er := &flow.ExecutionResult{
 		PreviousResultID: previousErID,
 		BlockID:          block.ID(),
 		Chunks:           chunks,
-		ServiceEvents:    serviceEvents,
+		ServiceEvents:    convertedServiceEvents,
 	}
 
 	return er, nil

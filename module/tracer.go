@@ -2,6 +2,7 @@ package module
 
 import (
 	"context"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 
@@ -29,6 +30,16 @@ type Tracer interface {
 		operationName trace.SpanName,
 		opts ...opentracing.StartSpanOption,
 	) opentracing.Span
+
+	// RecordSpanFromParent records an span at finish time
+	// start time will be computed by reducing time.Now() - duration
+	RecordSpanFromParent(
+		span opentracing.Span,
+		operationName trace.SpanName,
+		duration time.Duration,
+		logs []opentracing.LogRecord,
+		opts ...opentracing.StartSpanOption,
+	)
 
 	// WithSpanFromContext encapsulates executing a function within an span, i.e., it starts a span with the specified SpanName from the context,
 	// executes the function f, and finishes the span once the function returns.

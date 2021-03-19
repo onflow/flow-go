@@ -35,15 +35,15 @@ func (_m *IncorporatedResults) Add(result *flow.IncorporatedResult) (bool, error
 }
 
 // All provides a mock function with given fields:
-func (_m *IncorporatedResults) All() []*flow.IncorporatedResult {
+func (_m *IncorporatedResults) All() flow.IncorporatedResultList {
 	ret := _m.Called()
 
-	var r0 []*flow.IncorporatedResult
-	if rf, ok := ret.Get(0).(func() []*flow.IncorporatedResult); ok {
+	var r0 flow.IncorporatedResultList
+	if rf, ok := ret.Get(0).(func() flow.IncorporatedResultList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.IncorporatedResult)
+			r0 = ret.Get(0).(flow.IncorporatedResultList)
 		}
 	}
 

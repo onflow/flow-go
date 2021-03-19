@@ -101,7 +101,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	// generates an execution result with a single collection, chunk, and transaction.
 	completeER := utils.LightExecutionResultFixture(1)
 	suite.collection = completeER.Collections[0]
-	suite.block = completeER.Block
+	suite.block = completeER.ReferenceBlock
 	suite.receipt = completeER.Receipt
 	suite.chunk = completeER.Receipt.ExecutionResult.Chunks[0]
 	suite.chunkDataPack = completeER.ChunkDataPacks[0]

@@ -8,12 +8,19 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -47,7 +54,7 @@ func TestSafetyCheck(t *testing.T) {
 
 			contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-			ledger := state.NewMapLedger()
+			view := utils.NewSimpleView()
 
 			contractCode := `X`
 
@@ -57,14 +64,14 @@ func TestSafetyCheck(t *testing.T) {
 			encodedName, err := encodeContractNames([]string{"TestContract"})
 			require.NoError(t, err)
 
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"contract_names",
 				encodedName,
 			)
 			require.NoError(t, err)
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"code.TestContract",
@@ -74,14 +81,14 @@ func TestSafetyCheck(t *testing.T) {
 
 			context := NewContext(log)
 
-			st := state.NewState(
-				ledger,
+			sth := state.NewStateHolder(state.NewState(
+				view,
 				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-			)
+			))
 
-			err = txInvocator.Process(vm, context, proc, st)
+			err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -117,7 +124,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 
 		contractCode := `pub contract TestContract: X {}`
 
@@ -127,14 +134,14 @@ func TestSafetyCheck(t *testing.T) {
 		encodedName, err := encodeContractNames([]string{"TestContract"})
 		require.NoError(t, err)
 
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"contract_names",
 			encodedName,
 		)
 		require.NoError(t, err)
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"code.TestContract",
@@ -144,14 +151,14 @@ func TestSafetyCheck(t *testing.T) {
 
 		context := NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err = txInvocator.Process(vm, context, proc, st)
+		err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -173,17 +180,17 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		context := NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st)
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -206,17 +213,17 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		context := NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st)
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -224,6 +231,80 @@ func TestSafetyCheck(t *testing.T) {
 		require.Equal(t, 0, proc.Retried)
 	})
 
+	t.Run("retriable errors causes retry", func(t *testing.T) {
+
+		rt := &ErrorReturningRuntime{TxErrors: []error{
+			runtime.Error{ // first error
+				Err: &runtime.ParsingCheckingError{
+					Err: &sema.CheckerError{
+						Errors: []error{
+							&sema.AlwaysFailingNonResourceCastingTypeError{
+								ValueType:  sema.AnyType,
+								TargetType: sema.AnyType,
+							}, // some dummy error
+							&sema.ImportedProgramError{
+								Err:      &sema.CheckerError{},
+								Location: common.AddressLocation{Address: common.BytesToAddress([]byte{1, 2, 3, 4})},
+							},
+						},
+					},
+				},
+				Location: common.TransactionLocation{'t', 'x'},
+				Codes:    nil,
+				Programs: nil,
+			},
+			nil, // second error, second call to runtime should be successful
+		}}
+
+		log := zerolog.Nop()
+		txInvocator := NewTransactionInvocator(log)
+
+		vm := New(rt)
+		code := `doesn't matter`
+
+		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+
+		view := utils.NewSimpleView()
+		header := unittest.BlockHeaderFixture()
+		context := NewContext(log, WithBlockHeader(&header))
+
+		sth := state.NewStateHolder(state.NewState(view))
+
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		assert.NoError(t, err)
+
+		require.Equal(t, 1, proc.Retried)
+	})
+}
+
+type ErrorReturningRuntime struct {
+	TxErrors []error
+}
+
+func (e *ErrorReturningRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
+	if len(e.TxErrors) == 0 {
+		panic("no tx errors left")
+	}
+
+	errToReturn := e.TxErrors[0]
+	e.TxErrors = e.TxErrors[1:]
+	return errToReturn
+}
+
+func (*ErrorReturningRuntime) ExecuteScript(_ runtime.Script, _ runtime.Context) (cadence.Value, error) {
+	panic("ExecuteScript not expected")
+}
+
+func (*ErrorReturningRuntime) ParseAndCheckProgram(_ []byte, _ runtime.Context) (*interpreter.Program, error) {
+	panic("ParseAndCheckProgram not expected")
+}
+
+func (*ErrorReturningRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
+	panic("not used coverage")
+}
+
+func (*ErrorReturningRuntime) SetContractUpdateValidationEnabled(_ bool) {
+	panic("SetContractUpdateValidationEnabled not expected")
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {

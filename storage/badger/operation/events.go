@@ -16,8 +16,16 @@ func InsertEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) er
 	return insert(eventPrefix(codeEvent, blockID, event), event)
 }
 
+func BatchInsertEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
+	return batchInsert(eventPrefix(codeEvent, blockID, event), event)
+}
+
 func InsertServiceEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) error {
 	return insert(eventPrefix(codeServiceEvent, blockID, event), event)
+}
+
+func BatchInsertServiceEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
+	return batchInsert(eventPrefix(codeServiceEvent, blockID, event), event)
 }
 
 func RetrieveEvents(blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) func(*badger.Txn) error {
