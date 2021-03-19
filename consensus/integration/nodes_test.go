@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -29,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -71,34 +69,16 @@ func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Nod
 
 	// create n consensus node participants
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
-	// create non-consensus nodes
-	others := unittest.IdentityListFixture(4, unittest.WithAllRolesExcept(flow.RoleConsensus))
-	// append additional nodes to consensus
-	participants := append(consensus, others...)
+	// add other roles to create a complete identity list
+	participants := unittest.CompleteIdentitySet(consensus...)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
-
-	// make root QC
-	sig1 := make([]byte, 32)
-	rand.Read(sig1[:])
-	sig2 := make([]byte, 32)
-	rand.Read(sig2[:])
-	c := &signature.Combiner{}
-	combined, err := c.Join(sig1, sig2)
-	require.NoError(t, err)
-
-	// all participants will sign the rootBlock block
-	signerIDs := make([]flow.Identifier, 0)
-	// only consensus participants can sign root block
-	for _, participant := range consensus {
-		signerIDs = append(signerIDs, participant.ID())
-	}
 
 	rootQC := &flow.QuorumCertificate{
 		View:      root.Header.View,
 		BlockID:   root.ID(),
-		SignerIDs: signerIDs,
-		SigData:   combined,
+		SignerIDs: consensus.NodeIDs(), // all participants sign root block
+		SigData:   unittest.CombinedSignatureFixture(2),
 	}
 
 	hub := NewNetworkHub()
@@ -186,7 +166,7 @@ func createNode(
 
 	// make local
 	priv := helper.MakeBLSKey(t)
-	local, err := local.New(identity, priv)
+	me, err := local.New(identity, priv)
 	require.NoError(t, err)
 
 	// add a network for this node to the hub
@@ -231,11 +211,11 @@ func createNode(
 	compCore, err := compliance.NewCore(log, metrics, tracer, metrics, metrics, cleaner, headersDB, payloadsDB, fullState, cache, syncCore)
 	require.NoError(t, err)
 
-	comp, err := compliance.NewEngine(log, net, local, prov, compCore)
+	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
 	require.NoError(t, err)
 
 	// initialize the synchronization engine
-	sync, err := synceng.New(log, metrics, net, local, state, blocksDB, comp, syncCore)
+	sync, err := synceng.New(log, metrics, net, me, state, blocksDB, comp, syncCore)
 	require.NoError(t, err)
 
 	pending := []*flow.Header{}
@@ -261,7 +241,7 @@ func createNode(
 
 func cleanupNodes(nodes []*Node) {
 	for _, n := range nodes {
-		n.db.Close()
-		os.RemoveAll(n.dbDir)
+		_ = n.db.Close()
+		_ = os.RemoveAll(n.dbDir)
 	}
 }

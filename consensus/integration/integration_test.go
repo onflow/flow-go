@@ -66,6 +66,9 @@ func Test5Nodes(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
+// with 5 nodes, one has no weight - should not vote and should never be leader
+func TestUnweightedNode(t *testing.T) {}
+
 // TODO: verify if each receiver lost 50% messages, the network can't reach consensus
 
 func allFinalizedViews(t *testing.T, nodes []*Node) [][]uint64 {
