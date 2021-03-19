@@ -471,7 +471,7 @@ func newMockWorker() *mockWorker {
 	}
 }
 
-func (w *mockWorker) Run(job Job) {
+func (w *mockWorker) Run(job Job) error {
 	w.Lock()
 	defer w.Unlock()
 
@@ -479,6 +479,8 @@ func (w *mockWorker) Run(job Job) {
 
 	w.called = append(w.called, job)
 	w.fn(job)
+
+	return nil
 }
 
 // return the IDs of the jobs
