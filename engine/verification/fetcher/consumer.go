@@ -34,9 +34,12 @@ func ChunkLocatorToJob(locator *chunks.Locator) *ChunkJob {
 	return &ChunkJob{ChunkLocator: locator}
 }
 
-func JobToChunkLocator(job module.Job) *chunks.Locator {
-	chunkjob, _ := job.(*ChunkJob)
-	return chunkjob.ChunkLocator
+func JobToChunkLocator(job module.Job) (*chunks.Locator, error) {
+	chunkjob, ok := job.(*ChunkJob)
+	if !ok {
+		return nil, fmt.Errorf("could not assert job to chunk locator, job id: %x", job.ID())
+	}
+	return chunkjob.ChunkLocator, nil
 }
 
 // ChunkJobs wraps the storage layer to provide an abstraction for consumers to read jobs.
@@ -76,9 +79,14 @@ func NewWorker(engine EngineWorker) *Worker {
 
 // Run converts the job to Chunk, it's guaranteed to work, because
 // ChunkJobs converted chunk into job symmetrically
-func (w *Worker) Run(job module.Job) {
-	chunk := JobToChunkLocator(job)
+func (w *Worker) Run(job module.Job) error {
+	chunk, err := JobToChunkLocator(job)
+	if err != nil {
+		return err
+	}
 	w.engine.ProcessMyChunk(chunk)
+
+	return nil
 }
 
 func (w *Worker) Notify(chunkID flow.Identifier) {
