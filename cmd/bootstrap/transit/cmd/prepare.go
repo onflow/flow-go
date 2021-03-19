@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/spf13/cobra"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // prepareCmd represents a command to generate transit keys for push command
