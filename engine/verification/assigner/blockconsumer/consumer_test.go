@@ -30,8 +30,9 @@ func TestBlockToJob(t *testing.T) {
 }
 
 func TestProduceConsume(t *testing.T) {
-	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the assigner engine blocking on the blocks,
-	// results in engine only receiving the first three finalized blocks (in any order).
+	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the block processor
+	// blocking on the blocks, results in processor only receiving the first three finalized blocks:
+	// 10 block sequentially --> block reader --> consumer can read and push 3 blocks at a time to processor --> blocking processor.
 	t.Run("pushing 10 blocks, blocking, receives 3", func(t *testing.T) {
 		received := make([]*flow.Block, 0)
 		lock := &sync.Mutex{}
