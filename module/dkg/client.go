@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -72,7 +73,12 @@ func (c *Client) Broadcast(msg messages.DKGMessage) error {
 		SetPayer(c.accountAddress).
 		AddAuthorizer(c.accountAddress)
 
-	err = tx.AddArgument(cadence.NewString(string(msg.Data)))
+	// json encode the DKG message
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("could not marshal DKG messages struct: %v", err)
+	}
+	err = tx.AddArgument(cadence.NewString(string(data)))
 	if err != nil {
 		return fmt.Errorf("could not add whiteboard dkg message to transaction: %v", err)
 	}
@@ -114,16 +120,33 @@ func (c *Client) Broadcast(msg messages.DKGMessage) error {
 // and stored in the smart contract)
 func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.DKGMessage, error) {
 
+	type dkgContractMsg struct {
+		nodeID  string
+		content string
+	}
+
 	ctx := context.Background()
 
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
-	dkgMessages, err := c.flowClient.ExecuteScriptAtBlockID(ctx, sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
+	value, err := c.flowClient.ExecuteScriptAtBlockID(ctx, sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
 	if err != nil {
-		return nil, fmt.Errorf("could not execute read broadcast script")
+		return nil, fmt.Errorf("could not execute read broadcast script: %v", err)
+	}
+	values := value.(cadence.Array).Values
+
+	messages := make([]messages.DKGMessage, len(values))
+	for _, val := range values {
+		jsonString := val.(dkgContractMsg).content
+
+		var msg messages.DKGMessage
+		err := json.Unmarshal([]byte(jsonString), &msg)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
+		}
+		messages = append(messages, msg)
 	}
 
-	// TODO: convert from `cadence.Array` to `[]messages.DKGMessage`
-	return dkgMessages.ToGoValue().([]messages.DKGMessage), nil
+	return messages, nil
 }
 
 // SubmitResult submits the final public result of the DKG protocol. This
