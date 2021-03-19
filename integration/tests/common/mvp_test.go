@@ -113,11 +113,12 @@ func prepareNetwork(t *testing.T) *testnet.FlowNetwork {
 	net := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
