@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -26,8 +27,8 @@ func TestBootstrapLedger(t *testing.T) {
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
-			unittest.GenesisTokenSupply,
 			chain,
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		)
 		require.NoError(t, err)
 
@@ -57,7 +58,6 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
 			ls,
 			unittest.ServiceAccountPublicKey,
-			0,
 			chain,
 		)
 		require.NoError(t, err)
