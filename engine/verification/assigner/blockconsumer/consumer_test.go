@@ -32,7 +32,7 @@ func TestBlockToJob(t *testing.T) {
 func TestProduceConsume(t *testing.T) {
 	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the block processor
 	// blocking on the blocks, results in processor only receiving the first three finalized blocks:
-	// 10 block sequentially --> block reader --> consumer can read and push 3 blocks at a time to processor --> blocking processor.
+	// 10 blocks sequentially --> block reader --> consumer can read and push 3 blocks at a time to processor --> blocking processor.
 	t.Run("pushing 10 blocks, blocking, receives 3", func(t *testing.T) {
 		received := make([]*flow.Block, 0)
 		lock := &sync.Mutex{}
@@ -63,8 +63,10 @@ func TestProduceConsume(t *testing.T) {
 		})
 	})
 
-	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the assigner engine finishes processing
-	// all blocks immediately, results in engine receiving all 10 blocks (in any order).
+	// pushing 10 finalized blocks sequentially to block reader, with 3 workers on consumer and the processor finishes processing
+	// each received block immediately, results in processor receiving all 10 blocks:
+	// 10 blocks sequentially --> block reader --> consumer can read and push 3 blocks at a time to processor --> processor finishes blocks
+	// immediately.
 	t.Run("pushing 10 blocks, non-blocking, receives 10", func(t *testing.T) {
 		received := make([]*flow.Block, 0)
 		lock := &sync.Mutex{}
@@ -92,7 +94,7 @@ func TestProduceConsume(t *testing.T) {
 				consumer.OnFinalizedBlock(&model.Block{})
 			}
 
-			// waits until all finished
+			// waits until all blocks finish processing
 			unittest.RequireReturnsBefore(t, processAll.Wait, 1*time.Second, "could not process all blocks on time")
 			<-consumer.Done()
 
@@ -101,12 +103,15 @@ func TestProduceConsume(t *testing.T) {
 		})
 	})
 
-	// pushing 100 finalized blocks concurrently to block reader, with 3 workers on consumer and the assigner engine finishes processing
-	// all blocks immediately, results in engine receiving all 100 blocks (in any order).
+	// pushing 100 finalized blocks concurrently to block reader, with 3 workers on consumer and the processor finishes processing
+	// all blocks immediately, results in the processor receiving all 100 blocks:
+	// 100 blocks concurrently --> block reader --> consumer can read and push 3 blocks at a time to processor --> processor finishes blocks
+	// immediately.
 	t.Run("pushing 100 blocks concurrently, non-blocking, receives 100", func(t *testing.T) {
 		received := make([]*flow.Block, 0)
 		lock := &sync.Mutex{}
 		var processAll sync.WaitGroup
+
 		alwaysFinish := func(notifier module.ProcessingNotifier, block *flow.Block) {
 			lock.Lock()
 			defer lock.Unlock()
