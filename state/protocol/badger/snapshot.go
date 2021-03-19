@@ -273,18 +273,17 @@ func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
 	var segment []*flow.Block
-	err = state.TraverseBackward(s.state.headers, s.blockID, func(header *flow.Header) (bool, error) {
+	err = state.TraverseBackward(s.state.headers, s.blockID, func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
 		if err != nil {
-			return false, fmt.Errorf("could not get block: %w", err)
+			return fmt.Errorf("could not get block: %w", err)
 		}
 		segment = append(segment, block)
-		if blockID == seal.BlockID {
-			return false, nil
-		}
 
-		return true, nil
+		return nil
+	}, func(header *flow.Header) bool {
+		return header.ID() != seal.BlockID
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)

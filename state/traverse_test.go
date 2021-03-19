@@ -50,10 +50,12 @@ func TestTraverseBackward(t *testing.T) {
 	// should return error and not call callback when start block doesn't exist
 	t.Run("non-existent start block", func(t *testing.T) {
 		start := unittest.IdentifierFixture()
-		err := TraverseBackward(headers, start, func(_ *flow.Header) (bool, error) {
+		err := TraverseBackward(headers, start, func(_ *flow.Header) error {
 			// should not be called
 			t.Fail()
-			return false, nil
+			return nil
+		}, func(header *flow.Header) bool {
+			return false
 		})
 		assert.Error(t, err)
 	})
@@ -61,8 +63,10 @@ func TestTraverseBackward(t *testing.T) {
 	// should return error when end block doesn't exist
 	t.Run("non-existent end block", func(t *testing.T) {
 		start := byHeight[8].ID()
-		err := TraverseBackward(headers, start, func(_ *flow.Header) (bool, error) {
-			return true, nil
+		err := TraverseBackward(headers, start, func(_ *flow.Header) error {
+			return nil
+		}, func(header *flow.Header) bool {
+			return true
 		})
 		assert.Error(t, err)
 	})
@@ -70,8 +74,10 @@ func TestTraverseBackward(t *testing.T) {
 	// should return error if the callback returns an error
 	t.Run("callback error", func(t *testing.T) {
 		start := byHeight[8].ID()
-		err := TraverseBackward(headers, start, func(_ *flow.Header) (bool, error) {
-			return true, fmt.Errorf("callback error")
+		err := TraverseBackward(headers, start, func(_ *flow.Header) error {
+			return fmt.Errorf("callback error")
+		}, func(header *flow.Header) bool {
+			return true
 		})
 		assert.Error(t, err)
 	})
@@ -82,15 +88,14 @@ func TestTraverseBackward(t *testing.T) {
 		end := byHeight[4].ID()
 
 		called := 0
-		err := TraverseBackward(headers, start, func(header *flow.Header) (bool, error) {
-			if header.ID() == end {
-				return false, nil
-			}
+		err := TraverseBackward(headers, start, func(header *flow.Header) error {
 			// should call callback for single block in traversal path
 			assert.Equal(t, start, header.ID())
 			// track calls - should only be called once
 			called++
-			return true, nil
+			return nil
+		}, func(header *flow.Header) bool {
+			return header.ParentID != end
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, 1, called)
@@ -106,14 +111,13 @@ func TestTraverseBackward(t *testing.T) {
 
 		// assert that we are receiving the correct block at each height
 		height := startHeight
-		err := TraverseBackward(headers, start, func(header *flow.Header) (bool, error) {
-			if header.Height < endHeight {
-				return false, nil
-			}
+		err := TraverseBackward(headers, start, func(header *flow.Header) error {
 			expectedID := byHeight[height].ID()
 			assert.Equal(t, expectedID, header.ID())
 			height--
-			return true, nil
+			return nil
+		}, func(header *flow.Header) bool {
+			return header.Height != endHeight
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, endHeight, height+1)
@@ -204,7 +208,7 @@ func TestTraverseForward(t *testing.T) {
 			called++
 			return nil
 		}, func(header *flow.Header) bool {
-			return end != header.ID()
+			return end != header.ParentID
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, 1, called)
@@ -219,7 +223,7 @@ func TestTraverseForward(t *testing.T) {
 		start := byHeight[startHeight].ID()
 
 		// assert that we are receiving the correct block at each height
-		height := endHeight + 1
+		height := endHeight
 		err := TraverseForward(headers, start, func(header *flow.Header) error {
 			expectedID := byHeight[height].ID()
 			assert.Equal(t, height, header.Height)
@@ -227,7 +231,7 @@ func TestTraverseForward(t *testing.T) {
 			height++
 			return nil
 		}, func(header *flow.Header) bool {
-			return header.Height > endHeight
+			return header.Height != endHeight
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, height, startHeight+1)

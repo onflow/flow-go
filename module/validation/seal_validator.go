@@ -146,18 +146,14 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
-	err = state.TraverseBackward(s.headers, header.ParentID, func(header *flow.Header) (bool, error) {
+	err = state.TraverseBackward(s.headers, header.ParentID, func(header *flow.Header) error {
 		blockID := header.ID()
-		if sealedID == blockID {
-			return false, nil
-		}
-
 		// keep track of blocks on the fork
 		blockIDs = append(blockIDs, blockID)
 
 		payload, err := s.payloads.ByBlockID(blockID)
 		if err != nil {
-			return false, fmt.Errorf("could not get block payload %x: %w", blockID, err)
+			return fmt.Errorf("could not get block payload %x: %w", blockID, err)
 		}
 
 		// Collect execution results from receipts.
@@ -179,7 +175,9 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			)
 
 		}
-		return true, nil
+		return nil
+	}, func(header *flow.Header) bool {
+		return sealedID != header.ParentID
 	})
 	if err != nil {
 		return nil, err
