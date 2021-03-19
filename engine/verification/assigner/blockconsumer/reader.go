@@ -24,13 +24,13 @@ func newFinalizedBlockReader(state protocol.State, blocks storage.Blocks) *Final
 }
 
 // AtIndex returns the block job at the given index.
-// The block job at an index is just be the finalized block at that index (i.e., height).
+// The block job at an index is just the finalized block at that index (i.e., height).
 func (r FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
 	block, err := r.blockByHeight(uint64(index))
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by index %v: %w", index, err)
 	}
-	return blockToJob(block), nil
+	return toJob(block), nil
 }
 
 // blockByHeight returns the block at the given height.
@@ -59,7 +59,7 @@ func (r FinalizedBlockReader) Head() (int64, error) {
 	return int64(header.Height), nil
 }
 
-// blockToJob converts the block to a BlockJob.
-func blockToJob(block *flow.Block) *BlockJob {
+// toJob converts the block to a BlockJob.
+func toJob(block *flow.Block) *BlockJob {
 	return &BlockJob{Block: block}
 }
