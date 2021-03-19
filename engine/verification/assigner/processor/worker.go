@@ -1,8 +1,6 @@
 package processor
 
 import (
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -16,7 +14,6 @@ import (
 type Worker struct {
 	blockWorker assigner.FinalizedBlockProcessor
 	consumer    *BlockConsumer
-	log         zerolog.Logger
 }
 
 func newWorker(blockWorker assigner.FinalizedBlockProcessor) *Worker {
