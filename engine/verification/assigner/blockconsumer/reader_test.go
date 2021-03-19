@@ -55,13 +55,12 @@ func withReader(
 
 		reader := newFinalizedBlockReader(s.State, s.Storage.Blocks)
 
-		root, err := s.State.Params().Root()
-		require.NoError(t, err)
-
-		// generates blockCount chain of blocks in the form of R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
+		root, err := s.State.Params().Root()
+		require.NoError(t, err)
 		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2)
 		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
 
