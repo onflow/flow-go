@@ -343,7 +343,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
-	commit, err := bootstrapper.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
+	commit, err := bootstrapper.BootstrapLedger(
+		ls,
+		unittest.ServiceAccountPublicKey,
+		node.ChainID.Chain(),
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
