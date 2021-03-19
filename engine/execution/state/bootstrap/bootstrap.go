@@ -6,7 +6,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"

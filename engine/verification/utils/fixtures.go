@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 

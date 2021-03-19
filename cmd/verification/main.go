@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
