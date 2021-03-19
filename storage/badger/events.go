@@ -68,7 +68,7 @@ func (e *Events) ByBlockIDTransactionID(blockID flow.Identifier, txID flow.Ident
 		return nil, handleError(err, flow.Event{})
 	}
 
-	matched := make([]flow.Event, 0, len(events))
+	var matched []flow.Event
 	for _, event := range events {
 		if event.TransactionID == txID {
 			matched = append(matched, event)
@@ -84,7 +84,7 @@ func (e *Events) ByBlockIDEventType(blockID flow.Identifier, eventType flow.Even
 		return nil, handleError(err, flow.Event{})
 	}
 
-	matched := make([]flow.Event, 0, len(events))
+	var matched []flow.Event
 	for _, event := range events {
 		if event.Type == eventType {
 			matched = append(matched, event)
