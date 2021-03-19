@@ -84,3 +84,29 @@ func (g *GoogleBucket) DownloadFile(ctx context.Context, client *storage.Client,
 	}
 	return nil
 }
+
+// UploadFile uploads a file to the google bucket
+func (g *GoogleBucket) UploadFile(ctx context.Context, client *storage.Client, destination, source string) error {
+
+	upload := client.Bucket(g.Name).Object(destination).NewWriter(ctx)
+	defer func() {
+		err := upload.Close()
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to close writer stream")
+		}
+	}()
+
+	file, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("Error opening upload file: %w", err)
+	}
+	defer file.Close()
+
+	n, err := io.Copy(upload, file)
+	if err != nil {
+		return fmt.Errorf("Error uploading file: %w", err)
+	}
+
+	log.Info().Int64("byte_count", n).Msg("uploaded bytes")
+	return nil
+}
