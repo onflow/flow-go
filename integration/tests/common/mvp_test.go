@@ -109,8 +109,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetReferenceBlockID(sdk.Identifier(root.ID())).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress)
-
-
+	
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
 	require.NoError(t, err)
@@ -129,7 +128,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			newAccountAddress = accountCreatedEvent.Address()
 		}
 	}
-	
+
 	fmt.Printf("new account address: %s\n", newAccountAddress)
 
 	// Generate the fund account transaction (so account can be used as a payer)
@@ -170,7 +169,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 
 	cancel()
-	
+
 	fundCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), fundAccountTx.ID())
 	require.NoError(t, err)
 	t.Log(fundCreationTxRes)
