@@ -41,7 +41,7 @@ func KeyToBlockIDTransactionID(key string) (flow.Identifier, flow.Identifier, er
 	return blockID, txID, nil
 }
 
-func NewTransactionResults(collector module.CacheMetrics, db *badger.DB) *TransactionResults {
+func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transactionResultsCacheSize uint) *TransactionResults {
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		var txResult flow.TransactionResult
 		return func(tx *badger.Txn) (interface{}, error) {
@@ -61,7 +61,7 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB) *Transa
 	return &TransactionResults{
 		db: db,
 		cache: newCache(collector,
-			withLimit(10000),
+			withLimit(transactionResultsCacheSize),
 			withStore(noopStore),
 			withRetrieve(retrieve)),
 	}

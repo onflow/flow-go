@@ -20,7 +20,7 @@ import (
 func TestBatchStoringTransactionResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := bstorage.NewTransactionResults(metrics, db)
+		store := bstorage.NewTransactionResults(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
@@ -46,7 +46,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 		}
 
 		// test loading from database
-		newStore := bstorage.NewTransactionResults(metrics, db)
+		newStore := bstorage.NewTransactionResults(metrics, db, 1000)
 		for _, txResult := range txResults {
 			actual, err := newStore.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 			require.Nil(t, err)
@@ -58,7 +58,7 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 func TestReadingNotStoreTransaction(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := bstorage.NewTransactionResults(metrics, db)
+		store := bstorage.NewTransactionResults(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
