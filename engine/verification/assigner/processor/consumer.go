@@ -20,9 +20,10 @@ type BlockConsumer struct {
 	defaultIndex int64
 }
 
-// the consumer is consuming the jobs from jobs queue for the first time,
-// we initialize the default processed index as the last sealed block's height,
-// so that we will process from the first unsealed block
+// defaultProcessedIndex returns the last sealed block height from the protocol state.
+//
+// The BlockConsumer utilizes this return height to fetch and consume BlockJob from jobs queue the first time it
+// initializes.
 func defaultProcessedIndex(state protocol.State) (int64, error) {
 	final, err := state.Sealed().Head()
 	if err != nil {
@@ -40,11 +41,15 @@ func NewBlockConsumer(log zerolog.Logger,
 	blockProcessor assigner.FinalizedBlockProcessor,
 	maxProcessing int64) (*BlockConsumer, int64, error) {
 
+	// wires blockProcessor as the worker. The block consumer will
+	// invoke instances of worker concurrently to process block jobs.
 	worker := newWorker(blockProcessor)
 	blockProcessor.WithBlockConsumerNotifier(worker)
-	jobs := newFinalizedBlockReader(state, blocks)
-	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 
+	// the block reader is where the consumer reads new finalized blocks from (i.e., jobs).
+	jobs := newFinalizedBlockReader(state, blocks)
+
+	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)
@@ -59,10 +64,18 @@ func NewBlockConsumer(log zerolog.Logger,
 	return blockConsumer, defaultIndex, nil
 }
 
+// NotifyJobIsDone is invoked by the worker to let the consumer know that it is done
+// processing a (block) job.
 func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
 	c.consumer.NotifyJobIsDone(jobID)
 }
 
+// OnFinalizedBlock implements FinalizationConsumer, and is invoked by the follower engine whenever
+// a new block is finalized.
+// In this implementation for block consumer, invoking OnFinalizedBlock is enough to only notify the consumer
+// to check its internal queue and move its processing index ahead to the next height if there are workers available.
+// The consumer retrieves the new blocks from its block reader module, hence it does not need to use the parameter
+// of OnFinalizedBlock here.
 func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
 	c.consumer.Check()
 }
