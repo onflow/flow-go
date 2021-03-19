@@ -45,7 +45,7 @@ func TestProduceConsume(t *testing.T) {
 			// hence from consumer perspective, it is blocking on each received block.
 		}
 
-		WithConsumer(t, 10, 3, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 10, 3, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
 			<-consumer.Ready()
 
 			for i := 0; i < len(blocks); i++ {
@@ -83,7 +83,7 @@ func TestProduceConsume(t *testing.T) {
 			}()
 		}
 
-		WithConsumer(t, 10, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 10, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
 			<-consumer.Ready()
 			processAll.Add(len(blocks))
 
@@ -124,7 +124,7 @@ func TestProduceConsume(t *testing.T) {
 			}()
 		}
 
-		WithConsumer(t, 100, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 100, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
 			<-consumer.Ready()
 			processAll.Add(len(blocks))
 
@@ -148,12 +148,15 @@ func TestProduceConsume(t *testing.T) {
 
 }
 
-func WithConsumer(
+// withConsumer is a test helper that sets up a block consumer with specified number of workers.
+// The block consumer that operates on a block reader with a chain of specified number of finalized blocks
+// ready to read and consumer.
+func withConsumer(
 	t *testing.T,
 	blockCount int,
 	workerCount int,
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
-	withConsumer func(*BlockConsumer, []*flow.Block),
+	withBlockConsumer func(*BlockConsumer, []*flow.Block),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(workerCount)
@@ -176,19 +179,18 @@ func WithConsumer(
 			maxProcessing)
 		require.NoError(t, err)
 
-		root, err := s.State.Params().Root()
-		require.NoError(t, err)
-
-		// generates 2 * blockCount chain of blocks in the form of R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
 		// Container blocks only contain receipts of their preceding reference blocks. But they do not
 		// hold any guarantees.
+		root, err := s.State.Params().Root()
+		require.NoError(t, err)
 		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2)
 		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
 
-		withConsumer(consumer, blocks)
+		withBlockConsumer(consumer, blocks)
 	})
 }
 
