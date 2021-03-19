@@ -148,7 +148,7 @@ func TestProduceConsume(t *testing.T) {
 }
 
 // withConsumer is a test helper that sets up a block consumer with specified number of workers.
-// The block consumer that operates on a block reader with a chain of specified number of finalized blocks
+// The block consumer operates on a block reader with a chain of specified number of finalized blocks
 // ready to read and consumer.
 func withConsumer(
 	t *testing.T,

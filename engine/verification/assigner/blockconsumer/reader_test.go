@@ -37,9 +37,9 @@ func TestBlockReader(t *testing.T) {
 	})
 }
 
-// withReader is a test helper that provides the implementation of its `withReader` with an instance of FinalizedBlockReader that is connected
-// to blocks storage and protocol state. The protocol state has been extended with `blockCount` finalized blocks and those
-// blocks are also provided for the `withReader` function body.
+// withReader is a test helper that sets up a block reader.
+// It also provides a chain of specified number of finalized blocks ready to read by block reader, i.e., the protocol state is extended with the
+// chain of blocks and the blocks are stored in blocks storage.
 func withReader(
 	t *testing.T,
 	blockCount int,
