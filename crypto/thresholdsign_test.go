@@ -15,10 +15,10 @@ import (
 )
 
 func TestThresholdSignature(t *testing.T) {
-	//t.Run("stateful_simple_keygen", testStatefulThresholdSignatureSimpleKeyGen)
-	//t.Run("stateful_signature_feldmanVSS_keygen", testStatefulThresholdSignatureFeldmanVSS)
-	//t.Run("stateful_signature_jointFeldman_keygen", testStatefulThresholdSignatureJointFeldman)
-	//t.Run("stateless_simple_keygen", testStatelessThresholdSignatureSimpleKeyGen)
+	t.Run("stateful_simple_keygen", testStatefulThresholdSignatureSimpleKeyGen)
+	t.Run("stateful_signature_feldmanVSS_keygen", testStatefulThresholdSignatureFeldmanVSS)
+	t.Run("stateful_signature_jointFeldman_keygen", testStatefulThresholdSignatureJointFeldman)
+	t.Run("stateless_simple_keygen", testStatelessThresholdSignatureSimpleKeyGen)
 	t.Run("stateless_signature_feldmanVSS_keygen", testStatelessThresholdSignatureFeldmanVSS)
 }
 

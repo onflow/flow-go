@@ -98,7 +98,5 @@ const (
 	maxRelicPrgSeed = 1 << 32
 )
 
-const ()
-
 // Signature is a generic type, regardless of the signature scheme
 type Signature []byte
