@@ -51,7 +51,7 @@ func NewNode(height int,
 	rchild *Node,
 	path ledger.Path,
 	payload *ledger.Payload,
-	hashValue hash.Hash, // TODO: revisit
+	hashValue hash.Hash,
 	maxDepth uint16,
 	regCount uint64) *Node {
 
@@ -152,7 +152,7 @@ func (n *Node) ComputeHash() {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
 			// LEAF node: defined by key-value pair
-			hash.ComputeCompactValue(&n.hashValue, n.path, n.payload.Value, n.height)
+			n.hashValue = hash.ComputeCompactValue(n.path, n.payload.Value, n.height)
 			return
 		}
 		// ROOT NODE: no children, no key-value pair
@@ -173,22 +173,20 @@ func (n *Node) ComputeHash() {
 	} else {
 		h2 = hash.GetDefaultHashForHeight(n.height - 1)
 	}
-	hash.HashInterNodeIn(&n.hashValue, h1, h2)
+	n.hashValue = hash.HashInterNodeIn(h1, h2)
 }
 
 // computeHash computes the hashValue for the given node
 // and stores the value in result.
-func computeHash(result *hash.Hash, n *Node) {
+func computeHash(n *Node) hash.Hash {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
 			// LEAF node: defined by key-value pair
-			hash.ComputeCompactValue(result, n.path, n.payload.Value, n.height)
-			return
+			return hash.ComputeCompactValue(n.path, n.payload.Value, n.height)
 		}
 		// ROOT NODE: no children, no key-value pair
-		(*result) = hash.GetDefaultHashForHeight(n.height)
-		return
+		return hash.GetDefaultHashForHeight(n.height)
 	}
 
 	// this is an INTERIOR node at least one of lChild or rChild is not nil.
@@ -204,30 +202,29 @@ func computeHash(result *hash.Hash, n *Node) {
 	} else {
 		h2 = hash.GetDefaultHashForHeight(n.height - 1)
 	}
-	hash.HashInterNodeIn(result, h1, h2)
+	return hash.HashInterNodeIn(h1, h2)
 }
 
 // VerifyCachedHash verifies the hash of a node is valid
-func (n *Node) verifyCachedHashRecursive(computedHash *hash.Hash) bool {
+func (n *Node) verifyCachedHashRecursive() bool {
 	if n.lChild != nil {
-		if !n.lChild.verifyCachedHashRecursive(computedHash) {
+		if !n.lChild.verifyCachedHashRecursive() {
 			return false
 		}
 	}
 	if n.rChild != nil {
-		if !n.rChild.verifyCachedHashRecursive(computedHash) {
+		if !n.rChild.verifyCachedHashRecursive() {
 			return false
 		}
 	}
 
-	computeHash(computedHash, n)
-	return n.hashValue == *computedHash
+	computedHash := computeHash(n)
+	return n.hashValue == computedHash
 }
 
 // VerifyCachedHash verifies the hash of a node is valid
 func (n *Node) VerifyCachedHash() bool {
-	var computedHash hash.Hash
-	return n.verifyCachedHashRecursive(&computedHash)
+	return n.verifyCachedHashRecursive()
 }
 
 // Hash returns the Node's hash value.
