@@ -40,6 +40,9 @@ func TestProduceConsume(t *testing.T) {
 			lock.Lock()
 			defer lock.Unlock()
 			received = append(received, block)
+
+			// this processor never notifies consumer that it is done with the block.
+			// hence from consumer perspective, it is blocking on each received block.
 		}
 
 		WithConsumer(t, 10, 3, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
@@ -54,7 +57,7 @@ func TestProduceConsume(t *testing.T) {
 
 			<-consumer.Done()
 
-			// expect the mock engine receive only the first 3 calls (since it is blocked on those, hence no
+			// expects the processor receive only the first 3 blocks (since it is blocked on those, hence no
 			// new block is fetched to process).
 			requireBlockListsEqualIgnoreOrder(t, received, blocks[:3])
 		})
