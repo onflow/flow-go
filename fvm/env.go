@@ -49,13 +49,9 @@ type hostEnv struct {
 	rng                *rand.Rand
 }
 
-func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) (*hostEnv, error) {
+func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
 	accounts := state.NewAccounts(sth)
-	generator, err := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
-	if err != nil {
-		return nil, err
-	}
-
+	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	contracts := handler.NewContractHandler(accounts,
 		ctx.RestrictedDeploymentEnabled,
 		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
@@ -87,7 +83,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 		env.metrics = &metricsCollector{ctx.Metrics}
 	}
 
-	return env, nil
+	return env
 }
 
 func (e *hostEnv) seedRNG(header *flow.Header) {
@@ -451,6 +447,10 @@ func (e *hostEnv) GetComputationLimit() uint64 {
 func (e *hostEnv) SetComputationUsed(used uint64) error {
 	e.totalGasUsed = used
 	return nil
+}
+
+func (e *hostEnv) GetComputationUsed() uint64 {
+	return e.totalGasUsed
 }
 
 func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -917,7 +917,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		err = e.vm.invokeMetaTransaction(
+		txErr, vmError := e.vm.invokeMetaTransaction(
 			e.ctx,
 			initAccountTransaction(
 				flow.Address(payer),
@@ -927,9 +927,13 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			e.sth,
 			e.programs.Programs,
 		)
-		if err != nil {
+		if txErr != nil {
 			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-			return address, err
+			return address, txErr
+		}
+		if vmError != nil {
+			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
+			return address, vmError
 		}
 	}
 

@@ -73,15 +73,17 @@ func TestAccountFreezing(t *testing.T) {
 
 		context := fvm.NewContext(log, fvm.WithAccountFreezeAvailable(false), fvm.WithChain(chain))
 
-		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		err, vmErr := txInvocator.Process(vm, &context, proc, st, programsStorage)
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 		require.Contains(t, err.Error(), "cannot find")
 		require.Contains(t, err.Error(), "setAccountFrozen")
 
 		context = fvm.NewContext(log, fvm.WithAccountFreezeAvailable(true), fvm.WithChain(chain))
 
-		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		err, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)
+		require.NoError(t, vmErr)
 
 		// account should be frozen now
 		frozen, err = accounts.GetAccountFrozen(address)
@@ -114,40 +116,48 @@ func TestAccountFreezing(t *testing.T) {
 
 		// no account associated with tx so it should work
 		tx := fvm.Transaction(&flow.TransactionBody{}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr := txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
 		require.NoError(t, err)
+		require.NoError(t, vmErr)
 
 		tx = fvm.Transaction(&flow.TransactionBody{Authorizers: []flow.Address{notFrozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
 		require.NoError(t, err)
+		require.NoError(t, vmErr)
 
 		tx = fvm.Transaction(&flow.TransactionBody{Authorizers: []flow.Address{frozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		// all addresses must not be frozen
 		tx = fvm.Transaction(&flow.TransactionBody{Authorizers: []flow.Address{frozenAddress, notFrozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		// Payer should be part of authorizers account, but lets check it separately for completeness
 
 		tx = fvm.Transaction(&flow.TransactionBody{Payer: notFrozenAddress}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
 		require.NoError(t, err)
+		require.NoError(t, vmErr)
 
 		tx = fvm.Transaction(&flow.TransactionBody{Payer: frozenAddress}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		// Proposal account
 
 		tx = fvm.Transaction(&flow.TransactionBody{ProposalKey: flow.ProposalKey{Address: frozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		tx = fvm.Transaction(&flow.TransactionBody{ProposalKey: flow.ProposalKey{Address: notFrozenAddress}}, 0)
-		err = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		err, vmErr = txChecker.Process(nil, &fvm.Context{}, tx, st, programsStorage)
+		require.NoError(t, vmErr)
 		require.NoError(t, err)
 	})
 
@@ -190,10 +200,12 @@ func TestAccountFreezing(t *testing.T) {
 
 		deployVm := fvm.New(deployRt)
 
-		err := deployTxInvocator.Process(deployVm, &deployContext, procFrozen, st, programsStorage)
+		err, vmErr := deployTxInvocator.Process(deployVm, &deployContext, procFrozen, st, programsStorage)
 		require.NoError(t, err)
-		err = deployTxInvocator.Process(deployVm, &deployContext, procNotFrozen, st, programsStorage)
+		require.NoError(t, vmErr)
+		err, vmErr = deployTxInvocator.Process(deployVm, &deployContext, procNotFrozen, st, programsStorage)
 		require.NoError(t, err)
+		require.NoError(t, vmErr)
 
 		// both contracts should load now
 		context := fvm.NewContext(log, fvm.WithCadenceLogging(true))
@@ -213,15 +225,17 @@ func TestAccountFreezing(t *testing.T) {
 		// code from not frozen loads fine
 		proc := fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
 
-		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		err, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)
+		require.NoError(t, vmErr)
 		require.Len(t, proc.Logs, 1)
 		require.Contains(t, proc.Logs[0], "Düsseldorf")
 
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(notFrozenAddress)}, 0)
 
-		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		err, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
 		require.NoError(t, err)
+		require.NoError(t, vmErr)
 		require.Len(t, proc.Logs, 1)
 		require.Contains(t, proc.Logs[0], "Düsseldorf")
 
@@ -241,8 +255,9 @@ func TestAccountFreezing(t *testing.T) {
 		// loading code from frozen account triggers error
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
 
-		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		err, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		// find frozen account specific error
 		require.IsType(t, runtime.Error{}, err)

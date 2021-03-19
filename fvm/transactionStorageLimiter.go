@@ -25,10 +25,7 @@ func getStorageCapacityFuncFactory(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) (func(address common.Address) (value uint64, err error), error) {
-	env, err := newEnvironment(ctx, vm, sth, programs)
-	if err != nil {
-		return nil, err
-	}
+	env := newEnvironment(ctx, vm, sth, programs)
 	return func(address common.Address) (value uint64, err error) {
 		return env.GetStorageCapacity(common.BytesToAddress(address.Bytes()))
 	}, nil
@@ -46,14 +43,14 @@ func (d *TransactionStorageLimiter) Process(
 	tp *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) error {
+) (txError error, vmError error) {
 	if !ctx.LimitAccountStorage {
-		return nil
+		return nil, nil
 	}
 
 	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, sth, programs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	accounts := state.NewAccounts(sth)
 
@@ -64,7 +61,7 @@ func (d *TransactionStorageLimiter) Process(
 		// does it exist?
 		exists, err := accounts.Exists(address)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if !exists {
 			continue
@@ -72,12 +69,12 @@ func (d *TransactionStorageLimiter) Process(
 
 		capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		usage, err := accounts.GetStorageUsed(address)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		if usage > capacity {
@@ -85,8 +82,8 @@ func (d *TransactionStorageLimiter) Process(
 				Address:         address,
 				StorageUsed:     usage,
 				StorageCapacity: capacity,
-			}
+			}, nil
 		}
 	}
-	return nil
+	return nil, nil
 }

@@ -18,7 +18,7 @@ func (d *TransactionFeeDeductor) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) error {
+) (txError error, vmError error) {
 	return d.deductFees(vm, ctx, proc.Transaction, sth, programs)
 }
 
@@ -28,7 +28,7 @@ func (d *TransactionFeeDeductor) deductFees(
 	tx *flow.TransactionBody,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) error {
+) (txError error, vmError error) {
 	return vm.invokeMetaTransaction(
 		*ctx,
 		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),

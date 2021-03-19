@@ -88,7 +88,8 @@ func TestSafetyCheck(t *testing.T) {
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 			))
 
-			err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+			err, vmErr := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+			require.NoError(t, vmErr)
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -158,8 +159,9 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err, vmErr := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		require.Contains(t, buffer.String(), "programs")
 		require.Contains(t, buffer.String(), "codes")
@@ -190,8 +192,9 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err, vmErr := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -223,8 +226,9 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err, vmErr := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
+		require.NoError(t, vmErr)
 
 		require.NotContains(t, buffer.String(), "programs")
 		require.NotContains(t, buffer.String(), "codes")
@@ -270,8 +274,9 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(view))
 
-		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err, vmErr := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
+		require.NoError(t, vmErr)
 
 		require.Equal(t, 1, proc.Retried)
 	})

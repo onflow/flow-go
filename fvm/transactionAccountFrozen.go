@@ -20,34 +20,37 @@ func (c *TransactionAccountFrozenChecker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
-) error {
+) (txError error, vmError error) {
 	return c.checkAccountNotFrozen(proc.Transaction, sth)
 }
 
 func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 	tx *flow.TransactionBody,
 	sth *state.StateHolder,
-) error {
+) (txError error, vmError error) {
 	accounts := state.NewAccounts(sth)
 
 	for _, authorizer := range tx.Authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)
 		if err != nil {
-			return fmt.Errorf("check account not frozen authorizer: %w", err)
+			// TODO diff between txError and vmError
+			return fmt.Errorf("check account not frozen authorizer: %w", err), nil
 		}
 	}
 
 	err := accounts.CheckAccountNotFrozen(tx.ProposalKey.Address)
 	if err != nil {
-		return fmt.Errorf("check account not frozen proposal: %w", err)
+		// TODO diff between txError and vmError
+		return fmt.Errorf("check account not frozen proposal: %w", err), nil
 	}
 
 	err = accounts.CheckAccountNotFrozen(tx.Payer)
 	if err != nil {
-		return fmt.Errorf("check account not frozen payer: %w", err)
+		// TODO diff between txError and vmError
+		return fmt.Errorf("check account not frozen payer: %w", err), nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 type TransactionAccountFrozenEnabler struct{}
@@ -62,16 +65,16 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	proc *TransactionProcedure,
 	_ *state.StateHolder,
 	_ *programs.Programs,
-) error {
+) (txError error, vmError error) {
 
 	serviceAddress := ctx.Chain.ServiceAddress()
 
 	for _, signature := range proc.Transaction.EnvelopeSignatures {
 		if signature.Address == serviceAddress {
 			ctx.AccountFreezeAvailable = true
-			return nil //we can bail out and save maybe some loops
+			return nil, nil //we can bail out and save maybe some loops
 		}
 	}
 
-	return nil
+	return nil, nil
 }

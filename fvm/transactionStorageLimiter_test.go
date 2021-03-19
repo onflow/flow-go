@@ -27,10 +27,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, &fvm.Context{
+		err, vmErr := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, sm, programs.NewEmptyPrograms())
-
+		require.NoError(t, vmErr)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
@@ -45,10 +45,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, &fvm.Context{
+		err, vmErr := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, sm, programs.NewEmptyPrograms())
-
+		require.NoError(t, vmErr)
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
@@ -63,10 +63,10 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, &fvm.Context{
+		err, vmErr := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, sm, programs.NewEmptyPrograms())
-
+		require.NoError(t, vmErr)
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("non account registers are ignored", func(t *testing.T) {
@@ -81,10 +81,11 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, &fvm.Context{
+		err, vmErr := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, sm, programs.NewEmptyPrograms())
 
+		require.NoError(t, vmErr)
 		require.NoError(t, err)
 	})
 	t.Run("account registers without exists are ignored", func(t *testing.T) {
@@ -98,10 +99,11 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, &fvm.Context{
+		err, vmErr := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
 		}, nil, sm, programs.NewEmptyPrograms())
 
+		require.NoError(t, vmErr)
 		require.NoError(t, err)
 	})
 }

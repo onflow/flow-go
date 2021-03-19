@@ -29,7 +29,7 @@ func (v *TransactionSignatureVerifier) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) error {
+) (txError error, vmError error) {
 	return v.verifyTransactionSignatures(proc, *ctx, sth)
 }
 
@@ -37,8 +37,8 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	proc *TransactionProcedure,
 	ctx Context,
 	sth *state.StateHolder,
-) (err error) {
-
+) (txError error, vmError error) {
+	// TODO diff vmErrors
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
 		span.LogFields(
@@ -50,20 +50,20 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx := proc.Transaction
 	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
-		return &MissingPayerError{}
+		return &MissingPayerError{}, nil
 	}
 
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool
 
-	payloadWeights, proposalKeyVerifiedInPayload, err = v.aggregateAccountSignatures(
+	payloadWeights, proposalKeyVerifiedInPayload, err := v.aggregateAccountSignatures(
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
 	)
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	var envelopeWeights map[flow.Address]int
@@ -76,7 +76,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		tx.ProposalKey,
 	)
 	if err != nil {
-		return err
+		return err, nil
 	}
 
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
@@ -85,7 +85,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &InvalidProposalKeyMissingSignatureError{
 			Address:  tx.ProposalKey.Address,
 			KeyIndex: tx.ProposalKey.KeyIndex,
-		}
+		}, nil
 	}
 
 	for _, addr := range tx.Authorizers {
@@ -97,15 +97,15 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		}
 
 		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
-			return &MissingSignatureError{addr}
+			return &MissingSignatureError{addr}, nil
 		}
 	}
 
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
-		return &MissingSignatureError{tx.Payer}
+		return &MissingSignatureError{tx.Payer}, nil
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

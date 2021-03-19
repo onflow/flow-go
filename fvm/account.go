@@ -32,10 +32,7 @@ func getAccount(
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env, err := newEnvironment(ctx, vm, sth, programs)
-		if err != nil {
-			return nil, err
-		}
+		env := newEnvironment(ctx, vm, sth, programs)
 		balance, err := env.GetAccountBalance(common.BytesToAddress(address.Bytes()))
 		if err != nil {
 			return nil, err

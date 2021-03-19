@@ -74,13 +74,8 @@ func (i ScriptInvocator) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env, err := newEnvironment(ctx, vm, sth, programs)
-	if err != nil {
-		return err
-	}
-
+	env := newEnvironment(ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])
-
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
 			Source:    proc.Script,

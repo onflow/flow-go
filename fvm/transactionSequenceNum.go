@@ -22,9 +22,9 @@ func (c *TransactionSequenceNumberChecker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) error {
-
-	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
+) (txError error, vmError error) {
+	// TODO diff txError and vmError
+	return c.checkAndIncrementSequenceNumber(proc, ctx, sth), nil
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
