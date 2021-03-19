@@ -184,13 +184,28 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 	return updatedTrie, nil
 }
 
+// The update recursion: returns a  subtree at height `nodeHeight` with all the input `paths` and `payloads`,
+// as well as the `compactLeaf` path and payload.
+//
+// The inputs are:
+//  - `nodeHeight` is the height of the returned subtree
+//  - `parentNode` is the node of the subtree where the recursion is called.
+//  - `paths` and `payloads` are the paths and payloads to update.
+//  - `compactLeaf` is a node that needs to be propagated down the recursion, of which the path and
+//       payload will be in the returned subtree.
+//
+//  The returned subtree represents a new leaf node if there is only one path to update with a new
+//    value (that path can be the one from `compactLeaf`). The returned tree is the same parent node if there
+//  are no paths to update, or if the paths are updated with the same values.
 func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node) *node.Node {
 
 	// No new paths to write
 	if len(paths) == 0 {
-		// check is a compactLeaf from a higher height is still left
+		// check is a compactLeaf from a higher height is still left.
 		if compactLeaf != nil {
+			// create a new node for the compact leaf path and payload. The old node shouldn't
+			// be recycled as it is still used by the tree copy before the update.
 			return node.NewLeaf(compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
 		}
 		return parentNode
@@ -219,6 +234,8 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 			}
 		}
 		if !found {
+			// if the parent node carries a path not included in the input path, then the parent node
+			// represents a compact leaf that needs to be carried down the recursion.
 			compactLeaf = parentNode
 		}
 	}
