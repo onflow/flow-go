@@ -21,7 +21,6 @@ func init() {
 
 func addPrepareCmdFlags() {
 	pullCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-
 	_ = pullCmd.MarkFlagRequired("role")
 }
 

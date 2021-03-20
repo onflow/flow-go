@@ -35,10 +35,8 @@ func init() {
 }
 
 func addSnapshotCmdFlags() {
-	pullCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	pullCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-
-	_ = pullCmd.MarkFlagRequired("role")
+	pullCmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "the address of an access node")
+	_ = pullCmd.MarkFlagRequired("access-address")
 }
 
 // snapshot downloads a protocol snapshot from an access node and writes it to disk
