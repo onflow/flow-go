@@ -2,12 +2,15 @@ package trie_test
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 
+	"github.com/disiqueira/gotree"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
@@ -28,6 +31,57 @@ func Test_EmptyTrie(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(emptyTrie.RootHash()))
 }
 
+func printTree(t *trie.MTrie) {
+	r := t.RootNode()
+	tree := gotree.New("tree")
+	traverseTree(tree, r)
+	fmt.Println(tree.Print())
+}
+
+func traverseTree(tree gotree.Tree, n *node.Node) {
+	if n == nil {
+		// tree.Add("nil")
+		return
+	}
+	if n.IsLeaf() {
+		tree.Add(nodeData(n))
+		return
+	}
+
+	parent := tree.Add(nodeData(n))
+
+	traverseTree(parent, n.LeftChild())
+	traverseTree(parent, n.RightChild())
+}
+
+func nodeData(n *node.Node) string {
+	return fmt.Sprintf("[%v] (%v) {%v}", n.Height(), n.Path(), n.Payload() != nil)
+}
+
+func Test_SimpleTrie(t *testing.T) {
+	t0, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
+	require.NoError(t, err)
+	printTree(t0)
+
+	path1 := utils.PathByUint16LeftPadded(4)
+	payload1 := utils.LightPayload(1, 11)
+	t1, err := trie.NewTrieWithUpdatedRegisters(t0, []ledger.Path{path1}, []ledger.Payload{*payload1})
+	require.NoError(t, err)
+	printTree(t1)
+
+	b := make([]byte, 32)
+	for i := 2; i < len(b); i++ {
+		b[i] = uint8(255)
+	}
+	path2 := ledger.Path(b)
+
+	payload2 := utils.LightPayload(2, 22)
+	t2, err := trie.NewTrieWithUpdatedRegisters(t1, []ledger.Path{path2}, []ledger.Payload{*payload2})
+	require.NoError(t, err)
+	printTree(t2)
+
+}
+
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
 // register populated matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
@@ -42,6 +96,8 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 	require.NoError(t, err)
 	expectedRootHashHex := "b30c99cc3e027a6ff463876c638041b1c55316ed935f1b3699e52a2c3e3eaaab"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
+
+	printTree(leftPopulatedTrie)
 }
 
 // Test_TrieWithRightRegister tests whether the root hash of trie with only the right-most
@@ -63,6 +119,8 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	require.NoError(t, err)
 	expectedRootHashHex := "4313d22bcabbf21b1cfb833d38f1921f06a91e7198a6672bc68fa24eaaa1a961"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
+
+	printTree(rightPopulatedTrie)
 }
 
 // // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
@@ -79,6 +137,8 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	require.NoError(t, err)
 	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
+
+	printTree(leftPopulatedTrie)
 }
 
 // Test_TrieWithManyRegisters tests whether the root hash of a trie storing 12001 randomly selected registers
@@ -96,6 +156,8 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	require.NoError(t, err)
 	expectedRootHashHex := "74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
+
+	printTree(updatedTrie)
 }
 
 // Test_FullTrie tests whether the root hash of a trie,
