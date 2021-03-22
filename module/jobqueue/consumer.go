@@ -37,7 +37,7 @@ type Consumer struct {
 	// are ready, and stop when shutting down.
 	runningJobs sync.WaitGroup // to wait for all existing jobs to finish for graceful shutdown
 
-	processedIndex   int64
+	processedIndex   uint64
 	processings      map[int64]*jobStatus   // keep track of the status of each on going job
 	processingsIndex map[module.JobID]int64 // lookup the index of the job, useful when fast forwarding the
 	// `processed` variable
@@ -71,7 +71,7 @@ func NewConsumer(
 }
 
 // Start starts consuming the jobs from the job queue.
-func (c *Consumer) Start(defaultIndex int64) error {
+func (c *Consumer) Start(defaultIndex uint64) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -97,7 +97,7 @@ func (c *Consumer) Start(defaultIndex int64) error {
 
 		processedIndex = defaultIndex
 
-		c.log.Warn().Int64("processed index", processedIndex).
+		c.log.Warn().Uint64("processed index", processedIndex).
 			Msg("processed index not found, initialized.")
 	} else if err != nil {
 		return fmt.Errorf("could not read processed index: %w", err)
@@ -107,7 +107,9 @@ func (c *Consumer) Start(defaultIndex int64) error {
 
 	c.checkProcessable()
 
-	c.log.Info().Int64("processed", processedIndex).Msg("consumer started")
+	c.log.Info().
+		Uint64("processed", processedIndex).
+		Msg("consumer started")
 	return nil
 }
 
@@ -187,7 +189,7 @@ func (c *Consumer) run() (int64, error) {
 	}
 
 	c.log.Debug().
-		Int64("processed_from", processedFrom).
+		Uint64("processed_from", processedFrom).
 		Int64("processed_to", processedTo).
 		Int("processables", len(processables)).
 		Bool("running", c.running).
@@ -221,7 +223,7 @@ func (c *Consumer) run() (int64, error) {
 	return int64(len(processables)), nil
 }
 
-func (c *Consumer) processableJobs() ([]*jobAtIndex, int64, error) {
+func (c *Consumer) processableJobs() ([]*jobAtIndex, uint64, error) {
 	processables, processedTo, err := processableJobs(
 		c.jobs,
 		c.processings,
@@ -245,7 +247,7 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, int64, error) {
 // processableJobs check the worker's capacity and if sufficient, read
 // jobs from the storage, return the processable jobs, and the processed
 // index
-func processableJobs(jobs module.Jobs, processings map[int64]*jobStatus, maxProcessing int64, processedIndex int64) ([]*jobAtIndex, int64, error) {
+func processableJobs(jobs module.Jobs, processings map[int64]*jobStatus, maxProcessing int64, processedIndex uint64) ([]*jobAtIndex, uint64, error) {
 	processables := make([]*jobAtIndex, 0)
 
 	// count how many jobs are still processing,
@@ -324,7 +326,7 @@ func (c *Consumer) doneJob(jobID module.JobID) bool {
 
 type jobAtIndex struct {
 	job   module.Job
-	index int64
+	index uint64
 }
 
 type jobStatus struct {

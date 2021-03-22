@@ -154,7 +154,7 @@ func NewMockJobs() *MockJobs {
 	}
 }
 
-func (j *MockJobs) AtIndex(index int64) (module.Job, error) {
+func (j *MockJobs) AtIndex(index uint64) (module.Job, error) {
 	j.Lock()
 	defer j.Unlock()
 
@@ -169,8 +169,8 @@ func (j *MockJobs) AtIndex(index int64) (module.Job, error) {
 	return job, nil
 }
 
-func (j *MockJobs) Head() (int64, error) {
-	return int64(j.last), nil
+func (j *MockJobs) Head() (uint64, error) {
+	return uint64(j.last), nil
 }
 
 func (j *MockJobs) Add(job module.Job) error {
