@@ -17,7 +17,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
+	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 type TransactionProcedure struct {
@@ -41,7 +41,7 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
 
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st, programs)
+		err := p.Process(vm, &ctx, proc, st, programs)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr

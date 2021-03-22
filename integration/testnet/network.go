@@ -22,6 +22,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -237,6 +238,7 @@ type NodeConfig struct {
 	LogLevel        zerolog.Level
 	Ghost           bool
 	AdditionalFlags []string
+	Debug           bool
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -297,6 +299,12 @@ func WithIDInt(id uint) func(config *NodeConfig) {
 func WithLogLevel(level zerolog.Level) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.LogLevel = level
+	}
+}
+
+func WithDebugImage(debug bool) func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.Debug = debug
 	}
 }
 
@@ -510,6 +518,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 	}
 
+	if nodeConf.Debug {
+		hostPort := "2345"
+		containerPort := "2345/tcp"
+		nodeContainer.bindPort(hostPort, containerPort)
+	}
+
 	suiteContainer := net.suite.Container(*opts)
 	nodeContainer.Container = suiteContainer
 	net.Containers[nodeContainer.Name()] = nodeContainer
@@ -583,7 +597,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate the initial execution state
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(trieDir, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, chain)
+	commit, err := run.GenerateExecutionState(
+		trieDir,
+		unittest.ServiceAccountPublicKey,
+		chain,
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+	)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -702,6 +723,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			LogLevel:        conf.LogLevel,
 			Ghost:           conf.Ghost,
 			AdditionalFlags: conf.AdditionalFlags,
+			Debug:           conf.Debug,
 		}
 
 		confs = append(confs, containerConf)

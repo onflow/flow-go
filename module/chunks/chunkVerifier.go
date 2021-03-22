@@ -24,8 +24,9 @@ type VirtualMachine interface {
 
 // ChunkVerifier is a verifier based on the current definitions of the flow network
 type ChunkVerifier struct {
-	vm    VirtualMachine
-	vmCtx fvm.Context
+	vm             VirtualMachine
+	vmCtx          fvm.Context
+	systemChunkCtx fvm.Context
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
@@ -33,6 +34,11 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:    vm,
 		vmCtx: vmCtx,
+		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithRestrictedDeployment(false),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
+		),
 	}
 }
 
@@ -70,13 +76,16 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	tx := fvm.Transaction(txBody, uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState)
+	systemChunkContext := fvm.NewContextFromParent(fcv.systemChunkCtx,
+		fvm.WithBlockHeader(vc.Header),
+	)
+
+	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState)
 }
 
-func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
+func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
-	header *flow.Header,
 	transactions []*fvm.TransactionProcedure,
 	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
 
@@ -86,9 +95,6 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 	chIndex := chunk.Index
 	execResID := result.ID()
-
-	// build a block context
-	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
 
 	if chunkDataPack == nil {
 		return nil, nil, fmt.Errorf("missing chunk data pack")
@@ -145,7 +151,7 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 
 		// tx := fvm.Transaction(txBody, uint32(i))
 
-		err := fcv.vm.Run(blockCtx, tx, txView, programs)
+		err := fcv.vm.Run(context, tx, txView, programs)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
@@ -205,4 +211,17 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 		return nil, chmodels.NewCFNonMatchingFinalState(expEndStateComm, endState, chIndex, execResID), nil
 	}
 	return chunkView.SpockSecret(), nil, nil
+}
+
+func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
+	chunkDataPack *flow.ChunkDataPack,
+	result *flow.ExecutionResult,
+	header *flow.Header,
+	transactions []*fvm.TransactionProcedure,
+	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
+
+	// build a block context
+	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
+
+	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState)
 }

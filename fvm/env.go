@@ -274,6 +274,13 @@ func (e *hostEnv) ResolveLocation(
 	// then fetch all identifiers at this address
 
 	if len(identifiers) == 0 {
+		address := flow.Address(addressLocation.Address)
+
+		err := e.accounts.CheckAccountNotFrozen(address)
+		if err != nil {
+			return nil, fmt.Errorf("resolve location: %w", err)
+		}
+
 		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
 		if err != nil {
 			panic(err)
@@ -324,6 +331,13 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
 	}
 
+	address := flow.BytesToAddress(contractLocation.Address.Bytes())
+
+	err := e.accounts.CheckAccountNotFrozen(address)
+	if err != nil {
+		return nil, fmt.Errorf("get code: %w", err)
+	}
+
 	return e.contracts.GetContract(contractLocation.Address, contractLocation.Name)
 }
 
@@ -331,6 +345,16 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetProgram)
 		defer sp.Finish()
+	}
+
+	if addressLocation, ok := location.(common.AddressLocation); ok {
+		address := flow.BytesToAddress(addressLocation.Address.Bytes())
+
+		freezeError := e.accounts.CheckAccountNotFrozen(address)
+
+		if freezeError != nil {
+			return nil, freezeError
+		}
 	}
 
 	program, has := e.programs.Get(location)
@@ -426,6 +450,25 @@ func (e *hostEnv) GetComputationLimit() uint64 {
 
 func (e *hostEnv) SetComputationUsed(used uint64) error {
 	e.totalGasUsed = used
+	return nil
+}
+
+func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
+
+	flowAddress := flow.Address(address)
+
+	if flowAddress == e.ctx.Chain.ServiceAddress() {
+		return fmt.Errorf("cannot freeze service account")
+	}
+
+	if !e.transactionEnv.isAuthorizerServiceAccount() {
+		return fmt.Errorf("SetAccountFrozen can only be used in transactions authorized by service account")
+	}
+
+	err := e.accounts.SetAccountFrozen(flowAddress, frozen)
+	if err != nil {
+		return fmt.Errorf("cannot set account [%s] frozen [%t]: %w", flowAddress, frozen, err)
+	}
 	return nil
 }
 
@@ -597,6 +640,11 @@ func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte
 		return errors.New("adding account keys is not supported")
 	}
 
+	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return fmt.Errorf("add count key: %w", err)
+	}
+
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.AddEncodedAccountKey(address, publicKey)
 }
@@ -609,6 +657,11 @@ func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (p
 
 	if e.transactionEnv == nil {
 		return nil, errors.New("removing account keys is not supported")
+	}
+
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return nil, fmt.Errorf("remove account key: %w", err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -670,6 +723,11 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 		return errors.New("updating account contract code is not supported")
 	}
 
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return fmt.Errorf("update account contract code: %w", err)
+	}
+
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return e.transactionEnv.UpdateAccountContractCode(address, name, code)
 }
@@ -694,6 +752,11 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 
 	if e.transactionEnv == nil {
 		return errors.New("removing account contracts is not supported")
+	}
+
+	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
+	if err != nil {
+		return fmt.Errorf("remove account contract code: %w", err)
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -948,6 +1011,19 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	return encodedPublicKey, nil
+}
+
+func (e *transactionEnv) isAuthorizerServiceAccount() bool {
+	return e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress()))
+}
+
+func (e *transactionEnv) isAuthorizer(address runtime.Address) bool {
+	for _, accountAddress := range e.GetSigningAccounts() {
+		if accountAddress == address {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *transactionEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
