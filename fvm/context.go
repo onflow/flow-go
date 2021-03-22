@@ -91,7 +91,6 @@ func defaultContext(logger zerolog.Logger) Context {
 			NewTransactionFeeDeductor(),
 			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvocator(logger),
-			NewTransactionStorageLimiter(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
