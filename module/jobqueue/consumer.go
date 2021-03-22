@@ -38,8 +38,8 @@ type Consumer struct {
 	runningJobs sync.WaitGroup // to wait for all existing jobs to finish for graceful shutdown
 
 	processedIndex   uint64
-	processings      map[int64]*jobStatus   // keep track of the status of each on going job
-	processingsIndex map[module.JobID]int64 // lookup the index of the job, useful when fast forwarding the
+	processings      map[uint64]*jobStatus   // keep track of the status of each on going job
+	processingsIndex map[module.JobID]uint64 // lookup the index of the job, useful when fast forwarding the
 	// `processed` variable
 }
 
@@ -65,8 +65,8 @@ func NewConsumer(
 		running:          false,
 		isChecking:       atomic.NewBool(false),
 		processedIndex:   0,
-		processings:      make(map[int64]*jobStatus),
-		processingsIndex: make(map[module.JobID]int64),
+		processings:      make(map[uint64]*jobStatus),
+		processingsIndex: make(map[module.JobID]uint64),
 	}
 }
 
@@ -190,7 +190,7 @@ func (c *Consumer) run() (int64, error) {
 
 	c.log.Debug().
 		Uint64("processed_from", processedFrom).
-		Int64("processed_to", processedTo).
+		Uint64("processed_to", processedTo).
 		Int("processables", len(processables)).
 		Bool("running", c.running).
 		Msg("running")
@@ -247,7 +247,7 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, uint64, error) {
 // processableJobs check the worker's capacity and if sufficient, read
 // jobs from the storage, return the processable jobs, and the processed
 // index
-func processableJobs(jobs module.Jobs, processings map[int64]*jobStatus, maxProcessing int64, processedIndex uint64) ([]*jobAtIndex, uint64, error) {
+func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxProcessing int64, processedIndex uint64) ([]*jobAtIndex, uint64, error) {
 	processables := make([]*jobAtIndex, 0)
 
 	// count how many jobs are still processing,

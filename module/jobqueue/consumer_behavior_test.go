@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	DefaultIndex = int64(0)
+	DefaultIndex = uint64(0)
 	ConsumerTag  = "consumer"
 )
 
