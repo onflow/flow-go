@@ -47,6 +47,7 @@ type TransactionResult struct {
 	StatusCode   uint
 	Events       []flow.Event
 	ErrorMessage string
+	BlockID      flow.Identifier
 }
 
 func TransactionResultToMessage(result *TransactionResult) *access.TransactionResultResponse {
@@ -55,6 +56,7 @@ func TransactionResultToMessage(result *TransactionResult) *access.TransactionRe
 		StatusCode:   uint32(result.StatusCode),
 		ErrorMessage: result.ErrorMessage,
 		Events:       convert.EventsToMessages(result.Events),
+		BlockId:      result.BlockID[:],
 	}
 }
 
@@ -65,6 +67,7 @@ func MessageToTransactionResult(message *access.TransactionResultResponse) *Tran
 		StatusCode:   uint(message.StatusCode),
 		ErrorMessage: message.ErrorMessage,
 		Events:       convert.MessagesToEvents(message.Events),
+		BlockID:      flow.HashToID(message.BlockId),
 	}
 }
 
