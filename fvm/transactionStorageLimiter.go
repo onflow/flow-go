@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
 
@@ -13,8 +14,8 @@ type TransactionStorageLimiter struct {
 		vm *VirtualMachine,
 		ctx Context,
 		tp *TransactionProcedure,
-		stm *state.StateManager,
-		programs *Programs,
+		sth *state.StateHolder,
+		programs *programs.Programs,
 	) (func(address common.Address) (value uint64, err error), error)
 	logger zerolog.Logger
 }
@@ -23,10 +24,10 @@ func getStorageCapacityFuncFactory(
 	vm *VirtualMachine,
 	ctx Context,
 	_ *TransactionProcedure,
-	stm *state.StateManager,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) (func(address common.Address) (value uint64, err error), error) {
-	env, err := newEnvironment(ctx, vm, stm, programs)
+	env, err := newEnvironment(ctx, vm, sth, programs)
 	if err != nil {
 		return nil, err
 	}
@@ -44,22 +45,22 @@ func NewTransactionStorageLimiter(logger zerolog.Logger) *TransactionStorageLimi
 
 func (d *TransactionStorageLimiter) Process(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	tp *TransactionProcedure,
-	stm *state.StateManager,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
 	if !ctx.LimitAccountStorage {
 		return nil
 	}
 
-	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, ctx, tp, stm, programs)
+	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, sth, programs)
 	if err != nil {
 		return err
 	}
-	accounts := state.NewAccounts(stm)
+	accounts := state.NewAccounts(sth)
 
-	addresses := stm.State().UpdatedAddresses()
+	addresses := sth.State().UpdatedAddresses()
 
 	for _, address := range addresses {
 

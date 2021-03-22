@@ -10,12 +10,14 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -30,7 +32,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateManager, *Programs) error
+	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 type TransactionProcedure struct {
@@ -51,9 +53,10 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 	proc.TraceSpan = traceSpan
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateManager, programs *Programs) error {
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
+
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st, programs)
+		err := p.Process(vm, &ctx, proc, st, programs)
 		stopProcessing, vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -67,27 +70,25 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 		}
 	}
 
-	return st.State().ApplyTouchesToLedger()
+	return nil
 }
 
 type TransactionInvocator struct {
 	logger zerolog.Logger
-	checkStorage bool
 }
 
-func NewTransactionInvocator(logger zerolog.Logger, checkStorage bool) *TransactionInvocator {
+func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
 	return &TransactionInvocator{
 		logger: logger,
-		checkStorage: checkStorage,
 	}
 }
 
 func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	proc *TransactionProcedure,
-	stm *state.StateManager,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
 	if proc.Err != nil {
 		i.logger.Debug().
@@ -110,16 +111,73 @@ func (i *TransactionInvocator) Process(
 	if ctx.BlockHeader != nil {
 		blockHeight = ctx.BlockHeader.Height
 	}
+	var predeclaredValues []runtime.ValueDeclaration
+
+	if ctx.AccountFreezeAvailable {
+
+		setAccountFrozen := runtime.ValueDeclaration{
+			Name: "setAccountFrozen",
+			Type: &sema.FunctionType{
+				Parameters: []*sema.Parameter{
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "account",
+						TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
+					},
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "frozen",
+						TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+					},
+				},
+				ReturnTypeAnnotation: &sema.TypeAnnotation{
+					Type: sema.VoidType,
+				},
+			},
+			Kind:           common.DeclarationKindFunction,
+			IsConstant:     true,
+			ArgumentLabels: nil,
+			Value: interpreter.NewHostFunctionValue(
+				func(invocation interpreter.Invocation) interpreter.Value {
+					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
+					if !ok {
+						panic(errors.New("first argument must be an address"))
+					}
+
+					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
+					if !ok {
+						panic(errors.New("second argument must be a boolean"))
+					}
+
+					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
+					if err != nil {
+						panic(fmt.Errorf("cannot set account frozen: %w", err))
+					}
+
+					return interpreter.VoidValue{}
+				},
+			),
+		}
+
+		predeclaredValues = append(predeclaredValues, setAccountFrozen)
+	}
+
 	retry := false
 	numberOfRetries := 0
-	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
+	parentState := sth.State()
+	childState := sth.NewChild()
+	defer func() {
+		if mergeError := parentState.MergeState(childState); mergeError != nil {
+			panic(mergeError)
+		}
+		sth.SetActiveState(parentState)
+	}()
 
+	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
 		if retry {
 			// rest state
-			rollUpError := stm.RollUpNoMerge()
-			if rollUpError != nil {
-				return rollUpError
-			}
+			sth.SetActiveState(parentState)
+			childState = sth.NewChild()
 			// force cleanup if retries
 			programs.ForceCleanup()
 
@@ -127,7 +185,7 @@ func (i *TransactionInvocator) Process(
 				Str("txHash", proc.ID.String()).
 				Uint64("blockHeight", blockHeight).
 				Int("retries_count", numberOfRetries).
-				Uint64("ledger_interaction_used", stm.State().InteractionUsed()).
+				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
 				Msg("retrying transaction execution")
 
 			// reset error part of proc
@@ -139,8 +197,7 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		stm.Nest()
-		env, err = newEnvironment(ctx, vm, stm, programs)
+		env, err = newEnvironment(*ctx, vm, sth, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
@@ -156,8 +213,9 @@ func (i *TransactionInvocator) Process(
 				Arguments: proc.Transaction.Arguments,
 			},
 			runtime.Context{
-				Interface: env,
-				Location:  location,
+				Interface:         env,
+				Location:          location,
+				PredeclaredValues: predeclaredValues,
 			},
 		)
 
@@ -190,36 +248,28 @@ func (i *TransactionInvocator) Process(
 		txError = err
 	}
 
-	// based on the contract updates we decide how to clean up the programs
-	// for failed transactions we also do the same as
-	// transaction without any deployed contracts
-	programs.Cleanup(updatedKeys)
-
-	if txError == nil && i.checkStorage {
-		// use the same state to check if accounts are over storage limit, so it can be cleaned in case of error
-		txError = NewTransactionStorageLimiter(i.logger).Process(vm, ctx, proc, stm, programs)
+	// check the storage limits
+	if ctx.LimitAccountStorage && txError == nil {
+		txError = NewTransactionStorageLimiter(i.logger).Process(vm, ctx, proc, sth, programs)
 	}
 
 	if txError != nil {
-		err := stm.RollUpWithTouchMergeOnly()
-		if err != nil {
-			return err
-		}
+		// drop delta
+		childState.View().DropDelta()
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
-			Uint64("ledgerInteractionUsed", stm.State().InteractionUsed()).
+			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
 		return txError
 	}
 
-	// don't roll up with true for failed tx
-	err = stm.RollUpWithMerge()
-	if err != nil {
-		return err
-	}
+	// based on the contract updates we decide how to clean up the programs
+	// for failed transactions we also do the same as
+	// transaction without any deployed contracts
+	programs.Cleanup(updatedKeys)
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()
@@ -228,7 +278,7 @@ func (i *TransactionInvocator) Process(
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
 		Uint64("blockHeight", blockHeight).
-		Uint64("ledgerInteractionUsed", stm.State().InteractionUsed()).
+		Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 		Int("retried", proc.Retried).
 		Msg("transaction executed successfully")
 

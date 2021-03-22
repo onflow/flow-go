@@ -19,11 +19,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/trace"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
-	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -123,8 +120,8 @@ func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 }
 
 func (suite *CollectorSuite) Clusters() flow.ClusterList {
-	seal := suite.net.Seal()
-	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	result := suite.net.Result()
+	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
 
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
@@ -310,7 +307,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
-	setup, ok := suite.net.Seal().ServiceEvents[0].Event.(*flow.EpochSetup)
+	setup, ok := suite.net.Result().ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok, "could not get root seal setup")
 	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
@@ -318,14 +315,10 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	metrics := metrics.NewNoopCollector()
-	tracer := trace.NewNoopTracer()
+	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock)
+	suite.NoError(err)
+	clusterState, err := clusterstateimpl.Bootstrap(db, clusterStateRoot)
+	require.NoError(suite.T(), err, "could not get cluster state")
 
-	headers := storage.NewHeaders(metrics, db)
-	payloads := storage.NewClusterPayloads(metrics, db)
-
-	state, err := clusterstateimpl.NewState(db, tracer, rootBlock.Header.ChainID, headers, payloads)
-	require.Nil(suite.T(), err, "could not get cluster state")
-
-	return state
+	return clusterState
 }

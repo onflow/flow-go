@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -75,8 +76,7 @@ func run(*cobra.Command, []string) {
 	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 
 		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
-		// TODO (RAMTIN) change the path finder version
-		path, err := pathfinder.KeyToPath(ledgerKey, 0)
+		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot convert key to path")
 		}
@@ -96,16 +96,11 @@ func run(*cobra.Command, []string) {
 		return payload[0].Value, nil
 	})
 
-	stm := state.NewStateManager(state.NewState(ldg))
-	accounts := state.NewAccounts(stm)
-	finalGenerator, err := state.NewStateBoundAddressGenerator(stm, chain)
+	sth := state.NewStateHolder(state.NewState(ldg))
+	accounts := state.NewAccounts(sth)
+	finalGenerator, err := state.NewStateBoundAddressGenerator(sth, chain)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot get current address state")
-	}
-
-	err = stm.State().ApplyDeltaToLedger()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot commit state to ledger")
 	}
 
 	finalState := finalGenerator.Bytes()

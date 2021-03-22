@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func constructRootQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) {
+func constructRootQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo, dkgData model.DKGData) *flow.QuorumCertificate {
 	participantData, err := run.GenerateQCParticipantData(allNodes, internalNodes, dkgData)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")
@@ -17,5 +17,5 @@ func constructRootQC(block *flow.Block, allNodes, internalNodes []model.NodeInfo
 		log.Fatal().Err(err).Msg("generating root QC failed")
 	}
 
-	writeJSON(model.PathRootQC, qc)
+	return qc
 }

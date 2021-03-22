@@ -9,12 +9,13 @@ import (
 
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestContract_DraftFunctionality(t *testing.T) {
-	stm := state.NewStateManager(state.NewState(state.NewMapLedger()))
-	accounts := state.NewAccounts(stm)
+func TestContract_ChildMergeFunctionality(t *testing.T) {
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)
@@ -65,8 +66,8 @@ func TestContract_DraftFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	stm := state.NewStateManager(state.NewState(state.NewMapLedger()))
-	accounts := state.NewAccounts(stm)
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
 	err := accounts.Create(nil, address)

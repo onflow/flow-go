@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -18,8 +19,8 @@ import (
 type BootstrapProcedure struct {
 	vm       *VirtualMachine
 	ctx      Context
-	stm      *state.StateManager
-	programs *Programs
+	sth      *state.StateHolder
+	programs *programs.Programs
 	accounts *state.Accounts
 
 	// genesis parameters
@@ -96,15 +97,15 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, stm *state.StateManager, programs *Programs) error {
+func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
-	b.stm = stm
+	b.sth = sth
 	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(stm)
-	addressGenerator, err := state.NewStateBoundAddressGenerator(stm, ctx.Chain)
+	b.accounts = state.NewAccounts(b.sth)
+	addressGenerator, err := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
 	}
@@ -162,7 +163,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {
@@ -180,7 +181,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {
@@ -201,7 +202,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {
@@ -221,7 +222,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployStorageFeesTransaction(service, contract),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {
@@ -240,7 +241,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {
@@ -255,7 +256,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {
@@ -271,7 +272,7 @@ func (b *BootstrapProcedure) setupFees(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupFeesTransaction(service, addressCreationFee, minimumStorageReservation),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {
@@ -285,7 +286,7 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
-		b.stm,
+		b.sth,
 		b.programs,
 	)
 	if err != nil {

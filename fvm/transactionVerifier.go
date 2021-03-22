@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
@@ -23,19 +24,19 @@ func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatu
 }
 
 func (v *TransactionSignatureVerifier) Process(
-	vm *VirtualMachine,
-	ctx Context,
+	_ *VirtualMachine,
+	ctx *Context,
 	proc *TransactionProcedure,
-	stm *state.StateManager,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
-	return v.verifyTransactionSignatures(proc, ctx, stm)
+	return v.verifyTransactionSignatures(proc, *ctx, sth)
 }
 
 func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	proc *TransactionProcedure,
 	ctx Context,
-	stm *state.StateManager,
+	sth *state.StateHolder,
 ) (err error) {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -50,9 +51,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	// If there is an authorizer signature error, still charge fees
 
 	tx := proc.Transaction
-
-	stm.Nest()
-	accounts := state.NewAccounts(stm)
+	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
 		return &MissingPayerError{}
 	}
@@ -109,7 +108,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &MissingSignatureError{tx.Payer}
 	}
 
-	return stm.RollUpWithMerge()
+	return nil
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(

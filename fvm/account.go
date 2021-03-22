@@ -8,6 +8,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -15,11 +16,11 @@ import (
 func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
-	stm *state.StateManager,
-	programs *Programs,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 	address flow.Address,
 ) (*flow.Account, error) {
-	accounts := state.NewAccounts(stm)
+	accounts := state.NewAccounts(sth)
 
 	account, err := accounts.Get(address)
 	if err != nil {
@@ -31,7 +32,7 @@ func getAccount(
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env, err := newEnvironment(ctx, vm, stm, programs)
+		env, err := newEnvironment(ctx, vm, sth, programs)
 		if err != nil {
 			return nil, err
 		}
