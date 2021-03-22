@@ -52,8 +52,3 @@ func (r FinalizedBlockReader) Head() (int64, error) {
 
 	return int64(header.Height), nil
 }
-
-// blockToJob converts the block to a BlockJob.
-func blockToJob(block *flow.Block) *BlockJob {
-	return &BlockJob{Block: block}
-}

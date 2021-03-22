@@ -26,7 +26,15 @@ func jobID(blockID flow.Identifier) module.JobID {
 }
 
 // jobToBlock converts a block job into its corresponding block.
-func jobToBlock(job module.Job) *flow.Block {
-	blockJob, _ := job.(*BlockJob)
-	return blockJob.Block
+func jobToBlock(job module.Job) (*flow.Block, error) {
+	blockJob, ok := job.(*BlockJob)
+	if !ok {
+		return nil, fmt.Errorf("could not assert job to block, job id: %x", job.ID())
+	}
+	return blockJob.Block, nil
+}
+
+// blockToJob converts the block to a BlockJob.
+func blockToJob(block *flow.Block) *BlockJob {
+	return &BlockJob{Block: block}
 }
