@@ -146,6 +146,11 @@ func (i *TransactionInvocator) Process(
 		return nil, vmError
 	}
 
+	// check the storage limits
+	if ctx.LimitAccountStorage && txError == nil {
+		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+	}
+
 	if txError != nil {
 		// drop delta
 		childState.View().DropDelta()
