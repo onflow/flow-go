@@ -305,6 +305,11 @@ func executionNodesForBlockID(
 	return executionIdentitiesRandom, nil
 }
 
+// chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
+// choosing the preferred execution nodes which have executed the transaction. If no such preferred
+// execution nodes are found, then the fixed execution nodes defined in the identity table are returned
+// e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
+// and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
 func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentityList, error) {
 
 	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
@@ -320,7 +325,7 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 		return preferredENIDs, nil
 	}
 
-	// if no such preferred ID is found, the choose the fixed EN IDs
+	// if no such preferred ID is found, then choose the fixed EN IDs
 	fixedENIDs := allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
 
 	return fixedENIDs, nil
