@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/state"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -222,9 +223,15 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 
 	// Start from the lowest unfinalized block and walk the chain upwards until we
 	// hit the candidate's parent. For each visited block track:
-	bookKeeper := func(blockID flow.Identifier, payloadIndex *flow.Index) error {
+	bookKeeper := func(block *flow.Header) error {
+		blockID := block.ID()
 		// track encountered blocks
 		forkBlocks[blockID] = struct{}{}
+
+		payloadIndex, err := v.index.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve payload index: %w", err)
+		}
 
 		// track encountered receipts
 		for _, recID := range payloadIndex.ReceiptIDs {
@@ -248,8 +255,9 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		return nil
 	}
 
-	// Demonstration that order of block traversal is critical for correctness of algorithm:
-	err = v.forkCrawler(header.ParentID, sealedHeight+1, bookKeeper) // crawling bottom up works
+	err = state.TraverseForward(v.headers, header.ParentID, bookKeeper, func(header *flow.Header) bool {
+		return header.Height > sealedHeight
+	})
 	if err != nil {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
