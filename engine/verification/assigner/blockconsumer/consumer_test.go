@@ -54,7 +54,7 @@ func TestProduceConsume(t *testing.T) {
 				consumer.OnFinalizedBlock(&model.Block{})
 			}
 
-			<-consumer.Done()
+			unittest.AssertClosesBefore(consumer.Done(), time.Second)
 
 			// expects the processor receive only the first 3 blocks (since it is blocked on those, hence no
 			// new block is fetched to process).
