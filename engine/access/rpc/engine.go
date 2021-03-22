@@ -28,14 +28,16 @@ import (
 
 // Config defines the configurable options for the access node server
 type Config struct {
-	GRPCListenAddr          string        // the GRPC server address as ip:port
-	HTTPListenAddr          string        // the HTTP web proxy address as ip:port
-	ExecutionAddr           string        // the address of the upstream execution node
-	CollectionAddr          string        // the address of the upstream collection node
-	HistoricalAccessAddrs   string        // the list of all access nodes from previous spork
-	MaxMsgSize              int           // GRPC max message size
-	ExecutionClientTimeout  time.Duration // execution API GRPC client timeout
-	CollectionClientTimeout time.Duration // collection API GRPC client timeout
+	GRPCListenAddr            string        // the GRPC server address as ip:port
+	HTTPListenAddr            string        // the HTTP web proxy address as ip:port
+	ExecutionAddr             string        // the address of the upstream execution node
+	CollectionAddr            string        // the address of the upstream collection node
+	HistoricalAccessAddrs     string        // the list of all access nodes from previous spork
+	MaxMsgSize                int           // GRPC max message size
+	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
+	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
+	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
+	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -131,6 +133,8 @@ func New(log zerolog.Logger,
 		transactionMetrics,
 		connectionFactory,
 		retryEnabled,
+		config.PreferredExecutionNodeIDs,
+		config.FixedExecutionNodeIDs,
 		log,
 	)
 
