@@ -1583,7 +1583,7 @@ func TestEventLimits(t *testing.T) {
 	})
 }
 
-func TestBlockContext_ExecuteTransaction_FailingTransactionFees(t *testing.T) {
+func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
 		return flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(`

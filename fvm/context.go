@@ -88,6 +88,8 @@ func defaultContext(logger zerolog.Logger) Context {
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionAccountFrozenEnabler(),
+			NewTransactionInvocator(logger),
+			NewTransactionStorageLimiter(logger),
 			NewTransactionFeeDeductor(),
 		},
 		ScriptProcessors: []ScriptProcessor{
