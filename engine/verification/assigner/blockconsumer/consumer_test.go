@@ -45,7 +45,7 @@ func TestProduceConsume(t *testing.T) {
 		}
 
 		withConsumer(t, 10, 3, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
-			<-consumer.Ready()
+			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 
 			for i := 0; i < len(blocks); i++ {
 				// consumer is only required to be "notified" that a new finalized block available.
@@ -54,7 +54,7 @@ func TestProduceConsume(t *testing.T) {
 				consumer.OnFinalizedBlock(&model.Block{})
 			}
 
-			unittest.AssertClosesBefore(consumer.Done(), time.Second)
+			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
 
 			// expects the processor receive only the first 3 blocks (since it is blocked on those, hence no
 			// new block is fetched to process).
@@ -83,7 +83,7 @@ func TestProduceConsume(t *testing.T) {
 		}
 
 		withConsumer(t, 10, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
-			<-consumer.Ready()
+			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 			processAll.Add(len(blocks))
 
 			for i := 0; i < len(blocks); i++ {
@@ -94,8 +94,8 @@ func TestProduceConsume(t *testing.T) {
 			}
 
 			// waits until all blocks finish processing
-			unittest.RequireReturnsBefore(t, processAll.Wait, 1*time.Second, "could not process all blocks on time")
-			<-consumer.Done()
+			unittest.RequireReturnsBefore(t, processAll.Wait, time.Second, "could not process all blocks on time")
+			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
 
 			// expects the mock engine receive all 10 blocks.
 			unittest.RequireBlockListsMatchElements(t, received, blocks)
@@ -124,7 +124,7 @@ func TestProduceConsume(t *testing.T) {
 		}
 
 		withConsumer(t, 100, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
-			<-consumer.Ready()
+			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 			processAll.Add(len(blocks))
 
 			for i := 0; i < len(blocks); i++ {
@@ -137,8 +137,8 @@ func TestProduceConsume(t *testing.T) {
 			}
 
 			// waits until all finished
-			unittest.RequireReturnsBefore(t, processAll.Wait, 1*time.Second, "could not process all blocks on time")
-			<-consumer.Done()
+			unittest.RequireReturnsBefore(t, processAll.Wait, time.Second, "could not process all blocks on time")
+			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
 
 			// expects the mock engine receive all 100 blocks.
 			unittest.RequireBlockListsMatchElements(t, received, blocks)
