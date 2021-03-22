@@ -335,7 +335,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, ledger, privateKeys, chain)
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCheckerHeavyTransaction(accounts[0], chain)
@@ -351,7 +351,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		tx := fvm.Transaction(txBody, 0)
 
-		err = vm.Run(ctx, tx, ledger)
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		assert.NoError(t, tx.Err)
