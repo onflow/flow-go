@@ -30,7 +30,7 @@ func (r FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by index %v: %w", index, err)
 	}
-	return toJob(block), nil
+	return blockToJob(block), nil
 }
 
 // blockByHeight returns the block at the given height.
@@ -53,7 +53,7 @@ func (r FinalizedBlockReader) Head() (int64, error) {
 	return int64(header.Height), nil
 }
 
-// toJob converts the block to a BlockJob.
-func toJob(block *flow.Block) *BlockJob {
+// blockToJob converts the block to a BlockJob.
+func blockToJob(block *flow.Block) *BlockJob {
 	return &BlockJob{Block: block}
 }

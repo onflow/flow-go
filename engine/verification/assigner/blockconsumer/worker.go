@@ -31,12 +31,9 @@ func (w *worker) withBlockConsumer(consumer *BlockConsumer) {
 // It then converts the job to a block and passes it to the underlying engine
 // for processing.
 func (w *worker) Run(job module.Job) error {
-	block, err := toBlock(job)
-	if err != nil {
-		return err
-	}
+	block := jobToBlock(job)
+	// TODO: wire out the internal fatal error, and return.
 	w.processor.ProcessFinalizedBlock(block)
-
 	return nil
 }
 

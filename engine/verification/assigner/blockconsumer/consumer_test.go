@@ -23,8 +23,7 @@ import (
 // and its corresponding job can be converted back to the same block.
 func TestBlockToJob(t *testing.T) {
 	block := unittest.BlockFixture()
-	actual, err := toBlock(toJob(&block))
-	require.NoError(t, err)
+	actual := jobToBlock(blockToJob(&block))
 	require.Equal(t, &block, actual)
 }
 

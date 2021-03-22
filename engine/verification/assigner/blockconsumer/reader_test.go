@@ -30,8 +30,7 @@ func TestBlockReader(t *testing.T) {
 			job, err := reader.AtIndex(index)
 			require.NoError(t, err)
 
-			retrieved, err := toBlock(job)
-			require.NoError(t, err)
+			retrieved := jobToBlock(job)
 			require.Equal(t, actual.ID(), retrieved.ID())
 		}
 	})
