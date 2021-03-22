@@ -37,7 +37,7 @@ func (r FinalizedBlockReader) AtIndex(index int64) (module.Job, error) {
 func (r FinalizedBlockReader) blockByHeight(height uint64) (*flow.Block, error) {
 	block, err := r.blocks.ByHeight(height)
 	if err != nil {
-		return nil, fmt.Errorf("could not get block by ID %v: %w", blockID, err)
+		return nil, fmt.Errorf("could not get block by height %d: %w", height, err)
 	}
 
 	return block, nil
