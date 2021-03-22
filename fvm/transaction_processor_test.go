@@ -2,7 +2,6 @@ package fvm_test
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -200,11 +200,11 @@ func TestAccountFreezing(t *testing.T) {
 
 		deployVm := fvm.New(deployRt)
 
-		err, vmErr := deployTxInvocator.Process(deployVm, &deployContext, procFrozen, st, programsStorage)
-		require.NoError(t, err)
+		txErr, vmErr := deployTxInvocator.Process(deployVm, &deployContext, procFrozen, st, programsStorage)
+		require.NoError(t, txErr)
 		require.NoError(t, vmErr)
-		err, vmErr = deployTxInvocator.Process(deployVm, &deployContext, procNotFrozen, st, programsStorage)
-		require.NoError(t, err)
+		txErr, vmErr = deployTxInvocator.Process(deployVm, &deployContext, procNotFrozen, st, programsStorage)
+		require.NoError(t, txErr)
 		require.NoError(t, vmErr)
 
 		// both contracts should load now
@@ -225,22 +225,22 @@ func TestAccountFreezing(t *testing.T) {
 		// code from not frozen loads fine
 		proc := fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
 
-		err, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
-		require.NoError(t, err)
+		txErr, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		require.NoError(t, txErr)
 		require.NoError(t, vmErr)
 		require.Len(t, proc.Logs, 1)
 		require.Contains(t, proc.Logs[0], "Düsseldorf")
 
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(notFrozenAddress)}, 0)
 
-		err, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
-		require.NoError(t, err)
+		txErr, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		require.NoError(t, txErr)
 		require.NoError(t, vmErr)
 		require.Len(t, proc.Logs, 1)
 		require.Contains(t, proc.Logs[0], "Düsseldorf")
 
 		// freeze account
-		err = accounts.SetAccountFrozen(frozenAddress, true)
+		err := accounts.SetAccountFrozen(frozenAddress, true)
 		require.NoError(t, err)
 
 		// make sure freeze status is correct
@@ -276,7 +276,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		importedCheckerError := checkerErrors[0].(*sema.ImportedProgramError).Err
 
-		accountFrozenError := &state.AccountFrozenError{}
+		accountFrozenError := &errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
 		require.Equal(t, frozenAddress, accountFrozenError.Address)
@@ -328,7 +328,7 @@ func TestAccountFreezing(t *testing.T) {
 
 		require.Contains(t, tx.Err.Error(), "cannot find")
 		require.Contains(t, tx.Err.Error(), "setAccountFrozen")
-		require.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+		require.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 
 		// sign tx by service account now
 		txBody = &flow.TransactionBody{Script: []byte(code)}

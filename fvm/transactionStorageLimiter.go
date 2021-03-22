@@ -3,6 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence/runtime/common"
 
+	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
@@ -43,15 +44,18 @@ func (d *TransactionStorageLimiter) Process(
 	tp *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 	if !ctx.LimitAccountStorage {
 		return nil, nil
 	}
 
 	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, sth, programs)
-	if err != nil {
-		return nil, err
+
+	txError, vmError = errors.SplitErrorTypes(err)
+	if txError != nil || vmError != nil {
+		return
 	}
+
 	accounts := state.NewAccounts(sth)
 
 	addresses := sth.State().UpdatedAddresses()
@@ -61,7 +65,10 @@ func (d *TransactionStorageLimiter) Process(
 		// does it exist?
 		exists, err := accounts.Exists(address)
 		if err != nil {
-			return nil, err
+			txError, vmError = errors.SplitErrorTypes(err)
+			if txError != nil || vmError != nil {
+				return
+			}
 		}
 		if !exists {
 			continue
@@ -69,16 +76,22 @@ func (d *TransactionStorageLimiter) Process(
 
 		capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
 		if err != nil {
-			return nil, err
+			txError, vmError = errors.SplitErrorTypes(err)
+			if txError != nil || vmError != nil {
+				return
+			}
 		}
 
 		usage, err := accounts.GetStorageUsed(address)
 		if err != nil {
-			return nil, err
+			txError, vmError = errors.SplitErrorTypes(err)
+			if txError != nil || vmError != nil {
+				return
+			}
 		}
 
 		if usage > capacity {
-			return &StorageCapacityExceededError{
+			return &errors.StorageCapacityExceededError{
 				Address:         address,
 				StorageUsed:     usage,
 				StorageCapacity: capacity,

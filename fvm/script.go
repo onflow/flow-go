@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,7 +30,7 @@ type ScriptProcedure struct {
 	Events    []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
-	Err     Error
+	Err     errors.TransactionError
 }
 
 type ScriptProcessor interface {
@@ -47,13 +48,13 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, sth, programs)
-		vmErr, fatalErr := handleError(err)
-		if fatalErr != nil {
-			return fatalErr
+		txError, vmError := errors.SplitErrorTypes(err)
+		if vmError != nil {
+			return vmError
 		}
 
-		if vmErr != nil {
-			proc.Err = vmErr
+		if txError != nil {
+			proc.Err = txError
 			return nil
 		}
 	}

@@ -3,7 +3,6 @@ package state
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -26,19 +26,6 @@ const (
 	AccountFrozenValue    = 1
 	AccountNotFrozenValue = 0
 )
-
-var (
-	ErrAccountNotFound          = errors.New("account not found")
-	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
-)
-
-type AccountFrozenError struct {
-	Address flow.Address
-}
-
-func (e *AccountFrozenError) Error() string {
-	return fmt.Sprintf("account %s is frozen", e.Address)
-}
 
 func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
@@ -64,7 +51,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	}
 
 	if !ok {
-		return nil, ErrAccountNotFound
+		return nil, &errors.AccountNotFoundError{address}
 	}
 	contracts := make(map[string][]byte)
 	contractNames, err := a.getContractNames(address)
@@ -97,7 +84,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
 	exists, err := a.getValue(address, false, KeyExists)
 	if err != nil {
-		return false, newLedgerGetError(KeyExists, address, err)
+		return false, err
 	}
 
 	if len(exists) != 0 {
@@ -114,7 +101,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return err
 	}
 	if exists {
-		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
+		return &errors.AccountAlreadyExistsError{Address: newAddress}
 	}
 
 	storageUsedByStorageUsed := uint64(RegisterSize(newAddress, false, KeyStorageUsed, make([]byte, uint64StorageSize)))
@@ -126,7 +113,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 	// mark that this account exists
 	err = a.setValue(newAddress, false, KeyExists, []byte{1})
 	if err != nil {
-		return fmt.Errorf("failed to update the ledger: %w", err)
+		return err
 	}
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
@@ -134,11 +121,11 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
 	publicKey, err := a.getValue(address, true, keyPublicKey(keyIndex))
 	if err != nil {
-		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
+		return flow.AccountPublicKey{}, err
 	}
 
 	if len(publicKey) == 0 {
-		return flow.AccountPublicKey{}, ErrAccountPublicKeyNotFound
+		return flow.AccountPublicKey{}, &errors.AccountPublicKeyNotFoundError{address, keyIndex}
 	}
 
 	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey, keyIndex)
@@ -152,7 +139,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 	countBytes, err := a.getValue(address, true, KeyPublicKeyCount)
 	if err != nil {
-		return 0, newLedgerGetError(KeyPublicKeyCount, address, err)
+		return 0, err
 	}
 
 	countInt := new(big.Int).SetBytes(countBytes)
@@ -198,12 +185,12 @@ func (a *Accounts) SetPublicKey(
 ) (encodedPublicKey []byte, err error) {
 	err = publicKey.Validate()
 	if err != nil {
-		return nil, fmt.Errorf("invalid public key: %w", err)
+		return nil, &errors.InvalidPublicKeyValueError{Err: err}
 	}
 
 	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode public key: %w", err)
+		return nil, &errors.EncodingFailure{Err: fmt.Errorf("failed to encode public key: %w", err)}
 	}
 
 	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
@@ -275,7 +262,7 @@ func (a *Accounts) getContract(contractName string, address flow.Address) ([]byt
 		true,
 		ContractKey(contractName))
 	if err != nil {
-		return nil, newLedgerGetError(contractName, address, err)
+		return nil, err
 	}
 
 	return contract, nil
@@ -308,10 +295,6 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	}
 
 	return nil
-}
-
-func newLedgerGetError(key string, address flow.Address, err error) error {
-	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
 }
 
 func (a *Accounts) setContractNames(contractNames contractNames, address flow.Address) error {
@@ -566,7 +549,7 @@ func readUint64(input []byte) (value uint64, rest []byte, err error) {
 func (a *Accounts) GetAccountFrozen(address flow.Address) (bool, error) {
 	frozen, err := a.getValue(address, false, KeyAccountFrozen)
 	if err != nil {
-		return false, newLedgerGetError(KeyAccountFrozen, address, err)
+		return false, err
 	}
 
 	if len(frozen) == 0 {
@@ -593,7 +576,7 @@ func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
 		return fmt.Errorf("cannot check account freeze status: %w", err)
 	}
 	if frozen {
-		return &AccountFrozenError{Address: address}
+		return &errors.FrozenAccountError{Address: address}
 	}
 	return nil
 }

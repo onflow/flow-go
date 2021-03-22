@@ -1,10 +1,11 @@
 package fvm
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
@@ -22,16 +23,15 @@ func (c *TransactionSequenceNumberChecker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError error, vmError error) {
-	// TODO diff txError and vmError
-	return c.checkAndIncrementSequenceNumber(proc, ctx, sth), nil
+) (txError errors.TransactionError, vmError errors.VMError) {
+	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
 }
 
 func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proc *TransactionProcedure,
 	ctx *Context,
 	sth *state.StateHolder,
-) error {
+) (txError errors.TransactionError, vmError errors.VMError) {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
@@ -55,42 +55,51 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
-		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
-			return &InvalidProposalKeyPublicKeyDoesNotExistError{
+		txError, vmError = errors.SplitErrorTypes(err)
+		if vmError != nil {
+			return nil, vmError
+		}
+		if txError != nil {
+			return &errors.InvalidProposalSignatureError{
 				Address:  proposalKey.Address,
 				KeyIndex: proposalKey.KeyIndex,
-			}
+				Err:      err,
+			}, nil
 		}
-
-		return err
 	}
 
 	if accountKey.Revoked {
-		return &InvalidProposalKeyPublicKeyRevokedError{
+		return &errors.InvalidProposalSignatureError{
 			Address:  proposalKey.Address,
 			KeyIndex: proposalKey.KeyIndex,
-		}
+			Err:      fmt.Errorf("proposal key has been revoked"),
+		}, nil
 	}
 
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return &InvalidProposalKeySequenceNumberError{
+		return &errors.ProposalSeqNumberMismatchError{
 			Address:           proposalKey.Address,
 			KeyIndex:          proposalKey.KeyIndex,
 			CurrentSeqNumber:  accountKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}
+		}, nil
 	}
 
 	accountKey.SeqNumber++
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
-		// drop the changes
-		childState.View().DropDelta()
-		return err
+		txError, vmError = errors.SplitErrorTypes(err)
+		if vmError != nil {
+			return nil, vmError
+		}
+		if txError != nil {
+			// drop the changes
+			childState.View().DropDelta()
+			return txError, nil
+		}
 	}
-
-	return nil
+	return nil, nil
 }

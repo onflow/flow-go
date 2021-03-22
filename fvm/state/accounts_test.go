@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
@@ -77,7 +78,7 @@ func TestAccounts_GetPublicKey(t *testing.T) {
 			require.NoError(t, err)
 
 			_, err = accounts.GetPublicKey(address, 0)
-			require.Equal(t, state.ErrAccountPublicKeyNotFound, err)
+			require.True(t, errors.Is(err, &errors.AccountPublicKeyNotFoundError{}))
 		}
 	})
 }

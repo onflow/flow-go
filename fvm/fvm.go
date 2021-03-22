@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
+	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -43,7 +44,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			// Return an error for now, which will cause transactions to revert.
 			//
 			if encodingErr, ok := r.(interpreter.EncodingUnsupportedValueError); ok {
-				err = &EncodingUnsupportedValueError{
+				err = &errors.EncodingUnsupportedValueError{
 					Path:  encodingErr.Path,
 					Value: encodingErr.Value,
 				}
@@ -82,8 +83,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (txError error, vmError error) {
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (txError errors.TransactionError, vmError errors.VMError) {
 	invocator := NewTransactionInvocator(zerolog.Nop())
-	txError, vmError = invocator.Process(vm, &ctx, tx, sth, programs)
-	return
+	return invocator.Process(vm, &ctx, tx, sth, programs)
 }

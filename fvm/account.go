@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -24,10 +23,6 @@ func getAccount(
 
 	account, err := accounts.Get(address)
 	if err != nil {
-		if errors.Is(err, state.ErrAccountNotFound) {
-			return nil, ErrAccountNotFound
-		}
-
 		return nil, err
 	}
 

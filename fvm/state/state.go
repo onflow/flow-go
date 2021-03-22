@@ -3,6 +3,7 @@ package state
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -96,7 +97,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 
 	value, err := s.view.Get(owner, controller, key)
 	if err != nil {
-		return nil, err
+		return nil, newLedgerGetError(key, owner, err)
 	}
 
 	// if not part of recent updates count them as read
@@ -116,7 +117,7 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	}
 
 	if err := s.view.Set(owner, controller, key, value); err != nil {
-		return err
+		return newLedgerSetError(key, owner, err)
 	}
 
 	if err := s.checkMaxInteraction(); err != nil {
@@ -164,7 +165,7 @@ func (s *State) MergeState(other *State) error {
 
 	err := s.view.MergeView(other.view)
 	if err != nil {
-		return fmt.Errorf("can not merge the state: %w", err)
+		return &errors.StateMergeFailure{Err: err}
 	}
 
 	// apply address updates
@@ -197,7 +198,7 @@ func (s *State) UpdatedAddresses() []flow.Address {
 
 func (s *State) checkMaxInteraction() error {
 	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return &StateInteractionLimitExceededError{
+		return &errors.StateInteractionLimitExceededError{
 			Used:  s.InteractionUsed(),
 			Limit: s.maxInteractionAllowed}
 	}
@@ -208,14 +209,14 @@ func (s *State) checkSize(owner, controller, key string, value flow.RegisterValu
 	keySize := uint64(len(owner) + len(controller) + len(key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
-		return &StateKeySizeLimitError{Owner: owner,
+		return &errors.StateKeySizeLimitError{Owner: owner,
 			Controller: controller,
 			Key:        key,
 			Size:       keySize,
 			Limit:      s.maxKeySizeAllowed}
 	}
 	if valueSize > s.maxValueSizeAllowed {
-		return &StateValueSizeLimitError{Value: value,
+		return &errors.StateValueSizeLimitError{Value: value,
 			Size:  keySize,
 			Limit: s.maxKeySizeAllowed}
 	}
@@ -230,4 +231,14 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	}
 	address := flow.BytesToAddress(ownerBytes)
 	return address, true
+}
+
+func newLedgerGetError(address string, key string, err error) error {
+	getError := fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
+	return &errors.LedgerFailure{Err: getError}
+}
+
+func newLedgerSetError(address string, key string, err error) error {
+	setError := fmt.Errorf("failed to set key %s on account %s: %w", key, address, err)
+	return &errors.LedgerFailure{Err: setError}
 }

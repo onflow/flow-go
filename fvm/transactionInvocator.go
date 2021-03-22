@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"path"
@@ -16,6 +15,7 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -39,7 +39,7 @@ func (i *TransactionInvocator) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 
 	var span opentracing.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -66,7 +66,7 @@ func (i *TransactionInvocator) Process(
 	childState := sth.NewChild()
 	defer func() {
 		if mergeError := parentState.MergeState(childState); mergeError != nil {
-			vmError = mergeError
+			vmError = mergeError.(errors.VMError)
 			return
 		}
 		sth.SetActiveState(parentState)
@@ -141,14 +141,20 @@ func (i *TransactionInvocator) Process(
 	// applying contract changes
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
-	updatedKeys, vmError := env.Commit()
-	if vmError != nil {
-		return nil, vmError
+	updatedKeys, err := env.Commit()
+	if err != nil {
+		txError, vmError = errors.SplitErrorTypes(err)
+		if vmError != nil {
+			return nil, vmError
+		}
 	}
 
 	// check the storage limits
 	if ctx.LimitAccountStorage && txError == nil {
-		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+		txError, vmError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+		if vmError != nil {
+			return nil, vmError
+		}
 	}
 
 	if txError != nil {
@@ -215,12 +221,12 @@ func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []r
 				func(invocation interpreter.Invocation) interpreter.Value {
 					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 					if !ok {
-						panic(errors.New("first argument must be an address"))
+						panic(fmt.Errorf("first argument must be an address"))
 					}
 
 					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
 					if !ok {
-						panic(errors.New("second argument must be a boolean"))
+						panic(fmt.Errorf("second argument must be a boolean"))
 					}
 					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
 					if err != nil {
@@ -325,12 +331,12 @@ func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error, proced
 		Msg("checking failed")
 }
 
-func (i *TransactionInvocator) handleRuntimeError(err error) (txError error, vmErr error) {
+func (i *TransactionInvocator) handleRuntimeError(err error) (txError errors.TransactionError, vmErr errors.VMError) {
 	var runErr runtime.Error
 	var ok bool
 	// if not a runtime error return as vm error
 	if runErr, ok = err.(runtime.Error); !ok {
-		return nil, runErr
+		return nil, &errors.UnknownFailure{runErr}
 	}
 	innerErr := runErr.Err
 
@@ -344,18 +350,19 @@ func (i *TransactionInvocator) handleRuntimeError(err error) (txError error, vmE
 			// error handler to distinguish between fatal and non-fatal errors.
 			switch typedErr := recoveredErr.(type) {
 			// TODO change this type to Env Error types
-			case Error:
+			case errors.TransactionError:
 				// If the error is an fvm.Error, return as is
 				return typedErr, nil
 			default:
 				// All other errors are considered fatal
-				return nil, err
+				return nil, &errors.UnknownFailure{runErr}
 			}
 		}
+		// TODO revisit this
 		// if not recovered return
-		return nil, externalErr
+		return nil, &errors.UnknownFailure{externalErr}
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return &ExecutionError{Err: runErr}, nil
+	return &errors.CadenceRuntimeError{Err: runErr}, nil
 }

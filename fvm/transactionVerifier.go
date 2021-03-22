@@ -1,14 +1,22 @@
 package fvm
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
+)
+
+type signType int
+
+const (
+	payloadSignature  signType = 0
+	envelopeSignature signType = 1
 )
 
 type TransactionSignatureVerifier struct {
@@ -29,7 +37,7 @@ func (v *TransactionSignatureVerifier) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 	return v.verifyTransactionSignatures(proc, *ctx, sth)
 }
 
@@ -37,7 +45,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	proc *TransactionProcedure,
 	ctx Context,
 	sth *state.StateHolder,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 	// TODO diff vmErrors
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMVerifyTransaction)
@@ -50,39 +58,44 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx := proc.Transaction
 	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
-		return &MissingPayerError{}, nil
+		return &errors.InvalidAddressError{tx.Payer, fmt.Errorf("payer address is invalid")}, nil
 	}
 
+	var txErr errors.TransactionError
+	var vmErr errors.VMError
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool
 
-	payloadWeights, proposalKeyVerifiedInPayload, err := v.aggregateAccountSignatures(
+	payloadWeights, proposalKeyVerifiedInPayload, txErr, vmErr = v.aggregateAccountSignatures(
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
 		tx.ProposalKey,
+		payloadSignature,
 	)
-	if err != nil {
-		return err, nil
+	// any error return
+	if txErr != nil || vmErr != nil {
+		return txErr, vmErr
 	}
 
 	var envelopeWeights map[flow.Address]int
 	var proposalKeyVerifiedInEnvelope bool
 
-	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.aggregateAccountSignatures(
+	envelopeWeights, proposalKeyVerifiedInEnvelope, txErr, vmErr = v.aggregateAccountSignatures(
 		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
 		tx.ProposalKey,
+		envelopeSignature,
 	)
-	if err != nil {
-		return err, nil
+	// any error return
+	if txErr != nil || vmErr != nil {
+		return txErr, vmErr
 	}
 
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
-
 	if !proposalKeyVerified {
-		return &InvalidProposalKeyMissingSignatureError{
+		return &errors.InvalidProposalSignatureError{
 			Address:  tx.ProposalKey.Address,
 			KeyIndex: tx.ProposalKey.KeyIndex,
 		}, nil
@@ -97,12 +110,13 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		}
 
 		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
-			return &MissingSignatureError{addr}, nil
+			return &errors.AuthorizationError{Address: addr, SignedWeight: uint32(payloadWeights[addr])}, nil
 		}
 	}
 
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
-		return &MissingSignatureError{tx.Payer}, nil
+		// TODO change this to payer error (needed for fees)
+		return &errors.AuthorizationError{Address: tx.Payer, SignedWeight: uint32(envelopeWeights[tx.Payer])}, nil
 	}
 
 	return nil, nil
@@ -113,19 +127,21 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
+	sType signType,
 ) (
 	weights map[flow.Address]int,
 	proposalKeyVerified bool,
-	err error,
+	txErr errors.TransactionError,
+	vmErr errors.VMError,
 ) {
 	weights = make(map[flow.Address]int)
 
+	var accountKey *flow.AccountPublicKey
 	for _, txSig := range signatures {
-		accountKey, err := v.verifyAccountSignature(accounts, txSig, message)
-		if err != nil {
-			return nil, false, err
+		accountKey, txErr, vmErr = v.verifyAccountSignature(accounts, txSig, message, sType)
+		if txErr != nil || vmErr != nil {
+			return nil, false, txErr, vmErr
 		}
-
 		if v.sigIsForProposalKey(txSig, proposalKey) {
 			proposalKeyVerified = true
 		}
@@ -147,24 +163,47 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	accounts *state.Accounts,
 	txSig flow.TransactionSignature,
 	message []byte,
-) (*flow.AccountPublicKey, error) {
+	sType signType,
+) (*flow.AccountPublicKey, errors.TransactionError, errors.VMError) {
 	accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
 	if err != nil {
-		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
-			return nil, &InvalidSignaturePublicKeyDoesNotExistError{
-				Address:  txSig.Address,
-				KeyIndex: txSig.KeyIndex,
-			}
+		txError, vmError := errors.SplitErrorTypes(err)
+		if vmError != nil {
+			return nil, nil, vmError
 		}
-
-		return nil, err
+		if txError != nil {
+			if sType == envelopeSignature {
+				return nil,
+					&errors.InvalidEnvelopeSignatureError{
+						Address:  txSig.Address,
+						KeyIndex: txSig.KeyIndex,
+						Err:      err,
+					}, nil
+			}
+			return nil,
+				&errors.InvalidPayloadSignatureError{
+					Address:  txSig.Address,
+					KeyIndex: txSig.KeyIndex,
+					Err:      err,
+				}, nil
+		}
 	}
 
 	if accountKey.Revoked {
-		return nil, &InvalidSignaturePublicKeyRevokedError{
+		if sType == envelopeSignature {
+			return nil,
+				&errors.InvalidEnvelopeSignatureError{
+					Address:  txSig.Address,
+					KeyIndex: txSig.KeyIndex,
+					Err:      fmt.Errorf("account key has been revoked"),
+				}, nil
+		}
+
+		return nil, &errors.InvalidPayloadSignatureError{
 			Address:  txSig.Address,
 			KeyIndex: txSig.KeyIndex,
-		}
+			Err:      fmt.Errorf("account key has been revoked"),
+		}, nil
 	}
 
 	valid, err := v.SignatureVerifier.Verify(
@@ -175,25 +214,47 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		accountKey.HashAlgo,
 	)
 	if err != nil {
-		if errors.Is(err, ErrInvalidHashAlgorithm) {
-			return nil, &InvalidHashAlgorithmError{
-				Address:  txSig.Address,
-				KeyIndex: txSig.KeyIndex,
-				HashAlgo: accountKey.HashAlgo,
-			}
+		txError, vmError := errors.SplitErrorTypes(err)
+		if vmError != nil {
+			return nil, nil, vmError
 		}
-
-		return nil, err
+		if txError != nil {
+			if sType == envelopeSignature {
+				return nil,
+					&errors.InvalidEnvelopeSignatureError{
+						Address:  txSig.Address,
+						KeyIndex: txSig.KeyIndex,
+						Err:      txError,
+					}, nil
+			}
+			return nil,
+				&errors.InvalidPayloadSignatureError{
+					Address:  txSig.Address,
+					KeyIndex: txSig.KeyIndex,
+					Err:      txError,
+				}, nil
+		}
 	}
 
 	if !valid {
-		return nil, &InvalidSignatureVerificationError{
-			Address:  txSig.Address,
-			KeyIndex: txSig.KeyIndex,
+		if sType == envelopeSignature {
+			return nil,
+				&errors.InvalidEnvelopeSignatureError{
+					Address:  txSig.Address,
+					KeyIndex: txSig.KeyIndex,
+					Err:      fmt.Errorf("signature is not valid"),
+				}, nil
 		}
+		return nil,
+			&errors.InvalidPayloadSignatureError{
+				Address:  txSig.Address,
+				KeyIndex: txSig.KeyIndex,
+				Err:      fmt.Errorf("signature is not valid"),
+			}, nil
+
 	}
 
-	return &accountKey, nil
+	return &accountKey, nil, nil
 }
 
 func (v *TransactionSignatureVerifier) hasSufficientKeyWeight(

@@ -3,7 +3,6 @@ package fvm
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
+	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -395,7 +395,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	}
 
 	if e.transactionEnv == nil {
-		return errors.New("emitting events is not supported")
+		return &errors.OperationNotSupportedError{"emitting events"}
 	}
 
 	payload, err := jsoncdc.Encode(event)
@@ -408,7 +408,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	// skip limit if payer is service account
 	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
 		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
-			return &EventLimitExceededError{
+			return &errors.EventLimitExceededError{
 				TotalByteSize: e.totalEventByteSize,
 				Limit:         e.ctx.EventCollectionByteSizeLimit,
 			}
@@ -562,7 +562,7 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	}
 
 	if e.ctx.BlockHeader == nil {
-		return 0, errors.New("getting the current block height is not supported")
+		return 0, &errors.OperationNotSupportedError{"getting the current block height"}
 	}
 	return e.ctx.BlockHeader.Height, nil
 }
@@ -576,7 +576,7 @@ func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	}
 
 	if e.rng == nil {
-		return 0, errors.New("unsafe random is not supported")
+		return 0, &errors.OperationNotSupportedError{"unsafe random"}
 	}
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
@@ -600,7 +600,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	}
 
 	if e.ctx.Blocks == nil {
-		return runtime.Block{}, false, errors.New("getting block information is not supported")
+		return runtime.Block{}, false, &errors.OperationNotSupportedError{"getting block information"}
 	}
 
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
@@ -629,7 +629,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 	}
 
 	if e.transactionEnv == nil {
-		return runtime.Address{}, errors.New("creating accounts is not supported")
+		return runtime.Address{}, &errors.OperationNotSupportedError{"creating accounts"}
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -643,7 +643,7 @@ func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte
 	}
 
 	if e.transactionEnv == nil {
-		return errors.New("adding account keys is not supported")
+		return &errors.OperationNotSupportedError{"adding account keys"}
 	}
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -662,7 +662,7 @@ func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (p
 	}
 
 	if e.transactionEnv == nil {
-		return nil, errors.New("removing account keys is not supported")
+		return nil, &errors.OperationNotSupportedError{"removing account keys"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -687,7 +687,7 @@ func (e *hostEnv) AddAccountKey(
 	}
 
 	if e.transactionEnv == nil {
-		return nil, errors.New("adding account keys is not supported")
+		return nil, &errors.OperationNotSupportedError{"adding account keys"}
 	}
 
 	return e.transactionEnv.AddAccountKey(address, publicKey, hashAlgo, weight)
@@ -700,7 +700,7 @@ func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.Ac
 	}
 
 	if e.transactionEnv == nil {
-		return nil, errors.New("getting account keys is not supported")
+		return nil, &errors.OperationNotSupportedError{"getting account keys"}
 	}
 
 	return e.transactionEnv.GetAccountKey(address, index)
@@ -713,7 +713,7 @@ func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime
 	}
 
 	if e.transactionEnv == nil {
-		return nil, errors.New("revoking account keys is not supported")
+		return nil, &errors.OperationNotSupportedError{"revoking account keys"}
 	}
 
 	return e.transactionEnv.RevokeAccountKey(address, index)
@@ -726,7 +726,7 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return errors.New("updating account contract code is not supported")
+		return &errors.OperationNotSupportedError{"updating account contract code"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -757,7 +757,7 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return errors.New("removing account contracts is not supported")
+		return &errors.OperationNotSupportedError{"removing account contracts"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -775,7 +775,7 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 		defer sp.Finish()
 	}
 	if e.transactionEnv == nil {
-		return nil, errors.New("getting signer accounts is not supported")
+		return nil, &errors.OperationNotSupportedError{"getting signer accounts"}
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
@@ -1150,7 +1150,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
 		// distinguish between a 'key not found error' vs other internal errors.
 
-		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
+		if errors.Is(err, &errors.AccountPublicKeyNotFoundError{}) {
 			return nil, nil
 		}
 
@@ -1229,7 +1229,7 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 		// If a key is not found at a given index, then return a nil key with no errors.
 		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
 		// distinguish between a 'key not found error' vs other internal errors.
-		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
+		if errors.Is(err, &errors.AccountPublicKeyNotFoundError{}) {
 			return nil, nil
 		}
 

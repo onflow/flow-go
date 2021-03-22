@@ -1,8 +1,7 @@
 package fvm
 
 import (
-	"fmt"
-
+	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,34 +19,31 @@ func (c *TransactionAccountFrozenChecker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	_ *programs.Programs,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 	return c.checkAccountNotFrozen(proc.Transaction, sth)
 }
 
 func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 	tx *flow.TransactionBody,
 	sth *state.StateHolder,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 	accounts := state.NewAccounts(sth)
 
 	for _, authorizer := range tx.Authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)
 		if err != nil {
-			// TODO diff between txError and vmError
-			return fmt.Errorf("check account not frozen authorizer: %w", err), nil
+			return errors.SplitErrorTypes(err)
 		}
 	}
 
 	err := accounts.CheckAccountNotFrozen(tx.ProposalKey.Address)
 	if err != nil {
-		// TODO diff between txError and vmError
-		return fmt.Errorf("check account not frozen proposal: %w", err), nil
+		return errors.SplitErrorTypes(err)
 	}
 
 	err = accounts.CheckAccountNotFrozen(tx.Payer)
 	if err != nil {
-		// TODO diff between txError and vmError
-		return fmt.Errorf("check account not frozen payer: %w", err), nil
+		return errors.SplitErrorTypes(err)
 	}
 
 	return nil, nil
@@ -65,7 +61,7 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	proc *TransactionProcedure,
 	_ *state.StateHolder,
 	_ *programs.Programs,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 
 	serviceAddress := ctx.Chain.ServiceAddress()
 

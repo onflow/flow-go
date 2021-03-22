@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,7 +19,7 @@ func (d *TransactionFeeDeductor) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 	return d.deductFees(vm, ctx, proc.Transaction, sth, programs)
 }
 
@@ -28,7 +29,7 @@ func (d *TransactionFeeDeductor) deductFees(
 	tx *flow.TransactionBody,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError error, vmError error) {
+) (txError errors.TransactionError, vmError errors.VMError) {
 	return vm.invokeMetaTransaction(
 		*ctx,
 		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),

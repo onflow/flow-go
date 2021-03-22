@@ -1,322 +1,309 @@
 package fvm
 
-import (
-	"errors"
-	"fmt"
-	"strings"
+// const (
+// 	errCodeMissingSignature                      = 1
+// 	errCodeMissingPayer                          = 2
+// 	errCodeInvalidSignaturePublicKeyDoesNotExist = 3
+// 	errCodeInvalidSignaturePublicKeyRevoked      = 4
+// 	errCodeInvalidSignatureVerification          = 5
 
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
+// 	errCodeInvalidProposalKeyPublicKeyDoesNotExist = 6
+// 	errCodeInvalidProposalKeyPublicKeyRevoked      = 7
+// 	errCodeInvalidProposalKeySequenceNumber        = 8
+// 	errCodeInvalidProposalKeyMissingSignature      = 9
 
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/flow"
-)
+// 	errCodeInvalidHashAlgorithm = 10
 
-const (
-	errCodeMissingSignature                      = 1
-	errCodeMissingPayer                          = 2
-	errCodeInvalidSignaturePublicKeyDoesNotExist = 3
-	errCodeInvalidSignaturePublicKeyRevoked      = 4
-	errCodeInvalidSignatureVerification          = 5
+// 	errCodeStorageCapacityExceeded = 11
 
-	errCodeInvalidProposalKeyPublicKeyDoesNotExist = 6
-	errCodeInvalidProposalKeyPublicKeyRevoked      = 7
-	errCodeInvalidProposalKeySequenceNumber        = 8
-	errCodeInvalidProposalKeyMissingSignature      = 9
+// 	errCodeEventLimitExceededError = 20
 
-	errCodeInvalidHashAlgorithm = 10
+// 	errCodeEncodingUnsupportedValue = 30
 
-	errCodeStorageCapacityExceeded = 11
+// 	errCodeExecution = 100
+// )
 
-	errCodeEventLimitExceededError = 20
+// var ErrInvalidHashAlgorithm = errors.New("invalid hash algorithm")
 
-	errCodeEncodingUnsupportedValue = 30
+// // An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
+// //
+// // VM errors are distinct from fatal errors, which indicate an unexpected failure
+// // in the VM (i.e. storage, stack overflow).
+// //
+// // Each VM error is identified by a unique error code that is returned to the user.
+// type Error interface {
+// 	Code() uint32
+// 	Error() string
+// }
 
-	errCodeExecution = 100
-)
+// // A MissingSignatureError indicates that a transaction is missing a required signature.
+// type MissingSignatureError struct {
+// 	Address flow.Address
+// }
 
-var ErrAccountNotFound = errors.New("account not found")
-var ErrInvalidHashAlgorithm = errors.New("invalid hash algorithm")
+// func (e *MissingSignatureError) Error() string {
+// 	return fmt.Sprintf("account %s does not have sufficient signatures", e.Address)
+// }
 
-// An Error represents a non-fatal error that is expected during normal operation of the virtual machine.
-//
-// VM errors are distinct from fatal errors, which indicate an unexpected failure
-// in the VM (i.e. storage, stack overflow).
-//
-// Each VM error is identified by a unique error code that is returned to the user.
-type Error interface {
-	Code() uint32
-	Error() string
-}
+// func (e *MissingSignatureError) Code() uint32 {
+// 	return errCodeMissingSignature
+// }
 
-// A MissingSignatureError indicates that a transaction is missing a required signature.
-type MissingSignatureError struct {
-	Address flow.Address
-}
+// // A MissingPayerError indicates that a transaction is missing a payer.
+// type MissingPayerError struct{}
 
-func (e *MissingSignatureError) Error() string {
-	return fmt.Sprintf("account %s does not have sufficient signatures", e.Address)
-}
+// func (e *MissingPayerError) Error() string {
+// 	return "no payer address provided"
+// }
 
-func (e *MissingSignatureError) Code() uint32 {
-	return errCodeMissingSignature
-}
+// func (e *MissingPayerError) Code() uint32 {
+// 	return errCodeMissingPayer
+// }
 
-// A MissingPayerError indicates that a transaction is missing a payer.
-type MissingPayerError struct{}
+// // An InvalidSignaturePublicKeyDoesNotExistError indicates that a signature specifies a public key that
+// // does not exist.
+// type InvalidSignaturePublicKeyDoesNotExistError struct {
+// 	Address  flow.Address
+// 	KeyIndex uint64
+// }
 
-func (e *MissingPayerError) Error() string {
-	return "no payer address provided"
-}
+// func (e *InvalidSignaturePublicKeyDoesNotExistError) Error() string {
+// 	return fmt.Sprintf(
+// 		"invalid signature: public key with index %d does not exist on account %s",
+// 		e.KeyIndex,
+// 		e.Address,
+// 	)
+// }
 
-func (e *MissingPayerError) Code() uint32 {
-	return errCodeMissingPayer
-}
+// func (e *InvalidSignaturePublicKeyDoesNotExistError) Code() uint32 {
+// 	return errCodeInvalidSignaturePublicKeyDoesNotExist
+// }
 
-// An InvalidSignaturePublicKeyDoesNotExistError indicates that a signature specifies a public key that
-// does not exist.
-type InvalidSignaturePublicKeyDoesNotExistError struct {
-	Address  flow.Address
-	KeyIndex uint64
-}
+// // An InvalidSignaturePublicKeyRevokedError indicates that a signature specifies a public key that has been revoked.
+// type InvalidSignaturePublicKeyRevokedError struct {
+// 	Address  flow.Address
+// 	KeyIndex uint64
+// }
 
-func (e *InvalidSignaturePublicKeyDoesNotExistError) Error() string {
-	return fmt.Sprintf(
-		"invalid signature: public key with index %d does not exist on account %s",
-		e.KeyIndex,
-		e.Address,
-	)
-}
+// func (e *InvalidSignaturePublicKeyRevokedError) Error() string {
+// 	return fmt.Sprintf(
+// 		"invalid signature: public key with index %d on account %s has been revoked",
+// 		e.KeyIndex,
+// 		e.Address,
+// 	)
+// }
 
-func (e *InvalidSignaturePublicKeyDoesNotExistError) Code() uint32 {
-	return errCodeInvalidSignaturePublicKeyDoesNotExist
-}
+// func (e *InvalidSignaturePublicKeyRevokedError) Code() uint32 {
+// 	return errCodeInvalidSignaturePublicKeyRevoked
+// }
 
-// An InvalidSignaturePublicKeyRevokedError indicates that a signature specifies a public key that has been revoked.
-type InvalidSignaturePublicKeyRevokedError struct {
-	Address  flow.Address
-	KeyIndex uint64
-}
+// // An InvalidSignatureVerificationError indicates that a signature could not be verified using its specified
+// // public key.
+// type InvalidSignatureVerificationError struct {
+// 	Address  flow.Address
+// 	KeyIndex uint64
+// }
 
-func (e *InvalidSignaturePublicKeyRevokedError) Error() string {
-	return fmt.Sprintf(
-		"invalid signature: public key with index %d on account %s has been revoked",
-		e.KeyIndex,
-		e.Address,
-	)
-}
+// func (e *InvalidSignatureVerificationError) Error() string {
+// 	return fmt.Sprintf(
+// 		"invalid signature: signature could not be verified using public key with index %d on account %s",
+// 		e.KeyIndex,
+// 		e.Address,
+// 	)
+// }
 
-func (e *InvalidSignaturePublicKeyRevokedError) Code() uint32 {
-	return errCodeInvalidSignaturePublicKeyRevoked
-}
+// func (e *InvalidSignatureVerificationError) Code() uint32 {
+// 	return errCodeInvalidSignatureVerification
+// }
 
-// An InvalidSignatureVerificationError indicates that a signature could not be verified using its specified
-// public key.
-type InvalidSignatureVerificationError struct {
-	Address  flow.Address
-	KeyIndex uint64
-}
+// // A InvalidProposalKeyPublicKeyDoesNotExistError indicates that proposal key specifies a nonexistent public key.
+// type InvalidProposalKeyPublicKeyDoesNotExistError struct {
+// 	Address  flow.Address
+// 	KeyIndex uint64
+// }
 
-func (e *InvalidSignatureVerificationError) Error() string {
-	return fmt.Sprintf(
-		"invalid signature: signature could not be verified using public key with index %d on account %s",
-		e.KeyIndex,
-		e.Address,
-	)
-}
+// func (e *InvalidProposalKeyPublicKeyDoesNotExistError) Error() string {
+// 	return fmt.Sprintf(
+// 		"invalid proposal key: public key with index %d does not exist on account %s",
+// 		e.KeyIndex,
+// 		e.Address,
+// 	)
+// }
 
-func (e *InvalidSignatureVerificationError) Code() uint32 {
-	return errCodeInvalidSignatureVerification
-}
+// func (e *InvalidProposalKeyPublicKeyDoesNotExistError) Code() uint32 {
+// 	return errCodeInvalidProposalKeyPublicKeyDoesNotExist
+// }
 
-// A InvalidProposalKeyPublicKeyDoesNotExistError indicates that proposal key specifies a nonexistent public key.
-type InvalidProposalKeyPublicKeyDoesNotExistError struct {
-	Address  flow.Address
-	KeyIndex uint64
-}
+// // An InvalidProposalKeyPublicKeyRevokedError indicates that proposal key sequence number does not match the on-chain value.
+// type InvalidProposalKeyPublicKeyRevokedError struct {
+// 	Address  flow.Address
+// 	KeyIndex uint64
+// }
 
-func (e *InvalidProposalKeyPublicKeyDoesNotExistError) Error() string {
-	return fmt.Sprintf(
-		"invalid proposal key: public key with index %d does not exist on account %s",
-		e.KeyIndex,
-		e.Address,
-	)
-}
+// func (e *InvalidProposalKeyPublicKeyRevokedError) Error() string {
+// 	return fmt.Sprintf(
+// 		"invalid proposal key: public key with index %d on account %s has been revoked",
+// 		e.KeyIndex,
+// 		e.Address,
+// 	)
+// }
 
-func (e *InvalidProposalKeyPublicKeyDoesNotExistError) Code() uint32 {
-	return errCodeInvalidProposalKeyPublicKeyDoesNotExist
-}
+// func (e *InvalidProposalKeyPublicKeyRevokedError) Code() uint32 {
+// 	return errCodeInvalidProposalKeyPublicKeyRevoked
+// }
 
-// An InvalidProposalKeyPublicKeyRevokedError indicates that proposal key sequence number does not match the on-chain value.
-type InvalidProposalKeyPublicKeyRevokedError struct {
-	Address  flow.Address
-	KeyIndex uint64
-}
+// // An InvalidProposalKeySequenceNumberError indicates that proposal key sequence number does not match the on-chain value.
+// type InvalidProposalKeySequenceNumberError struct {
+// 	Address           flow.Address
+// 	KeyIndex          uint64
+// 	CurrentSeqNumber  uint64
+// 	ProvidedSeqNumber uint64
+// }
 
-func (e *InvalidProposalKeyPublicKeyRevokedError) Error() string {
-	return fmt.Sprintf(
-		"invalid proposal key: public key with index %d on account %s has been revoked",
-		e.KeyIndex,
-		e.Address,
-	)
-}
+// func (e *InvalidProposalKeySequenceNumberError) Error() string {
+// 	return fmt.Sprintf(
+// 		"invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
+// 		e.KeyIndex,
+// 		e.Address,
+// 		e.CurrentSeqNumber,
+// 		e.ProvidedSeqNumber,
+// 	)
+// }
 
-func (e *InvalidProposalKeyPublicKeyRevokedError) Code() uint32 {
-	return errCodeInvalidProposalKeyPublicKeyRevoked
-}
+// func (e *InvalidProposalKeySequenceNumberError) Code() uint32 {
+// 	return errCodeInvalidProposalKeySequenceNumber
+// }
 
-// An InvalidProposalKeySequenceNumberError indicates that proposal key sequence number does not match the on-chain value.
-type InvalidProposalKeySequenceNumberError struct {
-	Address           flow.Address
-	KeyIndex          uint64
-	CurrentSeqNumber  uint64
-	ProvidedSeqNumber uint64
-}
+// // A InvalidProposalKeyMissingSignatureError indicates that a proposal key does not have a valid signature.
+// type InvalidProposalKeyMissingSignatureError struct {
+// 	Address  flow.Address
+// 	KeyIndex uint64
+// }
 
-func (e *InvalidProposalKeySequenceNumberError) Error() string {
-	return fmt.Sprintf(
-		"invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
-		e.KeyIndex,
-		e.Address,
-		e.CurrentSeqNumber,
-		e.ProvidedSeqNumber,
-	)
-}
+// func (e *InvalidProposalKeyMissingSignatureError) Error() string {
+// 	return fmt.Sprintf(
+// 		"invalid proposal key: public key %d on account %s does not have a valid signature",
+// 		e.KeyIndex,
+// 		e.Address,
+// 	)
+// }
 
-func (e *InvalidProposalKeySequenceNumberError) Code() uint32 {
-	return errCodeInvalidProposalKeySequenceNumber
-}
+// func (e *InvalidProposalKeyMissingSignatureError) Code() uint32 {
+// 	return errCodeInvalidProposalKeyMissingSignature
+// }
 
-// A InvalidProposalKeyMissingSignatureError indicates that a proposal key does not have a valid signature.
-type InvalidProposalKeyMissingSignatureError struct {
-	Address  flow.Address
-	KeyIndex uint64
-}
+// // EventLimitExceededError indicates that the transaction has produced events with size more than limit.
+// type EventLimitExceededError struct {
+// 	TotalByteSize uint64
+// 	Limit         uint64
+// }
 
-func (e *InvalidProposalKeyMissingSignatureError) Error() string {
-	return fmt.Sprintf(
-		"invalid proposal key: public key %d on account %s does not have a valid signature",
-		e.KeyIndex,
-		e.Address,
-	)
-}
+// func (e *EventLimitExceededError) Error() string {
+// 	return fmt.Sprintf(
+// 		"total event byte size (%d) exceeds limit (%d)",
+// 		e.TotalByteSize,
+// 		e.Limit,
+// 	)
+// }
 
-func (e *InvalidProposalKeyMissingSignatureError) Code() uint32 {
-	return errCodeInvalidProposalKeyMissingSignature
-}
+// // Code returns the error code for this error
+// func (e *EventLimitExceededError) Code() uint32 {
+// 	return errCodeEventLimitExceededError
+// }
 
-// EventLimitExceededError indicates that the transaction has produced events with size more than limit.
-type EventLimitExceededError struct {
-	TotalByteSize uint64
-	Limit         uint64
-}
+// // An InvalidHashAlgorithmError indicates that a given key has an invalid hash algorithm.
+// type InvalidHashAlgorithmError struct {
+// 	Address  flow.Address
+// 	KeyIndex uint64
+// 	HashAlgo hash.HashingAlgorithm
+// }
 
-func (e *EventLimitExceededError) Error() string {
-	return fmt.Sprintf(
-		"total event byte size (%d) exceeds limit (%d)",
-		e.TotalByteSize,
-		e.Limit,
-	)
-}
+// func (e *InvalidHashAlgorithmError) Error() string {
+// 	return fmt.Sprintf("invalid hash algorithm %d for key %d on account %s", e.HashAlgo, e.KeyIndex, e.Address)
+// }
 
-// Code returns the error code for this error
-func (e *EventLimitExceededError) Code() uint32 {
-	return errCodeEventLimitExceededError
-}
+// func (e *InvalidHashAlgorithmError) Code() uint32 {
+// 	return errCodeInvalidHashAlgorithm
+// }
 
-// An InvalidHashAlgorithmError indicates that a given key has an invalid hash algorithm.
-type InvalidHashAlgorithmError struct {
-	Address  flow.Address
-	KeyIndex uint64
-	HashAlgo hash.HashingAlgorithm
-}
+// // An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
+// type StorageCapacityExceededError struct {
+// 	Address         flow.Address
+// 	StorageUsed     uint64
+// 	StorageCapacity uint64
+// }
 
-func (e *InvalidHashAlgorithmError) Error() string {
-	return fmt.Sprintf("invalid hash algorithm %d for key %d on account %s", e.HashAlgo, e.KeyIndex, e.Address)
-}
+// func (e *StorageCapacityExceededError) Error() string {
+// 	return fmt.Sprintf("address %s storage %d is over capacity %d", e.Address, e.StorageUsed, e.StorageCapacity)
+// }
 
-func (e *InvalidHashAlgorithmError) Code() uint32 {
-	return errCodeInvalidHashAlgorithm
-}
+// func (e *StorageCapacityExceededError) Code() uint32 {
+// 	return errCodeStorageCapacityExceeded
+// }
 
-// An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
-type StorageCapacityExceededError struct {
-	Address         flow.Address
-	StorageUsed     uint64
-	StorageCapacity uint64
-}
+// type ExecutionError struct {
+// 	Err runtime.Error
+// }
 
-func (e *StorageCapacityExceededError) Error() string {
-	return fmt.Sprintf("address %s storage %d is over capacity %d", e.Address, e.StorageUsed, e.StorageCapacity)
-}
+// func (e *ExecutionError) Error() string {
+// 	return e.Err.Error()
+// }
 
-func (e *StorageCapacityExceededError) Code() uint32 {
-	return errCodeStorageCapacityExceeded
-}
+// func (e *ExecutionError) Code() uint32 {
+// 	return errCodeExecution
+// }
 
-type ExecutionError struct {
-	Err runtime.Error
-}
+// // EncodingUnsupportedValueError indicates that Cadence attempted
+// // to encode a value that is not supported.
+// type EncodingUnsupportedValueError struct {
+// 	Value interpreter.Value
+// 	Path  []string
+// }
 
-func (e *ExecutionError) Error() string {
-	return e.Err.Error()
-}
+// func (e *EncodingUnsupportedValueError) Error() string {
+// 	return fmt.Sprintf(
+// 		"encoding unsupported value to path [%s]: %[1]T, %[1]v",
+// 		strings.Join(e.Path, ","),
+// 		e.Value,
+// 	)
+// }
 
-func (e *ExecutionError) Code() uint32 {
-	return errCodeExecution
-}
+// func (e *EncodingUnsupportedValueError) Code() uint32 {
+// 	return errCodeEncodingUnsupportedValue
+// }
 
-// EncodingUnsupportedValueError indicates that Cadence attempted
-// to encode a value that is not supported.
-type EncodingUnsupportedValueError struct {
-	Value interpreter.Value
-	Path  []string
-}
+// func handleError(err error) (vmErr Error, fatalErr error) {
+// 	switch typedErr := err.(type) {
+// 	case runtime.Error:
+// 		// If the error originated from the runtime, handle separately
+// 		return handleRuntimeError(typedErr)
+// 	case Error:
+// 		// If the error is an fvm.Error, return as is
+// 		return typedErr, nil
+// 	default:
+// 		// All other errors are considered fatal
+// 		return nil, err
+// 	}
+// }
 
-func (e *EncodingUnsupportedValueError) Error() string {
-	return fmt.Sprintf(
-		"encoding unsupported value to path [%s]: %[1]T, %[1]v",
-		strings.Join(e.Path, ","),
-		e.Value,
-	)
-}
+// func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
+// 	innerErr := err.Err
 
-func (e *EncodingUnsupportedValueError) Code() uint32 {
-	return errCodeEncodingUnsupportedValue
-}
+// 	// External errors are reported by the runtime but originate from the VM.
+// 	//
+// 	// External errors may be fatal or non-fatal, so additional handling
+// 	// is required.
+// 	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
+// 		if recoveredErr, ok := externalErr.Recovered.(error); ok {
+// 			// If the recovered value is an error, pass it to the original
+// 			// error handler to distinguish between fatal and non-fatal errors.
+// 			return handleError(recoveredErr)
+// 		}
 
-func handleError(err error) (vmErr Error, fatalErr error) {
-	switch typedErr := err.(type) {
-	case runtime.Error:
-		// If the error originated from the runtime, handle separately
-		return handleRuntimeError(typedErr)
-	case Error:
-		// If the error is an fvm.Error, return as is
-		return typedErr, nil
-	default:
-		// All other errors are considered fatal
-		return nil, err
-	}
-}
+// 		// If the recovered value is not an error, bubble up the panic.
+// 		panic(externalErr.Recovered)
+// 	}
 
-func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
-	innerErr := err.Err
-
-	// External errors are reported by the runtime but originate from the VM.
-	//
-	// External errors may be fatal or non-fatal, so additional handling
-	// is required.
-	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
-		if recoveredErr, ok := externalErr.Recovered.(error); ok {
-			// If the recovered value is an error, pass it to the original
-			// error handler to distinguish between fatal and non-fatal errors.
-			return handleError(recoveredErr)
-		}
-
-		// If the recovered value is not an error, bubble up the panic.
-		panic(externalErr.Recovered)
-	}
-
-	// All other errors are non-fatal Cadence errors.
-	return &ExecutionError{Err: err}, nil
-}
+// 	// All other errors are non-fatal Cadence errors.
+// 	return &ExecutionError{Err: err}, nil
+// }

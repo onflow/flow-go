@@ -3,6 +3,7 @@ package fvm
 import (
 	"github.com/opentracing/opentracing-go"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +18,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) (txError error, vmError error)
+	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) (txError errors.TransactionError, vmError errors.VMError)
 }
 
 type TransactionProcedure struct {
@@ -28,7 +29,7 @@ type TransactionProcedure struct {
 	Events        []flow.Event
 	ServiceEvents []flow.Event
 	GasUsed       uint64
-	Err           Error
+	Err           errors.TransactionError
 	Retried       int
 	TraceSpan     opentracing.Span
 }
@@ -47,7 +48,7 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 		}
 
 		if txErr != nil {
-			proc.Err = txErr.(Error)
+			proc.Err = txErr
 			// TODO we should not break here we should continue for fee deductions
 			break
 		}
