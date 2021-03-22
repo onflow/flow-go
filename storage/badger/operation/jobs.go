@@ -29,15 +29,15 @@ func InsertJobAtIndex(queue string, index int64, entity flow.Identifier) func(*b
 }
 
 // RetrieveProcessedIndex returns the processed index for a job consumer
-func RetrieveProcessedIndex(jobName string, processed *int64) func(*badger.Txn) error {
+func RetrieveProcessedIndex(jobName string, processed *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }
 
-func InsertProcessedIndex(jobName string, processed int64) func(*badger.Txn) error {
+func InsertProcessedIndex(jobName string, processed uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }
 
 // SetProcessedIndex updates the processed index for a job consumer with given index
-func SetProcessedIndex(jobName string, processed int64) func(*badger.Txn) error {
+func SetProcessedIndex(jobName string, processed uint64) func(*badger.Txn) error {
 	return update(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }
