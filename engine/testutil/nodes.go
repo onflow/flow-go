@@ -313,9 +313,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
-	eventsStorage := storage.NewEvents(node.DB)
-	serviceEventsStorage := storage.NewServiceEvents(node.DB)
-	txResultStorage := storage.NewTransactionResults(node.DB)
+	eventsStorage := storage.NewEvents(node.Metrics, node.DB)
+	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
+	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)

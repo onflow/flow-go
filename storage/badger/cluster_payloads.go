@@ -30,7 +30,7 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 		blockID := key.(flow.Identifier)
 		var payload cluster.Payload
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(procedure.RetrieveClusterPayload(blockID, &payload))
+			err := procedure.RetrieveClusterPayload(blockID, &payload)(tx)
 			return &payload, err
 		}
 	}
