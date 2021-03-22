@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
@@ -34,7 +35,7 @@ func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
 
 func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
@@ -56,6 +57,57 @@ func (i *TransactionInvocator) Process(
 	if ctx.BlockHeader != nil {
 		blockHeight = ctx.BlockHeader.Height
 	}
+	var predeclaredValues []runtime.ValueDeclaration
+
+	if ctx.AccountFreezeAvailable {
+
+		setAccountFrozen := runtime.ValueDeclaration{
+			Name: "setAccountFrozen",
+			Type: &sema.FunctionType{
+				Parameters: []*sema.Parameter{
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "account",
+						TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
+					},
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "frozen",
+						TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+					},
+				},
+				ReturnTypeAnnotation: &sema.TypeAnnotation{
+					Type: sema.VoidType,
+				},
+			},
+			Kind:           common.DeclarationKindFunction,
+			IsConstant:     true,
+			ArgumentLabels: nil,
+			Value: interpreter.NewHostFunctionValue(
+				func(invocation interpreter.Invocation) interpreter.Value {
+					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
+					if !ok {
+						panic(errors.New("first argument must be an address"))
+					}
+
+					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
+					if !ok {
+						panic(errors.New("second argument must be a boolean"))
+					}
+
+					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
+					if err != nil {
+						panic(fmt.Errorf("cannot set account frozen: %w", err))
+					}
+
+					return interpreter.VoidValue{}
+				},
+			),
+		}
+
+		predeclaredValues = append(predeclaredValues, setAccountFrozen)
+	}
+
 	retry := false
 	numberOfRetries := 0
 	parentState := sth.State()
@@ -91,7 +143,7 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		env, err = newEnvironment(ctx, vm, sth, programs)
+		env, err = newEnvironment(*ctx, vm, sth, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
@@ -107,8 +159,9 @@ func (i *TransactionInvocator) Process(
 				Arguments: proc.Transaction.Arguments,
 			},
 			runtime.Context{
-				Interface: env,
-				Location:  location,
+				Interface:         env,
+				Location:          location,
+				PredeclaredValues: predeclaredValues,
 			},
 		)
 
