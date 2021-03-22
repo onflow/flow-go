@@ -51,41 +51,42 @@ import (
 func main() {
 
 	var (
-		followerState         protocol.MutableState
-		ledgerStorage         *ledger.Ledger
-		events                *storage.Events
-		serviceEvents         *storage.ServiceEvents
-		txResults             *storage.TransactionResults
-		results               *storage.ExecutionResults
-		receipts              *storage.ExecutionReceipts
-		myReceipts            *storage.MyExecutionReceipts
-		providerEngine        *exeprovider.Engine
-		checkerEng            *checker.Engine
-		syncCore              *chainsync.Core
-		pendingBlocks         *buffer.PendingBlocks // used in follower engine
-		deltas                *ingestion.Deltas
-		syncEngine            *synchronization.Engine
-		followerEng           *followereng.Engine // to sync blocks from consensus nodes
-		computationManager    *computation.Manager
-		collectionRequester   *requester.Engine
-		ingestionEng          *ingestion.Engine
-		rpcConf               rpc.Config
-		err                   error
-		executionState        state.ExecutionState
-		triedir               string
-		collector             module.ExecutionMetrics
-		mTrieCacheSize        uint32
-		checkpointDistance    uint
-		checkpointsToKeep     uint
-		stateDeltasLimit      uint
-		cadenceExecutionCache uint
-		requestInterval       time.Duration
-		preferredExeNodeIDStr string
-		syncByBlocks          bool
-		syncFast              bool
-		syncThreshold         int
-		extensiveLog          bool
-		checkStakedAtBlock    func(blockID flow.Identifier) (bool, error)
+		followerState               protocol.MutableState
+		ledgerStorage               *ledger.Ledger
+		events                      *storage.Events
+		serviceEvents               *storage.ServiceEvents
+		txResults                   *storage.TransactionResults
+		results                     *storage.ExecutionResults
+		receipts                    *storage.ExecutionReceipts
+		myReceipts                  *storage.MyExecutionReceipts
+		providerEngine              *exeprovider.Engine
+		checkerEng                  *checker.Engine
+		syncCore                    *chainsync.Core
+		pendingBlocks               *buffer.PendingBlocks // used in follower engine
+		deltas                      *ingestion.Deltas
+		syncEngine                  *synchronization.Engine
+		followerEng                 *followereng.Engine // to sync blocks from consensus nodes
+		computationManager          *computation.Manager
+		collectionRequester         *requester.Engine
+		ingestionEng                *ingestion.Engine
+		rpcConf                     rpc.Config
+		err                         error
+		executionState              state.ExecutionState
+		triedir                     string
+		collector                   module.ExecutionMetrics
+		mTrieCacheSize              uint32
+		transactionResultsCacheSize uint
+		checkpointDistance          uint
+		checkpointsToKeep           uint
+		stateDeltasLimit            uint
+		cadenceExecutionCache       uint
+		requestInterval             time.Duration
+		preferredExeNodeIDStr       string
+		syncByBlocks                bool
+		syncFast                    bool
+		syncThreshold               int
+		extensiveLog                bool
+		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).

@@ -16,11 +16,6 @@ type TransactionResults struct {
 	cache *Cache
 }
 
-type BlockIDTransactionID struct {
-	BlockID       flow.Identifier
-	TransactionID flow.Identifier
-}
-
 func KeyFromBlockIDTransactionID(blockID flow.Identifier, txID flow.Identifier) string {
 	return fmt.Sprintf("%x%x", blockID, txID)
 }
