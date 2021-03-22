@@ -245,13 +245,8 @@ func (i *TransactionInvocator) Process(
 
 	// check the storage limits
 	if ctx.LimitAccountStorage && txError == nil {
-		txError = NewTransactionStorageLimiter(i.logger).Process(vm, ctx, proc, sth, programs)
+		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
 	}
-
-	// based on the contract updates we decide how to clean up the programs
-	// for failed transactions we also do the same as
-	// transaction without any deployed contracts
-	programs.Cleanup(updatedKeys)
 
 	if txError != nil {
 		// drop delta
@@ -265,6 +260,11 @@ func (i *TransactionInvocator) Process(
 			Msg("transaction executed with error")
 		return txError
 	}
+
+	// based on the contract updates we decide how to clean up the programs
+	// for failed transactions we also do the same as
+	// transaction without any deployed contracts
+	programs.Cleanup(updatedKeys)
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()
