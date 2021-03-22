@@ -129,7 +129,7 @@ func TestExecutionFlow(t *testing.T) {
 				Blobs:     blobs,
 			}
 
-			err := provConduit.Submit(res, originID)
+			err := provConduit.Publish(res, originID)
 			assert.NoError(t, err)
 		}).
 		Once().
@@ -186,6 +186,11 @@ func TestExecutionFlow(t *testing.T) {
 
 	// check that the block has been executed.
 	exeNode.AssertHighestExecutedBlock(t, block.Header)
+
+	myReceipt, err := exeNode.MyExecutionReceipts.MyReceipt(block.ID())
+	require.NoError(t, err)
+	require.NotNil(t, myReceipt)
+	require.Equal(t, exeNode.Me.NodeID(), myReceipt.ExecutorID)
 
 	providerEngine.AssertExpectations(t)
 	verificationEngine.AssertExpectations(t)
@@ -402,7 +407,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
 			}
 			res := &messages.EntityResponse{Blobs: [][]byte{blob}, EntityIDs: req.EntityIDs[:1]}
-			err := colConduit.Submit(res, originID)
+			err := colConduit.Publish(res, originID)
 			assert.NoError(t, err)
 		}).
 		Return(nil).

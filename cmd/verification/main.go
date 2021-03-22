@@ -47,8 +47,9 @@ const (
 	// failureThreshold represents the number of retries match engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// this value is set following this issue (3443)
-	failureThreshold = 2
+	// Currently setting the threshold to a very large value (corresponding to 100 days),
+	// which for all practical purposes is equivalent to the Verifier trying indefinitely.
+	failureThreshold = 10000000
 )
 
 func main() {
@@ -102,7 +103,7 @@ func main() {
 			return err
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
+			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("cached execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {

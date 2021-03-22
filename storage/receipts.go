@@ -6,23 +6,33 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// ExecutionReceipts holds and indexes Execution Receipts. The storage-layer
+// abstraction is from the viewpoint of the network: there are multiple
+// execution nodes which produce several receipts for each block. By default,
+// there is no distinguished execution node (the are all equal).
 type ExecutionReceipts interface {
 
 	// Store stores an execution receipt.
-	Store(result *flow.ExecutionReceipt) error
+	Store(receipt *flow.ExecutionReceipt) error
 
 	// ByID retrieves an execution receipt by its ID.
-	ByID(resultID flow.Identifier) (*flow.ExecutionReceipt, error)
+	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
 
-	// Index indexes an execution receipt by block ID.
-	Index(blockID flow.Identifier, resultID flow.Identifier) error
+	// ByBlockID retrieves all known execution receipts for the given block
+	// (from any Execution Node).
+	ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error)
+}
 
-	// Index indexes an execution receipt by block ID and execution ID
-	IndexByBlockIDAndExecutionID(blockID, executorID, resultID flow.Identifier) error
+// MyExecutionReceipts reuses the storage.ExecutionReceipts API, but doesn't expose
+// them. Instead, it includes the "My" in the method name in order to highlight the notion
+// of "MY execution receipt", from the viewpoint of an individual Execution Node.
+type MyExecutionReceipts interface {
+	// StoreMyReceipt stores the receipt and marks it as mine (trusted). My
+	// receipts are indexed by the block whose result they compute. Currently,
+	// we only support indexing a _single_ receipt per block. Attempting to
+	// store conflicting receipts for the same block will error.
+	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
 
-	// ByBlockID retrieves an execution receipt by block ID.
-	ByBlockID(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
-
-	// ByBlockIDAllExecutionReceipts retrieves all execution receipts for a block ID
-	ByBlockIDAllExecutionReceipts(blockID flow.Identifier) ([]flow.ExecutionReceipt, error)
+	// MyReceipt retrieves my receipt for the given block.
+	MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
 }

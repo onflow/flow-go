@@ -1,6 +1,6 @@
 COLLECTION = 3
 CONSENSUS = 3
-EXECUTION = 1
+EXECUTION = 2
 VERIFICATION = 1
 ACCESS = 1
 NCLUSTERS=1
@@ -20,6 +20,11 @@ init:
 		-profiler=$(PROFILER) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY) \
+
+# Creates a light version of the localnet with just 1 instance for each node type
+.PHONY: init-light
+init-light:
+	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
 
 .PHONY: start
 start:

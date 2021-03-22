@@ -10,6 +10,7 @@ require (
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
+	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
 	github.com/gogo/protobuf v1.3.1
@@ -17,6 +18,8 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/go-cmp v0.5.2
 	github.com/google/uuid v1.1.1
+	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.4
@@ -33,11 +36,11 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.12.6-0.20210201222818-6088ce017c4f
+	github.com/onflow/cadence v0.14.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
-	github.com/onflow/flow-go-sdk v0.14.2
+	github.com/onflow/flow-go-sdk v0.15.0
 	github.com/onflow/flow-go/crypto v0.12.0
-	github.com/onflow/flow/protobuf/go/flow v0.1.8
+	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
@@ -54,6 +57,7 @@ require (
 	go.uber.org/atomic v1.6.0
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
 	gotest.tools v2.2.0+incompatible

@@ -1,6 +1,8 @@
 package unittest
 
 import (
+	"fmt"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -39,9 +41,7 @@ type BaseChainSuite struct {
 
 	// MEMPOOLS and STORAGE which are injected into Matching Engine
 	// mock storage.ExecutionReceipts: backed by in-memory map PersistedReceipts
-	ReceiptsDB             *storage.ExecutionReceipts
-	PersistedReceipts      map[flow.Identifier]*flow.ExecutionReceipt
-	PersistedReceiptsIndex map[flow.Identifier]flow.Identifier // index ExecutionResult.BlockID -> ExecutionReceipt.ID
+	ReceiptsDB *storage.ExecutionReceipts
 
 	ResultsDB        *storage.ExecutionResults
 	PersistedResults map[flow.Identifier]*flow.ExecutionResult
@@ -144,6 +144,15 @@ func (bc *BaseChainSuite) SetupChain() {
 		nil,
 	)
 
+	findBlockByHeight := func(blocks map[flow.Identifier]*flow.Block, height uint64) (*flow.Block, bool) {
+		for _, block := range blocks {
+			if block.Header.Height == height {
+				return block, true
+			}
+		}
+		return nil, false
+	}
+
 	// define the protocol state snapshot for any block in `bc.Blocks`
 	bc.State.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
@@ -152,6 +161,23 @@ func (bc *BaseChainSuite) SetupChain() {
 				return StateSnapshotForUnknownBlock()
 			}
 			return StateSnapshotForKnownBlock(block.Header, bc.Identities)
+		},
+	)
+
+	bc.State.On("AtHeight", mock.Anything).Return(
+		func(height uint64) realproto.Snapshot {
+			block, found := findBlockByHeight(bc.Blocks, height)
+			if found {
+				snapshot := &protocol.Snapshot{}
+				snapshot.On("Head").Return(
+					func() *flow.Header {
+						return block.Header
+					},
+					nil,
+				)
+				return snapshot
+			}
+			panic(fmt.Sprintf("unknown height: %v, final: %v, sealed: %v", height, bc.LatestFinalizedBlock.Header.Height, bc.LatestSealedBlock.Header.Height))
 		},
 	)
 
@@ -180,56 +206,7 @@ func (bc *BaseChainSuite) SetupChain() {
 		},
 	).Maybe() // this call is optional
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
-	bc.PersistedReceipts = make(map[flow.Identifier]*flow.ExecutionReceipt)
-	bc.PersistedReceiptsIndex = make(map[flow.Identifier]flow.Identifier)
 	bc.ReceiptsDB = &storage.ExecutionReceipts{}
-	bc.ReceiptsDB.On("ByID", mock.Anything).Return(
-		func(receiptID flow.Identifier) *flow.ExecutionReceipt {
-			return bc.PersistedReceipts[receiptID]
-		},
-		func(receiptID flow.Identifier) error {
-			_, found := bc.PersistedReceipts[receiptID]
-			if !found {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	).Maybe()
-	bc.ReceiptsDB.On("Index", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, receiptID flow.Identifier) error {
-			_, found := bc.PersistedReceiptsIndex[receiptID]
-			if found {
-				return storerr.ErrAlreadyExists
-			}
-			bc.PersistedReceiptsIndex[blockID] = receiptID
-			return nil
-		},
-	)
-	bc.ReceiptsDB.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.ExecutionReceipt {
-			receiptID, found := bc.PersistedReceiptsIndex[blockID]
-			if !found {
-				return nil
-			}
-			return bc.PersistedReceipts[receiptID]
-		},
-		func(blockID flow.Identifier) error {
-			_, found := bc.PersistedReceiptsIndex[blockID]
-			if !found {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	).Maybe()
-	bc.ReceiptsDB.On("Store", mock.Anything).Return(
-		func(receipt *flow.ExecutionReceipt) error {
-			_, found := bc.PersistedReceipts[receipt.ID()]
-			if found {
-				return storerr.ErrAlreadyExists
-			}
-			return nil
-		},
-	).Maybe() // this call is optional
 
 	// ~~~~~~~~~~~~~~~~~~~~ SETUP BLOCK HEADER STORAGE ~~~~~~~~~~~~~~~~~~~~~ //
 	bc.HeadersDB = &storage.Headers{}
@@ -351,8 +328,8 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.ResultsPL = &mempool.IncorporatedResults{}
 	bc.ResultsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 	bc.ResultsPL.On("All").Return(
-		func() []*flow.IncorporatedResult {
-			results := make([]*flow.IncorporatedResult, 0, len(bc.PendingResults))
+		func() flow.IncorporatedResultList {
+			results := make(flow.IncorporatedResultList, 0, len(bc.PendingResults))
 			for _, result := range bc.PendingResults {
 				results = append(results, result)
 			}
@@ -388,6 +365,15 @@ func (bc *BaseChainSuite) SetupChain() {
 			return found
 		},
 	).Maybe()
+	bc.SealsPL.On("All").Return(
+		func() []*flow.IncorporatedResultSeal {
+			seals := make([]*flow.IncorporatedResultSeal, 0, len(bc.PendingSeals))
+			for _, seal := range bc.PendingSeals {
+				seals = append(seals, seal)
+			}
+			return seals
+		},
+	).Maybe()
 
 	bc.Assigner = &module.ChunkAssigner{}
 	bc.Assignments = make(map[flow.Identifier]*chunks.Assignment)
@@ -396,6 +382,9 @@ func (bc *BaseChainSuite) SetupChain() {
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
 	snapshot := &protocol.Snapshot{}
 	snapshot.On("Identity", mock.Anything).Return(
+		nil, storerr.ErrNotFound,
+	)
+	snapshot.On("Identities", mock.Anything).Return(
 		nil, storerr.ErrNotFound,
 	)
 	snapshot.On("Head", mock.Anything).Return(
@@ -415,6 +404,20 @@ func StateSnapshotForKnownBlock(block *flow.Header, identities map[flow.Identifi
 			if !found {
 				return realproto.IdentityNotFoundError{NodeID: nodeID}
 			}
+			return nil
+		},
+	)
+	snapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			var idts flow.IdentityList
+			for _, i := range identities {
+				if selector(i) {
+					idts = append(idts, i)
+				}
+			}
+			return idts
+		},
+		func(selector flow.IdentityFilter) error {
 			return nil
 		},
 	)
@@ -469,7 +472,9 @@ type subgraphFixture struct {
 func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	// BLOCKS: <- previousBlock <- block
 	parentBlock := BlockFixture()
+	parentBlock.SetPayload(PayloadFixture(WithGuarantees(CollectionGuaranteesFixture(12)...)))
 	block := BlockWithParentFixture(parentBlock.Header)
+	block.SetPayload(PayloadFixture(WithGuarantees(CollectionGuaranteesFixture(12)...)))
 
 	// RESULTS for Blocks:
 	previousResult := ExecutionResultFixture(WithBlock(&parentBlock))

@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -46,4 +47,9 @@ type LedgerFailure struct {
 
 func (e *LedgerFailure) Error() string {
 	return fmt.Sprintf("ledger returns unsuccessful: %s", e.err.Error())
+}
+
+func fullKey(owner, controller, key string) string {
+	// https://en.wikipedia.org/wiki/C0_and_C1_control_codes#Field_separators
+	return strings.Join([]string{owner, controller, key}, "\x1F")
 }

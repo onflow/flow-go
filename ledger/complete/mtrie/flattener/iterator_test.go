@@ -31,11 +31,11 @@ func TestPopulatedTrie(t *testing.T) {
 	require.NoError(t, err)
 
 	// key: 0000...
-	p1 := utils.OneBytePath(1)
+	p1 := utils.PathByUint8(1)
 	v1 := utils.LightPayload8('A', 'a')
 
 	// key: 0100....
-	p2 := utils.OneBytePath(64)
+	p2 := utils.PathByUint8(64)
 	v2 := utils.LightPayload8('B', 'b')
 
 	paths := []ledger.Path{p1, p2}
