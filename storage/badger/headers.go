@@ -49,7 +49,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		blockID := key.(flow.Identifier)
 		var header flow.Header
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.RetrieveHeader(blockID, &header))
+			err := operation.RetrieveHeader(blockID, &header)(tx)
 			return &header, err
 		}
 	}
@@ -58,7 +58,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		height := key.(uint64)
 		var id flow.Identifier
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.LookupBlockHeight(height, &id))
+			err := operation.LookupBlockHeight(height, &id)(tx)
 			return id, err
 		}
 	}
@@ -67,7 +67,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		chunkID := key.(flow.Identifier)
 		var blockID flow.Identifier
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.LookupBlockIDByChunkID(chunkID, &blockID))
+			err := operation.LookupBlockIDByChunkID(chunkID, &blockID)(tx)
 			return blockID, err
 		}
 	}
@@ -169,8 +169,6 @@ func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
 }
 
 func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {
-	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
-		return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
-	}
-	return fmt.Errorf("unsupported BatchStore type %T", batch)
+	writeBatch := batch.GetWriter()
+	return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
 }
