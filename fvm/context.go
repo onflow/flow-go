@@ -27,6 +27,7 @@ type Context struct {
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
 	CadenceLoggingEnabled            bool
+	AccountFreezeAvailable           bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
@@ -80,14 +81,16 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
+		AccountFreezeAvailable:           false,
 		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
+			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
+			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvocator(logger),
-			NewTransactionStorageLimiter(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
@@ -155,6 +158,16 @@ func WithEventCollectionSizeLimit(limit uint64) Option {
 func WithBlockHeader(header *flow.Header) Option {
 	return func(ctx Context) Context {
 		ctx.BlockHeader = header
+		return ctx
+	}
+}
+
+// WithAccountFreezeAvailable sets availability of account freeze function for a virtual machine context.
+//
+// With this option set to true, a setAccountFreeze function will be enabled for transactions processed by the VM
+func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
+	return func(ctx Context) Context {
+		ctx.AccountFreezeAvailable = accountFreezeAvailable
 		return ctx
 	}
 }

@@ -12,9 +12,11 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 var (
@@ -41,7 +43,7 @@ type PartnerStakes map[flow.Identifier]uint64
 var finalizeCmd = &cobra.Command{
 	Use:   "finalize",
 	Short: "Finalize the bootstrapping process",
-	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon 
+	Long: `Finalize the bootstrapping process, which includes running the DKG for the generation of the random beacon
 	keys and generating the root block, QC, execution result and block seal.`,
 	Run: finalize,
 }
@@ -133,7 +135,11 @@ func finalize(cmd *cobra.Command, args []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid genesis token supply")
 		}
-		commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
+		commit, err = run.GenerateExecutionState(
+			filepath.Join(flagOutdir, model.DirnameExecutionState),
+			serviceAccountPublicKey,
+			parseChainID(flagRootChain).Chain(),
+			fvm.WithInitialTokenSupply(value))
 		if err != nil {
 			log.Fatal().Err(err).Msg("unable to generate execution state")
 		}
@@ -146,7 +152,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QC")
-	constructRootQC(
+	rootQC := constructRootQC(
 		block,
 		model.FilterByRole(stakingNodes, flow.RoleConsensus),
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
@@ -167,7 +173,17 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root execution result and block seal")
-	constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	result, seal := constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	log.Info().Msg("")
+
+	// construct serializable root protocol snapshot
+	log.Info().Msg("constructing root procotol snapshot")
+	snapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, rootQC)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
+	}
+	// write snapshot to disk
+	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
 
 	// copy files only if the directories differ
@@ -208,7 +224,11 @@ func assemblePartnerNodes() []model.NodeInfo {
 		nodeID := validateNodeID(partner.NodeID)
 		networkPubKey := validateNetworkPubKey(partner.NetworkPubKey)
 		stakingPubKey := validateStakingPubKey(partner.StakingPubKey)
-		stake := validateStake(stakes[partner.NodeID])
+		stake, valid := validateStake(stakes[partner.NodeID])
+		if !valid {
+			log.Error().Msgf("stakes: %v", stakes)
+			log.Fatal().Msgf("partner node id %v has no stake", nodeID)
+		}
 
 		node := model.NewPublicNodeInfo(
 			nodeID,
@@ -261,7 +281,11 @@ func assembleInternalNodes() []model.NodeInfo {
 
 		// validate every single internal node
 		nodeID := validateNodeID(internal.NodeID)
-		stake := validateStake(stakes[internal.Address])
+		stake, valid := validateStake(stakes[internal.Address])
+		if !valid {
+			log.Error().Msgf("stakes: %v", stakes)
+			log.Fatal().Msgf("internal node %v has no stake. Did you forget to update the node address?", internal)
+		}
 
 		node := model.NewPrivateNodeInfo(
 			nodeID,
@@ -371,9 +395,6 @@ func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey 
 	return key
 }
 
-func validateStake(stake uint64) uint64 {
-	if stake == 0 {
-		log.Fatal().Msg("Stake must be bigger than 0")
-	}
-	return stake
+func validateStake(stake uint64) (uint64, bool) {
+	return stake, stake > 0
 }

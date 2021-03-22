@@ -37,6 +37,6 @@ func TestEpochCommitStoreAndRetrieve(t *testing.T) {
 
 		// test storing same epoch commit
 		err = store.Store(expected)
-		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
+		require.NoError(t, err)
 	})
 }

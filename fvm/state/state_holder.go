@@ -8,7 +8,6 @@ package state
 type StateHolder struct {
 	startState  *State
 	activeState *State
-	parents     map[*State]*State
 }
 
 // NewStateHolder constructs a new state manager
@@ -16,7 +15,6 @@ func NewStateHolder(startState *State) *StateHolder {
 	return &StateHolder{
 		startState:  startState,
 		activeState: startState,
-		parents:     make(map[*State]*State),
 	}
 }
 

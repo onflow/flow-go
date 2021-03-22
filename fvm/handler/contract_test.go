@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func TestContract_DraftFunctionality(t *testing.T) {
+func TestContract_ChildMergeFunctionality(t *testing.T) {
 	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")

@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// SimpleView provides a simple view for testing purposes.
 type SimpleView struct {
 	Parent *SimpleView
 	Ledger *MapLedger
@@ -88,6 +89,7 @@ type MapLedger struct {
 	RegisterTouches map[string]bool
 }
 
+// NewMapLedger returns an instance of map ledger (should only be used for testing)
 func NewMapLedger() *MapLedger {
 	return &MapLedger{
 		Registers:       make(map[string]flow.RegisterEntry),
@@ -95,7 +97,7 @@ func NewMapLedger() *MapLedger {
 	}
 }
 
-func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) error {
+func (m *MapLedger) Set(owner, controller, key string, value flow.RegisterValue) error {
 	k := fullKey(owner, controller, key)
 	m.RegisterTouches[k] = true
 	m.Registers[k] = flow.RegisterEntry{
@@ -109,18 +111,18 @@ func (m MapLedger) Set(owner, controller, key string, value flow.RegisterValue) 
 	return nil
 }
 
-func (m MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error) {
+func (m *MapLedger) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	k := fullKey(owner, controller, key)
 	m.RegisterTouches[k] = true
 	return m.Registers[k].Value, nil
 }
 
-func (m MapLedger) Touch(owner, controller, key string) error {
+func (m *MapLedger) Touch(owner, controller, key string) error {
 	m.RegisterTouches[fullKey(owner, controller, key)] = true
 	return nil
 }
 
-func (m MapLedger) Delete(owner, controller, key string) error {
+func (m *MapLedger) Delete(owner, controller, key string) error {
 	delete(m.RegisterTouches, fullKey(owner, controller, key))
 	return nil
 }

@@ -147,11 +147,8 @@ func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.Noop
 	s := storage.InitAll(metric, db)
 	consumer := events.NewNoop()
 
-	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := badgerstate.NewStateRoot(root, result, seal, 0)
-	require.NoError(t, err)
-
-	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
 	require.NoError(t, err)
 
 	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
@@ -324,6 +321,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
+	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
@@ -343,7 +343,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
-	commit, err := bootstrapper.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
+	commit, err := bootstrapper.BootstrapLedger(
+		ls,
+		unittest.ServiceAccountPublicKey,
+		node.ChainID.Chain(),
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
@@ -363,7 +367,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 
@@ -425,6 +429,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		deltas,
 		syncThreshold,
 		false,
+		checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -454,21 +459,22 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	return testmock.ExecutionNode{
-		GenericNode:     node,
-		MutableState:    followerState,
-		IngestionEngine: ingestionEngine,
-		FollowerEngine:  followerEng,
-		SyncEngine:      syncEngine,
-		ExecutionEngine: computation,
-		RequestEngine:   requestEngine,
-		ReceiptsEngine:  pusherEngine,
-		BadgerDB:        node.DB,
-		VM:              vm,
-		ExecutionState:  execState,
-		Ledger:          ls,
-		LevelDbDir:      dbDir,
-		Collections:     collectionsStorage,
-		Finalizer:       finalizer,
+		GenericNode:         node,
+		MutableState:        followerState,
+		IngestionEngine:     ingestionEngine,
+		FollowerEngine:      followerEng,
+		SyncEngine:          syncEngine,
+		ExecutionEngine:     computation,
+		RequestEngine:       requestEngine,
+		ReceiptsEngine:      pusherEngine,
+		BadgerDB:            node.DB,
+		VM:                  vm,
+		ExecutionState:      execState,
+		Ledger:              ls,
+		LevelDbDir:          dbDir,
+		Collections:         collectionsStorage,
+		Finalizer:           finalizer,
+		MyExecutionReceipts: myReceipts,
 	}
 }
 

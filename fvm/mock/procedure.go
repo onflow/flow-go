@@ -6,6 +6,8 @@ import (
 	fvm "github.com/onflow/flow-go/fvm"
 	mock "github.com/stretchr/testify/mock"
 
+	programs "github.com/onflow/flow-go/fvm/programs"
+
 	state "github.com/onflow/flow-go/fvm/state"
 )
 
@@ -14,13 +16,13 @@ type Procedure struct {
 	mock.Mock
 }
 
-// Run provides a mock function with given fields: vm, ctx, sth, programs
-func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, sth *state.StateHolder, programs *fvm.Programs) error {
-	ret := _m.Called(vm, ctx, sth, programs)
+// Run provides a mock function with given fields: vm, ctx, sth, _a3
+func (_m *Procedure) Run(vm *fvm.VirtualMachine, ctx fvm.Context, sth *state.StateHolder, _a3 *programs.Programs) error {
+	ret := _m.Called(vm, ctx, sth, _a3)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *state.StateHolder, *fvm.Programs) error); ok {
-		r0 = rf(vm, ctx, sth, programs)
+	if rf, ok := ret.Get(0).(func(*fvm.VirtualMachine, fvm.Context, *state.StateHolder, *programs.Programs) error); ok {
+		r0 = rf(vm, ctx, sth, _a3)
 	} else {
 		r0 = ret.Error(0)
 	}

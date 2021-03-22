@@ -51,12 +51,17 @@ func TestState_ChildMergeFunctionality(t *testing.T) {
 		err := stChild.Set("address", "controller", key, value)
 		require.NoError(t, err)
 
+		// read before merge
+		v, err := st.Get("address", "controller", key)
+		require.NoError(t, err)
+		require.Equal(t, len(v), 0)
+
 		// merge to parent
 		err = st.MergeState(stChild)
 		require.NoError(t, err)
 
 		// read key3 on parent
-		v, err := st.Get("address", "controller", key)
+		v, err = st.Get("address", "controller", key)
 		require.NoError(t, err)
 		require.Equal(t, v, value)
 	})

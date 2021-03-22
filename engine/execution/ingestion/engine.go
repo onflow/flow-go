@@ -63,6 +63,7 @@ type Engine struct {
 	syncConduit        network.Conduit     // sending state syncing requests
 	syncDeltas         mempool.Deltas      // storing the synced state deltas
 	syncFast           bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
 }
 
 func New(
@@ -86,6 +87,7 @@ func New(
 	syncDeltas mempool.Deltas,
 	syncThreshold int,
 	syncFast bool,
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -115,6 +117,7 @@ func New(
 		syncThreshold:      syncThreshold,
 		syncDeltas:         syncDeltas,
 		syncFast:           syncFast,
+		checkStakedAtBlock: checkStakedAtBlock,
 	}
 
 	// move to state syncing engine
@@ -558,12 +561,19 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	isExecutedBlockSealed := executableBlock.Block.Header.Height <= lastSealed.Height
 	broadcasted := false
+
 	if !isExecutedBlockSealed {
-		err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+		stakedAtBlock, err := e.checkStakedAtBlock(executableBlock.ID())
 		if err != nil {
-			e.log.Err(err).Msg("critical: failed to broadcast the receipt")
-		} else {
-			broadcasted = true
+			e.log.Fatal().Err(err).Msg("could not check staking status")
+		}
+		if stakedAtBlock {
+			err = e.providerEngine.BroadcastExecutionReceipt(ctx, receipt)
+			if err != nil {
+				e.log.Err(err).Msg("critical: failed to broadcast the receipt")
+			} else {
+				broadcasted = true
+			}
 		}
 	}
 
@@ -1108,7 +1118,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionResult, events, serviceEvents, txResults)
+	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionReceipt, events, serviceEvents, txResults)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -1191,11 +1201,21 @@ func (e *Engine) generateExecutionResultForBlock(
 			block.Header.ParentID, err)
 	}
 
+	// convert Cadence service event representation to flow-go representation
+	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
+	for _, event := range serviceEvents {
+		converted, err := flow.ConvertServiceEvent(event)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert service event: %w", err)
+		}
+		convertedServiceEvents = append(convertedServiceEvents, *converted)
+	}
+
 	er := &flow.ExecutionResult{
 		PreviousResultID: previousErID,
 		BlockID:          block.ID(),
 		Chunks:           chunks,
-		ServiceEvents:    serviceEvents,
+		ServiceEvents:    convertedServiceEvents,
 	}
 
 	return er, nil

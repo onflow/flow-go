@@ -28,13 +28,17 @@ type View struct {
 
 type Snapshot struct {
 	Delta Delta
-	Reads []flow.RegisterID
+	Reads map[string]flow.RegisterID
 }
 
 // Snapshot is state of interactions with the register
 type SpockSnapshot struct {
 	Snapshot
 	SpockSecret []byte
+}
+
+func AlwaysEmptyGetRegisterFunc(owner, controller, key string) (flow.RegisterValue, error) {
+	return nil, nil
 }
 
 // NewView instantiates a new ledger view with the provided read function.
@@ -53,15 +57,15 @@ func (v *View) Interactions() *SpockSnapshot {
 	var delta = Delta{
 		Data: make(map[string]flow.RegisterEntry, len(v.delta.Data)),
 	}
-	var reads = make([]flow.RegisterID, 0, len(v.regTouchSet))
+	var reads = make(map[string]flow.RegisterID, len(v.regTouchSet))
 
 	//copy data
 	for s, value := range v.delta.Data {
 		delta.Data[s] = value
 	}
 
-	for _, id := range v.regTouchSet {
-		reads = append(reads, id)
+	for i, id := range v.regTouchSet {
+		reads[i] = id
 	}
 
 	spockSecHashSum := v.spockSecretHasher.SumHash()
@@ -95,7 +99,7 @@ func (r *Snapshot) AllRegisters() []flow.RegisterID {
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (v *View) NewChild() state.View {
-	return NewView(v.Get)
+	return NewView(v.Peek)
 }
 
 func (v *View) DropDelta() {
@@ -110,7 +114,7 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	value, exists := v.delta.Get(owner, controller, key)
 	if exists {
 		// every time we read a value (order preserving) we update spock
-		var err error = nil
+		var err error
 		if value != nil {
 			err = v.updateSpock(value)
 		}
@@ -135,10 +139,21 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	return value, err
 }
 
+// Peek reads the value without registering the read, as when used as parent read function
+func (v *View) Peek(owner, controller, key string) (flow.RegisterValue, error) {
+	value, exists := v.delta.Get(owner, controller, key)
+	if exists {
+		return value, nil
+	}
+
+	return v.readFunc(owner, controller, key)
+}
+
 // Set sets a register value in this view.
 func (v *View) Set(owner, controller, key string, value flow.RegisterValue) error {
 	// every time we write something to delta (order preserving) we update spock
 	// TODO return the error and handle it properly on other places
+
 	err := v.updateSpock(value)
 	if err != nil {
 		panic(err)
@@ -198,20 +213,29 @@ func (v *View) MergeView(ch state.View) error {
 	for _, id := range child.Interactions().RegisterTouches() {
 		v.regTouchSet[id.String()] = id
 	}
+
 	// SpockSecret is order aware
 	// TODO return the error and handle it properly on other places
-	err := v.updateSpock(child.SpockSecret())
+
+	spockSecret := child.SpockSecret()
+
+	err := v.updateSpock(spockSecret)
 	if err != nil {
 		return fmt.Errorf("can not merge view: %w", err)
 	}
 	v.delta.MergeWith(child.delta)
+
+	v.readsCount += child.readsCount
+
 	return nil
 }
 
 // RegisterTouches returns the register IDs touched by this view (either read or write)
-func (r *Snapshot) RegisterTouches() []flow.RegisterID {
-	ret := make([]flow.RegisterID, 0, len(r.Reads))
-	ret = append(ret, r.Reads...)
+func (r *Snapshot) RegisterTouches() map[string]flow.RegisterID {
+	ret := make(map[string]flow.RegisterID, len(r.Reads))
+	for k, v := range r.Reads {
+		ret[k] = v
+	}
 	return ret
 }
 
@@ -223,4 +247,10 @@ func (v *View) ReadsCount() uint64 {
 // SpockSecret returns the secret value for SPoCK
 func (v *View) SpockSecret() []byte {
 	return v.spockSecretHasher.SumHash()
+}
+
+// Detach detaches view from parent, by setting readFunc to
+// default, empty one
+func (v *View) Detach() {
+	v.readFunc = AlwaysEmptyGetRegisterFunc
 }
