@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultJobIndex = int64(0)
+	DefaultJobIndex = uint64(0)
 )
 
 // ChunkJob converts a chunk locator into a Job to be used by job queue.
