@@ -37,7 +37,7 @@ type Config struct {
 	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
 	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
-
+	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -134,6 +134,7 @@ func New(log zerolog.Logger,
 		connectionFactory,
 		retryEnabled,
 		config.PreferredExecutionNodeIDs,
+		config.FixedExecutionNodeIDs,
 		log,
 	)
 

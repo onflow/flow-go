@@ -112,6 +112,7 @@ func (suite *Suite) RunTest(
 			nil,
 			false,
 			nil,
+			nil,
 			suite.log,
 		)
 
@@ -285,6 +286,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			metrics,
 			connFactory, // passing in the connection factory
 			false,
+			nil,
 			nil,
 			suite.log,
 		)
@@ -516,6 +518,7 @@ func (suite *Suite) TestExecuteScript() {
 			suite.metrics,
 			connFactory,
 			false,
+			nil,
 			nil,
 			suite.log,
 		)

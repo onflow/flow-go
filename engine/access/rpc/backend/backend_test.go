@@ -88,6 +88,7 @@ func (suite *Suite) TestPing() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -110,6 +111,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
 		nil,
 		suite.log,
 	)
@@ -139,6 +141,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
 		nil,
 		suite.log,
 	)
@@ -174,6 +177,7 @@ func (suite *Suite) TestGetTransaction() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -204,6 +208,7 @@ func (suite *Suite) TestGetCollection() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -226,7 +231,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-	validTestENMap := map[flow.Identifier]bool{}
+	fixedENIDs := flow.IdentifierList{}
 
 	suite.snapshot.
 		On("Head").
@@ -253,7 +258,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	blockID := block.ID()
 
 	receipts := suite.setupReceipts(&block)
-	validTestENMap[receipts[0].ExecutorID] = true
+	fixedENIDs = append(fixedENIDs, receipts[0].ExecutorID)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -283,10 +288,11 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		connFactory,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
-	validENMap = validTestENMap
+	preferredENIdentifiers = fixedENIDs
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -396,6 +402,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -478,6 +485,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -514,6 +522,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -533,7 +542,7 @@ func (mc *mockCloser) Close() error { return nil }
 
 func (suite *Suite) TestGetEventsForBlockIDs() {
 	events := getEvents(10)
-	validTestENMap := map[flow.Identifier]bool{}
+	validExecutorIDs := flow.IdentifierList{}
 	ids := flow.IdentityList{}
 
 	setupStorage := func(n int) []*flow.Header {
@@ -554,7 +563,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			receipt2.ExecutorID = ids[1].NodeID
 			receipt1.ExecutionResult = receipt2.ExecutionResult
 			// mark as valid EN
-			validTestENMap[receipt1.ExecutorID] = true
+			validExecutorIDs = append(validExecutorIDs, receipt1.ExecutorID)
 			suite.receipts.
 				On("ByBlockIDAllExecutionReceipts", b.ID()).
 				Return([]*flow.ExecutionReceipt{receipt1, receipt2}, nil).Once()
@@ -634,6 +643,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil,
 			false,
 			nil,
+			nil,
 			suite.log,
 		)
 
@@ -659,10 +669,11 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			nil,
+			nil,
 			suite.log,
 		)
 
-		validENMap = validTestENMap
+		fixedENIdentifiers = validExecutorIDs
 
 		// execute request
 		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
@@ -686,10 +697,12 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			nil,
+			nil,
 			suite.log,
 		)
 
-		validENMap = validTestENMap
+		// set the fixed EN Identifiers to the generated execution IDs
+		fixedENIdentifiers = validExecutorIDs
 
 		// execute request with an empty block id list and expect an error (not a panic)
 		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
@@ -787,6 +800,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			nil,
 			false,
 			nil,
+			nil,
 			suite.log,
 		)
 
@@ -819,6 +833,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			nil,
 			false,
 			nil,
+			nil,
 			suite.log,
 		)
 
@@ -849,6 +864,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			nil,
 			nil,
 			suite.log,
 		)
@@ -882,6 +898,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			nil,
 			nil,
 			suite.log,
 		)
@@ -950,11 +967,12 @@ func (suite *Suite) TestGetAccount() {
 		connFactory,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
 	suite.Run("happy path - valid request and valid response", func() {
-		validENMap = map[flow.Identifier]bool{receipts[0].ExecutorID: true}
+		preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 		account, err := backend.GetAccountAtLatestBlock(ctx, address)
 		suite.checkResponse(account, err)
 
@@ -1016,6 +1034,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -1040,6 +1059,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		nil,
 		false,
 		nil,
+		nil,
 		suite.log,
 	)
 
@@ -1051,9 +1071,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 // TestExecutionNodesForBlockID tests the common method backend.executionNodesForBlockID used for serving all API calls
 // that need to talk to an execution node.
 func (suite *Suite) TestExecutionNodesForBlockID() {
-	if validENMap == nil {
-		validENMap = map[flow.Identifier]bool{}
-	}
+
 	totalBlocks := 3
 	receiptPerBlock := 2
 	totalReceipts := receiptPerBlock * totalBlocks
@@ -1061,7 +1079,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	blocks := unittest.BlockFixtures(totalBlocks)
 	blockIDExecNodeMap := make(map[flow.Identifier]flow.IdentityList, totalReceipts)
 	allExecutionIDs := make(flow.IdentityList, 0, totalReceipts) // assume each ER is generated by a unique exec node
-	// validENMap = map[flow.Identifier]bool{}
+	// preferredENIdentifiers = map[flow.Identifier]bool{}
 	// generate identitylist and receipts for each block and mark each receipt with a unique execution ID
 	for i := 0; i < totalBlocks; i++ {
 
@@ -1085,9 +1103,9 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			Return(receipts, nil).Once()
 	}
 
-	validENMap = make(map[flow.Identifier]bool, len(allExecutionIDs))
+	preferredENIdentifiers = flow.IdentifierList{}
 	for _, id := range allExecutionIDs {
-		validENMap[id.ID()] = true
+		preferredENIdentifiers = append(preferredENIdentifiers, id.NodeID)
 	}
 	suite.snapshot.On("Identities", mock.Anything).Return(allExecutionIDs, nil)
 
