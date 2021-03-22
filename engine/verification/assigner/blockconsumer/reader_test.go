@@ -22,11 +22,11 @@ func TestBlockReader(t *testing.T) {
 		// head of block reader should be the same height as the last block on the chain.
 		head, err := reader.Head()
 		require.NoError(t, err)
-		require.Equal(t, uint64(head), blocks[len(blocks)-1].Header.Height)
+		require.Equal(t, head, blocks[len(blocks)-1].Header.Height)
 
 		// retrieved blocks from block reader should be the same as the original blocks stored in it.
 		for _, actual := range blocks {
-			index := int64(actual.Header.Height)
+			index := actual.Header.Height
 			job, err := reader.AtIndex(index)
 			require.NoError(t, err)
 
