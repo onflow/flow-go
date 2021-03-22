@@ -27,7 +27,7 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 		txID := key.(flow.Identifier)
 		var flowTx flow.TransactionBody
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.RetrieveTransaction(txID, &flowTx))
+			err := operation.RetrieveTransaction(txID, &flowTx)(tx)
 			return &flowTx, err
 		}
 	}
