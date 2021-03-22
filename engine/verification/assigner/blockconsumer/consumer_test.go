@@ -58,7 +58,7 @@ func TestProduceConsume(t *testing.T) {
 
 			// expects the processor receive only the first 3 blocks (since it is blocked on those, hence no
 			// new block is fetched to process).
-			unittest.RequireBlockListsMatchElements(t, received, blocks[:3])
+			require.ElementsMatch(t, flow.GetIDs(blocks[:3]), flow.GetIDs(received))
 		})
 	})
 
@@ -98,7 +98,7 @@ func TestProduceConsume(t *testing.T) {
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
 
 			// expects the mock engine receive all 10 blocks.
-			unittest.RequireBlockListsMatchElements(t, received, blocks)
+			require.ElementsMatch(t, flow.GetIDs(blocks), flow.GetIDs(received))
 		})
 	})
 
@@ -141,7 +141,7 @@ func TestProduceConsume(t *testing.T) {
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
 
 			// expects the mock engine receive all 100 blocks.
-			unittest.RequireBlockListsMatchElements(t, received, blocks)
+			require.ElementsMatch(t, flow.GetIDs(blocks), flow.GetIDs(received))
 		})
 	})
 
