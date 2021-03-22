@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
@@ -31,7 +32,7 @@ func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
+	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 type TransactionProcedure struct {
@@ -53,8 +54,9 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
+
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, st, programs)
+		err := p.Process(vm, &ctx, proc, st, programs)
 		vmErr, fatalErr := handleError(err)
 		if fatalErr != nil {
 			return fatalErr
@@ -82,7 +84,7 @@ func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
 
 func (i *TransactionInvocator) Process(
 	vm *VirtualMachine,
-	ctx Context,
+	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
@@ -104,6 +106,57 @@ func (i *TransactionInvocator) Process(
 	if ctx.BlockHeader != nil {
 		blockHeight = ctx.BlockHeader.Height
 	}
+	var predeclaredValues []runtime.ValueDeclaration
+
+	if ctx.AccountFreezeAvailable {
+
+		setAccountFrozen := runtime.ValueDeclaration{
+			Name: "setAccountFrozen",
+			Type: &sema.FunctionType{
+				Parameters: []*sema.Parameter{
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "account",
+						TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
+					},
+					{
+						Label:          sema.ArgumentLabelNotRequired,
+						Identifier:     "frozen",
+						TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+					},
+				},
+				ReturnTypeAnnotation: &sema.TypeAnnotation{
+					Type: sema.VoidType,
+				},
+			},
+			Kind:           common.DeclarationKindFunction,
+			IsConstant:     true,
+			ArgumentLabels: nil,
+			Value: interpreter.NewHostFunctionValue(
+				func(invocation interpreter.Invocation) interpreter.Value {
+					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
+					if !ok {
+						panic(errors.New("first argument must be an address"))
+					}
+
+					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
+					if !ok {
+						panic(errors.New("second argument must be a boolean"))
+					}
+
+					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
+					if err != nil {
+						panic(fmt.Errorf("cannot set account frozen: %w", err))
+					}
+
+					return interpreter.VoidValue{}
+				},
+			),
+		}
+
+		predeclaredValues = append(predeclaredValues, setAccountFrozen)
+	}
+
 	retry := false
 	numberOfRetries := 0
 	parentState := sth.State()
@@ -139,7 +192,7 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		env, err = newEnvironment(ctx, vm, sth, programs)
+		env, err = newEnvironment(*ctx, vm, sth, programs)
 		// env construction error is fatal
 		if err != nil {
 			return err
@@ -155,8 +208,9 @@ func (i *TransactionInvocator) Process(
 				Arguments: proc.Transaction.Arguments,
 			},
 			runtime.Context{
-				Interface: env,
-				Location:  location,
+				Interface:         env,
+				Location:          location,
+				PredeclaredValues: predeclaredValues,
 			},
 		)
 
@@ -189,10 +243,10 @@ func (i *TransactionInvocator) Process(
 		txError = err
 	}
 
-	// based on the contract updates we decide how to clean up the programs
-	// for failed transactions we also do the same as
-	// transaction without any deployed contracts
-	programs.Cleanup(updatedKeys)
+	// check the storage limits
+	if ctx.LimitAccountStorage && txError == nil {
+		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+	}
 
 	if txError != nil {
 		// drop delta
@@ -206,6 +260,11 @@ func (i *TransactionInvocator) Process(
 			Msg("transaction executed with error")
 		return txError
 	}
+
+	// based on the contract updates we decide how to clean up the programs
+	// for failed transactions we also do the same as
+	// transaction without any deployed contracts
+	programs.Cleanup(updatedKeys)
 
 	proc.Events = env.getEvents()
 	proc.ServiceEvents = env.getServiceEvents()

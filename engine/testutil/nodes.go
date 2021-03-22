@@ -313,14 +313,17 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
-	eventsStorage := storage.NewEvents(node.DB)
-	serviceEventsStorage := storage.NewServiceEvents(node.DB)
-	txResultStorage := storage.NewTransactionResults(node.DB)
+	eventsStorage := storage.NewEvents(node.Metrics, node.DB)
+	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
+	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
+	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
@@ -340,7 +343,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
-	commit, err := bootstrapper.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
+	commit, err := bootstrapper.BootstrapLedger(
+		ls,
+		unittest.ServiceAccountPublicKey,
+		node.ChainID.Chain(),
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
@@ -360,7 +367,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 
@@ -422,6 +429,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		deltas,
 		syncThreshold,
 		false,
+		checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
