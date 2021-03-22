@@ -42,7 +42,7 @@ func InitMax(tx *badger.Txn) error {
 }
 
 // SetMax sets the value for the maximum key length used for efficient iteration.
-func SetMax(tx storage.BatchStorage) error {
+func SetMax(tx storage.Transaction) error {
 	key := makePrefix(codeMax)
 	val := make([]byte, 4)
 	binary.LittleEndian.PutUint32(val, max)
