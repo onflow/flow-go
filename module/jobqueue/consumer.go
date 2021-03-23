@@ -13,6 +13,7 @@ import (
 )
 
 type Worker interface {
+	// returned error must be unexpected fatal error
 	Run(job module.Job) error
 }
 
