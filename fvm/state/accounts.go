@@ -312,7 +312,7 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	cborEncoder := cbor.NewEncoder(&buf)
 	err = cborEncoder.Encode(contractNames)
 	if err != nil {
-		return fmt.Errorf("cannot encode contract names")
+		return &errors.EncodingFailure{Err: fmt.Errorf("cannot encode contract names")}
 	}
 	newContractNames := buf.Bytes()
 

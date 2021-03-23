@@ -395,7 +395,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{"emitting events"}
+		return &errors.OperationNotSupportedError{Operation: "emitting events"}
 	}
 
 	payload, err := jsoncdc.Encode(event)
@@ -562,7 +562,7 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	}
 
 	if e.ctx.BlockHeader == nil {
-		return 0, &errors.OperationNotSupportedError{"getting the current block height"}
+		return 0, &errors.OperationNotSupportedError{Operation: "getting the current block height"}
 	}
 	return e.ctx.BlockHeader.Height, nil
 }
@@ -576,7 +576,7 @@ func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	}
 
 	if e.rng == nil {
-		return 0, &errors.OperationNotSupportedError{"unsafe random"}
+		return 0, &errors.OperationNotSupportedError{Operation: "unsafe random"}
 	}
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
@@ -600,7 +600,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	}
 
 	if e.ctx.Blocks == nil {
-		return runtime.Block{}, false, &errors.OperationNotSupportedError{"getting block information"}
+		return runtime.Block{}, false, &errors.OperationNotSupportedError{Operation: "getting block information"}
 	}
 
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
@@ -629,7 +629,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 	}
 
 	if e.transactionEnv == nil {
-		return runtime.Address{}, &errors.OperationNotSupportedError{"creating accounts"}
+		return runtime.Address{}, &errors.OperationNotSupportedError{Operation: "creating accounts"}
 	}
 
 	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
@@ -643,7 +643,7 @@ func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{"adding account keys"}
+		return &errors.OperationNotSupportedError{Operation: "adding account keys"}
 	}
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -662,7 +662,7 @@ func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (p
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{"removing account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "removing account keys"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -687,7 +687,7 @@ func (e *hostEnv) AddAccountKey(
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{"adding account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "adding account keys"}
 	}
 
 	return e.transactionEnv.AddAccountKey(address, publicKey, hashAlgo, weight)
@@ -700,7 +700,7 @@ func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.Ac
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{"getting account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "getting account keys"}
 	}
 
 	return e.transactionEnv.GetAccountKey(address, index)
@@ -713,7 +713,7 @@ func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{"revoking account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "revoking account keys"}
 	}
 
 	return e.transactionEnv.RevokeAccountKey(address, index)
@@ -726,7 +726,7 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{"updating account contract code"}
+		return &errors.OperationNotSupportedError{Operation: "updating account contract code"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -757,7 +757,7 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{"removing account contracts"}
+		return &errors.OperationNotSupportedError{Operation: "removing account contracts"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -775,7 +775,7 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 		defer sp.Finish()
 	}
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{"getting signer accounts"}
+		return nil, &errors.OperationNotSupportedError{Operation: "getting signer accounts"}
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
@@ -1071,14 +1071,12 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 
 	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgorithm == crypto.UnknownSignatureAlgorithm {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("cannot decode public key: invalid signature algorithm: %s", publicKey.SignAlgo)
+		return nil, &errors.InvalidSignatureAlgorithmError{SigningAlgo: signAlgorithm}
 	}
 
 	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
 	if hashAlgorithm == crypto.UnknownHashAlgorithm {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("cannot decode public key: invalid hash algorithm: %s", hashAlgo)
+		return nil, &errors.InvalidHashAlgorithmError{HashAlgo: hashAlgorithm}
 	}
 
 	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
@@ -1134,8 +1132,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if !ok {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("account with address %s does not exist", address)
+		return nil, &errors.AccountNotFoundError{Address: accountAddress}
 	}
 
 	// Don't return an error for invalid key indices
@@ -1171,20 +1168,12 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf(
-			"failed to revoke account key: failed to convert signature algorithm: %s",
-			publicKey.SignAlgo,
-		)
+		return nil, &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
 	}
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf(
-			"failed to revoke account key: failed to convert hash algorithm: %s",
-			publicKey.HashAlgo,
-		)
+		return nil, &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
 	}
 
 	return &runtime.AccountKey{
@@ -1214,8 +1203,7 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 	}
 
 	if !ok {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("account with address %s does not exist", address)
+		return nil, &errors.AccountNotFoundError{Address: accountAddress}
 	}
 
 	// Don't return an error for invalid key indices
@@ -1241,20 +1229,12 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf(
-			"failed to get account key: failed to convert signature algorithm: %s",
-			publicKey.SignAlgo,
-		)
+		return nil, &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
 	}
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf(
-			"failed to get account key: failed to convert hash algorithm: %s",
-			publicKey.HashAlgo,
-		)
+		return nil, &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
 	}
 
 	return &runtime.AccountKey{

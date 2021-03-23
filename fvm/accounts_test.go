@@ -764,7 +764,7 @@ func TestAddAccountKey(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "invalid account key hash algorithm")
+						assert.Contains(t, tx.Err.Error(), "invalid hash algorithm")
 
 						after, err := vm.GetAccount(ctx, address, view, programs)
 						require.NoError(t, err)
@@ -822,7 +822,7 @@ func TestAddAccountKey(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "invalid account key signature algorithm")
+						assert.Contains(t, tx.Err.Error(), "invalid signature algorithm")
 
 						after, err := vm.GetAccount(ctx, address, view, programs)
 						require.NoError(t, err)
