@@ -88,7 +88,7 @@ func main() {
 		syncThreshold               int
 		extensiveLog                bool
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
-		diskWAL               *wal.DiskWAL
+		diskWAL                     *wal.DiskWAL
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).

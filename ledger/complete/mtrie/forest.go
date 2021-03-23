@@ -30,7 +30,6 @@ type Forest struct {
 	// there is no mechanism to load a trie from disk in case of a cache miss. Missing a
 	// needed trie in the forest might cause a fatal application logic error.
 	tries          *lru.Cache
-	dir            string
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie) error
 	pathByteSize   int // length [bytes] of register path
