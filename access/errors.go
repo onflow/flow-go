@@ -37,7 +37,6 @@ func (e InvalidScriptError) Error() string {
 	return fmt.Sprintf("failed to parse transaction Cadence script: %s", e.ParserErr)
 }
 
-// Unwrap returns the internal error
 func (e InvalidScriptError) Unwrap() error {
 	return e.ParserErr
 }

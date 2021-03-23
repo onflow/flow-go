@@ -960,8 +960,7 @@ func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPu
 	}
 
 	if !ok {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("account with address %s does not exist", address)
+		return &errors.AccountNotFoundError{Address: accountAddress}
 	}
 
 	var publicKey flow.AccountPublicKey
@@ -995,8 +994,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if !ok {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("account with address %s does not exist", address)
+		return nil, &errors.AccountNotFoundError{Address: accountAddress}
 	}
 
 	if keyIndex < 0 {
@@ -1065,8 +1063,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 	}
 
 	if !ok {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("account with address %s does not exist", address)
+		return nil, &errors.AccountNotFoundError{Address: accountAddress}
 	}
 
 	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)

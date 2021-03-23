@@ -41,7 +41,6 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
 
 	for _, p := range ctx.TransactionProcessors {
-		// TODO (ramtin) fix me
 		txErr, vmErr := p.Process(vm, &ctx, proc, st, programs)
 		if vmErr != nil {
 			return vmErr
