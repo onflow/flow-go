@@ -55,6 +55,7 @@ func TestProduceConsume(t *testing.T) {
 			}
 
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
+
 			// expects the processor receive only the first 3 blocks (since it is blocked on those, hence no
 			// new block is fetched to process).
 			require.ElementsMatch(t, flow.GetIDs(blocks[:3]), flow.GetIDs(received))
@@ -95,6 +96,7 @@ func TestProduceConsume(t *testing.T) {
 			// waits until all blocks finish processing
 			unittest.RequireReturnsBefore(t, processAll.Wait, time.Second, "could not process all blocks on time")
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
+
 			// expects the mock engine receive all 10 blocks.
 			require.ElementsMatch(t, flow.GetIDs(blocks), flow.GetIDs(received))
 		})
