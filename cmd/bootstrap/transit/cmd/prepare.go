@@ -28,23 +28,24 @@ func addPrepareCmdFlags() {
 func prepare(cmd *cobra.Command, args []string) {
 	log.Info().Msg("running prepare")
 
-	nodeID, err := readNodeID()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read node ID")
-	}
-
 	role, err := flow.ParseRole(flagNodeRole)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not parse Flow role")
 	}
 
-	if role == flow.RoleConsensus {
-		err := generateKeys(nodeID)
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to prepare")
-		}
+	if role != flow.RoleConsensus {
+		log.Info().Str("role", role.String()).Msg("no preparation needed for role")
 		return
 	}
 
-	log.Info().Str("role", role.String()).Msg("no preparation needed for role")
+	nodeID, err := readNodeID()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read node ID")
+	}
+
+	err = generateKeys(nodeID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to prepare")
+	}
+	log.Info().Str("role", role.String()).Msg("completed preparation")
 }
