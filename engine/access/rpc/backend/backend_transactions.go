@@ -404,6 +404,10 @@ func (b *backendTransactions) getHistoricalTransactionResult(
 				// This is on a historical node. No transactions from it will ever be
 				// executed, therefore we should consider this expired
 				result.Status = entities.TransactionStatus_EXPIRED
+			} else if result.GetStatus() == entities.TransactionStatus_UNKNOWN {
+				// We've moved to returning Status UNKNOWN instead of an error with the NotFound status,
+				// Therefore we should continue and look at the next access node for answers.
+				continue
 			}
 			return access.MessageToTransactionResult(result), nil
 		}
