@@ -35,6 +35,7 @@ func (w *worker) Run(job module.Job) error {
 	if err != nil {
 		return err
 	}
+	// TODO: wire out the internal fatal error, and return.
 	w.processor.ProcessFinalizedBlock(block)
 
 	return nil
