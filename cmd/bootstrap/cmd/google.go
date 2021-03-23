@@ -13,19 +13,19 @@ import (
 )
 
 // GoogleBucket ...
-type GoogleBucket struct {
+type googleBucket struct {
 	Name string
 }
 
 // NewGoogleBucket ...
-func NewGoogleBucket(bucketName string) *GoogleBucket {
-	return &GoogleBucket{
+func NewGoogleBucket(bucketName string) *googleBucket {
+	return &googleBucket{
 		Name: bucketName,
 	}
 }
 
 // NewClient ...
-func (g *GoogleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
+func (g *googleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
 	client, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (g *GoogleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
 }
 
 // GetFiles returns a list of file names within the Google bucket
-func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
+func (g *googleBucket) GetFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
 	it := client.Bucket(g.Name).Objects(ctx, &storage.Query{
 		Prefix:    prefix,
 		Delimiter: delimiter,
@@ -57,7 +57,7 @@ func (g *GoogleBucket) GetFiles(ctx context.Context, client *storage.Client, pre
 }
 
 // DownloadFile downloads a file from the bucket to a desination folder
-func (g *GoogleBucket) DownloadFile(ctx context.Context, client *storage.Client, destination, source string) error {
+func (g *googleBucket) DownloadFile(ctx context.Context, client *storage.Client, destination, source string) error {
 
 	// create dir of destination
 	dir := filepath.Dir(destination)
@@ -86,7 +86,7 @@ func (g *GoogleBucket) DownloadFile(ctx context.Context, client *storage.Client,
 }
 
 // UploadFile uploads a file to the google bucket
-func (g *GoogleBucket) UploadFile(ctx context.Context, client *storage.Client, destination, source string) error {
+func (g *googleBucket) UploadFile(ctx context.Context, client *storage.Client, destination, source string) error {
 
 	upload := client.Bucket(g.Name).Object(destination).NewWriter(ctx)
 	defer func() {
