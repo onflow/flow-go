@@ -23,7 +23,7 @@ var (
 // pullCmd represents a command to pull keys and metadata from the Google bucket
 var pullCmd = &cobra.Command{
 	Use:   "pull",
-	Short: "Fetch keys and metadata from the transit server",
+	Short: "Fetch public keys and metadata from the transit server",
 	Long:  `Fetch keys and metadata from the transit server`,
 	Run:   pull,
 }
