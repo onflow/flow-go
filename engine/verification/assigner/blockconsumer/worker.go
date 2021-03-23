@@ -31,7 +31,7 @@ func (w *worker) withBlockConsumer(consumer *BlockConsumer) {
 // It then converts the job to a block and passes it to the underlying engine
 // for processing.
 func (w *worker) Run(job module.Job) error {
-	block, err := toBlock(job)
+	block, err := jobToBlock(job)
 	if err != nil {
 		return err
 	}
