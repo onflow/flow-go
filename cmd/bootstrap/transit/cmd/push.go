@@ -28,11 +28,9 @@ func init() {
 func addPushCmdFlags() {
 	pushCmd.Flags().StringVar(&flagToken, "token", "", "token provided by the Flow team to access the Transit server")
 	pushCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	pushCmd.Flags().StringVar(&flagBucketName, "bucket", "", "the name of the bucket provided by the Flow team")
 
 	_ = pushCmd.MarkFlagRequired("token")
 	_ = pushCmd.MarkFlagRequired("role")
-	_ = pushCmd.MarkFlagRequired("bucket")
 }
 
 // push uploads public keys to the transit server
