@@ -117,7 +117,6 @@ func (i *TransactionInvocator) Process(
 			},
 		)
 		if err != nil {
-			// TODO ExecuteTransaction returns both txErr and vmErr
 			txError, vmError = errors.HandleRuntimeError(err)
 			if vmError != nil {
 				return nil, vmError
