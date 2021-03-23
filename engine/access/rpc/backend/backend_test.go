@@ -718,6 +718,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	events := getEvents(10)
+	validExecutorIDs := flow.IdentifierList{}
 
 	setupStorage := func(n int) []*flow.Header {
 		headers := make([]*flow.Header, n)
@@ -739,6 +740,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.receipts.
 				On("ByBlockID", b.ID()).
 				Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
+			validExecutorIDs = append(validExecutorIDs, receipt1.ExecutorID)
 		}
 
 		return headers
@@ -844,6 +846,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil,
 			suite.log,
 		)
+		// set the fixed EN Identifiers to the generated execution IDs
+		fixedENIdentifiers = validExecutorIDs
 
 		// execute request
 		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
@@ -870,6 +874,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil,
 			suite.log,
 		)
+
+		fixedENIdentifiers = validExecutorIDs
 
 		// execute request with an empty block id list and expect an error (not a panic)
 		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
