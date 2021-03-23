@@ -771,12 +771,8 @@ func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime
 		return nil, &errors.OperationNotSupportedError{Operation: "RevokeAccountKey"}
 	}
 
-	accKey, err := e.transactionEnv.RevokeAccountKey(address, index)
-	if err != nil {
-		return nil, fmt.Errorf("revoking account key failed: %w", err)
-	}
-
-	return accKey, nil
+	// no need for extra error wrapping since this is just a redirect
+	return e.transactionEnv.RevokeAccountKey(address, index)
 }
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
@@ -991,8 +987,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 
 	err = e.accounts.Create(nil, flowAddress)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return address, err
+		return address, fmt.Errorf("creating account failed: %w", err)
 	}
 
 	if e.ctx.ServiceAccountEnabled {
@@ -1007,12 +1002,10 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			e.programs.Programs,
 		)
 		if txErr != nil {
-			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-			return address, txErr
+			return address, fmt.Errorf("creating account failed: %w", txErr)
 		}
 		if vmError != nil {
-			// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-			return address, vmError
+			return address, fmt.Errorf("creating account failed: %w", vmError)
 		}
 	}
 
@@ -1028,8 +1021,7 @@ func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPu
 
 	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return err
+		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 
 	if !ok {
@@ -1040,14 +1032,13 @@ func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPu
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("cannot decode runtime public account key: %w", err)
+		issue := &errors.InvalidPublicKeyValueError{Err: err}
+		return fmt.Errorf("adding encoded account key failed: %w", issue)
 	}
 
 	err = e.accounts.AppendPublicKey(accountAddress, publicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return fmt.Errorf("failed to add public key to account: %w", err)
+		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 
 	return nil
@@ -1062,24 +1053,23 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 
 	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("remove account key failed: %w", err)
 	}
 
 	if !ok {
-		return nil, &errors.AccountNotFoundError{Address: accountAddress}
+		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		return nil, fmt.Errorf("remove account key failed: %w", issue)
 	}
 
 	if keyIndex < 0 {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("key index must be positive, received %d", keyIndex)
+		issue := &errors.InvalidInputError{Err: fmt.Errorf("key index must be positive, received %d", keyIndex)}
+		return nil, fmt.Errorf("remove account key failed: %w", issue)
 	}
 
 	var publicKey flow.AccountPublicKey
 	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("remove account key failed: %w", err)
 	}
 
 	// mark this key as revoked
@@ -1087,8 +1077,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 
 	encodedPublicKey, err = e.accounts.SetPublicKey(accountAddress, uint64(keyIndex), publicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202 {
-		return nil, fmt.Errorf("failed to revoke account key: %w", err)
+		return nil, fmt.Errorf("remove account key failed: %w", err)
 	}
 
 	return encodedPublicKey, nil
@@ -1131,34 +1120,34 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 
 	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
-
 	if !ok {
-		return nil, &errors.AccountNotFoundError{Address: accountAddress}
+		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		return nil, fmt.Errorf("adding account key failed: %w", issue)
 	}
 
 	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgorithm == crypto.UnknownSignatureAlgorithm {
-		return nil, &errors.InvalidSignatureAlgorithmError{SigningAlgo: signAlgorithm}
+		issue := &errors.InvalidSignatureAlgorithmError{SigningAlgo: signAlgorithm}
+		return nil, fmt.Errorf("adding account key failed: %w", issue)
 	}
 
 	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
 	if hashAlgorithm == crypto.UnknownHashAlgorithm {
-		return nil, &errors.InvalidHashAlgorithmError{HashAlgo: hashAlgorithm}
+		issue := &errors.InvalidHashAlgorithmError{HashAlgo: hashAlgorithm}
+		return nil, fmt.Errorf("adding account key failed: %w", issue)
 	}
 
 	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("cannot decode public key: %w", err)
+		issue := &errors.InvalidInputError{Err: fmt.Errorf("cannot decode public key: %w", err)}
+		return nil, fmt.Errorf("adding account key failed: %w", issue)
 	}
 
 	keyIndex, err := e.accounts.GetPublicKeyCount(accountAddress)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	accountPublicKey := flow.AccountPublicKey{
@@ -1173,8 +1162,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 
 	err = e.accounts.AppendPublicKey(accountAddress, accountPublicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("failed to add public key to account: %w", err)
+		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	return &runtime.AccountKey{
@@ -1197,12 +1185,12 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
 	if !ok {
-		return nil, &errors.AccountNotFoundError{Address: accountAddress}
+		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		return nil, fmt.Errorf("revoking account key failed: %w", issue)
 	}
 
 	// Don't return an error for invalid key indices
@@ -1220,9 +1208,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 		if errors.Is(err, &errors.AccountPublicKeyNotFoundError{}) {
 			return nil, nil
 		}
-
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
 	// mark this key as revoked
@@ -1230,8 +1216,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	_, err = e.accounts.SetPublicKey(accountAddress, uint64(keyIndex), publicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, fmt.Errorf("failed to revoke account key: %w", err)
+		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
 	// Prepare the account key to return
@@ -1268,12 +1253,12 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 
 	ok, err := e.accounts.Exists(accountAddress)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 
 	if !ok {
-		return nil, &errors.AccountNotFoundError{Address: accountAddress}
+		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		return nil, fmt.Errorf("getting account key failed: %w", issue)
 	}
 
 	// Don't return an error for invalid key indices
@@ -1291,20 +1276,21 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 			return nil, nil
 		}
 
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return nil, err
+		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 
 	// Prepare the account key to return
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		return nil, &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
+		issue := &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
+		return nil, fmt.Errorf("getting account key failed: %w", issue)
 	}
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		return nil, &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
+		issue := &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
+		return nil, fmt.Errorf("getting account key failed: %w", issue)
 	}
 
 	return &runtime.AccountKey{
