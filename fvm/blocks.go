@@ -52,7 +52,8 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		// recent block should be in cache so this is supposed to be fast
 		parent, err := b.storage.ByBlockID(id)
 		if err != nil {
-			return nil, &errors.BlockFinderFailure{Err: fmt.Errorf("cannot retrieve block parent: %w", err)}
+			failure := &errors.BlockFinderFailure{Err: err}
+			return nil, fmt.Errorf("cannot retrieve block parent: %w", failure)
 		}
 		if parent.Height == height {
 			return parent, nil
@@ -66,7 +67,8 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		}
 		// any other error bubbles up
 		if err != nil {
-			return nil, &errors.BlockFinderFailure{Err: fmt.Errorf("cannot retrieve block parent: %w", err)}
+			failure := &errors.BlockFinderFailure{Err: err}
+			return nil, fmt.Errorf("cannot retrieve block parent: %w", failure)
 		}
 		//if parent is finalized block, we can just use finalized chain
 		// to get desired height

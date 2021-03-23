@@ -143,10 +143,13 @@ func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 		}()
 	}
 
-	v, _ := e.accounts.GetValue(
+	v, err := e.accounts.GetValue(
 		flow.BytesToAddress(owner),
 		string(key),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("getting value failed: %w", err)
+	}
 	valueByteSize = len(v)
 	return v, nil
 }
@@ -157,11 +160,15 @@ func (e *hostEnv) SetValue(owner, key, value []byte) error {
 		defer sp.Finish()
 	}
 
-	return e.accounts.SetValue(
+	err := e.accounts.SetValue(
 		flow.BytesToAddress(owner),
 		string(key),
 		value,
 	)
+	if err != nil {
+		return fmt.Errorf("setting value failed: %w", err)
+	}
+	return nil
 }
 
 func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
@@ -172,7 +179,7 @@ func (e *hostEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 
 	v, err := e.GetValue(owner, key)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("checking value existence failed: %w", err)
 	}
 
 	return len(v) > 0, nil
@@ -184,7 +191,12 @@ func (e *hostEnv) GetStorageUsed(address common.Address) (value uint64, err erro
 		defer sp.Finish()
 	}
 
-	return e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
+	value, err = e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
+	if err != nil {
+		return value, fmt.Errorf("getting storage used failed: %w", err)
+	}
+
+	return value, nil
 }
 
 func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err error) {
@@ -195,6 +207,8 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 
 	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
 
+	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
+	// and we handle the errors and still compute the state interactions
 	err = e.vm.Run(
 		e.ctx,
 		script,
@@ -228,6 +242,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 
 	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
 
+	// TODO similar to the one above
 	err = e.vm.Run(
 		e.ctx,
 		script,
@@ -261,7 +276,6 @@ func (e *hostEnv) ResolveLocation(
 
 	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
 	// then return a single resolved location which declares all identifiers.
-
 	if !isAddress {
 		return []runtime.ResolvedLocation{
 			{
@@ -274,23 +288,21 @@ func (e *hostEnv) ResolveLocation(
 	// if the location is an address,
 	// and no specific identifiers where requested in the import statement,
 	// then fetch all identifiers at this address
-
 	if len(identifiers) == 0 {
 		address := flow.Address(addressLocation.Address)
 
 		err := e.accounts.CheckAccountNotFrozen(address)
 		if err != nil {
-			return nil, fmt.Errorf("resolve location: %w", err)
+			return nil, fmt.Errorf("resolving location failed: %w", err)
 		}
 
 		contractNames, err := e.contracts.GetContractNames(addressLocation.Address)
 		if err != nil {
-			panic(err)
+			return nil, fmt.Errorf("resolving location failed: %w", err)
 		}
 
 		// if there are no contractNames deployed,
 		// then return no resolved locations
-
 		if len(contractNames) == 0 {
 			return nil, nil
 		}
@@ -306,7 +318,6 @@ func (e *hostEnv) ResolveLocation(
 
 	// return one resolved location per identifier.
 	// each resolved location is an address contract location
-
 	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
 	for i := range resolvedLocations {
 		identifier := identifiers[i]
@@ -330,17 +341,23 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
-		return nil, fmt.Errorf("can only get code for an account contract (an AddressLocation)")
+		issue := fmt.Errorf("expecting an AddressLocation, but other location types are passed")
+		return nil, &errors.InvalidLocationError{Location: location, Err: issue}
 	}
 
 	address := flow.BytesToAddress(contractLocation.Address.Bytes())
 
 	err := e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
-		return nil, fmt.Errorf("get code: %w", err)
+		return nil, fmt.Errorf("get code failed: %w", err)
 	}
 
-	return e.contracts.GetContract(contractLocation.Address, contractLocation.Name)
+	add, err := e.contracts.GetContract(contractLocation.Address, contractLocation.Name)
+	if err != nil {
+		return nil, fmt.Errorf("get code failed: %w", err)
+	}
+
+	return add, nil
 }
 
 func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
@@ -353,9 +370,8 @@ func (e *hostEnv) GetProgram(location common.Location) (*interpreter.Program, er
 		address := flow.BytesToAddress(addressLocation.Address.Bytes())
 
 		freezeError := e.accounts.CheckAccountNotFrozen(address)
-
 		if freezeError != nil {
-			return nil, freezeError
+			return nil, fmt.Errorf("get program failed: %w", freezeError)
 		}
 	}
 
@@ -373,7 +389,11 @@ func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Prog
 		defer sp.Finish()
 	}
 
-	return e.programs.Set(location, program)
+	err := e.programs.Set(location, program)
+	if err != nil {
+		return fmt.Errorf("set program failed: %w", err)
+	}
+	return nil
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
@@ -395,12 +415,13 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "emitting events"}
+		return &errors.OperationNotSupportedError{Operation: "EmitEvent"}
 	}
 
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
-		return fmt.Errorf("failed to json encode a cadence event: %w", err)
+		issue := fmt.Errorf("failed to json encode a cadence event: %w", err)
+		return &errors.EncodingFailure{Err: issue}
 	}
 
 	e.totalEventByteSize += uint64(len(payload))
@@ -437,8 +458,14 @@ func (e *hostEnv) GenerateUUID() (uint64, error) {
 		defer sp.Finish()
 	}
 
-	// TODO add not supported
+	if e.uuidGenerator == nil {
+		return 0, &errors.OperationNotSupportedError{Operation: "GenerateUUID"}
+	}
+
 	uuid, err := e.uuidGenerator.GenerateUUID()
+	if err != nil {
+		return 0, fmt.Errorf("generating uuid failed: %w", err)
+	}
 	return uuid, err
 }
 
@@ -464,16 +491,17 @@ func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 	flowAddress := flow.Address(address)
 
 	if flowAddress == e.ctx.Chain.ServiceAddress() {
-		return fmt.Errorf("cannot freeze service account")
+		return &errors.InvalidInputError{Err: fmt.Errorf("cannot freeze service account")}
 	}
 
 	if !e.transactionEnv.isAuthorizerServiceAccount() {
-		return fmt.Errorf("SetAccountFrozen can only be used in transactions authorized by service account")
+		issue := fmt.Errorf("SetAccountFrozen can only be used in transactions authorized by service account")
+		return &errors.AuthorizationError{Address: flowAddress, Err: issue}
 	}
 
 	err := e.accounts.SetAccountFrozen(flowAddress, frozen)
 	if err != nil {
-		return fmt.Errorf("cannot set account [%s] frozen [%t]: %w", flowAddress, frozen, err)
+		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
 	return nil
 }
@@ -484,7 +512,12 @@ func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error
 		defer sp.Finish()
 	}
 
-	return jsoncdc.Decode(b)
+	v, err := jsoncdc.Decode(b)
+	if err != nil {
+		return nil, fmt.Errorf("decodeing argument failed: %w", err)
+	}
+
+	return v, err
 }
 
 func (e *hostEnv) Events() []flow.Event {
@@ -503,12 +536,12 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == crypto.UnknownHashAlgorithm {
-		panic(fmt.Errorf("unknown hash algorithm: %s", hashAlgorithm))
+		return nil, fmt.Errorf("hashing failed: %w", &errors.InvalidHashAlgorithmError{HashAlgo: hashAlgo})
 	}
 
 	hasher, err := crypto.NewHasher(hashAlgo)
 	if err != nil {
-		panic(fmt.Errorf("cannot create hasher: %w", err))
+		return nil, &errors.HasherFailure{Err: err}
 	}
 
 	return hasher.ComputeHash(data), nil
@@ -538,7 +571,7 @@ func (e *hostEnv) VerifySignature(
 	)
 
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("verifying signature failed: %w", err)
 	}
 
 	return valid, nil
@@ -549,7 +582,11 @@ func (e *hostEnv) HighLevelStorageEnabled() bool {
 }
 
 func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadence.Value) error {
-	return e.ctx.SetValueHandler(flow.Address(owner), key, value)
+	err := e.ctx.SetValueHandler(flow.Address(owner), key, value)
+	if err != nil {
+		return fmt.Errorf("setting cadence value failed: %w", err)
+	}
+	return err
 }
 
 // Block Environment Functions
@@ -562,7 +599,7 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	}
 
 	if e.ctx.BlockHeader == nil {
-		return 0, &errors.OperationNotSupportedError{Operation: "getting the current block height"}
+		return 0, &errors.OperationNotSupportedError{Operation: "GetCurrentBlockHeight"}
 	}
 	return e.ctx.BlockHeader.Height, nil
 }
@@ -576,8 +613,10 @@ func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	}
 
 	if e.rng == nil {
-		return 0, &errors.OperationNotSupportedError{Operation: "unsafe random"}
+		return 0, &errors.OperationNotSupportedError{Operation: "UnsafeRandom"}
 	}
+
+	// TODO (ramtin) return errors this assumption that this always succeeds might not be true
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
 	return binary.LittleEndian.Uint64(buf), nil
@@ -600,7 +639,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	}
 
 	if e.ctx.Blocks == nil {
-		return runtime.Block{}, false, &errors.OperationNotSupportedError{Operation: "getting block information"}
+		return runtime.Block{}, false, &errors.OperationNotSupportedError{Operation: "GetBlockAtHeight"}
 	}
 
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
@@ -608,19 +647,15 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	}
 
 	header, err := e.ctx.Blocks.ByHeightFrom(height, e.ctx.BlockHeader)
-	// TODO: remove dependency on storage
+	// TODO (ramtin): remove dependency on storage and move this if condition to blockfinder
 	if errors.Is(err, storage.ErrNotFound) {
 		return runtime.Block{}, false, nil
 	} else if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return runtime.Block{}, false, fmt.Errorf("unexpected failure of GetBlockAtHeight, height %v: %w", height, err)
+		return runtime.Block{}, false, fmt.Errorf("getting block at height failed for height %v: %w", height, err)
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 	return runtimeBlockFromHeader(header), true, nil
 }
-
-// Transaction Environment Functions
 
 func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 	if e.isTraceable() {
@@ -629,11 +664,14 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 	}
 
 	if e.transactionEnv == nil {
-		return runtime.Address{}, &errors.OperationNotSupportedError{Operation: "creating accounts"}
+		return runtime.Address{}, &errors.OperationNotSupportedError{Operation: "CreateAccount"}
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.CreateAccount(payer)
+	add, err := e.transactionEnv.CreateAccount(payer)
+	if err != nil {
+		return add, fmt.Errorf("creating account failed: %w", err)
+	}
+	return add, nil
 }
 
 func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte) error {
@@ -643,16 +681,19 @@ func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "adding account keys"}
+		return &errors.OperationNotSupportedError{Operation: "AddEncodedAccountKey"}
 	}
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return fmt.Errorf("add count key: %w", err)
+		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.AddEncodedAccountKey(address, publicKey)
+	err = e.transactionEnv.AddEncodedAccountKey(address, publicKey)
+	if err != nil {
+		return fmt.Errorf("adding encoded account key failed: %w", err)
+	}
+	return nil
 }
 
 func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
@@ -662,16 +703,20 @@ func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (p
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "removing account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "RevokeEncodedAccountKey"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return nil, fmt.Errorf("remove account key: %w", err)
+		return nil, fmt.Errorf("revoking encoded account key failed: %w", err)
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.RemoveAccountKey(address, index)
+	encodedKey, err := e.transactionEnv.RemoveAccountKey(address, index)
+	if err != nil {
+		return nil, fmt.Errorf("revoking encoded account key failed: %w", err)
+	}
+
+	return encodedKey, nil
 }
 
 func (e *hostEnv) AddAccountKey(
@@ -687,10 +732,15 @@ func (e *hostEnv) AddAccountKey(
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "adding account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "AddAccountKey"}
 	}
 
-	return e.transactionEnv.AddAccountKey(address, publicKey, hashAlgo, weight)
+	accKey, err := e.transactionEnv.AddAccountKey(address, publicKey, hashAlgo, weight)
+	if err != nil {
+		return nil, fmt.Errorf("adding account key failed: %w", err)
+	}
+
+	return accKey, nil
 }
 
 func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
@@ -700,10 +750,15 @@ func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.Ac
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "getting account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "GetAccountKey"}
 	}
 
-	return e.transactionEnv.GetAccountKey(address, index)
+	accKey, err := e.transactionEnv.GetAccountKey(address, index)
+	if err != nil {
+		return nil, fmt.Errorf("getting account key failed: %w", err)
+	}
+
+	return accKey, nil
 }
 
 func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
@@ -713,10 +768,15 @@ func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "revoking account keys"}
+		return nil, &errors.OperationNotSupportedError{Operation: "RevokeAccountKey"}
 	}
 
-	return e.transactionEnv.RevokeAccountKey(address, index)
+	accKey, err := e.transactionEnv.RevokeAccountKey(address, index)
+	if err != nil {
+		return nil, fmt.Errorf("revoking account key failed: %w", err)
+	}
+
+	return accKey, nil
 }
 
 func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string, code []byte) (err error) {
@@ -726,16 +786,20 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "updating account contract code"}
+		return &errors.OperationNotSupportedError{Operation: "UpdateAccountContractCode"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return fmt.Errorf("update account contract code: %w", err)
+		return fmt.Errorf("updating account contract code failed: %w", err)
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.UpdateAccountContractCode(address, name, code)
+	err = e.transactionEnv.UpdateAccountContractCode(address, name, code)
+	if err != nil {
+		return fmt.Errorf("updating account contract code failed: %w", err)
+	}
+
+	return nil
 }
 
 func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (code []byte, err error) {
@@ -744,10 +808,15 @@ func (e *hostEnv) GetAccountContractCode(address runtime.Address, name string) (
 		defer sp.Finish()
 	}
 
-	return e.GetCode(common.AddressLocation{
+	code, err = e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("getting account contract code failed: %w", err)
+	}
+
+	return code, nil
 }
 
 func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
@@ -757,16 +826,20 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "removing account contracts"}
+		return &errors.OperationNotSupportedError{Operation: "RemoveAccountContractCode"}
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
-		return fmt.Errorf("remove account contract code: %w", err)
+		return fmt.Errorf("removing account contract code: %w", err)
 	}
 
-	// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-	return e.transactionEnv.RemoveAccountContractCode(address, name)
+	err = e.transactionEnv.RemoveAccountContractCode(address, name)
+	if err != nil {
+		return fmt.Errorf("removing account contract code: %w", err)
+	}
+
+	return nil
 }
 
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
@@ -775,7 +848,7 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 		defer sp.Finish()
 	}
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "getting signer accounts"}
+		return nil, &errors.OperationNotSupportedError{Operation: "GetSigningAccounts"}
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
@@ -840,8 +913,8 @@ func (e *hostEnv) ValueDecoded(duration time.Duration) {
 	e.metrics.ValueDecoded(duration)
 }
 
+// Commit commits changes and return a list of updated keys
 func (e *hostEnv) Commit() ([]programs.ContractUpdateKey, error) {
-	// commit changes and return a list of updated keys
 	return e.contracts.Commit()
 }
 

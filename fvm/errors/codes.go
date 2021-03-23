@@ -30,6 +30,8 @@ const (
 	errCodeEncodingUnsupportedValue   = 120
 	errCodeOperationNotSupportedError = 121
 	errCodeInvalidBlockHeightError    = 122
+	errCodeInvalidLocationError       = 123
+	errCodeInvalidInputError          = 124
 
 	// account errors
 	errCodeAccountNotFoundError          = 150
@@ -56,4 +58,5 @@ const (
 	failureCodeLedgerFailure      = 1002
 	failureCodeStateMergeFailure  = 1003
 	failureCodeBlockFinderFailure = 1004
+	failureCodeHasherFailure      = 1005
 )

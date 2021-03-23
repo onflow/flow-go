@@ -386,15 +386,17 @@ func (e InvalidPublicKeyValueError) Unwrap() error {
 // this error is the result of failure in any of the following conditions:
 // - no signature provided for an account
 // - not enough key weight in total for this account
+// TODO (ramtin) update the doc
 type AuthorizationError struct {
-	Address      flow.Address
-	SignedWeight uint32
+	Address flow.Address
+	Err     error
 }
 
 func (e *AuthorizationError) Error() string {
 	return fmt.Sprintf(
-		"account %s does not have sufficient signatures (unauthorized access)",
+		"authorization failed for account %s: %s",
 		e.Address,
+		e.Err.Error(),
 	)
 }
 
@@ -407,4 +409,9 @@ func (e *AuthorizationError) Code() uint32 {
 func (e AuthorizationError) Is(target error) bool {
 	_, ok := target.(*AuthorizationError)
 	return ok
+}
+
+// Unwrap unwraps the error
+func (e AuthorizationError) Unwrap() error {
+	return e.Err
 }

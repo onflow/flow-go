@@ -111,13 +111,15 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		}
 
 		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
-			return &errors.AuthorizationError{Address: addr, SignedWeight: uint32(payloadWeights[addr])}, nil
+			issue := fmt.Errorf("authorizer account does not have sufficient signatures (got: %d)", payloadWeights[addr])
+			return &errors.AuthorizationError{Address: addr, Err: issue}, nil
 		}
 	}
 
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
 		// TODO change this to payer error (needed for fees)
-		return &errors.AuthorizationError{Address: tx.Payer, SignedWeight: uint32(envelopeWeights[tx.Payer])}, nil
+		issue := fmt.Errorf("payer account does not have sufficient signatures (got: %d)", envelopeWeights[tx.Payer])
+		return &errors.AuthorizationError{Address: tx.Payer, Err: issue}, nil
 	}
 
 	return nil, nil

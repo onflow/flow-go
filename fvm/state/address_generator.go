@@ -23,8 +23,9 @@ func NewStateBoundAddressGenerator(stateHolder *StateHolder, chain flow.Chain) *
 	}
 }
 
-// TODO return error instead of a panic
+// TODO (ramtin) return error instead of a panic
 // this requires changes outside of fvm since the type is defined on flow model
+// and emulator and others might be dependent on that
 func (g *StateBoundAddressGenerator) Bytes() []byte {
 	stateBytes, err := g.stateHolder.State().Get("", "", keyAddressState)
 	if err != nil {

@@ -85,19 +85,25 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
+// InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
 func (s *State) InteractionUsed() uint64 {
 	return s.TotalBytesRead + s.TotalBytesWritten
 }
 
 // Get returns a register value given owner, controller and key
 func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
-	if err := s.checkSize(owner, controller, key, []byte{}); err != nil {
+	var value []byte
+	var err error
+
+	if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
 		return nil, err
 	}
 
-	value, err := s.view.Get(owner, controller, key)
-	if err != nil {
-		return nil, newLedgerGetError(key, owner, err)
+	if value, err = s.view.Get(owner, controller, key); err != nil {
+		// wrap error into a fatal error
+		getError := &errors.LedgerFailure{Err: err}
+		// wrap with more info
+		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, owner, getError)
 	}
 
 	// if not part of recent updates count them as read
@@ -117,7 +123,10 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	}
 
 	if err := s.view.Set(owner, controller, key, value); err != nil {
-		return newLedgerSetError(key, owner, err)
+		// wrap error into a fatal error
+		setError := &errors.LedgerFailure{Err: err}
+		// wrap with more info
+		return fmt.Errorf("failed to update key %s on account %s: %w", key, owner, setError)
 	}
 
 	if err := s.checkMaxInteraction(); err != nil {
@@ -188,6 +197,7 @@ func (s *State) MergeState(other *State) error {
 	return s.checkMaxInteraction()
 }
 
+// UpdatedAddresses returns a list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
 	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
 	for k := range s.updatedAddresses {
@@ -231,14 +241,4 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	}
 	address := flow.BytesToAddress(ownerBytes)
 	return address, true
-}
-
-func newLedgerGetError(address string, key string, err error) error {
-	getError := fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
-	return &errors.LedgerFailure{Err: getError}
-}
-
-func newLedgerSetError(address string, key string, err error) error {
-	setError := fmt.Errorf("failed to set key %s on account %s: %w", key, address, err)
-	return &errors.LedgerFailure{Err: setError}
 }

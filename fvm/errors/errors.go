@@ -35,16 +35,15 @@ func As(err error, target interface{}) bool {
 
 // SplitErrorTypes splits the error into transaction errors and vm fatal errors
 func SplitErrorTypes(err error) (txError TransactionError, vmError VMError) {
-	switch err.(type) {
-	case VMError:
-		return nil, err.(VMError)
-	case TransactionError:
-		return err.(TransactionError), nil
-	default:
-		if err != nil {
-			// capture anything else as unknown failures
-			return nil, &UnknownFailure{Err: err}
-		}
+	if As(err, &vmError) {
+		return nil, vmError
+	}
+	if As(err, &txError) {
+		return txError, nil
+	}
+	if err != nil {
+		// capture anything else as unknown failures
+		return nil, &UnknownFailure{Err: err}
 	}
 	return nil, nil
 }

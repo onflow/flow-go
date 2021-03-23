@@ -73,3 +73,17 @@ func (e *BlockFinderFailure) Error() string {
 func (e *BlockFinderFailure) FailureCode() uint16 {
 	return failureCodeBlockFinderFailure
 }
+
+// HasherFailure captures a fatal caused by hasher
+type HasherFailure struct {
+	Err error
+}
+
+func (e *HasherFailure) Error() string {
+	return fmt.Sprintf("hasher failed: %s", e.Err.Error())
+}
+
+// FailureCode returns the failure code
+func (e *HasherFailure) FailureCode() uint16 {
+	return failureCodeHasherFailure
+}

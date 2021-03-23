@@ -166,7 +166,7 @@ type OperationNotSupportedError struct {
 }
 
 func (e *OperationNotSupportedError) Error() string {
-	return fmt.Sprintf("%s is not supported in this environment.", e.Operation)
+	return fmt.Sprintf("%s is not supported in this environment", e.Operation)
 }
 
 // Code returns the error code for this error
@@ -231,4 +231,59 @@ func (e *InvalidBlockHeightError) Code() uint32 {
 func (e *InvalidBlockHeightError) Is(target error) bool {
 	_, ok := target.(*InvalidBlockHeightError)
 	return ok
+}
+
+// InvalidLocationError indicates an invalid location is passed
+type InvalidLocationError struct {
+	Location runtime.Location
+	Err      error
+}
+
+func (e InvalidLocationError) Error() string {
+	return fmt.Sprintf(
+		"location (%s) is not a valid location: %s",
+		e.Location.String(),
+		e.Err.Error(),
+	)
+}
+
+// Code returns the error code for this error
+func (e InvalidLocationError) Code() uint32 {
+	return errCodeInvalidLocationError
+}
+
+// Is returns true if the given error type is InvalidLocationError
+func (e InvalidLocationError) Is(target error) bool {
+	_, ok := target.(*InvalidLocationError)
+	return ok
+}
+
+// Unwrap unwraps the error
+func (e InvalidLocationError) Unwrap() error {
+	return e.Err
+}
+
+// InvalidInputError indicates passed input is not valid.
+type InvalidInputError struct {
+	Err error
+}
+
+func (e InvalidInputError) Error() string {
+	return fmt.Sprintf("invalid input: %s", e.Err.Error())
+}
+
+// Code returns the error code for this error type
+func (e InvalidInputError) Code() uint32 {
+	return errCodeInvalidInputError
+}
+
+// Is returns true if the given error type is InvalidInputError
+func (e InvalidInputError) Is(target error) bool {
+	_, ok := target.(*InvalidInputError)
+	return ok
+}
+
+// Unwrap unwraps the error
+func (e InvalidInputError) Unwrap() error {
+	return e.Err
 }

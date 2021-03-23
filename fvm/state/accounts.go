@@ -466,6 +466,7 @@ func (a *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 }
 
 func (a *Accounts) getContractNames(address flow.Address) (contractNames, error) {
+	// TODO ramtin : return fatal error if can't fetch
 	encContractNames, err := a.getValue(address, true, KeyContractNames)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
