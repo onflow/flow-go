@@ -9,7 +9,7 @@ import (
 // prepareCmd represents a command to generate transit keys for push command
 var prepareCmd = &cobra.Command{
 	Use:   "prepare",
-	Short: "Generate transit keys for push command",
+	Short: "Generate transit keys for push command (only needed for consensus node)",
 	Long:  `Generate transit keys for push command`,
 	Run:   prepare,
 }
