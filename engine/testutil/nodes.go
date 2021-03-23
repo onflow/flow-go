@@ -82,7 +82,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	metrics := metrics.NewNoopCollector()
 
 	// creates state fixture and bootstrap it.
-	stateFixture := CompleteStateFixture(t, log, metrics, tracer, participants)
+	stateFixture := CompleteStateFixture(t, metrics, tracer, participants)
 
 	require.NoError(t, err)
 	for _, option := range options {
@@ -140,7 +140,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 }
 
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
-func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.NoopCollector, tracer module.Tracer,
+func CompleteStateFixture(t testing.TB, metric *metrics.NoopCollector, tracer module.Tracer,
 	participants flow.IdentityList) *testmock.StateFixture {
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
