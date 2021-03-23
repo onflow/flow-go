@@ -39,7 +39,7 @@ func (i *TransactionInvocator) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError errors.TransactionError, vmError errors.VMError) {
+) (processErr error) {
 
 	var span opentracing.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
@@ -56,6 +56,7 @@ func (i *TransactionInvocator) Process(
 	}
 
 	var env *hostEnv
+	var txError error
 	env = newEnvironment(*ctx, vm, sth, programs)
 	predeclaredValues := i.valueDeclarations(ctx, env)
 
@@ -66,8 +67,7 @@ func (i *TransactionInvocator) Process(
 	childState := sth.NewChild()
 	defer func() {
 		if mergeError := parentState.MergeState(childState); mergeError != nil {
-			vmError = mergeError.(errors.VMError)
-			return
+			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
 	}()
@@ -117,10 +117,7 @@ func (i *TransactionInvocator) Process(
 			},
 		)
 		if err != nil {
-			txError, vmError = errors.HandleRuntimeError(err)
-			if vmError != nil {
-				return nil, vmError
-			}
+			txError = fmt.Errorf("transaction invocation failed: %w", errors.HandleRuntimeError(err))
 		}
 
 		// break the loop
@@ -141,19 +138,13 @@ func (i *TransactionInvocator) Process(
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
 	updatedKeys, err := env.Commit()
-	if err != nil {
-		txError, vmError = errors.SplitErrorTypes(err)
-		if vmError != nil {
-			return nil, vmError
-		}
+	if err != nil && txError == nil {
+		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
 	// check the storage limits
 	if ctx.LimitAccountStorage && txError == nil {
-		txError, vmError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
-		if vmError != nil {
-			return nil, vmError
-		}
+		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
 	}
 
 	if txError != nil {
@@ -166,8 +157,7 @@ func (i *TransactionInvocator) Process(
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
-		proc.Err = txError
-		return txError, nil
+		return txError
 	}
 
 	// based on the contract updates we decide how to clean up the programs
@@ -187,7 +177,7 @@ func (i *TransactionInvocator) Process(
 		Int("retried", proc.Retried).
 		Msg("transaction executed successfully")
 
-	return nil, nil
+	return nil
 }
 
 func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {

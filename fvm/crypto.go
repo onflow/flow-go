@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const runtimeUserDomainTag = "user"
+
 type SignatureVerifier interface {
 	Verify(
 		signature []byte,
@@ -150,14 +152,14 @@ func verifySignatureFromRuntime(
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return false, err
+		issue := &errors.InvalidInputError{Err: fmt.Errorf("cannot decode public key: %w", err)}
+		return false, issue
 	}
 
 	tag := parseRuntimeDomainTag(rawTag)
 	if tag == nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return false, fmt.Errorf("invalid domain tag: %s", rawTag)
+		issue := &errors.InvalidInputError{Err: fmt.Errorf("invalid domain tag: %s", rawTag)}
+		return false, issue
 	}
 
 	valid, err := verifier.Verify(
@@ -168,14 +170,11 @@ func verifySignatureFromRuntime(
 		hashAlgo,
 	)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return false, err
 	}
 
 	return valid, nil
 }
-
-const runtimeUserDomainTag = "user"
 
 func parseRuntimeDomainTag(tag string) []byte {
 	if tag == runtimeUserDomainTag {

@@ -23,7 +23,7 @@ func (c *TransactionSequenceNumberChecker) Process(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError errors.TransactionError, vmError errors.VMError) {
+) error {
 	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
 }
 
@@ -31,7 +31,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	proc *TransactionProcedure,
 	ctx *Context,
 	sth *state.StateHolder,
-) (txError errors.TransactionError, vmError errors.VMError) {
+) error {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
@@ -55,25 +55,21 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
-		txError, vmError = errors.SplitErrorTypes(err)
-		if vmError != nil {
-			return nil, vmError
+		issue := &errors.InvalidProposalSignatureError{
+			Address:  proposalKey.Address,
+			KeyIndex: proposalKey.KeyIndex,
+			Err:      err,
 		}
-		if txError != nil {
-			return &errors.InvalidProposalSignatureError{
-				Address:  proposalKey.Address,
-				KeyIndex: proposalKey.KeyIndex,
-				Err:      err,
-			}, nil
-		}
+		return fmt.Errorf("checking sequence number failed: %w", issue)
 	}
 
 	if accountKey.Revoked {
-		return &errors.InvalidProposalSignatureError{
+		issue := &errors.InvalidProposalSignatureError{
 			Address:  proposalKey.Address,
 			KeyIndex: proposalKey.KeyIndex,
 			Err:      fmt.Errorf("proposal key has been revoked"),
-		}, nil
+		}
+		return fmt.Errorf("checking sequence number failed: %w", issue)
 	}
 
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
@@ -84,22 +80,15 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 			KeyIndex:          proposalKey.KeyIndex,
 			CurrentSeqNumber:  accountKey.SeqNumber,
 			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}, nil
+		}
 	}
 
 	accountKey.SeqNumber++
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
-		txError, vmError = errors.SplitErrorTypes(err)
-		if vmError != nil {
-			return nil, vmError
-		}
-		if txError != nil {
-			// drop the changes
-			childState.View().DropDelta()
-			return txError, nil
-		}
+		childState.View().DropDelta()
+		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
-	return nil, nil
+	return nil
 }

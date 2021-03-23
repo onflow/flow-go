@@ -33,7 +33,7 @@ type ScriptProcedure struct {
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) (txError errors.TransactionError, vmError errors.VMError)
+	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
@@ -46,7 +46,8 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
-		txError, vmError := p.Process(vm, ctx, proc, sth, programs)
+		err := p.Process(vm, ctx, proc, sth, programs)
+		txError, vmError := errors.SplitErrorTypes(err)
 		if vmError != nil {
 			return vmError
 		}
@@ -54,7 +55,6 @@ func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 			proc.Err = txError
 			return nil
 		}
-
 	}
 
 	return nil
@@ -72,7 +72,7 @@ func (i ScriptInvocator) Process(
 	proc *ScriptProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError errors.TransactionError, vmError errors.VMError) {
+) error {
 	env := newEnvironment(ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])
 	value, err := vm.Runtime.ExecuteScript(
@@ -87,16 +87,12 @@ func (i ScriptInvocator) Process(
 	)
 
 	if err != nil {
-		txError, vmError := errors.HandleRuntimeError(err)
-
-		if txError != nil || vmError != nil {
-			return txError, vmError
-		}
+		return errors.HandleRuntimeError(err)
 	}
 
 	proc.Value = value
 	proc.Logs = env.getLogs()
 	proc.Events = env.Events()
 	proc.GasUsed = env.GetComputationUsed()
-	return nil, nil
+	return nil
 }

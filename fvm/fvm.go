@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
@@ -73,8 +75,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 	sth := state.NewStateHolder(st)
 	account, err := getAccount(vm, ctx, sth, programs, address)
 	if err != nil {
-		// TODO: wrap error
-		return nil, err
+		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
 }
@@ -83,7 +84,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (txError errors.TransactionError, vmError errors.VMError) {
+func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) error {
 	invocator := NewTransactionInvocator(zerolog.Nop())
 	return invocator.Process(vm, &ctx, tx, sth, programs)
 }

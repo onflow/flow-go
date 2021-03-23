@@ -991,7 +991,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		txErr, vmError := e.vm.invokeMetaTransaction(
+		err := e.vm.invokeMetaTransaction(
 			e.ctx,
 			initAccountTransaction(
 				flow.Address(payer),
@@ -1001,11 +1001,8 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			e.sth,
 			e.programs.Programs,
 		)
-		if txErr != nil {
-			return address, fmt.Errorf("creating account failed: %w", txErr)
-		}
-		if vmError != nil {
-			return address, fmt.Errorf("creating account failed: %w", vmError)
+		if err != nil {
+			return address, fmt.Errorf("creating account failed: %w", err)
 		}
 	}
 

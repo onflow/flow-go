@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime/common"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -44,16 +46,15 @@ func (d *TransactionStorageLimiter) Process(
 	tp *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (txError errors.TransactionError, vmError errors.VMError) {
+) error {
 	if !ctx.LimitAccountStorage {
-		return nil, nil
+		return nil
 	}
 
 	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, sth, programs)
 
-	txError, vmError = errors.SplitErrorTypes(err)
-	if txError != nil || vmError != nil {
-		return
+	if err != nil {
+		return fmt.Errorf("storage limit check failed: %w", err)
 	}
 
 	accounts := state.NewAccounts(sth)
@@ -65,10 +66,7 @@ func (d *TransactionStorageLimiter) Process(
 		// does it exist?
 		exists, err := accounts.Exists(address)
 		if err != nil {
-			txError, vmError = errors.SplitErrorTypes(err)
-			if txError != nil || vmError != nil {
-				return
-			}
+			return fmt.Errorf("storage limit check failed: %w", err)
 		}
 		if !exists {
 			continue
@@ -76,18 +74,12 @@ func (d *TransactionStorageLimiter) Process(
 
 		capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
 		if err != nil {
-			txError, vmError = errors.SplitErrorTypes(err)
-			if txError != nil || vmError != nil {
-				return
-			}
+			return fmt.Errorf("storage limit check failed: %w", err)
 		}
 
 		usage, err := accounts.GetStorageUsed(address)
 		if err != nil {
-			txError, vmError = errors.SplitErrorTypes(err)
-			if txError != nil || vmError != nil {
-				return
-			}
+			return fmt.Errorf("storage limit check failed: %w", err)
 		}
 
 		if usage > capacity {
@@ -95,8 +87,8 @@ func (d *TransactionStorageLimiter) Process(
 				Address:         address,
 				StorageUsed:     usage,
 				StorageCapacity: capacity,
-			}, nil
+			}
 		}
 	}
-	return nil, nil
+	return nil
 }

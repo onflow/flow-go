@@ -35,27 +35,31 @@ func As(err error, target interface{}) bool {
 
 // SplitErrorTypes splits the error into transaction errors and vm fatal errors
 func SplitErrorTypes(err error) (txError TransactionError, vmError VMError) {
+	// vmErrors should get the priority
+	// any vmError at any level
 	if As(err, &vmError) {
 		return nil, vmError
 	}
+	// then we should try to match txErrors (happy cases)
 	if As(err, &txError) {
 		return txError, nil
 	}
+	// anything else that is left is an unknown failure
+	// (except the ones green listed for now to be considered as txErrors)
 	if err != nil {
-		// capture anything else as unknown failures
 		return nil, &UnknownFailure{Err: err}
 	}
 	return nil, nil
 }
 
 // HandleRuntimeError splits the error into transaction errors and vm fatal errors
-func HandleRuntimeError(err error) (txError TransactionError, vmErr VMError) {
+func HandleRuntimeError(err error) error {
 	var runErr runtime.Error
 	var ok bool
 	// if is not a runtime error return as vm error
 	// this should never happen unless a bug in the code
 	if runErr, ok = err.(runtime.Error); !ok {
-		return nil, &UnknownFailure{runErr}
+		return &UnknownFailure{runErr}
 	}
 	innerErr := runErr.Err
 
@@ -65,12 +69,12 @@ func HandleRuntimeError(err error) (txError TransactionError, vmErr VMError) {
 		if recoveredErr, ok := externalErr.Recovered.(error); ok {
 			// If the recovered value is an error, pass it to the original
 			// error handler to distinguish between fatal and non-fatal errors.
-			return SplitErrorTypes(recoveredErr)
+			return recoveredErr
 		}
 		// if not recovered return
-		return nil, &UnknownFailure{externalErr}
+		return &UnknownFailure{externalErr}
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return &CadenceRuntimeError{Err: &runErr}, nil
+	return &CadenceRuntimeError{Err: &runErr}
 }
