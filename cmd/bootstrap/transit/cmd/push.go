@@ -28,7 +28,7 @@ func init() {
 func addPushCmdFlags() {
 	pushCmd.Flags().StringVar(&flagToken, "token", "", "token provided by the Flow team to access the Transit server")
 	pushCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	pushCmd.Flags().StringVar(&flagBucketName, "bucket", "", "the name of the Google Bucket provided by the Flow team")
+	pushCmd.Flags().StringVar(&flagBucketName, "bucket", "", "the name of the bucket provided by the Flow team")
 
 	_ = pushCmd.MarkFlagRequired("token")
 	_ = pushCmd.MarkFlagRequired("role")
@@ -42,14 +42,14 @@ func push(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	nodeID, err := readNodeID()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read node ID")
-	}
-
 	role, err := flow.ParseRole(flagNodeRole)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not parse Flow role")
+	}
+
+	nodeID, err := readNodeID()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read node ID")
 	}
 
 	// create new bucket instance with Flow Bucket name
@@ -58,7 +58,7 @@ func push(cmd *cobra.Command, args []string) {
 	// initialize a new client to GCS
 	client, err := bucket.NewClient(ctx)
 	if err != nil {
-		log.Error().Msgf("error trying get new google bucket client: %v", err)
+		log.Fatal().Msgf("error trying get new google bucket client: %v", err)
 	}
 	defer client.Close()
 
