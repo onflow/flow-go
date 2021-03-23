@@ -100,8 +100,14 @@ func (mt *MTrie) String() string {
 	return trieStr + mt.root.FmtStr("", "")
 }
 
-// UnsafeRead read payloads for the given paths. It is called unsafe as it modifies the
-// input paths (paths are sorted when the function returns).
+// UnsafeRead read payloads for the given paths.
+// UNSAFE: requires _all_ paths to have a length of mt.Height bits.
+// CAUTION: while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
+// Return:
+//  * `payloads` []*ledger.Payload
+//     For each path, the corresponding payload is written into payloads. AFTER
+//     the read operation completes, the order of `path` and `payloads` are such that
+//     for `path[i]` the corresponding register value is referenced by 0`payloads[i]`.
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 	// allocate the result buffer
@@ -110,7 +116,12 @@ func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 	return res
 }
 
-func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Path) {
+// read reads all the registers in subtree with `head` as root node. For each
+// `path[i]`, the corresponding payload is written into `payloads[i]` for the same index `i`.
+// CAUTION:
+//  * while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
+//  * unchecked requirement: all paths must go through the `head` node
+func (mt *MTrie) read(head *node.Node, paths []ledger.Path, payloads []*ledger.Payload) {
 	// check for empty paths
 	if len(paths) == 0 {
 		return
@@ -119,7 +130,7 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	// path not found
 	if head == nil {
 		for i := range paths {
-			(*res)[i] = ledger.EmptyPayload()
+			payloads[i] = ledger.EmptyPayload()
 		}
 		return
 	}
@@ -127,9 +138,9 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	if head.IsLeaf() {
 		for i, p := range paths {
 			if bytes.Equal(head.Path(), p) {
-				(*res)[i] = head.Payload()
+				payloads[i] = head.Payload()
 			} else {
-				(*res)[i] = ledger.EmptyPayload()
+				payloads[i] = ledger.EmptyPayload()
 			}
 		}
 		return
@@ -141,26 +152,24 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	heightIndex := mt.Height() - head.Height() // distance to the tree root
 	partitionIndex := utils.SplitPaths(paths, heightIndex)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
-	lres, rres := (*res)[:partitionIndex], (*res)[partitionIndex:]
+	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
 	// read values from left and right subtrees in parallel
-	wg := sync.WaitGroup{}
-	parallelRecursionThreshold := 32 // thresold to avoid the parallelization going too deep in the recursion
-
-	if len(lpaths) > parallelRecursionThreshold {
+	parallelRecursionThreshold := 32 // threshold to avoid the parallelization going too deep in the recursion
+	if len(lpaths) <= parallelRecursionThreshold {
+		mt.read(head.LeftChild(), lpaths, lpayloads)
+		mt.read(head.RightChild(), rpaths, rpayloads)
+	} else {
+		// concurrent read of left and right subtree
+		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			mt.read(&lres, head.LeftChild(), lpaths)
+			mt.read(head.LeftChild(), lpaths, lpayloads)
 			wg.Done()
 		}()
-	} else {
-		mt.read(&lres, head.LeftChild(), lpaths)
+		mt.read(head.RightChild(), rpaths, rpayloads)
+		wg.Wait() // wait for all threads
 	}
-
-	mt.read(&rres, head.RightChild(), rpaths)
-
-	// wait for all threads
-	wg.Wait()
 }
 
 // NewTrieWithUpdatedRegisters constructs a new trie containing all registers from the parent trie.
@@ -170,10 +179,18 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 //   * subtries that remain unchanged are from the parent trie instead of copied.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * keys are NOT duplicated
+// CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
+	if len(updatedPaths) == 0 { // No new paths to write
+		return parentTrie, nil
+	}
+
 	parentRoot := parentTrie.root
-	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, nil)
+	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads)
+	if parentRoot == updatedRoot {
+		return parentTrie, nil
+	}
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -181,94 +198,189 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 	return updatedTrie, nil
 }
 
-func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
-	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node) *node.Node {
-
-	// No new paths to write
-	if len(paths) == 0 {
-		// check is a compactLeaf from a higher height is still left
-		if compactLeaf != nil {
-			return node.NewLeaf(compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
-		}
-		return parentNode
+// update traverses the subtree and updates the stored registers
+// UNSAFE: method requires the following conditions to be satisfied:
+//   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
+//     (excluding the bit at index headHeight)
+//   * paths contains at least one element
+//   * paths are NOT duplicated
+func (parentTrie *MTrie) update(
+	nodeHeight int, parentNode *node.Node,
+	paths []ledger.Path, payloads []ledger.Payload,
+) *node.Node {
+	if parentNode == nil { // arrived at default node in parent tree, which needs to be expanded
+		return constructSubtrie(parentTrie.Height(), nodeHeight, paths, payloads)
 	}
-
-	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
-		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
+	if parentNode.IsLeaf() { // arrived at compactified leaf of parent tree, which needs to be expanded
+		return replaceLeaf(parentTrie.Height(), parentNode, parentNode.Height(), paths, payloads)
 	}
-
-	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
-		// check if the parent path node is among the updated paths
-		parentPath := parentNode.Path()
-		found := false
-		for i, p := range paths {
-			if bytes.Equal(p, parentPath) {
-				// the case where the leaf can be reused
-				if len(paths) == 1 {
-					if !bytes.Equal(parentNode.Payload().Value, payloads[i].Value) {
-						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
-					}
-					// avoid creating a new node when the same payload is written
-					return parentNode
-				}
-				found = true
-				break
-			}
-		}
-		if !found {
-			compactLeaf = parentNode
-		}
-	}
-
-	// in the remaining code: len(paths)>1
 
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	heightIndex := parentTrie.Height() - nodeHeight // distance to the tree root
-	partitionIndex := utils.SplitByPath(paths, payloads, heightIndex)
+	depth := parentTrie.Height() - parentNode.Height() // distance to the tree root
+	partitionIndex := utils.SplitByPath(paths, payloads, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
-	// check if there is a compact leaf that needs to get deep to height 0
-	var lcompactLeaf, rcompactLeaf *node.Node
-	if compactLeaf != nil {
-		// if yes, check which branch it will go to.
-		if utils.Bit(compactLeaf.Path(), parentTrie.Height()-nodeHeight) == 0 {
-			lcompactLeaf = compactLeaf
-		} else {
-			rcompactLeaf = compactLeaf
+	// runtime optimization: if there are _no_ value for either left or right sub-tree, proceed single-threaded
+	if len(lpaths) == 0 {
+		rChild := parentTrie.update(nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
+		if parentNode.RightChild() == rChild {
+			return parentNode
 		}
+		return node.NewInterimNode(parentNode.Height(), parentNode.LeftChild(), rChild)
+	}
+	if len(rpaths) == 0 {
+		lChild := parentTrie.update(nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
+		if parentNode.LeftChild() == lChild {
+			return parentNode
+		}
+		return node.NewInterimNode(parentNode.Height(), lChild, parentNode.RightChild())
 	}
 
-	// set the parent node children
-	var lchildParent, rchildParent *node.Node
-	if parentNode != nil {
-		lchildParent = parentNode.LeftChild()
-		rchildParent = parentNode.RightChild()
-	}
-
-	// recurse over each branch
+	// recurse into left and right subtree
 	var lChild, rChild *node.Node
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
+		lChild = parentTrie.update(nodeHeight-1, parentNode.LeftChild(), lpaths, lpayloads)
 	}()
-	rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+	rChild = parentTrie.update(nodeHeight-1, parentNode.RightChild(), rpaths, rpayloads)
 	wg.Wait()
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
 	// payload is re-written at a register.
-	if lChild == lchildParent && rChild == rchildParent {
+	if lChild == parentNode.LeftChild() && rChild == parentNode.RightChild() {
 		return parentNode
 	}
 	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
-// UnsafeProofs provides proofs for the given paths, this is called unsafe as
-// it requires the input paths to be sorted in advance.
+// replaceLeaf replaces the (compactified) leaf with an entire subtree containing
+// paths with respective payloads. This method
+// the head of a newly-constructed sub-trie for the specified key-value pairs.
+// UNSAFE: replaceLeaf requires the following conditions to be satisfied,
+// but does not explicitly check them for performance reasons
+//   * leaf is not nil
+//   * paths all share the same common prefix [0 : mt.maxHeight-1 - headHeight)
+//     (excluding the bit at index headHeight)
+//   * paths contains at least one element
+//   * paths are NOT duplicated
+func replaceLeaf(
+	treeHeight int, leaf *node.Node,
+	height int, paths []ledger.Path, payloads []ledger.Payload,
+) *node.Node {
+	// only the leaf remains for this subtree
+	if len(paths) == 0 {
+		if leaf.Height() == height {
+			return leaf
+		}
+		return node.NewLeaf(leaf.Path(), leaf.Payload(), height)
+	}
+	if len(paths) == 1 {
+		path := paths[0]
+		payload := payloads[0]
+		if bytes.Equal(path, leaf.Path()) { // override leaf's register
+			if bytes.Equal(payload.Value, leaf.Payload().Value) && leaf.Height() == height {
+				return leaf
+			}
+			return node.NewLeaf(path, &payload, height)
+		}
+		// write to _different_ register than leaf:
+		// we allocate two slices here; however, this is negligible, as it happens only _once_ during a full update
+		return constructSubtrie(treeHeight, height, []ledger.Path{path, leaf.Path()}, []ledger.Payload{payload, *leaf.Payload()})
+	}
+
+	// Split paths and payloads to recurse:
+	// lpaths contains all paths that have `0` at the partitionIndex
+	// rpaths contains all paths that have `1` at the partitionIndex
+	depth := treeHeight - height // distance to the tree root
+	partitionIndex := utils.SplitByPath(paths, payloads, depth)
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
+
+	// if yes, check which branch it will go to.
+	var lChild, rChild *node.Node
+	if utils.Bit(leaf.Path(), depth) == 0 { // leaf goes into the left subtree
+		if len(rpaths) > 0 {
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				rChild = constructSubtrie(treeHeight, height-1, rpaths, rpayloads)
+			}()
+			lChild = replaceLeaf(treeHeight, leaf, height-1, lpaths, lpayloads)
+			wg.Wait()
+		} else {
+			lChild = replaceLeaf(treeHeight, leaf, height-1, lpaths, lpayloads)
+		}
+	} else { // leaf goes into the right subtree
+		if len(lpaths) > 0 {
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				lChild = constructSubtrie(treeHeight, height-1, lpaths, lpayloads)
+			}()
+			rChild = replaceLeaf(treeHeight, leaf, height-1, rpaths, rpayloads)
+			wg.Wait()
+		} else {
+			rChild = replaceLeaf(treeHeight, leaf, height-1, rpaths, rpayloads)
+		}
+	}
+	return node.NewInterimNode(height, lChild, rChild)
+}
+
+// constructSubtrie returns the head of a newly-constructed sub-trie for the specified key-value pairs.
+// UNSAFE: constructSubtrie requires the following conditions to be satisfied,
+// but does not explicitly check them for performance reasons
+//   * paths all share the same common prefix [0 : mt.maxHeight-1 - headHeight)
+//     (excluding the bit at index headHeight)
+//   * paths contains at least one element
+//   * paths are NOT duplicated
+func constructSubtrie(treeHeight int, nodeHeight int, paths []ledger.Path, payloads []ledger.Payload) *node.Node {
+	// If we are at a leaf node, we create the node
+	if len(paths) == 1 {
+		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
+	}
+	// from here on, we have: len(paths) > 1
+
+	// Split paths and payloads to recurse:
+	// lpaths contains all paths that have `0` at the partitionIndex
+	// rpaths contains all paths that have `1` at the partitionIndex
+	depth := treeHeight - nodeHeight // distance to the tree root
+	partitionIndex := utils.SplitByPath(paths, payloads, depth)
+	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
+	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
+
+	// runtime optimization: if there are _no_ value for either left or right sub-tree, proceed single-threaded
+	if len(lpaths) == 0 {
+		rChild := constructSubtrie(treeHeight, nodeHeight-1, rpaths, rpayloads)
+		return node.NewInterimNode(nodeHeight, nil, rChild)
+	}
+	if len(rpaths) == 0 {
+		lChild := constructSubtrie(treeHeight, nodeHeight-1, lpaths, lpayloads)
+		return node.NewInterimNode(nodeHeight, lChild, nil)
+	}
+
+	// we only reach this code, if we have values for the left _and_ right subtree;
+	// concurrently construct left and right subtree
+	var lChild, rChild *node.Node
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		lChild = constructSubtrie(treeHeight, nodeHeight-1, lpaths, lpayloads)
+	}()
+	rChild = constructSubtrie(treeHeight, nodeHeight-1, rpaths, rpayloads)
+	wg.Wait()
+	return node.NewInterimNode(nodeHeight, lChild, rChild)
+}
+
+// UnsafeProofs provides proofs for the given paths.
+// UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) {
 	mt.proofs(mt.root, paths, proofs)
 }

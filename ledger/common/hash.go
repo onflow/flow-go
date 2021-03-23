@@ -28,7 +28,6 @@ var defaultHashes [defaultHashLen][]byte
 var log zerolog.Logger
 
 func init() {
-
 	log = zerolog.New(os.Stderr)
 
 	hasher := hash.NewSHA3_256()
@@ -98,7 +97,7 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 }
 
 // HashLeafIn generates hash value for leaf nodes (SHA3-256)
-// and stores the result in the result input
+// and stores the hash value in the provided result slice
 //
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
@@ -117,7 +116,7 @@ func HashLeafIn(result *[]byte, path []byte, value []byte) {
 }
 
 // HashInterNodeIn generates hash value for intermediate nodes (SHA3-256)
-// and stores the result in the input array.
+// and stores the hash value in the provided result slice
 //
 // result slice can be equal to hash1 or hash2.
 // hash1 and hash2 must each be a 32 byte slice.
