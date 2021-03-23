@@ -107,6 +107,6 @@ func (g *GoogleBucket) UploadFile(ctx context.Context, client *storage.Client, d
 		return fmt.Errorf("Error uploading file: %w", err)
 	}
 
-	log.Info().Int64("byte_count", n).Msg("uploaded bytes")
+	log.Info().Int64("byte_count", n).Msg("uploaded file")
 	return nil
 }
