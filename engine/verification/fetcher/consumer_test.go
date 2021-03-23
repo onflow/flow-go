@@ -174,6 +174,6 @@ func (e *MockEngine) ProcessAssignedChunk(locator *chunks.Locator) {
 	e.process(e.notifier, locator)
 }
 
-func (e *MockEngine) WithProcessingNotifier(notifier module.ProcessingNotifier) {
+func (e *MockEngine) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.notifier = notifier
 }

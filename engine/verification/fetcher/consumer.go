@@ -113,7 +113,7 @@ func NewChunkConsumer(
 	maxProcessing int64, // max number of jobs to be processed in parallel
 ) *ChunkConsumer {
 	worker := NewWorker(engine)
-	engine.WithProcessingNotifier(worker)
+	engine.WithChunkConsumerNotifier(worker)
 
 	jobs := &ChunkJobs{locators: chunksQueue}
 
