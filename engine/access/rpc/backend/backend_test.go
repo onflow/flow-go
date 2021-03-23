@@ -718,7 +718,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	events := getEvents(10)
-	validExecutorIDs := flow.IdentifierList{}
+	validExecutorIdentities := flow.IdentityList{}
 
 	setupStorage := func(n int) []*flow.Header {
 		headers := make([]*flow.Header, n)
@@ -740,14 +740,15 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.receipts.
 				On("ByBlockID", b.ID()).
 				Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
-			validExecutorIDs = append(validExecutorIDs, receipt1.ExecutorID)
+			validExecutorIdentities = append(validExecutorIdentities, ids...)
 		}
 
 		return headers
 	}
 	blockHeaders := setupStorage(5)
 
-	suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Once()
+	suite.snapshot.On("Identities", mock.Anything).Return(validExecutorIdentities, nil).Once()
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -829,7 +830,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 
 	suite.Run("with an execution node chosen using block ID", func() {
-
 		// create the handler
 		backend := New(
 			suite.state,
@@ -843,11 +843,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			nil,
-			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 		)
-		// set the fixed EN Identifiers to the generated execution IDs
-		fixedENIdentifiers = validExecutorIDs
 
 		// execute request
 		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
@@ -871,11 +869,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
 			nil,
-			nil,
+			validENIDs.Strings(),
 			suite.log,
 		)
-
-		fixedENIdentifiers = validExecutorIDs
 
 		// execute request with an empty block id list and expect an error (not a panic)
 		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
