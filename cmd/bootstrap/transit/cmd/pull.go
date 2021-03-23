@@ -66,7 +66,7 @@ func pull(cmd *cobra.Command, args []string) {
 	// initialize a new client to GCS
 	client, err := bucket.NewClient(ctx)
 	if err != nil {
-		log.Error().Msgf("error trying get new google bucket client: %v", err)
+		log.Fatal().Msgf("error trying get new google bucket client: %v", err)
 	}
 	defer client.Close()
 
