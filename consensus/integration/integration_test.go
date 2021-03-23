@@ -23,7 +23,9 @@ func runNodes(nodes []*Node) {
 
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
-	nodes, stopper, hub := createNodes(t, 3, 5, 0)
+	stopper := NewStopper(5, 0)
+	rootSnapshot := createRootSnapshot(t, 3)
+	nodes, hub := createNodes(t, stopper, rootSnapshot)
 
 	hub.WithFilter(blockNothing)
 	runNodes(nodes)
@@ -47,7 +49,9 @@ func Test3Nodes(t *testing.T) {
 func Test5Nodes(t *testing.T) {
 
 	// 4 nodes should be able finalize at least 3 blocks.
-	nodes, stopper, hub := createNodes(t, 5, 2, 1)
+	stopper := NewStopper(2, 1)
+	rootSnapshot := createRootSnapshot(t, 5)
+	nodes, hub := createNodes(t, stopper, rootSnapshot)
 
 	hub.WithFilter(blockNodes(nodes[0]))
 	runNodes(nodes)

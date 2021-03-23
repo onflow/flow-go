@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow/filter"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 
 	"github.com/onflow/flow-go/consensus"
@@ -31,7 +32,8 @@ import (
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	protocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol"
+	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -51,7 +53,7 @@ type Node struct {
 	compliance *compliance.Engine
 	sync       *synceng.Engine
 	hot        *hotstuff.EventLoop
-	state      *protocol.MutableState
+	state      *bprotocol.MutableState
 	headers    *storage.Headers
 	net        *Network
 }
@@ -65,7 +67,22 @@ func (n *Node) Shutdown() {
 // finalizedCount - the number of finalized blocks before stopping the tests
 // tolerate - the number of node to tolerate that don't need to reach the finalization count
 // 						before stopping the tests
-func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Node, *Stopper, *Hub) {
+func createNodes(t *testing.T, stopper *Stopper, rootSnapshot protocol.Snapshot) ([]*Node, *Hub) {
+
+	consensus, err := rootSnapshot.Identities(filter.IsVotingConsensusCommitteeMember)
+	require.NoError(t, err)
+
+	hub := NewNetworkHub()
+	nodes := make([]*Node, 0, len(consensus))
+	for i, identity := range consensus {
+		node := createNode(t, i, identity, rootSnapshot, hub, stopper)
+		nodes = append(nodes, node)
+	}
+
+	return nodes, hub
+}
+
+func createRootSnapshot(t *testing.T, n int) *inmem.Snapshot {
 
 	// create n consensus node participants
 	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
@@ -73,7 +90,6 @@ func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Nod
 	participants := unittest.CompleteIdentitySet(consensus...)
 
 	root, result, seal := unittest.BootstrapFixture(participants)
-
 	rootQC := &flow.QuorumCertificate{
 		View:      root.Header.View,
 		BlockID:   root.ID(),
@@ -81,26 +97,17 @@ func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Nod
 		SigData:   unittest.CombinedSignatureFixture(2),
 	}
 
-	hub := NewNetworkHub()
-	stopper := NewStopper(finalizedCount, tolerate)
-	nodes := make([]*Node, 0, len(consensus))
-	for i, identity := range consensus {
-		node := createNode(t, i, identity, participants, root, result, seal, rootQC, hub, stopper)
-		nodes = append(nodes, node)
-	}
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, rootQC)
+	require.NoError(t, err)
 
-	return nodes, stopper, hub
+	return rootSnapshot
 }
 
 func createNode(
 	t *testing.T,
 	index int,
 	identity *flow.Identity,
-	participants flow.IdentityList,
-	root *flow.Block,
-	result *flow.ExecutionResult,
-	seal *flow.Seal,
-	rootQC *flow.QuorumCertificate,
+	rootSnapshot protocol.Snapshot,
 	hub *Hub,
 	stopper *Stopper,
 ) *Node {
@@ -122,13 +129,10 @@ func createNode(
 	statusesDB := storage.NewEpochStatuses(metrics, db)
 	consumer := events.NewNoop()
 
-	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, rootQC)
+	state, err := bprotocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
-	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
-	require.NoError(t, err)
-
-	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
+	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -189,7 +193,11 @@ func createNode(
 	// initialize the pending blocks cache
 	cache := buffer.NewPendingBlocks()
 
-	rootHeader := root.Header
+	rootHeader, err := rootSnapshot.Head()
+	require.NoError(t, err)
+
+	rootQC, err := rootSnapshot.QuorumCertificate()
+	require.NoError(t, err)
 
 	// selector := filter.HasRole(flow.RoleConsensus)
 	committee, err := committees.NewConsensusCommittee(state, localID)
