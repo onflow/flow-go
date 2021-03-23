@@ -55,7 +55,6 @@ func TestProduceConsume(t *testing.T) {
 			}
 
 			unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
-
 			// expects the processor receive only the first 3 blocks (since it is blocked on those, hence no
 			// new block is fetched to process).
 			require.ElementsMatch(t, flow.GetIDs(blocks[:3]), flow.GetIDs(received))
