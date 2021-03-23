@@ -10,18 +10,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TxExecutionError captures errors when executing a transaction.
+// TransactionExecutionError captures errors when executing a transaction.
 // A transaction having this error has already passed validation and is included in a collection.
 // the transaction will be executed by execution nodes but the result is reverted
 // and in some cases there will be a penalty (or fees) for the payer, access nodes or collection nodes.
-// type TransactionExecutionError interface {
-// 	// returns runtime error if the source of this error is runtime
-// 	// return nil for all other errors
-// 	RuntimeError() error
-// 	TransactionError
-// }
+type TransactionExecutionError interface {
+	TransactionError
+}
 
-// CadenceRunTimeError captures a collection of errors provided by cadence runtime
+// CadenceRuntimeError captures a collection of errors provided by cadence runtime
 // it cover cadence errors such as
 // NotDeclaredError, NotInvokableError, ArgumentCountError, TransactionNotDeclaredError,
 // ConditionError, RedeclarationError, DereferenceError,
@@ -37,9 +34,15 @@ func (e *CadenceRuntimeError) Error() string {
 	return fmt.Sprintf("cadence runtime error %s", e.Err.Error())
 }
 
-// TODO return a proper code
+// Code returns the error code for this error
 func (e *CadenceRuntimeError) Code() uint32 {
-	return 0
+	return errCodeCadenceRunTimeError
+}
+
+// Is returns true if the given error type is CadenceRuntimeError
+func (e *CadenceRuntimeError) Is(target error) bool {
+	_, ok := target.(*CadenceRuntimeError)
+	return ok
 }
 
 // An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
@@ -53,15 +56,15 @@ func (e *StorageCapacityExceededError) Error() string {
 	return fmt.Sprintf("address %s storage %d is over capacity %d", e.Address, e.StorageUsed, e.StorageCapacity)
 }
 
+// Code returns the error code for this error
 func (e *StorageCapacityExceededError) Code() uint32 {
 	return errCodeStorageCapacityExceeded
 }
 
-// - if user can pay for the tx fees
-type InsufficientTokenBalanceError struct {
-}
-
-type MaxGasExceededError struct {
+// Is returns true if the given error type is StorageCapacityExceededError
+func (e *StorageCapacityExceededError) Is(target error) bool {
+	_, ok := target.(*StorageCapacityExceededError)
+	return ok
 }
 
 // EventLimitExceededError indicates that the transaction has produced events with size more than limit.
@@ -83,6 +86,7 @@ func (e *EventLimitExceededError) Code() uint32 {
 	return errCodeEventLimitExceededError
 }
 
+// Is returns true if the given error type is EventLimitExceededError
 func (e *EventLimitExceededError) Is(target error) bool {
 	_, ok := target.(*EventLimitExceededError)
 	return ok
@@ -98,13 +102,15 @@ type StateKeySizeLimitError struct {
 }
 
 func (e *StateKeySizeLimitError) Error() string {
-	return fmt.Sprintf("key %s has size %d which is higher than storage key size limit %d.", fullKey(e.Owner, e.Controller, e.Key), e.Size, e.Limit)
+	return fmt.Sprintf("key %s has size %d which is higher than storage key size limit %d.", strings.Join([]string{e.Owner, e.Controller, e.Key}, "/"), e.Size, e.Limit)
 }
 
+// Code returns the error code for this error
 func (e *StateKeySizeLimitError) Code() uint32 {
 	return errCodeStateValueSizeLimitError
 }
 
+// Is returns true if the given error type is StateKeySizeLimitError
 func (e *StateKeySizeLimitError) Is(target error) bool {
 	_, ok := target.(*StateKeySizeLimitError)
 	return ok
@@ -121,16 +127,18 @@ func (e *StateValueSizeLimitError) Error() string {
 	return fmt.Sprintf("value %s has size %d which is higher than storage value size limit %d.", string(e.Value[0:10])+"..."+string(e.Value[len(e.Value)-10:]), e.Size, e.Limit)
 }
 
+// Code returns the error code for this error
 func (e *StateValueSizeLimitError) Code() uint32 {
 	return errCodeStateValueSizeLimitError
 }
 
+// Is returns true if the given error type is StateValueSizeLimitError
 func (e *StateValueSizeLimitError) Is(target error) bool {
 	_, ok := target.(*StateValueSizeLimitError)
 	return ok
 }
 
-// A LedgerIntractionLimitExceededError
+// LedgerIntractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
 type LedgerIntractionLimitExceededError struct {
 	Used  uint64
 	Limit uint64
@@ -140,10 +148,12 @@ func (e *LedgerIntractionLimitExceededError) Error() string {
 	return fmt.Sprintf("max interaction with storage has exceeded the limit (used: %d, limit %d)", e.Used, e.Limit)
 }
 
+// Code returns the error code for this error
 func (e *LedgerIntractionLimitExceededError) Code() uint32 {
 	return errCodeLedgerIntractionLimitExceededError
 }
 
+// Is returns true if the given error type is LedgerIntractionLimitExceededError
 func (e *LedgerIntractionLimitExceededError) Is(target error) bool {
 	_, ok := target.(*LedgerIntractionLimitExceededError)
 	return ok
@@ -159,10 +169,12 @@ func (e *OperationNotSupportedError) Error() string {
 	return fmt.Sprintf("%s is not supported in this environment.", e.Operation)
 }
 
+// Code returns the error code for this error
 func (e *OperationNotSupportedError) Code() uint32 {
 	return errCodeOperationNotSupportedError
 }
 
+// Is returns true if the given error type is OperationNotSupportedError
 func (e *OperationNotSupportedError) Is(target error) bool {
 	_, ok := target.(*OperationNotSupportedError)
 	return ok
@@ -183,20 +195,45 @@ func (e *EncodingUnsupportedValueError) Error() string {
 	)
 }
 
+// Code returns the error code for this error
 func (e *EncodingUnsupportedValueError) Code() uint32 {
 	return errCodeEncodingUnsupportedValue
 }
 
+// Is returns true if the given error type is EncodingUnsupportedValueError
 func (e *EncodingUnsupportedValueError) Is(target error) bool {
 	_, ok := target.(*EncodingUnsupportedValueError)
 	return ok
 }
 
+// InvalidBlockHeightError indicates an invalid block height for the current epoch
+type InvalidBlockHeightError struct {
+	MinHeight       uint64
+	MaxHeight       uint64
+	RequestedHeight uint64
+}
+
+func (e *InvalidBlockHeightError) Error() string {
+	return fmt.Sprintf(
+		"requested height (%d) is not in the range(%d, %d)",
+		e.RequestedHeight,
+		e.MinHeight,
+		e.MaxHeight,
+	)
+}
+
+// Code returns the error code for this error
+func (e *InvalidBlockHeightError) Code() uint32 {
+	return errCodeInvalidBlockHeightError
+}
+
+// Is returns true if the given error type is InvalidBlockHeightError
+func (e *InvalidBlockHeightError) Is(target error) bool {
+	_, ok := target.(*InvalidBlockHeightError)
+	return ok
+}
+
 // Notes (ramtin)
-// when runtime errors are retured, we check the internal errors and if
+// when runtime errors are returned, we check the internal errors and if
 // type is external means that we have cause the error in the first place
 // probably inside the env (so we put it back???)
-
-func fullKey(owner, controller, key string) string {
-	return strings.Join([]string{owner, controller, key}, "\x1F")
-}

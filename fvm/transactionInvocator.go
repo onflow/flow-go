@@ -118,7 +118,7 @@ func (i *TransactionInvocator) Process(
 		)
 		if err != nil {
 			// TODO ExecuteTransaction returns both txErr and vmErr
-			txError, vmError = i.handleRuntimeError(err)
+			txError, vmError = errors.HandleRuntimeError(err)
 			if vmError != nil {
 				return nil, vmError
 			}
@@ -329,40 +329,4 @@ func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error, proced
 		Str("codes", string(codesJSON)).
 		Str("programs", string(programsJSON)).
 		Msg("checking failed")
-}
-
-func (i *TransactionInvocator) handleRuntimeError(err error) (txError errors.TransactionError, vmErr errors.VMError) {
-	var runErr runtime.Error
-	var ok bool
-	// if not a runtime error return as vm error
-	if runErr, ok = err.(runtime.Error); !ok {
-		return nil, &errors.UnknownFailure{runErr}
-	}
-	innerErr := runErr.Err
-
-	// External errors are reported by the runtime but originate from the VM.
-	//
-	// External errors may be fatal or non-fatal, so additional handling
-	// is required.
-	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
-		if recoveredErr, ok := externalErr.Recovered.(error); ok {
-			// If the recovered value is an error, pass it to the original
-			// error handler to distinguish between fatal and non-fatal errors.
-			switch typedErr := recoveredErr.(type) {
-			// TODO change this type to Env Error types
-			case errors.TransactionError:
-				// If the error is an fvm.Error, return as is
-				return typedErr, nil
-			default:
-				// All other errors are considered fatal
-				return nil, &errors.UnknownFailure{runErr}
-			}
-		}
-		// TODO revisit this
-		// if not recovered return
-		return nil, &errors.UnknownFailure{externalErr}
-	}
-
-	// All other errors are non-fatal Cadence errors.
-	return &errors.CadenceRuntimeError{Err: runErr}, nil
 }

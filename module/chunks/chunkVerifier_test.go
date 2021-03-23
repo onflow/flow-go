@@ -7,17 +7,15 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-
-	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/fvm/programs"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/verification"
-	fvmErrors "github.com/onflow/flow-go/fmv/errors"
 	"github.com/onflow/flow-go/fvm"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"

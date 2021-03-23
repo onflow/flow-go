@@ -1,10 +1,5 @@
 package errors
 
-// Notes (ramtin)
-// when runtime errors are retured, we check the internal errors and if
-// type is external means that we have cause the error in the first place
-// probably inside the env (so we put it back???)
-
 const (
 	// tx validation errors
 	errCodeInvalidTxByteSizeError     = 1
@@ -34,6 +29,7 @@ const (
 	errCodeCadenceRunTimeError        = 100
 	errCodeEncodingUnsupportedValue   = 120
 	errCodeOperationNotSupportedError = 121
+	errCodeInvalidBlockHeightError    = 122
 
 	// account errors
 	errCodeAccountNotFoundError          = 150
@@ -49,4 +45,12 @@ const (
 	errCodeLedgerIntractionLimitExceededError = 204
 	errCodeStateKeySizeLimitError             = 205
 	errCodeStateValueSizeLimitError           = 206
+)
+
+const (
+	failureCodeUnknownFailure     = 1000
+	failureCodeEncodingFailure    = 1001
+	failureCodeLedgerFailure      = 1002
+	failureCodeStateMergeFailure  = 1003
+	failureCodeBlockFinderFailure = 1004
 )

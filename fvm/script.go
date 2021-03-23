@@ -4,7 +4,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -89,7 +88,7 @@ func (i ScriptInvocator) Process(
 	)
 
 	if err != nil {
-		txError, vmError := i.handleRuntimeError(err)
+		txError, vmError := errors.HandleRuntimeError(err)
 
 		if txError != nil || vmError != nil {
 			return txError, vmError
@@ -100,40 +99,4 @@ func (i ScriptInvocator) Process(
 	proc.Logs = env.getLogs()
 	proc.Events = env.Events()
 	return nil, nil
-}
-
-func (i *ScriptInvocator) handleRuntimeError(err error) (txError errors.TransactionError, vmErr errors.VMError) {
-	var runErr runtime.Error
-	var ok bool
-	// if not a runtime error return as vm error
-	if runErr, ok = err.(runtime.Error); !ok {
-		return nil, &errors.UnknownFailure{Err: runErr}
-	}
-	innerErr := runErr.Err
-
-	// External errors are reported by the runtime but originate from the VM.
-	//
-	// External errors may be fatal or non-fatal, so additional handling
-	// is required.
-	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
-		if recoveredErr, ok := externalErr.Recovered.(error); ok {
-			// If the recovered value is an error, pass it to the original
-			// error handler to distinguish between fatal and non-fatal errors.
-			switch typedErr := recoveredErr.(type) {
-			// TODO change this type to Env Error types
-			case errors.TransactionError:
-				// If the error is an fvm.Error, return as is
-				return typedErr, nil
-			default:
-				// All other errors are considered fatal
-				return nil, &errors.UnknownFailure{Err: runErr}
-			}
-		}
-		// TODO revisit this
-		// if not recovered return
-		return nil, &errors.UnknownFailure{Err: externalErr}
-	}
-
-	// All other errors are non-fatal Cadence errors.
-	return &errors.CadenceRuntimeError{Err: runErr}, nil
 }

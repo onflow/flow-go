@@ -27,10 +27,12 @@ func (e InvalidTxByteSizeError) Error() string {
 	return fmt.Sprintf("transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.TxByteSize, e.Maximum)
 }
 
+// Code returns the error code for this error type
 func (e InvalidTxByteSizeError) Code() uint32 {
 	return errCodeInvalidTxByteSizeError
 }
 
+// Is returns true if the given error type is InvalidTxByteSizeError
 func (e InvalidTxByteSizeError) Is(target error) bool {
 	_, ok := target.(*InvalidTxByteSizeError)
 	return ok
@@ -48,10 +50,12 @@ func (e InvalidReferenceBlockError) Error() string {
 	return fmt.Sprintf("reference block is pointing to an invalid block: %s", e.ReferenceBlockID)
 }
 
+// Code returns the error code for this error type
 func (e InvalidReferenceBlockError) Code() uint32 {
 	return errCodeInvalidReferenceBlockError
 }
 
+// Is returns true if the given error type is InvalidReferenceBlockError
 func (e InvalidReferenceBlockError) Is(target error) bool {
 	_, ok := target.(*InvalidReferenceBlockError)
 	return ok
@@ -68,10 +72,12 @@ func (e ExpiredTransactionError) Error() string {
 	return fmt.Sprintf("transaction is expired: ref_height=%d final_height=%d", e.RefHeight, e.FinalHeight)
 }
 
+// Code returns the error code for this error type
 func (e ExpiredTransactionError) Code() uint32 {
 	return errCodeInvalidReferenceBlockError
 }
 
+// Is returns true if the given error type is ExpiredTransactionError
 func (e ExpiredTransactionError) Is(target error) bool {
 	_, ok := target.(*ExpiredTransactionError)
 	return ok
@@ -90,15 +96,18 @@ func (e InvalidScriptError) Error() string {
 	return fmt.Sprintf("failed to parse transaction Cadence script: %s", e.ParserErr)
 }
 
+// Code returns the error code for this error type
 func (e InvalidScriptError) Code() uint32 {
 	return errCodeInvalidScriptError
 }
 
+// Is returns true if the given error type is InvalidScriptError
 func (e InvalidScriptError) Is(target error) bool {
 	_, ok := target.(*InvalidScriptError)
 	return ok
 }
 
+// Unwrap unwraps the error
 func (e InvalidScriptError) Unwrap() error {
 	return e.ParserErr
 }
@@ -109,14 +118,16 @@ type InvalidGasLimitError struct {
 	Actual  uint64
 }
 
-func (e InvalidGasLimitError) Code() uint32 {
-	return errCodeInvalidGasLimitError
-}
-
 func (e InvalidGasLimitError) Error() string {
 	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
 }
 
+// Code returns the error code for this error type
+func (e InvalidGasLimitError) Code() uint32 {
+	return errCodeInvalidGasLimitError
+}
+
+// Is returns true if the given error type is InvalidGasLimitError
 func (e InvalidGasLimitError) Is(target error) bool {
 	_, ok := target.(*InvalidGasLimitError)
 	return ok
@@ -129,17 +140,24 @@ type InvalidAddressError struct {
 	Err     error
 }
 
-func (e InvalidAddressError) Code() uint32 {
-	return errCodeInvalidAddressError
-}
-
 func (e InvalidAddressError) Error() string {
 	return fmt.Sprintf("invalid address (%s): %s", e.Address, e.Err.Error())
 }
 
+// Code returns the error code for this error type
+func (e InvalidAddressError) Code() uint32 {
+	return errCodeInvalidAddressError
+}
+
+// Is returns true if the given error type is InvalidGasLimitError
 func (e InvalidAddressError) Is(target error) bool {
 	_, ok := target.(*InvalidAddressError)
 	return ok
+}
+
+// Unwrap unwraps the error
+func (e InvalidAddressError) Unwrap() error {
+	return e.Err
 }
 
 // InvalidArgumentError indicates that a transaction includes invalid arguments.
@@ -150,14 +168,16 @@ type InvalidArgumentError struct {
 	Issue string
 }
 
-func (e InvalidArgumentError) Code() uint32 {
-	return errCodeInvalidArgumentError
-}
-
 func (e InvalidArgumentError) Error() string {
 	return fmt.Sprintf("transaction arguments are invalid: (%s)", e.Issue)
 }
 
+// Code returns the error code for this error type
+func (e InvalidArgumentError) Code() uint32 {
+	return errCodeInvalidArgumentError
+}
+
+// Is returns true if the given error type is InvalidGasLimitError
 func (e InvalidArgumentError) Is(target error) bool {
 	_, ok := target.(*InvalidArgumentError)
 	return ok
@@ -170,10 +190,6 @@ type InvalidProposalSignatureError struct {
 	Err      error
 }
 
-func (e *InvalidProposalSignatureError) Code() uint32 {
-	return errCodeInvalidProposalSignatureError
-}
-
 func (e *InvalidProposalSignatureError) Error() string {
 	return fmt.Sprintf(
 		"invalid proposal key: public key %d on account %s does not have a valid signature: %s",
@@ -183,9 +199,20 @@ func (e *InvalidProposalSignatureError) Error() string {
 	)
 }
 
+// Code returns the error code for this error type
+func (e *InvalidProposalSignatureError) Code() uint32 {
+	return errCodeInvalidProposalSignatureError
+}
+
+// Is returns true if the given error type is InvalidProposalSignatureError
 func (e InvalidProposalSignatureError) Is(target error) bool {
 	_, ok := target.(*InvalidProposalSignatureError)
 	return ok
+}
+
+// Unwrap unwraps the error
+func (e InvalidProposalSignatureError) Unwrap() error {
+	return e.Err
 }
 
 // ProposalSeqNumberMismatchError indicates that proposal key sequence number does not match the on-chain value.
@@ -194,10 +221,6 @@ type ProposalSeqNumberMismatchError struct {
 	KeyIndex          uint64
 	CurrentSeqNumber  uint64
 	ProvidedSeqNumber uint64
-}
-
-func (e *ProposalSeqNumberMismatchError) Code() uint32 {
-	return errCodeProposalSeqNumberMismatchError
 }
 
 func (e *ProposalSeqNumberMismatchError) Error() string {
@@ -210,6 +233,12 @@ func (e *ProposalSeqNumberMismatchError) Error() string {
 	)
 }
 
+// Code returns the error code for this error type
+func (e *ProposalSeqNumberMismatchError) Code() uint32 {
+	return errCodeProposalSeqNumberMismatchError
+}
+
+// Is returns true if the given error type is ProposalSeqNumberMismatchError
 func (e ProposalSeqNumberMismatchError) Is(target error) bool {
 	_, ok := target.(*ProposalSeqNumberMismatchError)
 	return ok
@@ -227,10 +256,6 @@ type InvalidPayloadSignatureError struct {
 	Err      error
 }
 
-func (e *InvalidPayloadSignatureError) Code() uint32 {
-	return errCodeInvalidPayloadSignatureError
-}
-
 func (e *InvalidPayloadSignatureError) Error() string {
 	return fmt.Sprintf(
 		"invalid payload signature: public key %d on account %s does not have a valid signature",
@@ -239,9 +264,20 @@ func (e *InvalidPayloadSignatureError) Error() string {
 	)
 }
 
+// Code returns the error code for this error type
+func (e *InvalidPayloadSignatureError) Code() uint32 {
+	return errCodeInvalidPayloadSignatureError
+}
+
+// Is returns true if the given error type is InvalidPayloadSignatureError
 func (e InvalidPayloadSignatureError) Is(target error) bool {
 	_, ok := target.(*InvalidPayloadSignatureError)
 	return ok
+}
+
+// Unwrap unwraps the error
+func (e InvalidPayloadSignatureError) Unwrap() error {
+	return e.Err
 }
 
 // InvalidEnvelopeSignatureError indicates that signature verification for a envelope key in this transaction has failed.
@@ -256,10 +292,6 @@ type InvalidEnvelopeSignatureError struct {
 	Err      error
 }
 
-func (e *InvalidEnvelopeSignatureError) Code() uint32 {
-	return errCodeInvalidEnvelopeSignatureError
-}
-
 func (e *InvalidEnvelopeSignatureError) Error() string {
 	return fmt.Sprintf(
 		"invalid envelope key: public key %d on account %s does not have a valid signature",
@@ -268,9 +300,20 @@ func (e *InvalidEnvelopeSignatureError) Error() string {
 	)
 }
 
+// Code returns the error code for this error type
+func (e *InvalidEnvelopeSignatureError) Code() uint32 {
+	return errCodeInvalidEnvelopeSignatureError
+}
+
+// Is returns true if the given error type is InvalidEnvelopeSignatureError
 func (e InvalidEnvelopeSignatureError) Is(target error) bool {
 	_, ok := target.(*InvalidEnvelopeSignatureError)
 	return ok
+}
+
+// Unwrap unwraps the error
+func (e InvalidEnvelopeSignatureError) Unwrap() error {
+	return e.Err
 }
 
 // An InvalidHashAlgorithmError indicates invalid hash algorithm.
@@ -282,10 +325,12 @@ func (e *InvalidHashAlgorithmError) Error() string {
 	return fmt.Sprintf("invalid hash algorithm: %s", e.HashAlgo)
 }
 
+// Code returns the error code for this error type
 func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithmError
 }
 
+// Is returns true if the given error type is InvalidHashAlgorithmError
 func (e InvalidHashAlgorithmError) Is(target error) bool {
 	_, ok := target.(*InvalidHashAlgorithmError)
 	return ok
@@ -300,10 +345,12 @@ func (e *InvalidSignatureAlgorithmError) Error() string {
 	return fmt.Sprintf("invalid signature algorithm: %s", e.SigningAlgo)
 }
 
+// Code returns the error code for this error type
 func (e *InvalidSignatureAlgorithmError) Code() uint32 {
 	return errCodeInvalidSignatureAlgorithmError
 }
 
+// Is returns true if the given error type is InvalidSignatureAlgorithmError
 func (e InvalidSignatureAlgorithmError) Is(target error) bool {
 	_, ok := target.(*InvalidSignatureAlgorithmError)
 	return ok
@@ -318,13 +365,20 @@ func (e *InvalidPublicKeyValueError) Error() string {
 	return fmt.Sprintf("invalid public key value %s", e.Err.Error())
 }
 
+// Code returns the error code for this error type
 func (e *InvalidPublicKeyValueError) Code() uint32 {
 	return errCodeInvalidPublicKeyValueError
 }
 
+// Is returns true if the given error type is InvalidPublicKeyValueError
 func (e InvalidPublicKeyValueError) Is(target error) bool {
 	_, ok := target.(*InvalidPublicKeyValueError)
 	return ok
+}
+
+// Unwrap unwraps the error
+func (e InvalidPublicKeyValueError) Unwrap() error {
+	return e.Err
 }
 
 // AuthorizationError indicates that a transaction is missing a required signature to
@@ -337,10 +391,6 @@ type AuthorizationError struct {
 	SignedWeight uint32
 }
 
-func (e *AuthorizationError) Code() uint32 {
-	return errCodeAuthorizationError
-}
-
 func (e *AuthorizationError) Error() string {
 	return fmt.Sprintf(
 		"account %s does not have sufficient signatures (unauthorized access)",
@@ -348,6 +398,12 @@ func (e *AuthorizationError) Error() string {
 	)
 }
 
+// Code returns the error code for this error type
+func (e *AuthorizationError) Code() uint32 {
+	return errCodeAuthorizationError
+}
+
+// Is returns true if the given error type is AuthorizationError
 func (e AuthorizationError) Is(target error) bool {
 	_, ok := target.(*AuthorizationError)
 	return ok
