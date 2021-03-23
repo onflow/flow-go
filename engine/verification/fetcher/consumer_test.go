@@ -34,7 +34,7 @@ func TestProduceConsume(t *testing.T) {
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
-		neverFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
+		neverFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
@@ -65,13 +65,13 @@ func TestProduceConsume(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
 		var finishAll sync.WaitGroup
-		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
+		alwaysFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 			finishAll.Add(1)
 			go func() {
-				finishProcessing.Notify(locator.ID())
+				notifier.Notify(locator.ID())
 				finishAll.Done()
 			}()
 		}
@@ -101,12 +101,12 @@ func TestProduceConsume(t *testing.T) {
 		lock := &sync.Mutex{}
 		var finishAll sync.WaitGroup
 		finishAll.Add(100)
-		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
+		alwaysFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 			go func() {
-				finishProcessing.Notify(locator.ID())
+				notifier.Notify(locator.ID())
 				finishAll.Done()
 			}()
 		}
@@ -137,7 +137,7 @@ func TestProduceConsume(t *testing.T) {
 
 func WithConsumer(
 	t *testing.T,
-	process func(fetcher.FinishProcessing, *chunks.Locator),
+	process func(module.ProcessingNotifier, *chunks.Locator),
 	withConsumer func(*fetcher.ChunkConsumer, *storage.ChunksQueue),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -166,14 +166,14 @@ func WithConsumer(
 }
 
 type MockEngine struct {
-	finishProcessing fetcher.FinishProcessing
-	process          func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator)
+	notifier module.ProcessingNotifier
+	process  func(notifier module.ProcessingNotifier, locator *chunks.Locator)
 }
 
-func (e *MockEngine) ProcessMyChunk(locator *chunks.Locator) {
-	e.process(e.finishProcessing, locator)
+func (e *MockEngine) ProcessAssignedChunk(locator *chunks.Locator) {
+	e.process(e.notifier, locator)
 }
 
-func (e *MockEngine) WithFinishProcessing(finishProcessing fetcher.FinishProcessing) {
-	e.finishProcessing = finishProcessing
+func (e *MockEngine) WithProcessingNotifier(notifier module.ProcessingNotifier) {
+	e.notifier = notifier
 }
