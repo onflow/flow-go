@@ -80,7 +80,7 @@ func (c *Client) Broadcast(msg messages.DKGMessage) error {
 	}
 	err = tx.AddArgument(cadence.NewString(string(data)))
 	if err != nil {
-		return fmt.Errorf("could not add whiteboard dkg message to transaction: %v", err)
+		return fmt.Errorf("could not add whiteboard dkg message to transaction: %w", err)
 	}
 
 	// sign payload using account signer
