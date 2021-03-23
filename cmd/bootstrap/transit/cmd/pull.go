@@ -47,7 +47,7 @@ func addPullCmdFlags() {
 func pull(cmd *cobra.Command, args []string) {
 	log.Info().Msg("running pull")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	nodeID, err := readNodeID()
