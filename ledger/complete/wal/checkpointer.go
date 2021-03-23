@@ -33,12 +33,12 @@ const RootCheckpointFilename = "root.checkpoint"
 
 type Checkpointer struct {
 	dir            string
-	wal            *LedgerWAL
+	wal            *DiskWAL
 	keyByteSize    int
 	forestCapacity int
 }
 
-func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Checkpointer {
+func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int) *Checkpointer {
 	return &Checkpointer{
 		dir:            wal.wal.Dir(),
 		wal:            wal,
@@ -154,7 +154,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	forest, err := mtrie.NewForest(c.keyByteSize, c.dir, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(c.keyByteSize, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
 		return nil
 	})
 	if err != nil {

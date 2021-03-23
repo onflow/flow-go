@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -73,7 +74,13 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	header := unittest.BlockHeaderWithParentFixture(root)
 
 	unittest.RunWithTempDir(t, func(dir string) {
-		led, err := completeLedger.NewLedger(dir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
+
+		w := &fixtures.NoopWAL{}
+
+		//w, err := wal.NewDiskWAL(zerolog.Nop(), nil, dir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+		//require.NoError(t, err)
+
+		led, err := completeLedger.NewLedger(w, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
 		defer led.Done()
 

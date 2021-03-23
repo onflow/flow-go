@@ -9,9 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
@@ -38,30 +36,23 @@ const DefaultPathFinderVersion = 1
 // tries and purge the old ones (LRU-based); in other words, Ledger is not designed to be used
 // for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
-	forest  *mtrie.Forest
-	wal     *wal.LedgerWAL
-	metrics module.LedgerMetrics
-	logger  zerolog.Logger
-	// disk size reading can be time consuming, so limit how often its read
-	diskUpdateLimiter *time.Ticker
+	forest            *mtrie.Forest
+	wal               wal.LedgerWAL
+	metrics           module.LedgerMetrics
+	logger            zerolog.Logger
 	pathFinderVersion uint8
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(dbDir string,
+func NewLedger(
+	wal wal.LedgerWAL,
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
-	reg prometheus.Registerer,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
-	}
-
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
-		return w.RecordDelete(evictedTrie.RootHash())
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+		return wal.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
@@ -71,23 +62,22 @@ func NewLedger(dbDir string,
 
 	storage := &Ledger{
 		forest:            forest,
-		wal:               w,
+		wal:               wal,
 		metrics:           metrics,
 		logger:            logger,
-		diskUpdateLimiter: time.NewTicker(5 * time.Second),
 		pathFinderVersion: pathFinderVer,
 	}
 
 	// pause records to prevent double logging trie removals
-	w.PauseRecord()
-	defer w.UnpauseRecord()
+	wal.PauseRecord()
+	defer wal.UnpauseRecord()
 
-	err = w.ReplayOnForest(forest)
+	err = wal.ReplayOnForest(forest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
 
-	w.UnpauseRecord()
+	wal.UnpauseRecord()
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
@@ -106,7 +96,6 @@ func (l *Ledger) Ready() <-chan struct{} {
 // Done implements interface module.ReadyDoneAware
 // it closes all the open write-ahead log files.
 func (l *Ledger) Done() <-chan struct{} {
-	_ = l.wal.Close()
 	done := make(chan struct{})
 	close(done)
 	return done
@@ -166,14 +155,21 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	l.metrics.UpdateCount()
 	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
-	err = l.wal.RecordUpdate(trieUpdate)
-	if err != nil {
-		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
-	}
+	walChan := make(chan error)
+
+	go func() {
+		walChan <- l.wal.RecordUpdate(trieUpdate)
+		close(walChan)
+	}()
 
 	newRootHash, err := l.forest.Update(trieUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
+	}
+
+	walError := <-walChan
+	if walError != nil {
+		return nil, fmt.Errorf("error while writing LedgerWAL: %w", err)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -185,17 +181,6 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	if len(trieUpdate.Paths) > 0 {
 		durationPerValue := time.Duration(elapsed.Nanoseconds()/int64(len(trieUpdate.Paths))) * time.Nanosecond
 		l.metrics.UpdateDurationPerItem(durationPerValue)
-	}
-
-	select {
-	case <-l.diskUpdateLimiter.C:
-		diskSize, err := l.forest.DiskSize()
-		if err != nil {
-			log.Warn().Err(err).Msg("error while checking forest disk size")
-		} else {
-			l.metrics.DiskSize(diskSize)
-		}
-	default: //don't block
 	}
 
 	l.logger.Info().Hex("from", update.State()).
@@ -228,20 +213,10 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 	return ledger.Proof(proofToGo), err
 }
 
-// CloseStorage closes the DB
-func (l *Ledger) CloseStorage() {
-	_ = l.wal.Close()
-}
-
 // MemSize return the amount of memory used by ledger
 // TODO implement an approximate MemSize method
 func (l *Ledger) MemSize() (int64, error) {
 	return 0, nil
-}
-
-// DiskSize returns the amount of disk space used by the storage (in bytes)
-func (l *Ledger) DiskSize() (uint64, error) {
-	return l.forest.DiskSize()
 }
 
 // ForestSize returns the number of tries stored in the forest

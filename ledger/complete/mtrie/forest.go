@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 // Forest holds several in-memory tries. As Forest is a storage-abstraction layer,
@@ -45,7 +44,7 @@ type Forest struct {
 // THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
-func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
+func NewForest(pathByteSize int, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -70,7 +69,6 @@ func NewForest(pathByteSize int, trieStorageDir string, forestCapacity int, metr
 		return nil, errors.New("trie's path size [in bytes] must be positive")
 	}
 	forest := &Forest{tries: cache,
-		dir:            trieStorageDir,
 		forestCapacity: forestCapacity,
 		onTreeEvicted:  onTreeEvicted,
 		pathByteSize:   pathByteSize,
@@ -379,9 +377,4 @@ func (f *Forest) GetEmptyRootHash() []byte {
 // Size returns the number of active tries in this store
 func (f *Forest) Size() int {
 	return f.tries.Len()
-}
-
-// DiskSize returns the disk size of the directory used by the forest (in bytes)
-func (f *Forest) DiskSize() (uint64, error) {
-	return io.DirSize(f.dir)
 }

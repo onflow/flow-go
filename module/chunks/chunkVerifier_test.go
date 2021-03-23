@@ -10,6 +10,7 @@ import (
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -194,73 +195,71 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	metricsCollector := &metrics.NoopCollector{}
 
-	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := completeLedger.NewLedger(dbDir, 1000, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
+	f, _ := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 
-		keys := executionState.RegisterIDSToKeys(ids)
-		update, err := ledger.NewUpdate(
-			f.InitialState(),
-			keys,
-			executionState.RegisterValuesToValues(values),
-		)
+	keys := executionState.RegisterIDSToKeys(ids)
+	update, err := ledger.NewUpdate(
+		f.InitialState(),
+		keys,
+		executionState.RegisterValuesToValues(values),
+	)
 
-		require.NoError(t, err)
+	require.NoError(t, err)
 
-		startState, err := f.Set(update)
-		require.NoError(t, err)
+	startState, err := f.Set(update)
+	require.NoError(t, err)
 
-		query, err := ledger.NewQuery(startState, keys)
-		require.NoError(t, err)
+	query, err := ledger.NewQuery(startState, keys)
+	require.NoError(t, err)
 
-		proof, err := f.Prove(query)
-		require.NoError(t, err)
+	proof, err := f.Prove(query)
+	require.NoError(t, err)
 
-		ids = []flow.RegisterID{id2}
-		values = [][]byte{UpdatedValue2}
+	ids = []flow.RegisterID{id2}
+	values = [][]byte{UpdatedValue2}
 
-		keys = executionState.RegisterIDSToKeys(ids)
-		update, err = ledger.NewUpdate(
-			startState,
-			keys,
-			executionState.RegisterValuesToValues(values),
-		)
-		require.NoError(t, err)
+	keys = executionState.RegisterIDSToKeys(ids)
+	update, err = ledger.NewUpdate(
+		startState,
+		keys,
+		executionState.RegisterValuesToValues(values),
+	)
+	require.NoError(t, err)
 
-		endState, err := f.Set(update)
-		require.NoError(t, err)
+	endState, err := f.Set(update)
+	require.NoError(t, err)
 
-		// Chunk setup
-		chunk := flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: 0,
-				StartState:      startState,
-				BlockID:         blockID,
-			},
-			Index: 0,
-		}
+	// Chunk setup
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
+			StartState:      startState,
+			BlockID:         blockID,
+		},
+		Index: 0,
+	}
 
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID:    chunk.ID(),
-			StartState: startState,
-			Proof:      proof,
-		}
+	chunkDataPack := flow.ChunkDataPack{
+		ChunkID:    chunk.ID(),
+		StartState: startState,
+		Proof:      proof,
+	}
 
-		// ExecutionResult setup
-		result := flow.ExecutionResult{
-			BlockID: blockID,
-			Chunks:  flow.ChunkList{&chunk},
-		}
+	// ExecutionResult setup
+	result := flow.ExecutionResult{
+		BlockID: blockID,
+		Chunks:  flow.ChunkList{&chunk},
+	}
 
-		verifiableChunkData = verification.VerifiableChunkData{
-			IsSystemChunk: false,
-			Chunk:         &chunk,
-			Header:        &header,
-			Result:        &result,
-			Collection:    &coll,
-			ChunkDataPack: &chunkDataPack,
-			EndState:      endState,
-		}
-	})
+	verifiableChunkData = verification.VerifiableChunkData{
+		IsSystemChunk: false,
+		Chunk:         &chunk,
+		Header:        &header,
+		Result:        &result,
+		Collection:    &coll,
+		ChunkDataPack: &chunkDataPack,
+		EndState:      endState,
+	}
 
 	return &verifiableChunkData
 }
