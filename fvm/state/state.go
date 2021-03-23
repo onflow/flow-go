@@ -198,7 +198,7 @@ func (s *State) UpdatedAddresses() []flow.Address {
 
 func (s *State) checkMaxInteraction() error {
 	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return &errors.StateInteractionLimitExceededError{
+		return &errors.LedgerIntractionLimitExceededError{
 			Used:  s.InteractionUsed(),
 			Limit: s.maxInteractionAllowed}
 	}

@@ -3,6 +3,7 @@ package errors
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,6 +31,11 @@ func (e InvalidTxByteSizeError) Code() uint32 {
 	return errCodeInvalidTxByteSizeError
 }
 
+func (e InvalidTxByteSizeError) Is(target error) bool {
+	_, ok := target.(*InvalidTxByteSizeError)
+	return ok
+}
+
 // InvalidReferenceBlockError indicates that the transaction's ReferenceBlockID is not acceptable.
 // this error is the result of failure in any of the following conditions:
 // - ReferenceBlockID refer to a non-existing block
@@ -44,6 +50,11 @@ func (e InvalidReferenceBlockError) Error() string {
 
 func (e InvalidReferenceBlockError) Code() uint32 {
 	return errCodeInvalidReferenceBlockError
+}
+
+func (e InvalidReferenceBlockError) Is(target error) bool {
+	_, ok := target.(*InvalidReferenceBlockError)
+	return ok
 }
 
 // ExpiredTransactionError indicates that a transaction has expired.
@@ -61,6 +72,11 @@ func (e ExpiredTransactionError) Code() uint32 {
 	return errCodeInvalidReferenceBlockError
 }
 
+func (e ExpiredTransactionError) Is(target error) bool {
+	_, ok := target.(*ExpiredTransactionError)
+	return ok
+}
+
 // InvalidScriptError indicates that a transaction contains an invalid Cadence script.
 // this error is the result of failure in any of the following conditions:
 // - script is empty
@@ -76,6 +92,11 @@ func (e InvalidScriptError) Error() string {
 
 func (e InvalidScriptError) Code() uint32 {
 	return errCodeInvalidScriptError
+}
+
+func (e InvalidScriptError) Is(target error) bool {
+	_, ok := target.(*InvalidScriptError)
+	return ok
 }
 
 func (e InvalidScriptError) Unwrap() error {
@@ -96,6 +117,11 @@ func (e InvalidGasLimitError) Error() string {
 	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
 }
 
+func (e InvalidGasLimitError) Is(target error) bool {
+	_, ok := target.(*InvalidGasLimitError)
+	return ok
+}
+
 // InvalidAddressError indicates that a transaction references an invalid flow Address
 // in either the Authorizers or Payer field.
 type InvalidAddressError struct {
@@ -109,6 +135,11 @@ func (e InvalidAddressError) Code() uint32 {
 
 func (e InvalidAddressError) Error() string {
 	return fmt.Sprintf("invalid address (%s): %s", e.Address, e.Err.Error())
+}
+
+func (e InvalidAddressError) Is(target error) bool {
+	_, ok := target.(*InvalidAddressError)
+	return ok
 }
 
 // InvalidArgumentError indicates that a transaction includes invalid arguments.
@@ -125,6 +156,11 @@ func (e InvalidArgumentError) Code() uint32 {
 
 func (e InvalidArgumentError) Error() string {
 	return fmt.Sprintf("transaction arguments are invalid: (%s)", e.Issue)
+}
+
+func (e InvalidArgumentError) Is(target error) bool {
+	_, ok := target.(*InvalidArgumentError)
+	return ok
 }
 
 // InvalidProposalSignatureError indicates that no valid signature is provided for the proposal key.
@@ -147,6 +183,11 @@ func (e *InvalidProposalSignatureError) Error() string {
 	)
 }
 
+func (e InvalidProposalSignatureError) Is(target error) bool {
+	_, ok := target.(*InvalidProposalSignatureError)
+	return ok
+}
+
 // ProposalSeqNumberMismatchError indicates that proposal key sequence number does not match the on-chain value.
 type ProposalSeqNumberMismatchError struct {
 	Address           flow.Address
@@ -167,6 +208,11 @@ func (e *ProposalSeqNumberMismatchError) Error() string {
 		e.CurrentSeqNumber,
 		e.ProvidedSeqNumber,
 	)
+}
+
+func (e ProposalSeqNumberMismatchError) Is(target error) bool {
+	_, ok := target.(*ProposalSeqNumberMismatchError)
+	return ok
 }
 
 // InvalidPayloadSignatureError indicates that signature verification for a key in this transaction has failed.
@@ -193,6 +239,11 @@ func (e *InvalidPayloadSignatureError) Error() string {
 	)
 }
 
+func (e InvalidPayloadSignatureError) Is(target error) bool {
+	_, ok := target.(*InvalidPayloadSignatureError)
+	return ok
+}
+
 // InvalidEnvelopeSignatureError indicates that signature verification for a envelope key in this transaction has failed.
 // this error is the result of failure in any of the following conditions:
 // - provided hashing method is not supported
@@ -217,22 +268,48 @@ func (e *InvalidEnvelopeSignatureError) Error() string {
 	)
 }
 
-// An InvalidHashAlgorithmError indicates that a given key has an invalid hash algorithm.
+func (e InvalidEnvelopeSignatureError) Is(target error) bool {
+	_, ok := target.(*InvalidEnvelopeSignatureError)
+	return ok
+}
+
+// An InvalidHashAlgorithmError indicates invalid hash algorithm.
 type InvalidHashAlgorithmError struct {
-	Address  flow.Address
-	KeyIndex uint64
 	HashAlgo hash.HashingAlgorithm
 }
 
 func (e *InvalidHashAlgorithmError) Error() string {
-	return fmt.Sprintf("invalid hash algorithm %d for key %d on account %s", e.HashAlgo, e.KeyIndex, e.Address)
+	return fmt.Sprintf("invalid hash algorithm: %s", e.HashAlgo)
 }
 
 func (e *InvalidHashAlgorithmError) Code() uint32 {
 	return errCodeInvalidHashAlgorithmError
 }
 
-// An InvalidHashAlgorithmError indicates that a given key has an invalid hash algorithm.
+func (e InvalidHashAlgorithmError) Is(target error) bool {
+	_, ok := target.(*InvalidHashAlgorithmError)
+	return ok
+}
+
+// An InvalidSignatureAlgorithmError indicates invalid signature algorithm
+type InvalidSignatureAlgorithmError struct {
+	SigningAlgo crypto.SigningAlgorithm
+}
+
+func (e *InvalidSignatureAlgorithmError) Error() string {
+	return fmt.Sprintf("invalid signature algorithm: %s", e.SigningAlgo)
+}
+
+func (e *InvalidSignatureAlgorithmError) Code() uint32 {
+	return errCodeInvalidSignatureAlgorithmError
+}
+
+func (e InvalidSignatureAlgorithmError) Is(target error) bool {
+	_, ok := target.(*InvalidSignatureAlgorithmError)
+	return ok
+}
+
+// An InvalidPublicKeyValueError indicates invalid byte content for a public key.
 type InvalidPublicKeyValueError struct {
 	Err error
 }
@@ -243,6 +320,11 @@ func (e *InvalidPublicKeyValueError) Error() string {
 
 func (e *InvalidPublicKeyValueError) Code() uint32 {
 	return errCodeInvalidPublicKeyValueError
+}
+
+func (e InvalidPublicKeyValueError) Is(target error) bool {
+	_, ok := target.(*InvalidPublicKeyValueError)
+	return ok
 }
 
 // AuthorizationError indicates that a transaction is missing a required signature to
@@ -264,4 +346,9 @@ func (e *AuthorizationError) Error() string {
 		"account %s does not have sufficient signatures (unauthorized access)",
 		e.Address,
 	)
+}
+
+func (e AuthorizationError) Is(target error) bool {
+	_, ok := target.(*AuthorizationError)
+	return ok
 }

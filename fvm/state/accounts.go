@@ -125,7 +125,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 	}
 
 	if len(publicKey) == 0 {
-		return flow.AccountPublicKey{}, &errors.AccountPublicKeyNotFoundError{address, keyIndex}
+		return flow.AccountPublicKey{}, &errors.AccountPublicKeyNotFoundError{Address: address, KeyIndex: keyIndex}
 	}
 
 	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey, keyIndex)
@@ -214,11 +214,11 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
 
 	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
-		return fmt.Errorf("invalid account key hash algorithm: %s", publicKey.HashAlgo)
+		return &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
 	}
 
 	if !IsValidAccountKeySignAlgo(publicKey.SignAlgo) {
-		return fmt.Errorf("invalid account key signature algorithm: %s", publicKey.SignAlgo)
+		return &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
 	}
 
 	count, err := a.GetPublicKeyCount(address)
@@ -275,13 +275,15 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	}
 
 	if !ok {
-		return fmt.Errorf("account with address %s does not exist", address)
+		return &errors.AccountNotFoundError{Address: address}
 	}
 
 	var prevContract []byte
 	prevContract, err = a.getValue(address, true, ContractKey(contractName))
+	// TODO handle ledger failures
 	if err != nil {
-		return fmt.Errorf("cannot retreive previous contract: %w", err)
+		return &errors.ContractNotFoundError{Address: address, Contract: contractName}
+		// return fmt.Errorf("cannot retreive previous contract: %w", err)
 	}
 
 	// skip updating if the new contract equals the old
@@ -304,7 +306,7 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	}
 
 	if !ok {
-		return fmt.Errorf("account with address %s does not exist", address)
+		return &errors.AccountNotFoundError{Address: address}
 	}
 	var buf bytes.Buffer
 	cborEncoder := cbor.NewEncoder(&buf)

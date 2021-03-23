@@ -260,7 +260,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, vmErr)
 
 		// find frozen account specific error
-		require.IsType(t, runtime.Error{}, err)
+		require.IsType(t, &errors.CadenceRuntimeError{}, err)
 		err = err.(runtime.Error).Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)

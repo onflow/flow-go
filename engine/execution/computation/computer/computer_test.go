@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -111,7 +112,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
-				tx.Err = &fvm.MissingPayerError{}
+				tx.Err = &fvmErrors.InvalidAddressError{Err: fmt.Errorf("no payer address provided")}
 				// create dummy events
 				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
 			}).
@@ -147,7 +148,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  "no payer address provided",
+					ErrorMessage:  "invalid address (0000000000000000): no payer address provided",
 				}
 				expectedResults = append(expectedResults, txResult)
 			}

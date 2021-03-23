@@ -15,8 +15,9 @@ const (
 	errCodeInvalidAddressError        = 6
 	errCodeInvalidArgumentError       = 7
 
-	errCodeInvalidHashAlgorithmError  = 10
-	errCodeInvalidPublicKeyValueError = 11
+	errCodeInvalidHashAlgorithmError      = 10
+	errCodeInvalidSignatureAlgorithmError = 11
+	errCodeInvalidPublicKeyValueError     = 12
 
 	// execution errors
 	errCodeInvalidProposalSignatureError  = 50
@@ -30,13 +31,15 @@ const (
 
 	errCodeAuthorizationError = 80
 
-	errCodeCadenceRunTimeError      = 100
-	errCodeEncodingUnsupportedValue = 120
+	errCodeCadenceRunTimeError        = 100
+	errCodeEncodingUnsupportedValue   = 120
+	errCodeOperationNotSupportedError = 121
 
 	// account errors
 	errCodeAccountNotFoundError          = 150
 	errCodeAccountPublicKeyNotFoundError = 151
 	errCodeAccountAlreadyExistsError     = 152
+	errCodeFrozenAccountError            = 153
 
 	// limit errors
 	errCodeStorageCapacityExceeded = 200
@@ -44,4 +47,6 @@ const (
 	errCodeGasLimitExceededError              = 202
 	errCodeEventLimitExceededError            = 203
 	errCodeLedgerIntractionLimitExceededError = 204
+	errCodeStateKeySizeLimitError             = 205
+	errCodeStateValueSizeLimitError           = 206
 )

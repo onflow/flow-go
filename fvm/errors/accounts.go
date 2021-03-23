@@ -22,6 +22,11 @@ func (e *AccountNotFoundError) Error() string {
 	)
 }
 
+func (e *AccountNotFoundError) Is(target error) bool {
+	_, ok := target.(*AccountNotFoundError)
+	return ok
+}
+
 // AccountPublicKeyNotFoundError not found for the given address
 type AccountAlreadyExistsError struct {
 	Address flow.Address
@@ -36,6 +41,11 @@ func (e *AccountAlreadyExistsError) Error() string {
 		"account with address %s already exists",
 		e.Address,
 	)
+}
+
+func (e *AccountAlreadyExistsError) Is(target error) bool {
+	_, ok := target.(*AccountAlreadyExistsError)
+	return ok
 }
 
 // AccountPublicKeyNotFoundError not found for the given address
@@ -56,10 +66,24 @@ func (e *AccountPublicKeyNotFoundError) Error() string {
 	)
 }
 
+func (e *AccountPublicKeyNotFoundError) Is(target error) bool {
+	_, ok := target.(*AccountPublicKeyNotFoundError)
+	return ok
+}
+
 type FrozenAccountError struct {
 	Address flow.Address
 }
 
 func (e *FrozenAccountError) Error() string {
 	return fmt.Sprintf("account %s is frozen", e.Address)
+}
+
+func (e *FrozenAccountError) Code() uint32 {
+	return errCodeFrozenAccountError
+}
+
+func (e *FrozenAccountError) Is(target error) bool {
+	_, ok := target.(*FrozenAccountError)
+	return ok
 }

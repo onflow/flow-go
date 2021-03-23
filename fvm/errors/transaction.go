@@ -10,8 +10,8 @@ type TransactionError interface {
 	error
 }
 
-func Is(err, target error) bool {
-	return stdErrors.Is(err, target)
+func Is(source, target error) bool {
+	return stdErrors.Is(source, target)
 }
 
 func As(err error, target interface{}) bool {
@@ -25,7 +25,10 @@ func SplitErrorTypes(err error) (txError TransactionError, vmError VMError) {
 	case TransactionError:
 		return err.(TransactionError), nil
 	default:
-		// capture anything else as unknown failures
-		return nil, &UnknownFailure{Err: err}
+		if err != nil {
+			// capture anything else as unknown failures
+			return nil, &UnknownFailure{Err: err}
+		}
 	}
+	return nil, nil
 }

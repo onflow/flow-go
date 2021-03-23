@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/verification"
+	fvmErrors "github.com/onflow/flow-go/fmv/errors"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -281,7 +282,7 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	case "failedTx":
 		// add updates to the ledger
 		_ = led.Set("00", "", "", []byte{'F'})
-		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
+		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		_, _ = led.Get("00", "", "")
 		_, _ = led.Get("05", "", "")

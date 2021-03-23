@@ -58,7 +58,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx := proc.Transaction
 	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
-		return &errors.InvalidAddressError{tx.Payer, fmt.Errorf("payer address is invalid")}, nil
+		return &errors.InvalidAddressError{Address: tx.Payer, Err: fmt.Errorf("payer address is invalid")}, nil
 	}
 
 	var txErr errors.TransactionError
@@ -98,6 +98,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		return &errors.InvalidProposalSignatureError{
 			Address:  tx.ProposalKey.Address,
 			KeyIndex: tx.ProposalKey.KeyIndex,
+			Err:      fmt.Errorf("either the payload or the envelope should provide proposal signatures"),
 		}, nil
 	}
 

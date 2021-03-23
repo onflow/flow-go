@@ -14,12 +14,12 @@ import (
 // A transaction having this error has already passed validation and is included in a collection.
 // the transaction will be executed by execution nodes but the result is reverted
 // and in some cases there will be a penalty (or fees) for the payer, access nodes or collection nodes.
-type TransactionExecutionError interface {
-	// returns runtime error if the source of this error is runtime
-	// return nil for all other errors
-	RuntimeError() error
-	TransactionError
-}
+// type TransactionExecutionError interface {
+// 	// returns runtime error if the source of this error is runtime
+// 	// return nil for all other errors
+// 	RuntimeError() error
+// 	TransactionError
+// }
 
 // CadenceRunTimeError captures a collection of errors provided by cadence runtime
 // it cover cadence errors such as
@@ -83,7 +83,9 @@ func (e *EventLimitExceededError) Code() uint32 {
 	return errCodeEventLimitExceededError
 }
 
-type MaxLedgerIntractionLimitExceededError struct {
+func (e *EventLimitExceededError) Is(target error) bool {
+	_, ok := target.(*EventLimitExceededError)
+	return ok
 }
 
 // A StateKeySizeLimitError indicates that the provided key has exceeded the size limit allowed by the storage
@@ -100,7 +102,12 @@ func (e *StateKeySizeLimitError) Error() string {
 }
 
 func (e *StateKeySizeLimitError) Code() uint32 {
-	return errCodeLedgerIntractionLimitExceededError
+	return errCodeStateValueSizeLimitError
+}
+
+func (e *StateKeySizeLimitError) Is(target error) bool {
+	_, ok := target.(*StateKeySizeLimitError)
+	return ok
 }
 
 // A StateValueSizeLimitError indicates that the provided value has exceeded the size limit allowed by the storage
@@ -114,14 +121,32 @@ func (e *StateValueSizeLimitError) Error() string {
 	return fmt.Sprintf("value %s has size %d which is higher than storage value size limit %d.", string(e.Value[0:10])+"..."+string(e.Value[len(e.Value)-10:]), e.Size, e.Limit)
 }
 
-// A StateInteractionLimitExceededError
-type StateInteractionLimitExceededError struct {
+func (e *StateValueSizeLimitError) Code() uint32 {
+	return errCodeStateValueSizeLimitError
+}
+
+func (e *StateValueSizeLimitError) Is(target error) bool {
+	_, ok := target.(*StateValueSizeLimitError)
+	return ok
+}
+
+// A LedgerIntractionLimitExceededError
+type LedgerIntractionLimitExceededError struct {
 	Used  uint64
 	Limit uint64
 }
 
-func (e *StateInteractionLimitExceededError) Error() string {
+func (e *LedgerIntractionLimitExceededError) Error() string {
 	return fmt.Sprintf("max interaction with storage has exceeded the limit (used: %d, limit %d)", e.Used, e.Limit)
+}
+
+func (e *LedgerIntractionLimitExceededError) Code() uint32 {
+	return errCodeLedgerIntractionLimitExceededError
+}
+
+func (e *LedgerIntractionLimitExceededError) Is(target error) bool {
+	_, ok := target.(*LedgerIntractionLimitExceededError)
+	return ok
 }
 
 // OperationNotSupportedError is generated when an operation (e.g. getting block info) is
@@ -132,6 +157,15 @@ type OperationNotSupportedError struct {
 
 func (e *OperationNotSupportedError) Error() string {
 	return fmt.Sprintf("%s is not supported in this environment.", e.Operation)
+}
+
+func (e *OperationNotSupportedError) Code() uint32 {
+	return errCodeOperationNotSupportedError
+}
+
+func (e *OperationNotSupportedError) Is(target error) bool {
+	_, ok := target.(*OperationNotSupportedError)
+	return ok
 }
 
 // EncodingUnsupportedValueError indicates that Cadence attempted
@@ -151,6 +185,11 @@ func (e *EncodingUnsupportedValueError) Error() string {
 
 func (e *EncodingUnsupportedValueError) Code() uint32 {
 	return errCodeEncodingUnsupportedValue
+}
+
+func (e *EncodingUnsupportedValueError) Is(target error) bool {
+	_, ok := target.(*EncodingUnsupportedValueError)
+	return ok
 }
 
 // Notes (ramtin)
