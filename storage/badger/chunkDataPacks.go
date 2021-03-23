@@ -38,10 +38,8 @@ func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
 }
 
 func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
-	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
-		return operation.BatchInsertChunkDataPack(c)(writeBatch)
-	}
-	return fmt.Errorf("unsupported BatchStore type %T", batch)
+	writeBatch := batch.GetWriter()
+	return operation.BatchInsertChunkDataPack(c)(writeBatch)
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
