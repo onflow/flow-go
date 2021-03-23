@@ -1118,7 +1118,7 @@ func (suite *Suite) TestGetAccount() {
 		Return(exeResp, nil).
 		Once()
 
-	suite.setupReceipts(&block)
+	receipts := suite.setupReceipts(&block)
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
@@ -1139,6 +1139,8 @@ func (suite *Suite) TestGetAccount() {
 		nil,
 		suite.log,
 	)
+
+	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 
 	suite.Run("happy path - valid request and valid response", func() {
 		account, err := backend.GetAccountAtLatestBlock(ctx, address)
