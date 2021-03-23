@@ -98,7 +98,7 @@ func pull(cmd *cobra.Command, args []string) {
 		log.Info().Msgf("downloading extra file: %s", objectName)
 		err = bucket.DownloadFile(ctx, client, fullOutpath, objectName)
 		if err != nil {
-			log.Error().Err(err).Msgf("could not download google bucket file")
+			log.Fatal().Err(err).Msgf("could not download google bucket file")
 		}
 	}
 
