@@ -115,7 +115,6 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 // If you need to inspect state, first `Stop` the containers, then check state, then `Cleanup` resources.
 // If you need to restart containers, use `Stop` instead, which does not remove containers.
 func (net *FlowNetwork) Remove() {
-
 	net.StopContainers()
 	net.RemoveContainers()
 	net.Cleanup()
@@ -573,7 +572,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 			GroupIndex:          i,
 		}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
+		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticpant)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -589,7 +588,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 			return nil, nil, nil, nil, err
 		}
 
-		err = writeJSON(path, private)
+		err = WriteJSON(path, private)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -668,7 +667,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot")
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
+	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

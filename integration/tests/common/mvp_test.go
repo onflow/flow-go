@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"path/filepath"
 	"testing"
 	"time"
@@ -22,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
 // timeout for individual actions
@@ -69,7 +69,10 @@ func TestMVP_Bootstrap(t *testing.T) {
 	bytes, err := convert.SnapshotToBytes(snapshot)
 	require.NoError(t, err)
 
-	err = ioutils.WriteFile(filepath.Join(testnet.DefaultBootstrapDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+	bootstrapDir, err := ioutil.TempDir(testnet.TmpRoot, "flow-integration-bootstrap")
+	require.Nil(t, err)
+
+	err = testnet.WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
 	require.NoError(t, err)
 
 	// Restart network
