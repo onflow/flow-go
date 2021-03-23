@@ -16,7 +16,7 @@ var defaultLeafHash hash.Hash
 const defaultHashLen = 257
 
 // HashLen is the default output hash length in bytes
-const HashLen = 32
+const HashLen = hash.HashLenSha3_256
 
 // EmptyHash is a hash with all zeroes, used for padding
 var EmptyHash [HashLen]byte

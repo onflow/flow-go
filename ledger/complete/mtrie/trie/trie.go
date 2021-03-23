@@ -398,7 +398,7 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
 func EmptyTrieRootHash(pathByteSize int) []byte {
-	return node.NewEmptyTreeRoot(8 * pathByteSize).Hash()
+	return common.GetDefaultHashForHeight(8 * pathByteSize)
 }
 
 // AllPayloads returns all payloads
