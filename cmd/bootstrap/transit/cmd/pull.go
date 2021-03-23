@@ -14,12 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var (
-	flagToken      string
-	flagNodeRole   string
-	flagBucketName string
-)
-
 // pullCmd represents a command to pull keys and metadata from the Google bucket
 var pullCmd = &cobra.Command{
 	Use:   "pull",
@@ -117,7 +111,7 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// unwrap consensus node role files
 	if role == flow.RoleConsensus {
-		err = unWrapFile(nodeID)
+		err = unWrapFile(flagBootDir, nodeID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to pull")
 		}

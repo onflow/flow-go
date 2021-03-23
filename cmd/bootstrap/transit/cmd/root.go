@@ -10,8 +10,7 @@ import (
 )
 
 var (
-	flagBootDir string
-	log         zerolog.Logger
+	log zerolog.Logger
 )
 
 var rootCmd = &cobra.Command{

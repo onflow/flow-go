@@ -88,16 +88,6 @@ func getFileMD5(file string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-// func optionsSelected(options ...bool) int {
-// 	n := 0
-// 	for _, v := range options {
-// 		if v {
-// 			n++
-// 		}
-// 	}
-// 	return n
-// }
-
 // moveFile moves a file from source to destination where src and dst are full paths including the filename
 func moveFile(src, dst string) error {
 
@@ -178,14 +168,14 @@ func moveFile(src, dst string) error {
 	return nil
 }
 
-func unWrapFile(nodeID string) error {
+func unWrapFile(bootDir string, nodeID string) error {
 
 	log.Info().Msg("decrypting Random Beacon key")
 
-	pubKeyPath := filepath.Join(flagBootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
-	privKeyPath := filepath.Join(flagBootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
-	ciphertextPath := filepath.Join(flagBootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
-	plaintextPath := filepath.Join(flagBootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
+	privKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
+	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
+	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
 
 	ciphertext, err := ioutils.ReadFile(ciphertextPath)
 	if err != nil {
@@ -221,44 +211,44 @@ func unWrapFile(nodeID string) error {
 	return nil
 }
 
-// func wrapFile(nodeID string) error {
-// 	pubKeyPath := filepath.Join(flagBootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
-// 	plaintextPath := filepath.Join(flagBootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
-// 	ciphertextPath := filepath.Join(flagBootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
+func wrapFile(bootDir string, nodeID string) error {
+	pubKeyPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
+	plaintextPath := filepath.Join(bootDir, fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID))
+	ciphertextPath := filepath.Join(bootDir, fmt.Sprintf(FilenameRandomBeaconCipher, nodeID))
 
-// 	plaintext, err := ioutils.ReadFile(plaintextPath)
-// 	if err != nil {
-// 		return fmt.Errorf("Failed to open plaintext file %s: %w", plaintextPath, err)
-// 	}
+	plaintext, err := ioutils.ReadFile(plaintextPath)
+	if err != nil {
+		return fmt.Errorf("Failed to open plaintext file %s: %w", plaintextPath, err)
+	}
 
-// 	publicKey, err := ioutils.ReadFile(pubKeyPath)
-// 	if err != nil {
-// 		return fmt.Errorf("Faield to open public keyfile %s: %w", pubKeyPath, err)
-// 	}
+	publicKey, err := ioutils.ReadFile(pubKeyPath)
+	if err != nil {
+		return fmt.Errorf("Faield to open public keyfile %s: %w", pubKeyPath, err)
+	}
 
-// 	var pubKeyBytes [32]byte
-// 	copy(pubKeyBytes[:], publicKey)
+	var pubKeyBytes [32]byte
+	copy(pubKeyBytes[:], publicKey)
 
-// 	ciphertext := make([]byte, 0, len(plaintext)+box.AnonymousOverhead)
+	ciphertext := make([]byte, 0, len(plaintext)+box.AnonymousOverhead)
 
-// 	ciphertext, err = box.SealAnonymous(ciphertext, plaintext, &pubKeyBytes, rand.Reader)
-// 	if err != nil {
-// 		return fmt.Errorf("Could not encrypt file: %w", err)
-// 	}
+	ciphertext, err = box.SealAnonymous(ciphertext, plaintext, &pubKeyBytes, rand.Reader)
+	if err != nil {
+		return fmt.Errorf("Could not encrypt file: %w", err)
+	}
 
-// 	err = ioutil.WriteFile(ciphertextPath, ciphertext, fileMode)
-// 	if err != nil {
-// 		return fmt.Errorf("Error writing ciphertext: %w", err)
-// 	}
+	err = ioutil.WriteFile(ciphertextPath, ciphertext, fileMode)
+	if err != nil {
+		return fmt.Errorf("Error writing ciphertext: %w", err)
+	}
 
-// 	return nil
-// }
+	return nil
+}
 
 // generateKeys creates the transit keypair and writes them to disk for later
-func generateKeys(nodeID string) error {
+func generateKeys(bootDir string, nodeID string) error {
 
-	privPath := filepath.Join(flagBootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
-	pubPath := filepath.Join(flagBootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
+	privPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPriv, nodeID))
+	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
 
 	if ioutils.FileExists(privPath) && ioutils.FileExists(pubPath) {
 		log.Warn().Msg("transit-key-path priv & pub both exist, exiting")

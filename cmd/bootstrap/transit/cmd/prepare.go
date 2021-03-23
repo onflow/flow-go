@@ -20,8 +20,8 @@ func init() {
 }
 
 func addPrepareCmdFlags() {
-	pullCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	_ = pullCmd.MarkFlagRequired("role")
+	prepareCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	_ = prepareCmd.MarkFlagRequired("role")
 }
 
 // prepare generates transit keys for push command
@@ -43,7 +43,7 @@ func prepare(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not read node ID")
 	}
 
-	err = generateKeys(nodeID)
+	err = generateKeys(flagBootDir, nodeID)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to prepare")
 	}

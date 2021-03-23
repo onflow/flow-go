@@ -26,13 +26,13 @@ func init() {
 }
 
 func addPushCmdFlags() {
-	pullCmd.Flags().StringVar(&flagToken, "token", "", "token provided by the Flow team to access the Transit server")
-	pullCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
-	pullCmd.Flags().StringVar(&flagBucketName, "bucket", "", "the name of the Google Bucket provided by the Flow team")
+	pushCmd.Flags().StringVar(&flagToken, "token", "", "token provided by the Flow team to access the Transit server")
+	pushCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	pushCmd.Flags().StringVar(&flagBucketName, "bucket", "", "the name of the Google Bucket provided by the Flow team")
 
-	_ = pullCmd.MarkFlagRequired("token")
-	_ = pullCmd.MarkFlagRequired("role")
-	_ = pullCmd.MarkFlagRequired("bucket")
+	_ = pushCmd.MarkFlagRequired("token")
+	_ = pushCmd.MarkFlagRequired("role")
+	_ = pushCmd.MarkFlagRequired("bucket")
 }
 
 // push uploads public keys to the transit server
@@ -63,7 +63,7 @@ func push(cmd *cobra.Command, args []string) {
 	defer client.Close()
 
 	if role == flow.RoleConsensus {
-		err := generateKeys(nodeID)
+		err := generateKeys(flagBootDir, nodeID)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to push")
 		}

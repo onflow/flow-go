@@ -16,10 +16,6 @@ import (
 	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
-var (
-	flagAccessAddress string
-)
-
 // snapshotCmd represents a command to download the latest protocol state snapshot
 // from an access node and write to disk
 var snapshotCmd = &cobra.Command{
@@ -35,8 +31,8 @@ func init() {
 }
 
 func addSnapshotCmdFlags() {
-	pullCmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "the address of an access node")
-	_ = pullCmd.MarkFlagRequired("access-address")
+	snapshotCmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "the address of an access node")
+	_ = snapshotCmd.MarkFlagRequired("access-address")
 }
 
 // snapshot downloads a protocol snapshot from an access node and writes it to disk
