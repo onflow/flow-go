@@ -56,7 +56,7 @@ func push(cmd *cobra.Command, args []string) {
 	// initialize a new client to GCS
 	client, err := bucket.NewClient(ctx)
 	if err != nil {
-		log.Fatal().Msgf("error trying get new google bucket client: %v", err)
+		log.Fatal().Err(err).Msgf("error trying get new google bucket client")
 	}
 	defer client.Close()
 
