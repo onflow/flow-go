@@ -255,12 +255,15 @@ func TestAccountFreezing(t *testing.T) {
 		// loading code from frozen account triggers error
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(frozenAddress)}, 0)
 
-		err, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
-		require.Error(t, err)
+		txErr, vmErr = txInvocator.Process(vm, &context, proc, st, programsStorage)
+		require.Error(t, txErr)
 		require.NoError(t, vmErr)
 
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, err)
+		require.IsType(t, &errors.CadenceRuntimeError{}, txErr)
+		err = txErr.(*errors.CadenceRuntimeError).Err
+
+		require.IsType(t, runtime.Error{}, err)
 		err = err.(runtime.Error).Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)

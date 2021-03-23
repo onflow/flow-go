@@ -30,17 +30,17 @@ type CadenceRuntimeError struct {
 	Err runtime.Error
 }
 
-func (e *CadenceRuntimeError) Error() string {
+func (e CadenceRuntimeError) Error() string {
 	return fmt.Sprintf("cadence runtime error %s", e.Err.Error())
 }
 
 // Code returns the error code for this error
-func (e *CadenceRuntimeError) Code() uint32 {
+func (e CadenceRuntimeError) Code() uint32 {
 	return errCodeCadenceRunTimeError
 }
 
 // Is returns true if the given error type is CadenceRuntimeError
-func (e *CadenceRuntimeError) Is(target error) bool {
+func (e CadenceRuntimeError) Is(target error) bool {
 	_, ok := target.(*CadenceRuntimeError)
 	return ok
 }
@@ -52,17 +52,17 @@ type StorageCapacityExceededError struct {
 	StorageCapacity uint64
 }
 
-func (e *StorageCapacityExceededError) Error() string {
+func (e StorageCapacityExceededError) Error() string {
 	return fmt.Sprintf("address %s storage %d is over capacity %d", e.Address, e.StorageUsed, e.StorageCapacity)
 }
 
 // Code returns the error code for this error
-func (e *StorageCapacityExceededError) Code() uint32 {
+func (e StorageCapacityExceededError) Code() uint32 {
 	return errCodeStorageCapacityExceeded
 }
 
 // Is returns true if the given error type is StorageCapacityExceededError
-func (e *StorageCapacityExceededError) Is(target error) bool {
+func (e StorageCapacityExceededError) Is(target error) bool {
 	_, ok := target.(*StorageCapacityExceededError)
 	return ok
 }
@@ -73,7 +73,7 @@ type EventLimitExceededError struct {
 	Limit         uint64
 }
 
-func (e *EventLimitExceededError) Error() string {
+func (e EventLimitExceededError) Error() string {
 	return fmt.Sprintf(
 		"total event byte size (%d) exceeds limit (%d)",
 		e.TotalByteSize,
@@ -82,12 +82,12 @@ func (e *EventLimitExceededError) Error() string {
 }
 
 // Code returns the error code for this error
-func (e *EventLimitExceededError) Code() uint32 {
+func (e EventLimitExceededError) Code() uint32 {
 	return errCodeEventLimitExceededError
 }
 
 // Is returns true if the given error type is EventLimitExceededError
-func (e *EventLimitExceededError) Is(target error) bool {
+func (e EventLimitExceededError) Is(target error) bool {
 	_, ok := target.(*EventLimitExceededError)
 	return ok
 }
@@ -101,17 +101,17 @@ type StateKeySizeLimitError struct {
 	Limit      uint64
 }
 
-func (e *StateKeySizeLimitError) Error() string {
+func (e StateKeySizeLimitError) Error() string {
 	return fmt.Sprintf("key %s has size %d which is higher than storage key size limit %d.", strings.Join([]string{e.Owner, e.Controller, e.Key}, "/"), e.Size, e.Limit)
 }
 
 // Code returns the error code for this error
-func (e *StateKeySizeLimitError) Code() uint32 {
+func (e StateKeySizeLimitError) Code() uint32 {
 	return errCodeStateValueSizeLimitError
 }
 
 // Is returns true if the given error type is StateKeySizeLimitError
-func (e *StateKeySizeLimitError) Is(target error) bool {
+func (e StateKeySizeLimitError) Is(target error) bool {
 	_, ok := target.(*StateKeySizeLimitError)
 	return ok
 }
@@ -123,17 +123,17 @@ type StateValueSizeLimitError struct {
 	Limit uint64
 }
 
-func (e *StateValueSizeLimitError) Error() string {
+func (e StateValueSizeLimitError) Error() string {
 	return fmt.Sprintf("value %s has size %d which is higher than storage value size limit %d.", string(e.Value[0:10])+"..."+string(e.Value[len(e.Value)-10:]), e.Size, e.Limit)
 }
 
 // Code returns the error code for this error
-func (e *StateValueSizeLimitError) Code() uint32 {
+func (e StateValueSizeLimitError) Code() uint32 {
 	return errCodeStateValueSizeLimitError
 }
 
 // Is returns true if the given error type is StateValueSizeLimitError
-func (e *StateValueSizeLimitError) Is(target error) bool {
+func (e StateValueSizeLimitError) Is(target error) bool {
 	_, ok := target.(*StateValueSizeLimitError)
 	return ok
 }
@@ -232,8 +232,3 @@ func (e *InvalidBlockHeightError) Is(target error) bool {
 	_, ok := target.(*InvalidBlockHeightError)
 	return ok
 }
-
-// Notes (ramtin)
-// when runtime errors are returned, we check the internal errors and if
-// type is external means that we have cause the error in the first place
-// probably inside the env (so we put it back???)

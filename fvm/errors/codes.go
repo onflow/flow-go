@@ -37,6 +37,9 @@ const (
 	errCodeAccountAlreadyExistsError     = 152
 	errCodeFrozenAccountError            = 153
 
+	errCodeContractNotFoundError      = 160
+	errCodeContractNamesNotFoundError = 161
+
 	// limit errors
 	errCodeStorageCapacityExceeded = 200
 	// errCodeInsufficientTokenBalanceError      = 201
