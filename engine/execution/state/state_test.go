@@ -26,7 +26,6 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 			metricsCollector := &metrics.NoopCollector{}
 			diskWal := &fixtures.NoopWAL{}
 			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
-			//ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
 			require.NoError(t, err)
 
 			ctrl := gomock.NewController(t)

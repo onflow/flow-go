@@ -77,9 +77,6 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 		w := &fixtures.NoopWAL{}
 
-		//w, err := wal.NewDiskWAL(zerolog.Nop(), nil, dir, 100, pathfinder.PathByteSize, wal.SegmentSize)
-		//require.NoError(t, err)
-
 		led, err := completeLedger.NewLedger(w, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
 		defer led.Done()
