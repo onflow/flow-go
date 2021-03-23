@@ -275,7 +275,7 @@ func TestSafetyCheck(t *testing.T) {
 		sth := state.NewStateHolder(state.NewState(view))
 
 		txErr, vmErr := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
-		assert.NoError(t, txErr)
+		assert.Error(t, txErr)
 		require.NoError(t, vmErr)
 
 		require.Equal(t, 1, proc.Retried)

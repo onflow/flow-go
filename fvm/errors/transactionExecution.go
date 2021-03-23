@@ -27,7 +27,7 @@ type TransactionExecutionError interface {
 // TypeMismatchError, InvalidPathDomainError, OverwriteError, CyclicLinkError,
 // ArrayIndexOutOfBoundsError, ...
 type CadenceRuntimeError struct {
-	Err runtime.Error
+	Err *runtime.Error
 }
 
 func (e CadenceRuntimeError) Error() string {

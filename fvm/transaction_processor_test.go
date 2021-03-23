@@ -263,8 +263,8 @@ func TestAccountFreezing(t *testing.T) {
 		require.IsType(t, &errors.CadenceRuntimeError{}, txErr)
 		err = txErr.(*errors.CadenceRuntimeError).Err
 
-		require.IsType(t, runtime.Error{}, err)
-		err = err.(runtime.Error).Err
+		require.IsType(t, &runtime.Error{}, err)
+		err = err.(*runtime.Error).Err
 
 		require.IsType(t, &runtime.ParsingCheckingError{}, err)
 		err = err.(*runtime.ParsingCheckingError).Err

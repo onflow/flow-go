@@ -167,6 +167,7 @@ func (i *TransactionInvocator) Process(
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
+		proc.Err = txError
 		return txError, nil
 	}
 
@@ -253,7 +254,6 @@ func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedu
 
 	// Only consider runtime errors,
 	// in particular only consider parsing/checking errors
-
 	var runtimeErr runtime.Error
 	if !errors.As(err, &runtimeErr) {
 		return false
@@ -292,13 +292,13 @@ func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedu
 		return false
 	}
 
-	i.dumpRuntimeError(runtimeErr, proc)
+	i.dumpRuntimeError(&runtimeErr, proc)
 	return true
 }
 
 // logRuntimeError logs run time errors into a file
 // This is a temporary measure.
-func (i *TransactionInvocator) dumpRuntimeError(runtimeErr runtime.Error, procedure *TransactionProcedure) {
+func (i *TransactionInvocator) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
 
 	codesJSON, err := json.Marshal(runtimeErr.Codes)
 	if err != nil {

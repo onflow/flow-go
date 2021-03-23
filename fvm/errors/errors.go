@@ -73,5 +73,5 @@ func HandleRuntimeError(err error) (txError TransactionError, vmErr VMError) {
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return &CadenceRuntimeError{Err: runErr}, nil
+	return &CadenceRuntimeError{Err: &runErr}, nil
 }
