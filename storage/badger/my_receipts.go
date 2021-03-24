@@ -122,21 +122,19 @@ func (m *MyExecutionReceipts) StoreMyReceipt(receipt *flow.ExecutionReceipt) err
 
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
 
-	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+	writeBatch := batch.GetWriter()
 
-		err := m.genericReceipts.BatchStore(receipt, batch)
-		if err != nil {
-			return fmt.Errorf("cannot batch store generic execution receipt inside my execution receipt batch store: %w", err)
-		}
-
-		err = operation.BatchIndexOwnExecutionReceipt(receipt.ExecutionResult.BlockID, receipt.ID())(writeBatch)
-		if err != nil {
-			return fmt.Errorf("cannot batch index own execution receipt inside my execution receipt batch store: %w", err)
-		}
-
-		return nil
+	err := m.genericReceipts.BatchStore(receipt, batch)
+	if err != nil {
+		return fmt.Errorf("cannot batch store generic execution receipt inside my execution receipt batch store: %w", err)
 	}
-	return fmt.Errorf("unsupported BatchStore type %T", batch)
+
+	err = operation.BatchIndexOwnExecutionReceipt(receipt.ExecutionResult.BlockID, receipt.ID())(writeBatch)
+	if err != nil {
+		return fmt.Errorf("cannot batch index own execution receipt inside my execution receipt batch store: %w", err)
+	}
+
+	return nil
 }
 
 // MyReceipt retrieves my receipt for the given block.

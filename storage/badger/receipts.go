@@ -121,26 +121,24 @@ func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
 }
 
 func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
-	if writeBatch, ok := batch.(*badger.WriteBatch); ok {
+	writeBatch := batch.GetWriter()
 
-		err := r.results.BatchStore(&receipt.ExecutionResult, batch)
-		if err != nil {
-			return fmt.Errorf("cannot batch store execution result inside execution receipt batch store: %w", err)
-		}
-
-		err = operation.BatchInsertExecutionReceiptMeta(receipt.ID(), receipt.Meta())(writeBatch)
-		if err != nil {
-			return fmt.Errorf("cannot batch store execution meta inside execution receipt batch store: %w", err)
-		}
-
-		err = operation.BatchIndexExecutionReceipts(receipt.ExecutionResult.BlockID, receipt.ID())(writeBatch)
-		if err != nil {
-			return fmt.Errorf("cannot batch index execution receipt inside execution receipt batch store: %w", err)
-		}
-
-		return nil
+	err := r.results.BatchStore(&receipt.ExecutionResult, batch)
+	if err != nil {
+		return fmt.Errorf("cannot batch store execution result inside execution receipt batch store: %w", err)
 	}
-	return fmt.Errorf("unsupported BatchStore type %T", batch)
+
+	err = operation.BatchInsertExecutionReceiptMeta(receipt.ID(), receipt.Meta())(writeBatch)
+	if err != nil {
+		return fmt.Errorf("cannot batch store execution meta inside execution receipt batch store: %w", err)
+	}
+
+	err = operation.BatchIndexExecutionReceipts(receipt.ExecutionResult.BlockID, receipt.ID())(writeBatch)
+	if err != nil {
+		return fmt.Errorf("cannot batch index execution receipt inside execution receipt batch store: %w", err)
+	}
+
+	return nil
 }
 
 func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
