@@ -1,4 +1,4 @@
-package fvm
+package fvm_test
 
 import (
 	"bytes"
@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -40,9 +41,9 @@ func TestSafetyCheck(t *testing.T) {
 
 			buffer := &bytes.Buffer{}
 			log := zerolog.New(buffer)
-			txInvocator := NewTransactionInvocator(log)
+			txInvocator := fvm.NewTransactionInvocator(log)
 
-			vm := NewVirtualMachine(rt)
+			vm := fvm.NewVirtualMachine(rt)
 
 			code := `
 				import 0x0b2a3299cc857e29
@@ -50,7 +51,7 @@ func TestSafetyCheck(t *testing.T) {
 				transaction {}
 			`
 
-			proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+			proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 			contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
@@ -79,7 +80,7 @@ func TestSafetyCheck(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewContext(log)
+			context := fvm.NewContext(log)
 
 			sth := state.NewStateHolder(state.NewState(
 				view,
@@ -110,9 +111,9 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		code := `
 			import 0x0b2a3299cc857e29
@@ -120,7 +121,7 @@ func TestSafetyCheck(t *testing.T) {
 			transaction {}
 		`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
@@ -149,7 +150,7 @@ func TestSafetyCheck(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewContext(log)
+		context := fvm.NewContext(log)
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
@@ -172,16 +173,16 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		code := `X`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := NewContext(log)
+		context := fvm.NewContext(log)
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
@@ -205,16 +206,16 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		code := `transaction(arg: X) { }`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
-		context := NewContext(log)
+		context := fvm.NewContext(log)
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
@@ -257,16 +258,16 @@ func TestSafetyCheck(t *testing.T) {
 		}}
 
 		log := zerolog.Nop()
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := NewVirtualMachine(rt)
+		vm := fvm.NewVirtualMachine(rt)
 		code := `doesn't matter`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		view := utils.NewSimpleView()
 		header := unittest.BlockHeaderFixture()
-		context := NewContext(log, WithBlockHeader(&header))
+		context := fvm.NewContext(log, fvm.WithBlockHeader(&header))
 
 		sth := state.NewStateHolder(state.NewState(view))
 
