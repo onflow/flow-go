@@ -415,7 +415,7 @@ func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 	// Use encoder to prevent building entire trie in memory
 	enc := json.NewEncoder(w)
 
-	err := mt.dumpAsJSON(mt.root, enc)
+	err := dumpAsJSON(mt.root, enc)
 	if err != nil {
 		return err
 	}
@@ -423,7 +423,8 @@ func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 	return nil
 }
 
-func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
+// dumpAsJSON serializes the sub-trie with root n to json and feeds it into encoder
+func dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 	if n.IsLeaf() {
 		err := encoder.Encode(n.Payload())
 		if err != nil {
@@ -433,14 +434,14 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 	}
 
 	if lChild := n.LeftChild(); lChild != nil {
-		err := mt.dumpAsJSON(lChild, encoder)
+		err := dumpAsJSON(lChild, encoder)
 		if err != nil {
 			return err
 		}
 	}
 
 	if rChild := n.RightChild(); rChild != nil {
-		err := mt.dumpAsJSON(rChild, encoder)
+		err := dumpAsJSON(rChild, encoder)
 		if err != nil {
 			return err
 		}
