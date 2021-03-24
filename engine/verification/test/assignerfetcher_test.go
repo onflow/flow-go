@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func withBlockConsumer(t *testing.T, workerCount int, withConsumer func(blockconsumer.BlockConsumer)) *sync.WaitGroup {
+func withBlockConsumer(t *testing.T, workerCount int, withConsumer func(*blockconsumer.BlockConsumer, *sync.WaitGroup)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(workerCount)
 
@@ -40,7 +40,7 @@ func withBlockConsumer(t *testing.T, workerCount int, withConsumer func(blockcon
 
 		// chunk consumer and processor
 		chunksQueue := bstorage.NewChunkQueue(db)
-		chunkProcessor := &mockfetcher.AssignedChunkProcessor{}
+		chunkProcessor, chunksWg := mockChunkProcessor(t, flow.IdentifierList{}, true)
 		chunkConsumer := fetcher.NewChunkConsumer(unittest.Logger(),
 			processedIndex,
 			chunksQueue,
@@ -66,7 +66,7 @@ func withBlockConsumer(t *testing.T, workerCount int, withConsumer func(blockcon
 			maxProcessing)
 		require.NoError(t, err)
 
-		withConsumer(blockConsumer)
+		withConsumer(blockConsumer, chunksWg)
 	})
 }
 
@@ -77,8 +77,8 @@ func withBlockConsumer(t *testing.T, workerCount int, withConsumer func(blockcon
 // - in an unstaked verification node:
 // -- no chunk locator is passed to it.
 //
-//  mockChunkProcessor returns the mock chunk processor and a wait group that unblocks when all expected locators received.
-func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentityList,
+// mockChunkProcessor returns the mock chunk processor and a wait group that unblocks when all expected locators received.
+func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 	staked bool) (*mockfetcher.AssignedChunkProcessor, *sync.WaitGroup) {
 	processor := &mockfetcher.AssignedChunkProcessor{}
 
