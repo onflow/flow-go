@@ -89,14 +89,6 @@ func (w *Worker) Notify(chunkID flow.Identifier) {
 	w.consumer.NotifyJobIsDone(jobID)
 }
 
-// FinishProcessing is for the worker's underneath engine to report a chunk
-// has been processed without knowing the job queue
-// it's a callback so that the worker can convert the chunk id into a job
-// id, and notify the consumer about a finished job with the
-type FinishProcessing interface {
-	Notify(chunkID flow.Identifier)
-}
-
 // ChunkConsumer consumes the jobs from the job queue, and pass it to the
 // Worker for processing.
 // It wraps the generic job consumer in order to be used as a ReadyDoneAware
