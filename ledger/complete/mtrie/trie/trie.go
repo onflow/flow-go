@@ -346,47 +346,57 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
-	wg := sync.WaitGroup{}
-	parallelRecursionThreshold := 128 // thresold to avoid the parallelization going too deep in the recursion
+	parallelRecursionThreshold := 128 // threshold to avoid the parallelization going too deep in the recursion
+	if len(lpaths) <= parallelRecursionThreshold {
+		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
+		addSubtrieHashToProofs(head.RightChild(), heightIndex, lproofs)
+		mt.proofs(head.LeftChild(), lpaths, lproofs)
 
-	if rChild := head.RightChild(); rChild != nil {
-		// This code is necessary, because we do not remove nodes from the trie
-		// when a register is deleted. Instead, we just set the respective leaf's
-		// payload to empty. While this will cause the lead's hash to become the
-		// default hash, the node itself remains as part of the trie.
-		// TODO: On update, prune subtries which only contain empty registers.
-		//       Then, a child is nil if and only if the subtrie is empty.
-		nodeHash := rChild.Hash()
-		isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
-		if !isDef { // in proofs, we only provide non-default value hashes
-			for _, p := range lproofs {
-				utils.SetBit(p.Flags, heightIndex)
-				p.Interims = append(p.Interims, nodeHash)
-			}
-		}
-	}
-	if len(lpaths) > parallelRecursionThreshold {
+		addSubtrieHashToProofs(head.LeftChild(), heightIndex, rproofs)
+		mt.proofs(head.RightChild(), rpaths, rproofs)
+	} else {
+		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
+			addSubtrieHashToProofs(head.RightChild(), heightIndex, lproofs)
 			mt.proofs(head.LeftChild(), lpaths, lproofs)
 			wg.Done()
 		}()
-	} else {
-		mt.proofs(head.LeftChild(), lpaths, lproofs)
+
+		addSubtrieHashToProofs(head.LeftChild(), heightIndex, rproofs)
+		mt.proofs(head.RightChild(), rpaths, rproofs)
+		wg.Wait()
+	}
+}
+
+// addSubtrieHashToProofs inspects the other subtrie and adds its root hash
+// to the proofs, if the trie contains non-empty registers (i.e. the
+// otherSubtrie has a non-default hash).
+func addSubtrieHashToProofs(otherSubtrie *node.Node, depth int, proofs []*ledger.TrieProof) {
+	if otherSubtrie == nil || len(proofs) == 0 {
+		return
 	}
 
-	if lChild := head.LeftChild(); lChild != nil {
-		nodeHash := lChild.Hash()
-		isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(lChild.Height()))
-		if !isDef { // in proofs, we only provide non-default value hashes
-			for _, p := range rproofs {
-				utils.SetBit(p.Flags, heightIndex)
-				p.Interims = append(p.Interims, nodeHash)
-			}
+	// This code is necessary, because we do not remove nodes from the trie
+	// when a register is deleted. Instead, we just set the respective leaf's
+	// payload to empty. While this will cause the lead's hash to become the
+	// default hash, the node itself remains as part of the trie.
+	// However, a proof has the convention that the hash of the other subtrie
+	// should only be included, if it is _non-default_. Therefore, we can
+	// neither use `otherSubtrie == nil` nor `otherSubtrie.RegisterCount == 0`,
+	// as the other subtrie might contain leafs with default value (which are
+	// still counted as occupied registers)
+	// TODO: On update, prune subtries which only contain empty registers.
+	//       Then, a child is nil if and only if the subtrie is empty.
+
+	nodeHash := otherSubtrie.Hash()
+	isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(otherSubtrie.Height()))
+	if !isDef { // in proofs, we only provide non-default value hashes
+		for _, p := range proofs {
+			utils.SetBit(p.Flags, depth)
+			p.Interims = append(p.Interims, nodeHash)
 		}
 	}
-	mt.proofs(head.RightChild(), rpaths, rproofs)
-	wg.Wait()
 }
 
 // Equals compares two tries for equality.
