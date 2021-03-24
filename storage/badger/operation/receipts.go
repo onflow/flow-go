@@ -11,6 +11,11 @@ func InsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionR
 	return insert(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
 }
 
+// BatchInsertExecutionReceiptMeta inserts an execution receipt meta by ID.
+func BatchInsertExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(batch *badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
+}
+
 // RetrieveExecutionReceipt retrieves a execution receipt meta by ID.
 func RetrieveExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.ExecutionReceiptMeta) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeExecutionReceiptMeta, receiptID), meta)
@@ -19,6 +24,11 @@ func RetrieveExecutionReceiptMeta(receiptID flow.Identifier, meta *flow.Executio
 // IndexOwnExecutionReceipt inserts an execution receipt ID keyed by block ID
 func IndexOwnExecutionReceipt(blockID flow.Identifier, receiptID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeOwnBlockReceipt, blockID), receiptID)
+}
+
+// BatchIndexOwnExecutionReceipt inserts an execution receipt ID keyed by block ID into a batch
+func BatchIndexOwnExecutionReceipt(blockID flow.Identifier, receiptID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeOwnBlockReceipt, blockID), receiptID)
 }
 
 // LookupOwnExecutionReceipt finds execution receipt ID by block
@@ -30,6 +40,11 @@ func LookupOwnExecutionReceipt(blockID flow.Identifier, receiptID *flow.Identifi
 // one block could have multiple receipts, even if they are from the same executor
 func IndexExecutionReceipts(blockID, receiptID flow.Identifier) func(*badger.Txn) error {
 	return insert(makePrefix(codeAllBlockReceipts, blockID, receiptID), receiptID)
+}
+
+// BatchIndexExecutionReceipts inserts an execution receipt ID keyed by block ID and receipt ID into a batch
+func BatchIndexExecutionReceipts(blockID, receiptID flow.Identifier) func(batch *badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeAllBlockReceipts, blockID, receiptID), receiptID)
 }
 
 // LookupExecutionReceipts finds all execution receipts by block ID
