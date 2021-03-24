@@ -29,7 +29,7 @@ func NewChunkQueue(db *badger.DB) *ChunksQueue {
 }
 
 // Init initializes chunk queue's latest index with the given default index.
-func (q *ChunksQueue) Init(defaultIndex int64) (bool, error) {
+func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 	_, err := q.LatestIndex()
 	if errors.Is(err, storage.ErrNotFound) {
 		err = q.db.Update(operation.InitJobLatestIndex(JobQueueChunksQueue, defaultIndex))
@@ -57,7 +57,7 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 		}
 
 		// read the latest index
-		var latest int64
+		var latest uint64
 		err = operation.RetrieveJobLatestIndex(JobQueueChunksQueue, &latest)(tx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve job index for chunk locator queue: %w", err)
@@ -90,8 +90,8 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 }
 
 // LatestIndex returns the index of the latest chunk locator stored in the queue.
-func (q *ChunksQueue) LatestIndex() (int64, error) {
-	var latest int64
+func (q *ChunksQueue) LatestIndex() (uint64, error) {
+	var latest uint64
 	err := q.db.View(operation.RetrieveJobLatestIndex(JobQueueChunksQueue, &latest))
 	if err != nil {
 		return 0, fmt.Errorf("could not retrieve latest index for chunks queue: %w", err)
@@ -100,7 +100,7 @@ func (q *ChunksQueue) LatestIndex() (int64, error) {
 }
 
 // AtIndex returns the chunk locator stored at the given index in the queue.
-func (q *ChunksQueue) AtIndex(index int64) (*chunks.Locator, error) {
+func (q *ChunksQueue) AtIndex(index uint64) (*chunks.Locator, error) {
 	var locatorID flow.Identifier
 	err := q.db.View(operation.RetrieveJobAtIndex(JobQueueChunksQueue, index, &locatorID))
 	if err != nil {

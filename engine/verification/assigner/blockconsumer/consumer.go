@@ -18,19 +18,19 @@ import (
 // (i.e., its block reader) for new block jobs.
 type BlockConsumer struct {
 	consumer     module.JobConsumer
-	defaultIndex int64
+	defaultIndex uint64
 }
 
 // defaultProcessedIndex returns the last sealed block height from the protocol state.
 //
 // The BlockConsumer utilizes this return height to fetch and consume block jobs from
 // jobs queue the first time it initializes.
-func defaultProcessedIndex(state protocol.State) (int64, error) {
+func defaultProcessedIndex(state protocol.State) (uint64, error) {
 	final, err := state.Sealed().Head()
 	if err != nil {
 		return 0, fmt.Errorf("could not get finalized height: %w", err)
 	}
-	return int64(final.Height), nil
+	return final.Height, nil
 }
 
 // NewBlockConsumer creates a new consumer and returns the default processed
@@ -40,7 +40,7 @@ func NewBlockConsumer(log zerolog.Logger,
 	blocks storage.Blocks,
 	state protocol.State,
 	blockProcessor assigner.FinalizedBlockProcessor,
-	maxProcessing int64) (*BlockConsumer, int64, error) {
+	maxProcessing int64) (*BlockConsumer, uint64, error) {
 
 	// wires blockProcessor as the worker. The block consumer will
 	// invoke instances of worker concurrently to process block jobs.
