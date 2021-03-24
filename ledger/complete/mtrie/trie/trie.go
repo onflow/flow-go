@@ -148,8 +148,8 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path, payloads []*ledger.P
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	heightIndex := mt.Height() - head.Height() // distance to the tree root
-	partitionIndex := utils.SplitPaths(paths, heightIndex)
+	depth := mt.Height() - head.Height() // distance to the tree root
+	partitionIndex := utils.SplitPaths(paths, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
@@ -245,8 +245,8 @@ func (parentTrie *MTrie) update(
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	heightIndex := parentTrie.Height() - nodeHeight // distance to the tree root
-	partitionIndex := utils.SplitByPath(paths, payloads, heightIndex)
+	depth := parentTrie.Height() - nodeHeight // distance to the tree root
+	partitionIndex := utils.SplitByPath(paths, payloads, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
@@ -341,29 +341,29 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	heightIndex := mt.Height() - head.Height() // distance to the tree root
-	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, heightIndex)
+	depth := mt.Height() - head.Height() // distance to the tree root
+	partitionIndex := utils.SplitTrieProofsByPath(paths, proofs, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
 	parallelRecursionThreshold := 128 // threshold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) <= parallelRecursionThreshold {
 		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
-		addSubtrieHashToProofs(head.RightChild(), heightIndex, lproofs)
+		addSubtrieHashToProofs(head.RightChild(), depth, lproofs)
 		mt.proofs(head.LeftChild(), lpaths, lproofs)
 
-		addSubtrieHashToProofs(head.LeftChild(), heightIndex, rproofs)
+		addSubtrieHashToProofs(head.LeftChild(), depth, rproofs)
 		mt.proofs(head.RightChild(), rpaths, rproofs)
 	} else {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			addSubtrieHashToProofs(head.RightChild(), heightIndex, lproofs)
+			addSubtrieHashToProofs(head.RightChild(), depth, lproofs)
 			mt.proofs(head.LeftChild(), lpaths, lproofs)
 			wg.Done()
 		}()
 
-		addSubtrieHashToProofs(head.LeftChild(), heightIndex, rproofs)
+		addSubtrieHashToProofs(head.LeftChild(), depth, rproofs)
 		mt.proofs(head.RightChild(), rpaths, rproofs)
 		wg.Wait()
 	}
