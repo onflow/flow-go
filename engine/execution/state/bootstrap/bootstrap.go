@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
@@ -33,8 +32,8 @@ func NewBootstrapper(logger zerolog.Logger) *Bootstrapper {
 func (b *Bootstrapper) BootstrapLedger(
 	ledger ledger.Ledger,
 	servicePublicKey flow.AccountPublicKey,
-	initialTokenSupply cadence.UFix64,
 	chain flow.Chain,
+	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.InitialState()))
 	programs := programs.NewEmptyPrograms()
@@ -45,7 +44,7 @@ func (b *Bootstrapper) BootstrapLedger(
 
 	bootstrap := fvm.Bootstrap(
 		servicePublicKey,
-		fvm.WithInitialTokenSupply(initialTokenSupply),
+		opts...,
 	)
 
 	err := vm.Run(ctx, bootstrap, view, programs)
