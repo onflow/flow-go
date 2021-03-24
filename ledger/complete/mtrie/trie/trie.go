@@ -268,14 +268,20 @@ func (parentTrie *MTrie) update(
 
 	// recurse over each branch
 	var lChild, rChild *node.Node
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	if len(lpayloads) == 0 || len(rpayloads) == 0 {
+		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
 		lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
-	}()
-	rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
-	wg.Wait()
+		rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+	} else {
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
+		}()
+		rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+		wg.Wait()
+	}
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
 	// payload is re-written at a register.
