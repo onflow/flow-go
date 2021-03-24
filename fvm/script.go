@@ -29,7 +29,7 @@ type ScriptProcedure struct {
 	Logs      []string
 	Events    []flow.Event
 	GasUsed   uint64
-	Err       errors.TransactionError
+	Err       errors.Error
 }
 
 type ScriptProcessor interface {
@@ -47,9 +47,9 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, sth, programs)
-		txError, vmError := errors.SplitErrorTypes(err)
-		if vmError != nil {
-			return vmError
+		txError, failure := errors.SplitErrorTypes(err)
+		if failure != nil {
+			return failure
 		}
 		if txError != nil {
 			proc.Err = txError

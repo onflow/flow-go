@@ -29,7 +29,7 @@ type TransactionProcedure struct {
 	Events        []flow.Event
 	ServiceEvents []flow.Event
 	GasUsed       uint64
-	Err           errors.TransactionError
+	Err           errors.Error
 	Retried       int
 	TraceSpan     opentracing.Span
 }
@@ -42,10 +42,10 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, &ctx, proc, st, programs)
-		txErr, vmErr := errors.SplitErrorTypes(err)
-		if vmErr != nil {
-			// TODO maybe panic on vmErrors
-			return vmErr
+		txErr, failure := errors.SplitErrorTypes(err)
+		if failure != nil {
+			// TODO maybe panic on failure
+			return failure
 		}
 
 		if txErr != nil {

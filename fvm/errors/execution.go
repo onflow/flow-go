@@ -10,12 +10,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TransactionExecutionError captures errors when executing a transaction.
+// ExecutionError captures errors when executing a transaction/script.
 // A transaction having this error has already passed validation and is included in a collection.
 // the transaction will be executed by execution nodes but the result is reverted
 // and in some cases there will be a penalty (or fees) for the payer, access nodes or collection nodes.
-type TransactionExecutionError interface {
-	TransactionError
+type ExecutionError interface {
+	Error
 }
 
 // CadenceRuntimeError captures a collection of errors provided by cadence runtime
@@ -285,5 +285,38 @@ func (e InvalidInputError) Is(target error) bool {
 
 // Unwrap unwraps the error
 func (e InvalidInputError) Unwrap() error {
+	return e.Err
+}
+
+// AuthorizationError indicates that an authorization issues
+// either a transaction is missing a required signature to
+// authorize access to an account or a transaction doesn't have authorization
+// to performe some operations like account creation.
+type AuthorizationError struct {
+	Address flow.Address
+	Err     error
+}
+
+func (e *AuthorizationError) Error() string {
+	return fmt.Sprintf(
+		"authorization failed for account %s: %s",
+		e.Address,
+		e.Err.Error(),
+	)
+}
+
+// Code returns the error code for this error type
+func (e *AuthorizationError) Code() uint32 {
+	return errCodeAuthorizationError
+}
+
+// Is returns true if the given error type is AuthorizationError
+func (e AuthorizationError) Is(target error) bool {
+	_, ok := target.(*AuthorizationError)
+	return ok
+}
+
+// Unwrap unwraps the error
+func (e AuthorizationError) Unwrap() error {
 	return e.Err
 }

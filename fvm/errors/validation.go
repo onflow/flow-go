@@ -8,11 +8,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// TransactionValidationError captures a transaction validation error
+// ValidationError captures a transaction/script validation error
 // A transaction having this error (in most cases) is rejected by access/collection nodes
 // and later in the pipeline be verified by execution and verification nodes.
-type TransactionValidationError interface {
-	TransactionError
+type ValidationError interface {
+	Error
 }
 
 // InvalidTxByteSizeError indicates that a transaction byte size exceeds the maximum limit.
@@ -378,40 +378,5 @@ func (e InvalidPublicKeyValueError) Is(target error) bool {
 
 // Unwrap unwraps the error
 func (e InvalidPublicKeyValueError) Unwrap() error {
-	return e.Err
-}
-
-// AuthorizationError indicates that a transaction is missing a required signature to
-// authorize access to an account.
-// this error is the result of failure in any of the following conditions:
-// - no signature provided for an account
-// - not enough key weight in total for this account
-// TODO (ramtin) update the doc
-type AuthorizationError struct {
-	Address flow.Address
-	Err     error
-}
-
-func (e *AuthorizationError) Error() string {
-	return fmt.Sprintf(
-		"authorization failed for account %s: %s",
-		e.Address,
-		e.Err.Error(),
-	)
-}
-
-// Code returns the error code for this error type
-func (e *AuthorizationError) Code() uint32 {
-	return errCodeAuthorizationError
-}
-
-// Is returns true if the given error type is AuthorizationError
-func (e AuthorizationError) Is(target error) bool {
-	_, ok := target.(*AuthorizationError)
-	return ok
-}
-
-// Unwrap unwraps the error
-func (e AuthorizationError) Unwrap() error {
 	return e.Err
 }
