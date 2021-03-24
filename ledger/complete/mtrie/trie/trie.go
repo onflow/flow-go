@@ -181,9 +181,6 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path, payloads []*ledger.P
 // CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
-	if len(updatedPaths) == 0 { // No new paths to write
-		return parentTrie, nil
-	}
 	parentRoot := parentTrie.root
 	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, nil)
 	if parentRoot == updatedRoot {
