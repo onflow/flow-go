@@ -4,6 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -53,7 +56,8 @@ func TestUnweightedNode(t *testing.T) {
 // test consensus across an epoch boundary, where both epochs have the same identity table.
 func TestStaticEpochTransition(t *testing.T) {
 
-	stopper := NewStopper(2, 0)
+	// must finalize 8 blocks, we specify the epoch transition after 4 views
+	stopper := NewStopper(8, 0)
 	rootSnapshot := createRootSnapshot(t, 3)
 
 	// convert to encodable form to add an un-staked consensus node
@@ -62,14 +66,17 @@ func TestStaticEpochTransition(t *testing.T) {
 	// same identities -> same consensus committee in next epoch
 	nextEpochIdentities := enc.Identities
 
-	currEpoch := enc.Epochs.Current
+	currEpoch := &enc.Epochs.Current              // take pointer so assignments apply
+	currEpoch.FinalView = currEpoch.FirstView + 4 // first epoch lasts 5 views
 	enc.Epochs.Next = &inmem.EncodableEpoch{
-		Counter:           currEpoch.Counter,
+		Counter:           currEpoch.Counter + 1,
 		FirstView:         currEpoch.FinalView + 1,
 		FinalView:         currEpoch.FinalView + 1 + 10000,
 		RandomSource:      unittest.SeedFixture(flow.EpochSetupRandomSourceLength),
 		InitialIdentities: nextEpochIdentities,
 		Clustering:        unittest.ClusterList(1, nextEpochIdentities),
+		Clusters:          currEpoch.Clusters,
+		DKG:               currEpoch.DKG,
 	}
 	enc.LatestSeal.ResultID = enc.LatestResult.ID()
 	enc.Phase = flow.EpochPhaseCommitted
@@ -86,6 +93,12 @@ func TestStaticEpochTransition(t *testing.T) {
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
+
+	// confirm that we have transitioned to a new epoch
+	pstate := nodes[0].state
+	counter, err := pstate.Final().Epochs().Current().Counter()
+	require.NoError(t, err)
+	assert.Equal(t, enc.Epochs.Next.Counter, counter)
 
 	cleanupNodes(nodes)
 }
