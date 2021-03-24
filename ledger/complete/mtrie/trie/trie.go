@@ -178,6 +178,7 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path, payloads []*ledger.P
 //   * subtries that remain unchanged are from the parent trie instead of copied.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * keys are NOT duplicated
+//   * requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
@@ -194,6 +195,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 }
 
 // update traverses the subtree and updates the stored registers
+// CAUTION: while updating, `paths` and `payloads` are permuted IN-PLACE for optimized processing.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
@@ -292,11 +294,18 @@ func (parentTrie *MTrie) update(
 }
 
 // UnsafeProofs provides proofs for the given paths.
+// CAUTION: while updating, `paths` and `proofs` are permuted IN-PLACE for optimized processing.
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) {
 	mt.proofs(mt.root, paths, proofs)
 }
 
+// proofs traverses the subtree and stores proofs for the given register paths in
+// the provided `proofs` slice
+// CAUTION: while updating, `paths` and `proofs` are permuted IN-PLACE for optimized processing.
+// UNSAFE: method requires the following conditions to be satisfied:
+//   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
+//     (excluding the bit at index headHeight)
 func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 	// check for empty paths
 	if len(paths) == 0 {
@@ -306,18 +315,21 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	// we've reached the end of a trie
 	// and path is not found (noninclusion proof)
 	if head == nil {
+		// by default, proofs are non-inclusion proofs
 		return
 	}
 
 	// we've reached a leaf
 	if head.IsLeaf() {
-		// value matches (inclusion proof)
-		if bytes.Equal(head.Path(), paths[0]) {
-			proofs[0].Path = head.Path()
-			proofs[0].Payload = head.Payload()
-			proofs[0].Inclusion = true
+		for i, path := range paths {
+			// value matches (inclusion proof)
+			if bytes.Equal(head.Path(), path) {
+				proofs[i].Path = head.Path()
+				proofs[i].Payload = head.Payload()
+				proofs[i].Inclusion = true
+			}
 		}
-		// TODO: insert ERROR if len(paths) != 1
+		// by default, proofs are non-inclusion proofs
 		return
 	}
 
@@ -337,10 +349,16 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	wg := sync.WaitGroup{}
 	parallelRecursionThreshold := 128 // thresold to avoid the parallelization going too deep in the recursion
 
-	if rChild := head.RightChild(); rChild != nil { // TODO: is that a sanity check?
+	if rChild := head.RightChild(); rChild != nil {
+		// This code is necessary, because we do not remove nodes from the trie
+		// when a register is deleted. Instead, we just set the respective leaf's
+		// payload to empty. While this will cause the lead's hash to become the
+		// default hash, the node itself remains as part of the trie.
+		// TODO: On update, prune subtries which only contain empty registers.
+		//       Then, a child is nil if and only if the subtrie is empty.
 		nodeHash := rChild.Hash()
-		isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height())) // TODO: why not rChild.RegisterCount != 0?
-		if !isDef {                                                                     // in proofs, we only provide non-default value hashes
+		isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(rChild.Height()))
+		if !isDef { // in proofs, we only provide non-default value hashes
 			for _, p := range lproofs {
 				utils.SetBit(p.Flags, heightIndex)
 				p.Interims = append(p.Interims, nodeHash)
