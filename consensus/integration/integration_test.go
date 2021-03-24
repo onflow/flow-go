@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func runNodes(nodes []*Node) {
@@ -30,14 +30,7 @@ func Test3Nodes(t *testing.T) {
 	hub.WithFilter(blockNothing)
 	runNodes(nodes)
 
-	assert.Eventually(t, func() bool {
-		select {
-		case <-stopper.stopped:
-			return true
-		default:
-			return false
-		}
-	}, 30*time.Second, 20*time.Millisecond)
+	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -69,20 +62,6 @@ func Test5Nodes(t *testing.T) {
 
 	cleanupNodes(nodes)
 }
-
-// should be able to reach consensus when identity table contains nodes with 0 weight.
-func TestUnweightedNode(t *testing.T) {}
-
-// test consensus across an epoch boundary, where both epochs have the same identity table.
-func TestStaticEpochTransition(t *testing.T) {}
-
-// test consensus across an epoch boundary, where the identity table changes
-// but the new epoch overlaps with the previous epoch.
-func TestEpochTransition_IdentitiesOverlap(t *testing.T) {}
-
-// test consensus across an epoch boundary, where the identity table in the new
-// epoch is disjoint from the identity table in the first epoch.
-func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {}
 
 // TODO: verify if each receiver lost 50% messages, the network can't reach consensus
 
