@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -376,9 +375,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	blockFinder := fvm.NewBlockFinder(node.Headers)
 
@@ -712,9 +711,9 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		blockFinder := fvm.NewBlockFinder(node.Headers)
 
