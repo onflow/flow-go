@@ -79,8 +79,8 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
-			unittest.GenesisTokenSupply,
 			chain,
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		)
 		require.NoError(t, err)
 
@@ -228,6 +228,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
 	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
+	containerBlock.Header.PayloadHash = containerBlock.Payload.Hash()
 
 	return CompleteExecutionResult{
 		Receipt:        receipt,
@@ -312,4 +313,27 @@ func LightExecutionResultFixture(chunkCount int) CompleteExecutionResult {
 		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
 	}
+}
+
+// CompleteExecutionResultChainFixture is a test fixture that creates a chain of blocks of size `count`.
+// The chain is in the form of root <- R1 <- C1 <- R2 <- C2 <- ...
+// In this chain Ri refers to reference blocks that contain guarantees.
+// Ci refers to a container block that contains an execution receipt for its preceding reference block Ri.
+// e.g., C1 contains an execution receipt for R1, C2 contains a receipt for R2, etc.
+// For sake of simplicity and test, container blocks (i.e., Cis) do not contain any guarantee.
+//
+// It returns a slice of CompleteExecutionResult fixtures that contains a pair of (Ri <- Ci).
+func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count int) []*CompleteExecutionResult {
+	results := make([]*CompleteExecutionResult, 0, count)
+	parent := root
+	for i := 0; i < count; i++ {
+		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
+		// and C is a container block containing execution receipt for R.
+		result := CompleteExecutionResultFixture(t, 1, flow.Testnet.Chain(), parent)
+		results = append(results, &result)
+
+		parent = result.ContainerBlock.Header
+
+	}
+	return results
 }

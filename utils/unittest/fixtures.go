@@ -228,6 +228,10 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func WithoutGuarantee(payload *flow.Payload) {
+	payload.Guarantees = nil
+}
+
 func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }

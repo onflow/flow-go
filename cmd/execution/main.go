@@ -50,41 +50,42 @@ import (
 func main() {
 
 	var (
-		followerState         protocol.MutableState
-		ledgerStorage         *ledger.Ledger
-		events                *storage.Events
-		serviceEvents         *storage.ServiceEvents
-		txResults             *storage.TransactionResults
-		results               *storage.ExecutionResults
-		receipts              *storage.ExecutionReceipts
-		myReceipts            *storage.MyExecutionReceipts
-		providerEngine        *exeprovider.Engine
-		checkerEng            *checker.Engine
-		syncCore              *chainsync.Core
-		pendingBlocks         *buffer.PendingBlocks // used in follower engine
-		deltas                *ingestion.Deltas
-		syncEngine            *synchronization.Engine
-		followerEng           *followereng.Engine // to sync blocks from consensus nodes
-		computationManager    *computation.Manager
-		collectionRequester   *requester.Engine
-		ingestionEng          *ingestion.Engine
-		rpcConf               rpc.Config
-		err                   error
-		executionState        state.ExecutionState
-		triedir               string
-		collector             module.ExecutionMetrics
-		mTrieCacheSize        uint32
-		checkpointDistance    uint
-		checkpointsToKeep     uint
-		stateDeltasLimit      uint
-		cadenceExecutionCache uint
-		requestInterval       time.Duration
-		preferredExeNodeIDStr string
-		syncByBlocks          bool
-		syncFast              bool
-		syncThreshold         int
-		extensiveLog          bool
-		checkStakedAtBlock    func(blockID flow.Identifier) (bool, error)
+		followerState               protocol.MutableState
+		ledgerStorage               *ledger.Ledger
+		events                      *storage.Events
+		serviceEvents               *storage.ServiceEvents
+		txResults                   *storage.TransactionResults
+		results                     *storage.ExecutionResults
+		receipts                    *storage.ExecutionReceipts
+		myReceipts                  *storage.MyExecutionReceipts
+		providerEngine              *exeprovider.Engine
+		checkerEng                  *checker.Engine
+		syncCore                    *chainsync.Core
+		pendingBlocks               *buffer.PendingBlocks // used in follower engine
+		deltas                      *ingestion.Deltas
+		syncEngine                  *synchronization.Engine
+		followerEng                 *followereng.Engine // to sync blocks from consensus nodes
+		computationManager          *computation.Manager
+		collectionRequester         *requester.Engine
+		ingestionEng                *ingestion.Engine
+		rpcConf                     rpc.Config
+		err                         error
+		executionState              state.ExecutionState
+		triedir                     string
+		collector                   module.ExecutionMetrics
+		mTrieCacheSize              uint32
+		transactionResultsCacheSize uint
+		checkpointDistance          uint
+		checkpointsToKeep           uint
+		stateDeltasLimit            uint
+		cadenceExecutionCache       uint
+		requestInterval             time.Duration
+		preferredExeNodeIDStr       string
+		syncByBlocks                bool
+		syncFast                    bool
+		syncThreshold               int
+		extensiveLog                bool
+		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -101,6 +102,7 @@ func main() {
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
+			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
@@ -230,6 +232,11 @@ func main() {
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
+			// Needed for gRPC server, make sure to assign to main scoped vars
+			events = storage.NewEvents(node.Metrics.Cache, node.DB)
+			serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
+			txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, transactionResultsCacheSize)
+
 			executionState = state.NewExecutionState(
 				ledgerStorage,
 				stateCommitments,
@@ -286,11 +293,6 @@ func main() {
 			} else if err != nil && preferredExeNodeIDStr != "" {
 				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 			}
-
-			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = storage.NewEvents(node.DB)
-			serviceEvents := storage.NewServiceEvents(node.DB)
-			txResults = storage.NewTransactionResults(node.DB)
 
 			ingestionEng, err = ingestion.New(
 				node.Logger,
