@@ -70,14 +70,18 @@ func withBlockConsumer(t *testing.T, workerCount int, withConsumer func(blockcon
 	})
 }
 
-// SetupMockMatchEng sets up a mock match engine that asserts the followings:
+// mockChunkProcessor sets up a mock chunk processor that asserts the followings:
 // - in a staked verification node:
-// -- that a set of execution results are delivered to it.
-// -- that each execution result is delivered only once.
+// -- that a set of chunk locators are delivered to it.
+// -- that each chunk locator is delivered only once.
 // - in an unstaked verification node:
-// -- no result is passed to it.
-// SetupMockMatchEng returns the mock engine and a wait group that unblocks when all results are received.
-func mockChunkProcessor(t testing.TB, processor *mockfetcher.AssignedChunkProcessor, expectedLocatorIDs flow.IdentityList, staked bool) *sync.WaitGroup {
+// -- no chunk locator is passed to it.
+//
+//  mockChunkProcessor returns the mock chunk processor and a wait group that unblocks when all expected locators received.
+func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentityList,
+	staked bool) (*mockfetcher.AssignedChunkProcessor, *sync.WaitGroup) {
+	processor := &mockfetcher.AssignedChunkProcessor{}
+
 	// keeps track of which locators it has received
 	receivedLocators := make(map[flow.Identifier]struct{})
 
@@ -121,5 +125,5 @@ func mockChunkProcessor(t testing.TB, processor *mockfetcher.AssignedChunkProces
 		require.Contains(t, expectedLocatorIDs, locatorID, fmt.Sprintf("chunk processor unexpected locator: %x", locatorID))
 	})
 
-	return &wg
+	return processor, &wg
 }
