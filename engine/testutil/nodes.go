@@ -102,22 +102,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 	tracer module.Tracer,
 	chainID flow.ChainID) testmock.GenericNode {
 
-	// Generates test signing oracle for the nodes
-	// Disclaimer: it should not be used for practical applications
-	//
-	// uses identity of node as its seed
-	seed, err := json.Marshal(identity)
-	require.NoError(t, err)
-	// creates signing key of the node
-	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
-	require.NoError(t, err)
-
-	// sets staking public key of the node
-	identity.StakingPubKey = sk.PublicKey()
-
-	me, err := local.New(identity, sk)
-	require.NoError(t, err)
-
+	me := LocalFixture(t, identity)
 	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
 
 	return testmock.GenericNode{
@@ -137,6 +122,26 @@ func GenericNodeWithStateFixture(t testing.TB,
 		ChainID:        chainID,
 		ProtocolEvents: stateFixture.ProtocolEvents,
 	}
+}
+
+func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
+	// Generates test signing oracle for the nodes
+	// Disclaimer: it should not be used for practical applications
+	//
+	// uses identity of node as its seed
+	seed, err := json.Marshal(identity)
+	require.NoError(t, err)
+	// creates signing key of the node
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+
+	// sets staking public key of the node
+	identity.StakingPubKey = sk.PublicKey()
+
+	me, err := local.New(identity, sk)
+	require.NoError(t, err)
+
+	return me
 }
 
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
