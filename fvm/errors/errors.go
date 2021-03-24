@@ -22,21 +22,24 @@ type Error interface {
 // if any of these errors occurs we should halt the
 // execution.
 type Failure interface {
+	// FailureCode returns the failure code for this error
 	FailureCode() uint16
+	// and anything else that is needed to be an error
 	error
 }
 
-// Is provides error.As utility functionality,
-// it does look into nested errors by callin `unwrap`
-// method on source and calls `is` method on each level.
-// if no is method is provided it does equality comparison.
+// Is is a utility function to call std error lib `Is` function.
+// Is reports whether any error in err's chain matches target.
+// The chain consists of err itself followed by the sequence of errors obtained by repeatedly calling Unwrap.
+// An error is considered to match a target if it is equal to that target or if it implements a method Is(error) bool such that Is(target) returns true.
 func Is(source, target error) bool {
 	return stdErrors.Is(source, target)
 }
 
-// As is a utility function similar to Is but can be
-// also used for interfaces and also writes the found error with the type
-// into the target
+// As is a utility function to call std error lib `As` function.
+// As finds the first error in err's chain that matches target,
+// and if so, sets target to that error value and returns true. Otherwise, it returns false.
+// The chain consists of err itself followed by the sequence of errors obtained by repeatedly calling Unwrap.
 func As(err error, target interface{}) bool {
 	return stdErrors.As(err, target)
 }
