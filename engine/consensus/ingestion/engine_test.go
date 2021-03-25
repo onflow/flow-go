@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	mockmempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -251,6 +252,7 @@ func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
 	// submit the guarantee as if it was sent by a consensus node
 	err := suite.ingest.onGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with missing guarantor")
+	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
@@ -273,6 +275,7 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
 	// submit the guarantee as if it was sent by a consensus node
 	err := suite.ingest.onGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with missing guarantor")
+	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
@@ -300,6 +303,7 @@ func (suite *IngestionSuite) TestOnGuaranteeExpired() {
 	// submit the guarantee as if it was sent by a consensus node
 	err := suite.ingest.onGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with expired collection")
+	suite.Assert().True(engine.IsOutdatedInputError(err))
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
@@ -322,6 +326,7 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.ingest.onGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with invalid guarantor")
+	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	// check that the guarantee has not been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
@@ -373,6 +378,7 @@ func (suite *IngestionSuite) TestOnGuaranteeUnknownOrigin() {
 	// submit the guarantee with an unknown origin
 	err := suite.ingest.onGuarantee(unittest.IdentifierFixture(), guarantee)
 	suite.Assert().Error(err)
+	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 }

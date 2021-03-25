@@ -100,11 +100,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
-		if engine.IsInvalidInputError(err) {
-			e.log.Error().Str("error_type", "invalid_input").Err(err).Msg("ingestion received invalid event")
-		} else if err != nil {
-			e.log.Error().Err(err).Msg("ingestion could not process submitted event")
-		}
+		engine.LogError(e.log, err)
 	})
 }
 
@@ -136,6 +132,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onGuarantee is used to process collection guarantees received
 // from nodes that are not consensus nodes (notably collection nodes).
+// Returns expected errors:
+// * InvalidInputError
+// * UnverifiableInput
+// * OutdatedInputError
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
 	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
