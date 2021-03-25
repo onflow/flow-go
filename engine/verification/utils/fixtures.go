@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -89,9 +88,9 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		)
 		require.NoError(t, err)
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		blocks := new(fvmMock.Blocks)
 
