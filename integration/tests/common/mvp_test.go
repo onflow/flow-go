@@ -3,8 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -21,7 +19,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -47,7 +44,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 	defer cancel()
 
 	flowNetwork.Start(ctx)
-	defer flowNetwork.Remove()
+	// defer flowNetwork.Remove()
 
 	initialRoot := flowNetwork.Root()
 	chain := initialRoot.Header.ChainID.Chain()
@@ -69,14 +66,11 @@ func TestMVP_Bootstrap(t *testing.T) {
 	bytes, err := convert.SnapshotToBytes(snapshot)
 	require.NoError(t, err)
 
-	bootstrapDir, err := ioutil.TempDir(testnet.TmpRoot, "flow-integration-bootstrap")
-	require.Nil(t, err)
-
-	err = testnet.WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), bytes)
+	err = flowNetwork.WriteRootSnapshot(bytes)
 	require.NoError(t, err)
 
-	// Restart network
 	flowNetwork.StopContainers()
+	flowNetwork.RemoveContainers()
 	flowNetwork.Start(ctx)
 
 	// Run MVP tests

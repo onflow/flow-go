@@ -68,16 +68,17 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t           *testing.T
-	suite       *testingdock.Suite
-	config      NetworkConfig
-	cli         *dockerclient.Client
-	network     *testingdock.Network
-	Containers  map[string]*Container
-	AccessPorts map[string]string
-	root        *flow.Block
-	result      *flow.ExecutionResult
-	seal        *flow.Seal
+	t            *testing.T
+	suite        *testingdock.Suite
+	config       NetworkConfig
+	cli          *dockerclient.Client
+	network      *testingdock.Network
+	Containers   map[string]*Container
+	AccessPorts  map[string]string
+	root         *flow.Block
+	result       *flow.ExecutionResult
+	seal         *flow.Seal
+	bootstrapDir string
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -352,16 +353,17 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:           t,
-		cli:         dockerClient,
-		config:      networkConf,
-		suite:       suite,
-		network:     network,
-		Containers:  make(map[string]*Container, nNodes),
-		AccessPorts: make(map[string]string),
-		root:        root,
-		seal:        seal,
-		result:      result,
+		t:            t,
+		cli:          dockerClient,
+		config:       networkConf,
+		suite:        suite,
+		network:      network,
+		Containers:   make(map[string]*Container, nNodes),
+		AccessPorts:  make(map[string]string),
+		root:         root,
+		seal:         seal,
+		result:       result,
+		bootstrapDir: bootstrapDir,
 	}
 
 	// add each node to the network
@@ -532,6 +534,15 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	} else {
 		net.network.After(suiteContainer)
 	}
+	return nil
+}
+
+func (net *FlowNetwork) WriteRootSnapshot(data []byte) error {
+	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), data)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
