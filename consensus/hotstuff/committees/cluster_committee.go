@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -75,7 +76,7 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 		selector,
 		c.clusterMemberFilter,
 	))
-	return identities, err
+	return identities, convertError(err)
 }
 
 func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
@@ -101,10 +102,10 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	// otherwise use the snapshot given by the reference block
 	identity, err := c.state.AtBlockID(payload.ReferenceBlockID).Identity(nodeID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
+		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, convertError(err))
 	}
 	if !c.clusterMemberFilter(identity) {
-		return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
+		return nil, model.ErrInvalidSigner
 	}
 	return identity, nil
 }
