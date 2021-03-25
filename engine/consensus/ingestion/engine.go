@@ -271,7 +271,7 @@ func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 		return engine.NewUnverifiableInputError("could not get clusters for unknown reference block (id=%x): %w", guarantee.ReferenceBlockID, err)
 	}
 	if err != nil {
-		return fmt.Errorf("could not get clusters: %w", err)
+		return fmt.Errorf("internal error retrieving collector clusters: %w", err)
 	}
 	cluster, _, ok := clusters.ByNodeID(guarantors[0])
 	if !ok {
@@ -310,7 +310,7 @@ func (e *Engine) validateOrigin(originID flow.Identifier, guarantee *flow.Collec
 	// get the origin identity w.r.t. the collection reference block
 	origin, err := e.state.AtBlockID(refBlock).Identity(originID)
 	if err != nil {
-		// an unknown block is unverifiable
+		// collection with an unknown reference block is unverifiable
 		if errors.Is(err, storage.ErrNotFound) {
 			return nil, engine.NewUnverifiableInputError("could not get origin (id=%x) for unknown reference block (id=%x): %w", originID, refBlock, err)
 		}
