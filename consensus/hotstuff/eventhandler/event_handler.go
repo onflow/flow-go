@@ -376,15 +376,28 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNextLeader(block *model.Blo
 	isNextLeader := true
 	curView := block.View
 
+	// before generating a vote, we first check that we are a valid committee
+	// member for this block. we may not be a valid committee member if we are
+	// joining in an upcoming epoch.
 	shouldVote := true
-	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
-	if err != nil {
-		if !model.IsNoVoteError(err) {
-			// unknown error, exit the event loop
-			return fmt.Errorf("could not produce vote: %w", err)
-		}
-		log.Debug().Err(err).Msg("should not vote for this block")
+	_, err := e.committee.Identity(block.BlockID, e.committee.Self())
+	if errors.Is(err, model.ErrInvalidSigner) {
 		shouldVote = false
+	} else if err != nil {
+		return fmt.Errorf("failed to retrieve own identity: %w", err)
+	}
+
+	var ownVote *model.Vote
+	if shouldVote {
+		ownVote, err = e.voter.ProduceVoteIfVotable(block, curView)
+		if err != nil {
+			if !model.IsNoVoteError(err) {
+				// unknown error, exit the event loop
+				return fmt.Errorf("could not produce vote: %w", err)
+			}
+			log.Debug().Err(err).Msg("should not vote for this block")
+			shouldVote = false
+		}
 	}
 
 	// if I'm the next leader, then stay at the current view to collect votes for the block of the current view.
