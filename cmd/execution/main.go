@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
@@ -136,9 +135,9 @@ func main() {
 
 			extralog.ExtraLogDumpPath = extraLogPath
 
-			rt := runtime.NewInterpreterRuntime()
+			rt := fvm.NewInterpreterRuntime()
 
-			vm := fvm.New(rt)
+			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 
 			manager, err := computation.New(

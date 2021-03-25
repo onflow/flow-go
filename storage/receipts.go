@@ -15,6 +15,9 @@ type ExecutionReceipts interface {
 	// Store stores an execution receipt.
 	Store(receipt *flow.ExecutionReceipt) error
 
+	// BatchStore stores an execution receipt inside given batch
+	BatchStore(receipt *flow.ExecutionReceipt, batch BatchStorage) error
+
 	// ByID retrieves an execution receipt by its ID.
 	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
 
@@ -32,6 +35,9 @@ type MyExecutionReceipts interface {
 	// we only support indexing a _single_ receipt per block. Attempting to
 	// store conflicting receipts for the same block will error.
 	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
+
+	// BatchStoreMyReceipt stores the receipt and marks it as mine (trusted) in a given batch
+	BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch BatchStorage) error
 
 	// MyReceipt retrieves my receipt for the given block.
 	MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error)
