@@ -544,7 +544,9 @@ type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	verIds flow.IdentityList,
 	completeReceipts []*utils.CompleteExecutionReceipt,
-	isAssigned ChunkAssignerFunc) {
+	isAssigned ChunkAssignerFunc) flow.IdentifierList {
+
+	expectedLocatorIds := flow.IdentifierList{}
 
 	for _, completeReceipt := range completeReceipts {
 		a := chunks.NewAssignment()
@@ -556,11 +558,19 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 					assignees = append(assignees, verIdentity.NodeID)
 				}
 			}
+			locatorID := chunks.Locator{
+				ResultID: completeReceipt.Receipt.ExecutionResult.ID(),
+				Index:    chunk.Index,
+			}.ID()
+
+			expectedLocatorIds = append(expectedLocatorIds, locatorID)
 			a.Add(chunk, assignees)
 		}
 
 		chunkAssigner.On("Assign", &completeReceipt.Receipt.ExecutionResult, completeReceipt.Receipt.ExecutionResult.BlockID).Return(a, nil)
 	}
+
+	return expectedLocatorIds
 }
 
 // evenChunkIndexAssigner is a helper function that returns true for the even indices in [0, chunkNum-1]
