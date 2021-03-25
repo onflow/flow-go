@@ -3,6 +3,7 @@ package complete_test
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -561,7 +562,30 @@ func TestWALUpdateIsRunInParallel(t *testing.T) {
 
 		return true
 	}, 500*time.Millisecond, 5*time.Millisecond)
+}
 
+func TestWALUpdateFailuresBubbleUp(t *testing.T) {
+
+	theError := fmt.Errorf("error error")
+
+	w := &LongRunningDummyWAL{
+		updateFn: func(update *ledger.TrieUpdate) error {
+			return theError
+		},
+	}
+
+	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
+
+	values := []ledger.Value{[]byte{1, 2, 3}}
+	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
+	require.NoError(t, err)
+
+	_, err = led.Set(update)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, theError))
 }
 
 func valuesMatches(expected []ledger.Value, got []ledger.Value) bool {

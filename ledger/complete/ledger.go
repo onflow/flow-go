@@ -169,7 +169,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 	walError := <-walChan
 	if walError != nil {
-		return nil, fmt.Errorf("error while writing LedgerWAL: %w", err)
+		return nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
