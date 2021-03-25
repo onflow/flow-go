@@ -110,7 +110,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	require.NoError(t, err)
 
 	// mocks chunk assignment
-	a := ChunkAssignmentFixture(flow.IdentityList{verIdentity}, completeER.Receipt.ExecutionResult, IsAssigned)
+	a := ChunkAssignmentFixture(flow.IdentityList{verIdentity}, completeER.Receipt.ExecutionResult, evenChunkIndexAssigner)
 	assigner.On("Assign", result, result.BlockID).Return(a, nil)
 
 	// starts all the engines

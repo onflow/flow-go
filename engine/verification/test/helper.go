@@ -122,7 +122,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	a := ChunkAssignmentFixture(verIdentities, completeER.Receipt.ExecutionResult, IsAssigned)
+	a := ChunkAssignmentFixture(verIdentities, completeER.Receipt.ExecutionResult, evenChunkIndexAssigner)
 	assigner.On("Assign", result, result.BlockID).Return(a, nil)
 
 	// mock execution node
@@ -236,7 +236,7 @@ func SetupMockExeNode(t *testing.T,
 	chunkDataPackCount := 0
 	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if IsAssigned(chunk.Index, chunksNum) {
+		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
 			chunkDataPackCount++
 		}
 	}
@@ -256,7 +256,7 @@ func SetupMockExeNode(t *testing.T,
 						require.True(t, ok, "chunk out of range requested")
 						chunkID := chunk.ID()
 						if chunkID == req.ChunkID {
-							if !IsAssigned(chunk.Index, chunksNum) {
+							if !evenChunkIndexAssigner(chunk.Index, chunksNum) {
 								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
 							}
 
@@ -308,7 +308,7 @@ func SetupMockConsensusNode(t *testing.T,
 	approvalsCount := 0
 	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
 	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		if IsAssigned(chunk.Index, chunksNum) {
+		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
 			approvalsCount++
 		}
 	}
@@ -354,7 +354,7 @@ func SetupMockConsensusNode(t *testing.T,
 			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
 
 			// asserts that the result approval is assigned to the verifier
-			assert.True(t, IsAssigned(resultApproval.Body.ChunkIndex, chunksNum))
+			assert.True(t, evenChunkIndexAssigner(resultApproval.Body.ChunkIndex, chunksNum))
 
 			// verifies SPoCK proof of result approval
 			// against the SPoCK secret of the execution result
@@ -411,7 +411,7 @@ func SetupMockVerifierEng(t testing.TB,
 	expected := 0
 	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
 	for _, c := range vChunks {
-		if IsAssigned(c.Chunk.Index, chunksNum) {
+		if evenChunkIndexAssigner(c.Chunk.Index, chunksNum) {
 			expected++
 		}
 	}
@@ -484,13 +484,6 @@ func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecu
 	}
 }
 
-// IsAssigned is a helper function that returns true for the even indices in [0, chunkNum-1]
-// It also returns true if the index corresponds to the system chunk.
-func IsAssigned(index uint64, chunkNum int) bool {
-	ok := index%2 == 0 || isSystemChunk(index, chunkNum)
-	return ok
-}
-
 // isSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in
 // the receipt.
 func isSystemChunk(index uint64, chunkNum int) bool {
@@ -561,4 +554,11 @@ func ChunkAssignmentFixture(verIds flow.IdentityList, result flow.ExecutionResul
 		a.Add(chunk, assignees)
 	}
 	return a
+}
+
+// evenChunkIndexAssigner is a helper function that returns true for the even indices in [0, chunkNum-1]
+// It also returns true if the index corresponds to the system chunk.
+func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
+	ok := index%2 == 0 || isSystemChunk(index, chunkNum)
+	return ok
 }
