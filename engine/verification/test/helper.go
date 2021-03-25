@@ -552,19 +552,15 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 		a := chunks.NewAssignment()
 
 		for _, chunk := range completeReceipt.Receipt.ExecutionResult.Chunks {
-			assignees := make([]flow.Identifier, 0)
-			for _, verIdentity := range verIds {
-				if isAssigned(chunk.Index, len(completeReceipt.Receipt.ExecutionResult.Chunks)) {
-					assignees = append(assignees, verIdentity.NodeID)
-				}
+			if isAssigned(chunk.Index, len(completeReceipt.Receipt.ExecutionResult.Chunks)) {
+				locatorID := chunks.Locator{
+					ResultID: completeReceipt.Receipt.ExecutionResult.ID(),
+					Index:    chunk.Index,
+				}.ID()
+				expectedLocatorIds = append(expectedLocatorIds, locatorID)
+				a.Add(chunk, verIds.NodeIDs())
 			}
-			locatorID := chunks.Locator{
-				ResultID: completeReceipt.Receipt.ExecutionResult.ID(),
-				Index:    chunk.Index,
-			}.ID()
 
-			expectedLocatorIds = append(expectedLocatorIds, locatorID)
-			a.Add(chunk, assignees)
 		}
 
 		chunkAssigner.On("Assign", &completeReceipt.Receipt.ExecutionResult, completeReceipt.Receipt.ExecutionResult.BlockID).Return(a, nil)
