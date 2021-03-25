@@ -2,8 +2,10 @@ package complete_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
