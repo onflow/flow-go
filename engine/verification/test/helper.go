@@ -122,16 +122,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	a := chunks.NewAssignment()
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
-		assignees := make([]flow.Identifier, 0)
-		for _, verIdentity := range verIdentities {
-			if IsAssigned(chunk.Index, len(completeER.Receipt.ExecutionResult.Chunks)) {
-				assignees = append(assignees, verIdentity.NodeID)
-			}
-		}
-		a.Add(chunk, assignees)
-	}
+	a := ChunkAssignmentFixture(verIdentities, completeER.Receipt.ExecutionResult, IsAssigned)
 	assigner.On("Assign", result, result.BlockID).Return(a, nil)
 
 	// mock execution node
@@ -554,4 +545,20 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 	return flow.ChunkDataPack{
 		ChunkID: chunkID,
 	}
+}
+
+type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
+
+func ChunkAssignmentFixture(verIds flow.IdentityList, result flow.ExecutionResult, isAssigned ChunkAssignerFunc) *chunks.Assignment {
+	a := chunks.NewAssignment()
+	for _, chunk := range result.Chunks {
+		assignees := make([]flow.Identifier, 0)
+		for _, verIdentity := range verIds {
+			if isAssigned(chunk.Index, len(result.Chunks)) {
+				assignees = append(assignees, verIdentity.NodeID)
+			}
+		}
+		a.Add(chunk, assignees)
+	}
+	return a
 }

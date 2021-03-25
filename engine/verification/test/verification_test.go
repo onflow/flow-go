@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/utils"
-	chmodel "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -111,16 +110,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	require.NoError(t, err)
 
 	// mocks chunk assignment
-	assignment := chmodel.NewAssignment()
-	for _, chunk := range result.Chunks {
-		assignees := make([]flow.Identifier, 0)
-		if IsAssigned(chunk.Index, len(result.Chunks)) {
-			assignees = append(assignees, verIdentity.NodeID)
-		}
-		assignment.Add(chunk, assignees)
-	}
-
-	assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+	a := ChunkAssignmentFixture(flow.IdentityList{verIdentity}, completeER.Receipt.ExecutionResult, IsAssigned)
+	assigner.On("Assign", result, result.BlockID).Return(a, nil)
 
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()
