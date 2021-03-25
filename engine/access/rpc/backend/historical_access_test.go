@@ -51,6 +51,8 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -105,6 +107,8 @@ func (suite *Suite) TestHistoricalTransaction() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
