@@ -69,7 +69,7 @@ func (n *Node) Shutdown() {
 // 						before stopping the tests
 func createNodes(t *testing.T, stopper *Stopper, rootSnapshot protocol.Snapshot) ([]*Node, *Hub) {
 
-	consensus, err := rootSnapshot.Identities(filter.IsVotingConsensusCommitteeMember)
+	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
 
 	hub := NewNetworkHub()
