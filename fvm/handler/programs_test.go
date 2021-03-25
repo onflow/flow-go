@@ -96,6 +96,17 @@ func Test_Programs(t *testing.T) {
 		).AddAuthorizer(address)
 	}
 
+	updateContractTx := func(name, code string, address flow.Address) *flow.TransactionBody {
+		encoded := hex.EncodeToString([]byte(code))
+
+		return flow.NewTransactionBody().SetScript([]byte(fmt.Sprintf(`transaction {
+             prepare(signer: AuthAccount) {
+               signer.contracts.update__experimental(name: "%s", code: "%s".decodeHex())
+             }
+           }`, name, encoded)),
+		).AddAuthorizer(address)
+	}
+
 	mainView := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
 		return nil, nil
 	})
@@ -144,9 +155,10 @@ func Test_Programs(t *testing.T) {
 		require.Equal(t, contractA0Code, string(retrievedContractA))
 
 		// deploy contract A
-		procContractA := fvm.Transaction(contractDeployTx("A", contractACode, addressA), 1)
+		procContractA := fvm.Transaction(updateContractTx("A", contractACode, addressA), 1)
 		err = vm.Run(context, procContractA, mainView, programs)
 		require.NoError(t, err)
+		require.NoError(t, procContractA.Err)
 
 		retrievedContractA, err = accounts.GetContract("A", addressA)
 		require.NoError(t, err)
