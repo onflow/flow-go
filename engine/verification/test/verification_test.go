@@ -103,11 +103,11 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	root, err := verNode.State.Params().Root()
 	require.NoError(t, err)
 
-	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain(), root)
+	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 	result := &completeER.Receipt.ExecutionResult
 
 	// stores block of execution result in state and mutate state accordingly
-	err = verNode.State.Extend(completeER.ReferenceBlock)
+	err = verNode.State.Extend(completeER.TestData.ReferenceBlock)
 	require.NoError(t, err)
 
 	// mocks chunk assignment

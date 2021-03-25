@@ -103,7 +103,7 @@ func VerificationHappyPath(t *testing.T,
 	require.NoError(t, err)
 
 	// creates a child block of root, with its corresponding execution result.
-	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain(), root)
+	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 	result := &completeER.Receipt.ExecutionResult
 
 	// imitates follower engine on verification nodes
@@ -116,7 +116,7 @@ func VerificationHappyPath(t *testing.T,
 		require.Equal(t, root, rootBlock)
 
 		// extends state of node by block of `completeER`.
-		err = node.State.Extend(completeER.ReferenceBlock)
+		err = node.State.Extend(completeER.TestData.ReferenceBlock)
 		assert.Nil(t, err)
 	}
 
@@ -235,7 +235,7 @@ func SetupMockExeNode(t *testing.T,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
 	chainID flow.ChainID,
-	completeER utils.CompleteExecutionResult) (*enginemock.GenericNode, *mocknetwork.Engine) {
+	completeER *utils.CompleteExecutionReceipt) (*enginemock.GenericNode, *mocknetwork.Engine) {
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity, chainID)
@@ -253,7 +253,7 @@ func SetupMockExeNode(t *testing.T,
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
-	chunkNum := len(completeER.ChunkDataPacks)
+	chunkNum := len(completeER.TestData.ChunkDataPacks)
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
@@ -271,13 +271,13 @@ func SetupMockExeNode(t *testing.T,
 
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataResponse{
-								ChunkDataPack: *completeER.ChunkDataPacks[i],
+								ChunkDataPack: *completeER.TestData.ChunkDataPacks[i],
 								Nonce:         rand.Uint64(),
 							}
 
 							// only non-system chunks have a collection
 							if !isSystemChunk(uint64(i), chunksNum) {
-								res.Collection = *completeER.Collections[i]
+								res.Collection = *completeER.TestData.Collections[i]
 							}
 
 							err := exeChunkDataConduit.Unicast(res, originID)
@@ -311,7 +311,7 @@ func SetupMockConsensusNode(t *testing.T,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER utils.CompleteExecutionResult,
+	completeER *utils.CompleteExecutionReceipt,
 	chainID flow.ChainID) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
@@ -383,7 +383,7 @@ func SetupMockConsensusNode(t *testing.T,
 			valid, err := crypto.SPOCKVerifyAgainstData(
 				pk,
 				resultApproval.Body.Spock,
-				completeER.SpockSecrets[resultApproval.Body.ChunkIndex],
+				completeER.TestData.SpockSecrets[resultApproval.Body.ChunkIndex],
 				hasher,
 			)
 			assert.NoError(t, err)
@@ -404,7 +404,7 @@ func SetupMockConsensusNode(t *testing.T,
 // SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
 func SetupMockVerifierEng(t testing.TB,
 	vChunks []*verification.VerifiableChunkData,
-	completeER *utils.CompleteExecutionResult) (*mocknetwork.Engine, *sync.WaitGroup) {
+	completeER *utils.CompleteExecutionReceipt) (*mocknetwork.Engine, *sync.WaitGroup) {
 	eng := new(mocknetwork.Engine)
 
 	// keep track of which verifiable chunks we have received
@@ -472,7 +472,7 @@ func SetupMockVerifierEng(t testing.TB,
 	return eng, &wg
 }
 
-func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecutionResult) *verification.VerifiableChunkData {
+func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecutionReceipt) *verification.VerifiableChunkData {
 	var endState flow.StateCommitment
 	// last chunk
 	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
@@ -485,10 +485,10 @@ func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecu
 
 	return &verification.VerifiableChunkData{
 		Chunk:         er.Receipt.ExecutionResult.Chunks[chunkIndex],
-		Header:        er.ReferenceBlock.Header,
+		Header:        er.TestData.ReferenceBlock.Header,
 		Result:        &er.Receipt.ExecutionResult,
-		Collection:    er.Collections[chunkIndex],
-		ChunkDataPack: er.ChunkDataPacks[chunkIndex],
+		Collection:    er.TestData.Collections[chunkIndex],
+		ChunkDataPack: er.TestData.ChunkDataPacks[chunkIndex],
 		EndState:      endState,
 	}
 }

@@ -123,6 +123,8 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 
 		// ensures the received locator matches one we expect
 		require.Contains(t, expectedLocatorIDs, locatorID, fmt.Sprintf("chunk processor unexpected locator: %x", locatorID))
+
+		notifier.Notify(locatorID)
 	})
 
 	return processor, &wg

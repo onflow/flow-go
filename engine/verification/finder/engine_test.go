@@ -100,11 +100,11 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 
 	// generates an execution result with a single collection, chunk, and transaction.
 	completeER := utils.LightExecutionResultFixture(1)
-	suite.collection = completeER.Collections[0]
-	suite.block = completeER.ReferenceBlock
+	suite.collection = completeER.TestData.Collections[0]
+	suite.block = completeER.TestData.ReferenceBlock
 	suite.receipt = completeER.Receipt
 	suite.chunk = completeER.Receipt.ExecutionResult.Chunks[0]
-	suite.chunkDataPack = completeER.ChunkDataPacks[0]
+	suite.chunkDataPack = completeER.TestData.ChunkDataPacks[0]
 
 	suite.verIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	suite.execIdentity = unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
