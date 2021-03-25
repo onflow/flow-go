@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultJobIndex = int64(0)
+	DefaultJobIndex = uint64(0)
 )
 
 // ChunkJob converts a chunk locator into a Job to be used by job queue.
@@ -47,7 +47,7 @@ type ChunkJobs struct {
 	locators storage.ChunksQueue
 }
 
-func (j *ChunkJobs) AtIndex(index int64) (module.Job, error) {
+func (j *ChunkJobs) AtIndex(index uint64) (module.Job, error) {
 	locator, err := j.locators.AtIndex(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
@@ -55,7 +55,7 @@ func (j *ChunkJobs) AtIndex(index int64) (module.Job, error) {
 	return ChunkLocatorToJob(locator), nil
 }
 
-func (j *ChunkJobs) Head() (int64, error) {
+func (j *ChunkJobs) Head() (uint64, error) {
 	return j.locators.LatestIndex()
 }
 

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	DefaultIndex = int64(0)
+	DefaultIndex = uint64(0)
 	ConsumerTag  = "consumer"
 )
 
@@ -442,7 +442,7 @@ func runWith(t testing.TB, runTestWith func(module.JobConsumer, storage.Consumer
 	})
 }
 
-func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed int64) {
+func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed uint64) {
 	processed, err := cp.ProcessedIndex()
 	require.NoError(t, err)
 	require.Equal(t, expectProcessed, processed)

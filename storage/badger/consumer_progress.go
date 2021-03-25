@@ -20,8 +20,8 @@ func NewConsumerProgress(db *badger.DB, consumer string) *ConsumerProgress {
 	}
 }
 
-func (cp *ConsumerProgress) ProcessedIndex() (int64, error) {
-	var processed int64
+func (cp *ConsumerProgress) ProcessedIndex() (uint64, error) {
+	var processed uint64
 	err := cp.db.View(operation.RetrieveProcessedIndex(cp.consumer, &processed))
 	if err != nil {
 		return 0, fmt.Errorf("failed to retrieve processed index: %w", err)
@@ -31,7 +31,7 @@ func (cp *ConsumerProgress) ProcessedIndex() (int64, error) {
 
 // InitProcessedIndex insert the default processed index to the storage layer, can only be done once.
 // initialize for the second time will return storage.ErrAlreadyExists
-func (cp *ConsumerProgress) InitProcessedIndex(defaultIndex int64) error {
+func (cp *ConsumerProgress) InitProcessedIndex(defaultIndex uint64) error {
 	err := operation.RetryOnConflict(cp.db.Update, operation.InsertProcessedIndex(cp.consumer, defaultIndex))
 	if err != nil {
 		return fmt.Errorf("could not update processed index: %w", err)
@@ -40,7 +40,7 @@ func (cp *ConsumerProgress) InitProcessedIndex(defaultIndex int64) error {
 	return nil
 }
 
-func (cp *ConsumerProgress) SetProcessedIndex(processed int64) error {
+func (cp *ConsumerProgress) SetProcessedIndex(processed uint64) error {
 	err := operation.RetryOnConflict(cp.db.Update, operation.SetProcessedIndex(cp.consumer, processed))
 	if err != nil {
 		return fmt.Errorf("could not update processed index: %w", err)
