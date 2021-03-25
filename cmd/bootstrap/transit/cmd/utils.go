@@ -50,7 +50,7 @@ func readNodeID() (string, error) {
 
 	data, err := ioutils.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("Error reading file %s: %w", path, err)
+		return "", fmt.Errorf("error reading file %s: %w", path, err)
 	}
 
 	return strings.TrimSpace(string(data)), nil
@@ -179,17 +179,17 @@ func unWrapFile(bootDir string, nodeID string) error {
 
 	ciphertext, err := ioutils.ReadFile(ciphertextPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open ciphertext file %s: %w", ciphertextPath, err)
+		return fmt.Errorf("failed to open ciphertext file %s: %w", ciphertextPath, err)
 	}
 
 	publicKey, err := ioutils.ReadFile(pubKeyPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open public keyfile %s: %w", pubKeyPath, err)
+		return fmt.Errorf("failed to open public keyfile %s: %w", pubKeyPath, err)
 	}
 
 	privateKey, err := ioutils.ReadFile(privKeyPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open private keyfile %s: %w", privKeyPath, err)
+		return fmt.Errorf("failed to open private keyfile %s: %w", privKeyPath, err)
 	}
 
 	// NaCl is picky and wants its type to be exactly a [32]byte, but readfile reads a slice
@@ -200,12 +200,12 @@ func unWrapFile(bootDir string, nodeID string) error {
 	plaintext := make([]byte, 0, len(ciphertext)-box.AnonymousOverhead)
 	plaintext, ok := box.OpenAnonymous(plaintext, ciphertext, &pubKeyBytes, &privKeyBytes)
 	if !ok {
-		return fmt.Errorf("Failed to decrypt random beacon key using private key from file: %s", privKeyPath)
+		return fmt.Errorf("failed to decrypt random beacon key using private key from file: %s", privKeyPath)
 	}
 
 	err = ioutil.WriteFile(plaintextPath, plaintext, fileMode)
 	if err != nil {
-		return fmt.Errorf("Failed to write the decrypted file %s: %w", plaintextPath, err)
+		return fmt.Errorf("failed to write the decrypted file %s: %w", plaintextPath, err)
 	}
 
 	return nil
@@ -218,12 +218,12 @@ func wrapFile(bootDir string, nodeID string) error {
 
 	plaintext, err := ioutils.ReadFile(plaintextPath)
 	if err != nil {
-		return fmt.Errorf("Failed to open plaintext file %s: %w", plaintextPath, err)
+		return fmt.Errorf("failed to open plaintext file %s: %w", plaintextPath, err)
 	}
 
 	publicKey, err := ioutils.ReadFile(pubKeyPath)
 	if err != nil {
-		return fmt.Errorf("Faield to open public keyfile %s: %w", pubKeyPath, err)
+		return fmt.Errorf("faield to open public keyfile %s: %w", pubKeyPath, err)
 	}
 
 	var pubKeyBytes [32]byte
@@ -233,12 +233,12 @@ func wrapFile(bootDir string, nodeID string) error {
 
 	ciphertext, err = box.SealAnonymous(ciphertext, plaintext, &pubKeyBytes, rand.Reader)
 	if err != nil {
-		return fmt.Errorf("Could not encrypt file: %w", err)
+		return fmt.Errorf("could not encrypt file: %w", err)
 	}
 
 	err = ioutil.WriteFile(ciphertextPath, ciphertext, fileMode)
 	if err != nil {
-		return fmt.Errorf("Error writing ciphertext: %w", err)
+		return fmt.Errorf("error writing ciphertext: %w", err)
 	}
 
 	return nil
@@ -251,7 +251,7 @@ func generateKeys(bootDir string, nodeID string) error {
 	pubPath := filepath.Join(bootDir, fmt.Sprintf(FilenameTransitKeyPub, nodeID))
 
 	if ioutils.FileExists(privPath) && ioutils.FileExists(pubPath) {
-		log.Warn().Msg("transit-key-path priv & pub both exist, exiting")
+		log.Warn().Msg("transit-key-path priv & pub both exist, skipping key generation")
 		return nil
 	}
 
@@ -260,19 +260,19 @@ func generateKeys(bootDir string, nodeID string) error {
 	// Generate the keypair
 	pub, priv, err := box.GenerateKey(rand.Reader)
 	if err != nil {
-		return fmt.Errorf("Failed to create keys: %w", err)
+		return fmt.Errorf("failed to create keys: %w", err)
 	}
 
 	// Write private key file
 	err = ioutil.WriteFile(privPath, priv[:], fileMode)
 	if err != nil {
-		return fmt.Errorf("Failed to write pivate key file: %w", err)
+		return fmt.Errorf("failed to write pivate key file: %w", err)
 	}
 
 	// Write public key file
 	err = ioutil.WriteFile(pubPath, pub[:], fileMode)
 	if err != nil {
-		return fmt.Errorf("Failed to write public key file: %w", err)
+		return fmt.Errorf("failed to write public key file: %w", err)
 	}
 
 	return nil

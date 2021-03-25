@@ -26,8 +26,8 @@ func init() {
 }
 
 func addPushCmdFlags() {
-	pushCmd.Flags().StringVar(&flagToken, "token", "", "token provided by the Flow team to access the Transit server")
-	pushCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	pushCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
+	pushCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 
 	_ = pushCmd.MarkFlagRequired("token")
 	_ = pushCmd.MarkFlagRequired("role")
@@ -67,6 +67,7 @@ func push(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	log.Info().Msg("attempting to push files to transit servers")
 	files := getFilesToUpload(role)
 	for _, file := range files {
 		fileName := fmt.Sprintf(file, nodeID)
@@ -77,4 +78,5 @@ func push(cmd *cobra.Command, args []string) {
 			log.Fatal().Err(err).Msg("failed to push")
 		}
 	}
+	log.Info().Msg("successfully completed running push")
 }

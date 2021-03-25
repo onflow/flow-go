@@ -20,8 +20,8 @@ func init() {
 }
 
 func addWrapCmdFlags() {
-	wrapCmd.Flags().StringVar(&flagWrapID, "wrap-id", "", "(Flow Team Use), wrap response keys for consensus node")
-	wrapCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	wrapCmd.Flags().StringVarP(&flagWrapID, "wrap-id", "i", "", "(Flow Team Use), wrap response keys for consensus node")
+	wrapCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 
 	_ = wrapCmd.MarkFlagRequired("wrap-id")
 	_ = wrapCmd.MarkFlagRequired("role")

@@ -31,7 +31,7 @@ func init() {
 }
 
 func addSnapshotCmdFlags() {
-	snapshotCmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "the address of an access node")
+	snapshotCmd.Flags().StringVarP(&flagAccessAddress, "access-address", "a", "", "the address of an access node")
 	_ = snapshotCmd.MarkFlagRequired("access-address")
 }
 

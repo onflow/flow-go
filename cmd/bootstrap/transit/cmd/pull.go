@@ -28,8 +28,8 @@ func init() {
 }
 
 func addPullCmdFlags() {
-	pullCmd.Flags().StringVar(&flagToken, "token", "", "token provided by the Flow team to access the Transit server")
-	pullCmd.Flags().StringVar(&flagNodeRole, "role", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
+	pullCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
+	pullCmd.Flags().StringVarP(&flagNodeRole, "role", "r", "", `node role (can be "collection", "consensus", "execution", "verification" or "access")`)
 
 	_ = pullCmd.MarkFlagRequired("token")
 	_ = pullCmd.MarkFlagRequired("role")
@@ -72,9 +72,9 @@ func pull(cmd *cobra.Command, args []string) {
 
 	// download found files
 	for _, file := range files {
-		fullOutpath := filepath.Join(flagBootDir, file)
+		fullOutpath := filepath.Join(flagBootDir, "public-root-information", filepath.Base(file))
 
-		log.Info().Msgf("downloading: %s", file)
+		log.Info().Str("source", file).Str("dest", fullOutpath).Msgf("downloading file from transit servers")
 		err = bucket.DownloadFile(ctx, client, fullOutpath, file)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("could not download google bucket file")
