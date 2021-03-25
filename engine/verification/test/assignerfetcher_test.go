@@ -29,57 +29,63 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type withConsumersFunc func(blockConsumer *blockconsumer.BlockConsumer, chunkConsumer *fetcher.ChunkConsumer, blocks []*flow.Block, wg *sync.WaitGroup)
-
 func TestAssignerFetcherPipeline(t *testing.T) {
+	testcases := []struct {
+		blockCount,
+		resultCount,
+		chunkCount int
+	}{
+		{
+			blockCount:  1,
+			resultCount: 1,
+			chunkCount:  1,
+		},
+		{
+			blockCount:  1,
+			resultCount: 1,
+			chunkCount:  10,
+		},
+		{
+			blockCount:  1,
+			resultCount: 1,
+			chunkCount:  10,
+		},
+		{
+			blockCount:  10,
+			resultCount: 1,
+			chunkCount:  10,
+		},
+	}
 
-	t.Run("single chunk result", func(t *testing.T) {
-		withBlockConsumer(t, 2, 1, func(blockConsumer *blockconsumer.BlockConsumer,
-			chunkConsumer *fetcher.ChunkConsumer,
-			blocks []*flow.Block,
-			wg *sync.WaitGroup) {
-			unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
-			unittest.RequireCloseBefore(t, blockConsumer.Ready(), time.Second, "could not start block consumer")
+	for _, tc := range testcases {
+		t.Run(fmt.Sprintf("%d-blocks %d-results %d-chunks", tc.blockCount, tc.resultCount, tc.chunkCount), func(t *testing.T) {
+			withBlockConsumer(t, tc.blockCount, tc.resultCount, tc.chunkCount, func(blockConsumer *blockconsumer.BlockConsumer,
+				chunkConsumer *fetcher.ChunkConsumer,
+				blocks []*flow.Block,
+				wg *sync.WaitGroup) {
+				unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
+				unittest.RequireCloseBefore(t, blockConsumer.Ready(), time.Second, "could not start block consumer")
 
-			for i := 0; i < len(blocks); i++ {
-				// consumer is only required to be "notified" that a new finalized block available.
-				// It keeps track of the last finalized block it has read, and read the next height upon
-				// getting notified as follows:
-				blockConsumer.OnFinalizedBlock(&model.Block{})
-			}
+				for i := 0; i < len(blocks); i++ {
+					// consumer is only required to be "notified" that a new finalized block available.
+					// It keeps track of the last finalized block it has read, and read the next height upon
+					// getting notified as follows:
+					blockConsumer.OnFinalizedBlock(&model.Block{})
+				}
 
-			unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "could not receive all chunk locators on time")
-			unittest.RequireCloseBefore(t, blockConsumer.Done(), time.Second, "could not terminate block consumer")
-			unittest.RequireCloseBefore(t, chunkConsumer.Done(), time.Second, "could not terminate chunk consumer")
+				unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "could not receive all chunk locators on time")
+				unittest.RequireCloseBefore(t, blockConsumer.Done(), time.Second, "could not terminate block consumer")
+				unittest.RequireCloseBefore(t, chunkConsumer.Done(), time.Second, "could not terminate chunk consumer")
+			})
 		})
-	})
-
-	t.Run("multiple chunks result", func(t *testing.T) {
-		withBlockConsumer(t, 2, 10, func(blockConsumer *blockconsumer.BlockConsumer,
-			chunkConsumer *fetcher.ChunkConsumer,
-			blocks []*flow.Block,
-			wg *sync.WaitGroup) {
-			unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
-			unittest.RequireCloseBefore(t, blockConsumer.Ready(), time.Second, "could not start block consumer")
-
-			for i := 0; i < len(blocks); i++ {
-				// consumer is only required to be "notified" that a new finalized block available.
-				// It keeps track of the last finalized block it has read, and read the next height upon
-				// getting notified as follows:
-				blockConsumer.OnFinalizedBlock(&model.Block{})
-			}
-
-			unittest.RequireReturnsBefore(t, wg.Wait, 2*time.Second, "could not receive all chunk locators on time")
-			unittest.RequireCloseBefore(t, blockConsumer.Done(), 1*time.Second, "could not terminate block consumer")
-			unittest.RequireCloseBefore(t, chunkConsumer.Done(), 1*time.Second, "could not terminate chunk consumer")
-		})
-	})
-
+	}
 }
 
-func withBlockConsumer(t *testing.T, blockCount int, chunkCount int, withConsumers func(*blockconsumer.BlockConsumer, *fetcher.ChunkConsumer,
-	[]*flow.Block,
-	*sync.WaitGroup)) {
+func withBlockConsumer(t *testing.T, blockCount int, resultCount, chunkCount int,
+	withConsumers func(*blockconsumer.BlockConsumer,
+		*fetcher.ChunkConsumer,
+		[]*flow.Block,
+		*sync.WaitGroup)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
 
@@ -97,10 +103,12 @@ func withBlockConsumer(t *testing.T, blockCount int, chunkCount int, withConsume
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		completeERs := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2, chunkCount)
+		completeERs := utils.CompleteExecutionResultChainFixture(t, root, blockCount, chunkCount)
 		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
+
 		// makes sure that we generated a block chain of requested length.
-		require.Len(t, blocks, blockCount)
+		// for each (container) block, we have a reference block, hence, we have 2*blockCount
+		require.Len(t, blocks, 2*blockCount)
 		// mocks chunk assigner to assign even chunk indices to this verification node
 		expectedLocatorIds := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{verId}, completeERs, evenChunkIndexAssigner)
 
