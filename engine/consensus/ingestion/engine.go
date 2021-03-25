@@ -208,10 +208,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	// consensus node committee than over the collection clusters.
 
 	// select all the consensus nodes on the network as our targets
-	committee, err := e.state.Final().Identities(filter.And(
-		filter.IsVotingConsensusCommitteeMember,
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
+	committee, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get committee: %w", err)
 	}
