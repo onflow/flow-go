@@ -24,8 +24,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type TestExecutionResultData struct {
-	ContainerBlock *flow.Block // block that contains execution receipt of reference block
+type ExecutionReceiptData struct {
 	ReferenceBlock *flow.Block // block that execution receipt refers to
 	Collections    []*flow.Collection
 	ChunkDataPacks []*flow.ChunkDataPack
@@ -37,8 +36,8 @@ type TestExecutionResultData struct {
 // verify it.
 // TODO update this as needed based on execution requirements
 type CompleteExecutionReceipt struct {
-	Receipt  *flow.ExecutionReceipt
-	TestData *TestExecutionResultData
+	ContainerBlock *flow.Block             // block that contains execution receipt of reference block
+	ReceiptsData   []*ExecutionReceiptData // execution receipts data of the container block
 }
 
 // CompleteExecutionReceiptFixture returns complete execution receipt with an
@@ -53,7 +52,7 @@ func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain,
 }
 
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
-	*TestExecutionResultData) {
+	*ExecutionReceiptData) {
 	// setups up the first collection of block consists of three transactions
 	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
@@ -231,7 +230,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		Chunks:  chunks,
 	}
 
-	return result, &TestExecutionResultData{
+	return result, &ExecutionReceiptData{
 		ReferenceBlock: &referenceBlock,
 		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
@@ -305,12 +304,13 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
 
 	return &CompleteExecutionReceipt{
-		Receipt: receipt,
-		TestData: &TestExecutionResultData{
-			ContainerBlock: &containerBlock,
-			ReferenceBlock: &referenceBlock,
-			Collections:    collections,
-			ChunkDataPacks: chunkDataPacks,
+		ContainerBlock: &containerBlock,
+		ReceiptsData: []*ExecutionReceiptData{
+			{
+				ReferenceBlock: &referenceBlock,
+				Collections:    collections,
+				ChunkDataPacks: chunkDataPacks,
+			},
 		},
 	}
 }
@@ -327,32 +327,27 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 // The generated execution results have chunks+1 chunks, where the last chunk accounts
 // for the system chunk.
 func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, chunks int) []*CompleteExecutionReceipt {
-	ers := make([]*CompleteExecutionReceipt, 0, count)
+	completeERs := make([]*CompleteExecutionReceipt, 0, count)
 	parent := root
 
 	for i := 0; i < count; i++ {
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
-		allResults, allData, head := ExecutionResultsFromParentBlockFixture(t, 1, parent, chunks, flow.Testnet.Chain())
+		allResults, allData, head := ExecutionResultsFromParentBlockFixture(t, 10, parent, chunks, flow.Testnet.Chain())
 		containerBlock := ContainerBlockFixture(head, allResults)
-
-		for j := 0; j < len(allResults); j++ {
-			allData[j].ContainerBlock = containerBlock
-			er := &CompleteExecutionReceipt{
-				Receipt:  containerBlock.Payload.Receipts[0],
-				TestData: allData[j],
-			}
-			ers = append(ers, er)
-		}
+		completeERs = append(completeERs, &CompleteExecutionReceipt{
+			ContainerBlock: containerBlock,
+			ReceiptsData:   allData,
+		})
 
 		parent = containerBlock.Header
 	}
-	return ers
+	return completeERs
 }
 
 func ExecutionResultsFromParentBlockFixture(t *testing.T, count int, parent *flow.Header, chunks int, chain flow.Chain) ([]*flow.ExecutionResult,
-	[]*TestExecutionResultData, *flow.Header) {
-	allData := make([]*TestExecutionResultData, 0, count)
+	[]*ExecutionReceiptData, *flow.Header) {
+	allData := make([]*ExecutionReceiptData, 0, count)
 	allResults := make([]*flow.ExecutionResult, 0, count)
 
 	for i := 0; i < count; i++ {
@@ -367,7 +362,7 @@ func ExecutionResultsFromParentBlockFixture(t *testing.T, count int, parent *flo
 
 // ExecutionResultFromParentBlockFixture is a test helper that creates a child (reference) block from the parent, as well as an execution for it.
 func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, chunks int, chain flow.Chain) (*flow.ExecutionResult,
-	*TestExecutionResultData) {
+	*ExecutionReceiptData) {
 	refBlkHeader := unittest.BlockHeaderWithParentFixture(parent)
 	return ExecutionResultFixture(t, chunks, chain, &refBlkHeader)
 }

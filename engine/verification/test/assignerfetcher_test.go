@@ -106,9 +106,6 @@ func withBlockConsumer(t *testing.T, blockCount int, resultCount, chunkCount int
 		completeERs := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount, chunkCount)
 		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
-		// makes sure that we generated a block chain of requested length.
-		// for each (container) block, we have a reference block, hence, we have 2*blockCount
-		require.Len(t, blocks, 2*blockCount)
 		// mocks chunk assigner to assign even chunk indices to this verification node
 		expectedLocatorIds := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{verId}, completeERs, evenChunkIndexAssigner)
 

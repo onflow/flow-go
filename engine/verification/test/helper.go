@@ -1,7 +1,6 @@
 package test
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 	"testing"
@@ -17,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
@@ -116,7 +114,7 @@ func VerificationHappyPath(t *testing.T,
 		require.Equal(t, root, rootBlock)
 
 		// extends state of node by block of `completeER`.
-		err = node.State.Extend(completeER.TestData.ReferenceBlock)
+		err = node.State.Extend(completeER.ReceiptsData[0].ReferenceBlock)
 		assert.Nil(t, err)
 	}
 
@@ -144,7 +142,7 @@ func VerificationHappyPath(t *testing.T,
 			defer verWG.Done()
 			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
 			require.NoError(t, err)
-		}(verNode, completeER.Receipt)
+		}(verNode, completeER.ContainerBlock.Payload.Receipts[0])
 	}
 
 	// requires all verification nodes process the receipt
@@ -233,8 +231,9 @@ func SetupMockExeNode(t *testing.T,
 
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
-	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+	chunks := completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.Chunks
+	chunksNum := len(chunks)
+	for _, chunk := range chunks {
 		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
 			chunkDataPackCount++
 		}
@@ -243,7 +242,7 @@ func SetupMockExeNode(t *testing.T,
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
-	chunkNum := len(completeER.TestData.ChunkDataPacks)
+	chunkNum := len(completeER.ReceiptsData[0].ChunkDataPacks)
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
@@ -251,7 +250,7 @@ func SetupMockExeNode(t *testing.T,
 				if req, ok := args[1].(*messages.ChunkDataRequest); ok {
 					require.True(t, ok)
 					for i := 0; i < chunkNum; i++ {
-						chunk, ok := completeER.Receipt.ExecutionResult.Chunks.ByIndex(uint64(i))
+						chunk, ok := chunks.ByIndex(uint64(i))
 						require.True(t, ok, "chunk out of range requested")
 						chunkID := chunk.ID()
 						if chunkID == req.ChunkID {
@@ -261,13 +260,13 @@ func SetupMockExeNode(t *testing.T,
 
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataResponse{
-								ChunkDataPack: *completeER.TestData.ChunkDataPacks[i],
+								ChunkDataPack: *completeER.ReceiptsData[0].ChunkDataPacks[i],
 								Nonce:         rand.Uint64(),
 							}
 
 							// only non-system chunks have a collection
 							if !isSystemChunk(uint64(i), chunksNum) {
-								res.Collection = *completeER.TestData.Collections[i]
+								res.Collection = *completeER.ReceiptsData[0].Collections[i]
 							}
 
 							err := exeChunkDataConduit.Unicast(res, originID)
@@ -305,8 +304,9 @@ func SetupMockConsensusNode(t *testing.T,
 	chainID flow.ChainID) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
-	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
-	for _, chunk := range completeER.Receipt.ExecutionResult.Chunks {
+	chunks := completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.Chunks
+	chunksNum := len(chunks)
+	for _, chunk := range chunks {
 		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
 			approvalsCount++
 		}
@@ -373,7 +373,7 @@ func SetupMockConsensusNode(t *testing.T,
 			valid, err := crypto.SPOCKVerifyAgainstData(
 				pk,
 				resultApproval.Body.Spock,
-				completeER.TestData.SpockSecrets[resultApproval.Body.ChunkIndex],
+				completeER.ReceiptsData[0].SpockSecrets[resultApproval.Body.ChunkIndex],
 				hasher,
 			)
 			assert.NoError(t, err)
@@ -386,101 +386,6 @@ func SetupMockConsensusNode(t *testing.T,
 	assert.Nil(t, err)
 
 	return &conNode, conEngine, wg
-}
-
-// SetupMockVerifierEng sets up a mock verifier engine that asserts the followings:
-// - that a set of chunks are delivered to it.
-// - that each chunk is delivered exactly once
-// SetupMockVerifierEng returns the mock engine and a wait group that unblocks when all ERs are received.
-func SetupMockVerifierEng(t testing.TB,
-	vChunks []*verification.VerifiableChunkData,
-	completeER *utils.CompleteExecutionReceipt) (*mocknetwork.Engine, *sync.WaitGroup) {
-	eng := new(mocknetwork.Engine)
-
-	// keep track of which verifiable chunks we have received
-	receivedChunks := make(map[flow.Identifier]struct{})
-	var (
-		// decrement the wait group when each verifiable chunk received
-		wg sync.WaitGroup
-		// check one verifiable chunk at a time to ensure dupe checking works
-		mu sync.Mutex
-	)
-
-	// computes expected number of assigned chunks
-	expected := 0
-	chunksNum := len(completeER.Receipt.ExecutionResult.Chunks)
-	for _, c := range vChunks {
-		if evenChunkIndexAssigner(c.Chunk.Index, chunksNum) {
-			expected++
-		}
-	}
-	wg.Add(expected)
-
-	eng.On("ProcessLocal", testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			mu.Lock()
-			defer mu.Unlock()
-
-			// the received entity should be a verifiable chunk
-			vchunk, ok := args[0].(*verification.VerifiableChunkData)
-			assert.True(t, ok)
-
-			// retrieves the content of received chunk
-			chunk, ok := vchunk.Result.Chunks.ByIndex(vchunk.Chunk.Index)
-			require.True(t, ok, "chunk out of range requested")
-			vID := chunk.ID()
-
-			// verifies that it has not seen this chunk before
-			_, alreadySeen := receivedChunks[vID]
-			if alreadySeen {
-				t.Logf("received duplicated chunk (id=%s)", vID)
-				t.Fail()
-				return
-			}
-
-			// ensure the received chunk matches one we expect
-			for _, vc := range vChunks {
-				if chunk.ID() == vID {
-					// mark it as seen and decrement the waitgroup
-					receivedChunks[vID] = struct{}{}
-					// checks end states match as expected
-					if !bytes.Equal(vchunk.EndState, vc.EndState) {
-						t.Logf("end states are not equal: expected %x got %x", vchunk.EndState, chunk.EndState)
-						t.Fail()
-					}
-					wg.Done()
-					return
-				}
-			}
-
-			// the received chunk doesn't match any expected ERs
-			t.Logf("received unexpected ER (id=%s)", vID)
-			t.Fail()
-		}).
-		Return(nil)
-
-	return eng, &wg
-}
-
-func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecutionReceipt) *verification.VerifiableChunkData {
-	var endState flow.StateCommitment
-	// last chunk
-	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
-		finalState, ok := er.Receipt.ExecutionResult.FinalStateCommitment()
-		require.True(t, ok)
-		endState = finalState
-	} else {
-		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState
-	}
-
-	return &verification.VerifiableChunkData{
-		Chunk:         er.Receipt.ExecutionResult.Chunks[chunkIndex],
-		Header:        er.TestData.ReferenceBlock.Header,
-		Result:        &er.Receipt.ExecutionResult,
-		Collection:    er.TestData.Collections[chunkIndex],
-		ChunkDataPack: er.TestData.ChunkDataPacks[chunkIndex],
-		EndState:      endState,
-	}
 }
 
 // isSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in
@@ -543,27 +448,30 @@ type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 
 func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	verIds flow.IdentityList,
-	completeReceipts []*utils.CompleteExecutionReceipt,
+	completeERS []*utils.CompleteExecutionReceipt,
 	isAssigned ChunkAssignerFunc) flow.IdentifierList {
 
 	expectedLocatorIds := flow.IdentifierList{}
 
-	for _, completeReceipt := range completeReceipts {
-		a := chunks.NewAssignment()
+	for _, completeER := range completeERS {
+		for _, receipt := range completeER.ContainerBlock.Payload.Receipts {
+			a := chunks.NewAssignment()
 
-		for _, chunk := range completeReceipt.Receipt.ExecutionResult.Chunks {
-			if isAssigned(chunk.Index, len(completeReceipt.Receipt.ExecutionResult.Chunks)) {
-				locatorID := chunks.Locator{
-					ResultID: completeReceipt.Receipt.ExecutionResult.ID(),
-					Index:    chunk.Index,
-				}.ID()
-				expectedLocatorIds = append(expectedLocatorIds, locatorID)
-				a.Add(chunk, verIds.NodeIDs())
+			for _, chunk := range receipt.ExecutionResult.Chunks {
+				if isAssigned(chunk.Index, len(receipt.ExecutionResult.Chunks)) {
+					locatorID := chunks.Locator{
+						ResultID: receipt.ExecutionResult.ID(),
+						Index:    chunk.Index,
+					}.ID()
+					expectedLocatorIds = append(expectedLocatorIds, locatorID)
+					a.Add(chunk, verIds.NodeIDs())
+				}
+
 			}
 
-		}
+			chunkAssigner.On("Assign", &receipt.ExecutionResult, receipt.ExecutionResult.BlockID).Return(a, nil)
 
-		chunkAssigner.On("Assign", &completeReceipt.Receipt.ExecutionResult, completeReceipt.Receipt.ExecutionResult.BlockID).Return(a, nil)
+		}
 	}
 
 	return expectedLocatorIds
@@ -577,26 +485,29 @@ func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
 }
 
 // ExtendStateWithFinalizedBlocks is a test helper to extend the execution state and return the list of blocks.
-// It receives a list of complete execution result fixtures in the form of (R1 <- C1) <- (R2 <- C2) <- .....
-// Where R and C are the reference and container blocks of a complete execution result fixture.
-// Reference blocks contain guarantees, and container blocks contain execution receipt for their preceding reference block.
+// It receives a list of complete execution receipt fixtures in the form of (R1,1 <- R1,2 <- ... <- C1) <- (R2,1 <- R2,2 <- ... <- C2) <- .....
+// Where R and C are the reference and container blocks.
+// Reference blocks contain guarantees, and container blocks contain execution receipt for their preceding reference blocks,
+// e.g., C1 contains receipts for R1,1, R1,2, etc.
 // Note: for sake of simplicity we do not include guarantees in the container blocks for now.
 func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts []*utils.CompleteExecutionReceipt, state protocol.MutableState) []*flow.Block {
 	blocks := make([]*flow.Block, 0)
 
 	// extends protocol state with the chain of blocks.
-	for _, completeExecutionReceipt := range completeExecutionReceipts {
-		err := state.Extend(completeExecutionReceipt.TestData.ReferenceBlock)
-		require.NoError(t, err)
-		err = state.Finalize(completeExecutionReceipt.TestData.ReferenceBlock.ID())
-		require.NoError(t, err)
-		blocks = append(blocks, completeExecutionReceipt.TestData.ReferenceBlock)
+	for _, completeER := range completeExecutionReceipts {
+		for _, receipts := range completeER.ReceiptsData {
+			err := state.Extend(receipts.ReferenceBlock)
+			require.NoError(t, err)
+			err = state.Finalize(receipts.ReferenceBlock.ID())
+			require.NoError(t, err)
+			blocks = append(blocks, receipts.ReferenceBlock)
+		}
 
-		err = state.Extend(completeExecutionReceipt.TestData.ContainerBlock)
+		err := state.Extend(completeER.ContainerBlock)
 		require.NoError(t, err)
-		err = state.Finalize(completeExecutionReceipt.TestData.ContainerBlock.ID())
+		err = state.Finalize(completeER.ContainerBlock.ID())
 		require.NoError(t, err)
-		blocks = append(blocks, completeExecutionReceipt.TestData.ContainerBlock)
+		blocks = append(blocks, completeER.ContainerBlock)
 	}
 
 	return blocks

@@ -104,7 +104,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 	// stores block of execution result in state and mutate state accordingly
-	err = verNode.State.Extend(completeER.TestData.ReferenceBlock)
+	err = verNode.State.Extend(completeER.ReceiptsData[0].ReferenceBlock)
 	require.NoError(t, err)
 
 	// mocks chunk assignment
@@ -140,7 +140,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		chainID)
 
 	// send the ER from execution to verification node
-	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.ContainerBlock.Payload.Receipts[0])
 	assert.Nil(t, err)
 
 	unittest.RequireReturnsBefore(t, conWG.Wait, 10*time.Second, "consensus nodes process")
@@ -162,7 +162,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
 
 	// receipt ID should be added to the ingested results mempool
-	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
+	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.ID()))
 
 	verNode.Done()
 	conNode.Done()
