@@ -286,6 +286,17 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		Uint64("block_view", view).
 		Hex("recipient_id", recipientID[:]).
 		Logger()
+
+	staked, err := protocol.IsNodeStakedAt(e.state.AtBlockID(blockID), e.me.NodeID())
+	if err != nil {
+		// this is a fatal error and will cause HotStuff to crash
+		return fmt.Errorf("could not check my stake: %w", err)
+	}
+	if !staked {
+		e.log.Debug().Msg("skipping vote transmission for unstaked block")
+		return nil
+	}
+
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
 	// build the vote message
