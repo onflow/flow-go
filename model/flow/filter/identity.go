@@ -85,10 +85,16 @@ func HasRole(roles ...flow.Role) flow.IdentityFilter {
 	}
 }
 
+// IsValidCurrentEpochParticipant is an identity filter for members of the
+// current epoch in good standing.
+var IsValidCurrentEpochParticipant = And(
+	HasStake(true),
+	Not(Ejected),
+)
+
 // IsVotingConsensusCommitteeMember is a identity filter for all members of
 // the consensus committee allowed to vote.
 var IsVotingConsensusCommitteeMember = And(
 	HasRole(flow.RoleConsensus),
-	HasStake(true),
-	Not(Ejected),
+	IsValidCurrentEpochParticipant,
 )
