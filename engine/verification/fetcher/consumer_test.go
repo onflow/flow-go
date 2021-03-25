@@ -21,7 +21,8 @@ import (
 // and its corresponding job can be converted back to the same locator.
 func TestChunkLocatorToJob(t *testing.T) {
 	locator := unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64())
-	actual := fetcher.JobToChunkLocator(fetcher.ChunkLocatorToJob(locator))
+	actual, err := fetcher.JobToChunkLocator(fetcher.ChunkLocatorToJob(locator))
+	require.NoError(t, err)
 	require.Equal(t, locator, actual)
 }
 

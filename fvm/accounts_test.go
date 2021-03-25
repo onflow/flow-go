@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -724,7 +722,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Invalid hash algorithms", func(t *testing.T) {
 
-		for _, hashAlgo := range []string{"SHA2_384", "SHA3_384", "KMAC_128"} {
+		for _, hashAlgo := range []string{"SHA2_384", "SHA3_384"} {
 
 			t.Run(hashAlgo,
 				newVMTest().withContextOptions(options...).
@@ -765,64 +763,6 @@ func TestAddAccountKey(t *testing.T) {
 
 						require.Error(t, tx.Err)
 						assert.Contains(t, tx.Err.Error(), "invalid account key hash algorithm")
-
-						after, err := vm.GetAccount(ctx, address, view, programs)
-						require.NoError(t, err)
-
-						assert.Empty(t, after.Keys)
-					}),
-			)
-		}
-	})
-
-	t.Run("Invalid signing algorithms", func(t *testing.T) {
-
-		for _, signingAlgo := range []string{"BLS_BLS12381"} {
-
-			t.Run(signingAlgo,
-				newVMTest().withContextOptions(options...).
-					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-						address := createAccount(t, vm, chain, ctx, view, programs)
-
-						privateKey, err := unittest.AccountKeyFixture(
-							crypto.KeyGenSeedMaxLenBLSBLS12381,
-							crypto.BLSBLS12381,
-							hash.SHA3_256,
-						)
-
-						require.NoError(t, err)
-
-						_, publicKeyArg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
-
-						txBody := flow.NewTransactionBody().
-							SetScript([]byte(fmt.Sprintf(
-								`
-								transaction(key: [UInt8]) {
-								  prepare(signer: AuthAccount) {
-								    let publicKey = PublicKey(
-									  publicKey: key,
-									  signatureAlgorithm: SignatureAlgorithm.%s
-									)
-								    signer.keys.add(
-								      publicKey: publicKey,
-								      hashAlgorithm: HashAlgorithm.SHA2_256,
-								      weight: 1000.0
-								    )
-								  }
-								}
-								`,
-								signingAlgo,
-							))).
-							AddArgument(publicKeyArg).
-							AddAuthorizer(address)
-
-						tx := fvm.Transaction(txBody, 0)
-
-						err = vm.Run(ctx, tx, view, programs)
-						require.NoError(t, err)
-
-						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "invalid account key signature algorithm")
 
 						after, err := vm.GetAccount(ctx, address, view, programs)
 						require.NoError(t, err)

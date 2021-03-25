@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -52,11 +51,11 @@ func (vmt vmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		chain := flow.Testnet.Chain()
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
@@ -161,11 +160,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Testnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -285,11 +284,11 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -309,6 +308,36 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+	})
+
+	t.Run("account update with checker heavy contract", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployCheckerHeavyTransaction(accounts[0], chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -386,11 +415,11 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -496,11 +525,11 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -689,11 +718,11 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -763,11 +792,11 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -933,11 +962,11 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	const count = 100
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1035,11 +1064,11 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	header := flow.Header{Height: 42}
 
@@ -1086,11 +1115,11 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.MonotonicEmulator.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1443,11 +1472,11 @@ func TestWithServiceAccount(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctxA := fvm.NewContext(
 		zerolog.Nop(),
@@ -1490,9 +1519,9 @@ func TestEventLimits(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
