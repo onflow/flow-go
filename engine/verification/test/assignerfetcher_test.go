@@ -103,7 +103,7 @@ func withBlockConsumer(t *testing.T, blockCount int, resultCount, chunkCount int
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		completeERs := utils.CompleteExecutionResultChainFixture(t, root, blockCount, chunkCount)
+		completeERs := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount, chunkCount)
 		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 		// makes sure that we generated a block chain of requested length.

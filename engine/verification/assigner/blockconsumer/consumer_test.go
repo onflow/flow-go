@@ -185,7 +185,7 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2, 1)
+		results := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, 1)
 		blocks := test.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)

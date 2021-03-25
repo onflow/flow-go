@@ -49,7 +49,7 @@ type CompleteExecutionReceipt struct {
 // for the system chunk.
 // TODO: remove this function once new verification architecture is in place.
 func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
-	return CompleteExecutionResultChainFixture(t, root, 1, chunks)[0]
+	return CompleteExecutionReceiptChainFixture(t, root, 1, chunks)[0]
 }
 
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
@@ -315,7 +315,7 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 	}
 }
 
-// CompleteExecutionResultChainFixture is a test fixture that creates a chain of blocks of size `count`.
+// CompleteExecutionReceiptChainFixture is a test fixture that creates a chain of blocks of size `count`.
 // The chain is in the form of root <- R1 <- C1 <- R2 <- C2 <- ...
 // In this chain Ri refers to reference blocks that contain guarantees.
 // Ci refers to a container block that contains an execution receipt for its preceding reference block Ri.
@@ -326,7 +326,7 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 //
 // The generated execution results have chunks+1 chunks, where the last chunk accounts
 // for the system chunk.
-func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count int, chunks int) []*CompleteExecutionReceipt {
+func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, chunks int) []*CompleteExecutionReceipt {
 	ers := make([]*CompleteExecutionReceipt, 0, count)
 	parent := root
 	for i := 0; i < count; i++ {
