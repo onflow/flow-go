@@ -205,7 +205,7 @@ func (n *Node) verifyCachedHashRecursive(computedHash *[]byte) bool {
 	}
 
 	if n.hashValue != nil {
-		n.computeAndStoreMyHash(&n.hashValue)
+		n.computeAndStoreMyHash(computedHash)
 		return bytes.Equal(n.hashValue, *computedHash)
 	}
 	return true
