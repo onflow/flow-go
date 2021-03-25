@@ -138,12 +138,12 @@ func New(
 	retry.SetBackend(b)
 
 	var err error
-	preferredENIdentifiers, err = enIDsToIndentifierList(preferredExecutionNodeIDs)
+	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
 	}
 
-	fixedENIdentifiers, err = enIDsToIndentifierList(fixedExecutionNodeIDs)
+	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
 	}
@@ -151,7 +151,7 @@ func New(
 	return b
 }
 
-func enIDsToIndentifierList(ids []string) (flow.IdentifierList, error) {
+func identifierList(ids []string) (flow.IdentifierList, error) {
 	idList := make(flow.IdentifierList, len(ids))
 	for i, idStr := range ids {
 		id, err := flow.HexStringToIdentifier(idStr)
