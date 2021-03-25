@@ -346,21 +346,21 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	parallelRecursionThreshold := 128 // threshold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) <= parallelRecursionThreshold {
 		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
-		addSubtrieHashToProofs(head.RightChild(), depth, lproofs)
+		addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
 		mt.proofs(head.LeftChild(), lpaths, lproofs)
 
-		addSubtrieHashToProofs(head.LeftChild(), depth, rproofs)
+		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
 		mt.proofs(head.RightChild(), rpaths, rproofs)
 	} else {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			addSubtrieHashToProofs(head.RightChild(), depth, lproofs)
+			addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
 			mt.proofs(head.LeftChild(), lpaths, lproofs)
 			wg.Done()
 		}()
 
-		addSubtrieHashToProofs(head.LeftChild(), depth, rproofs)
+		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
 		mt.proofs(head.RightChild(), rpaths, rproofs)
 		wg.Wait()
 	}
