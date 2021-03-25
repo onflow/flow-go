@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	mockmempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -129,6 +130,7 @@ func (suite *IngestionSuite) SetupTest() {
 
 	// we use the first consensus node as our local identity
 	me.On("NodeID").Return(suite.con1ID)
+	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(suite.con1ID)))
 
 	// we need to return the head as it's also used as reference block
 	headers.On("ByBlockID", head.ID()).Return(&head, nil)
@@ -388,11 +390,15 @@ func (suite *IngestionSuite) validGuarantee() *flow.CollectionGuarantee {
 func (suite *IngestionSuite) expectGuaranteePublished(guarantee *flow.CollectionGuarantee) {
 
 	// check that we call the submit with the correct consensus node IDs
-	suite.conduit.On("Publish", guarantee, mock.Anything, mock.Anything).Run(
+	suite.conduit.On("Publish", guarantee, mock.Anything, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			nodeID1 := args.Get(1).(flow.Identifier)
 			nodeID2 := args.Get(2).(flow.Identifier)
-			suite.Assert().ElementsMatch([]flow.Identifier{nodeID1, nodeID2}, []flow.Identifier{suite.con2ID, suite.con3ID})
+			nodeID3 := args.Get(3).(flow.Identifier)
+			suite.Assert().ElementsMatch(
+				[]flow.Identifier{nodeID1, nodeID2, nodeID3},
+				[]flow.Identifier{suite.con1ID, suite.con2ID, suite.con3ID},
+			)
 		},
 	).Return(nil).Once()
 }
