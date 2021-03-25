@@ -42,7 +42,7 @@ func (suite *Suite) TestTransactionRetry() {
 	// Setup Handler + Retry
 	backend := New(suite.state, suite.execClient, suite.colClient, nil, suite.blocks, suite.headers,
 		suite.collections, suite.transactions, suite.receipts, suite.chainID, metrics.NewNoopCollector(), nil,
-		false, suite.log)
+		false, nil, nil, suite.log)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
@@ -105,7 +105,7 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 	// Setup Handler + Retry
 	backend := New(suite.state, suite.execClient, suite.colClient, nil, suite.blocks, suite.headers,
 		suite.collections, suite.transactions, suite.receipts, suite.chainID, metrics.NewNoopCollector(), nil,
-		false, suite.log)
+		false, nil, nil, suite.log)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
