@@ -127,7 +127,7 @@ func NewLeaf(path ledger.Path,
 		regCount:  regCount,
 		hashValue: make([]byte, common.HashLen),
 	}
-	n.computeAndStoreMyHash(&n.hashValue)
+	n.computeAndStoreHash()
 	return n
 }
 
@@ -156,13 +156,19 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		regCount:  lRegCount + rRegCount,
 		hashValue: make([]byte, common.HashLen),
 	}
-	n.computeAndStoreMyHash(&n.hashValue)
+	n.computeAndStoreHash()
 	return n
 }
 
-// computeAndStoreMyHash computes the hashValue of this node and
+// computeAndStoreHash computes the hashValue of this node and
+// stores it the hash internal field
+func (n *Node) computeAndStoreHash() {
+	n.computeHash(&n.hashValue)
+}
+
+// computeAndStoreHash computes the hashValue of this node and
 // stores the output hash in the provided byte slice
-func (n *Node) computeAndStoreMyHash(result *[]byte) {
+func (n *Node) computeHash(result *[]byte) {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
@@ -205,7 +211,7 @@ func (n *Node) verifyCachedHashRecursive(computedHash *[]byte) bool {
 	}
 
 	if n.hashValue != nil {
-		n.computeAndStoreMyHash(&n.hashValue)
+		n.computeHash(computedHash)
 		return bytes.Equal(n.hashValue, *computedHash)
 	}
 	return true

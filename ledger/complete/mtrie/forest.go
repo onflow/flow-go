@@ -133,8 +133,8 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		indices := pathOrgIndex[string(p)]
 		for _, j := range indices {
 			orderedPayloads[j] = payload.DeepCopy()
+			totalPayloadSize += payload.Size()
 		}
-		totalPayloadSize += len(indices) * payload.Size()
 	}
 	// TODO rename the metrics
 	f.metrics.ReadValuesSize(uint64(totalPayloadSize))

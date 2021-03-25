@@ -184,9 +184,6 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path, payloads []*ledger.P
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
 	parentRoot := parentTrie.root
 	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, nil)
-	if parentRoot == updatedRoot {
-		return parentTrie, nil
-	}
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -270,11 +267,13 @@ func (parentTrie *MTrie) update(
 
 	// recurse over each branch
 	var lChild, rChild *node.Node
-	if len(lpayloads) == 0 || len(rpayloads) == 0 {
+	parallelRecursionThreshold := 16
+	if len(lpayloads) < parallelRecursionThreshold || len(rpayloads) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
 		lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
 		rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
 	} else {
+		// runtime optimization: process the left child is a separate thread
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
@@ -371,9 +370,9 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 
 // addSubtrieHashToProofs inspects the other subtrie and adds its root hash
 // to the proofs, if the trie contains non-empty registers (i.e. the
-// otherSubtrie has a non-default hash).
-func addSubtrieHashToProofs(otherSubtrie *node.Node, depth int, proofs []*ledger.TrieProof) {
-	if otherSubtrie == nil || len(proofs) == 0 {
+// siblingTrie has a non-default hash).
+func addSubtrieHashToProofs(siblingTrie *node.Node, depth int, proofs []*ledger.TrieProof) {
+	if siblingTrie == nil || len(proofs) == 0 {
 		return
 	}
 
@@ -383,14 +382,14 @@ func addSubtrieHashToProofs(otherSubtrie *node.Node, depth int, proofs []*ledger
 	// default hash, the node itself remains as part of the trie.
 	// However, a proof has the convention that the hash of the other subtrie
 	// should only be included, if it is _non-default_. Therefore, we can
-	// neither use `otherSubtrie == nil` nor `otherSubtrie.RegisterCount == 0`,
+	// neither use `siblingTrie == nil` nor `siblingTrie.RegisterCount == 0`,
 	// as the other subtrie might contain leafs with default value (which are
 	// still counted as occupied registers)
 	// TODO: On update, prune subtries which only contain empty registers.
 	//       Then, a child is nil if and only if the subtrie is empty.
 
-	nodeHash := otherSubtrie.Hash()
-	isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(otherSubtrie.Height()))
+	nodeHash := siblingTrie.Hash()
+	isDef := bytes.Equal(nodeHash, common.GetDefaultHashForHeight(siblingTrie.Height()))
 	if !isDef { // in proofs, we only provide non-default value hashes
 		for _, p := range proofs {
 			utils.SetBit(p.Flags, depth)
