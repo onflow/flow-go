@@ -103,15 +103,12 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	require.NoError(t, err)
 
 	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
-	result := &completeER.Receipt.ExecutionResult
-
 	// stores block of execution result in state and mutate state accordingly
 	err = verNode.State.Extend(completeER.TestData.ReferenceBlock)
 	require.NoError(t, err)
 
 	// mocks chunk assignment
-	a := ChunkAssignmentFixture(flow.IdentityList{verIdentity}, []*flow.ExecutionResult{result}, evenChunkIndexAssigner)
-	assigner.On("Assign", result, result.BlockID).Return(a, nil)
+	MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity}, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
 
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()

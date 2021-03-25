@@ -105,7 +105,6 @@ func VerificationHappyPath(t *testing.T,
 
 	// creates a child block of root, with its corresponding execution result.
 	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
-	result := &completeER.Receipt.ExecutionResult
 
 	// imitates follower engine on verification nodes
 	// received block of `completeER` and mutate state accordingly.
@@ -123,8 +122,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	a := ChunkAssignmentFixture(verIdentities, []*flow.ExecutionResult{result}, evenChunkIndexAssigner)
-	assigner.On("Assign", result, result.BlockID).Return(a, nil)
+	MockChunkAssignmentFixture(assigner, verIdentities, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
 
 	// mock execution node
 	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
@@ -543,20 +541,26 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 
 type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 
-func ChunkAssignmentFixture(verIds flow.IdentityList, results []*flow.ExecutionResult, isAssigned ChunkAssignerFunc) *chunks.Assignment {
-	a := chunks.NewAssignment()
-	for _, result := range results {
-		for _, chunk := range result.Chunks {
+func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
+	verIds flow.IdentityList,
+	completeReceipts []*utils.CompleteExecutionReceipt,
+	isAssigned ChunkAssignerFunc) {
+
+	for _, completeReceipt := range completeReceipts {
+		a := chunks.NewAssignment()
+
+		for _, chunk := range completeReceipt.Receipt.ExecutionResult.Chunks {
 			assignees := make([]flow.Identifier, 0)
 			for _, verIdentity := range verIds {
-				if isAssigned(chunk.Index, len(result.Chunks)) {
+				if isAssigned(chunk.Index, len(completeReceipt.Receipt.ExecutionResult.Chunks)) {
 					assignees = append(assignees, verIdentity.NodeID)
 				}
 			}
 			a.Add(chunk, assignees)
 		}
+
+		chunkAssigner.On("Assign", &completeReceipt.Receipt.ExecutionResult, completeReceipt.Receipt.ExecutionResult.BlockID).Return(a, nil)
 	}
-	return a
 }
 
 // evenChunkIndexAssigner is a helper function that returns true for the even indices in [0, chunkNum-1]
