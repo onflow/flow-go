@@ -329,21 +329,40 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, chunks int) []*CompleteExecutionReceipt {
 	ers := make([]*CompleteExecutionReceipt, 0, count)
 	parent := root
+
 	for i := 0; i < count; i++ {
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
-		result, data := ExecutionResultFromParentBlockFixture(t, parent, chunks, flow.Testnet.Chain())
-		containerBlock := ContainerBlockFixture(data.ReferenceBlock.Header, result)
-		data.ContainerBlock = containerBlock
-		er := &CompleteExecutionReceipt{
-			Receipt:  containerBlock.Payload.Receipts[0],
-			TestData: data,
+		allResults, allData, head := ExecutionResultsFromParentBlockFixture(t, 1, parent, chunks, flow.Testnet.Chain())
+		containerBlock := ContainerBlockFixture(head, allResults)
+
+		for j := 0; j < len(allResults); j++ {
+			allData[j].ContainerBlock = containerBlock
+			er := &CompleteExecutionReceipt{
+				Receipt:  containerBlock.Payload.Receipts[0],
+				TestData: allData[j],
+			}
+			ers = append(ers, er)
 		}
 
-		ers = append(ers, er)
 		parent = containerBlock.Header
 	}
 	return ers
+}
+
+func ExecutionResultsFromParentBlockFixture(t *testing.T, count int, parent *flow.Header, chunks int, chain flow.Chain) ([]*flow.ExecutionResult,
+	[]*TestExecutionResultData, *flow.Header) {
+	allData := make([]*TestExecutionResultData, 0, count)
+	allResults := make([]*flow.ExecutionResult, 0, count)
+
+	for i := 0; i < count; i++ {
+		result, data := ExecutionResultFromParentBlockFixture(t, parent, chunks, chain)
+		allData = append(allData, data)
+		allResults = append(allResults, result)
+		parent = data.ReferenceBlock.Header
+	}
+
+	return allResults, allData, parent
 }
 
 // ExecutionResultFromParentBlockFixture is a test helper that creates a child (reference) block from the parent, as well as an execution for it.
@@ -355,14 +374,17 @@ func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, ch
 
 // ContainerBlockFixture builds and returns a block that contains an execution receipt for the
 // input result.
-func ContainerBlockFixture(parent *flow.Header, result *flow.ExecutionResult) *flow.Block {
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: *result,
+func ContainerBlockFixture(parent *flow.Header, results []*flow.ExecutionResult) *flow.Block {
+	receipts := make([]*flow.ExecutionReceipt, 0, len(results))
+	for _, result := range results {
+		receipts = append(receipts, &flow.ExecutionReceipt{
+			ExecutionResult: *result,
+		})
 	}
 
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(parent)
-	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
+	containerBlock.Payload.Receipts = receipts
 	containerBlock.Header.PayloadHash = containerBlock.Payload.Hash()
 
 	return &containerBlock
