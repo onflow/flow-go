@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -62,34 +62,8 @@ func withReader(
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
 		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2, 1)
-		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
+		blocks := test.ExtendStateWithFinalizedBlocks(t, results, s.State)
 
 		withBlockReader(reader, blocks)
 	})
-}
-
-// extendStateWithFinalizedBlocks is a test helper to extend the execution state and return the list of blocks.
-// It receives a list of complete execution result fixtures in the form of (R1 <- C1) <- (R2 <- C2) <- .....
-// Where R and C are the reference and container blocks of a complete execution result fixture.
-// Reference blocks contain guarantees, and container blocks contain execution receipt for their preceding reference block.
-// Note: for sake of simplicity we do not include guarantees in the container blocks for now.
-func extendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts []*utils.CompleteExecutionReceipt, state protocol.MutableState) []*flow.Block {
-	blocks := make([]*flow.Block, 0)
-
-	// extends protocol state with the chain of blocks.
-	for _, completeExecutionReceipt := range completeExecutionReceipts {
-		err := state.Extend(completeExecutionReceipt.TestData.ReferenceBlock)
-		require.NoError(t, err)
-		err = state.Finalize(completeExecutionReceipt.TestData.ReferenceBlock.ID())
-		require.NoError(t, err)
-		blocks = append(blocks, completeExecutionReceipt.TestData.ReferenceBlock)
-
-		err = state.Extend(completeExecutionReceipt.TestData.ContainerBlock)
-		require.NoError(t, err)
-		err = state.Finalize(completeExecutionReceipt.TestData.ContainerBlock.ID())
-		require.NoError(t, err)
-		blocks = append(blocks, completeExecutionReceipt.TestData.ContainerBlock)
-	}
-
-	return blocks
 }

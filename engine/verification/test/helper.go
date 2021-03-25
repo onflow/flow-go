@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -122,7 +123,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	a := ChunkAssignmentFixture(verIdentities, completeER.Receipt.ExecutionResult, evenChunkIndexAssigner)
+	a := ChunkAssignmentFixture(verIdentities, []*flow.ExecutionResult{result}, evenChunkIndexAssigner)
 	assigner.On("Assign", result, result.BlockID).Return(a, nil)
 
 	// mock execution node
@@ -542,16 +543,18 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 
 type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 
-func ChunkAssignmentFixture(verIds flow.IdentityList, result flow.ExecutionResult, isAssigned ChunkAssignerFunc) *chunks.Assignment {
+func ChunkAssignmentFixture(verIds flow.IdentityList, results []*flow.ExecutionResult, isAssigned ChunkAssignerFunc) *chunks.Assignment {
 	a := chunks.NewAssignment()
-	for _, chunk := range result.Chunks {
-		assignees := make([]flow.Identifier, 0)
-		for _, verIdentity := range verIds {
-			if isAssigned(chunk.Index, len(result.Chunks)) {
-				assignees = append(assignees, verIdentity.NodeID)
+	for _, result := range results {
+		for _, chunk := range result.Chunks {
+			assignees := make([]flow.Identifier, 0)
+			for _, verIdentity := range verIds {
+				if isAssigned(chunk.Index, len(result.Chunks)) {
+					assignees = append(assignees, verIdentity.NodeID)
+				}
 			}
+			a.Add(chunk, assignees)
 		}
-		a.Add(chunk, assignees)
 	}
 	return a
 }
@@ -561,4 +564,30 @@ func ChunkAssignmentFixture(verIds flow.IdentityList, result flow.ExecutionResul
 func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
 	ok := index%2 == 0 || isSystemChunk(index, chunkNum)
 	return ok
+}
+
+// ExtendStateWithFinalizedBlocks is a test helper to extend the execution state and return the list of blocks.
+// It receives a list of complete execution result fixtures in the form of (R1 <- C1) <- (R2 <- C2) <- .....
+// Where R and C are the reference and container blocks of a complete execution result fixture.
+// Reference blocks contain guarantees, and container blocks contain execution receipt for their preceding reference block.
+// Note: for sake of simplicity we do not include guarantees in the container blocks for now.
+func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts []*utils.CompleteExecutionReceipt, state protocol.MutableState) []*flow.Block {
+	blocks := make([]*flow.Block, 0)
+
+	// extends protocol state with the chain of blocks.
+	for _, completeExecutionReceipt := range completeExecutionReceipts {
+		err := state.Extend(completeExecutionReceipt.TestData.ReferenceBlock)
+		require.NoError(t, err)
+		err = state.Finalize(completeExecutionReceipt.TestData.ReferenceBlock.ID())
+		require.NoError(t, err)
+		blocks = append(blocks, completeExecutionReceipt.TestData.ReferenceBlock)
+
+		err = state.Extend(completeExecutionReceipt.TestData.ContainerBlock)
+		require.NoError(t, err)
+		err = state.Finalize(completeExecutionReceipt.TestData.ContainerBlock.ID())
+		require.NoError(t, err)
+		blocks = append(blocks, completeExecutionReceipt.TestData.ContainerBlock)
+	}
+
+	return blocks
 }
