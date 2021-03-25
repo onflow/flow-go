@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
 )
 
 var (
@@ -44,7 +46,7 @@ func pull(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	bucket := NewGoogleBucket(flagBucketName)
+	bucket := gcs.NewGoogleBucket(flagBucketName)
 
 	client, err := bucket.NewClient(ctx)
 	if err != nil {

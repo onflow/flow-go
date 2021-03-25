@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	bootstrap "github.com/onflow/flow-go/cmd/bootstrap/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -51,7 +51,7 @@ func push(cmd *cobra.Command, args []string) {
 	}
 
 	// create new bucket instance with Flow Bucket name
-	bucket := bootstrap.NewGoogleBucket(flagBucketName)
+	bucket := gcs.NewGoogleBucket(flagBucketName)
 
 	// initialize a new client to GCS
 	client, err := bucket.NewClient(ctx)

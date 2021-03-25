@@ -1,4 +1,4 @@
-package cmd
+package gcs
 
 import (
 	"context"
@@ -89,12 +89,7 @@ func (g *googleBucket) DownloadFile(ctx context.Context, client *storage.Client,
 func (g *googleBucket) UploadFile(ctx context.Context, client *storage.Client, destination, source string) error {
 
 	upload := client.Bucket(g.Name).Object(destination).NewWriter(ctx)
-	defer func() {
-		err := upload.Close()
-		if err != nil {
-			log.Fatal().Err(err).Msg("failed to close writer stream")
-		}
-	}()
+	defer upload.Close()
 
 	file, err := os.Open(source)
 	if err != nil {
@@ -102,11 +97,10 @@ func (g *googleBucket) UploadFile(ctx context.Context, client *storage.Client, d
 	}
 	defer file.Close()
 
-	n, err := io.Copy(upload, file)
+	_, err = io.Copy(upload, file)
 	if err != nil {
 		return fmt.Errorf("Error uploading file: %w", err)
 	}
 
-	log.Info().Int64("byte_count", n).Msg("uploaded file")
 	return nil
 }
