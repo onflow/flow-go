@@ -13,11 +13,11 @@ type Jobs struct {
 }
 
 // AtIndex provides a mock function with given fields: index
-func (_m *Jobs) AtIndex(index int64) (module.Job, error) {
+func (_m *Jobs) AtIndex(index uint64) (module.Job, error) {
 	ret := _m.Called(index)
 
 	var r0 module.Job
-	if rf, ok := ret.Get(0).(func(int64) module.Job); ok {
+	if rf, ok := ret.Get(0).(func(uint64) module.Job); ok {
 		r0 = rf(index)
 	} else {
 		if ret.Get(0) != nil {
@@ -26,7 +26,7 @@ func (_m *Jobs) AtIndex(index int64) (module.Job, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(int64) error); ok {
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
 		r1 = rf(index)
 	} else {
 		r1 = ret.Error(1)
@@ -36,14 +36,14 @@ func (_m *Jobs) AtIndex(index int64) (module.Job, error) {
 }
 
 // Head provides a mock function with given fields:
-func (_m *Jobs) Head() (int64, error) {
+func (_m *Jobs) Head() (uint64, error) {
 	ret := _m.Called()
 
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(int64)
+		r0 = ret.Get(0).(uint64)
 	}
 
 	var r1 error
