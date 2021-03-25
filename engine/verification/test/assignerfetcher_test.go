@@ -54,21 +54,26 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		})
 	})
 
-	//t.Run("multiple chunks result", func(t *testing.T) {
-	//	withBlockConsumer(t, 2, 2, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, wg *sync.WaitGroup) {
-	//		unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
-	//
-	//		for i := 0; i < len(blocks); i++ {
-	//			// consumer is only required to be "notified" that a new finalized block available.
-	//			// It keeps track of the last finalized block it has read, and read the next height upon
-	//			// getting notified as follows:
-	//			consumer.OnFinalizedBlock(&model.Block{})
-	//		}
-	//
-	//		unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "could not receive all chunk locators on time")
-	//		unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
-	//	})
-	//})
+	t.Run("multiple chunks result", func(t *testing.T) {
+		withBlockConsumer(t, 2, 10, func(blockConsumer *blockconsumer.BlockConsumer,
+			chunkConsumer *fetcher.ChunkConsumer,
+			blocks []*flow.Block,
+			wg *sync.WaitGroup) {
+			unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
+			unittest.RequireCloseBefore(t, blockConsumer.Ready(), time.Second, "could not start block consumer")
+
+			for i := 0; i < len(blocks); i++ {
+				// consumer is only required to be "notified" that a new finalized block available.
+				// It keeps track of the last finalized block it has read, and read the next height upon
+				// getting notified as follows:
+				blockConsumer.OnFinalizedBlock(&model.Block{})
+			}
+
+			unittest.RequireReturnsBefore(t, wg.Wait, 2*time.Second, "could not receive all chunk locators on time")
+			unittest.RequireCloseBefore(t, blockConsumer.Done(), 1*time.Second, "could not terminate block consumer")
+			unittest.RequireCloseBefore(t, chunkConsumer.Done(), 1*time.Second, "could not terminate chunk consumer")
+		})
+	})
 
 }
 
@@ -165,6 +170,7 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 	if staked {
 		// in staked mode, it expects chunk locators coming
 		wg.Add(len(expectedLocatorIDs))
+		fmt.Println("count: ", len(expectedLocatorIDs))
 	}
 
 	var notifier module.ProcessingNotifier
@@ -197,6 +203,7 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 		notifier.Notify(locatorID)
 
 		wg.Done()
+		fmt.Println("done")
 	})
 
 	return processor, &wg
