@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -185,7 +186,7 @@ func withConsumer(
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
 		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2, 1)
-		blocks := ExtendStateWithFinalizedBlocks(t, results, s.State)
+		blocks := test.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
 
