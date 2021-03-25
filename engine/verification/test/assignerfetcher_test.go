@@ -29,33 +29,54 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+type withConsumersFunc func(blockConsumer *blockconsumer.BlockConsumer, chunkConsumer *fetcher.ChunkConsumer, blocks []*flow.Block, wg *sync.WaitGroup)
+
 func TestAssignerFetcherPipeline(t *testing.T) {
 
-	t.Run("single chunk results", func(t *testing.T) {
-		withBlockConsumer(t, 2, 1, 3, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, wg *sync.WaitGroup) {
-			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
+	t.Run("single chunk result", func(t *testing.T) {
+		withBlockConsumer(t, 2, 1, func(blockConsumer *blockconsumer.BlockConsumer,
+			chunkConsumer *fetcher.ChunkConsumer,
+			blocks []*flow.Block,
+			wg *sync.WaitGroup) {
+			unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
+			unittest.RequireCloseBefore(t, blockConsumer.Ready(), time.Second, "could not start block consumer")
 
 			for i := 0; i < len(blocks); i++ {
 				// consumer is only required to be "notified" that a new finalized block available.
 				// It keeps track of the last finalized block it has read, and read the next height upon
 				// getting notified as follows:
-				consumer.OnFinalizedBlock(&model.Block{})
+				blockConsumer.OnFinalizedBlock(&model.Block{})
 			}
 
 			unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "could not receive all chunk locators on time")
-			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not terminate consumer")
+			unittest.RequireCloseBefore(t, blockConsumer.Done(), time.Second, "could not terminate block consumer")
+			unittest.RequireCloseBefore(t, chunkConsumer.Done(), time.Second, "could not terminate chunk consumer")
 		})
 	})
 
+	//t.Run("multiple chunks result", func(t *testing.T) {
+	//	withBlockConsumer(t, 2, 2, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block, wg *sync.WaitGroup) {
+	//		unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
+	//
+	//		for i := 0; i < len(blocks); i++ {
+	//			// consumer is only required to be "notified" that a new finalized block available.
+	//			// It keeps track of the last finalized block it has read, and read the next height upon
+	//			// getting notified as follows:
+	//			consumer.OnFinalizedBlock(&model.Block{})
+	//		}
+	//
+	//		unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "could not receive all chunk locators on time")
+	//		unittest.RequireCloseBefore(t, consumer.Done(), time.Second, "could not terminate consumer")
+	//	})
+	//})
+
 }
 
-func withBlockConsumer(t *testing.T, blockCount int, chunkCount int, workerCount int, withConsumer func(*blockconsumer.BlockConsumer, []*flow.Block,
+func withBlockConsumer(t *testing.T, blockCount int, chunkCount int, withConsumers func(*blockconsumer.BlockConsumer, *fetcher.ChunkConsumer,
+	[]*flow.Block,
 	*sync.WaitGroup)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		maxProcessing := int64(workerCount)
-
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
-		processedIndex := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		maxProcessing := int64(3)
 
 		collector := &metrics.NoopCollector{}
 		tracer := &trace.NoopTracer{}
@@ -63,36 +84,7 @@ func withBlockConsumer(t *testing.T, blockCount int, chunkCount int, workerCount
 		s := testutil.CompleteStateFixture(t, collector, tracer, participants)
 		verId := participants.Filter(filter.HasRole(flow.RoleVerification))[0]
 		me := testutil.LocalFixture(t, verId)
-
-		// chunk consumer and processor
-		chunksQueue := bstorage.NewChunkQueue(db)
-		ok, err := chunksQueue.Init(fetcher.DefaultJobIndex)
-		require.True(t, ok)
-		chunkProcessor, chunksWg := mockChunkProcessor(t, flow.IdentifierList{}, true)
-		chunkConsumer := fetcher.NewChunkConsumer(unittest.Logger(),
-			processedIndex,
-			chunksQueue,
-			chunkProcessor,
-			maxProcessing)
-
-		// assigner engine
 		chunkAssigner := &mock.ChunkAssigner{}
-		assignerEng := assigner.New(unittest.Logger(),
-			collector,
-			tracer,
-			me,
-			s.State,
-			chunkAssigner,
-			chunksQueue,
-			chunkConsumer)
-
-		blockConsumer, _, err := blockconsumer.NewBlockConsumer(unittest.Logger(),
-			processedHeight,
-			s.Storage.Blocks,
-			s.State,
-			assignerEng,
-			maxProcessing)
-		require.NoError(t, err)
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
@@ -105,9 +97,46 @@ func withBlockConsumer(t *testing.T, blockCount int, chunkCount int, workerCount
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
 		// mocks chunk assigner to assign even chunk indices to this verification node
-		MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{verId}, completeERs, evenChunkIndexAssigner)
+		expectedLocatorIds := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{verId}, completeERs, evenChunkIndexAssigner)
 
-		withConsumer(blockConsumer, blocks, chunksWg)
+		// chunk consumer and processor
+		processedIndex := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+		chunksQueue := bstorage.NewChunkQueue(db)
+		ok, err := chunksQueue.Init(fetcher.DefaultJobIndex)
+		require.NoError(t, err)
+		require.True(t, ok)
+
+		chunkProcessor, chunksWg := mockChunkProcessor(t, expectedLocatorIds, true)
+		chunkConsumer := fetcher.NewChunkConsumer(
+			unittest.Logger(),
+			processedIndex,
+			chunksQueue,
+			chunkProcessor,
+			maxProcessing)
+
+		// assigner engine
+		assignerEng := assigner.New(
+			unittest.Logger(),
+			collector,
+			tracer,
+			me,
+			s.State,
+			chunkAssigner,
+			chunksQueue,
+			chunkConsumer)
+
+		// block consumer
+		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
+		blockConsumer, _, err := blockconsumer.NewBlockConsumer(
+			unittest.Logger(),
+			processedHeight,
+			s.Storage.Blocks,
+			s.State,
+			assignerEng,
+			maxProcessing)
+		require.NoError(t, err)
+
+		withConsumers(blockConsumer, chunkConsumer, blocks, chunksWg)
 	})
 }
 
@@ -166,6 +195,8 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 		require.Contains(t, expectedLocatorIDs, locatorID, fmt.Sprintf("chunk processor unexpected locator: %x", locatorID))
 
 		notifier.Notify(locatorID)
+
+		wg.Done()
 	})
 
 	return processor, &wg
