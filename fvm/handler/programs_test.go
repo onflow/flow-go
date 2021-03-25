@@ -37,6 +37,14 @@ func Test_Programs(t *testing.T) {
 		Name:    "C",
 	}
 
+	contractA0Code := `
+		pub contract A {
+			pub fun hello(): String {
+        		return "bad version"
+    		}
+		}
+	`
+
 	contractACode := `
 		pub contract A {
 			pub fun hello(): String {
@@ -119,6 +127,33 @@ func Test_Programs(t *testing.T) {
 	var contractAView *delta.View = nil
 	var contractBView *delta.View = nil
 	var txAView *delta.View = nil
+
+	t.Run("contracts can be updated", func(t *testing.T) {
+		retrievedContractA, err := accounts.GetContract("A", addressA)
+		require.NoError(t, err)
+		require.Empty(t, retrievedContractA)
+
+		// deploy contract A0
+		procContractA0 := fvm.Transaction(contractDeployTx("A", contractA0Code, addressA), 0)
+		err = vm.Run(context, procContractA0, mainView, programs)
+		require.NoError(t, err)
+
+		retrievedContractA, err = accounts.GetContract("A", addressA)
+		require.NoError(t, err)
+
+		require.Equal(t, contractA0Code, string(retrievedContractA))
+
+		// deploy contract A
+		procContractA := fvm.Transaction(contractDeployTx("A", contractACode, addressA), 1)
+		err = vm.Run(context, procContractA, mainView, programs)
+		require.NoError(t, err)
+
+		retrievedContractA, err = accounts.GetContract("A", addressA)
+		require.NoError(t, err)
+
+		require.Equal(t, contractACode, string(retrievedContractA))
+
+	})
 
 	t.Run("register touches are captured for simple contract A", func(t *testing.T) {
 
