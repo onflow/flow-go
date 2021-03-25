@@ -41,10 +41,11 @@ type CompleteExecutionReceipt struct {
 	TestData *TestExecutionResultData
 }
 
-// CompleteExecutionReceiptFixture returns complete execution result with an
-// execution receipt referencing the block/collections.
+// CompleteExecutionReceiptFixture returns complete execution receipt with an
+// execution receipt referencing the block collections.
+//
 // chunkCount determines the number of chunks inside each receipt.
-// The output is an execution result with `chunkCount`+1 chunks, where the last chunk accounts
+// The output is an execution result with chunkCount+1 chunks, where the last chunk accounts
 // for the system chunk.
 func CompleteExecutionReceiptFixture(t *testing.T, chunkCount int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
 	refBlkHeader := unittest.BlockHeaderWithParentFixture(root)
@@ -343,10 +344,38 @@ func CompleteExecutionResultChainFixture(t *testing.T, root *flow.Header, count 
 	for i := 0; i < count; i++ {
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
-		er := CompleteExecutionReceiptFixture(t, 1, flow.Testnet.Chain(), parent)
-		ers = append(ers, er)
+		result, data := ExecutionResultFromParentBlockFixture(t, parent, 1, flow.Testnet.Chain())
+		containerBlock := ContainerBlockFixture(data.ReferenceBlock.Header, result)
+		data.ContainerBlock = containerBlock
+		er := &CompleteExecutionReceipt{
+			Receipt:  containerBlock.Payload.Receipts[0],
+			TestData: data,
+		}
 
-		parent = er.TestData.ContainerBlock.Header
+		ers = append(ers, er)
+		parent = containerBlock.Header
 	}
 	return ers
+}
+
+// ExecutionResultFromParentBlockFixture is a test helper that creates a child (reference) block from the parent, as well as an execution for it.
+func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, chunks int, chain flow.Chain) (*flow.ExecutionResult,
+	*TestExecutionResultData) {
+	refBlkHeader := unittest.BlockHeaderWithParentFixture(parent)
+	return ExecutionResultFixture(t, chunks, chain, &refBlkHeader)
+}
+
+// ContainerBlockFixture builds and returns a block that contains an execution receipt for the
+// input result.
+func ContainerBlockFixture(parent *flow.Header, result *flow.ExecutionResult) *flow.Block {
+	receipt := &flow.ExecutionReceipt{
+		ExecutionResult: *result,
+	}
+
+	// container block is the block that contains the execution receipt of reference block
+	containerBlock := unittest.BlockWithParentFixture(parent)
+	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
+	containerBlock.Header.PayloadHash = containerBlock.Payload.Hash()
+
+	return &containerBlock
 }
