@@ -217,7 +217,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(emittingRuntime)
+		vm := fvm.NewVirtualMachine(emittingRuntime)
 
 		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 		require.NoError(t, err)
@@ -278,7 +278,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 		require.NoError(t, err)
@@ -347,7 +347,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
 		require.NoError(t, err)
@@ -424,8 +424,8 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
 
-	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
 	execCtx := fvm.NewContext(zerolog.Nop())
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)

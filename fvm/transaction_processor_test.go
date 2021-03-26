@@ -54,9 +54,9 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, frozen)
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 		log := zerolog.Nop()
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 		txInvocator := fvm.NewTransactionInvocator(log)
 
 		code := fmt.Sprintf(`
@@ -157,11 +157,11 @@ func TestAccountFreezing(t *testing.T) {
 		accounts := state.NewAccounts(st)
 		programsStorage := programs.NewEmptyPrograms()
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		log := zerolog.Nop()
 		txInvocator := fvm.NewTransactionInvocator(log)
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		// deploy code to accounts
 		whateverContractCode := `
@@ -186,9 +186,9 @@ func TestAccountFreezing(t *testing.T) {
 		procNotFrozen := fvm.Transaction(&flow.TransactionBody{Script: deployContract, Authorizers: []flow.Address{notFrozenAddress}, Payer: notFrozenAddress}, 0)
 		deployContext := fvm.NewContext(zerolog.Nop(), fvm.WithServiceAccount(false), fvm.WithRestrictedDeployment(false), fvm.WithCadenceLogging(false))
 		deployTxInvocator := fvm.NewTransactionInvocator(zerolog.Nop())
-		deployRt := runtime.NewInterpreterRuntime()
+		deployRt := fvm.NewInterpreterRuntime()
 
-		deployVm := fvm.New(deployRt)
+		deployVm := fvm.NewVirtualMachine(deployRt)
 
 		err := deployTxInvocator.Process(deployVm, &deployContext, procFrozen, st, programsStorage)
 		require.NoError(t, err)
@@ -276,9 +276,9 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("default settings allow only service account to freeze accounts", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 		log := zerolog.Nop()
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 		// create default context
 		context := fvm.NewContext(log)
 		programsStorage := programs.NewEmptyPrograms()
@@ -344,9 +344,9 @@ func TestAccountFreezing(t *testing.T) {
 
 	t.Run("service account cannot freeze itself", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 		log := zerolog.Nop()
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 		// create default context
 		context := fvm.NewContext(log)
 		programsStorage := programs.NewEmptyPrograms()

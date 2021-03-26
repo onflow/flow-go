@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -82,7 +81,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	metrics := metrics.NewNoopCollector()
 
 	// creates state fixture and bootstrap it.
-	stateFixture := CompleteStateFixture(t, log, metrics, tracer, participants)
+	stateFixture := CompleteStateFixture(t, metrics, tracer, participants)
 
 	require.NoError(t, err)
 	for _, option := range options {
@@ -140,7 +139,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 }
 
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
-func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.NoopCollector, tracer module.Tracer,
+func CompleteStateFixture(t testing.TB, metric *metrics.NoopCollector, tracer module.Tracer,
 	participants flow.IdentityList) *testmock.StateFixture {
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
@@ -371,9 +370,9 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	blockFinder := fvm.NewBlockFinder(node.Headers)
 
@@ -707,9 +706,9 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		blockFinder := fvm.NewBlockFinder(node.Headers)
 

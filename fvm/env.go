@@ -908,6 +908,11 @@ func (e *hostEnv) ValueDecoded(duration time.Duration) {
 
 // Commit commits changes and return a list of updated keys
 func (e *hostEnv) Commit() ([]programs.ContractUpdateKey, error) {
+	// commit changes and return a list of updated keys
+	err := e.programs.Cleanup()
+	if err != nil {
+		return nil, err
+	}
 	return e.contracts.Commit()
 }
 
