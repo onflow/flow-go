@@ -25,7 +25,7 @@ type LedgerWAL struct {
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
 func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
-	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
+	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, true)
 	if err != nil {
 		return nil, err
 	}
