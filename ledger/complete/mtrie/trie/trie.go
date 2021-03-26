@@ -155,7 +155,7 @@ func (mt *MTrie) read(payloads []*ledger.Payload, paths []ledger.Path, head *nod
 
 	// read values from left and right subtrees in parallel
 	parallelRecursionThreshold := 32 // threshold to avoid the parallelization going too deep in the recursion
-	if len(lpaths) <= parallelRecursionThreshold {
+	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		mt.read(lpayloads, lpaths, head.LeftChild())
 		mt.read(rpayloads, rpaths, head.RightChild())
 	} else {
@@ -268,7 +268,7 @@ func (parentTrie *MTrie) update(
 	// recurse over each branch
 	var lChild, rChild *node.Node
 	parallelRecursionThreshold := 16
-	if len(lpayloads) < parallelRecursionThreshold || len(rpayloads) < parallelRecursionThreshold {
+	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
 		lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
 		rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
@@ -345,8 +345,8 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
 
-	parallelRecursionThreshold := 128 // threshold to avoid the parallelization going too deep in the recursion
-	if len(lpaths) <= parallelRecursionThreshold {
+	parallelRecursionThreshold := 64 // threshold to avoid the parallelization going too deep in the recursion
+	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
 		addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
 		mt.proofs(head.LeftChild(), lpaths, lproofs)
