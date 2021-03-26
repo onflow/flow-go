@@ -35,42 +35,42 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		ops        []utils.CompleteExecutionReceiptBuilderOpt
 		msg        string
 	}{
-		//{
-		//	blockCount: 1,
-		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
-		//		utils.WithResults(1),
-		//		utils.WithChunks(1),
-		//		utils.WithCopies(1),
-		//	},
-		//	msg: "1 block, 1 result, 1 chunk, no duplicate",
-		//},
-		//{
-		//	blockCount: 10,
-		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
-		//		utils.WithResults(1),
-		//		utils.WithChunks(10),
-		//		utils.WithCopies(1),
-		//	},
-		//	msg: "10 blocks, 1 result, 10 chunks, no duplicate",
-		//},
-		//{
-		//	blockCount: 1,
-		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
-		//		utils.WithResults(1),
-		//		utils.WithChunks(10),
-		//		utils.WithCopies(1),
-		//	},
-		//	msg: "1 block, 1 result, 10 chunks, no duplicate",
-		//},
-		//{
-		//	blockCount: 10,
-		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
-		//		utils.WithResults(10),
-		//		utils.WithChunks(10),
-		//		utils.WithCopies(1),
-		//	},
-		//	msg: "10 block, 10 result, 10 chunks, no duplicate",
-		//},
+		{
+			blockCount: 1,
+			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+				utils.WithResults(1),
+				utils.WithChunks(1),
+				utils.WithCopies(1),
+			},
+			msg: "1 block, 1 result, 1 chunk, no duplicate",
+		},
+		{
+			blockCount: 10,
+			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+				utils.WithResults(1),
+				utils.WithChunks(10),
+				utils.WithCopies(1),
+			},
+			msg: "10 blocks, 1 result, 10 chunks, no duplicate",
+		},
+		{
+			blockCount: 1,
+			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+				utils.WithResults(1),
+				utils.WithChunks(10),
+				utils.WithCopies(1),
+			},
+			msg: "1 block, 1 result, 10 chunks, no duplicate",
+		},
+		{
+			blockCount: 10,
+			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+				utils.WithResults(10),
+				utils.WithChunks(10),
+				utils.WithCopies(1),
+			},
+			msg: "10 block, 10 result, 10 chunks, no duplicate",
+		},
 		{
 			blockCount: 1,
 			ops: []utils.CompleteExecutionReceiptBuilderOpt{
@@ -79,6 +79,15 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 				utils.WithCopies(2),
 			},
 			msg: "1 block, 1 result, 1 chunks, 1 duplicate",
+		},
+		{
+			blockCount: 10,
+			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+				utils.WithResults(10),
+				utils.WithChunks(10),
+				utils.WithCopies(10),
+			},
+			msg: "10 block, 10 result, 10 chunks, 10 duplicates",
 		},
 	}
 

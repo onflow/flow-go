@@ -453,9 +453,18 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 
 	expectedLocatorIds := flow.IdentifierList{}
 
+	// keeps track of duplicate results (receipts that share same result)
+	visited := make(map[flow.Identifier]struct{})
+
 	for _, completeER := range completeERS {
 		for _, receipt := range completeER.ContainerBlock.Payload.Receipts {
 			a := chunks.NewAssignment()
+
+			_, duplicate := visited[receipt.ExecutionResult.ID()]
+			if duplicate {
+				// skips mocking chunk assignment for duplicate results
+				continue
+			}
 
 			for _, chunk := range receipt.ExecutionResult.Chunks {
 				if isAssigned(chunk.Index, len(receipt.ExecutionResult.Chunks)) {
@@ -470,7 +479,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 			}
 
 			chunkAssigner.On("Assign", &receipt.ExecutionResult, receipt.ExecutionResult.BlockID).Return(a, nil)
-
+			visited[receipt.ExecutionResult.ID()] = struct{}{}
 		}
 	}
 
