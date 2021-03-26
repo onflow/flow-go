@@ -15,13 +15,19 @@ type Procedure interface {
 	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
 }
 
+func NewInterpreterRuntime() runtime.Runtime {
+	return runtime.NewInterpreterRuntime(
+		runtime.WithContractUpdateValidationEnabled(true),
+	)
+}
+
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
 	Runtime runtime.Runtime
 }
 
-// New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime) *VirtualMachine {
+// NewVirtualMachine creates a new virtual machine instance with the provided runtime.
+func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{
 		Runtime: rt,
 	}

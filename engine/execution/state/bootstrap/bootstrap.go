@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -38,7 +37,8 @@ func (b *Bootstrapper) BootstrapLedger(
 	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.InitialState()))
 	programs := programs.NewEmptyPrograms()
 
-	vm := fvm.New(runtime.NewInterpreterRuntime())
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(b.logger, fvm.WithChain(chain))
 
