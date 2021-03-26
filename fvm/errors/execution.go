@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,16 +28,32 @@ type ExecutionError interface {
 // TypeMismatchError, InvalidPathDomainError, OverwriteError, CyclicLinkError,
 // ArrayIndexOutOfBoundsError, ...
 type CadenceRuntimeError struct {
-	Err *runtime.Error
+	err *runtime.Error
+}
+
+// NewCadenceRuntimeError constructs a new CadenceRuntimeError and wraps a cadence runtime error
+func NewCadenceRuntimeError(err *runtime.Error) *CadenceRuntimeError {
+	return &CadenceRuntimeError{err: err}
+}
+
+// IsCadenceRuntimeError returns true if error has this type
+func IsCadenceRuntimeError(err error) bool {
+	var t *CadenceRuntimeError
+	return errors.As(err, &t)
 }
 
 func (e CadenceRuntimeError) Error() string {
-	return fmt.Sprintf("cadence runtime error %s", e.Err.Error())
+	return fmt.Sprintf("cadence runtime error %s", e.err.Error())
 }
 
 // Code returns the error code for this error
 func (e CadenceRuntimeError) Code() uint32 {
 	return errCodeCadenceRunTimeError
+}
+
+// Unwrap returns the wrapped err
+func (e CadenceRuntimeError) Unwrap() error {
+	return e.err
 }
 
 // An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
@@ -47,7 +64,7 @@ type StorageCapacityExceededError struct {
 }
 
 // NewStorageCapacityExceededError constructs a new StorageCapacityExceededError
-func NewStorageCapacityExceededError(address flow.Address, storageUsed, storageCapacity uint64) error {
+func NewStorageCapacityExceededError(address flow.Address, storageUsed, storageCapacity uint64) *StorageCapacityExceededError {
 	return &StorageCapacityExceededError{
 		address:         address,
 		storageUsed:     storageUsed,
@@ -71,7 +88,7 @@ type EventLimitExceededError struct {
 }
 
 // NewEventLimitExceededError constructs a EventLimitExceededError
-func NewEventLimitExceededError(totalByteSize, limit uint64) error {
+func NewEventLimitExceededError(totalByteSize, limit uint64) *EventLimitExceededError {
 	return &EventLimitExceededError{totalByteSize: totalByteSize, limit: limit}
 }
 
@@ -98,7 +115,7 @@ type StateKeySizeLimitError struct {
 }
 
 // NewStateKeySizeLimitError constructs a StateKeySizeLimitError
-func NewStateKeySizeLimitError(owner, controller, key string, size, limit uint64) error {
+func NewStateKeySizeLimitError(owner, controller, key string, size, limit uint64) *StateKeySizeLimitError {
 	return &StateKeySizeLimitError{owner: owner, controller: controller, key: key, size: size, limit: limit}
 }
 
@@ -119,7 +136,7 @@ type StateValueSizeLimitError struct {
 }
 
 // NewStateValueSizeLimitError constructs a StateValueSizeLimitError
-func NewStateValueSizeLimitError(value flow.RegisterValue, size, limit uint64) error {
+func NewStateValueSizeLimitError(value flow.RegisterValue, size, limit uint64) *StateValueSizeLimitError {
 	return &StateValueSizeLimitError{value: value, size: size, limit: limit}
 }
 
@@ -139,7 +156,7 @@ type LedgerIntractionLimitExceededError struct {
 }
 
 // NewLedgerIntractionLimitExceededError constructs a LedgerIntractionLimitExceededError
-func NewLedgerIntractionLimitExceededError(used, limit uint64) error {
+func NewLedgerIntractionLimitExceededError(used, limit uint64) *LedgerIntractionLimitExceededError {
 	return &LedgerIntractionLimitExceededError{used: used, limit: limit}
 }
 
@@ -159,7 +176,7 @@ type OperationNotSupportedError struct {
 }
 
 // NewOperationNotSupportedError construct a new OperationNotSupportedError
-func NewOperationNotSupportedError(operation string) error {
+func NewOperationNotSupportedError(operation string) *OperationNotSupportedError {
 	return &OperationNotSupportedError{operation: operation}
 }
 

@@ -43,7 +43,7 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		// TODO figure out min hight and enforce it to be bigger than min hight
 		minHeight := 0
 		msg := fmt.Sprintf("requested height (%d) is not in the range(%d, %d)", height, minHeight, header.Height)
-		err := errors.NewValueError(msg, string(height))
+		err := errors.NewValueError(msg, fmt.Sprint(height))
 		return nil, fmt.Errorf("cannot retrieve block parent: %w", err)
 	}
 

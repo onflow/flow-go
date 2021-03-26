@@ -1056,7 +1056,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if keyIndex < 0 {
-		err = errors.NewValueError("key index must be positive", string(keyIndex))
+		err = errors.NewValueError("key index must be positive", fmt.Sprint(keyIndex))
 		return nil, fmt.Errorf("remove account key failed: %w", err)
 	}
 

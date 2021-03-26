@@ -55,7 +55,7 @@ func SplitErrorTypes(inp error) (err Error, failure Failure) {
 	// anything else that is left is an unknown failure
 	// (except the ones green listed for now to be considered as txErrors)
 	if inp != nil {
-		return nil, &UnknownFailure{Err: inp}
+		return nil, NewUnknownFailure(inp)
 	}
 	return nil, nil
 }
@@ -68,7 +68,7 @@ func HandleRuntimeError(err error) error {
 	// if is not a runtime error return as vm error
 	// this should never happen unless a bug in the code
 	if runErr, ok = err.(runtime.Error); !ok {
-		return &UnknownFailure{runErr}
+		return NewUnknownFailure(runErr)
 	}
 	innerErr := runErr.Err
 
@@ -81,9 +81,9 @@ func HandleRuntimeError(err error) error {
 			return recoveredErr
 		}
 		// if not recovered return
-		return &UnknownFailure{externalErr}
+		return NewUnknownFailure(externalErr)
 	}
 
 	// All other errors are non-fatal Cadence errors.
-	return &CadenceRuntimeError{Err: &runErr}
+	return NewCadenceRuntimeError(&runErr)
 }

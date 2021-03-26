@@ -10,12 +10,17 @@ import (
 // this error is the result of failure in any of the following conditions:
 // - the total tx byte size is bigger than the limit set by the network
 type InvalidTxByteSizeError struct {
-	Maximum    uint64
-	TxByteSize uint64
+	txByteSize uint64
+	maximum    uint64
+}
+
+// NewInvalidTxByteSizeError constructs a new InvalidTxByteSizeError
+func NewInvalidTxByteSizeError(txByteSize, maximum uint64) *InvalidTxByteSizeError {
+	return &InvalidTxByteSizeError{txByteSize: txByteSize, maximum: maximum}
 }
 
 func (e InvalidTxByteSizeError) Error() string {
-	return fmt.Sprintf("transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.TxByteSize, e.Maximum)
+	return fmt.Sprintf("transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.txByteSize, e.maximum)
 }
 
 // Code returns the error code for this error type
@@ -28,11 +33,16 @@ func (e InvalidTxByteSizeError) Code() uint32 {
 // - ReferenceBlockID refer to a non-existing block
 // - ReferenceBlockID == ZeroID (if configured by the network)
 type InvalidReferenceBlockError struct {
-	ReferenceBlockID string
+	referenceBlockID string
+}
+
+// NewInvalidReferenceBlockError constructs a new InvalidReferenceBlockError
+func NewInvalidReferenceBlockError(referenceBlockID string) *InvalidReferenceBlockError {
+	return &InvalidReferenceBlockError{referenceBlockID: referenceBlockID}
 }
 
 func (e InvalidReferenceBlockError) Error() string {
-	return fmt.Sprintf("reference block is pointing to an invalid block: %s", e.ReferenceBlockID)
+	return fmt.Sprintf("reference block is pointing to an invalid block: %s", e.referenceBlockID)
 }
 
 // Code returns the error code for this error type
@@ -44,11 +54,16 @@ func (e InvalidReferenceBlockError) Code() uint32 {
 // this error is the result of failure in any of the following conditions:
 // - ReferenceBlock.Height - CurrentBlock.Height < Expiry Limit (Transaction is Expired)
 type ExpiredTransactionError struct {
-	RefHeight, FinalHeight uint64
+	refHeight, finalHeight uint64
+}
+
+// NewExpiredTransactionError constructs a new ExpiredTransactionError
+func NewExpiredTransactionError(refHeight, finalHeight uint64) *ExpiredTransactionError {
+	return &ExpiredTransactionError{refHeight: refHeight, finalHeight: finalHeight}
 }
 
 func (e ExpiredTransactionError) Error() string {
-	return fmt.Sprintf("transaction is expired: ref_height=%d final_height=%d", e.RefHeight, e.FinalHeight)
+	return fmt.Sprintf("transaction is expired: ref_height=%d final_height=%d", e.refHeight, e.finalHeight)
 }
 
 // Code returns the error code for this error type
@@ -81,12 +96,17 @@ func (e InvalidScriptError) Unwrap() error {
 
 // InvalidGasLimitError indicates that a transaction specifies a gas limit that exceeds the maximum allowed by the network.
 type InvalidGasLimitError struct {
-	Maximum uint64
-	Actual  uint64
+	actual  uint64
+	maximum uint64
+}
+
+// NewInvalidGasLimitError constructs a new InvalidGasLimitError
+func NewInvalidGasLimitError(actual, maximum uint64) *InvalidGasLimitError {
+	return &InvalidGasLimitError{actual: actual, maximum: maximum}
 }
 
 func (e InvalidGasLimitError) Error() string {
-	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
+	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.actual, e.maximum)
 }
 
 // Code returns the error code for this error type
@@ -102,11 +122,11 @@ type InvalidProposalSignatureError struct {
 }
 
 // NewInvalidProposalSignatureError constructs a new InvalidProposalSignatureError
-func NewInvalidProposalSignatureError(address flow.Address, keyIndex uint64, err error) error {
+func NewInvalidProposalSignatureError(address flow.Address, keyIndex uint64, err error) *InvalidProposalSignatureError {
 	return &InvalidProposalSignatureError{address: address, keyIndex: keyIndex, err: err}
 }
 
-func (e *InvalidProposalSignatureError) Error() string {
+func (e InvalidProposalSignatureError) Error() string {
 	return fmt.Sprintf(
 		"invalid proposal key: public key %d on account %s does not have a valid signature: %s",
 		e.keyIndex,
@@ -116,7 +136,7 @@ func (e *InvalidProposalSignatureError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *InvalidProposalSignatureError) Code() uint32 {
+func (e InvalidProposalSignatureError) Code() uint32 {
 	return errCodeInvalidProposalSignatureError
 }
 
@@ -134,7 +154,7 @@ type InvalidProposalSeqNumberError struct {
 }
 
 // NewInvalidProposalSeqNumberError constructs a new InvalidProposalSeqNumberError
-func NewInvalidProposalSeqNumberError(address flow.Address, keyIndex uint64, currentSeqNumber uint64, providedSeqNumber uint64) error {
+func NewInvalidProposalSeqNumberError(address flow.Address, keyIndex uint64, currentSeqNumber uint64, providedSeqNumber uint64) *InvalidProposalSeqNumberError {
 	return &InvalidProposalSeqNumberError{address: address,
 		keyIndex:          keyIndex,
 		currentSeqNumber:  currentSeqNumber,
@@ -142,11 +162,11 @@ func NewInvalidProposalSeqNumberError(address flow.Address, keyIndex uint64, cur
 }
 
 // CurrentSeqNumber returns the current sequence number
-func (e *InvalidProposalSeqNumberError) CurrentSeqNumber() uint64 {
+func (e InvalidProposalSeqNumberError) CurrentSeqNumber() uint64 {
 	return e.currentSeqNumber
 }
 
-func (e *InvalidProposalSeqNumberError) Error() string {
+func (e InvalidProposalSeqNumberError) Error() string {
 	return fmt.Sprintf(
 		"invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
 		e.keyIndex,
@@ -157,7 +177,7 @@ func (e *InvalidProposalSeqNumberError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *InvalidProposalSeqNumberError) Code() uint32 {
+func (e InvalidProposalSeqNumberError) Code() uint32 {
 	return errCodeProposalSeqNumberMismatchError
 }
 
@@ -174,11 +194,11 @@ type InvalidPayloadSignatureError struct {
 }
 
 // NewInvalidPayloadSignatureError constructs a new InvalidPayloadSignatureError
-func NewInvalidPayloadSignatureError(address flow.Address, keyIndex uint64, err error) error {
+func NewInvalidPayloadSignatureError(address flow.Address, keyIndex uint64, err error) *InvalidPayloadSignatureError {
 	return &InvalidPayloadSignatureError{address: address, keyIndex: keyIndex, err: err}
 }
 
-func (e *InvalidPayloadSignatureError) Error() string {
+func (e InvalidPayloadSignatureError) Error() string {
 	return fmt.Sprintf(
 		"invalid payload signature: public key %d on account %s does not have a valid signature: %s",
 		e.keyIndex,
@@ -188,7 +208,7 @@ func (e *InvalidPayloadSignatureError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *InvalidPayloadSignatureError) Code() uint32 {
+func (e InvalidPayloadSignatureError) Code() uint32 {
 	return errCodeInvalidPayloadSignatureError
 }
 
@@ -210,11 +230,11 @@ type InvalidEnvelopeSignatureError struct {
 }
 
 // NewInvalidEnvelopeSignatureError constructs a new InvalidEnvelopeSignatureError
-func NewInvalidEnvelopeSignatureError(address flow.Address, keyIndex uint64, err error) error {
+func NewInvalidEnvelopeSignatureError(address flow.Address, keyIndex uint64, err error) *InvalidEnvelopeSignatureError {
 	return &InvalidEnvelopeSignatureError{address: address, keyIndex: keyIndex, err: err}
 }
 
-func (e *InvalidEnvelopeSignatureError) Error() string {
+func (e InvalidEnvelopeSignatureError) Error() string {
 	return fmt.Sprintf(
 		"invalid envelope key: public key %d on account %s does not have a valid signature: %s",
 		e.keyIndex,
@@ -224,7 +244,7 @@ func (e *InvalidEnvelopeSignatureError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *InvalidEnvelopeSignatureError) Code() uint32 {
+func (e InvalidEnvelopeSignatureError) Code() uint32 {
 	return errCodeInvalidEnvelopeSignatureError
 }
 

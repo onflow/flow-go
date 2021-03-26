@@ -17,12 +17,12 @@ type InvalidAddressError struct {
 }
 
 // NewInvalidAddressErrorf constructs a new InvalidAddressError
-func NewInvalidAddressErrorf(msg string, err error, address flow.Address) error {
+func NewInvalidAddressErrorf(msg string, err error, address flow.Address) *InvalidAddressError {
 	return &InvalidAddressError{err: fmt.Errorf(msg, err), address: address}
 }
 
 // NewInvalidAddressError constructs a new InvalidAddressError
-func NewInvalidAddressError(msg string, address flow.Address) error {
+func NewInvalidAddressError(msg string, address flow.Address) *InvalidAddressError {
 	return &InvalidAddressError{err: errors.New(msg), address: address}
 }
 
@@ -59,7 +59,7 @@ type InvalidLocationError struct {
 }
 
 // NewInvalidLocationError constructs a new InvalidLocationError
-func NewInvalidLocationError(msg string, location runtime.Location) error {
+func NewInvalidLocationError(msg string, location runtime.Location) *InvalidLocationError {
 	return &InvalidLocationError{
 		location: location,
 		err:      stdErrors.New(msg),
@@ -67,7 +67,7 @@ func NewInvalidLocationError(msg string, location runtime.Location) error {
 }
 
 // NewInvalidLocationErrorf constructs a new InvalidLocationError (with inner error formatting)
-func NewInvalidLocationErrorf(msg string, err error, location runtime.Location) error {
+func NewInvalidLocationErrorf(msg string, err error, location runtime.Location) *InvalidLocationError {
 	return &InvalidLocationError{
 		location: location,
 		err:      fmt.Errorf(msg, err),
@@ -104,7 +104,7 @@ type ValueError struct {
 }
 
 // NewValueError constructs a new ValueError
-func NewValueError(msg string, valueStr string) error {
+func NewValueError(msg string, valueStr string) *ValueError {
 	return &ValueError{
 		valueStr: valueStr,
 		err:      stdErrors.New(msg),
@@ -112,7 +112,7 @@ func NewValueError(msg string, valueStr string) error {
 }
 
 // NewValueErrorf constructs a new ValueError (with inner error formatting)
-func NewValueErrorf(msg string, err error, valueStr string) error {
+func NewValueErrorf(msg string, err error, valueStr string) *ValueError {
 	return &ValueError{
 		valueStr: valueStr,
 		err:      fmt.Errorf(msg, err),
@@ -145,7 +145,7 @@ type OperationAuthorizationError struct {
 }
 
 // NewOperationAuthorizationError constructs a new OperationAuthorizationError
-func NewOperationAuthorizationError(msg string, operation string) error {
+func NewOperationAuthorizationError(msg string, operation string) *OperationAuthorizationError {
 	return &OperationAuthorizationError{
 		operation: operation,
 		err:       stdErrors.New(msg),
@@ -153,7 +153,7 @@ func NewOperationAuthorizationError(msg string, operation string) error {
 }
 
 // NewOperationAuthorizationErrorf constructs a new OperationAuthorizationError (inner error formatting)
-func NewOperationAuthorizationErrorf(msg string, err error, operation string) error {
+func NewOperationAuthorizationErrorf(msg string, err error, operation string) *OperationAuthorizationError {
 	return &OperationAuthorizationError{
 		operation: operation,
 		err:       fmt.Errorf(msg, err),
@@ -192,7 +192,7 @@ type AccountAuthorizationError struct {
 }
 
 // NewAccountAuthorizationError constructs a new account authorization error
-func NewAccountAuthorizationError(msg string, address flow.Address) error {
+func NewAccountAuthorizationError(msg string, address flow.Address) *AccountAuthorizationError {
 	return &AccountAuthorizationError{
 		address: address,
 		err:     stdErrors.New(msg),
@@ -200,7 +200,7 @@ func NewAccountAuthorizationError(msg string, address flow.Address) error {
 }
 
 // NewAccountAuthorizationErrorf constructs a new account authorization error (inner error formatting)
-func NewAccountAuthorizationErrorf(msg string, err error, address flow.Address) error {
+func NewAccountAuthorizationErrorf(msg string, err error, address flow.Address) *AccountAuthorizationError {
 	return &AccountAuthorizationError{
 		address: address,
 		err:     fmt.Errorf(msg, err),

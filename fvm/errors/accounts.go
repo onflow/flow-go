@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,7 +17,7 @@ func NewAccountNotFoundError(address flow.Address) error {
 	return &AccountNotFoundError{}
 }
 
-func (e *AccountNotFoundError) Error() string {
+func (e AccountNotFoundError) Error() string {
 	return fmt.Sprintf(
 		"account not found for address %s",
 		e.address.String(),
@@ -24,14 +25,19 @@ func (e *AccountNotFoundError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *AccountNotFoundError) Code() uint32 {
+func (e AccountNotFoundError) Code() uint32 {
 	return errCodeAccountNotFoundError
+}
+
+// IsAccountNotFoundError returns true if error has this type
+func IsAccountNotFoundError(err error) bool {
+	var t *AccountNotFoundError
+	return errors.As(err, &t)
 }
 
 // AccountAlreadyExistsError is returned when account creation fails because
 // another account already exist at that address
 // TODO maybe this should be failure since user has no control over this
-
 type AccountAlreadyExistsError struct {
 	address flow.Address
 }
@@ -41,7 +47,7 @@ func NewAccountAlreadyExistsError(address flow.Address) error {
 	return &AccountAlreadyExistsError{address: address}
 }
 
-func (e *AccountAlreadyExistsError) Error() string {
+func (e AccountAlreadyExistsError) Error() string {
 	return fmt.Sprintf(
 		"account with address %s already exists",
 		e.address,
@@ -49,7 +55,7 @@ func (e *AccountAlreadyExistsError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *AccountAlreadyExistsError) Code() uint32 {
+func (e AccountAlreadyExistsError) Code() uint32 {
 	return errCodeAccountAlreadyExistsError
 }
 
@@ -60,16 +66,17 @@ type AccountPublicKeyNotFoundError struct {
 }
 
 // NewAccountPublicKeyNotFoundError constructs a new AccountPublicKeyNotFoundError
-func NewAccountPublicKeyNotFoundError(address flow.Address, keyIndex uint64) error {
+func NewAccountPublicKeyNotFoundError(address flow.Address, keyIndex uint64) *AccountPublicKeyNotFoundError {
 	return &AccountPublicKeyNotFoundError{address: address, keyIndex: keyIndex}
 }
 
 // IsAccountAccountPublicKeyNotFoundError returns true if error has this type
 func IsAccountAccountPublicKeyNotFoundError(err error) bool {
-	return As(err, &AccountPublicKeyNotFoundError{})
+	var t *AccountPublicKeyNotFoundError
+	return errors.As(err, &t)
 }
 
-func (e *AccountPublicKeyNotFoundError) Error() string {
+func (e AccountPublicKeyNotFoundError) Error() string {
 	return fmt.Sprintf(
 		"account public key not found for address %s and key index %d",
 		e.address,
@@ -78,7 +85,7 @@ func (e *AccountPublicKeyNotFoundError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *AccountPublicKeyNotFoundError) Code() uint32 {
+func (e AccountPublicKeyNotFoundError) Code() uint32 {
 	return errCodeAccountPublicKeyNotFoundError
 }
 
@@ -97,11 +104,11 @@ func (e FrozenAccountError) Address() flow.Address {
 	return e.address
 }
 
-func (e *FrozenAccountError) Error() string {
+func (e FrozenAccountError) Error() string {
 	return fmt.Sprintf("account %s is frozen", e.address)
 }
 
 // Code returns the error code for this error type
-func (e *FrozenAccountError) Code() uint32 {
+func (e FrozenAccountError) Code() uint32 {
 	return errCodeFrozenAccountError
 }

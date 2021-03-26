@@ -6,11 +6,16 @@ import (
 
 // UnknownFailure captures an unknown vm fatal error
 type UnknownFailure struct {
-	Err error
+	err error
+}
+
+// NewUnknownFailure constructs a new UnknownFailure
+func NewUnknownFailure(err error) *UnknownFailure {
+	return &UnknownFailure{err: err}
 }
 
 func (e *UnknownFailure) Error() string {
-	return fmt.Sprintf("unknown failure: %s", e.Err.Error())
+	return fmt.Sprintf("unknown failure: %s", e.err.Error())
 }
 
 // FailureCode returns the failure code
@@ -24,7 +29,7 @@ type EncodingFailure struct {
 }
 
 // NewEncodingFailuref formats and returns a new EncodingFailure
-func NewEncodingFailuref(msg string, err error) error {
+func NewEncodingFailuref(msg string, err error) *EncodingFailure {
 	return &EncodingFailure{
 		err: fmt.Errorf(msg, err),
 	}
@@ -45,7 +50,7 @@ type LedgerFailure struct {
 }
 
 // NewLedgerFailure constructs a new LedgerFailure
-func NewLedgerFailure(err error) error {
+func NewLedgerFailure(err error) *LedgerFailure {
 	return &LedgerFailure{err: err}
 }
 
@@ -64,7 +69,7 @@ type StateMergeFailure struct {
 }
 
 // NewStateMergeFailure constructs a new StateMergeFailure
-func NewStateMergeFailure(err error) error {
+func NewStateMergeFailure(err error) *StateMergeFailure {
 	return &StateMergeFailure{err: err}
 }
 
@@ -83,7 +88,7 @@ type BlockFinderFailure struct {
 }
 
 // NewBlockFinderFailure constructs a new BlockFinderFailure
-func NewBlockFinderFailure(err error) error {
+func NewBlockFinderFailure(err error) *BlockFinderFailure {
 	return &BlockFinderFailure{err: err}
 }
 
@@ -102,7 +107,7 @@ type HasherFailure struct {
 }
 
 // NewHasherFailure returns a new hasherFailure
-func NewHasherFailure(err error) error {
+func NewHasherFailure(err error) *HasherFailure {
 	return &HasherFailure{
 		err: err,
 	}

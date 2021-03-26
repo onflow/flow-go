@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// VirtualMachine runs procedures
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }

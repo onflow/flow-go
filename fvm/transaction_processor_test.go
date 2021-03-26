@@ -244,11 +244,13 @@ func TestAccountFreezing(t *testing.T) {
 		err = txInvocator.Process(vm, &context, proc, st, programsStorage)
 		require.Error(t, err)
 
-		// TODO refactor this to use errors.As or errorIs for checking nested types
-
 		// find frozen account specific error
-		require.IsType(t, &errors.CadenceRuntimeError{}, err)
-		err = err.(*errors.CadenceRuntimeError).Err
+		require.True(t, errors.IsCadenceRuntimeError(err))
+
+		var cadenceRuntimeError *errors.CadenceRuntimeError
+		require.True(t, errors.As(err, &cadenceRuntimeError))
+
+		err = cadenceRuntimeError.Unwrap()
 
 		require.IsType(t, &runtime.Error{}, err)
 		err = err.(*runtime.Error).Err
