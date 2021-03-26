@@ -11,7 +11,7 @@ import (
 // while validating and executing a transaction or an script.
 type Error interface {
 	// Code returns the code for this error
-	Code() uint32
+	Code() ErrorCode
 	// and anything else that is needed to be an error
 	error
 }
@@ -23,7 +23,7 @@ type Error interface {
 // execution.
 type Failure interface {
 	// FailureCode returns the failure code for this error
-	FailureCode() uint16
+	FailureCode() FailureCode
 	// and anything else that is needed to be an error
 	error
 }

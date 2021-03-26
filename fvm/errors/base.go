@@ -31,8 +31,8 @@ func (e InvalidAddressError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e InvalidAddressError) Code() uint32 {
-	return errCodeInvalidAddressError
+func (e InvalidAddressError) Code() ErrorCode {
+	return ErrCodeInvalidAddressError
 }
 
 // InvalidArgumentError indicates that a transaction includes invalid arguments.
@@ -48,8 +48,8 @@ func (e InvalidArgumentError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e InvalidArgumentError) Code() uint32 {
-	return errCodeInvalidArgumentError
+func (e InvalidArgumentError) Code() ErrorCode {
+	return ErrCodeInvalidArgumentError
 }
 
 // InvalidLocationError indicates an invalid location is passed
@@ -88,8 +88,8 @@ func (e InvalidLocationError) Error() string {
 }
 
 // Code returns the error code for this error
-func (e InvalidLocationError) Code() uint32 {
-	return errCodeInvalidLocationError
+func (e InvalidLocationError) Code() ErrorCode {
+	return ErrCodeInvalidLocationError
 }
 
 // Unwrap unwraps the error
@@ -128,8 +128,8 @@ func (e ValueError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e ValueError) Code() uint32 {
-	return errCodeValueError
+func (e ValueError) Code() ErrorCode {
+	return ErrCodeValueError
 }
 
 // Unwrap unwraps the error
@@ -173,8 +173,8 @@ func (e OperationAuthorizationError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e OperationAuthorizationError) Code() uint32 {
-	return errCodeAccountAuthorizationError
+func (e OperationAuthorizationError) Code() ErrorCode {
+	return ErrCodeAccountAuthorizationError
 }
 
 // Unwrap unwraps the error
@@ -220,8 +220,8 @@ func (e AccountAuthorizationError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e AccountAuthorizationError) Code() uint32 {
-	return errCodeAccountAuthorizationError
+func (e AccountAuthorizationError) Code() ErrorCode {
+	return ErrCodeAccountAuthorizationError
 }
 
 // Unwrap unwraps the error

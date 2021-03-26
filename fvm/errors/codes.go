@@ -1,56 +1,70 @@
 package errors
 
+import "fmt"
+
+type ErrorCode uint16
+
+func (ec ErrorCode) String() string {
+	return fmt.Sprintf("[Error Code: %d]", ec)
+}
+
+type FailureCode uint16
+
+func (fc FailureCode) String() string {
+	return fmt.Sprintf("[Failure Code: %d]", fc)
+}
+
 const (
-	failureCodeUnknownFailure     = 2000
-	failureCodeEncodingFailure    = 2001
-	failureCodeLedgerFailure      = 2002
-	failureCodeStateMergeFailure  = 2003
-	failureCodeBlockFinderFailure = 2004
-	failureCodeHasherFailure      = 2005
+	FailureCodeUnknownFailure     FailureCode = 2000
+	FailureCodeEncodingFailure    FailureCode = 2001
+	FailureCodeLedgerFailure      FailureCode = 2002
+	FailureCodeStateMergeFailure  FailureCode = 2003
+	FailureCodeBlockFinderFailure FailureCode = 2004
+	FailureCodeHasherFailure      FailureCode = 2005
 )
 
 const (
 	// tx validation errors 1000 - 1049
-	// errCodeTxValidationError          = 1000 - reserved
-	errCodeInvalidTxByteSizeError        = 1001
-	errCodeInvalidReferenceBlockError    = 1002
-	errCodeExpiredTransactionError       = 1003
-	errCodeInvalidScriptError            = 1004
-	errCodeInvalidGasLimitError          = 1005
-	errCodeInvalidProposalSignatureError = 1006
-	errCodeInvalidProposalSeqNumberError = 1007
-	errCodeInvalidPayloadSignatureError  = 1008
-	errCodeInvalidEnvelopeSignatureError = 1009
+	// ErrCodeTxValidationError         ErrorCode = 1000 - reserved
+	ErrCodeInvalidTxByteSizeError        ErrorCode = 1001
+	ErrCodeInvalidReferenceBlockError    ErrorCode = 1002
+	ErrCodeExpiredTransactionError       ErrorCode = 1003
+	ErrCodeInvalidScriptError            ErrorCode = 1004
+	ErrCodeInvalidGasLimitError          ErrorCode = 1005
+	ErrCodeInvalidProposalSignatureError ErrorCode = 1006
+	ErrCodeInvalidProposalSeqNumberError ErrorCode = 1007
+	ErrCodeInvalidPayloadSignatureError  ErrorCode = 1008
+	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
 
 	// base errors 1050 - 1100
-	errCodeValueError                  = 1051
-	errCodeInvalidArgumentError        = 1052
-	errCodeInvalidAddressError         = 1053
-	errCodeInvalidLocationError        = 1054
-	errCodeAccountAuthorizationError   = 1055
-	errCodeOperationAuthorizationError = 1056
-	errCodeOperationNotSupportedError  = 1057
+	ErrCodeValueError                  ErrorCode = 1051
+	ErrCodeInvalidArgumentError        ErrorCode = 1052
+	ErrCodeInvalidAddressError         ErrorCode = 1053
+	ErrCodeInvalidLocationError        ErrorCode = 1054
+	ErrCodeAccountAuthorizationError   ErrorCode = 1055
+	ErrCodeOperationAuthorizationError ErrorCode = 1056
+	ErrCodeOperationNotSupportedError  ErrorCode = 1057
 
 	// execution errors 1100 - 1200
-	// errCodeExecutionError                  = 1000 - reserved
-	errCodeCadenceRunTimeError                = 1101
-	errCodeEncodingUnsupportedValue           = 1102
-	errCodeStorageCapacityExceeded            = 1103
-	errCodeGasLimitExceededError              = 1104
-	errCodeEventLimitExceededError            = 1105
-	errCodeLedgerIntractionLimitExceededError = 1106
-	errCodeStateKeySizeLimitError             = 1107
-	errCodeStateValueSizeLimitError           = 1108
+	// ErrCodeExecutionError                 ErrorCode = 1000 - reserved
+	ErrCodeCadenceRunTimeError                ErrorCode = 1101
+	ErrCodeEncodingUnsupportedValue           ErrorCode = 1102
+	ErrCodeStorageCapacityExceeded            ErrorCode = 1103
+	ErrCodeGasLimitExceededError              ErrorCode = 1104
+	ErrCodeEventLimitExceededError            ErrorCode = 1105
+	ErrCodeLedgerIntractionLimitExceededError ErrorCode = 1106
+	ErrCodeStateKeySizeLimitError             ErrorCode = 1107
+	ErrCodeStateValueSizeLimitError           ErrorCode = 1108
 
 	// accounts errors 1200 - 1250
-	// errCodeAccountError               = 1200 - reserved
-	errCodeAccountNotFoundError          = 1201
-	errCodeAccountPublicKeyNotFoundError = 1202
-	errCodeAccountAlreadyExistsError     = 1203
-	errCodeFrozenAccountError            = 1204
+	// ErrCodeAccountError              ErrorCode = 1200 - reserved
+	ErrCodeAccountNotFoundError          ErrorCode = 1201
+	ErrCodeAccountPublicKeyNotFoundError ErrorCode = 1202
+	ErrCodeAccountAlreadyExistsError     ErrorCode = 1203
+	ErrCodeFrozenAccountError            ErrorCode = 1204
 
 	// contract errors 1250 - 1300
-	// errCodeContractError           = 1250 - reserved
-	errCodeContractNotFoundError      = 1251
-	errCodeContractNamesNotFoundError = 1252
+	// ErrCodeContractError          ErrorCode = 1250 - reserved
+	ErrCodeContractNotFoundError      ErrorCode = 1251
+	ErrCodeContractNamesNotFoundError ErrorCode = 1252
 )

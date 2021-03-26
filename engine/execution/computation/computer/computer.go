@@ -205,7 +205,7 @@ func (e *blockComputer) executeCollection(
 	if e.tracer != nil {
 		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
 		defer func() {
-			colSpan.SetTag("collection.txcount", len(collection.Transactions))
+			colSpan.SetTag("collection.txCount", len(collection.Transactions))
 			colSpan.LogFields(
 				log.String("collection.hash", collection.Guarantee.CollectionID.String()),
 			)
@@ -323,7 +323,7 @@ func (e *blockComputer) executeTransaction(
 		e.log.Debug().
 			Hex("tx_id", logging.Entity(txBody)).
 			Str("error_message", tx.Err.Error()).
-			Uint32("error_code", tx.Err.Code()).
+			Uint16("error_code", uint16(tx.Err.Code())).
 			Msg("transaction execution failed")
 	} else {
 		e.log.Debug().

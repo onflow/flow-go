@@ -25,8 +25,8 @@ func (e AccountNotFoundError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e AccountNotFoundError) Code() uint32 {
-	return errCodeAccountNotFoundError
+func (e AccountNotFoundError) Code() ErrorCode {
+	return ErrCodeAccountNotFoundError
 }
 
 // IsAccountNotFoundError returns true if error has this type
@@ -55,8 +55,8 @@ func (e AccountAlreadyExistsError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e AccountAlreadyExistsError) Code() uint32 {
-	return errCodeAccountAlreadyExistsError
+func (e AccountAlreadyExistsError) Code() ErrorCode {
+	return ErrCodeAccountAlreadyExistsError
 }
 
 // AccountPublicKeyNotFoundError is returned when a public key not found for the given address and key index
@@ -85,8 +85,8 @@ func (e AccountPublicKeyNotFoundError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e AccountPublicKeyNotFoundError) Code() uint32 {
-	return errCodeAccountPublicKeyNotFoundError
+func (e AccountPublicKeyNotFoundError) Code() ErrorCode {
+	return ErrCodeAccountPublicKeyNotFoundError
 }
 
 // FrozenAccountError is returned when a frozen account signs a transaction
@@ -109,6 +109,6 @@ func (e FrozenAccountError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e FrozenAccountError) Code() uint32 {
-	return errCodeFrozenAccountError
+func (e FrozenAccountError) Code() ErrorCode {
+	return ErrCodeFrozenAccountError
 }

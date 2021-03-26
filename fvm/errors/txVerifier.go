@@ -20,12 +20,12 @@ func NewInvalidTxByteSizeError(txByteSize, maximum uint64) *InvalidTxByteSizeErr
 }
 
 func (e InvalidTxByteSizeError) Error() string {
-	return fmt.Sprintf("transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.txByteSize, e.maximum)
+	return fmt.Sprintf("%s transaction byte size (%d) exceeds the maximum byte size allowed for a transaction (%d)", e.Code().String(), e.txByteSize, e.maximum)
 }
 
 // Code returns the error code for this error type
-func (e InvalidTxByteSizeError) Code() uint32 {
-	return errCodeInvalidTxByteSizeError
+func (e InvalidTxByteSizeError) Code() ErrorCode {
+	return ErrCodeInvalidTxByteSizeError
 }
 
 // InvalidReferenceBlockError indicates that the transaction's ReferenceBlockID is not acceptable.
@@ -42,12 +42,12 @@ func NewInvalidReferenceBlockError(referenceBlockID string) *InvalidReferenceBlo
 }
 
 func (e InvalidReferenceBlockError) Error() string {
-	return fmt.Sprintf("reference block is pointing to an invalid block: %s", e.referenceBlockID)
+	return fmt.Sprintf("%s reference block is pointing to an invalid block: %s", e.Code().String(), e.referenceBlockID)
 }
 
 // Code returns the error code for this error type
-func (e InvalidReferenceBlockError) Code() uint32 {
-	return errCodeInvalidReferenceBlockError
+func (e InvalidReferenceBlockError) Code() ErrorCode {
+	return ErrCodeInvalidReferenceBlockError
 }
 
 // ExpiredTransactionError indicates that a transaction has expired.
@@ -63,12 +63,12 @@ func NewExpiredTransactionError(refHeight, finalHeight uint64) *ExpiredTransacti
 }
 
 func (e ExpiredTransactionError) Error() string {
-	return fmt.Sprintf("transaction is expired: ref_height=%d final_height=%d", e.refHeight, e.finalHeight)
+	return fmt.Sprintf("%s transaction is expired: ref_height=%d final_height=%d", e.Code().String(), e.refHeight, e.finalHeight)
 }
 
 // Code returns the error code for this error type
-func (e ExpiredTransactionError) Code() uint32 {
-	return errCodeInvalidReferenceBlockError
+func (e ExpiredTransactionError) Code() ErrorCode {
+	return ErrCodeInvalidReferenceBlockError
 }
 
 // InvalidScriptError indicates that a transaction contains an invalid Cadence script.
@@ -81,12 +81,12 @@ type InvalidScriptError struct {
 }
 
 func (e InvalidScriptError) Error() string {
-	return fmt.Sprintf("failed to parse transaction Cadence script: %s", e.ParserErr)
+	return fmt.Sprintf("%s failed to parse transaction Cadence script: %s", e.Code().String(), e.ParserErr)
 }
 
 // Code returns the error code for this error type
-func (e InvalidScriptError) Code() uint32 {
-	return errCodeInvalidScriptError
+func (e InvalidScriptError) Code() ErrorCode {
+	return ErrCodeInvalidScriptError
 }
 
 // Unwrap unwraps the error
@@ -106,12 +106,12 @@ func NewInvalidGasLimitError(actual, maximum uint64) *InvalidGasLimitError {
 }
 
 func (e InvalidGasLimitError) Error() string {
-	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.actual, e.maximum)
+	return fmt.Sprintf("%s transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Code().String(), e.actual, e.maximum)
 }
 
 // Code returns the error code for this error type
-func (e InvalidGasLimitError) Code() uint32 {
-	return errCodeInvalidGasLimitError
+func (e InvalidGasLimitError) Code() ErrorCode {
+	return ErrCodeInvalidGasLimitError
 }
 
 // InvalidProposalSignatureError indicates that no valid signature is provided for the proposal key.
@@ -128,7 +128,8 @@ func NewInvalidProposalSignatureError(address flow.Address, keyIndex uint64, err
 
 func (e InvalidProposalSignatureError) Error() string {
 	return fmt.Sprintf(
-		"invalid proposal key: public key %d on account %s does not have a valid signature: %s",
+		"%s invalid proposal key: public key %d on account %s does not have a valid signature: %s",
+		e.Code().String(),
 		e.keyIndex,
 		e.address,
 		e.err.Error(),
@@ -136,8 +137,8 @@ func (e InvalidProposalSignatureError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e InvalidProposalSignatureError) Code() uint32 {
-	return errCodeInvalidProposalSignatureError
+func (e InvalidProposalSignatureError) Code() ErrorCode {
+	return ErrCodeInvalidProposalSignatureError
 }
 
 // Unwrap unwraps the error
@@ -168,7 +169,8 @@ func (e InvalidProposalSeqNumberError) CurrentSeqNumber() uint64 {
 
 func (e InvalidProposalSeqNumberError) Error() string {
 	return fmt.Sprintf(
-		"invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
+		"%s invalid proposal key: public key %d on account %s has sequence number %d, but given %d",
+		e.Code().String(),
 		e.keyIndex,
 		e.address.String(),
 		e.currentSeqNumber,
@@ -177,8 +179,8 @@ func (e InvalidProposalSeqNumberError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e InvalidProposalSeqNumberError) Code() uint32 {
-	return errCodeInvalidProposalSeqNumberError
+func (e InvalidProposalSeqNumberError) Code() ErrorCode {
+	return ErrCodeInvalidProposalSeqNumberError
 }
 
 // InvalidPayloadSignatureError indicates that signature verification for a key in this transaction has failed.
@@ -200,7 +202,8 @@ func NewInvalidPayloadSignatureError(address flow.Address, keyIndex uint64, err 
 
 func (e InvalidPayloadSignatureError) Error() string {
 	return fmt.Sprintf(
-		"invalid payload signature: public key %d on account %s does not have a valid signature: %s",
+		"%s invalid payload signature: public key %d on account %s does not have a valid signature: %s",
+		e.Code().String(),
 		e.keyIndex,
 		e.address,
 		e.err.Error(),
@@ -208,8 +211,8 @@ func (e InvalidPayloadSignatureError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e InvalidPayloadSignatureError) Code() uint32 {
-	return errCodeInvalidPayloadSignatureError
+func (e InvalidPayloadSignatureError) Code() ErrorCode {
+	return ErrCodeInvalidPayloadSignatureError
 }
 
 // Unwrap unwraps the error
@@ -236,7 +239,8 @@ func NewInvalidEnvelopeSignatureError(address flow.Address, keyIndex uint64, err
 
 func (e InvalidEnvelopeSignatureError) Error() string {
 	return fmt.Sprintf(
-		"invalid envelope key: public key %d on account %s does not have a valid signature: %s",
+		"%s invalid envelope key: public key %d on account %s does not have a valid signature: %s",
+		e.Code().String(),
 		e.keyIndex,
 		e.address,
 		e.err.Error(),
@@ -244,8 +248,8 @@ func (e InvalidEnvelopeSignatureError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e InvalidEnvelopeSignatureError) Code() uint32 {
-	return errCodeInvalidEnvelopeSignatureError
+func (e InvalidEnvelopeSignatureError) Code() ErrorCode {
+	return ErrCodeInvalidEnvelopeSignatureError
 }
 
 // Unwrap unwraps the error

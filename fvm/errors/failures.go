@@ -19,8 +19,8 @@ func (e *UnknownFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e *UnknownFailure) FailureCode() uint16 {
-	return failureCodeUnknownFailure
+func (e *UnknownFailure) FailureCode() FailureCode {
+	return FailureCodeUnknownFailure
 }
 
 // EncodingFailure captures an fatal error sourced from encoding issues
@@ -40,8 +40,8 @@ func (e *EncodingFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e *EncodingFailure) FailureCode() uint16 {
-	return failureCodeEncodingFailure
+func (e *EncodingFailure) FailureCode() FailureCode {
+	return FailureCodeEncodingFailure
 }
 
 // LedgerFailure captures a fatal error cause by ledger failures
@@ -59,8 +59,8 @@ func (e *LedgerFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e *LedgerFailure) FailureCode() uint16 {
-	return failureCodeLedgerFailure
+func (e *LedgerFailure) FailureCode() FailureCode {
+	return FailureCodeLedgerFailure
 }
 
 // StateMergeFailure captures a fatal caused by state merge
@@ -78,8 +78,8 @@ func (e *StateMergeFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e *StateMergeFailure) FailureCode() uint16 {
-	return failureCodeStateMergeFailure
+func (e *StateMergeFailure) FailureCode() FailureCode {
+	return FailureCodeStateMergeFailure
 }
 
 // BlockFinderFailure captures a fatal caused by block finder
@@ -97,8 +97,8 @@ func (e *BlockFinderFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e *BlockFinderFailure) FailureCode() uint16 {
-	return failureCodeBlockFinderFailure
+func (e *BlockFinderFailure) FailureCode() FailureCode {
+	return FailureCodeBlockFinderFailure
 }
 
 // HasherFailure captures a fatal caused by hasher
@@ -125,6 +125,6 @@ func (e *HasherFailure) Error() string {
 }
 
 // FailureCode returns the failure code
-func (e *HasherFailure) FailureCode() uint16 {
-	return failureCodeHasherFailure
+func (e *HasherFailure) FailureCode() FailureCode {
+	return FailureCodeHasherFailure
 }

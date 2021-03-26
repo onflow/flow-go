@@ -43,12 +43,12 @@ func IsCadenceRuntimeError(err error) bool {
 }
 
 func (e CadenceRuntimeError) Error() string {
-	return fmt.Sprintf("cadence runtime error %s", e.err.Error())
+	return fmt.Sprintf("%s cadence runtime error %s", e.Code().String(), e.err.Error())
 }
 
 // Code returns the error code for this error
-func (e CadenceRuntimeError) Code() uint32 {
-	return errCodeCadenceRunTimeError
+func (e CadenceRuntimeError) Code() ErrorCode {
+	return ErrCodeCadenceRunTimeError
 }
 
 // Unwrap returns the wrapped err
@@ -73,12 +73,12 @@ func NewStorageCapacityExceededError(address flow.Address, storageUsed, storageC
 }
 
 func (e StorageCapacityExceededError) Error() string {
-	return fmt.Sprintf("address %s storage %d is over capacity %d", e.address, e.storageUsed, e.storageCapacity)
+	return fmt.Sprintf("%s address %s storage %d is over capacity %d", e.Code().String(), e.address, e.storageUsed, e.storageCapacity)
 }
 
 // Code returns the error code for this error
-func (e StorageCapacityExceededError) Code() uint32 {
-	return errCodeStorageCapacityExceeded
+func (e StorageCapacityExceededError) Code() ErrorCode {
+	return ErrCodeStorageCapacityExceeded
 }
 
 // EventLimitExceededError indicates that the transaction has produced events with size more than limit.
@@ -94,15 +94,16 @@ func NewEventLimitExceededError(totalByteSize, limit uint64) *EventLimitExceeded
 
 func (e EventLimitExceededError) Error() string {
 	return fmt.Sprintf(
-		"total event byte size (%d) exceeds limit (%d)",
+		"%s total event byte size (%d) exceeds limit (%d)",
+		e.Code().String(),
 		e.totalByteSize,
 		e.limit,
 	)
 }
 
 // Code returns the error code for this error
-func (e EventLimitExceededError) Code() uint32 {
-	return errCodeEventLimitExceededError
+func (e EventLimitExceededError) Code() ErrorCode {
+	return ErrCodeEventLimitExceededError
 }
 
 // A StateKeySizeLimitError indicates that the provided key has exceeded the size limit allowed by the storage
@@ -120,12 +121,12 @@ func NewStateKeySizeLimitError(owner, controller, key string, size, limit uint64
 }
 
 func (e StateKeySizeLimitError) Error() string {
-	return fmt.Sprintf("key %s has size %d which is higher than storage key size limit %d.", strings.Join([]string{e.owner, e.controller, e.key}, "/"), e.size, e.limit)
+	return fmt.Sprintf("%s key %s has size %d which is higher than storage key size limit %d.", e.Code().String(), strings.Join([]string{e.owner, e.controller, e.key}, "/"), e.size, e.limit)
 }
 
 // Code returns the error code for this error
-func (e StateKeySizeLimitError) Code() uint32 {
-	return errCodeStateValueSizeLimitError
+func (e StateKeySizeLimitError) Code() ErrorCode {
+	return ErrCodeStateValueSizeLimitError
 }
 
 // A StateValueSizeLimitError indicates that the provided value has exceeded the size limit allowed by the storage
@@ -141,12 +142,13 @@ func NewStateValueSizeLimitError(value flow.RegisterValue, size, limit uint64) *
 }
 
 func (e StateValueSizeLimitError) Error() string {
-	return fmt.Sprintf("value %s has size %d which is higher than storage value size limit %d.", string(e.value[0:10])+"..."+string(e.value[len(e.value)-10:]), e.size, e.limit)
+	return fmt.Sprintf("%s value %s has size %d which is higher than storage value size limit %d.",
+		e.Code().String(), string(e.value[0:10])+"..."+string(e.value[len(e.value)-10:]), e.size, e.limit)
 }
 
 // Code returns the error code for this error
-func (e StateValueSizeLimitError) Code() uint32 {
-	return errCodeStateValueSizeLimitError
+func (e StateValueSizeLimitError) Code() ErrorCode {
+	return ErrCodeStateValueSizeLimitError
 }
 
 // LedgerIntractionLimitExceededError is returned when a tx hits the maximum ledger interaction limit
@@ -161,12 +163,12 @@ func NewLedgerIntractionLimitExceededError(used, limit uint64) *LedgerIntraction
 }
 
 func (e *LedgerIntractionLimitExceededError) Error() string {
-	return fmt.Sprintf("max interaction with storage has exceeded the limit (used: %d, limit %d)", e.used, e.limit)
+	return fmt.Sprintf("%s max interaction with storage has exceeded the limit (used: %d, limit %d)", e.Code().String(), e.used, e.limit)
 }
 
 // Code returns the error code for this error
-func (e *LedgerIntractionLimitExceededError) Code() uint32 {
-	return errCodeLedgerIntractionLimitExceededError
+func (e *LedgerIntractionLimitExceededError) Code() ErrorCode {
+	return ErrCodeLedgerIntractionLimitExceededError
 }
 
 // OperationNotSupportedError is generated when an operation (e.g. getting block info) is
@@ -181,30 +183,36 @@ func NewOperationNotSupportedError(operation string) *OperationNotSupportedError
 }
 
 func (e *OperationNotSupportedError) Error() string {
-	return fmt.Sprintf("operation (%s) is not supported in this environment", e.operation)
+	return fmt.Sprintf("%s operation (%s) is not supported in this environment", e.Code().String(), e.operation)
 }
 
 // Code returns the error code for this error
-func (e *OperationNotSupportedError) Code() uint32 {
-	return errCodeOperationNotSupportedError
+func (e *OperationNotSupportedError) Code() ErrorCode {
+	return ErrCodeOperationNotSupportedError
 }
 
 // EncodingUnsupportedValueError indicates that Cadence attempted
 // to encode a value that is not supported.
 type EncodingUnsupportedValueError struct {
-	Value interpreter.Value
-	Path  []string
+	value interpreter.Value
+	path  []string
+}
+
+// NewEncodingUnsupportedValueError construct a new EncodingUnsupportedValueError
+func NewEncodingUnsupportedValueError(value interpreter.Value, path []string) *EncodingUnsupportedValueError {
+	return &EncodingUnsupportedValueError{value: value, path: path}
 }
 
 func (e *EncodingUnsupportedValueError) Error() string {
 	return fmt.Sprintf(
-		"encoding unsupported value to path [%s]: %[1]T, %[1]v",
-		strings.Join(e.Path, ","),
-		e.Value,
+		"%s encoding unsupported value to path [%s]: %[1]T, %[1]v",
+		e.Code().String(),
+		strings.Join(e.path, ","),
+		e.value,
 	)
 }
 
 // Code returns the error code for this error
-func (e *EncodingUnsupportedValueError) Code() uint32 {
-	return errCodeEncodingUnsupportedValue
+func (e *EncodingUnsupportedValueError) Code() ErrorCode {
+	return ErrCodeEncodingUnsupportedValue
 }

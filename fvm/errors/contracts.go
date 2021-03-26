@@ -29,8 +29,8 @@ func (e *ContractNotFoundError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *ContractNotFoundError) Code() uint32 {
-	return errCodeContractNotFoundError
+func (e *ContractNotFoundError) Code() ErrorCode {
+	return ErrCodeContractNotFoundError
 }
 
 // ContractNamesNotFoundError is returned when fetching a list of contract names under an account
@@ -53,6 +53,6 @@ func (e *ContractNamesNotFoundError) Error() string {
 }
 
 // Code returns the error code for this error type
-func (e *ContractNamesNotFoundError) Code() uint32 {
-	return errCodeContractNamesNotFoundError
+func (e *ContractNamesNotFoundError) Code() ErrorCode {
+	return ErrCodeContractNamesNotFoundError
 }

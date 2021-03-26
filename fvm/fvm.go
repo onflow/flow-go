@@ -52,10 +52,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			// Return an error for now, which will cause transactions to revert.
 			//
 			if encodingErr, ok := r.(interpreter.EncodingUnsupportedValueError); ok {
-				err = &errors.EncodingUnsupportedValueError{
-					Path:  encodingErr.Path,
-					Value: encodingErr.Value,
-				}
+				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
 				return
 			}
 
