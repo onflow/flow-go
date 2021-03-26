@@ -1,4 +1,4 @@
-package fetcher_test
+package chunkconsumer_test
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	chunkconsumer "github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
+	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/module"
 	storage "github.com/onflow/flow-go/storage/badger"

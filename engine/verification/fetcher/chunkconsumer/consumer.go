@@ -1,4 +1,4 @@
-package fetcher
+package chunkconsumer
 
 import (
 	"fmt"
@@ -6,8 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/verification/fetcher"
-	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
 	"github.com/onflow/flow-go/storage"
@@ -16,79 +14,6 @@ import (
 const (
 	DefaultJobIndex = uint64(0)
 )
-
-// ChunkJob converts a chunk locator into a Job to be used by job queue.
-type ChunkJob struct {
-	ChunkLocator *chunks.Locator
-}
-
-// ID converts chunk locator identifier into job id, which guarantees uniqueness.
-func (j ChunkJob) ID() module.JobID {
-	return locatorIDToJobID(j.ChunkLocator.ID())
-}
-
-func locatorIDToJobID(locatorID flow.Identifier) module.JobID {
-	return module.JobID(fmt.Sprintf("%v", locatorID))
-}
-
-func ChunkLocatorToJob(locator *chunks.Locator) *ChunkJob {
-	return &ChunkJob{ChunkLocator: locator}
-}
-
-func JobToChunkLocator(job module.Job) (*chunks.Locator, error) {
-	chunkjob, ok := job.(*ChunkJob)
-	if !ok {
-		return nil, fmt.Errorf("could not assert job to chunk locator, job id: %x", job.ID())
-	}
-	return chunkjob.ChunkLocator, nil
-}
-
-// ChunkJobs wraps the storage layer to provide an abstraction for consumers to read jobs.
-type ChunkJobs struct {
-	locators storage.ChunksQueue
-}
-
-func (j *ChunkJobs) AtIndex(index uint64) (module.Job, error) {
-	locator, err := j.locators.AtIndex(index)
-	if err != nil {
-		return nil, fmt.Errorf("could not read chunk: %w", err)
-	}
-	return ChunkLocatorToJob(locator), nil
-}
-
-func (j *ChunkJobs) Head() (uint64, error) {
-	return j.locators.LatestIndex()
-}
-
-// Worker receives job from job consumer and converts it back to Chunk
-// for engine to process
-type Worker struct {
-	engine   fetcher.AssignedChunkProcessor
-	consumer *ChunkConsumer
-}
-
-func NewWorker(engine fetcher.AssignedChunkProcessor) *Worker {
-	return &Worker{
-		engine: engine,
-	}
-}
-
-// Run converts the job to Chunk, it's guaranteed to work, because
-// ChunkJobs converted chunk into job symmetrically
-func (w *Worker) Run(job module.Job) error {
-	chunk, err := JobToChunkLocator(job)
-	if err != nil {
-		return err
-	}
-	w.engine.ProcessAssignedChunk(chunk)
-
-	return nil
-}
-
-func (w *Worker) Notify(chunkID flow.Identifier) {
-	jobID := locatorIDToJobID(chunkID)
-	w.consumer.NotifyJobIsDone(jobID)
-}
 
 // ChunkConsumer consumes the jobs from the job queue, and pass it to the
 // Worker for processing.
