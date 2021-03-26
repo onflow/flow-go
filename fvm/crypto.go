@@ -132,14 +132,12 @@ func verifySignatureFromRuntime(
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
-	// TODO fix these error types
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
 		return false, errors.NewValueError("signature algorithm type not found", signatureAlgorithm.Name())
 
 	}
 
-	// TODO fix these error types
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
 		return false, errors.NewValueError("hashing algorithm type not found", hashAlgorithm.Name())

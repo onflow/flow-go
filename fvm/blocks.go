@@ -49,7 +49,6 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 
 	id := header.ParentID
 
-	// TODO why we traverse instead of b.storage.ByHeight()
 	// travel chain back
 	for {
 		// recent block should be in cache so this is supposed to be fast
