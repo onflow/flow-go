@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
-	"github.com/onflow/flow-go/engine/verification/fetcher"
+	chunkconsumer "github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
@@ -67,7 +67,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(fmt.Sprintf(tc.msg), func(t *testing.T) {
 			withBlockConsumer(t, tc.blockCount, func(blockConsumer *blockconsumer.BlockConsumer,
-				chunkConsumer *fetcher.ChunkConsumer,
+				chunkConsumer *chunkconsumer.ChunkConsumer,
 				blocks []*flow.Block,
 				wg *sync.WaitGroup) {
 				unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
@@ -89,7 +89,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 }
 
 func withBlockConsumer(t *testing.T, blockCount int, withConsumers func(*blockconsumer.BlockConsumer,
-	*fetcher.ChunkConsumer,
+	*chunkconsumer.ChunkConsumer,
 	[]*flow.Block,
 	*sync.WaitGroup), ops ...utils.CompleteExecutionReceiptBuilderOpt) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
@@ -118,12 +118,12 @@ func withBlockConsumer(t *testing.T, blockCount int, withConsumers func(*blockco
 		// chunk consumer and processor
 		processedIndex := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := bstorage.NewChunkQueue(db)
-		ok, err := chunksQueue.Init(fetcher.DefaultJobIndex)
+		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
 
 		chunkProcessor, chunksWg := mockChunkProcessor(t, expectedLocatorIds, true)
-		chunkConsumer := fetcher.NewChunkConsumer(
+		chunkConsumer := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
 			processedIndex,
 			chunksQueue,

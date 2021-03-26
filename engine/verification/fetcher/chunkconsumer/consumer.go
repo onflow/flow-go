@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -62,11 +63,11 @@ func (j *ChunkJobs) Head() (uint64, error) {
 // Worker receives job from job consumer and converts it back to Chunk
 // for engine to process
 type Worker struct {
-	engine   AssignedChunkProcessor
+	engine   fetcher.AssignedChunkProcessor
 	consumer *ChunkConsumer
 }
 
-func NewWorker(engine AssignedChunkProcessor) *Worker {
+func NewWorker(engine fetcher.AssignedChunkProcessor) *Worker {
 	return &Worker{
 		engine: engine,
 	}
@@ -101,7 +102,7 @@ func NewChunkConsumer(
 	log zerolog.Logger,
 	processedIndex storage.ConsumerProgress, // to persist the processed index
 	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
-	engine AssignedChunkProcessor, // to process jobs (chunks)
+	engine fetcher.AssignedChunkProcessor, // to process jobs (chunks)
 	maxProcessing int64, // max number of jobs to be processed in parallel
 ) *ChunkConsumer {
 	worker := NewWorker(engine)
