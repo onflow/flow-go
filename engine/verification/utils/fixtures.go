@@ -24,6 +24,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// ExecutionReceiptData is a test helper struct that represents all data required
+// to verify the result of an execution receipt.
 type ExecutionReceiptData struct {
 	ReferenceBlock *flow.Block // block that execution receipt refers to
 	Collections    []*flow.Collection
@@ -31,19 +33,19 @@ type ExecutionReceiptData struct {
 	SpockSecrets   [][]byte
 }
 
-// CompleteExecutionResult represents an execution result that is ready to
-// be verified. It contains all execution result and all resources required to
-// verify it.
+// CompleteExecutionReceipt is a test helper struct that represents a container block accompanied with all
+// data required to verify its execution receipts.
 // TODO update this as needed based on execution requirements
 type CompleteExecutionReceipt struct {
 	ContainerBlock *flow.Block             // block that contains execution receipt of reference block
 	ReceiptsData   []*ExecutionReceiptData // execution receipts data of the container block
 }
 
+// CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
 type CompleteExecutionReceiptBuilder struct {
-	resultsCount int
-	copyCount    int
-	chunksCount  int
+	resultsCount int // number of execution results in the container block.
+	copyCount    int // number of times each execution result is copied in a block (by different receipts).
+	chunksCount  int // number of chunks in each execution result.
 	chain        flow.Chain
 }
 
@@ -76,14 +78,16 @@ func WithChain(chain flow.Chain) CompleteExecutionReceiptBuilderOpt {
 // CompleteExecutionReceiptFixture returns complete execution receipt with an
 // execution receipt referencing the block collections.
 //
-// chunkCount determines the number of chunks inside each receipt.
-// The output is an execution result with chunkCount+1 chunks, where the last chunk accounts
+// chunks determines the number of chunks inside each receipt.
+// The output is an execution result with chunks+1 chunks, where the last chunk accounts
 // for the system chunk.
 // TODO: remove this function once new verification architecture is in place.
 func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
 	return CompleteExecutionReceiptChainFixture(t, root, 1, WithChunks(chunks), WithChain(chain))[0]
 }
 
+// ExecutionResultFixture is a test helper that returns an execution result for the reference block header as well as the execution receipt data
+// for that result.
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 	// setups up the first collection of block consists of three transactions
@@ -275,6 +279,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 // execution receipt referencing the block/collections. In the light version of execution result,
 // everything is wired properly, but with the minimum viable content provided. This version is basically used
 // for profiling.
+// TODO: remove this once new architecture of verification node is in place.
 func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 	collections := make([]*flow.Collection, 0, chunkCount)
 	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
@@ -349,16 +354,13 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 }
 
 // CompleteExecutionReceiptChainFixture is a test fixture that creates a chain of blocks of size `count`.
-// The chain is in the form of root <- R1 <- C1 <- R2 <- C2 <- ...
-// In this chain Ri refers to reference blocks that contain guarantees.
-// Ci refers to a container block that contains an execution receipt for its preceding reference block Ri.
-// e.g., C1 contains an execution receipt for R1, C2 contains a receipt for R2, etc.
-// For sake of simplicity and test, container blocks (i.e., Cis) do not contain any guarantee.
+// The chain is in the form of root <- R1,1 <- R1,2 <- ... <- C1 <- R2,1 <- R2,2 <- ... <- C2 <- ...
+// In this chain R refers to reference blocks that contain guarantees.
+// C refers to a container block that contains an execution receipt for its preceding reference blocks.
+// e.g., C1 contains an execution receipt for R1,1, R1,2, etc, and C2 contains a receipt for R2,1, R2,2, etc.
+// For sake of simplicity and test, container blocks (i.e., C) do not contain any guarantee.
 //
-// It returns a slice of CompleteExecutionResult fixtures that contains a pair of (Ri <- Ci).
-//
-// The generated execution results have chunks+1 chunks, where the last chunk accounts
-// for the system chunk.
+// It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
 func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, opts ...CompleteExecutionReceiptBuilderOpt) []*CompleteExecutionReceipt {
 	completeERs := make([]*CompleteExecutionReceipt, 0, count)
 	parent := root
@@ -389,6 +391,12 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 	return completeERs
 }
 
+// ExecutionResultsFromParentBlockFixture creates a chain of results from a parent block.
+//
+// By default each result refers to a distinct reference block, and it extends the block chain after generating each
+// result (i.e., for the next result).
+//
+// Each result may appear in more than one receipt depending on the builder parameters.
 func ExecutionResultsFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) ([]*flow.ExecutionResult,
 	[]*ExecutionReceiptData, *flow.Header) {
 	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount)
