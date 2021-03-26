@@ -493,21 +493,43 @@ func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
 func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts []*utils.CompleteExecutionReceipt, state protocol.MutableState) []*flow.Block {
 	blocks := make([]*flow.Block, 0)
 
+	// tracks of duplicate reference blocks
+	// receipts may share the same execution result, hence
+	// their container reference is the same
+	duplicate := make(map[flow.Identifier]struct{})
+
 	// extends protocol state with the chain of blocks.
 	for _, completeER := range completeExecutionReceipts {
-		for _, receipts := range completeER.ReceiptsData {
-			err := state.Extend(receipts.ReferenceBlock)
+		// extends state with reference blocks of the receipts
+		for _, receipt := range completeER.ReceiptsData {
+			refBlockID := receipt.ReferenceBlock.ID()
+			_, dup := duplicate[refBlockID]
+			if dup {
+				// skips extending state with already duplicate reference block
+				continue
+			}
+
+			err := state.Extend(receipt.ReferenceBlock)
 			require.NoError(t, err)
-			err = state.Finalize(receipts.ReferenceBlock.ID())
+			err = state.Finalize(refBlockID)
 			require.NoError(t, err)
-			blocks = append(blocks, receipts.ReferenceBlock)
+			blocks = append(blocks, receipt.ReferenceBlock)
+			duplicate[refBlockID] = struct{}{}
 		}
 
+		// extends state with container block of receipt.
+		containerBlockID := completeER.ContainerBlock.ID()
+		_, dup := duplicate[containerBlockID]
+		if dup {
+			// skips extending state with already duplicate container block
+			continue
+		}
 		err := state.Extend(completeER.ContainerBlock)
 		require.NoError(t, err)
-		err = state.Finalize(completeER.ContainerBlock.ID())
+		err = state.Finalize(containerBlockID)
 		require.NoError(t, err)
 		blocks = append(blocks, completeER.ContainerBlock)
+		duplicate[containerBlockID] = struct{}{}
 	}
 
 	return blocks
