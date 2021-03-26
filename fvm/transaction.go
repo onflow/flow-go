@@ -44,7 +44,8 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 		err := p.Process(vm, &ctx, proc, st, programs)
 		txErr, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
-			// TODO maybe panic on failure
+			// log the full error path
+			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
 			return failure
 		}
 
