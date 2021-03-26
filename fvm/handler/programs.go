@@ -124,5 +124,13 @@ func (h *ProgramsHandler) Cleanup() error {
 		}
 	}
 
-	return h.initialState.MergeState(h.viewsStack[0].state)
+	err := h.initialState.MergeState(h.viewsStack[0].state)
+	if err != nil {
+		return err
+	}
+
+	// reset the stack
+	h.viewsStack = nil
+	h.masterState.SetActiveState(h.initialState)
+	return nil
 }
