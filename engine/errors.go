@@ -123,6 +123,10 @@ func LogError(log zerolog.Logger, err error) {
 }
 
 func LogErrorWithMsg(log zerolog.Logger, msg string, err error) {
+	if err == nil {
+		return
+	}
+
 	// Invalid input errors could be logged as warning, because they can be
 	// part of normal operations when the network is open and anyone can send
 	// weird messages around. However, during the non-BFT phase where we
@@ -140,6 +144,14 @@ func LogErrorWithMsg(log zerolog.Logger, msg string, err error) {
 	// thus be logged as warnings.
 	if IsOutdatedInputError(err) {
 		log.Warn().Str("error_type", "outdated_input").Err(err).Msg(msg)
+		return
+	}
+
+	// Unverifiable input errors may be due to out-of-date node state, or could
+	// indicate a malicious/unexpected message from another node. Since we don't
+	// know, log as warning.
+	if IsUnverifiableInputError(err) {
+		log.Warn().Str("error_type", "unverifiable_input").Err(err).Msg(msg)
 		return
 	}
 
