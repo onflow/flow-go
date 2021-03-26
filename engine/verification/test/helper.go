@@ -446,9 +446,14 @@ func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
 
 type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 
+// MockChunkAssignmentFixture is a test helper that mocks a chunk assigner for a set of verification nodes for the
+// execution results in the given complete execution receipts, and based on the given chunk assigner function.
+//
+// It returns the list of chunk locator ids assigned to the input verification nodes.
+// All verification nodes are assigned the same chunks.
 func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	verIds flow.IdentityList,
-	completeERS []*utils.CompleteExecutionReceipt,
+	completeERs []*utils.CompleteExecutionReceipt,
 	isAssigned ChunkAssignerFunc) flow.IdentifierList {
 
 	expectedLocatorIds := flow.IdentifierList{}
@@ -456,7 +461,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	// keeps track of duplicate results (receipts that share same result)
 	visited := make(map[flow.Identifier]struct{})
 
-	for _, completeER := range completeERS {
+	for _, completeER := range completeERs {
 		for _, receipt := range completeER.ContainerBlock.Payload.Receipts {
 			a := chunks.NewAssignment()
 
@@ -503,8 +508,8 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts []*u
 	blocks := make([]*flow.Block, 0)
 
 	// tracks of duplicate reference blocks
-	// receipts may share the same execution result, hence
-	// their container reference is the same
+	// since receipts may share the same execution result, hence
+	// their reference block is the same (and we should not extend for it).
 	duplicate := make(map[flow.Identifier]struct{})
 
 	// extends protocol state with the chain of blocks.
