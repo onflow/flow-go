@@ -181,7 +181,7 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 	for i := 0; i < receiptCount; i++ {
 		completeER := utils.CompleteExecutionReceiptFixture(suite.T(), chunkCount, chainID.Chain(), parent)
 		receipts[i] = completeER
-		results[i] = completeER.Receipt.ExecutionResult
+		results[i] = completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult
 	}
 
 	// sets up mock match engine that asserts:
@@ -245,7 +245,10 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 				}
 
 				senderWG.Done()
-			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.TestData.ReferenceBlock, completeER.Receipt)
+			}(i,
+				completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.ID(),
+				completeER.ReceiptsData[0].ReferenceBlock,
+				completeER.ContainerBlock.Payload.Receipts[0])
 		}
 	}
 

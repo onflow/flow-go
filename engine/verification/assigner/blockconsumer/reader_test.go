@@ -61,7 +61,7 @@ func withReader(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2, 1)
+		results := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
 		blocks := test.ExtendStateWithFinalizedBlocks(t, results, s.State)
 
 		withBlockReader(reader, blocks)
