@@ -89,7 +89,7 @@ func (e *Engine) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
 // Ready initializes the engine and returns a channel that is closed when the initialization is done
 func (e *Engine) Ready() <-chan struct{} {
 	if e.chunkConsumerNotifier == nil {
-		panic("missing chunkConsumerNotifier callback in verification match engine")
+		panic("missing chunk consumer notifier callback in verification fetcher engine")
 	}
 
 	delay := time.Duration(0)
