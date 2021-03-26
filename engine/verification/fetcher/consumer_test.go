@@ -149,7 +149,7 @@ func WithConsumer(
 		require.NoError(t, err)
 		require.True(t, ok)
 
-		engine := &MockChunkProcessor{
+		engine := &mockChunkProcessor{
 			process: process,
 		}
 
@@ -165,15 +165,16 @@ func WithConsumer(
 	})
 }
 
-type MockChunkProcessor struct {
+// mockChunkProcessor provides an AssignedChunkProcessor with a plug-and-play process method.
+type mockChunkProcessor struct {
 	notifier module.ProcessingNotifier
 	process  func(notifier module.ProcessingNotifier, locator *chunks.Locator)
 }
 
-func (e *MockChunkProcessor) ProcessAssignedChunk(locator *chunks.Locator) {
+func (e *mockChunkProcessor) ProcessAssignedChunk(locator *chunks.Locator) {
 	e.process(e.notifier, locator)
 }
 
-func (e *MockChunkProcessor) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
+func (e *mockChunkProcessor) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.notifier = notifier
 }
