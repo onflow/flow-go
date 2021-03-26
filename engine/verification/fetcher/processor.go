@@ -5,6 +5,14 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// AssignedChunkProcessor should be implemented by the verification node engine responsible
+// for processing assigned chunk locators to this node.
+//
+// In the current version, the fetcher engine is responsible of processing the assigned chunk locators.
+// From the architectural perspective, AssignedChunkProcessor aligns as following on the verification pipeline:
+// ----------------                                  ------------------                        ---------------------------
+// | Chunk Queue  | ---> assigned chunk locators --> | Chunk Consumer | ---> chunk workers --> | Assigned Chunk Processor|
+// ----------------                           		 ------------------                        ---------------------------
 type AssignedChunkProcessor interface {
 	// ProcessAssignedChunk receives an assigned chunk locator and processes its corresponding chunk.
 	// A chunk processor is expected to shape a verifiable chunk out of the assigned chunk, and pass it to
