@@ -51,7 +51,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	}
 
 	if !ok {
-		return nil, &errors.AccountNotFoundError{address}
+		return nil, errors.NewAccountNotFoundError(address)
 	}
 	contracts := make(map[string][]byte)
 	contractNames, err := a.getContractNames(address)
@@ -101,7 +101,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return err
 	}
 	if exists {
-		return &errors.AccountAlreadyExistsError{Address: newAddress}
+		return errors.NewAccountAlreadyExistsError(newAddress)
 	}
 
 	storageUsedByStorageUsed := uint64(RegisterSize(newAddress, false, KeyStorageUsed, make([]byte, uint64StorageSize)))
@@ -125,7 +125,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 	}
 
 	if len(publicKey) == 0 {
-		return flow.AccountPublicKey{}, &errors.AccountPublicKeyNotFoundError{Address: address, KeyIndex: keyIndex}
+		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
 	}
 
 	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey, keyIndex)
@@ -185,12 +185,14 @@ func (a *Accounts) SetPublicKey(
 ) (encodedPublicKey []byte, err error) {
 	err = publicKey.Validate()
 	if err != nil {
-		return nil, &errors.InvalidPublicKeyValueError{Err: err}
+		encoded, _ := publicKey.MarshalJSON()
+		return nil, errors.NewValueErrorf("invalid public key value", err, string(encoded))
 	}
 
 	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
 	if err != nil {
-		return nil, &errors.EncodingFailure{Err: fmt.Errorf("failed to encode public key: %w", err)}
+		encoded, _ := publicKey.MarshalJSON()
+		return nil, errors.NewValueErrorf("invalid public key value", err, string(encoded))
 	}
 
 	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
@@ -214,11 +216,11 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
 
 	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
-		return &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
+		return errors.NewValueError("hashing algorithm type not found", publicKey.HashAlgo.String())
 	}
 
 	if !IsValidAccountKeySignAlgo(publicKey.SignAlgo) {
-		return &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
+		return errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.String())
 	}
 
 	count, err := a.GetPublicKeyCount(address)
@@ -275,15 +277,13 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	}
 
 	if !ok {
-		return &errors.AccountNotFoundError{Address: address}
+		return errors.NewAccountNotFoundError(address)
 	}
 
 	var prevContract []byte
 	prevContract, err = a.getValue(address, true, ContractKey(contractName))
-	// TODO handle ledger failures
 	if err != nil {
-		return &errors.ContractNotFoundError{Address: address, Contract: contractName}
-		// return fmt.Errorf("cannot retreive previous contract: %w", err)
+		return errors.NewContractNotFoundError(address, contractName)
 	}
 
 	// skip updating if the new contract equals the old
@@ -306,13 +306,14 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	}
 
 	if !ok {
-		return &errors.AccountNotFoundError{Address: address}
+		return errors.NewAccountNotFoundError(address)
 	}
 	var buf bytes.Buffer
 	cborEncoder := cbor.NewEncoder(&buf)
 	err = cborEncoder.Encode(contractNames)
 	if err != nil {
-		return &errors.EncodingFailure{Err: fmt.Errorf("cannot encode contract names")}
+		msg := fmt.Sprintf("cannot encode contract names: %s", contractNames)
+		return errors.NewEncodingFailuref(msg, err)
 	}
 	newContractNames := buf.Bytes()
 
@@ -579,7 +580,7 @@ func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
 		return fmt.Errorf("cannot check account freeze status: %w", err)
 	}
 	if frozen {
-		return &errors.FrozenAccountError{Address: address}
+		return errors.NewFrozenAccountError(address)
 	}
 	return nil
 }

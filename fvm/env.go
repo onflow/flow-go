@@ -341,8 +341,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
-		issue := fmt.Errorf("expecting an AddressLocation, but other location types are passed")
-		return nil, &errors.InvalidLocationError{Location: location, Err: issue}
+		return nil, errors.NewInvalidLocationError("expecting an AddressLocation, but other location types are passed", location)
 	}
 
 	address := flow.BytesToAddress(contractLocation.Address.Bytes())
@@ -415,13 +414,12 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "EmitEvent"}
+		return errors.NewOperationNotSupportedError("EmitEvent")
 	}
 
 	payload, err := jsoncdc.Encode(event)
 	if err != nil {
-		issue := fmt.Errorf("failed to json encode a cadence event: %w", err)
-		return &errors.EncodingFailure{Err: issue}
+		return errors.NewEncodingFailuref("failed to json encode a cadence event: %w", err)
 	}
 
 	e.totalEventByteSize += uint64(len(payload))
@@ -429,10 +427,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	// skip limit if payer is service account
 	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
 		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
-			return &errors.EventLimitExceededError{
-				TotalByteSize: e.totalEventByteSize,
-				Limit:         e.ctx.EventCollectionByteSizeLimit,
-			}
+			return errors.NewEventLimitExceededError(e.totalEventByteSize, e.ctx.EventCollectionByteSizeLimit)
 		}
 	}
 
@@ -459,7 +454,7 @@ func (e *hostEnv) GenerateUUID() (uint64, error) {
 	}
 
 	if e.uuidGenerator == nil {
-		return 0, &errors.OperationNotSupportedError{Operation: "GenerateUUID"}
+		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
 	}
 
 	uuid, err := e.uuidGenerator.GenerateUUID()
@@ -491,12 +486,13 @@ func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 	flowAddress := flow.Address(address)
 
 	if flowAddress == e.ctx.Chain.ServiceAddress() {
-		return &errors.InvalidInputError{Err: fmt.Errorf("cannot freeze service account")}
+		err := errors.NewValueError("cannot freeze service account", flowAddress.String())
+		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
 
 	if !e.transactionEnv.isAuthorizerServiceAccount() {
-		issue := fmt.Errorf("SetAccountFrozen can only be used in transactions authorized by service account")
-		return &errors.AuthorizationError{Address: flowAddress, Err: issue}
+		err := errors.NewOperationAuthorizationError("accounts can be frozen only by transactions authorized by the service account", "SetAccountFrozen")
+		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
 
 	err := e.accounts.SetAccountFrozen(flowAddress, frozen)
@@ -536,12 +532,13 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == crypto.UnknownHashAlgorithm {
-		return nil, fmt.Errorf("hashing failed: %w", &errors.InvalidHashAlgorithmError{HashAlgo: hashAlgo})
+		err := errors.NewValueError("hashing algorithm type not found", hashAlgorithm.Name())
+		return nil, fmt.Errorf("hashing failed: %w", err)
 	}
 
 	hasher, err := crypto.NewHasher(hashAlgo)
 	if err != nil {
-		return nil, &errors.HasherFailure{Err: err}
+		return nil, errors.NewHasherFailure(err)
 	}
 
 	return hasher.ComputeHash(data), nil
@@ -599,7 +596,7 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 	}
 
 	if e.ctx.BlockHeader == nil {
-		return 0, &errors.OperationNotSupportedError{Operation: "GetCurrentBlockHeight"}
+		return 0, errors.NewOperationNotSupportedError("GetCurrentBlockHeight")
 	}
 	return e.ctx.BlockHeader.Height, nil
 }
@@ -613,7 +610,7 @@ func (e *hostEnv) UnsafeRandom() (uint64, error) {
 	}
 
 	if e.rng == nil {
-		return 0, &errors.OperationNotSupportedError{Operation: "UnsafeRandom"}
+		return 0, errors.NewOperationNotSupportedError("UnsafeRandom")
 	}
 
 	// TODO (ramtin) return errors this assumption that this always succeeds might not be true
@@ -639,7 +636,7 @@ func (e *hostEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error) {
 	}
 
 	if e.ctx.Blocks == nil {
-		return runtime.Block{}, false, &errors.OperationNotSupportedError{Operation: "GetBlockAtHeight"}
+		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
 	}
 
 	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
@@ -664,7 +661,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 	}
 
 	if e.transactionEnv == nil {
-		return runtime.Address{}, &errors.OperationNotSupportedError{Operation: "CreateAccount"}
+		return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
 	}
 
 	add, err := e.transactionEnv.CreateAccount(payer)
@@ -681,7 +678,7 @@ func (e *hostEnv) AddEncodedAccountKey(address runtime.Address, publicKey []byte
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "AddEncodedAccountKey"}
+		return errors.NewOperationNotSupportedError("AddEncodedAccountKey")
 	}
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -703,7 +700,7 @@ func (e *hostEnv) RevokeEncodedAccountKey(address runtime.Address, index int) (p
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "RevokeEncodedAccountKey"}
+		return nil, errors.NewOperationNotSupportedError("RevokeEncodedAccountKey")
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -732,7 +729,7 @@ func (e *hostEnv) AddAccountKey(
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "AddAccountKey"}
+		return nil, errors.NewOperationNotSupportedError("AddAccountKey")
 	}
 
 	accKey, err := e.transactionEnv.AddAccountKey(address, publicKey, hashAlgo, weight)
@@ -750,7 +747,7 @@ func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.Ac
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "GetAccountKey"}
+		return nil, errors.NewOperationNotSupportedError("GetAccountKey")
 	}
 
 	accKey, err := e.transactionEnv.GetAccountKey(address, index)
@@ -768,7 +765,7 @@ func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime
 	}
 
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "RevokeAccountKey"}
+		return nil, errors.NewOperationNotSupportedError("RevokeAccountKey")
 	}
 
 	// no need for extra error wrapping since this is just a redirect
@@ -782,7 +779,7 @@ func (e *hostEnv) UpdateAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "UpdateAccountContractCode"}
+		return errors.NewOperationNotSupportedError("UpdateAccountContractCode")
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -822,7 +819,7 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 	}
 
 	if e.transactionEnv == nil {
-		return &errors.OperationNotSupportedError{Operation: "RemoveAccountContractCode"}
+		return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
 	}
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
@@ -844,7 +841,7 @@ func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
 		defer sp.Finish()
 	}
 	if e.transactionEnv == nil {
-		return nil, &errors.OperationNotSupportedError{Operation: "GetSigningAccounts"}
+		return nil, errors.NewOperationNotSupportedError("GetSigningAccounts")
 	}
 
 	return e.transactionEnv.GetSigningAccounts(), nil
@@ -1022,15 +1019,15 @@ func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPu
 	}
 
 	if !ok {
-		return &errors.AccountNotFoundError{Address: accountAddress}
+		return errors.NewAccountNotFoundError(accountAddress)
 	}
 
 	var publicKey flow.AccountPublicKey
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		issue := &errors.InvalidPublicKeyValueError{Err: err}
-		return fmt.Errorf("adding encoded account key failed: %w", issue)
+		err = errors.NewValueErrorf("invalid encoded public key value", err, string(encodedPublicKey))
+		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 
 	err = e.accounts.AppendPublicKey(accountAddress, publicKey)
@@ -1054,13 +1051,13 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if !ok {
-		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		issue := errors.NewAccountNotFoundError(accountAddress)
 		return nil, fmt.Errorf("remove account key failed: %w", issue)
 	}
 
 	if keyIndex < 0 {
-		issue := &errors.InvalidInputError{Err: fmt.Errorf("key index must be positive, received %d", keyIndex)}
-		return nil, fmt.Errorf("remove account key failed: %w", issue)
+		err = errors.NewValueError("key index must be positive", string(keyIndex))
+		return nil, fmt.Errorf("remove account key failed: %w", err)
 	}
 
 	var publicKey flow.AccountPublicKey
@@ -1120,26 +1117,26 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 	if !ok {
-		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		issue := errors.NewAccountNotFoundError(accountAddress)
 		return nil, fmt.Errorf("adding account key failed: %w", issue)
 	}
 
 	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgorithm == crypto.UnknownSignatureAlgorithm {
-		issue := &errors.InvalidSignatureAlgorithmError{SigningAlgo: signAlgorithm}
-		return nil, fmt.Errorf("adding account key failed: %w", issue)
+		err = errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.Name())
+		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
 	if hashAlgorithm == crypto.UnknownHashAlgorithm {
-		issue := &errors.InvalidHashAlgorithmError{HashAlgo: hashAlgorithm}
-		return nil, fmt.Errorf("adding account key failed: %w", issue)
+		err = errors.NewValueError("hashing algorithm type not found", hashAlgo.Name())
+		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
 	if err != nil {
-		issue := &errors.InvalidInputError{Err: fmt.Errorf("cannot decode public key: %w", err)}
-		return nil, fmt.Errorf("adding account key failed: %w", issue)
+		err = errors.NewValueErrorf("cannot decode public key", err, string(publicKey.PublicKey))
+		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	keyIndex, err := e.accounts.GetPublicKeyCount(accountAddress)
@@ -1186,7 +1183,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if !ok {
-		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		issue := errors.NewAccountNotFoundError(accountAddress)
 		return nil, fmt.Errorf("revoking account key failed: %w", issue)
 	}
 
@@ -1201,8 +1198,7 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 		// If a key is not found at a given index, then return a nil key with no errors.
 		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
 		// distinguish between a 'key not found error' vs other internal errors.
-
-		if errors.Is(err, &errors.AccountPublicKeyNotFoundError{}) {
+		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
@@ -1220,12 +1216,14 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		return nil, &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
+		err = errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.String())
+		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		return nil, &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
+		err = errors.NewValueError("hashing algorithm type not found", publicKey.HashAlgo.String())
+		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
 	return &runtime.AccountKey{
@@ -1254,7 +1252,7 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 	}
 
 	if !ok {
-		issue := &errors.AccountNotFoundError{Address: accountAddress}
+		issue := errors.NewAccountNotFoundError(accountAddress)
 		return nil, fmt.Errorf("getting account key failed: %w", issue)
 	}
 
@@ -1269,7 +1267,7 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 		// If a key is not found at a given index, then return a nil key with no errors.
 		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
 		// distinguish between a 'key not found error' vs other internal errors.
-		if errors.Is(err, &errors.AccountPublicKeyNotFoundError{}) {
+		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
 			return nil, nil
 		}
 
@@ -1280,14 +1278,14 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		issue := &errors.InvalidSignatureAlgorithmError{SigningAlgo: publicKey.SignAlgo}
-		return nil, fmt.Errorf("getting account key failed: %w", issue)
+		err = errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.String())
+		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		issue := &errors.InvalidHashAlgorithmError{HashAlgo: publicKey.HashAlgo}
-		return nil, fmt.Errorf("getting account key failed: %w", issue)
+		err = errors.NewValueError("hashing algorithm type not found", publicKey.HashAlgo.String())
+		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 
 	return &runtime.AccountKey{

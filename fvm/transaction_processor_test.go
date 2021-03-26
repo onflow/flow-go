@@ -269,7 +269,7 @@ func TestAccountFreezing(t *testing.T) {
 		accountFrozenError := &errors.FrozenAccountError{}
 
 		require.True(t, errors.As(importedCheckerError, &accountFrozenError))
-		require.Equal(t, frozenAddress, accountFrozenError.Address)
+		require.Equal(t, frozenAddress, accountFrozenError.Address())
 	})
 
 	t.Run("default settings allow only service account to freeze accounts", func(t *testing.T) {

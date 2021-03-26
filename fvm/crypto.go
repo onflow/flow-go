@@ -38,7 +38,7 @@ func (DefaultSignatureVerifier) Verify(
 ) (bool, error) {
 	hasher := newHasher(hashAlgo)
 	if hasher == nil {
-		return false, &errors.InvalidHashAlgorithmError{HashAlgo: hashAlgo}
+		return false, errors.NewValueError("hashing algorithm type not found", hashAlgo.String())
 	}
 
 	message = append(tag, message...)
@@ -140,26 +140,27 @@ func verifySignatureFromRuntime(
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
+	// TODO fix these error types
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
-		return false, fmt.Errorf("invalid signature algorithm: %s", signatureAlgorithm)
+		return false, errors.NewValueError("signature algorithm type not found", signatureAlgorithm.Name())
+
 	}
 
+	// TODO fix these error types
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
-		return false, fmt.Errorf("invalid hash algorithm: %s", hashAlgorithm)
+		return false, errors.NewValueError("hashing algorithm type not found", hashAlgorithm.Name())
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
-		issue := &errors.InvalidInputError{Err: fmt.Errorf("cannot decode public key: %w", err)}
-		return false, issue
+		return false, errors.NewValueErrorf("cannot decode public key: %w", err, string(rawPublicKey))
 	}
 
 	tag := parseRuntimeDomainTag(rawTag)
 	if tag == nil {
-		issue := &errors.InvalidInputError{Err: fmt.Errorf("invalid domain tag: %s", rawTag)}
-		return false, issue
+		return false, errors.NewValueError("invalid domain tag", string(rawTag))
 	}
 
 	valid, err := verifier.Verify(

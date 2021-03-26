@@ -55,32 +55,20 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
-		issue := &errors.InvalidProposalSignatureError{
-			Address:  proposalKey.Address,
-			KeyIndex: proposalKey.KeyIndex,
-			Err:      err,
-		}
-		return fmt.Errorf("checking sequence number failed: %w", issue)
+		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
+		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 
 	if accountKey.Revoked {
-		issue := &errors.InvalidProposalSignatureError{
-			Address:  proposalKey.Address,
-			KeyIndex: proposalKey.KeyIndex,
-			Err:      fmt.Errorf("proposal key has been revoked"),
-		}
-		return fmt.Errorf("checking sequence number failed: %w", issue)
+		err = fmt.Errorf("proposal key has been revoked")
+		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
+		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return &errors.ProposalSeqNumberMismatchError{
-			Address:           proposalKey.Address,
-			KeyIndex:          proposalKey.KeyIndex,
-			CurrentSeqNumber:  accountKey.SeqNumber,
-			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}
+		return errors.NewInvalidProposalSeqNumberError(proposalKey.Address, proposalKey.KeyIndex, accountKey.SeqNumber, proposalKey.SequenceNumber)
 	}
 
 	accountKey.SeqNumber++

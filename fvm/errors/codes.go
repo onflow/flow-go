@@ -24,14 +24,15 @@ const (
 	errCodeInvalidEnvelopeSignatureError = 70
 	errCodeEnvelopeSignatureKeyError     = 71
 
-	errCodeAuthorizationError = 80
+	errCodeAccountAuthorizationError   = 80
+	errCodeOperationAuthorizationError = 81
 
 	errCodeCadenceRunTimeError        = 100
 	errCodeEncodingUnsupportedValue   = 120
 	errCodeOperationNotSupportedError = 121
 	errCodeInvalidBlockHeightError    = 122
 	errCodeInvalidLocationError       = 123
-	errCodeInvalidInputError          = 124
+	errCodeValueError                 = 124
 
 	// account errors
 	errCodeAccountNotFoundError          = 150

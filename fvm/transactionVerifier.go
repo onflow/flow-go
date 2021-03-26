@@ -57,7 +57,8 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx := proc.Transaction
 	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
-		return &errors.InvalidAddressError{Address: tx.Payer, Err: fmt.Errorf("payer address is invalid")}
+		err := errors.NewInvalidAddressError("payer address is invalid", tx.Payer)
+		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
 	var err error
@@ -72,7 +73,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		payloadSignature,
 	)
 	if err != nil {
-		return fmt.Errorf("verifying transaction signatures failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(tx.ProposalKey.Address, tx.ProposalKey.KeyIndex, err)
 	}
 
 	var envelopeWeights map[flow.Address]int
@@ -86,16 +87,14 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		envelopeSignature,
 	)
 	if err != nil {
-		return fmt.Errorf("verifying transaction signatures failed: %w", err)
+		return errors.NewInvalidProposalSignatureError(tx.ProposalKey.Address, tx.ProposalKey.KeyIndex, err)
+
 	}
 
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
 	if !proposalKeyVerified {
-		return &errors.InvalidProposalSignatureError{
-			Address:  tx.ProposalKey.Address,
-			KeyIndex: tx.ProposalKey.KeyIndex,
-			Err:      fmt.Errorf("either the payload or the envelope should provide proposal signatures"),
-		}
+		err := fmt.Errorf("either the payload or the envelope should provide proposal signatures")
+		return errors.NewInvalidProposalSignatureError(tx.ProposalKey.Address, tx.ProposalKey.KeyIndex, err)
 	}
 
 	for _, addr := range tx.Authorizers {
@@ -107,15 +106,15 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		}
 		// hasSufficientKeyWeight
 		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
-			issue := fmt.Errorf("authorizer account does not have sufficient signatures (got: %d)", payloadWeights[addr])
-			return &errors.AuthorizationError{Address: addr, Err: issue}
+			msg := fmt.Sprintf("authorizer account does not have sufficient signatures (%d < %d)", payloadWeights[addr], v.KeyWeightThreshold)
+			return errors.NewAccountAuthorizationError(msg, addr)
 		}
 	}
 
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
 		// TODO change this to payer error (needed for fees)
-		issue := fmt.Errorf("payer account does not have sufficient signatures (got: %d)", envelopeWeights[tx.Payer])
-		return &errors.AuthorizationError{Address: tx.Payer, Err: issue}
+		msg := fmt.Sprintf("payer account does not have sufficient signatures (%d < %d)", envelopeWeights[tx.Payer], v.KeyWeightThreshold)
+		return errors.NewAccountAuthorizationError(msg, tx.Payer)
 	}
 
 	return nil
@@ -166,36 +165,17 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
 	if err != nil {
 		if sType == envelopeSignature {
-			return nil,
-				&errors.InvalidEnvelopeSignatureError{
-					Address:  txSig.Address,
-					KeyIndex: txSig.KeyIndex,
-					Err:      err,
-				}
+			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
 		}
-		return nil,
-			&errors.InvalidPayloadSignatureError{
-				Address:  txSig.Address,
-				KeyIndex: txSig.KeyIndex,
-				Err:      err,
-			}
+		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
 	if accountKey.Revoked {
+		err = fmt.Errorf("account key has been revoked")
 		if sType == envelopeSignature {
-			return nil,
-				&errors.InvalidEnvelopeSignatureError{
-					Address:  txSig.Address,
-					KeyIndex: txSig.KeyIndex,
-					Err:      fmt.Errorf("account key has been revoked"),
-				}
+			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
 		}
-
-		return nil, &errors.InvalidPayloadSignatureError{
-			Address:  txSig.Address,
-			KeyIndex: txSig.KeyIndex,
-			Err:      fmt.Errorf("account key has been revoked"),
-		}
+		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
 	valid, err := v.SignatureVerifier.Verify(
@@ -207,36 +187,17 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	)
 	if err != nil {
 		if sType == envelopeSignature {
-			return nil,
-				&errors.InvalidEnvelopeSignatureError{
-					Address:  txSig.Address,
-					KeyIndex: txSig.KeyIndex,
-					Err:      err,
-				}
+			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
 		}
-		return nil,
-			&errors.InvalidPayloadSignatureError{
-				Address:  txSig.Address,
-				KeyIndex: txSig.KeyIndex,
-				Err:      err,
-			}
+		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
 	if !valid {
+		err = fmt.Errorf("signature is not valid")
 		if sType == envelopeSignature {
-			return nil,
-				&errors.InvalidEnvelopeSignatureError{
-					Address:  txSig.Address,
-					KeyIndex: txSig.KeyIndex,
-					Err:      fmt.Errorf("signature is not valid"),
-				}
+			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
 		}
-		return nil,
-			&errors.InvalidPayloadSignatureError{
-				Address:  txSig.Address,
-				KeyIndex: txSig.KeyIndex,
-				Err:      fmt.Errorf("signature is not valid"),
-			}
+		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
 	return &accountKey, nil

@@ -83,11 +83,7 @@ func (d *TransactionStorageLimiter) Process(
 		}
 
 		if usage > capacity {
-			return &errors.StorageCapacityExceededError{
-				Address:         address,
-				StorageUsed:     usage,
-				StorageCapacity: capacity,
-			}
+			return errors.NewStorageCapacityExceededError(address, usage, capacity)
 		}
 	}
 	return nil

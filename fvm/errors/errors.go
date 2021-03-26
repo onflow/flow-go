@@ -28,12 +28,9 @@ type Failure interface {
 	error
 }
 
-// Is is a utility function to call std error lib `Is` function.
-// Is reports whether any error in err's chain matches target.
-// The chain consists of err itself followed by the sequence of errors obtained by repeatedly calling Unwrap.
-// An error is considered to match a target if it is equal to that target or if it implements a method Is(error) bool such that Is(target) returns true.
-func Is(source, target error) bool {
-	return stdErrors.Is(source, target)
+// Is is a utility function to call std error lib `Is` function for instance equality checks.
+func Is(err error, target error) bool {
+	return stdErrors.Is(err, target)
 }
 
 // As is a utility function to call std error lib `As` function.
@@ -57,8 +54,8 @@ func SplitErrorTypes(inp error) (err Error, failure Failure) {
 	}
 	// anything else that is left is an unknown failure
 	// (except the ones green listed for now to be considered as txErrors)
-	if err != nil {
-		return nil, &UnknownFailure{Err: err}
+	if inp != nil {
+		return nil, &UnknownFailure{Err: inp}
 	}
 	return nil, nil
 }

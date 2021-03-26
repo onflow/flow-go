@@ -41,7 +41,10 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 
 	if height > header.Height {
 		// TODO figure out min hight and enforce it to be bigger than min hight
-		return nil, &errors.InvalidBlockHeightError{MaxHeight: header.Height, MinHeight: 0, RequestedHeight: height}
+		minHeight := 0
+		msg := fmt.Sprintf("requested height (%d) is not in the range(%d, %d)", height, minHeight, header.Height)
+		err := errors.NewValueError(msg, string(height))
+		return nil, fmt.Errorf("cannot retrieve block parent: %w", err)
 	}
 
 	id := header.ParentID
@@ -52,7 +55,7 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		// recent block should be in cache so this is supposed to be fast
 		parent, err := b.storage.ByBlockID(id)
 		if err != nil {
-			failure := &errors.BlockFinderFailure{Err: err}
+			failure := errors.NewBlockFinderFailure(err)
 			return nil, fmt.Errorf("cannot retrieve block parent: %w", failure)
 		}
 		if parent.Height == height {
@@ -67,7 +70,7 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		}
 		// any other error bubbles up
 		if err != nil {
-			failure := &errors.BlockFinderFailure{Err: err}
+			failure := errors.NewBlockFinderFailure(err)
 			return nil, fmt.Errorf("cannot retrieve block parent: %w", failure)
 		}
 		//if parent is finalized block, we can just use finalized chain

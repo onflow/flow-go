@@ -1741,8 +1741,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				require.Equal(t, (&errors.ProposalSeqNumberMismatchError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(1), tx.Err.(*errors.ProposalSeqNumberMismatchError).CurrentSeqNumber)
+				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(1), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
 }

@@ -101,7 +101,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 
 	if value, err = s.view.Get(owner, controller, key); err != nil {
 		// wrap error into a fatal error
-		getError := &errors.LedgerFailure{Err: err}
+		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
 		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, owner, getError)
 	}
@@ -124,7 +124,7 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 
 	if err := s.view.Set(owner, controller, key, value); err != nil {
 		// wrap error into a fatal error
-		setError := &errors.LedgerFailure{Err: err}
+		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
 		return fmt.Errorf("failed to update key %s on account %s: %w", key, owner, setError)
 	}
@@ -174,7 +174,7 @@ func (s *State) MergeState(other *State) error {
 
 	err := s.view.MergeView(other.view)
 	if err != nil {
-		return &errors.StateMergeFailure{Err: err}
+		return errors.NewStateMergeFailure(err)
 	}
 
 	// apply address updates
@@ -208,9 +208,7 @@ func (s *State) UpdatedAddresses() []flow.Address {
 
 func (s *State) checkMaxInteraction() error {
 	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return &errors.LedgerIntractionLimitExceededError{
-			Used:  s.InteractionUsed(),
-			Limit: s.maxInteractionAllowed}
+		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
 	}
 	return nil
 }
@@ -219,16 +217,10 @@ func (s *State) checkSize(owner, controller, key string, value flow.RegisterValu
 	keySize := uint64(len(owner) + len(controller) + len(key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
-		return &errors.StateKeySizeLimitError{Owner: owner,
-			Controller: controller,
-			Key:        key,
-			Size:       keySize,
-			Limit:      s.maxKeySizeAllowed}
+		return errors.NewStateKeySizeLimitError(owner, controller, key, keySize, s.maxKeySizeAllowed)
 	}
 	if valueSize > s.maxValueSizeAllowed {
-		return &errors.StateValueSizeLimitError{Value: value,
-			Size:  keySize,
-			Limit: s.maxKeySizeAllowed}
+		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
 	}
 	return nil
 }
