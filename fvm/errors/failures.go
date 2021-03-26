@@ -15,7 +15,7 @@ func NewUnknownFailure(err error) *UnknownFailure {
 }
 
 func (e *UnknownFailure) Error() string {
-	return fmt.Sprintf("unknown failure: %s", e.err.Error())
+	return fmt.Sprintf("%s unknown failure: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
@@ -36,7 +36,7 @@ func NewEncodingFailuref(msg string, err error) *EncodingFailure {
 }
 
 func (e *EncodingFailure) Error() string {
-	return fmt.Sprintf("encoding failed: %s", e.err.Error())
+	return fmt.Sprintf("%s encoding failed: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
@@ -55,7 +55,7 @@ func NewLedgerFailure(err error) *LedgerFailure {
 }
 
 func (e *LedgerFailure) Error() string {
-	return fmt.Sprintf("ledger returns unsuccessful: %s", e.err.Error())
+	return fmt.Sprintf("%s ledger returns unsuccessful: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
@@ -74,7 +74,7 @@ func NewStateMergeFailure(err error) *StateMergeFailure {
 }
 
 func (e *StateMergeFailure) Error() string {
-	return fmt.Sprintf("can not merge the state: %s", e.err.Error())
+	return fmt.Sprintf("%s can not merge the state: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
@@ -93,7 +93,7 @@ func NewBlockFinderFailure(err error) *BlockFinderFailure {
 }
 
 func (e *BlockFinderFailure) Error() string {
-	return fmt.Sprintf("can not retrieve the block: %s", e.err.Error())
+	return fmt.Sprintf("%s can not retrieve the block: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
@@ -121,7 +121,7 @@ func NewHasherFailuref(msg string, err error) error {
 }
 
 func (e *HasherFailure) Error() string {
-	return fmt.Sprintf("hasher failed: %s", e.err.Error())
+	return fmt.Sprintf("%s hasher failed: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code

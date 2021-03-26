@@ -19,7 +19,8 @@ func NewAccountNotFoundError(address flow.Address) error {
 
 func (e AccountNotFoundError) Error() string {
 	return fmt.Sprintf(
-		"account not found for address %s",
+		"%s account not found for address %s",
+		e.Code().String(),
 		e.address.String(),
 	)
 }
@@ -49,7 +50,8 @@ func NewAccountAlreadyExistsError(address flow.Address) error {
 
 func (e AccountAlreadyExistsError) Error() string {
 	return fmt.Sprintf(
-		"account with address %s already exists",
+		"%s account with address %s already exists",
+		e.Code().String(),
 		e.address,
 	)
 }
@@ -78,7 +80,8 @@ func IsAccountAccountPublicKeyNotFoundError(err error) bool {
 
 func (e AccountPublicKeyNotFoundError) Error() string {
 	return fmt.Sprintf(
-		"account public key not found for address %s and key index %d",
+		"%s account public key not found for address %s and key index %d",
+		e.Code().String(),
 		e.address,
 		e.keyIndex,
 	)
@@ -105,7 +108,7 @@ func (e FrozenAccountError) Address() flow.Address {
 }
 
 func (e FrozenAccountError) Error() string {
-	return fmt.Sprintf("account %s is frozen", e.address)
+	return fmt.Sprintf("%s account %s is frozen", e.Code().String(), e.address)
 }
 
 // Code returns the error code for this error type

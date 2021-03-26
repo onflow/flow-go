@@ -22,7 +22,8 @@ func NewContractNotFoundError(address flow.Address, contract string) error {
 
 func (e *ContractNotFoundError) Error() string {
 	return fmt.Sprintf(
-		"contract %s not found for address %s",
+		"%s contract %s not found for address %s",
+		e.Code().String(),
 		e.contract,
 		e.address,
 	)
@@ -47,7 +48,8 @@ func NewContractNamesNotFoundError(address flow.Address) error {
 
 func (e *ContractNamesNotFoundError) Error() string {
 	return fmt.Sprintf(
-		"cannot retrieve current contract names for account %s",
+		"%s cannot retrieve current contract names for account %s",
+		e.Code().String(),
 		e.address,
 	)
 }

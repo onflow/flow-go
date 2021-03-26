@@ -28,7 +28,7 @@ func NewInvalidAddressError(msg string, address flow.Address) *InvalidAddressErr
 }
 
 func (e InvalidAddressError) Error() string {
-	return fmt.Sprintf("invalid address (%s): %s", e.address.String(), e.err.Error())
+	return fmt.Sprintf("%s invalid address (%s): %s", e.Code().String(), e.address.String(), e.err.Error())
 }
 
 // Code returns the error code for this error type
@@ -45,7 +45,7 @@ type InvalidArgumentError struct {
 }
 
 func (e InvalidArgumentError) Error() string {
-	return fmt.Sprintf("transaction arguments are invalid: (%s)", e.err.Error())
+	return fmt.Sprintf("%s transaction arguments are invalid: (%s)", e.Code().String(), e.err.Error())
 }
 
 // Code returns the error code for this error type
@@ -82,7 +82,8 @@ func (e InvalidLocationError) Error() string {
 	}
 
 	return fmt.Sprintf(
-		"location (%s) is not a valid location: %s",
+		"%s location (%s) is not a valid location: %s",
+		e.Code().String(),
 		e.location.String(),
 		errMsg,
 	)
@@ -125,7 +126,7 @@ func (e ValueError) Error() string {
 	if e.err != nil {
 		errMsg = e.err.Error()
 	}
-	return fmt.Sprintf("invalid value (%s): %s", e.valueStr, errMsg)
+	return fmt.Sprintf("%s invalid value (%s): %s", e.Code().String(), e.valueStr, errMsg)
 }
 
 // Code returns the error code for this error type
@@ -167,7 +168,8 @@ func (e OperationAuthorizationError) Error() string {
 		errMsg = e.err.Error()
 	}
 	return fmt.Sprintf(
-		"(%s) is not authorized: %s",
+		"%s (%s) is not authorized: %s",
+		e.Code().String(),
 		e.operation,
 		errMsg,
 	)
@@ -214,7 +216,8 @@ func (e AccountAuthorizationError) Error() string {
 		errMsg = e.err.Error()
 	}
 	return fmt.Sprintf(
-		"authorization failed for account %s: %s",
+		"%s authorization failed for account %s: %s",
+		e.Code().String(),
 		e.address,
 		errMsg,
 	)
