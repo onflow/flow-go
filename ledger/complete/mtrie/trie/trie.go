@@ -111,7 +111,7 @@ func (mt *MTrie) String() string {
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 	payloads := make([]*ledger.Payload, len(paths)) // pre-allocate slice for the result
-	mt.read(mt.root, paths, payloads)
+	mt.read(payloads, paths, mt.root)
 	return payloads
 }
 
@@ -120,7 +120,7 @@ func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 // CAUTION:
 //  * while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
 //  * unchecked requirement: all paths must go through the `head` node
-func (mt *MTrie) read(head *node.Node, paths []ledger.Path, payloads []*ledger.Payload) {
+func (mt *MTrie) read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	// check for empty paths
 	if len(paths) == 0 {
 		return
@@ -156,17 +156,17 @@ func (mt *MTrie) read(head *node.Node, paths []ledger.Path, payloads []*ledger.P
 	// read values from left and right subtrees in parallel
 	parallelRecursionThreshold := 32 // threshold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) <= parallelRecursionThreshold {
-		mt.read(head.LeftChild(), lpaths, lpayloads)
-		mt.read(head.RightChild(), rpaths, rpayloads)
+		mt.read(lpayloads, lpaths, head.LeftChild())
+		mt.read(rpayloads, rpaths, head.RightChild())
 	} else {
 		// concurrent read of left and right subtree
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			mt.read(head.LeftChild(), lpaths, lpayloads)
+			mt.read(lpayloads, lpaths, head.LeftChild())
 			wg.Done()
 		}()
-		mt.read(head.RightChild(), rpaths, rpayloads)
+		mt.read(rpayloads, rpaths, head.RightChild())
 		wg.Wait() // wait for all threads
 	}
 }
@@ -348,30 +348,30 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	parallelRecursionThreshold := 128 // threshold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) <= parallelRecursionThreshold {
 		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
-		addSubtrieHashToProofs(head.RightChild(), depth, lproofs)
+		addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
 		mt.proofs(head.LeftChild(), lpaths, lproofs)
 
-		addSubtrieHashToProofs(head.LeftChild(), depth, rproofs)
+		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
 		mt.proofs(head.RightChild(), rpaths, rproofs)
 	} else {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			addSubtrieHashToProofs(head.RightChild(), depth, lproofs)
+			addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
 			mt.proofs(head.LeftChild(), lpaths, lproofs)
 			wg.Done()
 		}()
 
-		addSubtrieHashToProofs(head.LeftChild(), depth, rproofs)
+		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
 		mt.proofs(head.RightChild(), rpaths, rproofs)
 		wg.Wait()
 	}
 }
 
-// addSubtrieHashToProofs inspects the other subtrie and adds its root hash
+// addSiblingTrieHashToProofs inspects the sibling Trie and adds its root hash
 // to the proofs, if the trie contains non-empty registers (i.e. the
 // siblingTrie has a non-default hash).
-func addSubtrieHashToProofs(siblingTrie *node.Node, depth int, proofs []*ledger.TrieProof) {
+func addSiblingTrieHashToProofs(siblingTrie *node.Node, depth int, proofs []*ledger.TrieProof) {
 	if siblingTrie == nil || len(proofs) == 0 {
 		return
 	}
@@ -380,10 +380,10 @@ func addSubtrieHashToProofs(siblingTrie *node.Node, depth int, proofs []*ledger.
 	// when a register is deleted. Instead, we just set the respective leaf's
 	// payload to empty. While this will cause the lead's hash to become the
 	// default hash, the node itself remains as part of the trie.
-	// However, a proof has the convention that the hash of the other subtrie
+	// However, a proof has the convention that the hash of the sibling trie
 	// should only be included, if it is _non-default_. Therefore, we can
 	// neither use `siblingTrie == nil` nor `siblingTrie.RegisterCount == 0`,
-	// as the other subtrie might contain leafs with default value (which are
+	// as the sibling trie might contain leaves with default value (which are
 	// still counted as occupied registers)
 	// TODO: On update, prune subtries which only contain empty registers.
 	//       Then, a child is nil if and only if the subtrie is empty.
