@@ -31,35 +31,60 @@ import (
 
 func TestAssignerFetcherPipeline(t *testing.T) {
 	testcases := []struct {
-		blockCount,
-		resultCount,
-		chunkCount int
+		blockCount int
+		ops        []utils.CompleteExecutionReceiptBuilderOpt
+		msg        string
 	}{
+		//{
+		//	blockCount: 1,
+		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
+		//		utils.WithResults(1),
+		//		utils.WithChunks(1),
+		//		utils.WithCopies(1),
+		//	},
+		//	msg: "1 block, 1 result, 1 chunk, no duplicate",
+		//},
+		//{
+		//	blockCount: 10,
+		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
+		//		utils.WithResults(1),
+		//		utils.WithChunks(10),
+		//		utils.WithCopies(1),
+		//	},
+		//	msg: "10 blocks, 1 result, 10 chunks, no duplicate",
+		//},
+		//{
+		//	blockCount: 1,
+		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
+		//		utils.WithResults(1),
+		//		utils.WithChunks(10),
+		//		utils.WithCopies(1),
+		//	},
+		//	msg: "1 block, 1 result, 10 chunks, no duplicate",
+		//},
+		//{
+		//	blockCount: 10,
+		//	ops: []utils.CompleteExecutionReceiptBuilderOpt{
+		//		utils.WithResults(10),
+		//		utils.WithChunks(10),
+		//		utils.WithCopies(1),
+		//	},
+		//	msg: "10 block, 10 result, 10 chunks, no duplicate",
+		//},
 		{
-			blockCount:  1,
-			resultCount: 1,
-			chunkCount:  1,
-		},
-		{
-			blockCount:  1,
-			resultCount: 1,
-			chunkCount:  10,
-		},
-		{
-			blockCount:  1,
-			resultCount: 1,
-			chunkCount:  10,
-		},
-		{
-			blockCount:  10,
-			resultCount: 1,
-			chunkCount:  10,
+			blockCount: 1,
+			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+				utils.WithResults(1),
+				utils.WithChunks(1),
+				utils.WithCopies(2),
+			},
+			msg: "1 block, 1 result, 1 chunks, 1 duplicate",
 		},
 	}
 
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf("%d-blocks %d-results %d-chunks", tc.blockCount, tc.resultCount, tc.chunkCount), func(t *testing.T) {
-			withBlockConsumer(t, tc.blockCount, tc.resultCount, tc.chunkCount, func(blockConsumer *blockconsumer.BlockConsumer,
+		t.Run(fmt.Sprintf(tc.msg), func(t *testing.T) {
+			withBlockConsumer(t, tc.blockCount, func(blockConsumer *blockconsumer.BlockConsumer,
 				chunkConsumer *fetcher.ChunkConsumer,
 				blocks []*flow.Block,
 				wg *sync.WaitGroup) {
@@ -76,16 +101,15 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 				unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "could not receive all chunk locators on time")
 				unittest.RequireCloseBefore(t, blockConsumer.Done(), time.Second, "could not terminate block consumer")
 				unittest.RequireCloseBefore(t, chunkConsumer.Done(), time.Second, "could not terminate chunk consumer")
-			})
+			}, tc.ops...)
 		})
 	}
 }
 
-func withBlockConsumer(t *testing.T, blockCount int, resultCount, chunkCount int,
-	withConsumers func(*blockconsumer.BlockConsumer,
-		*fetcher.ChunkConsumer,
-		[]*flow.Block,
-		*sync.WaitGroup)) {
+func withBlockConsumer(t *testing.T, blockCount int, withConsumers func(*blockconsumer.BlockConsumer,
+	*fetcher.ChunkConsumer,
+	[]*flow.Block,
+	*sync.WaitGroup), ops ...utils.CompleteExecutionReceiptBuilderOpt) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
 
@@ -103,7 +127,7 @@ func withBlockConsumer(t *testing.T, blockCount int, resultCount, chunkCount int
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		completeERs := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount, chunkCount)
+		completeERs := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
 		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 		// mocks chunk assigner to assign even chunk indices to this verification node
