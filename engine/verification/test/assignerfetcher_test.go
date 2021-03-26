@@ -45,49 +45,22 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 			msg: "1 block, 1 result, 1 chunk, no duplicate",
 		},
 		{
-			blockCount: 10,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(1),
-				utils.WithChunks(10),
-				utils.WithCopies(1),
-			},
-			msg: "10 blocks, 1 result, 10 chunks, no duplicate",
-		},
-		{
 			blockCount: 1,
 			ops: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(1),
-				utils.WithChunks(10),
+				utils.WithResults(5),
+				utils.WithChunks(5),
 				utils.WithCopies(1),
 			},
-			msg: "1 block, 1 result, 10 chunks, no duplicate",
+			msg: "1 block, 5 result, 5 chunks, no duplicate",
 		},
 		{
 			blockCount: 10,
 			ops: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(10),
-				utils.WithChunks(10),
-				utils.WithCopies(1),
-			},
-			msg: "10 block, 10 result, 10 chunks, no duplicate",
-		},
-		{
-			blockCount: 1,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(1),
-				utils.WithChunks(1),
+				utils.WithResults(5),
+				utils.WithChunks(5),
 				utils.WithCopies(2),
 			},
-			msg: "1 block, 1 result, 1 chunks, 1 duplicate",
-		},
-		{
-			blockCount: 10,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(10),
-				utils.WithChunks(10),
-				utils.WithCopies(10),
-			},
-			msg: "10 block, 10 result, 10 chunks, 10 duplicates",
+			msg: "10 block, 5 result, 5 chunks, 1 duplicates",
 		},
 	}
 
@@ -208,7 +181,6 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 	if staked {
 		// in staked mode, it expects chunk locators coming
 		wg.Add(len(expectedLocatorIDs))
-		fmt.Println("count: ", len(expectedLocatorIDs))
 	}
 
 	var notifier module.ProcessingNotifier
@@ -241,7 +213,6 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 		notifier.Notify(locatorID)
 
 		wg.Done()
-		fmt.Println("done")
 	})
 
 	return processor, &wg
