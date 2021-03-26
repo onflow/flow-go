@@ -1,11 +1,12 @@
 package handler
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -49,7 +50,8 @@ func (h *ContractHandler) GetContract(address runtime.Address, name string) (cod
 func (h *ContractHandler) SetContract(address runtime.Address, name string, code []byte, signingAccounts []runtime.Address) (err error) {
 	// check if authorized
 	if !h.isAuthorized(signingAccounts) {
-		return errors.New("code deployment requires authorization from specific accounts")
+		err = errors.NewOperationAuthorizationError("setting contracts requires authorization from specific accounts", "SetContract")
+		return fmt.Errorf("setting contract failed: %w", err)
 	}
 	add := flow.Address(address)
 	h.lock.Lock()
@@ -64,7 +66,8 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 func (h *ContractHandler) RemoveContract(address runtime.Address, name string, signingAccounts []runtime.Address) (err error) {
 	// check if authorized
 	if !h.isAuthorized(signingAccounts) {
-		return errors.New("code deployment requires authorization from specific accounts")
+		err = errors.NewOperationAuthorizationError("removing contracts requires authorization from specific accounts", "RemoveContract")
+		return fmt.Errorf("removing contract failed: %w", err)
 	}
 
 	add := flow.Address(address)
