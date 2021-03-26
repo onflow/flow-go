@@ -178,7 +178,7 @@ func (e InvalidProposalSeqNumberError) Error() string {
 
 // Code returns the error code for this error type
 func (e InvalidProposalSeqNumberError) Code() uint32 {
-	return errCodeProposalSeqNumberMismatchError
+	return errCodeInvalidProposalSeqNumberError
 }
 
 // InvalidPayloadSignatureError indicates that signature verification for a key in this transaction has failed.

@@ -1,63 +1,56 @@
 package errors
 
 const (
-	// tx validation errors
-	errCodeInvalidTxByteSizeError     = 1
-	errCodeInvalidReferenceBlockError = 2
-	errCodeExpiredTransactionError    = 3
-	errCodeInvalidScriptError         = 4
-	errCodeInvalidGasLimitError       = 5
-	errCodeInvalidAddressError        = 6
-	errCodeInvalidArgumentError       = 7
-
-	errCodeInvalidHashAlgorithmError      = 10
-	errCodeInvalidSignatureAlgorithmError = 11
-	errCodeInvalidPublicKeyValueError     = 12
-
-	// execution errors
-	errCodeInvalidProposalSignatureError  = 50
-	errCodeProposalSeqNumberMismatchError = 51
-
-	errCodeInvalidPayloadSignatureError = 60
-	errCodePayloadSignatureKeyError     = 61
-
-	errCodeInvalidEnvelopeSignatureError = 70
-	errCodeEnvelopeSignatureKeyError     = 71
-
-	errCodeAccountAuthorizationError   = 80
-	errCodeOperationAuthorizationError = 81
-
-	errCodeCadenceRunTimeError        = 100
-	errCodeEncodingUnsupportedValue   = 120
-	errCodeOperationNotSupportedError = 121
-	errCodeInvalidBlockHeightError    = 122
-	errCodeInvalidLocationError       = 123
-	errCodeValueError                 = 124
-
-	// account errors
-	errCodeAccountNotFoundError          = 150
-	errCodeAccountPublicKeyNotFoundError = 151
-	errCodeAccountAlreadyExistsError     = 152
-	errCodeFrozenAccountError            = 153
-
-	errCodeContractNotFoundError      = 160
-	errCodeContractNamesNotFoundError = 161
-
-	// limit errors
-	errCodeStorageCapacityExceeded = 200
-	// errCodeInsufficientTokenBalanceError      = 201
-	errCodeGasLimitExceededError              = 202
-	errCodeEventLimitExceededError            = 203
-	errCodeLedgerIntractionLimitExceededError = 204
-	errCodeStateKeySizeLimitError             = 205
-	errCodeStateValueSizeLimitError           = 206
+	failureCodeUnknownFailure     = 2000
+	failureCodeEncodingFailure    = 2001
+	failureCodeLedgerFailure      = 2002
+	failureCodeStateMergeFailure  = 2003
+	failureCodeBlockFinderFailure = 2004
+	failureCodeHasherFailure      = 2005
 )
 
 const (
-	failureCodeUnknownFailure     = 1000
-	failureCodeEncodingFailure    = 1001
-	failureCodeLedgerFailure      = 1002
-	failureCodeStateMergeFailure  = 1003
-	failureCodeBlockFinderFailure = 1004
-	failureCodeHasherFailure      = 1005
+	// tx validation errors 1000 - 1049
+	errCodeTxValidationError             = 1000
+	errCodeInvalidTxByteSizeError        = 1001
+	errCodeInvalidReferenceBlockError    = 1002
+	errCodeExpiredTransactionError       = 1003
+	errCodeInvalidScriptError            = 1004
+	errCodeInvalidGasLimitError          = 1005
+	errCodeInvalidProposalSignatureError = 1006
+	errCodeInvalidProposalSeqNumberError = 1007
+	errCodeInvalidPayloadSignatureError  = 1008
+	errCodeInvalidEnvelopeSignatureError = 1009
+
+	// base errors 1050 - 1100
+	errCodeValueError                  = 1051
+	errCodeInvalidArgumentError        = 1052
+	errCodeInvalidAddressError         = 1053
+	errCodeInvalidLocationError        = 1054
+	errCodeAccountAuthorizationError   = 1055
+	errCodeOperationAuthorizationError = 1056
+	errCodeOperationNotSupportedError  = 1057
+
+	// execution errors 1100 - 1200
+	errCodeExecutionError                     = 1000
+	errCodeCadenceRunTimeError                = 1101
+	errCodeEncodingUnsupportedValue           = 1102
+	errCodeStorageCapacityExceeded            = 1103
+	errCodeGasLimitExceededError              = 1104
+	errCodeEventLimitExceededError            = 1105
+	errCodeLedgerIntractionLimitExceededError = 1106
+	errCodeStateKeySizeLimitError             = 1107
+	errCodeStateValueSizeLimitError           = 1108
+
+	// accounts errors 1200 - 1250
+	errCodeAccountError                  = 1200
+	errCodeAccountNotFoundError          = 1201
+	errCodeAccountPublicKeyNotFoundError = 1202
+	errCodeAccountAlreadyExistsError     = 1203
+	errCodeFrozenAccountError            = 1204
+
+	// contract errors 1250 - 1300
+	errCodeContractError              = 1250
+	errCodeContractNotFoundError      = 1251
+	errCodeContractNamesNotFoundError = 1252
 )
