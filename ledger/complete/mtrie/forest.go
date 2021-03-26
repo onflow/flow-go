@@ -1,11 +1,9 @@
 package mtrie
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -245,10 +243,6 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	// if we have to insert empty values
 	if len(notFoundPaths) > 0 {
 
-		sort.Slice(notFoundPaths, func(i, j int) bool {
-			return bytes.Compare(notFoundPaths[i], notFoundPaths[j]) < 0
-		})
-
 		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads)
 		if err != nil {
 			return nil, err
@@ -256,7 +250,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 		// rootHash shouldn't change
 		if newTrie.RootHash() != r.RootHash {
-			return nil, errors.New("root hash has changed during the operation")
+			return nil, fmt.Errorf("root hash has changed during the operation %s, %s", newTrie.RootHash(), r.RootHash)
 		}
 		stateTrie = newTrie
 	}

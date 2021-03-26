@@ -18,7 +18,7 @@ func TestEmptyTrie(t *testing.T) {
 	itr := flattener.NewNodeIterator(emptyTrie)
 	require.True(t, nil == itr.Value()) // initial iterator should return nil
 
-	require.True(t, itr.Next())
+	require.False(t, itr.Next())
 	require.Equal(t, emptyTrie.RootNode(), itr.Value())
 	require.Equal(t, emptyTrie.RootNode(), itr.Value()) // test that recalling twice has no problem
 	require.False(t, itr.Next())

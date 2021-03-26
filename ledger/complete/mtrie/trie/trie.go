@@ -44,9 +44,8 @@ func NewEmptyMTrie(pathByteSize int) (*MTrie, error) {
 	if pathByteSize < 1 {
 		return nil, errors.New("trie's path size [in bytes] must be positive")
 	}
-	height := pathByteSize * 8
 	return &MTrie{
-		root:         node.NewEmptyTreeRoot(height),
+		root:         node.NewEmptyTreeRoot(),
 		pathByteSize: pathByteSize,
 	}, nil
 }
@@ -393,9 +392,11 @@ func (mt *MTrie) DumpAsJSON(w io.Writer) error {
 
 func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 	if n.IsLeaf() {
-		err := encoder.Encode(n.Payload())
-		if err != nil {
-			return err
+		if n != nil {
+			err := encoder.Encode(n.Payload())
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -418,7 +419,7 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
 func EmptyTrieRootHash(pathByteSize int) ledger.RootHash {
-	return ledger.RootHash(node.NewEmptyTreeRoot(8 * pathByteSize).Hash())
+	return ledger.RootHash(hash.GetDefaultHashForHeight(8 * pathByteSize))
 }
 
 // AllPayloads returns all payloads

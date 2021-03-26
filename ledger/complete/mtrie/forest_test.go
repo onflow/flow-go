@@ -249,7 +249,7 @@ func TestExpansionInsert(t *testing.T) {
 
 	baseTrie, err := forest.GetTrie(baseRoot)
 	require.NoError(t, err)
-	require.Equal(t, baseTrie.MaxDepth(), uint16(1))
+	require.Equal(t, baseTrie.MaxDepth(), uint16(0))
 	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(1))
 	fmt.Println("BASE TRIE:")
 	fmt.Println(baseTrie.String())

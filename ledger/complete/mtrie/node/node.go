@@ -78,19 +78,8 @@ func NewNode(height int,
 }
 
 // NewEmptyTreeRoot creates a compact leaf Node
-// UNCHECKED requirement: height must be non-negative
-func NewEmptyTreeRoot(height int) *Node {
-	n := &Node{
-		lChild:    nil,
-		rChild:    nil,
-		height:    height,
-		path:      nil,
-		payload:   nil,
-		hashValue: hash.GetDefaultHashForHeight(height),
-		maxDepth:  0,
-		regCount:  0,
-	}
-	return n
+func NewEmptyTreeRoot() *Node {
+	return nil
 }
 
 // NewLeaf creates a compact leaf Node
@@ -229,27 +218,57 @@ func (n *Node) VerifyCachedHash() bool {
 
 // Hash returns the Node's hash value.
 // Do NOT MODIFY returned slice!
-func (n *Node) Hash() hash.Hash { return n.hashValue }
+func (n *Node) Hash() hash.Hash {
+	if n == nil {
+		return hash.GetDefaultHashForHeight(256)
+	}
+	return n.hashValue
+}
 
 // Height returns the Node's height.
 // Per definition, the height of a node v in a tree is the number
 // of edges on the longest downward path between v and a tree leaf.
-func (n *Node) Height() int { return n.height }
+func (n *Node) Height() int {
+	if n == nil {
+		return 256
+	}
+	return n.height
+}
 
 // MaxDepth returns the longest path from this node to compacted leafs in the subtree.
 // in contrast to the Height, this value captures compactness of the subtrie.
-func (n *Node) MaxDepth() uint16 { return n.maxDepth }
+func (n *Node) MaxDepth() uint16 {
+	if n == nil {
+		return 0
+	}
+	return n.maxDepth
+}
 
 // RegCount returns number of registers allocated in the subtrie of this node.
-func (n *Node) RegCount() uint64 { return n.regCount }
+func (n *Node) RegCount() uint64 {
+	if n == nil {
+		return 0
+	}
+	return n.regCount
+}
 
 // Path returns the the Node's register storage path.
-func (n *Node) Path() ledger.Path { return n.path }
+func (n *Node) Path() ledger.Path {
+	if n == nil {
+		return nil
+	}
+	return n.path
+}
 
 // Payload returns the the Node's payload.
 // only leaf nodes have children.
 // Do NOT MODIFY returned slices!
-func (n *Node) Payload() *ledger.Payload { return n.payload }
+func (n *Node) Payload() *ledger.Payload {
+	if n == nil {
+		return nil
+	}
+	return n.payload
+}
 
 // LeftChild returns the the Node's left child.
 // Only INTERIOR nodes have children.
@@ -264,7 +283,7 @@ func (n *Node) RightChild() *Node { return n.rChild }
 // IsLeaf returns true if and only if Node is a LEAF.
 func (n *Node) IsLeaf() bool {
 	// Per definition, a node is a leaf if and only if it has defined path
-	return len(n.path) > 0
+	return n == nil || len(n.path) > 0
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
@@ -17,15 +18,12 @@ const (
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
-// The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	expectedRootHashHex := "568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"
-	hash := emptyTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, emptyTrie.RootHash(), ledger.RootHash(hash.GetDefaultHashForHeight(256)))
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most

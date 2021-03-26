@@ -107,6 +107,9 @@ func (i *NodeIterator) Value() *node.Node {
 }
 
 func (i *NodeIterator) pop() *node.Node {
+	if len(i.stack) == 0 {
+		return nil
+	}
 	headIdx := len(i.stack) - 1
 	head := i.stack[headIdx]
 	i.stack = i.stack[:headIdx]
