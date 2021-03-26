@@ -11,7 +11,7 @@ const (
 
 const (
 	// tx validation errors 1000 - 1049
-	errCodeTxValidationError             = 1000
+	// errCodeTxValidationError          = 1000 - reserved
 	errCodeInvalidTxByteSizeError        = 1001
 	errCodeInvalidReferenceBlockError    = 1002
 	errCodeExpiredTransactionError       = 1003
@@ -32,7 +32,7 @@ const (
 	errCodeOperationNotSupportedError  = 1057
 
 	// execution errors 1100 - 1200
-	errCodeExecutionError                     = 1000
+	// errCodeExecutionError                  = 1000 - reserved
 	errCodeCadenceRunTimeError                = 1101
 	errCodeEncodingUnsupportedValue           = 1102
 	errCodeStorageCapacityExceeded            = 1103
@@ -43,14 +43,14 @@ const (
 	errCodeStateValueSizeLimitError           = 1108
 
 	// accounts errors 1200 - 1250
-	errCodeAccountError                  = 1200
+	// errCodeAccountError               = 1200 - reserved
 	errCodeAccountNotFoundError          = 1201
 	errCodeAccountPublicKeyNotFoundError = 1202
 	errCodeAccountAlreadyExistsError     = 1203
 	errCodeFrozenAccountError            = 1204
 
 	// contract errors 1250 - 1300
-	errCodeContractError              = 1250
+	// errCodeContractError           = 1250 - reserved
 	errCodeContractNotFoundError      = 1251
 	errCodeContractNamesNotFoundError = 1252
 )
