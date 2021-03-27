@@ -140,7 +140,8 @@ func finalize(cmd *cobra.Command, args []string) {
 			serviceAccountPublicKey,
 			parseChainID(flagRootChain).Chain(),
 			fvm.WithInitialTokenSupply(value),
-			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation))
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee))
 		if err != nil {
 			log.Fatal().Err(err).Msg("unable to generate execution state")
 		}
