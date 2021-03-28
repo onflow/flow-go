@@ -100,6 +100,7 @@ const (
 	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
 	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
 	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
+	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
@@ -143,9 +144,11 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction            SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction       SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction           SpanName = "fvm.executeTransaction"
+	FVMVerifyTransaction      SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction     SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees  SpanName = "fvm.deductTransactionFees"
+
 	FVMEnvHash                      SpanName = "fvm.env.Hash"
 	FVMEnvValueExists               SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                  SpanName = "fvm.env.getValue"
