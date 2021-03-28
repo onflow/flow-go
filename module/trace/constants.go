@@ -103,9 +103,11 @@ const (
 	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
+	EXEGenerateChunkDataPacks             SpanName = "exe.state.generateChunkDataPacks"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
 	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEPersistStateCommitment             SpanName = "exe.state.persistStateCommitment"
+	EXEPersistEvents                      SpanName = "exe.state.persistEvents"
 	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"

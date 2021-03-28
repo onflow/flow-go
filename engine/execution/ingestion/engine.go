@@ -1090,10 +1090,10 @@ func (e *Engine) saveExecutionResults(
 		chunk := generateChunk(i, startState, endState, collectionID, blockID)
 
 		// chunkDataPack
+
+		sp := e.tracer.StartSpanFromParent(span, trace.EXEGenerateChunkDataPacks)
 		allRegisters := view.AllRegisters()
-
 		proof, err := e.execState.GetProof(childCtx, chunk.StartState, allRegisters)
-
 		if err != nil {
 			return nil, fmt.Errorf(
 				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, blockID,
@@ -1101,11 +1101,12 @@ func (e *Engine) saveExecutionResults(
 		}
 
 		chdp := generateChunkDataPack(chunk, collectionID, proof)
-
 		chdps[i] = chdp
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
+		defer sp.Finish()
+
 	}
 
 	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState, serviceEvents)

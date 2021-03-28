@@ -322,9 +322,6 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 }
 
 func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
-	defer span.Finish()
-
 	return s.chunkDataPacks.ByChunkID(chunkID)
 }
 
@@ -367,20 +364,23 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		}
 	}
 
+	sp, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	err := s.commits.BatchStore(blockID, endState, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
+	sp.Finish()
 
+	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistEvents)
 	err = s.events.BatchStore(blockID, events, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
-
 	err = s.serviceEvents.BatchStore(blockID, events, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
+	sp.Finish()
 
 	executionResult := &executionReceipt.ExecutionResult
 
