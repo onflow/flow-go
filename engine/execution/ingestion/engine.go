@@ -1100,12 +1100,11 @@ func (e *Engine) saveExecutionResults(
 			)
 		}
 
-		chdp := generateChunkDataPack(chunk, collectionID, proof)
-		chdps[i] = chdp
+		chdps[i] = generateChunkDataPack(chunk, collectionID, proof)
+		sp.Finish()
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
-		defer sp.Finish()
 
 	}
 

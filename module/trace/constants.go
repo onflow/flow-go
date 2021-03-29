@@ -111,8 +111,6 @@ const (
 	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
-	EXEPersistStateInteractions           SpanName = "exe.state.persistStateInteractions"
-	EXERetrieveStateDelta                 SpanName = "exe.state.retrieveStateDelta"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 

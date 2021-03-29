@@ -251,10 +251,8 @@ func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommi
 }
 
 func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-		defer span.Finish()
-	}
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
+	defer span.Finish()
 
 	return CommitDelta(s.ls, delta, baseState)
 }
@@ -280,10 +278,8 @@ func (s *state) GetRegisters(
 	commit flow.StateCommitment,
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
-		defer span.Finish()
-	}
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
+	defer span.Finish()
 
 	_, values, err := s.getRegisters(commit, registerIDs)
 	if err != nil {
@@ -303,6 +299,9 @@ func (s *state) GetProof(
 	commit flow.StateCommitment,
 	registerIDs []flow.RegisterID,
 ) (flow.StorageProof, error) {
+
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
+	defer span.Finish()
 
 	query, err := makeQuery(commit, registerIDs)
 
@@ -326,10 +325,8 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 }
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
-		defer span.Finish()
-	}
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
+	defer span.Finish()
 
 	result, err := s.results.ByBlockID(blockID)
 	if err != nil {
@@ -352,6 +349,7 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	// but it's the closes thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
+	sp, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
 	for _, chunkDataPack := range chunkDataPacks {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
@@ -363,8 +361,9 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
 		}
 	}
+	sp.Finish()
 
-	sp, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
+	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	err := s.commits.BatchStore(blockID, endState, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)

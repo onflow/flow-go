@@ -151,10 +151,8 @@ func (e *blockComputer) executeBlock(
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 
 	var colSpan opentracing.Span
-	if e.tracer != nil {
-		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
-		defer colSpan.Finish()
-	}
+	colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
+	defer colSpan.Finish()
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 
@@ -259,6 +257,7 @@ func (e *blockComputer) executeTransaction(
 	txIndex uint32,
 ) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {
 
+	startedAt := time.Now()
 	var txSpan opentracing.Span
 	var traceID string
 	// call tracing
@@ -269,21 +268,8 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	defer func() {
-		// Attach runtime metrics to the transaction span.
-		//
-		// Each duration is the sum of all sub-programs in the transaction.
-		//
-		// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
-		// as well as any imported programs.
-		txSpan.SetTag("transaction.proposer", txBody.ProposalKey.Address.String())
-		txSpan.SetTag("transaction.payer", txBody.Payer.String())
 		txSpan.LogFields(
 			log.String("transaction.ID", txBody.ID().String()),
-			log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
-			log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
-			log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
-			log.Int64(trace.EXEValueEncodingDurationTag, int64(txMetrics.ValueEncoded())),
-			log.Int64(trace.EXEValueDecodingDurationTag, int64(txMetrics.ValueDecoded())),
 		)
 		txSpan.Finish()
 	}()
@@ -339,6 +325,7 @@ func (e *blockComputer) executeTransaction(
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
 		Str("traceID", traceID).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 
 	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil
