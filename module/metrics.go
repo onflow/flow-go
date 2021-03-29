@@ -5,8 +5,9 @@ import (
 
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 )
+
+type EntriesFunc func() uint
 
 // Network Metrics
 type NetworkMetrics interface {
@@ -50,6 +51,7 @@ type ComplianceMetrics interface {
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
+	BlockProposalDuration(duration time.Duration)
 }
 
 type CleanerMetrics interface {
@@ -64,7 +66,7 @@ type CacheMetrics interface {
 
 type MempoolMetrics interface {
 	MempoolEntries(resource string, entries uint)
-	Register(resource string, entriesFunc metrics.EntriesFunc) error
+	Register(resource string, entriesFunc EntriesFunc) error
 }
 
 type HotstuffMetrics interface {
@@ -189,12 +191,21 @@ type VerificationMetrics interface {
 	// It increases the total number of result approvals.
 	OnResultApproval()
 
-	// LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific
-	// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
-	// to capture all the resources needed to verify a chunk.
-	// The purpose of this function is to track the overall chunk resources size on disk.
-	// Todo wire this up to do monitoring (3183)
-	LogVerifiableChunkSize(size float64)
+	// OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
+	// It increments the total number of finalized blocks.
+	//
+	//
+	// Note: it assumes blocks are coming to assigner engine in strictly increasing order of their height.
+	OnAssignerProcessFinalizedBlock(height uint64)
+
+	// OnChunksAssigned is called whenever chunks assigned to this verification node by applying chunk assignment on an
+	// execution result.
+	// It increases the total number of assigned chunks by the input.
+	OnChunksAssigned(chunks int)
+
+	// OnChunkProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
+	// It increments the total number of sent chunks.
+	OnChunkProcessed()
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
@@ -207,7 +218,7 @@ type LedgerMetrics interface {
 	// ForestNumberOfTrees current number of trees in a forest (in memory)
 	ForestNumberOfTrees(number uint64)
 
-	// LatestTrieRegCount records the number of unique register allocated (the lastest created trie)
+	// LatestTrieRegCount records the number of unique register allocated (the latest created trie)
 	LatestTrieRegCount(number uint64)
 
 	// LatestTrieRegCountDiff records the difference between the number of unique register allocated of the latest created trie and parent trie
@@ -328,7 +339,7 @@ type TransactionMetrics interface {
 }
 
 type PingMetrics interface {
-	// NodeReachable tracks the node availability of the node and reports it as 1 if the node was successfully pinged, 0
-	// otherwise. The nodeInfo provides additional information about the node such as the name of the node operator
-	NodeReachable(node *flow.Identity, nodeInfo string, reachable bool)
+	// NodeReachable tracks the round trip time in milliseconds taken to ping a node
+	// The nodeInfo provides additional information about the node such as the name of the node operator
+	NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration)
 }

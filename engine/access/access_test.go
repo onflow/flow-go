@@ -54,7 +54,7 @@ type Suite struct {
 }
 
 // TestAccess tests scenarios which exercise multiple API calls using both the RPC handler and the ingest engine
-// and using a real badger storage.
+// and using a real badger storage
 func TestAccess(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
@@ -111,6 +111,8 @@ func (suite *Suite) RunTest(
 			suite.metrics,
 			nil,
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 
@@ -284,6 +286,8 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			metrics,
 			connFactory, // passing in the connection factory
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 
@@ -443,7 +447,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		require.NoError(suite.T(), err)
 
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
-			nil, suite.chainID, metrics, 0, 0, false, false)
+			nil, suite.chainID, metrics, 0, 0, false, false, nil, nil)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
@@ -502,7 +506,7 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.backend = backend.New(
 			suite.state,
-			nil,
+			suite.execClient,
 			suite.collClient,
 			nil,
 			blocks,
@@ -514,6 +518,8 @@ func (suite *Suite) TestExecuteScript() {
 			suite.metrics,
 			connFactory,
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 

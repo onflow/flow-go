@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/match"
-	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -157,7 +157,7 @@ func (suite *MatchEngineTestSuite) RespondChunkDataPack(engine *match.Engine,
 	en flow.Identifier) func(*messages.ChunkDataRequest) {
 	return func(req *messages.ChunkDataRequest) {
 		resp := &messages.ChunkDataResponse{
-			ChunkDataPack: FromChunkID(req.ChunkID),
+			ChunkDataPack: test.FromChunkID(req.ChunkID),
 			Nonce:         req.Nonce,
 		}
 
@@ -216,10 +216,10 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
+	result, assignment := test.CreateExecutionResult(
 		suite.head.ID(),
-		WithChunks(
-			WithAssignee(suite.myID),
+		test.WithChunks(
+			test.WithAssignee(suite.myID),
 		),
 	)
 
@@ -256,7 +256,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 
 	// create chunk data pack
 	myChunk := result.Chunks[0]
-	chunkDataPack := FromChunkID(myChunk.ID())
+	chunkDataPack := test.FromChunkID(myChunk.ID())
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
@@ -299,10 +299,10 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
+	result, assignment := test.CreateExecutionResult(
 		suite.head.ID(),
-		WithChunks(
-			WithAssignee(flow.Identifier{}),
+		test.WithChunks(
+			test.WithAssignee(flow.Identifier{}),
 		),
 	)
 
@@ -341,12 +341,12 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
+	result, assignment := test.CreateExecutionResult(
 		suite.head.ID(),
-		WithChunks(
-			WithAssignee(suite.myID),
-			WithAssignee(flow.Identifier{}), // some other node
-			WithAssignee(suite.myID),
+		test.WithChunks(
+			test.WithAssignee(suite.myID),
+			test.WithAssignee(flow.Identifier{}), // some other node
+			test.WithAssignee(suite.myID),
 		),
 	)
 
@@ -415,10 +415,10 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
+	result, assignment := test.CreateExecutionResult(
 		suite.head.ID(),
-		WithChunks(
-			WithAssignee(suite.myID),
+		test.WithChunks(
+			test.WithAssignee(suite.myID),
 		),
 	)
 
@@ -495,10 +495,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
+	result, assignment := test.CreateExecutionResult(
 		suite.head.ID(),
-		WithChunks(
-			WithAssignee(suite.myID),
+		test.WithChunks(
+			test.WithAssignee(suite.myID),
 		),
 	)
 
@@ -568,10 +568,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	e := suite.NewTestMatchEngine(3)
 	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
+	result, assignment := test.CreateExecutionResult(
 		suite.head.ID(),
-		WithChunks(
-			WithAssignee(suite.myID),
+		test.WithChunks(
+			test.WithAssignee(suite.myID),
 		),
 	)
 
@@ -641,10 +641,10 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 			View:   uint64(i),
 		}
 		// create a execution result that assigns to me
-		result, assignment := createExecutionResult(
+		result, assignment := test.CreateExecutionResult(
 			header.ID(),
-			WithChunks(
-				WithAssignee(suite.myID),
+			test.WithChunks(
+				test.WithAssignee(suite.myID),
 			),
 		)
 
@@ -706,15 +706,15 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := createExecutionResult(
+	result, assignment := test.CreateExecutionResult(
 		suite.head.ID(),
-		WithChunks(
-			WithAssignee(suite.myID),
-			WithAssignee(suite.myID),
-			WithAssignee(suite.myID),
-			WithAssignee(suite.myID),
-			WithAssignee(suite.myID),
-			WithAssignee(suite.myID),
+		test.WithChunks(
+			test.WithAssignee(suite.myID),
+			test.WithAssignee(suite.myID),
+			test.WithAssignee(suite.myID),
+			test.WithAssignee(suite.myID),
+			test.WithAssignee(suite.myID),
+			test.WithAssignee(suite.myID),
 		),
 	)
 
@@ -808,54 +808,4 @@ func (suite *MatchEngineTestSuite) NewTestMatchEngine(maxTry int) *match.Engine 
 	require.Nil(suite.T(), err)
 
 	return e
-}
-
-func createExecutionResult(blockID flow.Identifier, options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.ExecutionResult, *chunks.Assignment) {
-	result := &flow.ExecutionResult{
-		BlockID: blockID,
-		Chunks:  flow.ChunkList{},
-	}
-	assignments := chunks.NewAssignment()
-
-	for _, option := range options {
-		option(result, assignments)
-	}
-	return result, assignments
-}
-
-func WithChunks(setAssignees ...func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk) func(*flow.ExecutionResult, *chunks.Assignment) {
-	return func(result *flow.ExecutionResult, assignment *chunks.Assignment) {
-		for i, setAssignee := range setAssignees {
-			chunk := setAssignee(result.BlockID, uint64(i), assignment)
-			result.Chunks.Insert(chunk)
-		}
-	}
-}
-
-func ChunkWithIndex(blockID flow.Identifier, index int) *flow.Chunk {
-	chunk := &flow.Chunk{
-		Index: uint64(index),
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(index),
-			EventCollection: blockID, // ensure chunks from different blocks with the same index will have different chunk ID
-			BlockID:         blockID,
-		},
-		EndState: unittest.StateCommitmentFixture(),
-	}
-	return chunk
-}
-
-func WithAssignee(assignee flow.Identifier) func(flow.Identifier, uint64, *chunks.Assignment) *flow.Chunk {
-	return func(blockID flow.Identifier, index uint64, assignment *chunks.Assignment) *flow.Chunk {
-		chunk := ChunkWithIndex(blockID, int(index))
-		fmt.Printf("with assignee: %v, chunk id: %v\n", index, chunk.ID())
-		assignment.Add(chunk, flow.IdentifierList{assignee})
-		return chunk
-	}
-}
-
-func FromChunkID(chunkID flow.Identifier) flow.ChunkDataPack {
-	return flow.ChunkDataPack{
-		ChunkID: chunkID,
-	}
 }
