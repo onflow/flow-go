@@ -56,19 +56,15 @@ func NewNode(height int,
 	regCount uint64) *Node {
 
 	var pl *ledger.Payload
-	var p ledger.Path
 	if payload != nil {
 		pl = payload.DeepCopy()
-	}
-	if len(path) > 0 {
-		p = path.DeepCopy()
 	}
 
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
 		height:    height,
-		path:      p,
+		path:      path,
 		hashValue: hashValue,
 		payload:   pl,
 		maxDepth:  maxDepth,
@@ -82,25 +78,20 @@ func NewEmptyTreeRoot() *Node {
 	return nil
 }
 
-// NewLeaf creates a compact leaf Node
+// NewLeaf creates a compact leaf Node.
 // UNCHECKED requirement: height must be non-negative
 func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
 	height int) *Node {
 
-	regCount := uint64(0)
-	if path != nil {
-		regCount = uint64(1)
-	}
-
 	n := &Node{
 		lChild:   nil,
 		rChild:   nil,
 		height:   height,
-		path:     path.DeepCopy(),
+		path:     path,
 		payload:  payload.DeepCopy(),
 		maxDepth: 0,
-		regCount: regCount,
+		regCount: uint64(1),
 	}
 	n.ComputeHash()
 	return n
@@ -125,7 +116,6 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		lChild:   lchild,
 		rChild:   rchild,
 		height:   height,
-		path:     nil,
 		payload:  nil,
 		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
 		regCount: lRegCount + rRegCount,
@@ -135,13 +125,12 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 }
 
 // ComputeHash computes the hashValue for the given Node
-// we kept it this way to stay compatible with the previous versions
 func (n *Node) ComputeHash() {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
 			// LEAF node: defined by key-value pair
-			n.hashValue = hash.ComputeCompactValue(n.path, n.payload.Value, n.height)
+			n.hashValue = hash.ComputeCompactValue(hash.Hash(n.path), n.payload.Value, n.height)
 			return
 		}
 		// ROOT NODE: no children, no key-value pair
@@ -172,7 +161,7 @@ func computeHash(n *Node) hash.Hash {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
 			// LEAF node: defined by key-value pair
-			return hash.ComputeCompactValue(n.path, n.payload.Value, n.height)
+			return hash.ComputeCompactValue(hash.Hash(n.path), n.payload.Value, n.height)
 		}
 		// ROOT NODE: no children, no key-value pair
 		return hash.GetDefaultHashForHeight(n.height)
@@ -220,7 +209,7 @@ func (n *Node) VerifyCachedHash() bool {
 // Do NOT MODIFY returned slice!
 func (n *Node) Hash() hash.Hash {
 	if n == nil {
-		return hash.GetDefaultHashForHeight(256)
+		return hash.GetDefaultHashForHeight(hash.TreeMaxHeight)
 	}
 	return n.hashValue
 }
@@ -230,7 +219,7 @@ func (n *Node) Hash() hash.Hash {
 // of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int {
 	if n == nil {
-		return 256
+		return hash.TreeMaxHeight
 	}
 	return n.height
 }
@@ -255,13 +244,12 @@ func (n *Node) RegCount() uint64 {
 // Path returns the the Node's register storage path.
 func (n *Node) Path() ledger.Path {
 	if n == nil {
-		return nil
+		return ledger.EmptyPath
 	}
 	return n.path
 }
 
 // Payload returns the the Node's payload.
-// only leaf nodes have children.
 // Do NOT MODIFY returned slices!
 func (n *Node) Payload() *ledger.Payload {
 	if n == nil {
@@ -283,7 +271,7 @@ func (n *Node) RightChild() *Node { return n.rChild }
 // IsLeaf returns true if and only if Node is a LEAF.
 func (n *Node) IsLeaf() bool {
 	// Per definition, a node is a leaf if and only if it has defined path
-	return n == nil || len(n.path) > 0
+	return n == nil || (n.lChild == nil && n.rChild == nil)
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree

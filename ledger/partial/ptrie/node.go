@@ -26,10 +26,10 @@ type node struct {
 	hashValue hash.Hash       // hash value
 }
 
-// newNode creates a new node with the provided value and no children
-func newNode(hashValue hash.Hash, height int) *node {
+// newNode creates a new node with the provided height and hash
+func newNode(v hash.Hash, height int) *node {
 	n := new(node)
-	n.hashValue = hashValue
+	n.hashValue = v
 	n.height = height
 	n.lChild = nil
 	n.rChild = nil

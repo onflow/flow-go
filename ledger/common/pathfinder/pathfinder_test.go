@@ -27,9 +27,9 @@ func Test_KeyToPathV0(t *testing.T) {
 	require.NoError(t, err)
 	_, err = h.Write([]byte("key part 2"))
 	require.NoError(t, err)
-	expected := ledger.Path(h.Sum(nil))
-
-	require.True(t, path.Equals(expected))
+	var expected ledger.Path
+	copy(expected[:], h.Sum(nil))
+	require.True(t, path == expected)
 }
 
 func Test_KeyToPathV1(t *testing.T) {
@@ -46,6 +46,7 @@ func Test_KeyToPathV1(t *testing.T) {
 	_, err = hasher.Write([]byte("/1/key part 1/22/key part 2"))
 	require.NoError(t, err)
 
-	expected := ledger.Path(hasher.SumHash())
-	require.True(t, path.Equals(expected))
+	var expected ledger.Path
+	copy(expected[:], hasher.SumHash())
+	require.True(t, path == expected)
 }

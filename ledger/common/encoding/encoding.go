@@ -283,13 +283,9 @@ func EncodePath(p ledger.Path) []byte {
 	buffer = utils.AppendUint8(buffer, TypePath)
 
 	// encode path
-	buffer = append(buffer, encodePath(p)...)
+	buffer = append(buffer, p[:]...)
 
 	return buffer
-}
-
-func encodePath(p ledger.Path) []byte {
-	return p
 }
 
 // DecodePath constructs a path value using an encoded byte slice
@@ -297,20 +293,22 @@ func DecodePath(encodedPath []byte) (ledger.Path, error) {
 	// check enc dec version
 	rest, _, err := CheckVersion(encodedPath)
 	if err != nil {
-		return nil, err
+		return ledger.EmptyPath, err
 	}
 
 	// check the encoding type
 	rest, err = CheckType(rest, TypePath)
 	if err != nil {
-		return nil, err
+		return ledger.EmptyPath, err
 	}
 
-	return decodePath(rest)
+	return decodePath(rest), nil
 }
 
-func decodePath(inp []byte) (ledger.Path, error) {
-	return ledger.Path(inp), nil
+func decodePath(inp []byte) ledger.Path {
+	var path ledger.Path
+	copy(path[:], inp)
+	return path
 }
 
 // EncodePayload encodes a ledger payload
@@ -447,9 +445,9 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 
 	// encode paths
 	// encode path size (assuming all paths are the same size)
-	buffer = utils.AppendUint16(buffer, uint16(t.Paths[0].Size()))
+	buffer = utils.AppendUint16(buffer, uint16(ledger.PathLen))
 	for _, path := range t.Paths {
-		buffer = append(buffer, encodePath(path)...)
+		buffer = append(buffer, path[:]...)
 	}
 
 	// we assume same number of payloads
@@ -519,10 +517,7 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		path, err = decodePath(encPath)
-		if err != nil {
-			return nil, fmt.Errorf("error decoding trie update: %w", err)
-		}
+		path = decodePath(encPath)
 		paths = append(paths, path)
 	}
 
@@ -582,8 +577,8 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 	buffer = append(buffer, p.Flags...)
 
 	// include path size and content
-	buffer = utils.AppendUint16(buffer, uint16(p.Path.Size()))
-	buffer = append(buffer, p.Path...)
+	buffer = utils.AppendUint16(buffer, uint16(ledger.PathLen))
+	buffer = append(buffer, p.Path[:]...)
 
 	// include encoded payload size and content
 	encPayload := encodePayload(p.Payload)
@@ -653,7 +648,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	pInst.Path = path
+	copy(pInst.Path[:], path)
 
 	// read payload
 	encPayloadSize, rest, err := utils.ReadUint64(rest)

@@ -17,26 +17,23 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func Test_DumpJSON_Empty(t *testing.T) {
+func Test_DumpJSONEmpty(t *testing.T) {
 
-	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
-	require.NoError(t, err)
+	trie := trie.NewEmptyMTrie()
 
 	var buffer bytes.Buffer
-
-	err = trie.DumpAsJSON(&buffer)
+	err := trie.DumpAsJSON(&buffer)
 	require.NoError(t, err)
 
 	json := buffer.String()
-
 	assert.Empty(t, json)
 }
 
-func Test_DumpJSON(t *testing.T) {
+func Test_DumpJSONNonEmpty(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		forest, err := mtrie.NewForest(pathfinder.PathByteSize, dir, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
+		forest, err := mtrie.NewForest(dir, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
 		require.NoError(t, err)
 
 		emptyRootHash := forest.GetEmptyRootHash()
@@ -97,6 +94,7 @@ func Test_DumpJSON(t *testing.T) {
 
 		// key 3
 		require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":9,\"Value\":\"6c6f72656d\"},{\"Type\":0,\"Value\":\"697073756d\"},{\"Type\":5,\"Value\":\"646f6c6f72\"}]},\"Value\":\"03\"}")
+
 	})
 
 }

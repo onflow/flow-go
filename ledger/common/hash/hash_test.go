@@ -29,7 +29,7 @@ func Test_ComputeCompactValue(t *testing.T) {
 	v := []byte{'A'}
 
 	// 00000101...00000000
-	path := make([]byte, 32)
+	var path hash.Hash
 	path[0] = 5
 	nodeHeight := 251
 	h := hash.HashLeaf(path, v)
@@ -51,16 +51,16 @@ func TestHash(t *testing.T) {
 	t.Logf("math rand seed is %d", r)
 
 	t.Run("HashLeaf", func(t *testing.T) {
-		path := make([]byte, 32)
+		var path hash.Hash
 
 		for i := 0; i < 5000; i++ {
 			value := make([]byte, i)
-			rand.Read(path)
+			rand.Read(path[:])
 			rand.Read(value)
 			h := hash.HashLeaf(path, value)
 
 			hasher := cryhash.NewSHA3_256()
-			_, _ = hasher.Write(path)
+			_, _ = hasher.Write(path[:])
 			_, _ = hasher.Write(value)
 			expected := hasher.SumHash()
 			assert.Equal(t, []byte(expected), []byte(h[:]))

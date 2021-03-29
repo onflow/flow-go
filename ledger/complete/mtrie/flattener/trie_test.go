@@ -14,13 +14,11 @@ import (
 )
 
 func TestTrieStoreAndLoad(t *testing.T) {
-
-	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize)
+	emptyTrie := trie.NewEmptyMTrie()
 	require.NoError(t, err)
 
 	p1 := ledger.PathByUint8(1)

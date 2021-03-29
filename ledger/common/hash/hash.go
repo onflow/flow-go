@@ -21,11 +21,15 @@ var defaultLeafHash Hash
 // EmptyHash is a hash with all zeroes, used for padding
 var EmptyHash Hash
 
-// we are currently supporting paths of a size up to 32 bytes.
+// tree maximum height
+const TreeMaxHeight = 256
+
+// we are currently supporting paths of a size equal to 32 bytes.
 // I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256.
 // A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
-const defaultHashesNum = 257
+const defaultHashesNum = TreeMaxHeight + 1
 
+// array to store all default hashes
 var defaultHashes [defaultHashesNum]Hash
 
 // TODO: remove once the hashing with 32-bytes input is tested
@@ -66,7 +70,7 @@ func GetDefaultHashForHeight(height int) Hash {
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
 // TODO: delete this function after refactoring ptrie
-func HashLeaf(path []byte, value []byte) Hash {
+func HashLeaf(path Hash, value []byte) Hash {
 	hasher := new256()
 	return hasher.hash256Plus(path, value) // path is always 256 bits
 }
@@ -85,7 +89,7 @@ func HashInterNode(hash1 Hash, hash2 Hash) Hash {
 //
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
-func HashLeafIn(path []byte, value []byte) Hash {
+func HashLeafIn(path Hash, value []byte) Hash {
 	hasher := new256()
 	return hasher.hash256Plus(path, value) // path is always 256 bits
 }
@@ -95,7 +99,6 @@ func HashLeafIn(path []byte, value []byte) Hash {
 //
 // result slice can be equal to hash1 or hash2.
 // hash1 and hash2 must each be a 32 byte slice.
-// TODO : should hash1 and hash2 be pointers?
 func HashInterNodeIn(hash1 Hash, hash2 Hash) Hash {
 	hasher := new256()
 	return hasher.hash256plus256(hash1, hash2) // hash1 and hash2 are 256 bits
@@ -104,21 +107,18 @@ func HashInterNodeIn(hash1 Hash, hash2 Hash) Hash {
 // ComputeCompactValue computes the value for the node considering the sub tree
 // to only include this value and default values. It writes the hash result to the result input.
 // UNCHECKED: payload!= nil
-func ComputeCompactValue(path []byte, value []byte, nodeHeight int) Hash {
+func ComputeCompactValue(path Hash, value []byte, nodeHeight int) Hash {
 	// if register is unallocated: return default hash
 	if len(value) == 0 {
 		return GetDefaultHashForHeight(nodeHeight)
 	}
-
-	// register is allocated
-	treeHeight := 8 * len(path)
 
 	var out Hash
 	out = HashLeafIn(path, value)      // we first compute the hash of the fully-expanded leaf
 	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
-		bit := utils.Bit(path, treeHeight-h)
+		bit := utils.Bit(path[:], TreeMaxHeight-h)
 		if bit == 1 { // right branching
 			out = HashInterNodeIn(GetDefaultHashForHeight(h-1), out)
 		} else { // left branching

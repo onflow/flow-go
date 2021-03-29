@@ -34,13 +34,11 @@ func (u *TrieUpdate) IsEmpty() bool {
 func (u *TrieUpdate) String() string {
 	str := "Trie Update:\n "
 	str += "\t triehash : " + u.RootHash.String() + "\n"
-	tp := 0
 	for i, p := range u.Paths {
-		tp += p.Size()
 		str += fmt.Sprintf("\t\t path %d : %s\n", i, p)
 	}
-	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), tp)
-	tp = 0
+	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), len(u.Paths)*PathLen)
+	tp := 0
 	for _, p := range u.Payloads {
 		tp += p.Size()
 	}
@@ -90,37 +88,24 @@ func (rh RootHash) Equals(o RootHash) bool {
 
 // Path captures storage path of a payload;
 // where we store a payload in the ledger
-type Path []byte
+type Path hash.Hash
+
+var EmptyPath = Path(hash.EmptyHash)
+
+const PathLen = hash.HashLen
 
 func (p Path) String() string {
 	str := ""
 	for _, i := range p {
 		str += fmt.Sprintf("%08b", i)
 	}
-	if len(str) > 16 {
-		str = str[0:8] + "..." + str[len(str)-8:]
-	}
+	str = str[0:8] + "..." + str[len(str)-8:]
 	return str
-}
-
-// Size returns the size of the path
-func (p *Path) Size() int {
-	return len(*p)
 }
 
 // Equals compares this path to another path
 func (p Path) Equals(o Path) bool {
-	if o == nil {
-		return false
-	}
-	return bytes.Equal([]byte(p), []byte(o))
-}
-
-// DeepCopy returns a deep copy of the payload
-func (p *Path) DeepCopy() Path {
-	newP := make([]byte, 0, len(*p))
-	path := []byte(*p)
-	return Path(append(newP, path...))
+	return p == o
 }
 
 // Payload is the smallest immutable storable unit in ledger
@@ -191,7 +176,6 @@ type TrieProof struct {
 // NewTrieProof creates a new instance of Trie Proof
 func NewTrieProof() *TrieProof {
 	return &TrieProof{
-		Path:      make([]byte, 0),
 		Payload:   EmptyPayload(),
 		Interims:  make([]hash.Hash, 0),
 		Inclusion: false,

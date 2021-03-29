@@ -12,30 +12,30 @@ import (
 
 // PathByUint8 returns a path (32 bytes) given a uint8
 func PathByUint8(inp uint8) Path {
-	b := make([]byte, 32)
+	var b Path
 	b[0] = inp
-	return Path(b)
+	return b
 }
 
 // PathByUint16 returns a path (32 bytes) given a uint16 (big endian)
 func PathByUint16(inp uint16) Path {
-	b := make([]byte, 32)
-	binary.BigEndian.PutUint16(b, inp)
-	return Path(b)
+	var b Path
+	binary.BigEndian.PutUint16(b[:], inp)
+	return b
 }
 
 // PathByUint8LeftPadded returns a path (32 bytes) given a uint8 (left padded)
 func PathByUint8LeftPadded(inp uint8) Path {
-	b := make([]byte, 32)
+	var b Path
 	b[31] = inp
-	return Path(b)
+	return b
 }
 
 // PathByUint16LeftPadded returns a path (32 bytes) given a uint16 (left padded big endian)
 func PathByUint16LeftPadded(inp uint16) Path {
-	b := make([]byte, 32)
+	var b Path
 	binary.BigEndian.PutUint16(b[30:], inp)
-	return Path(b)
+	return b
 }
 
 // LightPayload returns a payload with 2 byte key and 2 byte value
@@ -134,25 +134,25 @@ func TrieBatchProofFixture() (*TrieBatchProof, State) {
 	return bp, State(s)
 }
 
-// RandomPathsRandLen generate m random paths (size: byteSize),
+// RandomPathsRandLen generate m random paths.
 // the number of paths, m, is also randomly selected from the range [1, maxN]
-func RandomPathsRandLen(maxN int, byteSize int) []Path {
+func RandomPathsRandLen(maxN int) []Path {
 	numberOfPaths := rand.Intn(maxN) + 1
-	return RandomPaths(numberOfPaths, byteSize)
+	return RandomPaths(numberOfPaths)
 }
 
-// RandomPaths generates n random (no repetition) fixed sized (byteSize) paths
-func RandomPaths(n int, byteSize int) []Path {
+// RandomPaths generates n random (no repetition)
+func RandomPaths(n int) []Path {
 	paths := make([]Path, 0, n)
 	alreadySelectPaths := make(map[string]bool)
 	i := 0
 	for i < n {
-		path := make([]byte, byteSize)
-		rand.Read(path)
+		var path Path
+		rand.Read(path[:])
 		// deduplicate
-		if _, found := alreadySelectPaths[string(path)]; !found {
-			paths = append(paths, Path(path))
-			alreadySelectPaths[string(path)] = true
+		if _, found := alreadySelectPaths[string(path[:])]; !found {
+			paths = append(paths, path)
+			alreadySelectPaths[string(path[:])] = true
 			i++
 		}
 	}

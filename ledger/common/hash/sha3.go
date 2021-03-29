@@ -88,9 +88,9 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 	}
 }
 
-func (d *state) hash256Plus(p1, p2 []byte) Hash {
+func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 	//xorIn since p1 length is a multiple of 8
-	xorInAtIndex(d, p1, 0)
+	xorInAtIndex(d, p1[:], 0)
 	written := 32 // written uint64s in the state
 
 	for len(p2)+written >= rate {

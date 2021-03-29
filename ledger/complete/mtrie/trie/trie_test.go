@@ -20,10 +20,8 @@ const (
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
-
-	require.Equal(t, emptyTrie.RootHash(), ledger.RootHash(hash.GetDefaultHashForHeight(256)))
+	emptyTrie := trie.NewEmptyMTrie()
+	require.Equal(t, emptyTrie.RootHash(), ledger.RootHash(hash.GetDefaultHashForHeight(hash.TreeMaxHeight)))
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
@@ -31,9 +29,7 @@ func Test_EmptyTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithLeftRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
-
+	emptyTrie := trie.NewEmptyMTrie()
 	path := ledger.PathByUint16LeftPadded(0)
 	payload := ledger.LightPayload(11, 12345)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
@@ -48,15 +44,12 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithRightRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
-
+	emptyTrie := trie.NewEmptyMTrie()
 	// build a path with all 1s
-	b := make([]byte, 32)
-	for i := 0; i < len(b); i++ {
-		b[i] = uint8(255)
+	var path ledger.Path
+	for i := 0; i < len(path); i++ {
+		path[i] = uint8(255)
 	}
-	path := ledger.Path(b)
 	payload := ledger.LightPayload(12346, 54321)
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
@@ -70,8 +63,7 @@ func Test_TrieWithRightRegister(t *testing.T) {
 // // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	path := ledger.PathByUint16LeftPadded(56809)
 	payload := ledger.LightPayload(12346, 59656)
@@ -87,9 +79,7 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithManyRegisters(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
-
+	emptyTrie := trie.NewEmptyMTrie()
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
 	paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, 12001))
@@ -105,8 +95,7 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	// allocate 65536 left-most registers
 	numberRegisters := 65536
@@ -153,8 +142,7 @@ func Test_UpdateTrie(t *testing.T) {
 	}
 
 	// Make new Trie (independently of MForest):
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
@@ -190,8 +178,7 @@ func Test_UpdateTrie(t *testing.T) {
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_UnallocateRegisters(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
-	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	// we first draw 99 random key-value pairs that will be first allocated and later unallocated:
 	paths1, payloads1 := deduplicateWrites(sampleRandomRegisterWrites(rng, 99))
@@ -254,13 +241,15 @@ func deduplicateWrites(paths []ledger.Path, payloads []ledger.Payload) ([]ledger
 	}
 	for i, path := range paths {
 		// we override the latest in the slice
-		payloadMapping[string(path)] = i
+		payloadMapping[string(path[:])] = i
 	}
 	dedupedPaths := make([]ledger.Path, 0, len(payloadMapping))
 	dedupedPayloads := make([]ledger.Payload, 0, len(payloadMapping))
-	for path := range payloadMapping {
-		dedupedPaths = append(dedupedPaths, []byte(path))
-		dedupedPayloads = append(dedupedPayloads, payloads[payloadMapping[path]])
+	for pathString := range payloadMapping {
+		var path ledger.Path
+		copy(path[:], pathString)
+		dedupedPaths = append(dedupedPaths, path)
+		dedupedPayloads = append(dedupedPayloads, payloads[payloadMapping[pathString]])
 	}
 	return dedupedPaths, dedupedPayloads
 }

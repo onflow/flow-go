@@ -60,7 +60,7 @@ func NewLedger(dbDir string,
 		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
 	}
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(ledger.RootHash(evictedTrie.RootHash()))
 	})
 	if err != nil {
@@ -316,10 +316,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		return ledger.State(hash.EmptyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
 
-	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
-	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("constructing empty trie failed: %w", err)
-	}
+	emptyTrie := trie.NewEmptyMTrie()
 
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	if err != nil {

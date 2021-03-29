@@ -31,7 +31,7 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -58,7 +58,7 @@ func Test_Compactor(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := ledger.RandomPaths(numInsPerStep, pathByteSize)
+				paths0 := ledger.RandomPaths(numInsPerStep)
 				payloads0 := ledger.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
@@ -71,6 +71,7 @@ func Test_Compactor(t *testing.T) {
 				err = wal.RecordUpdate(update)
 				require.NoError(t, err)
 
+				fmt.Println("WWWWW")
 				rootHash, err = f.Update(update)
 				require.NoError(t, err)
 
@@ -78,7 +79,7 @@ func Test_Compactor(t *testing.T) {
 
 				data := make(map[string]*ledger.Payload, len(paths))
 				for j, path := range paths {
-					data[string(path)] = payloads[j]
+					data[string(path[:])] = payloads[j]
 				}
 
 				savedData[string(rootHash[:])] = data
@@ -126,7 +127,7 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
@@ -158,7 +159,8 @@ func Test_Compactor(t *testing.T) {
 
 				paths := make([]ledger.Path, 0, len(data))
 				for pathString := range data {
-					path := []byte(pathString)
+					var path ledger.Path
+					copy(path[:], pathString)
 					paths = append(paths, path)
 				}
 
@@ -172,8 +174,8 @@ func Test_Compactor(t *testing.T) {
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[string(path)].Equals(payloads[i]))
-					require.True(t, data[string(path)].Equals(payloads2[i]))
+					require.True(t, data[string(path[:])].Equals(payloads[i]))
+					require.True(t, data[string(path[:])].Equals(payloads2[i]))
 				}
 			}
 
@@ -203,7 +205,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(pathByteSize, dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -223,7 +225,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := ledger.RandomPaths(numInsPerStep, pathByteSize)
+				paths0 := ledger.RandomPaths(numInsPerStep)
 				payloads0 := ledger.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path

@@ -90,11 +90,12 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 	}
 
 	hash := node.Hash()
+	path := node.Path()
 	storableNode := &StorableNode{
 		LIndex:     leftIndex,
 		RIndex:     rightIndex,
 		Height:     uint16(node.Height()),
-		Path:       node.Path(),
+		Path:       path[:],
 		EncPayload: encoding.EncodePayload(node.Payload()),
 		HashValue:  hash[:],
 		MaxDepth:   node.MaxDepth(),
@@ -155,7 +156,8 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 		}
 
 		if len(snode.Path) > 0 {
-			path := ledger.Path(snode.Path)
+			var path ledger.Path
+			copy(path[:], snode.Path)
 			payload, err := encoding.DecodePayload(snode.EncPayload)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode a payload for an storableNode %w", err)
@@ -168,7 +170,7 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 		}
 		var nodeHash hash.Hash
 		copy(nodeHash[:], snode.HashValue)
-		node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], nil, nil, nodeHash, snode.MaxDepth, snode.RegCount)
+		node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], ledger.EmptyPath, nil, nodeHash, snode.MaxDepth, snode.RegCount)
 		nodes = append(nodes, node)
 	}
 	return nodes, nil

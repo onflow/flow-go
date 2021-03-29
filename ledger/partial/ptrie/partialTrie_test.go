@@ -24,7 +24,7 @@ func withForest(
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
 
-	forest, err := mtrie.NewForest(pathByteSize, dir, numberOfActiveTries, &metrics.NoopCollector{}, nil)
+	forest, err := mtrie.NewForest(dir, numberOfActiveTries, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	f(t, forest)
@@ -48,7 +48,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting proofs values")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), pathByteSize, bp)
+		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
 
 		require.NoError(t, err, "error building partial trie")
 		if hash.Hash(rootHash) != psmt.root.HashValue() {
@@ -106,7 +106,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), pathByteSize, bp)
+		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if hash.Hash(rootHash) != psmt.root.HashValue() {
@@ -151,7 +151,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), pathByteSize, bp)
+		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if hash.Hash(f.GetEmptyRootHash()) != psmt.root.HashValue() {
@@ -203,7 +203,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), pathByteSize, bp)
+		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if hash.Hash(rootHash) != psmt.root.HashValue() {
@@ -259,7 +259,7 @@ func TestMixProof(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), pathByteSize, bp)
+		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
 		require.NoError(t, err, "error building partial trie")
 
 		if hash.Hash(rootHash) != psmt.root.HashValue() {
@@ -296,7 +296,7 @@ func TestRandomProofs(t *testing.T) {
 			rand.Seed(seed)
 			t.Logf("rand seed is %x", seed)
 			numberOfPaths := rand.Intn(256) + 1
-			paths := ledger.RandomPaths(numberOfPaths, pathByteSize)
+			paths := ledger.RandomPaths(numberOfPaths)
 			payloads := ledger.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
 			// keep a subset as initial insert and keep the rest for reading default values
 			split := rand.Intn(numberOfPaths)
@@ -315,7 +315,7 @@ func TestRandomProofs(t *testing.T) {
 			bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 			require.NoError(t, err, "error getting batch proof")
 
-			psmt, err := NewPSMT(hash.Hash(rootHash), pathByteSize, bp)
+			psmt, err := NewPSMT(hash.Hash(rootHash), bp)
 			require.NoError(t, err, "error building partial trie")
 
 			if hash.Hash(rootHash) != psmt.root.HashValue() {

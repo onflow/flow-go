@@ -35,7 +35,7 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 	}
 
 	// decode proof
-	psmt, err := ptrie.NewPSMT(hash.Hash(s), pathfinder.PathByteSize, batchProof)
+	psmt, err := ptrie.NewPSMT(hash.Hash(s), batchProof)
 
 	if err != nil {
 		// TODO provide more details based on the error type
@@ -80,12 +80,12 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 
 			for i, key := range query.Keys() {
 				path := paths[i]
-				pathToKey[string(path)] = key
+				pathToKey[string(path[:])] = key
 			}
 
 			keys := make([]ledger.Key, 0, len(pErr.Paths))
 			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[string(path)])
+				keys = append(keys, pathToKey[string(path[:])])
 			}
 			return nil, &ledger.ErrMissingKeys{Keys: keys}
 		}
@@ -128,12 +128,12 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 			for i, key := range update.Keys() {
 				path := paths[i]
-				pathToKey[string(path)] = key
+				pathToKey[string(path[:])] = key
 			}
 
 			keys := make([]ledger.Key, 0, len(pErr.Paths))
 			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[string(path)])
+				keys = append(keys, pathToKey[string(path[:])])
 			}
 			return emptyState, &ledger.ErrMissingKeys{Keys: keys}
 		}

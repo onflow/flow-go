@@ -40,14 +40,10 @@ type MTrie struct {
 }
 
 // NewEmptyMTrie returns an empty Mtrie (root is an empty node)
-func NewEmptyMTrie(pathByteSize int) (*MTrie, error) {
-	if pathByteSize < 1 {
-		return nil, errors.New("trie's path size [in bytes] must be positive")
-	}
+func NewEmptyMTrie() *MTrie {
 	return &MTrie{
-		root:         node.NewEmptyTreeRoot(),
-		pathByteSize: pathByteSize,
-	}, nil
+		root: node.NewEmptyTreeRoot(),
+	}
 }
 
 // NewMTrie returns a Mtrie given the root
@@ -55,21 +51,28 @@ func NewMTrie(root *node.Node) (*MTrie, error) {
 	if root.Height()%8 != 0 {
 		return nil, errors.New("height of root node must be integer-multiple of 8")
 	}
-	pathByteSize := root.Height() / 8
 	return &MTrie{
-		root:         root,
-		pathByteSize: pathByteSize,
+		root: root,
 	}, nil
 }
 
 // Height returns the height of the trie, which
 // is the height of its root node.
-func (mt *MTrie) Height() int { return mt.root.Height() }
+func (mt *MTrie) Height() int {
+	if mt.root == nil {
+		return hash.TreeMaxHeight
+	}
+	return mt.root.Height()
+}
 
 // StringRootHash returns the trie's Hex-encoded root hash.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) StringRootHash() string {
-	rootHash := mt.root.Hash()
+	var rootHash hash.Hash
+	if mt.root == nil {
+		rootHash = hash.GetDefaultHashForHeight(hash.TreeMaxHeight)
+	}
+	rootHash = mt.root.Hash()
 	return hex.EncodeToString(rootHash[:])
 }
 
@@ -77,17 +80,23 @@ func (mt *MTrie) StringRootHash() string {
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) RootHash() ledger.RootHash { return ledger.RootHash(mt.root.Hash()) }
 
-// PathLength return the length [in bytes] the trie operates with.
-// Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) PathLength() int { return mt.pathByteSize }
-
 // AllocatedRegCount returns the number of allocated registers in the trie.
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) AllocatedRegCount() uint64 { return mt.root.RegCount() }
+func (mt *MTrie) AllocatedRegCount() uint64 {
+	if mt.root == nil {
+		return 0
+	}
+	return mt.root.RegCount()
+}
 
 // MaxDepth returns the length of the longest branch from root to leaf.
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) MaxDepth() uint16 { return mt.root.MaxDepth() }
+func (mt *MTrie) MaxDepth() uint16 {
+	if mt.root == nil {
+		return 0
+	}
+	return mt.root.MaxDepth()
+}
 
 // RootNode returns the Trie's root Node
 // Concurrency safe (as Tries are immutable structures by convention)
@@ -128,7 +137,7 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 	// reached a leaf node
 	if head.IsLeaf() {
 		for i, p := range paths {
-			if bytes.Equal(head.Path(), p) {
+			if head.Path() == p {
 				(*res)[i] = head.Payload()
 			} else {
 				(*res)[i] = ledger.EmptyPayload()
@@ -175,7 +184,8 @@ func (mt *MTrie) read(res *[]*ledger.Payload, head *node.Node, paths []ledger.Pa
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, nil)
+	//updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, nil)
+	updatedRoot := parentTrie.update(hash.TreeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil)
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -219,7 +229,7 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 		parentPath := parentNode.Path()
 		found := false
 		for i, p := range paths {
-			if bytes.Equal(p, parentPath) {
+			if p == parentPath {
 				// the case where the leaf can be reused
 				if len(paths) == 1 {
 					if !bytes.Equal(parentNode.Payload().Value, payloads[i].Value) {
@@ -253,7 +263,8 @@ func (parentTrie *MTrie) update(nodeHeight int, parentNode *node.Node,
 	var lcompactLeaf, rcompactLeaf *node.Node
 	if compactLeaf != nil {
 		// if yes, check which branch it will go to.
-		if utils.Bit(compactLeaf.Path(), parentTrie.Height()-nodeHeight) == 0 {
+		path := compactLeaf.Path()
+		if utils.Bit(path[:], parentTrie.Height()-nodeHeight) == 0 {
 			lcompactLeaf = compactLeaf
 		} else {
 			rcompactLeaf = compactLeaf
@@ -307,7 +318,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	// we've reached a leaf
 	if head.IsLeaf() {
 		// value matches (inclusion proof)
-		if bytes.Equal(head.Path(), paths[0]) {
+		if head.Path() == paths[0] {
 			proofs[0].Path = head.Path()
 			proofs[0].Payload = head.Payload()
 			proofs[0].Inclusion = true
@@ -373,7 +384,7 @@ func (mt *MTrie) Equals(o *MTrie) bool {
 	if o == nil {
 		return false
 	}
-	return o.PathLength() == mt.PathLength() && o.RootHash() == mt.RootHash()
+	return o.RootHash() == mt.RootHash()
 }
 
 // DumpAsJSON dumps the trie key value pairs to a file having each key value pair as a json row
@@ -418,8 +429,8 @@ func (mt *MTrie) dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 }
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
-func EmptyTrieRootHash(pathByteSize int) ledger.RootHash {
-	return ledger.RootHash(hash.GetDefaultHashForHeight(8 * pathByteSize))
+func EmptyTrieRootHash() ledger.RootHash {
+	return ledger.RootHash(hash.GetDefaultHashForHeight(hash.TreeMaxHeight))
 }
 
 // AllPayloads returns all payloads
@@ -450,7 +461,7 @@ func (mt *MTrie) IsAValidTrie() bool {
 func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
-		bit := utils.Bit(path, bitIndex)
+		bit := utils.Bit(path[:], bitIndex)
 		if bit == 0 {
 			paths[i], paths[j] = paths[j], paths[i]
 			payloads[i], payloads[j] = payloads[j], payloads[i]
@@ -471,7 +482,7 @@ func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) i
 func splitPaths(paths []ledger.Path, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
-		bit := utils.Bit(path, bitIndex)
+		bit := utils.Bit(path[:], bitIndex)
 		if bit == 0 {
 			paths[i], paths[j] = paths[j], paths[i]
 			i++
@@ -492,7 +503,7 @@ func splitPaths(paths []ledger.Path, bitIndex int) int {
 func splitTrieProofsByPath(paths []ledger.Path, proofs []*ledger.TrieProof, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
-		bit := utils.Bit(path, bitIndex)
+		bit := utils.Bit(path[:], bitIndex)
 		if bit == 0 {
 			paths[i], paths[j] = paths[j], paths[i]
 			proofs[i], proofs[j] = proofs[j], proofs[i]

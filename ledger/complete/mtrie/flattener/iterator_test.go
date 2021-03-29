@@ -12,8 +12,7 @@ import (
 )
 
 func TestEmptyTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(1)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	itr := flattener.NewNodeIterator(emptyTrie)
 	require.True(t, nil == itr.Value()) // initial iterator should return nil
@@ -26,8 +25,7 @@ func TestEmptyTrie(t *testing.T) {
 }
 
 func TestPopulatedTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(1)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	// key: 0000...
 	p1 := ledger.PathByUint8(1)

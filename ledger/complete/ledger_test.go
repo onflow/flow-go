@@ -268,7 +268,6 @@ func TestLedgerFunctionality(t *testing.T) {
 	for e := 0; e < experimentRep; e++ {
 		numInsPerStep := 100
 		numHistLookupPerStep := 10
-		pathByteSize := 32
 		keyNumberOfParts := 10
 		keyPartMinByteSize := 1
 		keyPartMaxByteSize := 100
@@ -319,7 +318,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptrie.NewPSMT(hash.Hash(newState), pathByteSize, bProof)
+				_, err = ptrie.NewPSMT(hash.Hash(newState), bProof)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)
