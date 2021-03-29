@@ -66,7 +66,7 @@ func (c *TransactionAccountFrozenEnabler) Process(
 ) error {
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
-		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMDeductTransactionFees)
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMFrozenAccountCheckTransaction)
 		defer span.Finish()
 	}
 
