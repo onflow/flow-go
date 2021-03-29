@@ -162,6 +162,10 @@ func (i *TransactionInvocator) Process(
 	parentState := sth.State()
 	childState := sth.NewChild()
 	defer func() {
+		// an extra check for state holder health, this should never happen
+		if childState != sth.State() {
+			panic("child state doesn't match the active state on the state holder")
+		}
 		if mergeError := parentState.MergeState(childState); mergeError != nil {
 			panic(mergeError)
 		}
