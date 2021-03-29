@@ -50,6 +50,7 @@ const (
 	invalidVector
 	invalidComplaint
 	invalidComplaintAnswer
+	duplicatedMessages
 )
 
 type behavior int
@@ -63,6 +64,7 @@ const (
 	timeoutedComplaintBroadcast
 	invalidSharesComplainTrigger
 	invalidComplaintAnswerBroadcast
+	duplicatedSendAndBroadcast
 )
 
 // Testing Feldman VSS with the qualification system by simulating a network of n nodes
@@ -123,6 +125,10 @@ func testJointFeldman(t *testing.T) {
 	// unhappy path, with invalid complaint answers
 	t.Run(fmt.Sprintf("JointFeldman_InvalidComplaintAnswers_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
 		dkgCommonTest(t, jointFeldman, n, threshold, invalidComplaintAnswer)
+	})
+	// unhappy path, with duplicated messages (all types)
+	t.Run(fmt.Sprintf("JointFeldman_DuplicatedMessages_(n,t)=(%d,%d)", n, threshold), func(t *testing.T) {
+		dkgCommonTest(t, jointFeldman, n, threshold, duplicatedMessages)
 	})
 }
 
@@ -241,7 +247,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		}
 		// The participant (r1+r2) will send wrong shares and cause the 0..r1+r2-1 leaders to send complaints.
 		// This participant doesn't risk getting disqualified as the complaints against them
-		// are invalid and won't count.
+		// are invalid and won't count. The participant doesn't even answer the complaint.
 		processors[r1+r2].malicious = invalidSharesComplainTrigger
 		t.Logf("%d participants will be disqualified, %d other participants won't be disqualified.\n", r1, r2)
 
@@ -254,6 +260,13 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 			processors[i].malicious = invalidComplaintAnswerBroadcast
 		}
 		t.Logf("%d participants will be disqualified\n", r1)
+	case duplicatedMessages:
+		// r1 = r2 = 0
+		// node 0 will send duplicated shares, verif vector and complaint to all nodes
+		processors[0].malicious = duplicatedSendAndBroadcast
+		// node 1 is a complaint trigger, it sents a wrong share to 0 to trigger a complaint.
+		// it also sends duplicated complaint answers.
+		processors[1].malicious = invalidSharesComplainTrigger
 
 	default:
 		panic("test case not supported")
@@ -486,7 +499,8 @@ func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
 	go func() {
 		log.Infof("%d sending to %d", proc.current, dest)
 		if proc.malicious == fewInvalidShares || proc.malicious == manyInvalidShares ||
-			proc.malicious == invalidSharesComplainTrigger || proc.malicious == invalidComplaintAnswerBroadcast {
+			proc.malicious == invalidSharesComplainTrigger || proc.malicious == invalidComplaintAnswerBroadcast ||
+			proc.malicious == duplicatedSendAndBroadcast {
 			proc.invalidShareSend(dest, data)
 			return
 		}
@@ -518,6 +532,10 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 		recipients = proc.current // equal to r1+r2, which causes all r1+r2 to complain
 	case invalidComplaintAnswerBroadcast:
 		recipients = 0 // treat this case separately as the complaint trigger is the node n-1
+	case duplicatedSendAndBroadcast:
+		proc.honestSend(dest, data)
+		proc.honestSend(dest, data)
+		return
 	default:
 		panic("invalid share send not supported")
 	}
@@ -573,6 +591,11 @@ func (proc *testDKGProcessor) Broadcast(data []byte) {
 			proc.invalidComplaintBroadcast(data)
 		} else if data[0] == byte(feldmanVSSComplaintAnswer) && proc.malicious == invalidComplaintAnswerBroadcast {
 			proc.invalidComplaintAnswerBroadcast(data)
+		} else if proc.malicious == duplicatedSendAndBroadcast ||
+			(data[0] == byte(feldmanVSSComplaintAnswer) && proc.malicious == invalidSharesComplainTrigger) {
+			// the complaint trigger also sends duplicated complaint answers
+			proc.honestBroadcast(data)
+			proc.honestBroadcast(data)
 		} else {
 			proc.honestBroadcast(data)
 		}
