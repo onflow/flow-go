@@ -40,7 +40,7 @@ func prepare(cmd *cobra.Command, args []string) {
 
 	nodeID, err := readNodeID()
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read node ID")
+		log.Fatal().Err(err).Msg("could not read node ID from file")
 	}
 
 	err = generateKeys(flagBootDir, nodeID)
