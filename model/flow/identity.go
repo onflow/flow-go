@@ -227,9 +227,9 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 // appending new elements, re-ordering, or inserting new elements in an
 // existing index.
 func (il IdentityList) Copy() IdentityList {
-	dup := make(IdentityList, len(il))
-	copy(dup, il)
-	return dup
+	return il.Map(func(identity Identity) Identity {
+		return identity
+	})
 }
 
 // Selector returns an identity filter function that selects only identities
