@@ -32,7 +32,8 @@ const (
 
 	errCodeEncodingUnsupportedValue = 30
 
-	errCodeExecution = 100
+	errCodeExecution    = 100
+	errCodeUnknownError = 200
 )
 
 var ErrAccountNotFound = errors.New("account not found")
@@ -283,6 +284,19 @@ func (e *EncodingUnsupportedValueError) Error() string {
 
 func (e *EncodingUnsupportedValueError) Code() uint32 {
 	return errCodeEncodingUnsupportedValue
+}
+
+// UnknownError indicates that an unknown error that occurs during tx execution.
+type UnknownError struct {
+	msg string
+}
+
+func (e *UnknownError) Error() string {
+	return e.msg
+}
+
+func (e *UnknownError) Code() uint32 {
+	return errCodeUnknownError
 }
 
 func handleError(err error) (vmErr Error, fatalErr error) {
