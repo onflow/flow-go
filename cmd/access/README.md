@@ -81,6 +81,5 @@ It also supports GRPCWebproxy requests.
 The `ping` engine pings all the other nodes specified in the identity list via a [libp2p](https://github.com/libp2p/go-libp2p) ping and reports via metrics if the node is reachable or not.
 This helps identify nodes in the system which are unreachable.
 
-### Access node workflow
 
-[Sequence Diagram](/docs/AccessNodesSequenceDiagram.png)
+![Access node sequence diagram](/docs/AccessNodesSequenceDiagram.png)
