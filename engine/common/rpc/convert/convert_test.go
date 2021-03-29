@@ -23,7 +23,7 @@ func TestConvertTransaction(t *testing.T) {
 }
 
 func TestConvertAccountKey(t *testing.T) {
-	privateKey, _ := unittest.AccountKeyFixture()
+	privateKey, _ := unittest.AccountKeyDefaultFixture()
 	accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
 
 	// Explicitly test if Revoked is properly converted

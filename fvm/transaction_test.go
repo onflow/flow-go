@@ -18,7 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -52,7 +54,7 @@ func TestSafetyCheck(t *testing.T) {
 
 			contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-			ledger := state.NewMapLedger()
+			view := utils.NewSimpleView()
 
 			contractCode := `X`
 
@@ -62,14 +64,14 @@ func TestSafetyCheck(t *testing.T) {
 			encodedName, err := encodeContractNames([]string{"TestContract"})
 			require.NoError(t, err)
 
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"contract_names",
 				encodedName,
 			)
 			require.NoError(t, err)
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"code.TestContract",
@@ -79,14 +81,14 @@ func TestSafetyCheck(t *testing.T) {
 
 			context := NewContext(log)
 
-			st := state.NewState(
-				ledger,
+			sth := state.NewStateHolder(state.NewState(
+				view,
 				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-			)
+			))
 
-			err = txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+			err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -122,7 +124,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 
 		contractCode := `pub contract TestContract: X {}`
 
@@ -132,14 +134,14 @@ func TestSafetyCheck(t *testing.T) {
 		encodedName, err := encodeContractNames([]string{"TestContract"})
 		require.NoError(t, err)
 
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"contract_names",
 			encodedName,
 		)
 		require.NoError(t, err)
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"code.TestContract",
@@ -149,14 +151,14 @@ func TestSafetyCheck(t *testing.T) {
 
 		context := NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err = txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -178,17 +180,17 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		context := NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -211,17 +213,17 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		context := NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -262,13 +264,13 @@ func TestSafetyCheck(t *testing.T) {
 
 		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		header := unittest.BlockHeaderFixture()
 		context := NewContext(log, WithBlockHeader(&header))
 
-		st := state.NewState(ledger)
+		sth := state.NewStateHolder(state.NewState(view))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		require.Equal(t, 1, proc.Retried)

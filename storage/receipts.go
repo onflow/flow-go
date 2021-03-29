@@ -20,14 +20,17 @@ type ExecutionReceipts interface {
 
 	// ByBlockID retrieves all known execution receipts for the given block
 	// (from any Execution Node).
-	ByBlockID(blockID flow.Identifier) ([]*flow.ExecutionReceipt, error)
+	ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error)
 }
 
 // MyExecutionReceipts reuses the storage.ExecutionReceipts API, but doesn't expose
 // them. Instead, it includes the "My" in the method name in order to highlight the notion
 // of "MY execution receipt", from the viewpoint of an individual Execution Node.
 type MyExecutionReceipts interface {
-	// StoreMyReceipt stores the receipt and marks it as mine (trusted).
+	// StoreMyReceipt stores the receipt and marks it as mine (trusted). My
+	// receipts are indexed by the block whose result they compute. Currently,
+	// we only support indexing a _single_ receipt per block. Attempting to
+	// store conflicting receipts for the same block will error.
 	StoreMyReceipt(receipt *flow.ExecutionReceipt) error
 
 	// MyReceipt retrieves my receipt for the given block.

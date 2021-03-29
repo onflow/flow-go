@@ -38,6 +38,6 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 
 		// test storing same epoch setup
 		err = operation.RetryOnConflict(db.Update, store.StoreTx(expected))
-		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
+		require.NoError(t, err)
 	})
 }
