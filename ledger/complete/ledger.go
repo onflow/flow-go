@@ -159,7 +159,6 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 	go func() {
 		walChan <- l.wal.RecordUpdate(trieUpdate)
-		close(walChan)
 	}()
 
 	newRootHash, err := l.forest.Update(trieUpdate)
