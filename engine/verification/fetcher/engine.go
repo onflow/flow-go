@@ -38,10 +38,10 @@ type Engine struct {
 	con                   network.Conduit           // used to send the chunk data request
 	headers               storage.Headers           // used to fetch the block header when chunk data is ready to be verified
 	chunkConsumerNotifier module.ProcessingNotifier // to report a chunk has been processed
-
-	receiptsDB    storage.ExecutionReceipts // used to find executor of the chunk
-	retryInterval time.Duration             // determines time in milliseconds for retrying chunk data requests
-	maxAttempt    int                       // max time of retries to fetch the chunk data pack for a chunk
+	results               storage.ExecutionResults  // to retrieve execution result of an assigned chunk
+	receiptsDB            storage.ExecutionReceipts // used to find executor of the chunk
+	retryInterval         time.Duration             // determines time in milliseconds for retrying chunk data requests
+	maxAttempt            int                       // max time of retries to fetch the chunk data pack for a chunk
 }
 
 func New(
@@ -166,6 +166,14 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
+
+	result, err := e.results.ByID(locator.ResultID)
+	if err != nil {
+		e.log.Fatal().Err(err).
+			Hex("result_id", logging.ID(locator.ResultID)).
+			Uint64("chunk_index", locator.Index).
+			Msg("could not retrieve result for chunk locator")
+	}
 
 }
 
