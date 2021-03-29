@@ -144,10 +144,11 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction      SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction     SpanName = "fvm.executeTransaction"
-	FVMDeductTransactionFees  SpanName = "fvm.deductTransactionFees"
+	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
+	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
 
 	FVMEnvHash                      SpanName = "fvm.env.Hash"
 	FVMEnvValueExists               SpanName = "fvm.env.valueExists"
