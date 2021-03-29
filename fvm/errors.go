@@ -32,8 +32,8 @@ const (
 
 	errCodeEncodingUnsupportedValue = 30
 
-	errCodeExecution    = 100
-	errCodeUnknownError = 200
+	errCodeExecution        = 100
+	errCodeFVMInternalError = 200
 )
 
 var ErrAccountNotFound = errors.New("account not found")
@@ -286,17 +286,17 @@ func (e *EncodingUnsupportedValueError) Code() uint32 {
 	return errCodeEncodingUnsupportedValue
 }
 
-// UnknownError indicates that an unknown error that occurs during tx execution.
-type UnknownError struct {
+// FVMInternalError indicates that an internal error occurs during tx execution.
+type FVMInternalError struct {
 	msg string
 }
 
-func (e *UnknownError) Error() string {
+func (e *FVMInternalError) Error() string {
 	return e.msg
 }
 
-func (e *UnknownError) Code() uint32 {
-	return errCodeUnknownError
+func (e *FVMInternalError) Code() uint32 {
+	return errCodeFVMInternalError
 }
 
 func handleError(err error) (vmErr Error, fatalErr error) {
