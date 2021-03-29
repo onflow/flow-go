@@ -228,6 +228,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
 	containerBlock.Payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
+	containerBlock.Payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
 	containerBlock.Header.PayloadHash = containerBlock.Payload.Hash()
 
 	return CompleteExecutionResult{
