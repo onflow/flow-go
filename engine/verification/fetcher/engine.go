@@ -552,6 +552,14 @@ func (e *Engine) makeVerifiableChunkData(
 	}, nil
 }
 
+// HandleChunkDataPack is called by the chunk requester module everytime a new request chunk arrives.
+// The chunks are supposed to be deduplicated by the requester. So invocation of this method indicates arrival of a distinct
+// requested chunk.
+func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+	// TODO implement the logic
+	return nil
+}
+
 // CanTry returns checks the history attempts and determine whether a chunk request
 // can be tried again.
 func CanTry(maxAttempt int, chunk *ChunkStatus) bool {
