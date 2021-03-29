@@ -26,7 +26,7 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	flowNetwork := prepareNetwork(t)
+	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -38,13 +38,13 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
-	flowNetwork := prepareNetwork(t)
+	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	flowNetwork.Start(ctx)
-	// defer flowNetwork.Remove()
+	defer flowNetwork.Remove()
 
 	initialRoot := flowNetwork.Root()
 	chain := initialRoot.Header.ChainID.Chain()
@@ -71,6 +71,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 	flowNetwork.StopContainers()
 	flowNetwork.RemoveContainers()
+
 	flowNetwork.Start(ctx)
 
 	// Run MVP tests
@@ -94,7 +95,7 @@ func TestMVP_Emulator(t *testing.T) {
 	// _ = c
 }
 
-func prepareNetwork(t *testing.T) *testnet.FlowNetwork {
+func buildMVPNetConfig() testnet.NetworkConfig {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -119,9 +120,7 @@ func prepareNetwork(t *testing.T) *testnet.FlowNetwork {
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
-	conf := testnet.NewNetworkConfig("mvp", net)
-
-	return testnet.PrepareFlowNetwork(t, conf)
+	return testnet.NewNetworkConfig("mvp", net)
 }
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
