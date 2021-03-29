@@ -194,8 +194,15 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	rand := time.Now().UnixNano()
 	mrand.Seed(rand)
 	t.Logf("math rand seed is %d", rand)
+	// r1 and r2 is the number of malicious participants, each group with a slight diffrent behavior.
+	// - r1 participants of indices 0 to r1-1 behave maliciously and will get disqualified by honest participants.
+	// - r2 participants of indices r1 to r1+r2-1 will behave maliciously at first but will recover and won't be
+	// disqualified by honest nodes. The r2 participants may or may not obtain correct protocol results.
 	var r1, r2 int
-	var h int // h is the offset of the honest nodes to check the final protocol results are correct
+	// h is the index of the first honest participant. All participant with indices greater than or equal to h are honest.
+	// Checking the final protocol results is done for honest participants only.
+	// Whether the r2 participants belong to the honest participants or not depend on the malicious behavior (detailed below).
+	var h int
 
 	switch test {
 	case happyPath:

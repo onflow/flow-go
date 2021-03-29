@@ -1,12 +1,12 @@
 package run
 
 import (
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/fvm"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -30,8 +30,8 @@ func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 func GenerateExecutionState(
 	dbDir string,
 	accountKey flow.AccountPublicKey,
-	tokenSupply cadence.UFix64,
 	chain flow.Chain,
+	bootstrapOptions ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
 
@@ -41,5 +41,11 @@ func GenerateExecutionState(
 	}
 	defer ledgerStorage.CloseStorage()
 
-	return bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapLedger(ledgerStorage, accountKey, tokenSupply, chain)
+	return bootstrap.NewBootstrapper(
+		zerolog.Nop()).BootstrapLedger(
+		ledgerStorage,
+		accountKey,
+		chain,
+		bootstrapOptions...,
+	)
 }

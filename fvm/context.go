@@ -6,25 +6,28 @@ import (
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
 	Chain                            flow.Chain
-	ASTCache                         ASTCache
 	Blocks                           Blocks
 	Metrics                          *MetricsCollector
+	Tracer                           module.Tracer
 	GasLimit                         uint64
 	MaxStateKeySize                  uint64
 	MaxStateValueSize                uint64
 	MaxStateInteractionSize          uint64
 	EventCollectionByteSizeLimit     uint64
+	MaxNumOfTxRetries                uint8
 	BlockHeader                      *flow.Header
 	ServiceAccountEnabled            bool
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
 	CadenceLoggingEnabled            bool
+	AccountFreezeAvailable           bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
@@ -57,33 +60,37 @@ const AccountKeyWeightThreshold = 1000
 
 const (
 	DefaultGasLimit                     = 100_000 // 100K
-	DefaultEventCollectionByteSizeLimit = 128_000 // 128KB
+	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+	DefaultMaxNumOfTxRetries            = 3
 )
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
-		ASTCache:                         nil,
 		Blocks:                           nil,
 		Metrics:                          nil,
+		Tracer:                           nil,
 		GasLimit:                         DefaultGasLimit,
 		MaxStateKeySize:                  state.DefaultMaxKeySize,
 		MaxStateValueSize:                state.DefaultMaxValueSize,
 		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
 		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:                DefaultMaxNumOfTxRetries,
 		BlockHeader:                      nil,
 		ServiceAccountEnabled:            true,
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
+		AccountFreezeAvailable:           false,
 		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
+			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
 			NewTransactionFeeDeductor(),
+			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvocator(logger),
-			NewTransactionStorageLimiter(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
@@ -99,14 +106,6 @@ type Option func(ctx Context) Context
 func WithChain(chain flow.Chain) Option {
 	return func(ctx Context) Context {
 		ctx.Chain = chain
-		return ctx
-	}
-}
-
-// WithASTCache sets the AST cache for a virtual machine context.
-func WithASTCache(cache ASTCache) Option {
-	return func(ctx Context) Context {
-		ctx.ASTCache = cache
 		return ctx
 	}
 }
@@ -163,6 +162,16 @@ func WithBlockHeader(header *flow.Header) Option {
 	}
 }
 
+// WithAccountFreezeAvailable sets availability of account freeze function for a virtual machine context.
+//
+// With this option set to true, a setAccountFreeze function will be enabled for transactions processed by the VM
+func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
+	return func(ctx Context) Context {
+		ctx.AccountFreezeAvailable = accountFreezeAvailable
+		return ctx
+	}
+}
+
 // WithBlocks sets the block storage provider for a virtual machine context.
 //
 // The VM uses the block storage provider to provide historical block information to
@@ -180,6 +189,14 @@ func WithBlocks(blocks Blocks) Option {
 func WithMetricsCollector(mc *MetricsCollector) Option {
 	return func(ctx Context) Context {
 		ctx.Metrics = mc
+		return ctx
+	}
+}
+
+// WithTracer sets the tracer for a virtual machine context.
+func WithTracer(tr module.Tracer) Option {
+	return func(ctx Context) Context {
+		ctx.Tracer = tr
 		return ctx
 	}
 }

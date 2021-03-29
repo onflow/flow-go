@@ -245,7 +245,7 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 				}
 
 				senderWG.Done()
-			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
+			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.ReferenceBlock, completeER.Receipt)
 		}
 	}
 
@@ -390,7 +390,7 @@ func (suite *ConcurrencyTestSuite) bootstrapSystem(staked bool) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// bootstraps the system
-	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.log, suite.collector, suite.tracer, identities)
+	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.collector, suite.tracer, identities)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch

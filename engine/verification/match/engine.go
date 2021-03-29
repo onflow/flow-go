@@ -240,10 +240,11 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 
 	log.Info().
 		Int("total_assigned_chunks", len(chunks)).
+		Uints64("assigned_chunks_indices", chunks.Indices()).
 		Msg("chunk assignment done")
 
 	if len(chunks) == 0 {
-		// no chunk is assigned to this verifiaction node
+		// no chunk is assigned to this verification node
 		return nil
 	}
 
@@ -254,8 +255,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 		ExecutionResult: result,
 	}
 	if ok := e.results.Add(rdp); !ok {
-		log.Debug().
-			Msg("could not add result to results mempool")
+		log.Debug().Msg("could not add result to results mempool")
 		return nil
 	}
 
@@ -339,9 +339,10 @@ func (e *Engine) onTimer() {
 		chunkID := chunk.ID()
 
 		log := e.log.With().
-			Hex("chunk_id", logging.ID(chunkID)).
 			Hex("block_id", logging.ID(chunk.Chunk.BlockID)).
 			Hex("result_id", logging.ID(chunk.ExecutionResultID)).
+			Hex("chunk_id", logging.ID(chunkID)).
+			Uint64("chunk_index", chunk.Chunk.Index).
 			Logger()
 
 		header, err := e.headers.ByBlockID(chunk.Chunk.BlockID)
@@ -439,29 +440,25 @@ func (e *Engine) handleChunk(chunk *flow.Chunk, resultID flow.Identifier, execut
 	chunkID := chunk.ID()
 	status := NewChunkStatus(chunk, resultID, executorID)
 	added := e.pendingChunks.Add(status)
+	log := e.log.With().
+		Hex("result_id", logging.ID(status.ExecutionResultID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Uint64("chunk_index", chunk.Index).
+		Logger()
+
 	if !added {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
-			Msg("could not add chunk status to pendingChunks mempool")
+		log.Debug().Msg("could not add chunk status to pendingChunks mempool")
 		return
 	}
 
-	// attachs the chunk ID to its result ID for sake of memory cleanup tracking
+	// attaches the chunk ID to its result ID for sake of memory cleanup tracking
 	err := e.chunkIdsByResult.Append(resultID, chunkID)
 	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(status.ExecutionResultID)).
-			Msg("could not append chunk id to its result id")
+		log.Debug().Err(err).Msg("could not append chunk id to its result id")
 		return
 	}
 
-	e.log.Debug().
-		Hex("chunk_id", logging.ID(chunkID)).
-		Hex("result_id", logging.ID(status.ExecutionResultID)).
-		Msg("chunk marked assigned to this verification node")
+	e.log.Debug().Msg("chunk marked assigned to this verification node")
 }
 
 // handleChunkDataPack receives a chunk data pack, verifies its origin ID, pull other data to make a
@@ -475,7 +472,10 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 
 	log := e.log.With().
 		Hex("executor_id", logging.ID(originID)).
-		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).Logger()
+		Hex("chunk_data_pack_id", logging.Entity(chunkDataPack)).
+		Hex("collection_id", logging.ID(chunkDataPack.CollectionID)).
+		Hex("chunk_id", logging.ID(chunkID)).Logger()
+
 	log.Info().Msg("chunk data pack received")
 
 	// monitoring: increments number of received chunk data packs
@@ -572,33 +572,29 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 // If all assigned chunks of the corresponding result have been dropped, it also removes
 // the result from the memory.
 func (e *Engine) chunkMetaDataCleanup(chunkID, resultID flow.Identifier) {
+	log := e.log.With().
+		Hex("result_id", logging.ID(resultID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Logger()
 	err := e.chunkIdsByResult.RemIdFromKey(resultID, chunkID)
 	if err != nil {
-		e.log.Debug().
-			Err(err).
-			Hex("result_id", logging.ID(resultID)).
-			Hex("chunk_id", logging.ID(chunkID)).
-			Msg("could not dropped chunk")
+		log.Debug().Err(err).Msg("could not dropped chunk")
 		return
 	}
 
 	if e.chunkIdsByResult.Has(resultID) {
 		// there are still un-matched chunks correspond to this result
-		// so the result should not be cleanned.
+		// so the result should not be cleaned.
 		return
 	}
 
 	// no pending chunk is attached to this result, hence removes it
 	if ok := e.results.Rem(resultID); !ok {
-		e.log.Debug().
-			Hex("result_id", logging.ID(resultID)).
-			Msg("could not remove result")
+		log.Debug().Msg("could not remove result")
 		return
 	}
 
-	e.log.Info().
-		Hex("result_id", logging.ID(resultID)).
-		Msg("result successfully removed")
+	e.log.Info().Msg("result successfully removed")
 }
 
 // matchChunk performs the last step in matching pipeline for a chunk.

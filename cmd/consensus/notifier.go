@@ -3,11 +3,10 @@ package main
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	metricsconsumer "github.com/onflow/flow-go/module/metrics/hotstuff"
 	"github.com/onflow/flow-go/storage"

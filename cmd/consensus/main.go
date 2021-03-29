@@ -56,6 +56,7 @@ func main() {
 		resultLimit                            uint
 		approvalLimit                          uint
 		sealLimit                              uint
+		pendngReceiptsLimit                    uint
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
 		maxSealPerBlock                        uint
@@ -79,6 +80,7 @@ func main() {
 		receipts          mempool.ExecutionTree
 		approvals         mempool.Approvals
 		seals             mempool.IncorporatedResultSeals
+		pendingReceipts   mempool.PendingReceipts
 		prov              *provider.Engine
 		receiptRequester  *requester.Engine
 		syncCore          *synchronization.Core
@@ -96,6 +98,7 @@ func main() {
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
 			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
+			flags.UintVar(&pendngReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
@@ -204,6 +207,10 @@ func main() {
 			}
 			return nil
 		}).
+		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+			pendingReceipts = stdmap.NewPendingReceipts(pendngReceiptsLimit)
+			return nil
+		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
 			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
@@ -223,7 +230,8 @@ func main() {
 				engine.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
-				// requester.WithBatchThreshold(100),
+				requester.WithRetryInitial(2*time.Second),
+				requester.WithRetryMaximum(30*time.Second),
 			)
 			if err != nil {
 				return nil, err
@@ -246,6 +254,7 @@ func main() {
 				receipts,
 				approvals,
 				seals,
+				pendingReceipts,
 				chunkAssigner,
 				receiptValidator,
 				approvalValidator,
@@ -293,23 +302,23 @@ func main() {
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			// initialize the compliance engine
-			comp, err = compliance.New(
-				node.Logger,
+			core, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
-				conMetrics,
-				node.Network,
-				node.Me,
+				node.Metrics.Compliance,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				mutableState,
-				prov,
 				proposals,
-				syncCore,
-			)
+				syncCore)
+			if err != nil {
+				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -379,7 +388,14 @@ func main() {
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(node.Logger, mainMetrics, node.Tracer, node.Storage.Index, node.RootChainID)
+			notifier := createNotifier(
+				node.Logger,
+				mainMetrics,
+				node.Tracer,
+				node.Storage.Index,
+				node.RootChainID,
+			)
+			// make compliance engine as a FinalizationConsumer
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 

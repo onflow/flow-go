@@ -22,7 +22,7 @@ import (
 
 // TestTrieOperations tests adding removing and retrieving Trie from Forest
 func TestTrieOperations(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
@@ -58,7 +58,7 @@ func TestTrieOperations(t *testing.T) {
 // TestTrieUpdate updates the empty trie with some values and verifies that the
 // written values can be retrieved from the updated trie.
 func TestTrieUpdate(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	//      /  \        //
 	//    (X)  [~]      //
 	//////////////////////
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -121,11 +121,6 @@ func TestLeftEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, baseTrie.MaxDepth(), uint16(2))
 	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(2))
-	// resulting base trie:
-	// 16: (path:, hash:b07...4bd)[]
-	// 		15: (path:, hash:961...af6)[1]
-	// 			14: (path:1000000100000001, hash:7b6...095)[10]
-	// 			14: (path:1100000100000001, hash:a24...f52)[11]
 	fmt.Println("BASE TRIE:")
 	fmt.Println(baseTrie.String())
 
@@ -142,12 +137,6 @@ func TestLeftEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, updatedTrie.MaxDepth(), uint16(2))
 	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(3))
-	// expected updated Trie:
-	// 16: (path:, hash:ae6...645)[]
-	// 		15: (path:0000000100000001, hash:0ae...3ee)[0]
-	// 		15: (path:, hash:961...af6)[1]
-	// 			14: (path:1000000100000001, hash:7b6...095)[10]
-	// 			14: (path:1100000100000001, hash:a24...f52)[11]
 	fmt.Println("UPDATED TRIE:")
 	fmt.Println(updatedTrie.String())
 	paths = []ledger.Path{p1, p2, p3}
@@ -171,7 +160,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	//      /  \         //
 	//    [~]  (X)       //
 	///////////////////////
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -197,11 +186,6 @@ func TestRightEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, baseTrie.MaxDepth(), uint16(2))
 	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(2))
-	// resulting base trie:
-	// 16: (path:, hash:c6c...e2e)[]
-	// 		15: (path:, hash:abc...895)[0]
-	// 			14: (path:0000000100000001, hash:2d9...1c8)[00]
-	// 			14: (path:0100000000000001, hash:61e...d72)[01]
 	fmt.Println("BASE TRIE:")
 	fmt.Println(baseTrie.String())
 
@@ -219,12 +203,6 @@ func TestRightEmptyInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, updatedTrie.MaxDepth(), uint16(2))
 	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(3))
-	// expected updated Trie:
-	// 16: (path:, hash:e21...6cc)[]
-	// 		15: (path:, hash:abc...895)[0]
-	// 			14: (path:0000000100000001, hash:2d9...1c8)[00]
-	// 			14: (path:0100000000000001, hash:61e...d72)[01]
-	// 		15: (path:1000000100000001, hash:c9a...33e)[1]
 	fmt.Println("UPDATED TRIE:")
 	fmt.Println(updatedTrie.String())
 
@@ -251,7 +229,7 @@ func TestExpansionInsert(t *testing.T) {
 	//         [~]        //
 	////////////////////////
 
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -273,9 +251,6 @@ func TestExpansionInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, baseTrie.MaxDepth(), uint16(1))
 	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(1))
-	// resulting base trie:
-	// 16: (path:, hash:737...2a0)[]
-	// 		15: (path:1000000100000001, hash:c0e...0ca)[1]
 	fmt.Println("BASE TRIE:")
 	fmt.Println(baseTrie.String())
 
@@ -293,16 +268,6 @@ func TestExpansionInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, updatedTrie.MaxDepth(), uint16(7))
 	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(2))
-	// expected updated Trie:
-	// 16: (path:, hash:1a6...5c3)[]
-	// 		15: (path:, hash:810...713)[1]
-	// 			14: (path:, hash:1ad...0a8)[10]
-	// 				13: (path:, hash:b61...3d2)[100]
-	// 					12: (path:, hash:966...115)[1000]
-	// 						11: (path:, hash:0e2...f3f)[10000]
-	// 							10: (path:, hash:10b...e9a)[100000]
-	// 								9: (path:1000000100000001, hash:973...101)[1000000]
-	// 								9: (path:1000001000000001, hash:839...e32)[1000001]
 	fmt.Println("UPDATED TRIE:")
 	fmt.Println(updatedTrie.String())
 
@@ -330,7 +295,7 @@ func TestFullHouseInsert(t *testing.T) {
 	//    [~1]  [~2]     //
 	///////////////////////
 
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -360,12 +325,6 @@ func TestFullHouseInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, baseTrie.MaxDepth(), uint16(2))
 	require.Equal(t, baseTrie.AllocatedRegCount(), uint64(3))
-	// expected trie:
-	// 16: (path:, hash:9f5...00e)[]
-	// 		15: (path:0100000000000001, hash:590...108)[0]
-	// 		15: (path:, hash:961...af6)[1]
-	// 			14: (path:1000000100000001, hash:7b6...095)[10]
-	// 			14: (path:1100000100000001, hash:a24...f52)[11]
 	fmt.Println("BASE TRIE:")
 	fmt.Println(baseTrie.String())
 
@@ -386,14 +345,6 @@ func TestFullHouseInsert(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, updatedTrie.MaxDepth(), uint16(3))
 	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(4))
-	// expected trie:
-	// 16: (path:, hash:e2b...13e)[]
-	// 		15: (path:0100000000000001, hash:590...108)[0]
-	// 		15: (path:, hash:e5d...1b7)[1]
-	// 			14: (path:, hash:e71...3c1)[10]
-	// 				13: (path:1000000100000001, hash:bb7...85f)[100]
-	// 				13: (path:1010000000000001, hash:8bd...428)[101]
-	// 			14: (path:1100000100000001, hash:a24...f52)[11]
 	fmt.Println("UPDATED TRIE:")
 	fmt.Println(updatedTrie.String())
 
@@ -419,7 +370,7 @@ func TestLeafInsert(t *testing.T) {
 	//          /  \     //
 	//         ()  ()    //
 	///////////////////////
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -427,12 +378,12 @@ func TestLeafInsert(t *testing.T) {
 	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
-	// path: 0000000100000000
-	p1 := pathByUint8s([]uint8{uint8(1), uint8(0)}, pathByteSize)
+	// path: 000...0000000100000000
+	p1 := utils.PathByUint16LeftPadded(256)
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
-	// path: 0000000100000001
-	p2 := pathByUint8s([]uint8{uint8(1), uint8(1)}, pathByteSize)
+	// path: 000...0000000100000001
+	p2 := utils.PathByUint16LeftPadded(257)
 	v2 := payloadBySlices([]byte{'B'}, []byte{'B'})
 
 	paths := []ledger.Path{p1, p2}
@@ -443,15 +394,8 @@ func TestLeafInsert(t *testing.T) {
 
 	updatedTrie, err := forest.GetTrie(updatedRoot)
 	require.NoError(t, err)
-	require.Equal(t, updatedTrie.MaxDepth(), uint16(16))
+	require.Equal(t, updatedTrie.MaxDepth(), uint16(256))
 	require.Equal(t, updatedTrie.AllocatedRegCount(), uint64(2))
-	// expected trie:
-	// 16: (path:, hash:63c...d7f)[]
-	// 		15: (path:, hash:67f...6c7)[0]
-	//  		14: (path:, hash:4dd...cb4)[00]
-	//					...
-	//						0: (path:0000000100000000, hash:fa8...263)[0000000100000000]
-	//						0: (path:0000000100000001, hash:605...57d)[0000000100000001]
 	fmt.Println("TRIE:")
 	fmt.Println(updatedTrie.String())
 
@@ -466,7 +410,7 @@ func TestLeafInsert(t *testing.T) {
 // TestOverrideValue overrides an existing value in the trie (without any expansion)
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestOverrideValue(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -509,7 +453,7 @@ func TestOverrideValue(t *testing.T) {
 // same path. I.e. we update with (p0, v0) and (p0, v1)
 // We expect that the _last_ written value is persisted in the Trie
 func TestDuplicateOverride(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -542,10 +486,10 @@ func TestDuplicateOverride(t *testing.T) {
 
 }
 
-// TestReadSafety check if payload returned from a forest are safe against modification - ie. copy of the data
-// is returned, instead of a slice
+// TestReadSafety check if payload returned from a forest are safe against modification,
+// ie. copy of the data is returned, instead of a slice
 func TestReadSafety(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32 // path size of 256 bits
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -581,7 +525,7 @@ func TestReadSafety(t *testing.T) {
 
 // TestUpdateWithWrongPathSize verifies that attempting to update a trie with a wrong path size
 func TestUpdateWithWrongPathSize(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -590,7 +534,7 @@ func TestUpdateWithWrongPathSize(t *testing.T) {
 	require.NoError(t, err)
 
 	// short key
-	p1 := pathByUint8s([]uint8{uint8(1)}, 1)
+	p1 := pathByUint8s([]uint8{uint8(1)}, 31)
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 	paths := []ledger.Path{p1}
 	payloads := []*ledger.Payload{v1}
@@ -612,7 +556,7 @@ func TestUpdateWithWrongPathSize(t *testing.T) {
 
 // TestReadOrder tests that payloads from reading a trie are delivered in the order as specified by the paths
 func TestReadOrder(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -648,7 +592,7 @@ func TestReadOrder(t *testing.T) {
 // TestMixRead tests reading a mixture of set and unset registers.
 // We expect the default payload (nil) to be returned for unset registers.
 func TestMixRead(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -693,7 +637,7 @@ func TestMixRead(t *testing.T) {
 // TestReadWithDuplicatedKeys reads a the values for two keys, where both keys have the same value.
 // We expect that we receive the respective value twice in the return.
 func TestReadWithDuplicatedKeys(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -725,7 +669,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 
 // TestReadNonExistingPath tests reading an unset path.
 func TestReadNonExistingPath(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -751,7 +695,7 @@ func TestReadNonExistingPath(t *testing.T) {
 
 // TestReadWithWrongPathSize verifies that attempting to read a trie with wrong path size
 func TestReadWithWrongPathSize(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -769,7 +713,7 @@ func TestReadWithWrongPathSize(t *testing.T) {
 	require.NoError(t, err)
 
 	// key too short
-	p2 := pathByUint8s([]uint8{uint8(1)}, 1)
+	p2 := pathByUint8s([]uint8{uint8(1)}, 31)
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: []ledger.Path{p2}}
 	_, err = forest.Read(read)
 	require.Error(t, err)
@@ -781,14 +725,11 @@ func TestReadWithWrongPathSize(t *testing.T) {
 	require.Error(t, err)
 }
 
-// // TODO test read (multiple non exist in a branch)
-// // [AlexH] doesn't TestMixRead do this test?
-
 // TestForkingUpdates updates a base trie in two different ways. We expect
 // that for each update, a new trie is added to the forest preserving the
 // updated values independently of the other update.
 func TestForkingUpdates(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -853,7 +794,7 @@ func TestForkingUpdates(t *testing.T) {
 // Hence, the forest should de-duplicate the resulting two version of the identical trie
 // without an error.
 func TestIdenticalUpdateAppliedTwice(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -899,9 +840,9 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 }
 
 // TestRandomUpdateReadProof repeats a sequence of actions update, read and proof random paths
-// this simulates the common patern of actions on flow
+// this simulates the common pattern of actions on flow
 func TestRandomUpdateReadProof(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	minPayloadByteSize := 2
 	maxPayloadByteSize := 10
 	rep := 10
@@ -988,7 +929,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 // TestProofGenerationInclusion tests that inclusion proofs generated by a Trie pass verification
 func TestProofGenerationInclusion(t *testing.T) {
-	pathByteSize := 2 // path size of 16 bits
+	pathByteSize := 32
 	dir, err := ioutil.TempDir("", "test-mtrie-")
 	require.NoError(t, err)
 	defer os.RemoveAll(dir)
@@ -1020,7 +961,7 @@ func TestProofGenerationInclusion(t *testing.T) {
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
-	key := ledger.Key{KeyParts: []ledger.KeyPart{ledger.KeyPart{Type: 0, Value: keydata}}}
+	key := ledger.Key{KeyParts: []ledger.KeyPart{{Type: 0, Value: keydata}}}
 	value := ledger.Value(valuedata)
 	return &ledger.Payload{Key: key, Value: value}
 }

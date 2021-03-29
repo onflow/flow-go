@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -24,7 +25,11 @@ func TestGenerateExecutionState(t *testing.T) {
 	bootstrapDir, err := ioutil.TempDir("/tmp", "flow-integration-bootstrap")
 	require.NoError(t, err)
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := GenerateExecutionState(trieDir, pk, unittest.GenesisTokenSupply, flow.Testnet.Chain())
+	commit, err := GenerateExecutionState(
+		trieDir,
+		pk,
+		flow.Testnet.Chain(),
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 	fmt.Printf("sk: %v\n", sk)
 	fmt.Printf("pk: %v\n", pk)
