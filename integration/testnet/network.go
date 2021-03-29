@@ -78,7 +78,7 @@ type FlowNetwork struct {
 	root         *flow.Block
 	result       *flow.ExecutionResult
 	seal         *flow.Seal
-	bootstrapDir string
+	BootstrapDir string
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -363,7 +363,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		root:         root,
 		seal:         seal,
 		result:       result,
-		bootstrapDir: bootstrapDir,
+		BootstrapDir: bootstrapDir,
 	}
 
 	// add each node to the network
@@ -538,7 +538,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 }
 
 func (net *FlowNetwork) WriteRootSnapshot(data []byte) error {
-	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), data)
+	err := WriteJSON(filepath.Join(net.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot), data)
 	if err != nil {
 		return err
 	}
