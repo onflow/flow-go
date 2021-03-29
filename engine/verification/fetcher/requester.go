@@ -18,5 +18,5 @@ type ChunkDataPackRequester interface {
 type ChunkDataPackHandler interface {
 	// HandleChunkDataPack is called by the ChunkDataPackRequester anytime a new requested chunk arrives.
 	// It contains the logic of handling the chunk data pack.
-	HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error
+	HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection)
 }

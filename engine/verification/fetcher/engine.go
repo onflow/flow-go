@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -162,6 +163,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 
 	return nil
+}
+
+func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
+
 }
 
 // ProcessMyChunk processes the chunk that assigned to me. It should not be blocking since
@@ -390,48 +395,8 @@ func chooseChunkDataPackTarget(
 	return append(agrees, nonResponders...)
 }
 
-func (e *Engine) onChunkDataPack(
-	originID flow.Identifier,
-	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection,
-) error {
-	chunkID := chunkDataPack.ChunkID
+func (e *Engine) onChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
 
-	// make sure we still need it
-	status, exists := e.pendingChunks.ByID(chunkID)
-	if !exists {
-		return engine.NewInvalidInputErrorf(
-			"chunk's data pack is no longer needed, chunk id: %v", chunkID)
-	}
-
-	chunk := status.Chunk
-
-	// make sure the chunk data pack is valid
-	err := e.validateChunkDataPack(
-		chunk, originID, chunkDataPack, collection)
-	if err != nil {
-		return engine.NewInvalidInputErrorf(
-			"invalid chunk data pack for chunk: %v block: %v", chunkID, chunk.BlockID)
-	}
-
-	// make sure we won't process duplicated chunk data pack
-	removed := e.pendingChunks.Rem(chunkID)
-	if !removed {
-		return engine.NewInvalidInputErrorf(
-			"chunk not found in mempool, likely a race condition, chunk id: %v", chunkID)
-	}
-
-	// whenever we removed a chunk from pending chunks, we need to
-	// report that the job has been finished eventually
-	defer e.chunkConsumerNotifier.Notify(chunkID)
-
-	resultID := status.ExecutionResultID
-	err = e.verifyChunkWithChunkDataPack(chunk, resultID, chunkDataPack, collection)
-	if err != nil {
-		return fmt.Errorf("could not verify chunk with chunk data pack for result: %v: %w", resultID, err)
-	}
-
-	return nil
 }
 
 // verifyChunkWithChunkDataPack fetches the result for the executed block, and
@@ -555,8 +520,57 @@ func (e *Engine) makeVerifiableChunkData(
 // HandleChunkDataPack is called by the chunk requester module everytime a new request chunk arrives.
 // The chunks are supposed to be deduplicated by the requester. So invocation of this method indicates arrival of a distinct
 // requested chunk.
-func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
-	// TODO implement the logic
+func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
+	log := e.log.With().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+		Logger()
+
+	log.Info().Msg("chunk data pack arrived")
+
+	err := e.handleChunkDataPack(originID, chunkDataPack, collection)
+	if err != nil {
+		log.Debug().Err(err).Msg("could not handle chunk data pack")
+	}
+}
+
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+	chunkID := chunkDataPack.ChunkID
+
+	// make sure we still need it
+	status, exists := e.pendingChunks.ByID(chunkID)
+	if !exists {
+		return engine.NewInvalidInputErrorf(
+			"chunk's data pack is no longer needed, chunk id: %v", chunkID)
+	}
+
+	chunk := status.Chunk
+
+	// make sure the chunk data pack is valid
+	err := e.validateChunkDataPack(
+		chunk, originID, chunkDataPack, collection)
+	if err != nil {
+		return engine.NewInvalidInputErrorf(
+			"invalid chunk data pack for chunk: %v block: %v", chunkID, chunk.BlockID)
+	}
+
+	// make sure we won't process duplicated chunk data pack
+	removed := e.pendingChunks.Rem(chunkID)
+	if !removed {
+		return engine.NewInvalidInputErrorf(
+			"chunk not found in mempool, likely a race condition, chunk id: %v", chunkID)
+	}
+
+	// whenever we removed a chunk from pending chunks, we need to
+	// report that the job has been finished eventually
+	defer e.chunkConsumerNotifier.Notify(chunkID)
+
+	resultID := status.ExecutionResultID
+	err = e.verifyChunkWithChunkDataPack(chunk, resultID, chunkDataPack, collection)
+	if err != nil {
+		return fmt.Errorf("could not verify chunk with chunk data pack for result: %v: %w", resultID, err)
+	}
+
 	return nil
 }
 
