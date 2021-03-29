@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/state"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -377,41 +377,4 @@ func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.
 		return nil, nil, fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
 	}
 	return init, final, nil
-}
-
-// forkCrawler traverses the fork with the provided head. We start at the provided height
-// and work out way upwards until we arrive at the block with the provided ID. For each
-// visited block, we call the provided function.
-//
-// Note that internally, the forkCrawler is implemented as a recursive algorithm that crawls
-// the fork backwards (towards the genesis block) until it hits the specified height.
-func (v *receiptValidator) forkCrawler(
-	headID flow.Identifier,
-	lowestHeight uint64,
-	blockConsumer func(blockID flow.Identifier, payloadIndex *flow.Index) error,
-) error {
-	head, err := v.headers.ByBlockID(headID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve header for block %x: %w", headID, err)
-	}
-	if head.Height < lowestHeight {
-		return nil
-	}
-
-	// descend further down the chain
-	err = v.forkCrawler(head.ParentID, lowestHeight, blockConsumer)
-	if err != nil {
-		return err
-	}
-
-	// now we are on our way back up
-	index, err := v.index.ByBlockID(headID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve payload index for block %x: %w", headID, err)
-	}
-	err = blockConsumer(headID, index)
-	if err != nil {
-		return fmt.Errorf("error in consumer function at height %d (block %x): %w", head.Height, headID, err)
-	}
-	return nil
 }
