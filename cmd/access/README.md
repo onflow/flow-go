@@ -82,4 +82,4 @@ The `ping` engine pings all the other nodes specified in the identity list via a
 This helps identify nodes in the system which are unreachable.
 
 
-![Access node sequence diagram](/docs/AccessNodesSequenceDiagram.png)
+![Access node sequence diagram](/docs/AccessNodeSequenceDiagram.png)
