@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -23,38 +24,36 @@ import (
 func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
-			unittest.RunWithTempDir(t, func(dbDir string) {
-				metricsCollector := &metrics.NoopCollector{}
-				ls, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, ledger.DefaultPathFinderVersion)
-				//ls, err := ledger.NewMTrieStorage(dbDir, 100, metricsCollector, nil)
-				require.NoError(t, err)
+			metricsCollector := &metrics.NoopCollector{}
+			diskWal := &fixtures.NoopWAL{}
+			ls, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
+			require.NoError(t, err)
 
-				ctrl := gomock.NewController(t)
+			ctrl := gomock.NewController(t)
 
-				stateCommitments := mocks.NewMockCommits(ctrl)
-				blocks := mocks.NewMockBlocks(ctrl)
-				headers := mocks.NewMockHeaders(ctrl)
-				collections := mocks.NewMockCollections(ctrl)
-				events := mocks.NewMockEvents(ctrl)
-				serviceEvents := mocks.NewMockEvents(ctrl)
-				txResults := mocks.NewMockTransactionResults(ctrl)
+			stateCommitments := mocks.NewMockCommits(ctrl)
+			blocks := mocks.NewMockBlocks(ctrl)
+			headers := mocks.NewMockHeaders(ctrl)
+			collections := mocks.NewMockCollections(ctrl)
+			events := mocks.NewMockEvents(ctrl)
+			serviceEvents := mocks.NewMockEvents(ctrl)
+			txResults := mocks.NewMockTransactionResults(ctrl)
 
-				stateCommitment := ls.InitialState()
+			stateCommitment := ls.InitialState()
 
-				stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
+			stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
 
-				chunkDataPacks := new(storage.ChunkDataPacks)
+			chunkDataPacks := new(storage.ChunkDataPacks)
 
-				results := new(storage.ExecutionResults)
-				receipts := new(storage.ExecutionReceipts)
-				myReceipts := new(storage.MyExecutionReceipts)
+			results := new(storage.ExecutionResults)
+			receipts := new(storage.ExecutionReceipts)
+			myReceipts := new(storage.MyExecutionReceipts)
 
-				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, receipts, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
-				)
+			es := state.NewExecutionState(
+				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, receipts, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
+			)
 
-				f(t, es)
-			})
+			f(t, es)
 		})
 	}
 }
