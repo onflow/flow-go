@@ -2,11 +2,13 @@ package fetcher
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -17,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -165,8 +168,27 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
+// ProcessAssignedChunk is the entry point of fetcher engine.
+// It pushes the assigned chunk down the pipeline with tracing on it enabled.
+// Through the pipeline the chunk data pack for this chunk is requested, a verifiable chunk is shaped for it,
+// and is pushed to the verifier engine for verification.
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
+	locatorID := locator.ID()
+	span, ok := e.tracer.GetSpan(locatorID, trace.VERProcessAssignedChunk)
+	if !ok {
+		span = e.tracer.StartSpan(locatorID, trace.VERProcessAssignedChunk)
+		span.SetTag("chunk_locator_id", locatorID)
+		defer span.Finish()
+	}
 
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleChunkLocator, func() {
+		e.processAssignedChunkWithTracing(ctx, locator)
+	})
+}
+
+//
+func (e *Engine) processAssignedChunkWithTracing(ctx context.Context, locator *chunks.Locator) {
 	result, err := e.results.ByID(locator.ResultID)
 	if err != nil {
 		e.log.Fatal().Err(err).
@@ -175,6 +197,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 			Msg("could not retrieve result for chunk locator")
 	}
 
+	chunk := result.Chunks[locator.Index]
 }
 
 // ProcessMyChunk processes the chunk that assigned to me. It should not be blocking since
@@ -220,43 +243,47 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 	}
 }
 
-func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.Identifier) error {
-	blockID := c.ChunkBody.BlockID
-	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
-	}
+func (e *Engine) processChunk(index uint64, blockID flow.Identifier) {
 
-	var receipts []*flow.ExecutionReceipt
-	copy(receipts, receiptsData)
-
-	agrees, disagrees := executorsOf(receipts, resultID)
-	// chunk data pack request will only be sent to executors who produced the same result,
-	// never to who produced different results.
-	status := NewChunkStatus(c, resultID, header.Height, agrees, disagrees)
-	added := e.pendingChunks.Add(status)
-	if !added {
-		return nil
-	}
-
-	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return fmt.Errorf("could not find executors: %w", err)
-	}
-
-	err = e.requestChunkDataPack(status, allExecutors)
-	if err != nil {
-		return fmt.Errorf("could not request chunk data pack: %w", err)
-	}
-
-	// requesting a chunk data pack is async, when we receive it
-	// we will resume processing, and eventually call Notify
-	// again.
-	// in case we never receive the chunk data pack response, we need
-	// to make sure Notify is still called, because the
-	// consumer is still waiting for it to report finish processing,
-	return nil
 }
+
+//func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.Identifier) error {
+//	blockID := c.ChunkBody.BlockID
+//	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
+//	if err != nil {
+//		return fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
+//	}
+//
+//	var receipts []*flow.ExecutionReceipt
+//	copy(receipts, receiptsData)
+//
+//	agrees, disagrees := executorsOf(receipts, resultID)
+//	// chunk data pack request will only be sent to executors who produced the same result,
+//	// never to who produced different results.
+//	status := NewChunkStatus(c, resultID, header.Height, agrees, disagrees)
+//	added := e.pendingChunks.Add(status)
+//	if !added {
+//		return nil
+//	}
+//
+//	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+//	if err != nil {
+//		return fmt.Errorf("could not find executors: %w", err)
+//	}
+//
+//	err = e.requestChunkDataPack(status, allExecutors)
+//	if err != nil {
+//		return fmt.Errorf("could not request chunk data pack: %w", err)
+//	}
+//
+//	// requesting a chunk data pack is async, when we receive it
+//	// we will resume processing, and eventually call Notify
+//	// again.
+//	// in case we never receive the chunk data pack response, we need
+//	// to make sure Notify is still called, because the
+//	// consumer is still waiting for it to report finish processing,
+//	return nil
+//}
 
 func blockIsSealed(state protocol.State, headers storage.Headers, blockID flow.Identifier) (bool, *flow.Header, error) {
 	header, err := headers.ByBlockID(blockID)
@@ -540,6 +567,21 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	if err != nil {
 		log.Debug().Err(err).Msg("could not handle chunk data pack")
 	}
+}
+
+// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the chunk ID has been sealed and
+// hence the requester will no longer request it.
+//
+// When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
+// through HandleChunkDataPack).
+func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
+	e.onChunkWorkDone(chunkID)
+}
+
+// onChunkWorkDone is called whenever the engine is done processing a chunk. It cleans up the resources allocated for this chunk and
+// lets the consumer know that it is done with this chunk.
+func (e *Engine) onChunkWorkDone(chunkID flow.Identifier) {
+
 }
 
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
