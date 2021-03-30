@@ -171,7 +171,6 @@ func (s *State) NewChild() *State {
 
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(other *State) error {
-
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
