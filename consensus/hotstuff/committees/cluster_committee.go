@@ -94,7 +94,7 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 	if isRootBlock {
 		identity, ok := c.initialClusterMembers.ByNodeID(nodeID)
 		if !ok {
-			return nil, protocol.IdentityNotFoundError{NodeID: nodeID}
+			return nil, model.ErrInvalidSigner
 		}
 		return identity, nil
 	}
