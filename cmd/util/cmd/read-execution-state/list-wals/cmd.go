@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 var flagExecutionStateDir string
@@ -34,9 +35,10 @@ func Init() *cobra.Command {
 func run(*cobra.Command, []string) {
 	startTime := time.Now()
 
-	w, err := wal.NewWAL(
+	w, err := wal.NewDiskWAL(
 		zerolog.Nop(),
 		nil,
+		metrics.NewNoopCollector(),
 		flagExecutionStateDir,
 		complete.DefaultCacheSize,
 		pathfinder.PathByteSize,
@@ -45,6 +47,9 @@ func run(*cobra.Command, []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")
 	}
+	defer func() {
+		<-w.Done()
+	}()
 
 	err = w.ReplayLogsOnly(
 		func(forestSequencing *flattener.FlattenedForest) error {

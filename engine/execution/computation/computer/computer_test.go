@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -39,7 +40,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -66,7 +67,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		// create an empty block
@@ -94,7 +95,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -218,7 +219,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
@@ -279,7 +280,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -348,7 +349,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -444,7 +445,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
