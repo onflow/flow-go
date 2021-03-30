@@ -20,6 +20,7 @@ func TestProduceVote(t *testing.T) {
 	t.Run("should not vote for block with the same view as the last voted view", testEqualLastVotedView)
 	t.Run("should not vote for block with its view below the last voted view", testBelowLastVotedView)
 	t.Run("should not vote for the same view again", testVotingAgain)
+	t.Run("should not vote while not a committee member", testVotingWhileNonCommitteeMember)
 }
 
 func createVoter(t *testing.T, blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Block, *model.Vote, *Voter) {
@@ -136,6 +137,19 @@ func testVotingAgain(t *testing.T) {
 	_, err = voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "not above the last voted view")
+}
+
+func testVotingWhileNonCommitteeMember(t *testing.T) {
+	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), true, false
+
+	// create voter
+	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+
+	// produce vote
+	_, err := voter.ProduceVoteIfVotable(block, curView)
+
+	require.Error(t, err)
+	require.True(t, model.IsNoVoteError(err))
 }
 
 func makeVote(block *model.Block) *model.Vote {
