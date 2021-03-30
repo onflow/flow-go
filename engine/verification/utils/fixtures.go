@@ -406,7 +406,7 @@ func ExecutionResultsFromParentBlockFixture(t *testing.T, parent *flow.Header, b
 		result, data := ExecutionResultFromParentBlockFixture(t, parent, builder)
 
 		// makes several copies of the same result
-		for copy := 0; copy < builder.copyCount; copy++ {
+		for cp := 0; cp < builder.copyCount; cp++ {
 			allData = append(allData, data)
 			allResults = append(allResults, result)
 		}
