@@ -123,14 +123,6 @@ const (
 	VERAssignerChunkAssignment        SpanName = "ver.assigner.chunkAssignment"
 	VERAssignerProcessChunk           SpanName = "ver.assigner.processChunk"
 
-	// fetcher engine
-	VERProcessAssignedChunk SpanName = "ver.processAssignedChunk"
-	// children of VERProcessAssignedChunk
-	VERFetcherHandleChunkLocator SpanName = "ver.fetcher.handleAssignedChunkLocator"
-	//VERAssignerHandleExecutionReceipt SpanName = "ver.assigner.handleExecutionReceipt"
-	//VERAssignerChunkAssignment        SpanName = "ver.assigner.chunkAssignment"
-	//VERAssignerProcessChunk           SpanName = "ver.assigner.processChunk"
-
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
 	VERFindHandleExecutionReceipt SpanName = "ver.find.handleExecutionReceipt"
@@ -149,6 +141,9 @@ const (
 	VERVerVerifyWithMetrics       SpanName = "ver.verify.verifyWithMetrics"
 	VERVerChunkVerify             SpanName = "ver.verify.ChunkVerifier.Verify"
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
+	// fetcher engine
+	// children of VERProcessAssignedChunk
+	VERFetcherHandleChunkLocator SpanName = "ver.fetcher.handleAssignedChunkLocator"
 
 	// Flow Virtual Machine
 	FVMVerifyTransaction            SpanName = "fvm.verifyTransaction"
