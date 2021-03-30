@@ -37,27 +37,13 @@ func (av *AggregationVerifier) Verify(msg []byte, sig crypto.Signature, key cryp
 // provided public keys.
 func (av *AggregationVerifier) VerifyMany(msg []byte, sig crypto.Signature, keys []crypto.PublicKey) (bool, error) {
 
-	// NOTE: for now, we simply split the concatenated signature into its parts and verify each
-	// of them separately; in the future, this will be replaced by real aggregated signature verification
-	c := &Combiner{}
-	sigs, err := c.Split(sig)
+	// bls multi-signature verification with a single message
+	valid, err := crypto.VerifyBLSSignatureOneMessage(keys, sig, msg, av.hasher)
 	if err != nil {
-		return false, fmt.Errorf("could not split signatures: %w", err)
-	}
-	if len(keys) != len(sigs) {
-		return false, fmt.Errorf("invalid number of public keys (signatures: %d, keys: %d)", len(sigs), len(keys))
-	}
-	for i, sig := range sigs {
-		valid, err := av.Verify(msg, sig, keys[i])
-		if err != nil {
-			return false, fmt.Errorf("could not verify signature (index: %d): %w", i, err)
-		}
-		if !valid {
-			return false, nil
-		}
+		return false, fmt.Errorf("could not verify aggregated signature: %w", err)
 	}
 
-	return true, nil
+	return valid, nil
 }
 
 // AggregationProvider is an aggregating signer and verifier that can create/verify
@@ -89,13 +75,10 @@ func (ap *AggregationProvider) Sign(msg []byte) (crypto.Signature, error) {
 // Aggregate will aggregate the given signatures into one aggregated signature.
 func (ap *AggregationProvider) Aggregate(sigs []crypto.Signature) (crypto.Signature, error) {
 
-	// NOTE: the current implementation simply concatenates all signatures; this
-	// will be replace by real AggregationProvider signature aggregation once available
-	c := &Combiner{}
-	sig, err := c.Join(sigs...)
+	// BLS aggregation
+	sig, err := crypto.AggregateBLSSignatures(sigs)
 	if err != nil {
-		return nil, fmt.Errorf("could not combine signatures: %w", err)
+		return nil, fmt.Errorf("could not aggregate signatures: %w", err)
 	}
-
 	return sig, nil
 }

@@ -113,9 +113,10 @@ func TestSingleQC(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, valid, "original QC should be valid")
 
-	// verification with missing identity should be invalid
+	// verification with with not enough voters is invalid
 	valid, err = signers[0].VerifyQC(voterIDs[:minShares-1], qc.SigData, block)
-	assert.Error(t, err, "verification with missing voter ID should not work")
+	require.NoError(t, err)
+	assert.False(t, valid, "verification with missing voter ID should not work")
 
 	// verification with changed signature should fail
 	// TODO: change error handling so split failure and invalid signature are
