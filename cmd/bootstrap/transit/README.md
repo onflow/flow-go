@@ -34,10 +34,7 @@ After bootstrapping, running `transit pull` will:
 
    - `dkg-data.pub.json`
    - `node-infos.pub.json`
-   - `root-block.json`
-   - `root-qc.json`
-   - `root-result.json`
-   - `root-seal.json`
+   - `root-protocol-snapshot.json`
    - `execution-state [dir]`
    - `<id>.random-beacon.priv.json.enc`
 
