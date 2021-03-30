@@ -23,6 +23,9 @@ import (
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 3
 
+var preferredENIdentifiers flow.IdentifierList
+var fixedENIdentifiers flow.IdentifierList
+
 // Backends implements the Access API.
 //
 // It is composed of several sub-backends that implement part of the Access API.
@@ -65,6 +68,8 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	preferredExecutionNodeIDs []string,
+	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 ) *Backend {
 	retry := newRetry()
@@ -132,7 +137,30 @@ func New(
 
 	retry.SetBackend(b)
 
+	var err error
+	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+	}
+
+	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+	}
+
 	return b
+}
+
+func identifierList(ids []string) (flow.IdentifierList, error) {
+	idList := make(flow.IdentifierList, len(ids))
+	for i, idStr := range ids {
+		id, err := flow.HexStringToIdentifier(idStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %v", id, err)
+		}
+		idList[i] = id
+	}
+	return idList, nil
 }
 
 func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *access.TransactionValidator {
@@ -279,14 +307,40 @@ func executionNodesForBlockID(
 		return flow.IdentityList{}, nil
 	}
 
-	// find the node identities of these execution nodes
-	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executorIDs...))
+	// choose one of the preferred execution nodes
+	subsetENs, err := chooseExecutionNodes(state, executorIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
 	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom := executionIdentities.Sample(maxExecutionNodesCnt)
+	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
 
 	return executionIdentitiesRandom, nil
+}
+
+// chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
+// choosing the preferred execution nodes which have executed the transaction. If no such preferred
+// execution nodes are found, then the fixed execution nodes defined in the identity table are returned
+// e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
+// and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
+func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentityList, error) {
+
+	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
+	}
+
+	// find the preferred execution node IDs which have executed the transaction
+	preferredENIDs := allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
+		filter.HasNodeID(executorIDs...)))
+
+	if len(preferredENIDs) > 0 {
+		return preferredENIDs, nil
+	}
+
+	// if no such preferred ID is found, then choose the fixed EN IDs
+	fixedENIDs := allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
+
+	return fixedENIDs, nil
 }
