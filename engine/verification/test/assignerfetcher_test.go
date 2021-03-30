@@ -94,7 +94,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf(tc.msg), func(t *testing.T) {
+		t.Run(tc.msg, func(t *testing.T) {
 			withConsumers(t, tc.staked, tc.blockCount, func(
 				blockConsumer *blockconsumer.BlockConsumer,
 				chunkConsumer *chunkconsumer.ChunkConsumer,
