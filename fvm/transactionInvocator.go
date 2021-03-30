@@ -200,7 +200,7 @@ func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []r
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
-
+		// TODO return the errors instead of panicing
 		setAccountFrozen := runtime.ValueDeclaration{
 			Name: "setAccountFrozen",
 			Type: &sema.FunctionType{
@@ -227,16 +227,18 @@ func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []r
 				func(invocation interpreter.Invocation) interpreter.Value {
 					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 					if !ok {
-						panic(fmt.Errorf("first argument must be an address"))
+						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+							"first argument of setAccountFrozen must be an address"))
 					}
 
 					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
 					if !ok {
-						panic(fmt.Errorf("second argument must be a boolean"))
+						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+							"second argument of setAccountFrozen must be a boolean"))
 					}
 					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
 					if err != nil {
-						panic(fmt.Errorf("cannot set account frozen: %w", err))
+						panic(err)
 					}
 
 					return interpreter.VoidValue{}
