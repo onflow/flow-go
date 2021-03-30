@@ -380,7 +380,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "code deployment requires authorization from specific accounts")
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 
@@ -407,7 +407,7 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "code deployment requires authorization from specific accounts")
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 }
