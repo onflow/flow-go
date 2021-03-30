@@ -37,6 +37,7 @@ const (
 	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
 
 	// base errors 1050 - 1100
+	ErrCodeFVMInternalError            ErrorCode = 1050
 	ErrCodeValueError                  ErrorCode = 1051
 	ErrCodeInvalidArgumentError        ErrorCode = 1052
 	ErrCodeInvalidAddressError         ErrorCode = 1053
@@ -46,7 +47,7 @@ const (
 	ErrCodeOperationNotSupportedError  ErrorCode = 1057
 
 	// execution errors 1100 - 1200
-	// ErrCodeExecutionError                 ErrorCode = 1000 - reserved
+	// ErrCodeExecutionError                 ErrorCode = 1100 - reserved
 	ErrCodeCadenceRunTimeError                ErrorCode = 1101
 	ErrCodeEncodingUnsupportedValue           ErrorCode = 1102
 	ErrCodeStorageCapacityExceeded            ErrorCode = 1103

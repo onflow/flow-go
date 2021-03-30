@@ -66,6 +66,22 @@ func (i *TransactionInvocator) Process(
 	parentState := sth.State()
 	childState := sth.NewChild()
 	defer func() {
+		// an extra check for state holder health, this should never happen
+		if childState != sth.State() {
+			// error transaction
+			msg := "child state doesn't match the active state on the state holder"
+			i.logger.Error().
+				Str("txHash", proc.ID.String()).
+				Uint64("blockHeight", blockHeight).
+				Msg(msg)
+
+			// drop delta
+			childState.View().DropDelta()
+			proc.Err = &FVMInternalError{msg}
+			proc.Logs = make([]string, 0)
+			proc.Events = make([]flow.Event, 0)
+			proc.ServiceEvents = make([]flow.Event, 0)
+		}
 		if mergeError := parentState.MergeState(childState); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
 		}
