@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -101,7 +102,7 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 		programs := programs.NewEmptyPrograms()
 
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, nil, nil, log)
+		bc, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), log)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
