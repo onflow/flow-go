@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionAccountFrozenChecker struct{}
@@ -63,6 +64,11 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	_ *state.StateHolder,
 	_ *programs.Programs,
 ) error {
+
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMFrozenAccountCheckTransaction)
+		defer span.Finish()
+	}
 
 	serviceAddress := ctx.Chain.ServiceAddress()
 
