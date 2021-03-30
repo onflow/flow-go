@@ -91,7 +91,7 @@ func EnoughThresholdShares(size int, shares int) (bool, error) {
 	return enoughShares, nil
 }
 
-// Reconstruct will combine the provided public signature shares to attempt and reconstruct a threshold
+// Reconstruct will combine the provided signature shares to attempt and reconstruct a threshold
 // signature for the group of the given size. The indices represent the index for ech signature share
 // within the DKG algorithm.
 func (tp *ThresholdProvider) Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {

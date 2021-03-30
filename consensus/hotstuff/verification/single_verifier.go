@@ -6,15 +6,15 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 )
 
 // SingleVerifier is a verifier capable of verifying a single signature in the
 // signature data for its validity. It is used with an aggregating signature scheme.
 type SingleVerifier struct {
-	committee hotstuff.Committee
-	verifier  module.AggregatingVerifier
+	committee      hotstuff.Committee
+	verifier       module.AggregatingVerifier
+	keysAggregator *stakingKeysAggregator
 }
 
 // NewSingleVerifier creates a new single verifier with the given dependencies:
@@ -22,26 +22,15 @@ type SingleVerifier struct {
 // - the verifier is used to verify the signatures against the message;
 func NewSingleVerifier(committee hotstuff.Committee, verifier module.AggregatingVerifier) *SingleVerifier {
 	s := &SingleVerifier{
-		committee: committee,
-		verifier:  verifier,
+		committee:      committee,
+		verifier:       verifier,
+		keysAggregator: newStakingKeysAggregator(),
 	}
 	return s
 }
 
 // VerifyVote verifies a vote with a single signature as signature data.
-func (s *SingleVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-
-	// get the participants from the selector set
-	participants, err := s.committee.Identities(block.BlockID, filter.Any)
-	if err != nil {
-		return false, fmt.Errorf("error retrieving consensus participants for block %x: %w", block.BlockID, err)
-	}
-
-	// get the identity of the voter
-	voter, ok := participants.ByNodeID(voterID)
-	if !ok {
-		return false, fmt.Errorf("voter %x is not a valid consensus participant at block %x: %w", voterID, block.BlockID, model.ErrInvalidSigner)
-	}
+func (s *SingleVerifier) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the message we verify against and check signature
 	msg := makeVoteMessage(block.View, block.BlockID)
@@ -54,20 +43,18 @@ func (s *SingleVerifier) VerifyVote(voterID flow.Identifier, sigData []byte, blo
 }
 
 // VerifyQC verifies a QC with a single aggregated signature as signature data.
-func (s *SingleVerifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-
-	// get the full Identities of the signers
-	signers, err := s.committee.Identities(block.BlockID, filter.HasNodeID(voterIDs...))
-	if err != nil {
-		return false, fmt.Errorf("could not get signer identities: %w", err)
-	}
-	if len(signers) < len(voterIDs) { // check we have valid consensus member Identities for all signers
-		return false, fmt.Errorf("duplicate or invalid signer IDs in QC for block %x: %w", block.BlockID, model.ErrInvalidSigner)
-	}
+func (s *SingleVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the message we verify against and check signature
 	msg := makeVoteMessage(block.View, block.BlockID)
-	valid, err := s.verifier.VerifyMany(msg, sigData, signers.StakingKeys())
+
+	// compute the aggregated key of signers
+	aggregatedKey, err := s.keysAggregator.aggregatedStakingKey(signers)
+	if err != nil {
+		return false, fmt.Errorf("could not compute BLS key: %w", err)
+	}
+
+	valid, err := s.verifier.Verify(msg, sigData, aggregatedKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
 	}
