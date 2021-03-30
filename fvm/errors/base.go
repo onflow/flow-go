@@ -200,6 +200,12 @@ func (e AccountAuthorizationError) Unwrap() error {
 // FVMInternalError indicates that an internal error occurs during tx execution.
 type FVMInternalError struct {
 	msg string
+	err error
+}
+
+// NewFVMInternalErrorf constructs a new FVMInternalError
+func NewFVMInternalErrorf(msg string, args ...interface{}) *FVMInternalError {
+	return &FVMInternalError{err: fmt.Errorf(msg, args...)}
 }
 
 func (e *FVMInternalError) Error() string {

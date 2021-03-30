@@ -3,10 +3,6 @@ package fvm
 import (
 	"encoding/binary"
 	"encoding/hex"
-<<<<<<< HEAD
-=======
-	"errors"
->>>>>>> master
 	"fmt"
 	"math/rand"
 	"time"
@@ -20,7 +16,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
