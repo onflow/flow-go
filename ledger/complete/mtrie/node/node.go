@@ -209,6 +209,7 @@ func (n *Node) VerifyCachedHash() bool {
 // Do NOT MODIFY returned slice!
 func (n *Node) Hash() hash.Hash {
 	if n == nil {
+		// case of an empty trie root
 		return hash.GetDefaultHashForHeight(hash.TreeMaxHeight)
 	}
 	return n.hashValue
@@ -242,6 +243,9 @@ func (n *Node) RegCount() uint64 {
 }
 
 // Path returns the the Node's register storage path.
+//
+// the path of an nil node is defined as the arbitrary value 00..00, although
+// no node or trie algorithm is relying on this value.
 func (n *Node) Path() ledger.Path {
 	if n == nil {
 		return ledger.EmptyPath

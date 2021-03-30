@@ -448,12 +448,8 @@ func (e *Engine) verifyChunkWithChunkDataPack(
 		return fmt.Errorf("could not get result by id %v: %w", resultID, err)
 	}
 
-	vchunk, err := e.makeVerifiableChunkData(
+	vchunk := e.makeVerifiableChunkData(
 		chunk, header, result, chunkDataPack, collection)
-
-	if err != nil {
-		return fmt.Errorf("could not make verifiable chunk data: %w", err)
-	}
 
 	err = e.verifier.ProcessLocal(vchunk)
 	if err != nil {
@@ -522,7 +518,7 @@ func (e *Engine) makeVerifiableChunkData(
 	result *flow.ExecutionResult,
 	chunkDataPack *flow.ChunkDataPack,
 	collection *flow.Collection,
-) (*verification.VerifiableChunkData, error) {
+) *verification.VerifiableChunkData {
 
 	// system chunk is the last chunk
 	isSystemChunk := IsSystemChunk(chunk.Index, result)
@@ -530,11 +526,7 @@ func (e *Engine) makeVerifiableChunkData(
 	var endState flow.StateCommitment
 	if isSystemChunk {
 		// last chunk in a result is the system chunk and takes final state commitment
-		var ok bool
-		endState, ok = result.FinalStateCommitment()
-		if !ok {
-			return nil, fmt.Errorf("fatal: can not read final state commitment, likely a bug")
-		}
+		endState = result.FinalStateCommitment()
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		endState = result.Chunks[chunk.Index+1].StartState
@@ -548,7 +540,7 @@ func (e *Engine) makeVerifiableChunkData(
 		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}, nil
+	}
 }
 
 // CanTry returns checks the history attempts and determine whether a chunk request

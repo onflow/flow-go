@@ -122,14 +122,9 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResul
 // resultChainCheck enforces that the end state of the parent result
 // matches the current result's start state
 func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
-	finalState, isOk := prevResult.FinalStateCommitment()
-	if !isOk {
-		return fmt.Errorf("missing final state commitment in execution result %v", prevResult.ID())
-	}
-	initialState, isOK := result.InitialStateCommit()
-	if !isOK {
-		return fmt.Errorf("missing initial state commitment in execution result %v", result.ID())
-	}
+	finalState := prevResult.FinalStateCommitment()
+	initialState := result.InitialStateCommit()
+
 	if initialState != finalState {
 		return engine.NewInvalidInputErrorf("execution results do not form chain: expecting init state %x, but got %x",
 			finalState, initialState)
@@ -224,19 +219,8 @@ func (v *receiptValidator) validate(receipt *flow.ExecutionReceipt, getPreviousR
 
 // check the receipt's data integrity by checking its result has
 // both final statecommitment and initial statecommitment
-func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.StateCommitment, error) {
-	final, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok {
-		return flow.EmptyStateCommitment,
-			flow.EmptyStateCommitment,
-			fmt.Errorf("execution receipt without FinalStateCommit: %x", receipt.ID())
-	}
-
-	init, ok := receipt.ExecutionResult.InitialStateCommit()
-	if !ok {
-		return flow.EmptyStateCommitment,
-			flow.EmptyStateCommitment,
-			fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
-	}
-	return init, final, nil
+func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.StateCommitment) {
+	final := receipt.ExecutionResult.FinalStateCommitment()
+	init := receipt.ExecutionResult.InitialStateCommit()
+	return init, final
 }

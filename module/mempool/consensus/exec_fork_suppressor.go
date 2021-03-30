@@ -117,11 +117,12 @@ func (s *ExecForkSuppressor) Add(newSeal *flow.IncorporatedResultSeal) (bool, er
 		return false, nil
 	}
 
-	// STEP 1: ensure locally that newSeal's start and end state are non-empty values
+	// STEP 1: ensure locally that newSeal's chunks are non zero, which means
+	// that the new seal contains start and end state values.
 	// This wrapper is a temporary safety layer; we check all conditions that are
 	// required for its correct functioning locally, to not delegate safety-critical
 	// implementation aspects to external components
-	err := s.enforceValidStates(newSeal)
+	err := s.enforceValidChunks(newSeal)
 	if err != nil {
 		return false, fmt.Errorf("invalid candidate seal: %w", err)
 	}
@@ -241,34 +242,22 @@ func (s *ExecForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEj
 	s.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
-// enforceValidStates checks that seal has valid, non-empty, initial and final state.
+// enforceValidChunks checks that seal has valid non-zero number of chunks.
 // In case a seal fails the check, a detailed error message is logged and an
 // engine.InvalidInputError (sentinel error) is returned.
-func (s *ExecForkSuppressor) enforceValidStates(irSeal *flow.IncorporatedResultSeal) error {
+func (s *ExecForkSuppressor) enforceValidChunks(irSeal *flow.IncorporatedResultSeal) error {
 	result := irSeal.IncorporatedResult.Result
 
-	if _, ok := result.InitialStateCommit(); !ok {
-		scjson, err := json.Marshal(irSeal)
-		if err != nil {
-			return err
+	if !result.ValidateChunksLength() {
+		scjson, errjson := json.Marshal(irSeal)
+		if errjson != nil {
+			return errjson
 		}
 		s.log.Error().
 			Str("seal", string(scjson)).
-			Msg("seal's execution result has no InitialStateCommit")
-		return engine.NewInvalidInputErrorf("seal's execution result has no InitialStateCommit: %x", result.ID())
+			Msg("seal's execution result has no chunks")
+		return engine.NewInvalidInputErrorf("seal's execution result has no chunks: %x", result.ID())
 	}
-
-	if _, ok := result.FinalStateCommitment(); !ok {
-		scjson, err := json.Marshal(irSeal)
-		if err != nil {
-			return err
-		}
-		s.log.Error().
-			Str("seal", string(scjson)).
-			Msg("seal's execution result has no FinalStateCommit")
-		return engine.NewInvalidInputErrorf("seal's execution result has no FinalStateCommit: %x", result.ID())
-	}
-
 	return nil
 }
 
@@ -286,6 +275,7 @@ func getArbitraryElement(set sealSet) *flow.IncorporatedResultSeal {
 //   * internal execForkDetected flag is ste to true
 //   * the new value of execForkDetected is persisted to data base
 // and executionForkErr (sentinel error) is returned
+// The function assumes the execution results in the seals have a non-zero number of chunks.
 func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *flow.IncorporatedResultSeal) error {
 	if irSeal.IncorporatedResult.Result.ID() == irSeal2.IncorporatedResult.Result.ID() {
 		// happy case: candidate seals are for the same result
@@ -295,10 +285,10 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 	// => check whether initial and final state match in both seals
 
 	// unsafe: we assume validity of states has been checked before
-	irSeal1InitialState, _ := irSeal.IncorporatedResult.Result.InitialStateCommit()
-	irSeal1FinalState, _ := irSeal.IncorporatedResult.Result.FinalStateCommitment()
-	irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
-	irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
+	irSeal1InitialState := irSeal.IncorporatedResult.Result.InitialStateCommit()
+	irSeal1FinalState := irSeal.IncorporatedResult.Result.FinalStateCommitment()
+	irSeal2InitialState := irSeal2.IncorporatedResult.Result.InitialStateCommit()
+	irSeal2FinalState := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
 
 	if irSeal1InitialState != irSeal2InitialState || irSeal1FinalState != irSeal2FinalState {
 		log.Error().Msg("inconsistent seals for the same block")

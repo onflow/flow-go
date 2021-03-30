@@ -168,19 +168,6 @@ func Test_Rem(t *testing.T) {
 //  * the end state of the last chunk is empty
 //  * there are no chunks in the result (invalid result, as system chunk is missing)
 func Test_RejectInvalidSeals(t *testing.T) {
-	t.Run("reject seal for result with missing end state", func(t *testing.T) {
-		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
-			irSeal := unittest.IncorporatedResultSeal.Fixture()
-			chunks := irSeal.IncorporatedResult.Result.Chunks
-			chunks[len(chunks)-1].EndState = flow.EmptyStateCommitment
-			irSeal.Seal.FinalState = flow.EmptyStateCommitment
-
-			added, err := wrapper.Add(irSeal)
-			assert.Error(t, err)
-			assert.True(t, engine.IsInvalidInputError(err))
-			assert.False(t, added)
-		})
-	})
 
 	t.Run("reject seal without chunks", func(t *testing.T) {
 		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {

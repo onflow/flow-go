@@ -63,7 +63,7 @@ func ExportResults(blockID flow.Identifier, dbPath string, outputPath string) er
 		}
 
 		resID := res.ID()
-		finalState, _ := res.FinalStateCommitment()
+		finalState := res.FinalStateCommitment()
 		e := result{
 			ResultID:         hex.EncodeToString(resID[:]),
 			PreviousResultID: hex.EncodeToString(res.PreviousResultID[:]),

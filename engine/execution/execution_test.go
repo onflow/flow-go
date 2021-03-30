@@ -330,7 +330,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 			receiptsReceived++
 			originID := args[0].(flow.Identifier)
 			receipt := args[1].(*flow.ExecutionReceipt)
-			finalState, _ := receipt.ExecutionResult.FinalStateCommitment()
+			finalState := receipt.ExecutionResult.FinalStateCommitment()
 			consensusNode.Log.Debug().
 				Hex("origin", originID[:]).
 				Hex("block", receipt.ExecutionResult.BlockID[:]).

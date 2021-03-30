@@ -71,7 +71,6 @@ func Test_Compactor(t *testing.T) {
 				err = wal.RecordUpdate(update)
 				require.NoError(t, err)
 
-				fmt.Println("WWWWW")
 				rootHash, err = f.Update(update)
 				require.NoError(t, err)
 

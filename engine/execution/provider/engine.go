@@ -218,10 +218,7 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
-	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok {
-		return fmt.Errorf("could not get final state: no chunks found")
-	}
+	finalState := receipt.ExecutionResult.FinalStateCommitment()
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
 	defer span.Finish()

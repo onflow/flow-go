@@ -475,8 +475,7 @@ func VerifiableDataChunk(t *testing.T, chunkIndex uint64, er utils.CompleteExecu
 	var endState flow.StateCommitment
 	// last chunk
 	if int(chunkIndex) == len(er.Receipt.ExecutionResult.Chunks)-1 {
-		finalState, ok := er.Receipt.ExecutionResult.FinalStateCommitment()
-		require.True(t, ok)
+		finalState := er.Receipt.ExecutionResult.FinalStateCommitment()
 		endState = finalState
 	} else {
 		endState = er.Receipt.ExecutionResult.Chunks[chunkIndex+1].StartState

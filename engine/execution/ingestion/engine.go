@@ -1039,8 +1039,10 @@ func (e *Engine) handleComputationResult(
 		return flow.EmptyStateCommitment, nil, err
 	}
 
-	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok {
+	var finalState flow.StateCommitment
+	if receipt.ExecutionResult.ValidateChunksLength() {
+		finalState = receipt.ExecutionResult.FinalStateCommitment()
+	} else {
 		finalState = startState
 	}
 

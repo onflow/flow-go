@@ -70,6 +70,7 @@ func (mt *MTrie) Height() int {
 func (mt *MTrie) StringRootHash() string {
 	var rootHash hash.Hash
 	if mt.root == nil {
+		// case of an empty trie
 		rootHash = hash.GetDefaultHashForHeight(hash.TreeMaxHeight)
 	}
 	rootHash = mt.root.Hash()

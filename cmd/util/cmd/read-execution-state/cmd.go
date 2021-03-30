@@ -57,7 +57,7 @@ func loadExecutionState() *mtrie.Forest {
 		log.Fatal().Err(err).Msg("error while creating WAL")
 	}
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, flagExecutionStateDir, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
+	forest, err := mtrie.NewForest(flagExecutionStateDir, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}

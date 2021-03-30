@@ -215,11 +215,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		Hex("executor_id", receipt.ExecutorID[:]).
 		Logger()
 
-	initialState, finalState, err := validation.IntegrityCheck(receipt)
-	if err != nil {
-		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
-		return false, nil
-	}
+	initialState, finalState := validation.IntegrityCheck(receipt)
 
 	log = log.With().
 		Hex("initial_state", initialState[:]).
@@ -787,11 +783,7 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
 	// get final state of execution result
-	finalState, ok := incorporatedResult.Result.FinalStateCommitment()
-	if !ok {
-		// message correctness should have been checked before: failure here is an internal implementation bug
-		return fmt.Errorf("failed to get final state commitment from Execution Result")
-	}
+	finalState := incorporatedResult.Result.FinalStateCommitment()
 
 	// TODO: Check SPoCK proofs
 

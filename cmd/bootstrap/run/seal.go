@@ -5,7 +5,7 @@ import (
 )
 
 func GenerateRootSeal(result *flow.ExecutionResult, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Seal {
-	finalState, _ := result.FinalStateCommitment()
+	finalState := result.FinalStateCommitment()
 	seal := &flow.Seal{
 		BlockID:       result.BlockID,
 		ResultID:      result.ID(),

@@ -32,8 +32,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockA from execution node 1
 	erExe1BlockA := s.ReceiptState.WaitForReceiptFrom(s.T(), blockA.Header.ID(), s.exe1ID)
-	finalStateExe1BlockA, ok := erExe1BlockA.ExecutionResult.FinalStateCommitment()
-	require.True(s.T(), ok)
+	finalStateExe1BlockA := erExe1BlockA.ExecutionResult.FinalStateCommitment()
 	s.T().Logf("got erExe1BlockA with SC %x", finalStateExe1BlockA)
 
 	// send transaction
@@ -46,8 +45,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockB from execution node 1
 	erExe1BlockB := s.ReceiptState.WaitForReceiptFrom(s.T(), blockB.Header.ID(), s.exe1ID)
-	finalStateExe1BlockB, ok := erExe1BlockB.ExecutionResult.FinalStateCommitment()
-	require.True(s.T(), ok)
+	finalStateExe1BlockB := erExe1BlockB.ExecutionResult.FinalStateCommitment()
 	s.T().Logf("got erExe1BlockB with SC %x", finalStateExe1BlockB)
 
 	// require that state between blockA and blockB has changed
@@ -59,8 +57,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 
 	// wait for execution receipt for blockC from execution node 1
 	erExe1BlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe1ID)
-	finalStateExe1BlockC, ok := erExe1BlockC.ExecutionResult.FinalStateCommitment()
-	require.True(s.T(), ok)
+	finalStateExe1BlockC := erExe1BlockC.ExecutionResult.FinalStateCommitment()
 	s.T().Logf("got erExe1BlockC with SC %x", finalStateExe1BlockC)
 
 	// require that state between blockB and blockC has not changed

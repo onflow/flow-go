@@ -463,10 +463,7 @@ func ReceiptForBlockExecutorFixture(block *flow.Block, executor flow.Identifier)
 func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.PreviousResultID = prevResult.ID()
-		finalState, ok := prevResult.FinalStateCommitment()
-		if !ok {
-			panic("missing final state commitment")
-		}
+		finalState := prevResult.FinalStateCommitment()
 		result.Chunks[0].StartState = finalState
 	}
 }
