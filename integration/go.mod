@@ -11,10 +11,9 @@ require (
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.13.3
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2-0.20210120222512-ca3212c272a7
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.2-0.20210120222512-ca3212c272a7
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2-0.20210326212504-f350f3f9428d
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.2-0.20210326212504-f350f3f9428d
 	github.com/onflow/flow-emulator v0.14.0
-	github.com/onflow/flow-ft/contracts v0.1.3 // indirect
 	github.com/onflow/flow-go v0.13.1-0.20210119024156-79985711a957 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.15.0
 	github.com/onflow/flow-go/crypto v0.12.0 // replaced by version on-disk
