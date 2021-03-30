@@ -22,10 +22,10 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/fvm"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -117,13 +117,13 @@ func (cn ConsensusNode) Done() {
 
 type ComputerWrap struct {
 	*computation.Manager
-	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View)
+	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view fvmState.View)
 }
 
 func (c *ComputerWrap) ComputeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	view *delta.View,
+	view fvmState.View,
 ) (*execution.ComputationResult, error) {
 	if c.OnComputeBlock != nil {
 		c.OnComputeBlock(ctx, block, view)
@@ -134,20 +134,21 @@ func (c *ComputerWrap) ComputeBlock(
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	MutableState    protocol.MutableState
-	IngestionEngine *ingestion.Engine
-	ExecutionEngine *ComputerWrap
-	RequestEngine   *requester.Engine
-	ReceiptsEngine  *executionprovider.Engine
-	FollowerEngine  *followereng.Engine
-	SyncEngine      *synchronization.Engine
-	BadgerDB        *badger.DB
-	VM              *fvm.VirtualMachine
-	ExecutionState  state.ExecutionState
-	Ledger          ledger.Ledger
-	LevelDbDir      string
-	Collections     storage.Collections
-	Finalizer       *consensus.Finalizer
+	MutableState        protocol.MutableState
+	IngestionEngine     *ingestion.Engine
+	ExecutionEngine     *ComputerWrap
+	RequestEngine       *requester.Engine
+	ReceiptsEngine      *executionprovider.Engine
+	FollowerEngine      *followereng.Engine
+	SyncEngine          *synchronization.Engine
+	BadgerDB            *badger.DB
+	VM                  *fvm.VirtualMachine
+	ExecutionState      state.ExecutionState
+	Ledger              ledger.Ledger
+	LevelDbDir          string
+	Collections         storage.Collections
+	Finalizer           *consensus.Finalizer
+	MyExecutionReceipts storage.MyExecutionReceipts
 }
 
 func (en ExecutionNode) Ready() {

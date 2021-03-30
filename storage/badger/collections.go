@@ -126,8 +126,11 @@ func (c *Collections) StoreLightAndIndexByTransaction(collection *flow.LightColl
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
 
-		for _, t := range collection.Transactions {
-			err = operation.IndexCollectionByTransaction(t, collection.ID())(tx)
+		for _, txID := range collection.Transactions {
+			err = operation.IndexCollectionByTransaction(txID, collection.ID())(tx)
+			if errors.Is(err, storage.ErrAlreadyExists) {
+				continue
+			}
 			if err != nil {
 				return fmt.Errorf("could not insert transaction ID: %w", err)
 			}

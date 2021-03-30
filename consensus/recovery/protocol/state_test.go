@@ -19,11 +19,11 @@ import (
 // if it's not finalized yet, this block should be returned by latest
 func TestSaveBlockAsReplica(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	b0, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := protocol.NewStateRoot(b0, result, seal, 0)
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	b0, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, stateRoot, func(db *badger.DB, state *protocol.MutableState) {
-		b1 := unittest.BlockWithParentFixture(b0.Header)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		b1 := unittest.BlockWithParentFixture(b0)
 		b1.SetPayload(flow.Payload{})
 
 		err = state.Extend(&b1)

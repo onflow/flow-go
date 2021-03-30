@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
@@ -104,7 +103,7 @@ func main() {
 			return err
 		}).
 		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer, node.Logger)
+			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
 		Module("cached execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -266,8 +265,8 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rt := runtime.NewInterpreterRuntime()
-			vm := fvm.New(rt)
+			rt := fvm.NewInterpreterRuntime()
+			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)

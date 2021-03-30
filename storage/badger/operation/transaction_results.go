@@ -12,6 +12,10 @@ func InsertTransactionResult(blockID flow.Identifier, transactionResult *flow.Tr
 	return insert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
+func BatchInsertTransactionResult(blockID flow.Identifier, transactionResult *flow.TransactionResult) func(batch *badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
+}
+
 func RetrieveTransactionResult(blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.TransactionResult) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransactionResult, blockID, transactionID), transactionResult)
 }

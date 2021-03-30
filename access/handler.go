@@ -405,6 +405,18 @@ func (h *Handler) GetEventsForBlockIDs(
 	}, nil
 }
 
+// GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
+func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
+	}, nil
+}
+
 func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
 	msg, err := convert.BlockToMessage(block)
 	if err != nil {
