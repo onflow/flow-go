@@ -540,7 +540,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 
 	hasher, err := crypto.NewHasher(hashAlgo)
 	if err != nil {
-		return nil, errors.NewHasherFailuref("failed to create a hasher for env.Hash", err)
+		return nil, errors.NewHasherFailuref("failed to create a hasher for env.Hash: %w", err)
 	}
 
 	return hasher.ComputeHash(data), nil
@@ -1033,7 +1033,7 @@ func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPu
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		err = errors.NewValueErrorf(string(encodedPublicKey), "invalid encoded public key value", err)
+		err = errors.NewValueErrorf(string(encodedPublicKey), "invalid encoded public key value: %w", err)
 		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 

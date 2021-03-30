@@ -186,13 +186,13 @@ func (a *Accounts) SetPublicKey(
 	err = publicKey.Validate()
 	if err != nil {
 		encoded, _ := publicKey.MarshalJSON()
-		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value", err)
+		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value: %w", err)
 	}
 
 	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
 	if err != nil {
 		encoded, _ := publicKey.MarshalJSON()
-		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value", err)
+		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value: %w", err)
 	}
 
 	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
