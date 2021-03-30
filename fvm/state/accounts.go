@@ -186,13 +186,13 @@ func (a *Accounts) SetPublicKey(
 	err = publicKey.Validate()
 	if err != nil {
 		encoded, _ := publicKey.MarshalJSON()
-		return nil, errors.NewValueErrorf("invalid public key value", err, string(encoded))
+		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value", err)
 	}
 
 	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
 	if err != nil {
 		encoded, _ := publicKey.MarshalJSON()
-		return nil, errors.NewValueErrorf("invalid public key value", err, string(encoded))
+		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value", err)
 	}
 
 	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
@@ -216,11 +216,11 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
 
 	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
-		return errors.NewValueError("hashing algorithm type not found", publicKey.HashAlgo.String())
+		return errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
 	}
 
 	if !IsValidAccountKeySignAlgo(publicKey.SignAlgo) {
-		return errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.String())
+		return errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
 	}
 
 	count, err := a.GetPublicKeyCount(address)

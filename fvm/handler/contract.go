@@ -50,7 +50,7 @@ func (h *ContractHandler) GetContract(address runtime.Address, name string) (cod
 func (h *ContractHandler) SetContract(address runtime.Address, name string, code []byte, signingAccounts []runtime.Address) (err error) {
 	// check if authorized
 	if !h.isAuthorized(signingAccounts) {
-		err = errors.NewOperationAuthorizationError("setting contracts requires authorization from specific accounts", "SetContract")
+		err = errors.NewOperationAuthorizationErrorf("SetContract", "setting contracts requires authorization from specific accounts")
 		return fmt.Errorf("setting contract failed: %w", err)
 	}
 	add := flow.Address(address)
@@ -66,7 +66,7 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 func (h *ContractHandler) RemoveContract(address runtime.Address, name string, signingAccounts []runtime.Address) (err error) {
 	// check if authorized
 	if !h.isAuthorized(signingAccounts) {
-		err = errors.NewOperationAuthorizationError("removing contracts requires authorization from specific accounts", "RemoveContract")
+		err = errors.NewOperationAuthorizationErrorf("RemoveContract", "removing contracts requires authorization from specific accounts")
 		return fmt.Errorf("removing contract failed: %w", err)
 	}
 

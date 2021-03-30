@@ -341,7 +341,7 @@ func (e *hostEnv) GetCode(location runtime.Location) ([]byte, error) {
 
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
-		return nil, errors.NewInvalidLocationError("expecting an AddressLocation, but other location types are passed", location)
+		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
 	}
 
 	address := flow.BytesToAddress(contractLocation.Address.Bytes())
@@ -486,12 +486,12 @@ func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 	flowAddress := flow.Address(address)
 
 	if flowAddress == e.ctx.Chain.ServiceAddress() {
-		err := errors.NewValueError("cannot freeze service account", flowAddress.String())
+		err := errors.NewValueErrorf(flowAddress.String(), "cannot freeze service account")
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
 
 	if !e.transactionEnv.isAuthorizerServiceAccount() {
-		err := errors.NewOperationAuthorizationError("accounts can be frozen only by transactions authorized by the service account", "SetAccountFrozen")
+		err := errors.NewOperationAuthorizationErrorf("SetAccountFrozen", "accounts can be frozen only by transactions authorized by the service account")
 		return fmt.Errorf("setting account frozen failed: %w", err)
 	}
 
@@ -532,7 +532,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == crypto.UnknownHashAlgorithm {
-		err := errors.NewValueError("hashing algorithm type not found", hashAlgorithm.Name())
+		err := errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
 	}
 
@@ -1031,7 +1031,7 @@ func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPu
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		err = errors.NewValueErrorf("invalid encoded public key value", err, string(encodedPublicKey))
+		err = errors.NewValueErrorf(string(encodedPublicKey), "invalid encoded public key value", err)
 		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 
@@ -1061,7 +1061,7 @@ func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int)
 	}
 
 	if keyIndex < 0 {
-		err = errors.NewValueError("key index must be positive", fmt.Sprint(keyIndex))
+		err = errors.NewValueErrorf(fmt.Sprint(keyIndex), "key index must be positive")
 		return nil, fmt.Errorf("remove account key failed: %w", err)
 	}
 
@@ -1128,19 +1128,19 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 
 	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgorithm == crypto.UnknownSignatureAlgorithm {
-		err = errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.Name())
+		err = errors.NewValueErrorf(publicKey.SignAlgo.Name(), "signature algorithm type not found")
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
 	if hashAlgorithm == crypto.UnknownHashAlgorithm {
-		err = errors.NewValueError("hashing algorithm type not found", hashAlgo.Name())
+		err = errors.NewValueErrorf(hashAlgo.Name(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
 	if err != nil {
-		err = errors.NewValueErrorf("cannot decode public key", err, string(publicKey.PublicKey))
+		err = errors.NewValueErrorf(string(publicKey.PublicKey), "cannot decode public key: %w", err)
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
@@ -1221,13 +1221,13 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		err = errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.String())
+		err = errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		err = errors.NewValueError("hashing algorithm type not found", publicKey.HashAlgo.String())
+		err = errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
@@ -1283,13 +1283,13 @@ func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 
 	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		err = errors.NewValueError("signature algorithm type not found", publicKey.SignAlgo.String())
+		err = errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
 		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 
 	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
 	if hashAlgo == runtime.HashAlgorithmUnknown {
-		err = errors.NewValueError("hashing algorithm type not found", publicKey.HashAlgo.String())
+		err = errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("getting account key failed: %w", err)
 	}
 

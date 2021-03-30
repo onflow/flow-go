@@ -57,7 +57,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx := proc.Transaction
 	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
-		err := errors.NewInvalidAddressError("payer address is invalid", tx.Payer)
+		err := errors.NewInvalidAddressErrorf(tx.Payer, "payer address is invalid")
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
@@ -107,14 +107,14 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		// hasSufficientKeyWeight
 		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
 			msg := fmt.Sprintf("authorizer account does not have sufficient signatures (%d < %d)", payloadWeights[addr], v.KeyWeightThreshold)
-			return errors.NewAccountAuthorizationError(msg, addr)
+			return errors.NewAccountAuthorizationErrorf(addr, msg)
 		}
 	}
 
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
 		// TODO change this to payer error (needed for fees)
 		msg := fmt.Sprintf("payer account does not have sufficient signatures (%d < %d)", envelopeWeights[tx.Payer], v.KeyWeightThreshold)
-		return errors.NewAccountAuthorizationError(msg, tx.Payer)
+		return errors.NewAccountAuthorizationErrorf(tx.Payer, msg)
 	}
 
 	return nil

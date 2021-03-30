@@ -1,8 +1,6 @@
 package errors
 
 import (
-	"errors"
-	stdErrors "errors"
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
@@ -18,13 +16,8 @@ type InvalidAddressError struct {
 }
 
 // NewInvalidAddressErrorf constructs a new InvalidAddressError
-func NewInvalidAddressErrorf(msg string, err error, address flow.Address) *InvalidAddressError {
-	return &InvalidAddressError{err: fmt.Errorf(msg, err), address: address}
-}
-
-// NewInvalidAddressError constructs a new InvalidAddressError
-func NewInvalidAddressError(msg string, address flow.Address) *InvalidAddressError {
-	return &InvalidAddressError{err: errors.New(msg), address: address}
+func NewInvalidAddressErrorf(address flow.Address, msg string, args ...interface{}) *InvalidAddressError {
+	return &InvalidAddressError{address: address, err: fmt.Errorf(msg, args...)}
 }
 
 func (e InvalidAddressError) Error() string {
@@ -44,6 +37,11 @@ type InvalidArgumentError struct {
 	err error
 }
 
+// NewInvalidArgumentErrorf constructs a new InvalidArgumentError
+func NewInvalidArgumentErrorf(msg string, args ...interface{}) *InvalidArgumentError {
+	return &InvalidArgumentError{err: fmt.Errorf(msg, args...)}
+}
+
 func (e InvalidArgumentError) Error() string {
 	return fmt.Sprintf("%s transaction arguments are invalid: (%s)", e.Code().String(), e.err.Error())
 }
@@ -59,20 +57,9 @@ type InvalidLocationError struct {
 	err      error
 }
 
-// NewInvalidLocationError constructs a new InvalidLocationError
-func NewInvalidLocationError(msg string, location runtime.Location) *InvalidLocationError {
-	return &InvalidLocationError{
-		location: location,
-		err:      stdErrors.New(msg),
-	}
-}
-
-// NewInvalidLocationErrorf constructs a new InvalidLocationError (with inner error formatting)
-func NewInvalidLocationErrorf(msg string, err error, location runtime.Location) *InvalidLocationError {
-	return &InvalidLocationError{
-		location: location,
-		err:      fmt.Errorf(msg, err),
-	}
+// NewInvalidLocationErrorf constructs a new InvalidLocationError
+func NewInvalidLocationErrorf(location runtime.Location, msg string, args ...interface{}) *InvalidLocationError {
+	return &InvalidLocationError{location: location, err: fmt.Errorf(msg, args...)}
 }
 
 func (e InvalidLocationError) Error() string {
@@ -105,20 +92,9 @@ type ValueError struct {
 	err      error
 }
 
-// NewValueError constructs a new ValueError
-func NewValueError(msg string, valueStr string) *ValueError {
-	return &ValueError{
-		valueStr: valueStr,
-		err:      stdErrors.New(msg),
-	}
-}
-
-// NewValueErrorf constructs a new ValueError (with inner error formatting)
-func NewValueErrorf(msg string, err error, valueStr string) *ValueError {
-	return &ValueError{
-		valueStr: valueStr,
-		err:      fmt.Errorf(msg, err),
-	}
+// NewValueErrorf constructs a new ValueError
+func NewValueErrorf(valueStr string, msg string, args ...interface{}) *ValueError {
+	return &ValueError{valueStr: valueStr, err: fmt.Errorf(msg, args...)}
 }
 
 func (e ValueError) Error() string {
@@ -146,20 +122,9 @@ type OperationAuthorizationError struct {
 	err       error
 }
 
-// NewOperationAuthorizationError constructs a new OperationAuthorizationError
-func NewOperationAuthorizationError(msg string, operation string) *OperationAuthorizationError {
-	return &OperationAuthorizationError{
-		operation: operation,
-		err:       stdErrors.New(msg),
-	}
-}
-
-// NewOperationAuthorizationErrorf constructs a new OperationAuthorizationError (inner error formatting)
-func NewOperationAuthorizationErrorf(msg string, err error, operation string) *OperationAuthorizationError {
-	return &OperationAuthorizationError{
-		operation: operation,
-		err:       fmt.Errorf(msg, err),
-	}
+// NewOperationAuthorizationErrorf constructs a new OperationAuthorizationError
+func NewOperationAuthorizationErrorf(operation string, msg string, args ...interface{}) *OperationAuthorizationError {
+	return &OperationAuthorizationError{operation: operation, err: fmt.Errorf(msg, args...)}
 }
 
 func (e OperationAuthorizationError) Error() string {
@@ -194,20 +159,9 @@ type AccountAuthorizationError struct {
 	err     error
 }
 
-// NewAccountAuthorizationError constructs a new account authorization error
-func NewAccountAuthorizationError(msg string, address flow.Address) *AccountAuthorizationError {
-	return &AccountAuthorizationError{
-		address: address,
-		err:     stdErrors.New(msg),
-	}
-}
-
-// NewAccountAuthorizationErrorf constructs a new account authorization error (inner error formatting)
-func NewAccountAuthorizationErrorf(msg string, err error, address flow.Address) *AccountAuthorizationError {
-	return &AccountAuthorizationError{
-		address: address,
-		err:     fmt.Errorf(msg, err),
-	}
+// NewAccountAuthorizationErrorf constructs a new AccountAuthorizationError
+func NewAccountAuthorizationErrorf(address flow.Address, msg string, args ...interface{}) *AccountAuthorizationError {
+	return &AccountAuthorizationError{address: address, err: fmt.Errorf(msg, args...)}
 }
 
 func (e AccountAuthorizationError) Error() string {
