@@ -43,8 +43,7 @@ type Engine struct {
 	chunkConsumerNotifier module.ProcessingNotifier // to report a chunk has been processed
 	results               storage.ExecutionResults  // to retrieve execution result of an assigned chunk
 	receiptsDB            storage.ExecutionReceipts // used to find executor of the chunk
-	retryInterval         time.Duration             // determines time in milliseconds for retrying chunk data requests
-	maxAttempt            int                       // max time of retries to fetch the chunk data pack for a chunk
+	requester             ChunkDataPackRequester    // used to request chunk data packs from network
 }
 
 func New(
@@ -173,11 +172,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // Through the pipeline the chunk data pack for this chunk is requested, a verifiable chunk is shaped for it,
 // and is pushed to the verifier engine for verification.
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
-	locatorID := locator.ID()
-	span, ok := e.tracer.GetSpan(locatorID, trace.VERProcessAssignedChunk)
+	span, ok := e.tracer.GetSpan(locator.ResultID, trace.VERProcessExecutionResult)
 	if !ok {
-		span = e.tracer.StartSpan(locatorID, trace.VERProcessAssignedChunk)
-		span.SetTag("chunk_locator_id", locatorID)
+		span = e.tracer.StartSpan(locator.ResultID, trace.VERProcessExecutionResult)
+		span.SetTag("result_id", locator.ResultID)
 		defer span.Finish()
 	}
 
@@ -189,15 +187,20 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 
 //
 func (e *Engine) processAssignedChunkWithTracing(ctx context.Context, locator *chunks.Locator) {
+	log := e.log.With().
+		Hex("chunk_locator_id", logging.ID(locator.ID())).
+		Hex("result_id", logging.ID(locator.ResultID)).
+		Uint64("chunk_index", locator.Index).
+		Logger()
+
+	log.Debug().Msg("new assigned chunk locator arrived")
+
 	result, err := e.results.ByID(locator.ResultID)
 	if err != nil {
-		e.log.Fatal().Err(err).
-			Hex("result_id", logging.ID(locator.ResultID)).
-			Uint64("chunk_index", locator.Index).
-			Msg("could not retrieve result for chunk locator")
+		log.Fatal().Err(err).Msg("could not retrieve result for chunk locator")
 	}
-
 	chunk := result.Chunks[locator.Index]
+
 }
 
 // ProcessMyChunk processes the chunk that assigned to me. It should not be blocking since
