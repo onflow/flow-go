@@ -1,4 +1,4 @@
-package verification
+package signature
 
 import (
 	"errors"

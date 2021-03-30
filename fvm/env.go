@@ -3,6 +3,10 @@ package fvm
 import (
 	"encoding/binary"
 	"encoding/hex"
+<<<<<<< HEAD
+=======
+	"errors"
+>>>>>>> master
 	"fmt"
 	"math/rand"
 	"time"
@@ -133,14 +137,12 @@ func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	var valueByteSize int
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetValue)
-		defer func() {
-			sp.LogFields(
-				traceLog.String("owner", hex.EncodeToString(owner)),
-				traceLog.String("key", string(key)),
-				traceLog.Int("valueByteSize", valueByteSize),
-			)
-			sp.Finish()
-		}()
+		sp.LogFields(
+			traceLog.String("owner", hex.EncodeToString(owner)),
+			traceLog.String("key", string(key)),
+			traceLog.Int("valueByteSize", valueByteSize),
+		)
+		defer sp.Finish()
 	}
 
 	v, err := e.accounts.GetValue(
@@ -157,6 +159,10 @@ func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvSetValue)
+		sp.LogFields(
+			traceLog.String("owner", hex.EncodeToString(owner)),
+			traceLog.String("key", string(key)),
+		)
 		defer sp.Finish()
 	}
 
