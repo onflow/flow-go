@@ -42,7 +42,7 @@ import (
 func TestAssignerFetcherPipeline(t *testing.T) {
 	testcases := []struct {
 		blockCount int
-		ops        []utils.CompleteExecutionReceiptBuilderOpt
+		opts        []utils.CompleteExecutionReceiptBuilderOpt
 		msg        string
 		staked     bool
 	}{
