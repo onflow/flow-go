@@ -38,7 +38,7 @@ After bootstrapping, running `transit pull` will:
    - `execution-state [dir]`
    - `random-beacon.priv.json.<id>.enc`
 
-1. Decrypt `<id>.random-beacon.priv.json.enc` using the transit keys
+1. Decrypt `random-beacon.priv.json.<id>.enc` using the transit keys
    - `random-beacon.priv.json`
 
 ## Wrapping Responses
