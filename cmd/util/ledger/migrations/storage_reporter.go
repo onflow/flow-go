@@ -52,7 +52,7 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 		}
 	}()
 
-	l := newLed(payload)
+	l := newView(payload)
 	st := state.NewState(l)
 
 	for _, p := range payload {
@@ -82,7 +82,12 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 			r.Log.Err(err).Msg("Cannot determine if this is a dapper account")
 			return err
 		}
-		record := fmt.Sprintf("%s,%d,%d,%t,%t\n", address.Hex(), u, balance, hasVault, dapper)
+		hasReceiver, err := r.hasReceiver(address, st)
+		if err != nil {
+			r.Log.Err(err).Msg("Cannot determine if this account has a receiver")
+			return err
+		}
+		record := fmt.Sprintf("%s,%d,%d,%t,%t,%t\n", address.Hex(), u, balance, hasVault, hasReceiver, dapper)
 		_, err = writer.WriteString(record)
 		if err != nil {
 			return err
@@ -99,6 +104,20 @@ func (r StorageReporter) isDapper(address flow.Address, st *state.State) (bool, 
 		interpreter.PathValue{
 			Domain:     common.PathDomainPublic,
 			Identifier: "dapperUtilityCoinReceiver",
+		})
+
+	receiver, err := st.Get(id.Owner, id.Controller, id.Key)
+	if err != nil {
+		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
+	}
+	return len(receiver) != 0, nil
+}
+
+func (r StorageReporter) hasReceiver(address flow.Address, st *state.State) (bool, error) {
+	id := resourceId(address,
+		interpreter.PathValue{
+			Domain:     common.PathDomainPublic,
+			Identifier: "flowTokenReceiver",
 		})
 
 	receiver, err := st.Get(id.Owner, id.Controller, id.Key)

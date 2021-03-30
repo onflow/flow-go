@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/integration
 
-go 1.13
+go 1.15
 
 require (
 	github.com/HdrHistogram/hdrhistogram-go v1.0.1 // indirect
@@ -10,14 +10,14 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.13.3
+	github.com/onflow/cadence v0.14.4
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2-0.20210326212504-f350f3f9428d
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.2-0.20210326212504-f350f3f9428d
 	github.com/onflow/flow-emulator v0.14.0
 	github.com/onflow/flow-go v0.13.1-0.20210119024156-79985711a957 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.15.0
+	github.com/onflow/flow-go-sdk v0.17.0
 	github.com/onflow/flow-go/crypto v0.12.0 // replaced by version on-disk
-	github.com/onflow/flow/protobuf/go/flow v0.1.9
+	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.19.0
 	github.com/stretchr/testify v1.7.0

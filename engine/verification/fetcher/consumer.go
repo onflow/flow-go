@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultJobIndex = int64(0)
+	DefaultJobIndex = uint64(0)
 )
 
 // ChunkJob converts a chunk locator into a Job to be used by job queue.
@@ -34,9 +34,12 @@ func ChunkLocatorToJob(locator *chunks.Locator) *ChunkJob {
 	return &ChunkJob{ChunkLocator: locator}
 }
 
-func JobToChunkLocator(job module.Job) *chunks.Locator {
-	chunkjob, _ := job.(*ChunkJob)
-	return chunkjob.ChunkLocator
+func JobToChunkLocator(job module.Job) (*chunks.Locator, error) {
+	chunkjob, ok := job.(*ChunkJob)
+	if !ok {
+		return nil, fmt.Errorf("could not assert job to chunk locator, job id: %x", job.ID())
+	}
+	return chunkjob.ChunkLocator, nil
 }
 
 // ChunkJobs wraps the storage layer to provide an abstraction for consumers to read jobs.
@@ -44,7 +47,7 @@ type ChunkJobs struct {
 	locators storage.ChunksQueue
 }
 
-func (j *ChunkJobs) AtIndex(index int64) (module.Job, error) {
+func (j *ChunkJobs) AtIndex(index uint64) (module.Job, error) {
 	locator, err := j.locators.AtIndex(index)
 	if err != nil {
 		return nil, fmt.Errorf("could not read chunk: %w", err)
@@ -52,7 +55,7 @@ func (j *ChunkJobs) AtIndex(index int64) (module.Job, error) {
 	return ChunkLocatorToJob(locator), nil
 }
 
-func (j *ChunkJobs) Head() (int64, error) {
+func (j *ChunkJobs) Head() (uint64, error) {
 	return j.locators.LatestIndex()
 }
 
@@ -76,9 +79,14 @@ func NewWorker(engine EngineWorker) *Worker {
 
 // Run converts the job to Chunk, it's guaranteed to work, because
 // ChunkJobs converted chunk into job symmetrically
-func (w *Worker) Run(job module.Job) {
-	chunk := JobToChunkLocator(job)
+func (w *Worker) Run(job module.Job) error {
+	chunk, err := JobToChunkLocator(job)
+	if err != nil {
+		return err
+	}
 	w.engine.ProcessMyChunk(chunk)
+
+	return nil
 }
 
 func (w *Worker) Notify(chunkID flow.Identifier) {

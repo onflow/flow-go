@@ -100,16 +100,17 @@ const (
 	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
 	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
 	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
+	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
+	EXEGenerateChunkDataPacks             SpanName = "exe.state.generateChunkDataPacks"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
 	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEPersistStateCommitment             SpanName = "exe.state.persistStateCommitment"
+	EXEPersistEvents                      SpanName = "exe.state.persistEvents"
 	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
-	EXEPersistStateInteractions           SpanName = "exe.state.persistStateInteractions"
-	EXERetrieveStateDelta                 SpanName = "exe.state.retrieveStateDelta"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 
@@ -143,9 +144,12 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction            SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction       SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction           SpanName = "fvm.executeTransaction"
+	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
+	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
+
 	FVMEnvHash                      SpanName = "fvm.env.Hash"
 	FVMEnvValueExists               SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                  SpanName = "fvm.env.getValue"
@@ -167,6 +171,7 @@ const (
 	FVMEnvGetBlockAtHeight          SpanName = "fvm.env.getBlockAtHeight"
 	FVMEnvCreateAccount             SpanName = "fvm.env.createAccount"
 	FVMEnvAddAccountKey             SpanName = "fvm.env.addAccountKey"
+	FVMEnvGetAccountKey             SpanName = "fvm.env.getAccountKey"
 	FVMEnvRemoveAccountKey          SpanName = "fvm.env.removeAccountKey"
 	FVMEnvUpdateAccountContractCode SpanName = "fvm.env.updateAccountContractCode"
 	FVMEnvGetAccountContractCode    SpanName = "fvm.env.getAccountContractCode"

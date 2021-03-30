@@ -1,4 +1,4 @@
-package fvm
+package fvm_test
 
 import (
 	"bytes"
@@ -17,8 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -34,13 +37,13 @@ func TestSafetyCheck(t *testing.T) {
 
 			extralog.ExtraLogDumpPath = tmpDir
 
-			rt := runtime.NewInterpreterRuntime()
+			rt := fvm.NewInterpreterRuntime()
 
 			buffer := &bytes.Buffer{}
 			log := zerolog.New(buffer)
-			txInvocator := NewTransactionInvocator(log)
+			txInvocator := fvm.NewTransactionInvocator(log)
 
-			vm := New(rt)
+			vm := fvm.NewVirtualMachine(rt)
 
 			code := `
 				import 0x0b2a3299cc857e29
@@ -48,11 +51,11 @@ func TestSafetyCheck(t *testing.T) {
 				transaction {}
 			`
 
-			proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+			proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 			contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-			ledger := state.NewMapLedger()
+			view := utils.NewSimpleView()
 
 			contractCode := `X`
 
@@ -62,14 +65,14 @@ func TestSafetyCheck(t *testing.T) {
 			encodedName, err := encodeContractNames([]string{"TestContract"})
 			require.NoError(t, err)
 
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"contract_names",
 				encodedName,
 			)
 			require.NoError(t, err)
-			err = ledger.Set(
+			err = view.Set(
 				string(contractAddress.Bytes()),
 				string(contractAddress.Bytes()),
 				"code.TestContract",
@@ -77,16 +80,16 @@ func TestSafetyCheck(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			context := NewContext(log)
+			context := fvm.NewContext(log)
 
-			st := state.NewState(
-				ledger,
+			sth := state.NewStateHolder(state.NewState(
+				view,
 				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-			)
+			))
 
-			err = txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+			err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -104,13 +107,13 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("checking error in imported contract", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		code := `
 			import 0x0b2a3299cc857e29
@@ -118,11 +121,11 @@ func TestSafetyCheck(t *testing.T) {
 			transaction {}
 		`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
 		contractAddress := flow.HexToAddress("0b2a3299cc857e29")
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 
 		contractCode := `pub contract TestContract: X {}`
 
@@ -132,14 +135,14 @@ func TestSafetyCheck(t *testing.T) {
 		encodedName, err := encodeContractNames([]string{"TestContract"})
 		require.NoError(t, err)
 
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"contract_names",
 			encodedName,
 		)
 		require.NoError(t, err)
-		err = ledger.Set(
+		err = view.Set(
 			string(contractAddress.Bytes()),
 			string(contractAddress.Bytes()),
 			"code.TestContract",
@@ -147,16 +150,16 @@ func TestSafetyCheck(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		context := NewContext(log)
+		context := fvm.NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err = txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -166,29 +169,29 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("parsing error in transaction", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		code := `X`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
-		context := NewContext(log)
+		view := utils.NewSimpleView()
+		context := fvm.NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -199,29 +202,29 @@ func TestSafetyCheck(t *testing.T) {
 
 	t.Run("checking error in transaction", func(t *testing.T) {
 
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		code := `transaction(arg: X) { }`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
-		context := NewContext(log)
+		view := utils.NewSimpleView()
+		context := fvm.NewContext(log)
 
-		st := state.NewState(
-			ledger,
+		sth := state.NewStateHolder(state.NewState(
+			view,
 			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
 			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		)
+		))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -255,20 +258,20 @@ func TestSafetyCheck(t *testing.T) {
 		}}
 
 		log := zerolog.Nop()
-		txInvocator := NewTransactionInvocator(log)
+		txInvocator := fvm.NewTransactionInvocator(log)
 
-		vm := New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 		code := `doesn't matter`
 
-		proc := Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
+		proc := fvm.Transaction(&flow.TransactionBody{Script: []byte(code)}, 0)
 
-		ledger := state.NewMapLedger()
+		view := utils.NewSimpleView()
 		header := unittest.BlockHeaderFixture()
-		context := NewContext(log, WithBlockHeader(&header))
+		context := fvm.NewContext(log, fvm.WithBlockHeader(&header))
 
-		st := state.NewState(ledger)
+		sth := state.NewStateHolder(state.NewState(view))
 
-		err := txInvocator.Process(vm, context, proc, st, NewEmptyPrograms())
+		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 
 		require.Equal(t, 1, proc.Retried)

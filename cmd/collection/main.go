@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -180,7 +181,7 @@ func main() {
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner()
+			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee

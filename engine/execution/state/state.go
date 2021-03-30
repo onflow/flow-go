@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -83,7 +84,7 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
 }
 
 const (
@@ -107,20 +108,6 @@ type state struct {
 	serviceEvents      storage.ServiceEvents
 	transactionResults storage.TransactionResults
 	db                 *badger.DB
-}
-
-func (s *state) PersistExecutionResult(ctx context.Context, executionResult *flow.ExecutionResult) error {
-
-	err := s.results.Store(executionResult)
-	if err != nil {
-		return fmt.Errorf("could not store result: %w", err)
-	}
-
-	err = s.results.Index(executionResult.BlockID, executionResult.ID())
-	if err != nil {
-		return fmt.Errorf("could not index execution result: %w", err)
-	}
-	return nil
 }
 
 func RegisterIDToKey(reg flow.RegisterID) ledger.Key {
@@ -201,7 +188,19 @@ func RegisterValuesToValues(values []flow.RegisterValue) []ledger.Value {
 }
 
 func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta.GetRegisterFunc {
+
+	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
+
 	return func(owner, controller, key string) (flow.RegisterValue, error) {
+		regID := flow.RegisterID{
+			Owner:      owner,
+			Controller: controller,
+			Key:        key,
+		}
+
+		if value, ok := readCache[regID]; ok {
+			return value.Value, nil
+		}
 
 		query, err := makeSingleValueQuery(commitment, owner, controller, key)
 
@@ -218,6 +217,9 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 		if len(values) == 0 {
 			return nil, nil
 		}
+
+		// don't cache value with len zero
+		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
 
 		return values[0], nil
 	}
@@ -249,10 +251,8 @@ func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommi
 }
 
 func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-		defer span.Finish()
-	}
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
+	defer span.Finish()
 
 	return CommitDelta(s.ls, delta, baseState)
 }
@@ -278,10 +278,8 @@ func (s *state) GetRegisters(
 	commit flow.StateCommitment,
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
-		defer span.Finish()
-	}
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegisters)
+	defer span.Finish()
 
 	_, values, err := s.getRegisters(commit, registerIDs)
 	if err != nil {
@@ -302,6 +300,9 @@ func (s *state) GetProof(
 	registerIDs []flow.RegisterID,
 ) (flow.StorageProof, error) {
 
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetRegistersWithProofs)
+	defer span.Finish()
+
 	query, err := makeQuery(commit, registerIDs)
 
 	if err != nil {
@@ -319,27 +320,13 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) PersistStateCommitment(ctx context.Context, blockID flow.Identifier, commit flow.StateCommitment) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
-		defer span.Finish()
-	}
-
-	return s.commits.Store(blockID, commit)
-}
-
 func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
-	defer span.Finish()
-
 	return s.chunkDataPacks.ByChunkID(chunkID)
 }
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
-		defer span.Finish()
-	}
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEGetExecutionResultID)
+	defer span.Finish()
 
 	result, err := s.results.ByBlockID(blockID)
 	if err != nil {
@@ -348,29 +335,7 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistExecutionResult)
-		defer span.Finish()
-	}
-
-	err := s.myReceipts.StoreMyReceipt(receipt)
-	if err != nil {
-		return fmt.Errorf("could not persist execution result: %w", err)
-	}
-	return nil
-}
-
-func (s *state) PersistStateInteractions(ctx context.Context, blockID flow.Identifier, views []*delta.Snapshot) error {
-	if s.tracer != nil {
-		span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateInteractions)
-		defer span.Finish()
-	}
-
-	return operation.RetryOnConflict(s.db.Update, operation.InsertExecutionStateInteractions(blockID, views))
-}
-
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionResult *flow.ExecutionResult, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
 
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -382,8 +347,9 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	// as tightly as possible to let Badger manage it.
 	// Note, that it does not guarantee atomicity as transactions has size limit
 	// but it's the closes thing to atomicity we could have
-	batch := s.db.NewWriteBatch()
+	batch := badgerstorage.NewBatch(s.db)
 
+	sp, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
 	for _, chunkDataPack := range chunkDataPacks {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
@@ -395,21 +361,27 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
 		}
 	}
+	sp.Finish()
 
+	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	err := s.commits.BatchStore(blockID, endState, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
+	sp.Finish()
 
+	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistEvents)
 	err = s.events.BatchStore(blockID, events, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
-
 	err = s.serviceEvents.BatchStore(blockID, events, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
+	sp.Finish()
+
+	executionResult := &executionReceipt.ExecutionResult
 
 	err = s.transactionResults.BatchStore(blockID, results, batch)
 	if err != nil {
@@ -425,6 +397,11 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	err = s.results.BatchIndex(blockID, executionResult.ID(), batch)
 	if err != nil {
 		return fmt.Errorf("cannot index execution result: %w", err)
+	}
+
+	err = s.myReceipts.BatchStoreMyReceipt(executionReceipt, batch)
+	if err != nil {
+		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	err = batch.Flush()

@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,22 +15,25 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestPrograms_TestContractUpdates(t *testing.T) {
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	// setup transactions
@@ -94,7 +96,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -144,15 +146,15 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 //             -> Block1211 (emit event - version should be 2)
 func TestPrograms_TestBlockForks(t *testing.T) {
 	// setup
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
 	require.NoError(t, err)
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
-	accounts, err := testutil.CreateAccounts(vm, ledger, fvm.NewEmptyPrograms(), privateKeys, chain)
+	accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 	require.NoError(t, err)
 
 	account := accounts[0]
@@ -161,7 +163,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -182,7 +184,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		block1111, block12, block121, block1211 *flow.Block
 
 		block1View, block11View, block111View, block112View, block1121View,
-		block1111View, block12View, block121View, block1211View *delta.View
+		block1111View, block12View, block121View, block1211View state.View
 	)
 
 	t.Run("executing block1 (no collection)", func(t *testing.T) {
@@ -332,7 +334,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 
 }
 
-func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Block, col flow.Collection, view *delta.View) (*flow.Block, *execution.ComputationResult) {
+func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Block, col flow.Collection, view state.View) (*flow.Block, *execution.ComputationResult) {
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signature:    nil,

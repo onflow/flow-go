@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -78,11 +79,12 @@ func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Nod
 	root, result, seal := unittest.BootstrapFixture(participants)
 
 	// make root QC
-	sig1 := make([]byte, 32)
+	length := uint(32)
+	sig1 := make([]byte, length)
 	rand.Read(sig1[:])
-	sig2 := make([]byte, 32)
+	sig2 := make([]byte, length)
 	rand.Read(sig2[:])
-	c := &signature.Combiner{}
+	c := signature.NewCombiner(length, length)
 	combined, err := c.Join(sig1, sig2)
 	require.NoError(t, err)
 
@@ -141,10 +143,10 @@ func createNode(
 	statusesDB := storage.NewEpochStatuses(metrics, db)
 	consumer := events.NewNoop()
 
-	stateRoot, err := protocol.NewStateRoot(root, result, seal, 0)
+	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, rootQC)
 	require.NoError(t, err)
 
-	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, blocksDB, setupsDB, commitsDB, statusesDB, stateRoot)
+	state, err := protocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
 	fullState, err := protocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
