@@ -10,15 +10,16 @@ The server token is needed with the `-t` flag for both commands. It authenticate
 
 ## Usage
 
-```bash
-$ ./transit -push -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
-$ ./transit -pull -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
+```shell
+$ transit push -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
+$ transit pull -t ${server-token} -d ${bootstrap-dir} -r ${flow-role}
 ```
 
 ## Push
-Running `-push` will perform the following actions:
 
-1. Create a Transit Keypair with libsodium and write it to 
+Running `transit push` will perform the following actions:
+
+1. Create a Transit Keypair with libsodium and write it to
    - `<id>.transit-key.pub`
    - `<id>.transit-key.priv`
 1. Upload the node's public files to the server
@@ -27,9 +28,10 @@ Running `-push` will perform the following actions:
 
 ## Pull
 
-After bootstrapping, running `-pull` will:
+After bootstrapping, running `transit pull` will:
 
 1. Fetch the following files:
+
    - `dkg-data.pub.json`
    - `node-infos.pub.json`
    - `root-block.json`
@@ -43,13 +45,15 @@ After bootstrapping, running `-pull` will:
    - `<id>.random-beacon.priv.json`
 
 ## Wrapping Responses
+
 The transit script also has `-wrap` for the other end of the connection. This function takes a private random-beacon key and wraps it with the corresponding transit key, which can then be sent back to the node.
 
 ```shell
-./transit -wrap ${ID}
+$ transit wrap -i ${ID} -r ${flow-role}
 ```
 
 The wrap function:
+
 1. Takes in `<id>.random-beacon.priv.json` and produces
    - `<id>.random-beacon.priv.json.enc`
 1. Uploads `<id>.random-beacon.priv.json.enc` to the server
