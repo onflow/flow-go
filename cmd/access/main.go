@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -49,6 +51,8 @@ func main() {
 		executionGRPCPort            uint
 		pingEnabled                  bool
 		nodeInfoFile                 string
+		apiRatelimits                map[string]int
+		apiBurstlimits               map[string]int
 		followerState                protocol.MutableState
 		ingestEng                    *ingestion.Engine
 		requestEng                   *requester.Engine
@@ -86,6 +90,10 @@ func main() {
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
+			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
+			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
+			flags.StringSliceVar(&rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+			flags.StringSliceVar(&rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
 			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
 			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
 			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
@@ -93,6 +101,8 @@ func main() {
 			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
 			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -124,7 +134,8 @@ func main() {
 			collectionRPCConn, err := grpc.Dial(
 				rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure())
+				grpc.WithInsecure(),
+				backend.WithClientUnaryInterceptor(rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
 			}
@@ -144,7 +155,8 @@ func main() {
 			executionRPCConn, err := grpc.Dial(
 				rpcConf.ExecutionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure())
+				grpc.WithInsecure(),
+				backend.WithClientUnaryInterceptor(rpcConf.ExecutionClientTimeout))
 			if err != nil {
 				return err
 			}
@@ -225,6 +237,8 @@ func main() {
 				executionGRPCPort,
 				retryEnabled,
 				rpcMetricsEnabled,
+				apiRatelimits,
+				apiBurstlimits,
 			)
 			return rpcEng, nil
 		}).

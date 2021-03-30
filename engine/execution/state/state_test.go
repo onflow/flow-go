@@ -14,6 +14,7 @@ import (
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/storage/mocks"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -32,7 +33,11 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 				stateCommitments := mocks.NewMockCommits(ctrl)
 				blocks := mocks.NewMockBlocks(ctrl)
+				headers := mocks.NewMockHeaders(ctrl)
 				collections := mocks.NewMockCollections(ctrl)
+				events := mocks.NewMockEvents(ctrl)
+				serviceEvents := mocks.NewMockEvents(ctrl)
+				txResults := mocks.NewMockTransactionResults(ctrl)
 
 				stateCommitment := ls.InitialState()
 
@@ -42,9 +47,10 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 				results := new(storage.ExecutionResults)
 				receipts := new(storage.ExecutionReceipts)
+				myReceipts := new(storage.MyExecutionReceipts)
 
 				es := state.NewExecutionState(
-					ls, stateCommitments, blocks, collections, chunkDataPacks, results, receipts, badgerDB, nil,
+					ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, receipts, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
 				)
 
 				f(t, es)

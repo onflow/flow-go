@@ -104,6 +104,16 @@ func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
 	return operation.RetryOnConflict(r.db.Update, r.store(result))
 }
 
+func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchInsertExecutionResult(result)(writeBatch)
+}
+
+func (r *ExecutionResults) BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchIndexExecutionResult(blockID, resultID)(writeBatch)
+}
+
 func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()

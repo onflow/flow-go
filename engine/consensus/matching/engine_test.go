@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
@@ -19,21 +20,21 @@ import (
 )
 
 func TestMatchingEngineContext(t *testing.T) {
-	suite.Run(t, new(EngineContextSuite))
+	suite.Run(t, new(MatchingEngineSuite))
 }
 
-type EngineContextSuite struct {
+type MatchingEngineSuite struct {
 	unittest.BaseChainSuite
 	// misc SERVICE COMPONENTS which are injected into Matching Core
 	requester         *mockmodule.Requester
 	receiptValidator  *mockmodule.ReceiptValidator
 	approvalValidator *mockmodule.ApprovalValidator
 
-	// Context
-	context *Engine
+	// Matching Engine
+	engine *Engine
 }
 
-func (ms *EngineContextSuite) SetupTest() {
+func (ms *MatchingEngineSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SUITE ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.SetupChain()
 
@@ -50,13 +51,13 @@ func (ms *EngineContextSuite) SetupTest() {
 	approvalResponseProvider := make(chan *Event)
 	receiptsProvider := make(chan *Event)
 
-	ms.context = &Engine{
+	ms.engine = &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
 		core: &Core{
 			tracer:                               tracer,
 			log:                                  log,
-			engineMetrics:                        metrics,
+			coreMetrics:                          metrics,
 			mempool:                              metrics,
 			metrics:                              metrics,
 			state:                                ms.State,
@@ -68,6 +69,7 @@ func (ms *EngineContextSuite) SetupTest() {
 			receipts:                             ms.ReceiptsPL,
 			approvals:                            ms.ApprovalsPL,
 			seals:                                ms.SealsPL,
+			pendingReceipts:                      stdmap.NewPendingReceipts(100),
 			sealingThreshold:                     10,
 			maxResultsToRequest:                  200,
 			assigner:                             ms.Assigner,
@@ -75,7 +77,7 @@ func (ms *EngineContextSuite) SetupTest() {
 			approvalValidator:                    ms.approvalValidator,
 			requestTracker:                       NewRequestTracker(1, 3),
 			approvalRequestsThreshold:            10,
-			requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+			requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
 			emergencySealingActive:               false,
 		},
 		approvalSink:                         approvalsProvider,
@@ -84,19 +86,19 @@ func (ms *EngineContextSuite) SetupTest() {
 		pendingEventSink:                     make(chan *Event),
 		engineMetrics:                        metrics,
 		cacheMetrics:                         metrics,
-		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
 	}
 
-	ms.context.pendingReceipts, _ = fifoqueue.NewFifoQueue()
-	ms.context.pendingApprovals, _ = fifoqueue.NewFifoQueue()
-	ms.context.pendingRequestedApprovals, _ = fifoqueue.NewFifoQueue()
+	ms.engine.pendingReceipts, _ = fifoqueue.NewFifoQueue()
+	ms.engine.pendingApprovals, _ = fifoqueue.NewFifoQueue()
+	ms.engine.pendingRequestedApprovals, _ = fifoqueue.NewFifoQueue()
 
-	<-ms.context.Ready()
+	<-ms.engine.Ready()
 }
 
 // TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
 // Tests the whole processing pipeline.
-func (ms *EngineContextSuite) TestProcessValidReceipt() {
+func (ms *MatchingEngineSuite) TestProcessValidReceipt() {
 	originID := ms.ExeID
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(originID),
@@ -104,16 +106,16 @@ func (ms *EngineContextSuite) TestProcessValidReceipt() {
 	)
 
 	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
-
+	// we expect that receipt is persisted in storage
+	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 	// we expect that receipt is added to mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
-
 	// setup the results mempool to check if we attempted to add the incorporated result
 	ms.ResultsPL.
 		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
 		Return(true, nil).Once()
 
-	err := ms.context.Process(originID, receipt)
+	err := ms.engine.Process(originID, receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
 	// matching engine has at least 100ms ticks for processing events
@@ -124,9 +126,9 @@ func (ms *EngineContextSuite) TestProcessValidReceipt() {
 	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
-// TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
-// Tests the whole processing pipeline.
-func (ms *EngineContextSuite) TestMultipleProcessingItems() {
+// TestMultipleProcessingItems tests that the engine queues multiple receipts and approvals
+// and eventually feeds them into matching.Core for processing
+func (ms *MatchingEngineSuite) TestMultipleProcessingItems() {
 	originID := ms.ExeID
 
 	receipts := make([]*flow.ExecutionReceipt, 20)
@@ -136,6 +138,8 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 		)
 		ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+		// we expect that receipt is persisted in storage
+		ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 		// we expect that receipt is added to mempool
 		ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 		// setup the results mempool to check if we attempted to add the incorporated result
@@ -154,8 +158,7 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 				unittest.WithApproverID(approverID))
 			ms.approvalValidator.On("Validate", approval).Return(nil).Once()
 			approvals = append(approvals, approval)
-			ms.ApprovalsPL.
-				On("Add", approval).Return(true, nil).Once()
+			ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
 		}
 	}
 
@@ -164,7 +167,7 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, receipt := range receipts {
-			err := ms.context.Process(originID, receipt)
+			err := ms.engine.Process(originID, receipt)
 			ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 		}
 	}()
@@ -172,7 +175,7 @@ func (ms *EngineContextSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range approvals {
-			err := ms.context.Process(approverID, approval)
+			err := ms.engine.Process(approverID, approval)
 			ms.Require().NoError(err, "should process approval")
 		}
 	}()
