@@ -29,6 +29,11 @@ func (e InvalidAddressError) Code() ErrorCode {
 	return ErrCodeInvalidAddressError
 }
 
+// Unwrap unwraps the error
+func (e InvalidAddressError) Unwrap() error {
+	return e.err
+}
+
 // InvalidArgumentError indicates that a transaction includes invalid arguments.
 // this error is the result of failure in any of the following conditions:
 // - number of arguments doesn't match the template
@@ -49,6 +54,11 @@ func (e InvalidArgumentError) Error() string {
 // Code returns the error code for this error type
 func (e InvalidArgumentError) Code() ErrorCode {
 	return ErrCodeInvalidArgumentError
+}
+
+// Unwrap unwraps the error
+func (e InvalidArgumentError) Unwrap() error {
+	return e.err
 }
 
 // InvalidLocationError indicates an invalid location is passed

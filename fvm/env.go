@@ -538,7 +538,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 
 	hasher, err := crypto.NewHasher(hashAlgo)
 	if err != nil {
-		return nil, errors.NewHasherFailure(err)
+		return nil, errors.NewHasherFailuref("failed to create a hasher for env.Hash", err)
 	}
 
 	return hasher.ComputeHash(data), nil

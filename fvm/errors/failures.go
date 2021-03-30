@@ -23,6 +23,11 @@ func (e *UnknownFailure) FailureCode() FailureCode {
 	return FailureCodeUnknownFailure
 }
 
+// Unwrap unwraps the error
+func (e UnknownFailure) Unwrap() error {
+	return e.err
+}
+
 // EncodingFailure captures an fatal error sourced from encoding issues
 type EncodingFailure struct {
 	err error
@@ -44,6 +49,11 @@ func (e *EncodingFailure) FailureCode() FailureCode {
 	return FailureCodeEncodingFailure
 }
 
+// Unwrap unwraps the error
+func (e EncodingFailure) Unwrap() error {
+	return e.err
+}
+
 // LedgerFailure captures a fatal error cause by ledger failures
 type LedgerFailure struct {
 	err error
@@ -63,6 +73,11 @@ func (e *LedgerFailure) FailureCode() FailureCode {
 	return FailureCodeLedgerFailure
 }
 
+// Unwrap unwraps the error
+func (e LedgerFailure) Unwrap() error {
+	return e.err
+}
+
 // StateMergeFailure captures a fatal caused by state merge
 type StateMergeFailure struct {
 	err error
@@ -73,13 +88,18 @@ func NewStateMergeFailure(err error) *StateMergeFailure {
 	return &StateMergeFailure{err: err}
 }
 
-func (e *StateMergeFailure) Error() string {
+func (e StateMergeFailure) Error() string {
 	return fmt.Sprintf("%s can not merge the state: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
-func (e *StateMergeFailure) FailureCode() FailureCode {
+func (e StateMergeFailure) FailureCode() FailureCode {
 	return FailureCodeStateMergeFailure
+}
+
+// Unwrap unwraps the error
+func (e StateMergeFailure) Unwrap() error {
+	return e.err
 }
 
 // BlockFinderFailure captures a fatal caused by block finder
@@ -92,13 +112,18 @@ func NewBlockFinderFailure(err error) *BlockFinderFailure {
 	return &BlockFinderFailure{err: err}
 }
 
-func (e *BlockFinderFailure) Error() string {
+func (e BlockFinderFailure) Error() string {
 	return fmt.Sprintf("%s can not retrieve the block: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
-func (e *BlockFinderFailure) FailureCode() FailureCode {
+func (e BlockFinderFailure) FailureCode() FailureCode {
 	return FailureCodeBlockFinderFailure
+}
+
+// Unwrap unwraps the error
+func (e BlockFinderFailure) Unwrap() error {
+	return e.err
 }
 
 // HasherFailure captures a fatal caused by hasher
@@ -106,25 +131,21 @@ type HasherFailure struct {
 	err error
 }
 
-// NewHasherFailure returns a new hasherFailure
-func NewHasherFailure(err error) *HasherFailure {
-	return &HasherFailure{
-		err: err,
-	}
+// NewHasherFailuref constructs a new hasherFailure
+func NewHasherFailuref(msg string, args ...interface{}) *HasherFailure {
+	return &HasherFailure{err: fmt.Errorf(msg, args...)}
 }
 
-// NewHasherFailuref formats and returns a new hasherFailure
-func NewHasherFailuref(msg string, err error) error {
-	return &HasherFailure{
-		err: fmt.Errorf(msg, err),
-	}
-}
-
-func (e *HasherFailure) Error() string {
+func (e HasherFailure) Error() string {
 	return fmt.Sprintf("%s hasher failed: %s", e.FailureCode().String(), e.err.Error())
 }
 
 // FailureCode returns the failure code
-func (e *HasherFailure) FailureCode() FailureCode {
+func (e HasherFailure) FailureCode() FailureCode {
 	return FailureCodeHasherFailure
+}
+
+// Unwrap unwraps the error
+func (e HasherFailure) Unwrap() error {
+	return e.err
 }

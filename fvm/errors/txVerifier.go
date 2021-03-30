@@ -77,11 +77,16 @@ func (e ExpiredTransactionError) Code() ErrorCode {
 // - script can not be parsed by the cadence parser
 // - comment-only script, len(program.Declarations) == 0
 type InvalidScriptError struct {
-	ParserErr error
+	err error
+}
+
+// NewInvalidScriptError constructs a new InvalidScriptError
+func NewInvalidScriptError(err error) *InvalidScriptError {
+	return &InvalidScriptError{err: err}
 }
 
 func (e InvalidScriptError) Error() string {
-	return fmt.Sprintf("%s failed to parse transaction Cadence script: %s", e.Code().String(), e.ParserErr)
+	return fmt.Sprintf("%s failed to parse transaction Cadence script: %s", e.Code().String(), e.err.Error())
 }
 
 // Code returns the error code for this error type
@@ -91,7 +96,7 @@ func (e InvalidScriptError) Code() ErrorCode {
 
 // Unwrap unwraps the error
 func (e InvalidScriptError) Unwrap() error {
-	return e.ParserErr
+	return e.err
 }
 
 // InvalidGasLimitError indicates that a transaction specifies a gas limit that exceeds the maximum allowed by the network.
