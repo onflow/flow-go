@@ -259,7 +259,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	err = c.receiptValidator.Validate(receipt)
 	childSpan.Finish()
 
-	if validation.IsUnverifiableError(err) {
+	if engine.IsUnverifiableInputError(err) {
 		// If previous result is missing, we can't validate this receipt.
 		// Although we will request its previous receipt(s),
 		// we don't want to drop it now, because when the missing previous arrive

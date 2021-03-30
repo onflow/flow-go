@@ -41,7 +41,11 @@ func TraverseBackward(headers storage.Headers, startBlockID flow.Identifier, vis
 }
 
 // TraverseForward traverses a chain segment in forward order.
-// It first traverses backward with the given `forkHead` and `shouldContinue`. Once stopped, it will pass the visited blocks to the given `visitor` in a forward order. The last block that is fed into `visitor` is the `forkHead`.
+// The algorithm starts at the `forkHead` and walks the chain backwards towards
+// the genesis block. The descend continues as long as `shouldContinue` returns
+// true. Starting with _the first block_ where `shouldContinue` returned false,
+// the visited blocks are fed into `visitor` in a forward order (order of
+// increasing height). The last block that is fed into `visitor` is `forkHead`.
 func TraverseForward(headers storage.Headers,
 	forkHead flow.Identifier,
 	visitor onVisitBlock,
