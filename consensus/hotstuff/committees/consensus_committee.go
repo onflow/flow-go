@@ -70,13 +70,16 @@ func (c *Consensus) Identities(blockID flow.Identifier, selector flow.IdentityFi
 		filter.IsVotingConsensusCommitteeMember,
 		selector,
 	))
-	return il, convertError(err)
+	return il, err
 }
 
 func (c *Consensus) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
 	identity, err := c.state.AtBlockID(blockID).Identity(nodeID)
+	if protocol.IsIdentityNotFound(err) {
+		return nil, model.ErrInvalidSigner
+	}
 	if err != nil {
-		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, convertError(err))
+		return nil, fmt.Errorf("could not get identity for node ID %x: %w", nodeID, err)
 	}
 	if !filter.IsVotingConsensusCommitteeMember(identity) {
 		return nil, model.ErrInvalidSigner

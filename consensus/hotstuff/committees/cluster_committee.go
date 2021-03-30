@@ -76,7 +76,7 @@ func (c *Cluster) Identities(blockID flow.Identifier, selector flow.IdentityFilt
 		selector,
 		c.clusterMemberFilter,
 	))
-	return identities, convertError(err)
+	return identities, err
 }
 
 func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*flow.Identity, error) {
@@ -101,8 +101,11 @@ func (c *Cluster) Identity(blockID flow.Identifier, nodeID flow.Identifier) (*fl
 
 	// otherwise use the snapshot given by the reference block
 	identity, err := c.state.AtBlockID(payload.ReferenceBlockID).Identity(nodeID)
+	if protocol.IsIdentityNotFound(err) {
+		return nil, model.ErrInvalidSigner
+	}
 	if err != nil {
-		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, convertError(err))
+		return nil, fmt.Errorf("could not get identity for node (id=%x): %w", nodeID, err)
 	}
 	if !c.clusterMemberFilter(identity) {
 		return nil, model.ErrInvalidSigner
