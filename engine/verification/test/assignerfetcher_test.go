@@ -42,7 +42,7 @@ import (
 func TestAssignerFetcherPipeline(t *testing.T) {
 	testcases := []struct {
 		blockCount int
-		opts        []utils.CompleteExecutionReceiptBuilderOpt
+		opts       []utils.CompleteExecutionReceiptBuilderOpt
 		msg        string
 		staked     bool
 	}{
@@ -53,7 +53,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 			// The result has only one chunk.
 			// The verification node is staked
 			blockCount: 1,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(1),
 				utils.WithChunks(1),
 				utils.WithCopies(1),
@@ -63,7 +63,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		},
 		{
 			blockCount: 1,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(1),
 				utils.WithChunks(1),
 				utils.WithCopies(1),
@@ -73,7 +73,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		},
 		{
 			blockCount: 1,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(5),
 				utils.WithChunks(5),
 				utils.WithCopies(1),
@@ -83,7 +83,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		},
 		{
 			blockCount: 10,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(5),
 				utils.WithChunks(5),
 				utils.WithCopies(2),
@@ -115,7 +115,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 				unittest.RequireCloseBefore(t, blockConsumer.Done(), time.Second, "could not terminate block consumer")
 				unittest.RequireCloseBefore(t, chunkConsumer.Done(), time.Second, "could not terminate chunk consumer")
 
-			}, tc.ops...)
+			}, tc.opts...)
 		})
 	}
 }
