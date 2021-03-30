@@ -120,7 +120,7 @@ func NewParticipant(
 	}
 
 	// initialize the voter
-	voter := voter.New(signer, forks, persist, voted)
+	voter := voter.New(signer, forks, persist, committee, voted)
 
 	// initialize the event handler
 	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
