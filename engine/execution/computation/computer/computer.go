@@ -120,12 +120,14 @@ func (e *blockComputer) executeBlock(
 	}
 
 	var txIndex uint32
+	var err error
 	var err1 error
 	var err2 error
-	var proof []byte
-	stateCommit := block.StartState
 	var colView state.View
 	var prevColView state.View
+	var stateCommit flow.StateCommitment
+
+	stateCommit = block.StartState
 
 	if len(collections) > 0 {
 
@@ -154,31 +156,26 @@ func (e *blockComputer) executeBlock(
 			}()
 
 			go func() {
-				stateCommit, proof, err2 = e.committer.CommitView(ctx, prevColView, stateCommit)
+				stateCommit, err2 = e.commitView(ctx, prevColView, stateCommit, res)
 				wg.Done()
 			}()
 
 			wg.Wait()
-			res.AddStateCommitment(stateCommit)
-			res.AddProof(proof) // TODO fix me
 			if err1 != nil {
 				return nil, fmt.Errorf("failed to execute collection: %w", err1)
 			}
-
 			if err2 != nil {
 				return nil, fmt.Errorf("failed to commit view while executing a collection: %w", err2)
 			}
 			prevColView = colView
-			err := stateView.MergeView(colView)
+			err = stateView.MergeView(colView)
 			if err != nil {
 				return nil, fmt.Errorf("cannot merge view: %w", err)
 			}
 		}
 
 		// commit last view
-		stateCommit, proof, err2 = e.committer.CommitView(ctx, prevColView, stateCommit)
-		res.AddStateCommitment(stateCommit)
-		res.AddProof(proof)
+		stateCommit, err2 = e.commitView(ctx, prevColView, stateCommit, res)
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to commit view while executing a collection: %w", err2)
 		}
@@ -188,19 +185,29 @@ func (e *blockComputer) executeBlock(
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	collectionView := stateView.NewChild()
-	_, err := e.executeSystemCollection(ctx, txIndex, collectionView, programs, res)
+	_, err = e.executeSystemCollection(ctx, txIndex, collectionView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
-	stateCommit, proof, err = e.committer.CommitView(ctx, collectionView, stateCommit)
-	res.AddStateCommitment(stateCommit)
-	res.AddProof(proof) // TODO fix me
+	stateCommit, err = e.commitView(ctx, collectionView, stateCommit, res)
 	err = stateView.MergeView(collectionView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	return res, nil
+}
+
+func (e *blockComputer) commitView(
+	ctx context.Context,
+	collectionView state.View,
+	state flow.StateCommitment,
+	res *execution.ComputationResult,
+) (flow.StateCommitment, error) {
+	stateCommit, proof, err := e.committer.CommitView(ctx, collectionView, state)
+	res.AddStateCommitment(stateCommit)
+	res.AddProof(proof)
+	return stateCommit, err
 }
 
 func (e *blockComputer) executeSystemCollection(
