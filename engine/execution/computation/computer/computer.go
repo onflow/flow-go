@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -119,36 +120,75 @@ func (e *blockComputer) executeBlock(
 	}
 
 	var txIndex uint32
-	var err error
+	var err1 error
+	var err2 error
 	var proof []byte
 	stateCommit := block.StartState
-	// executing collections
-	for _, collection := range collections {
-		e.log.Debug().
-			Hex("block_id", logging.Entity(block)).
-			Hex("collection_id", logging.Entity(collection.Guarantee)).
-			Msg("executing collection")
+	var colView state.View
+	var prevColView state.View
 
-		collectionView := stateView.NewChild()
-		txIndex, err = e.executeCollection(ctx, txIndex, blockCtx, collectionView, programs, collection, res)
-		if err != nil {
-			return nil, fmt.Errorf("failed to execute collection: %w", err)
+	if len(collections) > 0 {
+
+		var wg sync.WaitGroup
+
+		// execute the first collection
+		colView = stateView.NewChild()
+		txIndex, err1 = e.executeCollection(ctx, txIndex, blockCtx, colView, programs, collections[0], res)
+		if err1 != nil {
+			return nil, fmt.Errorf("failed to execute collection: %w", err1)
 		}
-		stateCommit, proof, err = e.committer.CommitView(ctx, collectionView, stateCommit)
+		prevColView = colView
+		err1 = stateView.MergeView(colView)
+		if err1 != nil {
+			return nil, fmt.Errorf("cannot merge view: %w", err1)
+		}
+
+		// executing collections
+		for _, collection := range collections[1:] {
+			wg.Add(2)
+			colView = stateView.NewChild()
+
+			go func() {
+				txIndex, err1 = e.executeCollection(ctx, txIndex, blockCtx, colView, programs, collection, res)
+				wg.Done()
+			}()
+
+			go func() {
+				stateCommit, proof, err2 = e.committer.CommitView(ctx, prevColView, stateCommit)
+				wg.Done()
+			}()
+
+			wg.Wait()
+			res.AddStateCommitment(stateCommit)
+			res.AddProof(proof) // TODO fix me
+			if err1 != nil {
+				return nil, fmt.Errorf("failed to execute collection: %w", err1)
+			}
+
+			if err2 != nil {
+				return nil, fmt.Errorf("failed to commit view while executing a collection: %w", err2)
+			}
+			prevColView = colView
+			err := stateView.MergeView(colView)
+			if err != nil {
+				return nil, fmt.Errorf("cannot merge view: %w", err)
+			}
+		}
+
+		// commit last view
+		stateCommit, proof, err2 = e.committer.CommitView(ctx, prevColView, stateCommit)
 		res.AddStateCommitment(stateCommit)
-		res.AddProof(proof) // TODO fix me
-
-		err := stateView.MergeView(collectionView)
-		if err != nil {
-			return nil, fmt.Errorf("cannot merge view: %w", err)
+		res.AddProof(proof)
+		if err2 != nil {
+			return nil, fmt.Errorf("failed to commit view while executing a collection: %w", err2)
 		}
-
 	}
 
+	// TODO make this part also parallel (right now it doesn't worth the time)
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	collectionView := stateView.NewChild()
-	_, err = e.executeSystemCollection(ctx, txIndex, collectionView, programs, res)
+	_, err := e.executeSystemCollection(ctx, txIndex, collectionView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -195,6 +235,11 @@ func (e *blockComputer) executeCollection(
 	collection *entity.CompleteCollection,
 	res *execution.ComputationResult,
 ) (uint32, error) {
+
+	e.log.Debug().
+		Hex("block_id", logging.Entity(blockCtx.BlockHeader)).
+		Hex("collection_id", logging.Entity(collection.Guarantee)).
+		Msg("executing collection")
 
 	// call tracing
 	startedAt := time.Now()
