@@ -57,14 +57,14 @@ func (i *TransactionInvocator) Process(
 
 	var env *hostEnv
 	var txError error
-	predeclaredValues := i.valueDeclarations(ctx, env)
-
 	retry := false
 	numberOfRetries := 0
 
 	parentState := sth.State()
 	childState := sth.NewChild()
 	env = newEnvironment(*ctx, vm, sth, programs)
+	predeclaredValues := i.valueDeclarations(ctx, env)
+
 	defer func() {
 		// an extra check for state holder health, this should never happen
 		if childState != sth.State() {
