@@ -263,11 +263,8 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 // As the return values, it returns the state, local module, and identity of verification node.
 func bootstrapSystem(t *testing.T, staked bool) (*testmock.StateFixture, module.Local, flow.Identity) {
 	// creates identities to bootstrap system with
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	identities := flow.IdentityList{colID, conID, exeID, verID}
+	identities := unittest.CompleteIdentitySet(verID)
 
 	// bootstraps the system
 	collector := &metrics.NoopCollector{}
