@@ -5,19 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -38,7 +34,6 @@ type Engine struct {
 	verifier              network.Engine            // the verifier engine
 	state                 protocol.State            // used to verify the request origin
 	pendingChunks         *Chunks                   // used to store all the pending chunks that assigned to this node
-	con                   network.Conduit           // used to send the chunk data request
 	headers               storage.Headers           // used to fetch the block header when chunk data is ready to be verified
 	chunkConsumerNotifier module.ProcessingNotifier // to report a chunk has been processed
 	results               storage.ExecutionResults  // to retrieve execution result of an assigned chunk
@@ -50,14 +45,11 @@ func New(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
 	tracer module.Tracer,
-	net module.Network,
 	me module.Local,
 	verifier network.Engine,
 	state protocol.State,
 	chunks *Chunks,
 	headers storage.Headers,
-	retryInterval time.Duration,
-	maxAttempt int,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:          engine.NewUnit(),
@@ -69,19 +61,8 @@ func New(
 		state:         state,
 		pendingChunks: chunks,
 		headers:       headers,
-		retryInterval: retryInterval,
-		maxAttempt:    maxAttempt,
 	}
 
-	if maxAttempt == 0 {
-		return nil, fmt.Errorf("max retry can not be 0")
-	}
-
-	con, err := net.Register(engine.RequestChunks, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register chunk data pack provider engine: %w", err)
-	}
-	e.con = con
 	return e, nil
 }
 
@@ -94,77 +75,11 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.chunkConsumerNotifier == nil {
 		panic("missing chunk consumer notifier callback in verification fetcher engine")
 	}
-
-	delay := time.Duration(0)
-	// run a periodic check to retry requesting chunk data packs for chunks that assigned to me.
-	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous
-	// call has finished.
-	// That being said, there won't be two onTimer running in parallel. See test cases for LaunchPeriodically
-	e.unit.LaunchPeriodically(e.onTimer, e.retryInterval, delay)
-	return e.unit.Ready()
 }
 
 // Done terminates the engine and returns a channel that is closed when the termination is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
-}
-
-// SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
-}
-
-// ProcessLocal processes an event originating on the local node.
-// Note: this method is required as an Engine implementation,
-// however it should not be invoked as match engine requires origin ID of events
-// it receives. Use Process method instead.
-func (e *Engine) ProcessLocal(event interface{}) error {
-	return fmt.Errorf("should not invoke ProcessLocal of Match engine, use Process instead")
-}
-
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
-}
-
-// process receives and submits an event to the engine for processing.
-// It returns an error so the engine will not propagate an event unless
-// it is successfully processed by the engine.
-// The origin ID indicates the node which originally submitted the event to
-// the peer-to-peer network.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	var err error
-
-	switch resource := event.(type) {
-	case *messages.ChunkDataResponse:
-		err = e.onChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
-
-	if err != nil {
-		// logs the error instead of returning that.
-		// returning error would be projected at a higher level by network layer.
-		// however, this is an engine-level error, and not network layer error.
-		e.log.Debug().Err(err).Msg("engine could not process event successfully")
-	}
-
-	return nil
 }
 
 // ProcessAssignedChunk is the entry point of fetcher engine.
@@ -318,35 +233,6 @@ func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) ([
 		}
 	}
 	return agrees, disagrees
-}
-
-// requestChunkDataPack request the chunk data pack from the execution node.
-// the chunk data pack includes the collection and statecommitments that
-// needed to make a VerifiableChunk
-func (e *Engine) requestChunkDataPack(c *ChunkStatus, allExecutors flow.IdentityList) error {
-	chunkID := c.ID()
-
-	// creates chunk data pack request event
-	req := &messages.ChunkDataRequest{
-		ChunkID: chunkID,
-		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
-	}
-
-	targetIDs := chooseChunkDataPackTarget(allExecutors, c.Agrees, c.Disagrees)
-
-	// publishes the chunk data request to the network
-	err := e.con.Publish(req, targetIDs...)
-	if err != nil {
-		return fmt.Errorf(
-			"could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
-	}
-
-	exists := e.pendingChunks.IncrementAttempt(c.ID())
-	if !exists {
-		return fmt.Errorf("chunk is no longer needed to be processed")
-	}
-
-	return nil
 }
 
 func chooseChunkDataPackTarget(
