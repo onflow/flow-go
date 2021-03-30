@@ -320,65 +320,6 @@ func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) ([
 	return agrees, disagrees
 }
 
-// onTimer runs periodically, it goes through all pending chunks, and fetches
-// its chunk data pack.
-// it also retries the chunk data request if the data hasn't been received
-// for a while.
-func (e *Engine) onTimer() {
-	allChunks := e.pendingChunks.All()
-
-	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending pendingChunks")
-
-	sealed, err := e.state.Sealed().Head()
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not get last sealed block")
-		return
-	}
-
-	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not get executors")
-		return
-	}
-
-	for _, chunk := range allChunks {
-		chunkID := chunk.ID()
-
-		lg := e.log.With().
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(chunk.ExecutionResultID)).
-			Hex("block_id", logging.ID(chunk.Chunk.ChunkBody.BlockID)).
-			Uint64("height", chunk.Height).
-			Logger()
-
-		// if block has been sealed, then we can finish
-		isSealed := chunk.Height <= sealed.Height
-
-		if isSealed {
-			removed := e.pendingChunks.Rem(chunkID)
-			lg.Info().Bool("removed", removed).Msg("chunk has been sealed, no longer needed")
-			continue
-		}
-
-		// check if has reached max try
-		if !CanTry(e.maxAttempt, chunk) {
-			lg.Debug().
-				Int("max_attempt", e.maxAttempt).
-				Int("actual_attempts", chunk.Attempt).
-				Msg("max attempts reached, no longer fetch data pack for chunk")
-			continue
-		}
-
-		err := e.requestChunkDataPack(chunk, allExecutors)
-		if err != nil {
-			lg.Warn().Err(err).Msg("could not request chunk data pack")
-			continue
-		}
-
-		log.Info().Msg("chunk data requested")
-	}
-}
-
 // requestChunkDataPack request the chunk data pack from the execution node.
 // the chunk data pack includes the collection and statecommitments that
 // needed to make a VerifiableChunk
