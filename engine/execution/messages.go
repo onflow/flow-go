@@ -18,6 +18,8 @@ type ComputationOrder struct {
 type ComputationResult struct {
 	ExecutableBlock   *entity.ExecutableBlock
 	StateSnapshots    []*delta.SpockSnapshot
+	StateCommitments  []flow.StateCommitment
+	Proofs            [][]byte
 	Events            []flow.Event
 	ServiceEvents     []flow.Event
 	TransactionResult []flow.TransactionResult
@@ -43,4 +45,13 @@ func (cr *ComputationResult) AddGasUsed(inp uint64) {
 
 func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {
 	cr.StateSnapshots = append(cr.StateSnapshots, inp)
+}
+
+// TODO change this when state commitment is an array
+func (cr *ComputationResult) AddStateCommitment(inp flow.StateCommitment) {
+	cr.StateCommitments = append(cr.StateCommitments, inp)
+}
+
+func (cr *ComputationResult) AddProof(inp []byte) {
+	cr.Proofs = append(cr.Proofs, inp)
 }

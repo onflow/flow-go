@@ -53,22 +53,9 @@ type ReadOnlyExecutionState interface {
 	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
 
-// IsBlockExecuted returns whether the block has been executed.
-// it checks whether the state commitment exists in execution state.
-func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
-	_, err := state.StateCommitmentByBlockID(ctx, block)
-
-	// statecommitment exists means the block has been executed
-	if err == nil {
-		return true, nil
-	}
-
-	// statecommitment not exists means the block hasn't been executed yet
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
-
-	return false, err
+type ViewCommitter interface {
+	// CommitView commits a views' register delta and returns a new state commitment and proof.
+	CommitView(context.Context, delta.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
 }
 
 // TODO Many operations here are should be transactional, so we need to refactor this
@@ -78,6 +65,8 @@ func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block fl
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
 type ExecutionState interface {
 	ReadOnlyExecutionState
+
+	ViewCommitter
 
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(context.Context, delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
@@ -227,6 +216,47 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 
 func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 	return delta.NewView(LedgerGetRegister(s.ls, commitment))
+}
+
+func CommitView(ldg ledger.Ledger, view delta.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
+	ids, values := view.Delta().RegisterUpdates()
+
+	update, err := ledger.NewUpdate(
+		baseState,
+		RegisterIDSToKeys(ids),
+		RegisterValuesToValues(values),
+	)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
+	}
+
+	newCommit, err := ldg.Set(update)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	allRegisters := view.Interactions().AllRegisters()
+
+	query, err := makeQuery(baseState, allRegisters)
+
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
+	}
+
+	proof, err := ldg.Prove(query)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get proof: %w", err)
+	}
+
+	return newCommit, proof, nil
+}
+
+func (s *state) CommitView(ctx context.Context, view delta.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
+	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
+	defer span.Finish()
+
+	return CommitView(s.ls, view, baseState)
 }
 
 func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
@@ -552,4 +582,22 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	}
 
 	return highest.Height, blockID, nil
+}
+
+// IsBlockExecuted returns whether the block has been executed.
+// it checks whether the state commitment exists in execution state.
+func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
+	_, err := state.StateCommitmentByBlockID(ctx, block)
+
+	// statecommitment exists means the block has been executed
+	if err == nil {
+		return true, nil
+	}
+
+	// statecommitment not exists means the block hasn't been executed yet
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, nil
+	}
+
+	return false, err
 }
