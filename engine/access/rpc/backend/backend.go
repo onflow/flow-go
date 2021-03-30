@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -21,6 +22,9 @@ import (
 
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 3
+
+var preferredENIdentifiers flow.IdentifierList
+var fixedENIdentifiers flow.IdentifierList
 
 // Backends implements the Access API.
 //
@@ -64,6 +68,8 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	preferredExecutionNodeIDs []string,
+	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
 ) *Backend {
 	retry := newRetry()
@@ -131,7 +137,30 @@ func New(
 
 	retry.SetBackend(b)
 
+	var err error
+	preferredENIdentifiers, err = identifierList(preferredExecutionNodeIDs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for preferred EN map")
+	}
+
+	fixedENIdentifiers, err = identifierList(fixedExecutionNodeIDs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to convert node id string to Flow Identifier for fixed EN map")
+	}
+
 	return b
+}
+
+func identifierList(ids []string) (flow.IdentifierList, error) {
+	idList := make(flow.IdentifierList, len(ids))
+	for i, idStr := range ids {
+		id, err := flow.HexStringToIdentifier(idStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %v", id, err)
+		}
+		idList[i] = id
+	}
+	return idList, nil
 }
 
 func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *access.TransactionValidator {
@@ -172,7 +201,11 @@ func (b *Backend) GetCollectionByID(_ context.Context, colID flow.Identifier) (*
 	// retrieve the collection from the collection storage
 	col, err := b.collections.LightByID(colID)
 	if err != nil {
-		err = convertStorageError(err)
+		// Collections are retrieved asynchronously as we finalize blocks, so
+		// it is possible for a client to request a finalized block from us
+		// containing some collection, then get a not found error when requesting
+		// that collection. These clients should retry.
+		err = convertStorageError(fmt.Errorf("please retry for collection in finalized block: %w", err))
 		return nil, err
 	}
 
@@ -183,6 +216,15 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	return access.NetworkParameters{
 		ChainID: b.chainID,
 	}
+}
+
+func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
+	data, err := convert.SnapshotToBytes(b.state.Sealed())
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func convertStorageError(err error) error {
@@ -205,32 +247,100 @@ func convertStorageError(err error) error {
 func executionNodesForBlockID(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
-	state protocol.State) (flow.IdentityList, error) {
+	state protocol.State,
+	log zerolog.Logger) (flow.IdentityList, error) {
 
 	// lookup the receipts storage with the block ID
-	receipts, err := executionReceipts.ByBlockIDAllExecutionReceipts(blockID)
+	allReceipts, err := executionReceipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}
 
-	// collect the execution node id in each of the receipts
-	var executorIDs flow.IdentifierList
-	for _, receipt := range receipts {
-		executorIDs = append(executorIDs, receipt.ExecutorID)
+	// execution result ID to execution receipt map to keep track of receipts by their result id
+	var identicalReceipts = make(map[flow.Identifier][]*flow.ExecutionReceipt)
+
+	// maximum number of matching receipts found so far for any execution result id
+	maxMatchedReceiptCnt := 0
+	// execution result id key for the highest number of matching receipts in the identicalReceipts map
+	var maxMatchedReceiptResultID flow.Identifier
+
+	// find the largest list of receipts which have the same result ID
+	for _, receipt := range allReceipts {
+
+		resultID := receipt.ExecutionResult.ID()
+		identicalReceipts[resultID] = append(identicalReceipts[resultID], receipt)
+
+		currentMatchedReceiptCnt := len(identicalReceipts[resultID])
+		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
+			maxMatchedReceiptCnt = currentMatchedReceiptCnt
+			maxMatchedReceiptResultID = resultID
+		}
 	}
 
-	if len(executorIDs) == 0 {
+	mismatchReceiptCnt := len(identicalReceipts)
+	// if there are more than one execution result for the same block ID, log as error
+	if mismatchReceiptCnt > 1 {
+		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
+		log.Error().
+			Str("block_id", blockID.String()).
+			Str("execution_receipts", identicalReceiptsStr).
+			Msg("execution receipt mismatch")
+	}
+
+	// pick the largest list of matching receipts
+	matchingReceipts := identicalReceipts[maxMatchedReceiptResultID]
+
+	// collect all unique execution node ids from the receipts
+	var executorIDs flow.IdentifierList
+	executorIDMap := make(map[flow.Identifier]bool)
+	for _, receipt := range matchingReceipts {
+		if executorIDMap[receipt.ExecutorID] {
+			continue
+		}
+		executorIDs = append(executorIDs, receipt.ExecutorID)
+		executorIDMap[receipt.ExecutorID] = true
+	}
+
+	// return if less than 2 unique execution node ids were found
+	// since we want matching receipts from at least 2 ENs
+	if len(executorIDs) < 2 {
 		return flow.IdentityList{}, nil
 	}
 
-	// find the node identities of these execution nodes
-	executionIdentities, err := state.Final().Identities(filter.HasNodeID(executorIDs...))
+	// choose one of the preferred execution nodes
+	subsetENs, err := chooseExecutionNodes(state, executorIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
 	// randomly choose upto maxExecutionNodesCnt identities
-	executionIdentitiesRandom := executionIdentities.Sample(maxExecutionNodesCnt)
+	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
 
 	return executionIdentitiesRandom, nil
+}
+
+// chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
+// choosing the preferred execution nodes which have executed the transaction. If no such preferred
+// execution nodes are found, then the fixed execution nodes defined in the identity table are returned
+// e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
+// and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
+func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentityList, error) {
+
+	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
+	}
+
+	// find the preferred execution node IDs which have executed the transaction
+	preferredENIDs := allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
+		filter.HasNodeID(executorIDs...)))
+
+	if len(preferredENIDs) > 0 {
+		return preferredENIDs, nil
+	}
+
+	// if no such preferred ID is found, then choose the fixed EN IDs
+	fixedENIDs := allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
+
+	return fixedENIDs, nil
 }

@@ -55,6 +55,7 @@ const (
 
 // Verification Subsystems
 const (
+	subsystemAssignerEngine = "assigner"
 	subsystemFinderEngine   = "finder"
 	subsystemMatchEngine    = "match"
 	subsystemVerifierEngine = "verifier"

@@ -15,7 +15,7 @@ import (
 // ConsensusVoteSigLen is the length of a consensus vote as well as aggregated consensus votes.
 const ConsensusVoteSigLen = uint(crypto.SignatureLenBLSBLS12381)
 
-// RandomBeaconSigLen is the length of a randon beacon signature share as well as the random beacon resonstructed signature.
+// RandomBeaconSigLen is the length of a random beacon signature share as well as the random beacon resonstructed signature.
 const RandomBeaconSigLen = uint(crypto.SignatureLenBLSBLS12381)
 
 func toHex(bs []byte) string {

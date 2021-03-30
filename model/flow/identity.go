@@ -112,7 +112,7 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 func (iy Identity) MarshalJSON() ([]byte, error) {
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert to encodable: %w", err)
+		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
 	}
 	data, err := json.Marshal(encodable)
 	if err != nil {
@@ -160,7 +160,7 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	}
 	err = identityFromEncodable(encodable, iy)
 	if err != nil {
-		return fmt.Errorf("could not convert from encodable: %w", err)
+		return fmt.Errorf("could not convert from encodable json: %w", err)
 	}
 	return nil
 }
@@ -173,7 +173,7 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 	}
 	err = identityFromEncodable(encodable, iy)
 	if err != nil {
-		return fmt.Errorf("could not convert from encodable: %w", err)
+		return fmt.Errorf("could not convert from encodable msgpack: %w", err)
 	}
 	return nil
 }
@@ -227,9 +227,9 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 // appending new elements, re-ordering, or inserting new elements in an
 // existing index.
 func (il IdentityList) Copy() IdentityList {
-	dup := make(IdentityList, len(il))
-	copy(dup, il)
-	return dup
+	return il.Map(func(identity Identity) Identity {
+		return identity
+	})
 }
 
 // Selector returns an identity filter function that selects only identities

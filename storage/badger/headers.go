@@ -10,15 +10,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 )
 
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
-	db          *badger.DB
-	cache       *Cache
-	heightCache *Cache
+	db           *badger.DB
+	cache        *Cache
+	heightCache  *Cache
+	chunkIDCache *Cache
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
@@ -37,11 +39,17 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		return operation.IndexBlockHeight(height, id)
 	}
 
+	storeChunkID := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		chunkID := key.(flow.Identifier)
+		blockID := val.(flow.Identifier)
+		return operation.IndexBlockIDByChunkID(chunkID, blockID)
+	}
+
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		blockID := key.(flow.Identifier)
 		var header flow.Header
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.RetrieveHeader(blockID, &header))
+			err := operation.RetrieveHeader(blockID, &header)(tx)
 			return &header, err
 		}
 	}
@@ -50,8 +58,17 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		height := key.(uint64)
 		var id flow.Identifier
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.LookupBlockHeight(height, &id))
+			err := operation.LookupBlockHeight(height, &id)(tx)
 			return id, err
+		}
+	}
+
+	retrieveChunkID := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		chunkID := key.(flow.Identifier)
+		var blockID flow.Identifier
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := operation.LookupBlockIDByChunkID(chunkID, &blockID)(tx)
+			return blockID, err
 		}
 	}
 
@@ -67,6 +84,11 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(storeHeight),
 			withRetrieve(retrieveHeight),
+			withResource(metrics.ResourceFinalizedHeight)),
+		chunkIDCache: newCache(collector,
+			withLimit(4*flow.DefaultTransactionExpiry),
+			withStore(storeChunkID),
+			withRetrieve(retrieveChunkID),
 			withResource(metrics.ResourceFinalizedHeight)),
 	}
 
@@ -129,4 +151,24 @@ func (h *Headers) FindHeaders(filter func(header *flow.Header) bool) ([]flow.Hea
 	blocks := make([]flow.Header, 0, 1)
 	err := h.db.View(operation.FindHeaders(filter, &blocks))
 	return blocks, err
+}
+
+func (h *Headers) IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	bID, err := h.chunkIDCache.Get(chunkID)(tx)
+	if err != nil {
+		return flow.Identifier{}, fmt.Errorf("could not look up by chunk id: %w", err)
+	}
+	return bID.(flow.Identifier), nil
+}
+
+func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
+	return operation.RetryOnConflict(h.db.Update, h.chunkIDCache.Put(chunkID, headerID))
+}
+
+func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
 }

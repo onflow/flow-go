@@ -119,8 +119,13 @@ func IsDuplicatedEntryError(err error) bool {
 
 // LogError logs the engine processing error
 func LogError(log zerolog.Logger, err error) {
+	LogErrorWithMsg(log, "could not process message", err)
+}
 
-	msg := "could not process message"
+func LogErrorWithMsg(log zerolog.Logger, msg string, err error) {
+	if err == nil {
+		return
+	}
 
 	// Invalid input errors could be logged as warning, because they can be
 	// part of normal operations when the network is open and anyone can send
@@ -142,6 +147,14 @@ func LogError(log zerolog.Logger, err error) {
 		return
 	}
 
+	// Unverifiable input errors may be due to out-of-date node state, or could
+	// indicate a malicious/unexpected message from another node. Since we don't
+	// know, log as warning.
+	if IsUnverifiableInputError(err) {
+		log.Warn().Str("error_type", "unverifiable_input").Err(err).Msg(msg)
+		return
+	}
+
 	// all other errors should just be logged as usual
-	log.Error().Str("error_type", "generic_error").Err(err).Msg(msg)
+	log.Error().Str("error_type", "internal_error").Err(err).Msg(msg)
 }

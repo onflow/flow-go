@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -133,37 +134,32 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, engine.NewInvalidInputError("multiple seals for the same block")
 	}
 
-	// incorporatedResults collects the _first_ appearance of unsealed execution
+	// unsealedResults collects the _first_ appearance of unsealed execution
 	// results on the fork, along with the ID of the block in which they are
 	// incorporated.
-	incorporatedResults := make(map[flow.Identifier]*flow.IncorporatedResult)
+	unsealedResults := make(map[flow.Identifier]*flow.IncorporatedResult)
 
 	// collect IDs of blocks on the fork (from parent to last sealed)
 	var blockIDs []flow.Identifier
 
-	// loop through the fork backwards up to last sealed block and collect
+	// loop through the fork backwards from the parent block
+	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
-	ancestorID := header.ParentID
-	for ancestorID != sealedID {
-
-		ancestor, err := s.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
-		}
-
+	err = state.TraverseBackward(s.headers, header.ParentID, func(header *flow.Header) error {
+		blockID := header.ID()
 		// keep track of blocks on the fork
-		blockIDs = append(blockIDs, ancestorID)
+		blockIDs = append(blockIDs, blockID)
 
-		payload, err := s.payloads.ByBlockID(ancestorID)
+		payload, err := s.payloads.ByBlockID(blockID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block payload %x: %w", ancestorID, err)
+			return fmt.Errorf("could not get block payload %x: %w", blockID, err)
 		}
 
 		// Collect execution results from receipts.
 		for _, receipt := range payload.Receipts {
 			resultID := receipt.ExecutionResult.ID()
-			// incorporatedResults should contain the _first_ appearance of the
+			// unsealedResults should contain the _first_ appearance of the
 			// ExecutionResult. We are traversing the fork backwards, so we can
 			// overwrite any previously recorded result.
 
@@ -173,15 +169,25 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			// ExecutionResult. However, in phase 2 of the sealing roadmap,
 			// we are still using a temporary sealing logic where the
 			// IncorporatedBlockID is expected to be the result's block ID.
-			incorporatedResults[resultID] = flow.NewIncorporatedResult(
+			unsealedResults[resultID] = flow.NewIncorporatedResult(
 				receipt.ExecutionResult.BlockID,
 				&receipt.ExecutionResult,
 			)
 
 		}
-
-		ancestorID = ancestor.ParentID
+		return nil
+	}, func(header *flow.Header) bool {
+		return sealedID != header.ParentID
+	})
+	if err != nil {
+		return nil, err
 	}
+
+	// We do not include the receipts in the same payload to the unsealedResults.
+	// That's because a result requires to be added to a bock first in order to determine
+	// its chunk assignment for verification. Therefore a seal can only be added in
+	// the next block or after. In other words, a receipt and its seal can't be
+	// added in the same block.
 
 	// Loop forward across the fork and try to create a valid chain of seals.
 	// blockIDs, as populated by the previous loop, is in reverse order.
@@ -202,7 +208,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		delete(byBlock, blockID)
 
 		// check if we have an incorporatedResult for this seal
-		incorporatedResult, ok := incorporatedResults[seal.ResultID]
+		incorporatedResult, ok := unsealedResults[seal.ResultID]
 		if !ok {
 			return nil, engine.NewInvalidInputErrorf("seal %x does not correspond to a result on this fork", seal.ID())
 		}

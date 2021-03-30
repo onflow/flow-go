@@ -15,7 +15,7 @@ type Requester interface {
 	EntityByID(entityID flow.Identifier, selector flow.IdentityFilter)
 
 	// Query will request data through the request engine backing the interface.
-	//The additional selector will be applied to the subset
+	// The additional selector will be applied to the subset
 	// of valid providers for the data and allows finer-grained control
 	// over which providers to request data from. Doesn't perform integrity check
 	// can be used to get entities without knowing their ID.
