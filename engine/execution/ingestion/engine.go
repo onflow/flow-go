@@ -529,7 +529,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 
 	view := e.execState.NewView(executableBlock.StartState)
 
-	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view)
+	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view, e.execState)
 	if err != nil {
 		e.log.Err(err).
 			Hex("block_id", logging.Entity(executableBlock)).

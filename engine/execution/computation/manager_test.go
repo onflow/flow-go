@@ -104,7 +104,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	view := delta.NewView(ledger.Get)
 	blockView := view.NewChild()
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView, nil)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())

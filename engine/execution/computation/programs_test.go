@@ -111,7 +111,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	view := delta.NewView(ledger.Get)
 	blockView := view.NewChild()
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView, nil)
 	require.NoError(t, err)
 
 	// first event should be contract deployed
@@ -200,7 +200,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		executableBlock := &entity.ExecutableBlock{
 			Block: block1,
 		}
-		_, err := engine.ComputeBlock(context.Background(), executableBlock, block1View)
+		_, err := engine.ComputeBlock(context.Background(), executableBlock, block1View, nil)
 		require.NoError(t, err)
 	})
 
@@ -359,7 +359,7 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 			},
 		},
 	}
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view, nil)
 	require.NoError(t, err)
 	return block, returnedComputationResult
 }

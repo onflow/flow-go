@@ -11,6 +11,7 @@ import (
 	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine/execution"
+	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -28,7 +29,7 @@ type VirtualMachine interface {
 
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error)
+	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs, execState.ViewCommitter) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -72,6 +73,7 @@ func (e *blockComputer) ExecuteBlock(
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	program *programs.Programs,
+	committer execState.ViewCommitter,
 ) (*execution.ComputationResult, error) {
 
 	// call tracer
@@ -84,7 +86,7 @@ func (e *blockComputer) ExecuteBlock(
 		span.Finish()
 	}()
 
-	results, err := e.executeBlock(ctx, block, stateView, program)
+	results, err := e.executeBlock(ctx, block, stateView, program, committer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -99,6 +101,7 @@ func (e *blockComputer) executeBlock(
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	programs *programs.Programs,
+	committer execState.ViewCommitter,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
@@ -119,7 +122,7 @@ func (e *blockComputer) executeBlock(
 			Hex("collection_id", logging.Entity(collection.Guarantee)).
 			Msg("executing collection")
 
-		txIndex, err = e.executeCollection(ctx, txIndex, blockCtx, stateView, programs, collection, res)
+		txIndex, err = e.executeCollection(ctx, txIndex, blockCtx, stateView, programs, collection, committer, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
@@ -127,7 +130,7 @@ func (e *blockComputer) executeBlock(
 
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
-	_, err = e.executeSystemCollection(ctx, txIndex, stateView, programs, res)
+	_, err = e.executeSystemCollection(ctx, txIndex, stateView, programs, committer, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -141,6 +144,7 @@ func (e *blockComputer) executeSystemCollection(
 	txIndex uint32,
 	blockView state.View,
 	programs *programs.Programs,
+	committer execState.ViewCommitter,
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
@@ -172,6 +176,7 @@ func (e *blockComputer) executeCollection(
 	blockView state.View,
 	programs *programs.Programs,
 	collection *entity.CompleteCollection,
+	committer execState.ViewCommitter,
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
