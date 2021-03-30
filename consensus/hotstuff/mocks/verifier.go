@@ -15,20 +15,20 @@ type Verifier struct {
 	mock.Mock
 }
 
-// VerifyQC provides a mock function with given fields: voterIDs, sigData, block
-func (_m *Verifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-	ret := _m.Called(voterIDs, sigData, block)
+// VerifyQC provides a mock function with given fields: voters, sigData, block
+func (_m *Verifier) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+	ret := _m.Called(voters, sigData, block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func([]flow.Identifier, []byte, *model.Block) bool); ok {
-		r0 = rf(voterIDs, sigData, block)
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte, *model.Block) bool); ok {
+		r0 = rf(voters, sigData, block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]flow.Identifier, []byte, *model.Block) error); ok {
-		r1 = rf(voterIDs, sigData, block)
+	if rf, ok := ret.Get(1).(func(flow.IdentityList, []byte, *model.Block) error); ok {
+		r1 = rf(voters, sigData, block)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -36,20 +36,20 @@ func (_m *Verifier) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *
 	return r0, r1
 }
 
-// VerifyVote provides a mock function with given fields: voterID, sigData, block
-func (_m *Verifier) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
-	ret := _m.Called(voterID, sigData, block)
+// VerifyVote provides a mock function with given fields: voter, sigData, block
+func (_m *Verifier) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+	ret := _m.Called(voter, sigData, block)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []byte, *model.Block) bool); ok {
-		r0 = rf(voterID, sigData, block)
+	if rf, ok := ret.Get(0).(func(*flow.Identity, []byte, *model.Block) bool); ok {
+		r0 = rf(voter, sigData, block)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, []byte, *model.Block) error); ok {
-		r1 = rf(voterID, sigData, block)
+	if rf, ok := ret.Get(1).(func(*flow.Identity, []byte, *model.Block) error); ok {
+		r1 = rf(voter, sigData, block)
 	} else {
 		r1 = ret.Error(1)
 	}
