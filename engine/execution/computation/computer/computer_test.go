@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -40,7 +41,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), &computation.NoopViewCommitter{})
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -54,7 +55,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms(), nil)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 
@@ -67,7 +68,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), &computation.NoopViewCommitter{})
 		require.NoError(t, err)
 
 		// create an empty block
@@ -82,10 +83,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs, nil)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TransactionResult, 1)
+		assert.Len(t, result.TransactionResults, 1)
 
 		vm.AssertExpectations(t)
 	})
@@ -95,7 +96,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), &computation.NoopViewCommitter{})
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -123,7 +124,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs, nil)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 
 		// chunk count should match collection count
@@ -153,7 +154,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
+		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
 
 		vm.AssertExpectations(t)
 	})
@@ -219,7 +220,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), &computation.NoopViewCommitter{})
 		require.NoError(t, err)
 
 		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
@@ -239,7 +240,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms(), nil)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 
 		// all events should have been collected
@@ -280,7 +281,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), &computation.NoopViewCommitter{})
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -291,7 +292,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms(), nil)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -349,7 +350,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), &computation.NoopViewCommitter{})
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -358,7 +359,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			return nil, nil
 		})
 
-		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms(), nil)
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
@@ -445,7 +446,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), &computation.NoopViewCommitter{})
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
@@ -453,7 +454,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms(), nil)
+	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 	assert.NoError(t, err)
 
 	registerTouches := view.Interactions().RegisterTouches()

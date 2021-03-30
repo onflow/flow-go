@@ -124,34 +124,6 @@ func main() {
 			)
 			return err
 		}).
-		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
-			extraLogPath := path.Join(triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
-			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			rt := fvm.NewInterpreterRuntime()
-
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-
-			manager, err := computation.New(
-				node.Logger,
-				collector,
-				node.Tracer,
-				node.Me,
-				node.State,
-				vm,
-				vmCtx,
-				cadenceExecutionCache,
-			)
-			computationManager = manager
-
-			return err
-		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
@@ -227,6 +199,36 @@ func main() {
 			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
 
 			return compactor, nil
+		}).
+		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
+			extraLogPath := path.Join(triedir, "extralogs")
+			err := os.MkdirAll(extraLogPath, 0777)
+			if err != nil {
+				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
+			}
+
+			extralog.ExtraLogDumpPath = extraLogPath
+
+			rt := fvm.NewInterpreterRuntime()
+
+			vm := fvm.NewVirtualMachine(rt)
+			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+
+			committer := computation.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
+			manager, err := computation.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Me,
+				node.State,
+				vm,
+				vmCtx,
+				cadenceExecutionCache,
+				committer,
+			)
+			computationManager = manager
+
+			return err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)

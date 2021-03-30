@@ -8,8 +8,6 @@ import (
 	execution "github.com/onflow/flow-go/engine/execution"
 	entity "github.com/onflow/flow-go/module/mempool/entity"
 
-	executionstate "github.com/onflow/flow-go/engine/execution/state"
-
 	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
@@ -22,13 +20,13 @@ type ComputationManager struct {
 	mock.Mock
 }
 
-// ComputeBlock provides a mock function with given fields: ctx, block, view, commiter
-func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.ExecutableBlock, view state.View, commiter executionstate.ViewCommitter) (*execution.ComputationResult, error) {
-	ret := _m.Called(ctx, block, view, commiter)
+// ComputeBlock provides a mock function with given fields: ctx, block, view
+func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.ExecutableBlock, view state.View) (*execution.ComputationResult, error) {
+	ret := _m.Called(ctx, block, view)
 
 	var r0 *execution.ComputationResult
-	if rf, ok := ret.Get(0).(func(context.Context, *entity.ExecutableBlock, state.View, executionstate.ViewCommitter) *execution.ComputationResult); ok {
-		r0 = rf(ctx, block, view, commiter)
+	if rf, ok := ret.Get(0).(func(context.Context, *entity.ExecutableBlock, state.View) *execution.ComputationResult); ok {
+		r0 = rf(ctx, block, view)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*execution.ComputationResult)
@@ -36,8 +34,8 @@ func (_m *ComputationManager) ComputeBlock(ctx context.Context, block *entity.Ex
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, *entity.ExecutableBlock, state.View, executionstate.ViewCommitter) error); ok {
-		r1 = rf(ctx, block, view, commiter)
+	if rf, ok := ret.Get(1).(func(context.Context, *entity.ExecutableBlock, state.View) error); ok {
+		r1 = rf(ctx, block, view)
 	} else {
 		r1 = ret.Error(1)
 	}

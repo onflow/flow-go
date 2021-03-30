@@ -106,6 +106,15 @@ func (v *View) DropDelta() {
 	v.delta = NewDelta()
 }
 
+// TODO optimize this
+func (v *View) AllRegisters() []flow.RegisterID {
+	return v.Interactions().AllRegisters()
+}
+
+func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
+	return v.Delta().RegisterUpdates()
+}
+
 // Get gets a register value from this view.
 //
 // This function will return an error if it fails to read from the underlying

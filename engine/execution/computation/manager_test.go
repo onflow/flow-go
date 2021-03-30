@@ -89,7 +89,8 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+	// TODO update me with proper committer
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -104,7 +105,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	view := delta.NewView(ledger.Get)
 	blockView := view.NewChild()
 
-	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView, nil)
+	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, blockView)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
@@ -140,7 +141,7 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize)
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -162,7 +163,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize)
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)

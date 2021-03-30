@@ -11,7 +11,6 @@ import (
 	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine/execution"
-	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -27,9 +26,14 @@ type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
 
+type ViewCommitter interface {
+	// CommitView commits a views' register delta and returns a new state commitment and proof.
+	CommitView(context.Context, state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
+}
+
 // A BlockComputer executes the transactions in a block.
 type BlockComputer interface {
-	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs, execState.ViewCommitter) (*execution.ComputationResult, error)
+	ExecuteBlock(context.Context, *entity.ExecutableBlock, state.View, *programs.Programs) (*execution.ComputationResult, error)
 }
 
 type blockComputer struct {
@@ -39,6 +43,7 @@ type blockComputer struct {
 	tracer         module.Tracer
 	log            zerolog.Logger
 	systemChunkCtx fvm.Context
+	committer      ViewCommitter
 }
 
 // NewBlockComputer creates a new block executor.
@@ -48,6 +53,7 @@ func NewBlockComputer(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	logger zerolog.Logger,
+	committer ViewCommitter,
 ) (BlockComputer, error) {
 
 	systemChunkCtx := fvm.NewContextFromParent(
@@ -64,6 +70,7 @@ func NewBlockComputer(
 		tracer:         tracer,
 		log:            logger,
 		systemChunkCtx: systemChunkCtx,
+		committer:      committer,
 	}, nil
 }
 
@@ -73,7 +80,6 @@ func (e *blockComputer) ExecuteBlock(
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	program *programs.Programs,
-	committer execState.ViewCommitter,
 ) (*execution.ComputationResult, error) {
 
 	// call tracer
@@ -86,7 +92,7 @@ func (e *blockComputer) ExecuteBlock(
 		span.Finish()
 	}()
 
-	results, err := e.executeBlock(ctx, block, stateView, program, committer)
+	results, err := e.executeBlock(ctx, block, stateView, program)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -101,20 +107,21 @@ func (e *blockComputer) executeBlock(
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	programs *programs.Programs,
-	committer execState.ViewCommitter,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 	res := &execution.ComputationResult{
-		ExecutableBlock:   block,
-		Events:            make([]flow.Event, 0),
-		ServiceEvents:     make([]flow.Event, 0),
-		TransactionResult: make([]flow.TransactionResult, 0),
+		ExecutableBlock:    block,
+		Events:             make([]flow.Event, 0),
+		ServiceEvents:      make([]flow.Event, 0),
+		TransactionResults: make([]flow.TransactionResult, 0),
 	}
 
 	var txIndex uint32
 	var err error
+	var proof []byte
+	stateCommit := block.StartState
 	// executing collections
 	for _, collection := range collections {
 		e.log.Debug().
@@ -122,19 +129,36 @@ func (e *blockComputer) executeBlock(
 			Hex("collection_id", logging.Entity(collection.Guarantee)).
 			Msg("executing collection")
 
-		txIndex, err = e.executeCollection(ctx, txIndex, blockCtx, stateView, programs, collection, committer, res)
+		collectionView := stateView.NewChild()
+		txIndex, err = e.executeCollection(ctx, txIndex, blockCtx, collectionView, programs, collection, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
+		stateCommit, proof, err = e.committer.CommitView(ctx, collectionView, stateCommit)
+		res.AddStateCommitment(stateCommit)
+		res.AddProof(proof) // TODO fix me
+
+		err := stateView.MergeView(collectionView)
+		if err != nil {
+			return nil, fmt.Errorf("cannot merge view: %w", err)
+		}
+
 	}
 
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
-	_, err = e.executeSystemCollection(ctx, txIndex, stateView, programs, committer, res)
+	collectionView := stateView.NewChild()
+	_, err = e.executeSystemCollection(ctx, txIndex, collectionView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
-
+	stateCommit, proof, err = e.committer.CommitView(ctx, collectionView, stateCommit)
+	res.AddStateCommitment(stateCommit)
+	res.AddProof(proof) // TODO fix me
+	err = stateView.MergeView(collectionView)
+	if err != nil {
+		return nil, fmt.Errorf("cannot merge view: %w", err)
+	}
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	return res, nil
 }
@@ -142,16 +166,14 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeSystemCollection(
 	ctx context.Context,
 	txIndex uint32,
-	blockView state.View,
+	collectionView state.View,
 	programs *programs.Programs,
-	committer execState.ViewCommitter,
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
 	colSpan, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
 	defer colSpan.Finish()
 
-	collectionView := blockView.NewChild()
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 	tx := fvm.SystemChunkTransaction(serviceAddress)
 	txMetrics := fvm.NewMetricsCollector()
@@ -161,11 +183,6 @@ func (e *blockComputer) executeSystemCollection(
 		return txIndex, err
 	}
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
-
-	err = blockView.MergeView(collectionView)
-	if err != nil {
-		return txIndex, fmt.Errorf("cannot merge view: %w", err)
-	}
 	return txIndex, err
 }
 
@@ -173,10 +190,9 @@ func (e *blockComputer) executeCollection(
 	ctx context.Context,
 	txIndex uint32,
 	blockCtx fvm.Context,
-	blockView state.View,
+	collectionView state.View,
 	programs *programs.Programs,
 	collection *entity.CompleteCollection,
-	committer execState.ViewCommitter,
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
@@ -192,7 +208,6 @@ func (e *blockComputer) executeCollection(
 		colSpan.Finish()
 	}()
 
-	collectionView := blockView.NewChild()
 	txMetrics := fvm.NewMetricsCollector()
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
@@ -202,13 +217,7 @@ func (e *blockComputer) executeCollection(
 			return txIndex, err
 		}
 	}
-
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
-	err := blockView.MergeView(collectionView)
-	if err != nil {
-		return txIndex, fmt.Errorf("cannot merge view: %w", err)
-	}
-
 	e.log.Info().Str("collectionID", collection.Guarantee.CollectionID.String()).
 		Str("blockID", collection.Guarantee.ReferenceBlockID.String()).
 		Int("numberOfTransactions", len(collection.Transactions)).

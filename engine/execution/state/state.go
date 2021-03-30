@@ -53,11 +53,6 @@ type ReadOnlyExecutionState interface {
 	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
 
-type ViewCommitter interface {
-	// CommitView commits a views' register delta and returns a new state commitment and proof.
-	CommitView(context.Context, delta.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
-}
-
 // TODO Many operations here are should be transactional, so we need to refactor this
 // to store a reference to DB and compose operations and procedures rather then
 // just being amalgamate of proxies for single transactions operation
@@ -65,8 +60,6 @@ type ViewCommitter interface {
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
 type ExecutionState interface {
 	ReadOnlyExecutionState
-
-	ViewCommitter
 
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(context.Context, delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)

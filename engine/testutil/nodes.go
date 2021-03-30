@@ -381,6 +381,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
+	committer := computation.NewLedgerViewCommitter(ls, node.Tracer)
 
 	computationEngine, err := computation.New(
 		node.Log,
@@ -391,6 +392,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		vm,
 		vmCtx,
 		computation.DefaultProgramsCacheSize,
+		committer,
 	)
 	require.NoError(t, err)
 

@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -33,7 +32,6 @@ type ComputationManager interface {
 		ctx context.Context,
 		block *entity.ExecutableBlock,
 		view state.View,
-		commiter execState.ViewCommitter,
 	) (*execution.ComputationResult, error)
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
 }
@@ -58,6 +56,7 @@ func New(
 	vm VirtualMachine,
 	vmCtx fvm.Context,
 	programsCacheSize uint,
+	committer computer.ViewCommitter,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -67,6 +66,7 @@ func New(
 		metrics,
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
+		committer,
 	)
 
 	if err != nil {
@@ -146,7 +146,6 @@ func (e *Manager) ComputeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
 	view state.View,
-	commiter execState.ViewCommitter,
 ) (*execution.ComputationResult, error) {
 
 	e.log.Debug().
@@ -162,7 +161,7 @@ func (e *Manager) ComputeBlock(
 		blockPrograms = fromCache.ChildPrograms()
 	}
 
-	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms, commiter)
+	result, err := e.blockComputer.ExecuteBlock(ctx, block, view, blockPrograms)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).

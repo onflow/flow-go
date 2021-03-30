@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
@@ -99,10 +100,11 @@ func CompleteExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Cha
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
+		committer := computation.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 		programs := programs.NewEmptyPrograms()
 
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), log)
+		bc, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), log, committer)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
