@@ -204,7 +204,7 @@ func (e *blockComputer) commitView(
 	state flow.StateCommitment,
 	res *execution.ComputationResult,
 ) (flow.StateCommitment, error) {
-	span := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeTransaction)
+	span := e.tracer.StartSpanFromParent(blockSpan, trace.EXECommitDelta)
 	defer span.Finish()
 
 	stateCommit, proof, err := e.committer.CommitView(collectionView, state)
@@ -221,7 +221,7 @@ func (e *blockComputer) executeSystemCollection(
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
-	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeTransaction)
+	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
 	defer colSpan.Finish()
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
@@ -253,7 +253,7 @@ func (e *blockComputer) executeCollection(
 
 	// call tracing
 	startedAt := time.Now()
-	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeTransaction)
+	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
 	defer func() {
 		colSpan.SetTag("collection.txCount", len(collection.Transactions))
 		colSpan.LogFields(
