@@ -8,10 +8,6 @@ import (
 type ChunkDataPackRequester interface {
 	// Request makes the request of chunk data pack for the specified chunk id.
 	Request(chunkID flow.Identifier, executorID flow.Identifier) error
-
-	// WithHandler registers the handler function that takes care of processing requested chunk
-	// data packs upon their arrival.
-	WithHandler(handler ChunkDataPackHandler) error
 }
 
 // ChunkDataPackHandler encapsulates the logic of handling a requested chunk data pack upon its arrival.
