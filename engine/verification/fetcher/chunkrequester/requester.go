@@ -127,35 +127,34 @@ func (e *Engine) Request(request *fetcher.ChunkDataPackRequest) {
 // onTimer should run periodically, it goes through all pending chunks, and requests their chunk data pack.
 // It also retries the chunk data request if the data hasn't been received for a while.
 func (e *Engine) onTimer() {
-	allChunks := e.pendingRequests.All()
+	pendingReqs := e.pendingRequests.All()
 
-	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending pendingRequests")
+	e.log.Debug().
+		Int("total", len(pendingReqs)).
+		Msg("start processing all pending chunk data requests")
 
 	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
-		e.log.Error().Err(err).Msg("could not get executors")
-		return
+		e.log.Fatal().Err(err).Msg("could not get executors")
 	}
 
-	for _, chunk := range allChunks {
-		chunkID := chunk.ID()
-
+	for _, request := range pendingReqs {
 		log := e.log.With().
-			Hex("chunk_id", logging.ID(chunkID)).
-			Hex("result_id", logging.ID(chunk.ExecutionResultID)).
-			Hex("block_id", logging.ID(chunk.Chunk.ChunkBody.BlockID)).
+			Hex("chunk_id", logging.ID(request.ID())).
+			Uint64("block_height", request.Height).
 			Logger()
 
 		// if block has been sealed, then we can finish
-		sealed, err := e.blockIsSealed(chunk.Chunk.ChunkBody.BlockID)
+		sealed, err := e.blockIsSealed(request.Height)
 		if sealed {
-			removed := e.pendingRequests.Rem(chunkID)
-			log.Info().Bool("removed", removed).
-				Msg("chunk has been sealed, no longer needed")
+			removed := e.pendingRequests.Rem(request.ID())
+			log.Info().
+				Bool("removed", removed).
+				Msg("drops requesting chunk of a seald block")
 			continue
 		}
 
-		err = e.requestChunkDataPack(chunk, allExecutors)
+		err = e.requestChunkDataPack(request, allExecutors)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not request chunk data pack")
 			continue
@@ -165,25 +164,21 @@ func (e *Engine) onTimer() {
 	}
 }
 
-func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
-	header, err := e.headers.ByBlockID(blockID)
-	if err != nil {
-		return false, fmt.Errorf("could not get block header by ID: %w", err)
-	}
-
+// blockIsSealed returns true if the block at specified height is sealed.
+func (e Engine) blockIsSealed(height uint64) (bool, error) {
 	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
 		return false, fmt.Errorf("could not get last sealed: %w", err)
 	}
 
-	sealed := header.Height <= lastSealed.Height
+	sealed := height <= lastSealed.Height
 	return sealed, nil
 }
 
 // requestChunkDataPack request the chunk data pack from the execution node.
 // the chunk data pack includes the collection and statecommitments that
 // needed to make a VerifiableChunk
-func (e *Engine) requestChunkDataPack(status *fetcher.ChunkStatus, allExecutors flow.IdentityList) error {
+func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors flow.IdentityList) error {
 	chunkID := status.ID()
 
 	// creates chunk data pack request event
