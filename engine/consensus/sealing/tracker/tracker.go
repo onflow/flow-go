@@ -1,4 +1,4 @@
-package sealingtracker
+package tracker
 
 import (
 	"encoding/json"
