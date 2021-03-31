@@ -225,7 +225,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// Set of previously included results. Used for detecting duplicates.
 	forkReceipts := make(map[flow.Identifier]struct{})
 
-	// Start from the lowest unfinalized block and walk the chain upwards until we
+	// Start from the lowest unsealed block and walk the chain upwards until we
 	// hit the candidate's parent. For each visited block track:
 	bookKeeper := func(block *flow.Header) error {
 		blockID := block.ID()
@@ -258,10 +258,11 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 		return nil
 	}
-
-	err = state.TraverseForward(v.headers, header.ParentID, bookKeeper, func(header *flow.Header) bool {
-		return header.Height > sealedHeight
-	})
+	visitParent := func(header *flow.Header) bool {
+		parentHeight := header.Height - 1
+		return parentHeight > sealedHeight
+	}
+	err = state.TraverseForward(v.headers, header.ParentID, bookKeeper, visitParent)
 	if err != nil {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
