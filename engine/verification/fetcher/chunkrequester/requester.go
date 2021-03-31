@@ -19,6 +19,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// Max number of execution nodes being asked for chunk data pack.
+const RequestTargetCount = 2
+
 type Engine struct {
 	log             zerolog.Logger
 	me              module.Local
@@ -175,7 +178,7 @@ func (e Engine) blockIsSealed(height uint64) (bool, error) {
 	return sealed, nil
 }
 
-// requestChunkDataPack request the chunk data pack from the execution nodes.
+// requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
 func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors flow.IdentityList) error {
 	// creates chunk data pack request event
 	req := &messages.ChunkDataRequest{
@@ -183,13 +186,11 @@ func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors f
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
-	targetIDs := chooseChunkDataPackTarget(allExecutors, status.Agrees, status.Disagrees)
-
 	// publishes the chunk data request to the network
+	targetIDs := status.SampleTargets(allExecutors, RequestTargetCount)
 	err := e.con.Publish(req, targetIDs...)
 	if err != nil {
-		return fmt.Errorf(
-			"could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
+		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
 	}
 
 	exists := e.pendingRequests.IncrementAttempt(status.ID())
