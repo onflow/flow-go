@@ -12,17 +12,17 @@ import (
 // ChunkRequestStatus is a data struct represents the current status of fetching
 // chunk data pack for the chunk.
 type ChunkRequestStatus struct {
-	Request     *fetcher.ChunkDataPackRequest
+	*fetcher.ChunkDataPackRequest
 	LastAttempt time.Time
 	Attempt     int
 }
 
 func (s ChunkRequestStatus) ID() flow.Identifier {
-	return s.Request.ChunkID
+	return s.ChunkID
 }
 
 func (s ChunkRequestStatus) Checksum() flow.Identifier {
-	return s.Request.ChunkID
+	return s.ChunkID
 }
 
 type ChunkRequests struct {
