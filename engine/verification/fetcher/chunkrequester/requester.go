@@ -90,6 +90,22 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+// Ready initializes the engine and returns a channel that is closed when the initialization is done.
+func (e *Engine) Ready() <-chan struct{} {
+	delay := time.Duration(0)
+	// run a periodic check to retry requesting chunk data packs for chunks that assigned to me.
+	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous
+	// call has finished.
+	// That being said, there won't be two onTimer running in parallel. See test cases for LaunchPeriodically.
+	e.unit.LaunchPeriodically(e.onTimer, e.retryInterval, delay)
+	return e.unit.Ready()
+}
+
+// Done terminates the engine and returns a channel that is closed when the termination is done
+func (e *Engine) Done() <-chan struct{} {
+	return e.unit.Done()
+}
+
 // process receives and submits an event to the engine for processing.
 // It returns an error so the engine will not propagate an event unless
 // it is successfully processed by the engine.
@@ -199,22 +215,6 @@ func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors f
 	}
 
 	return nil
-}
-
-// Ready initializes the engine and returns a channel that is closed when the initialization is done.
-func (e *Engine) Ready() <-chan struct{} {
-	delay := time.Duration(0)
-	// run a periodic check to retry requesting chunk data packs for chunks that assigned to me.
-	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous
-	// call has finished.
-	// That being said, there won't be two onTimer running in parallel. See test cases for LaunchPeriodically.
-	e.unit.LaunchPeriodically(e.onTimer, e.retryInterval, delay)
-	return e.unit.Ready()
-}
-
-// Done terminates the engine and returns a channel that is closed when the termination is done
-func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
 }
 
 // canTry returns checks the history attempts and determine whether a chunk request
