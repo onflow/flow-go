@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -53,7 +53,7 @@ func TestEndToEnd(t *testing.T) {
 
 	// Client:
 	// Unwrap files
-	err = unwrapFile(bootdir, nodeID)
+	err = unWrapFile(bootdir, nodeID)
 	if err != nil {
 		t.Fatalf("Error unwrapping response: %s", err)
 	}

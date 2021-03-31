@@ -1,4 +1,4 @@
-package cmd
+package gcs
 
 import (
 	"context"
@@ -18,14 +18,14 @@ type googleBucket struct {
 }
 
 // NewGoogleBucket ...
-func newGoogleBucket(bucketName string) *googleBucket {
+func NewGoogleBucket(bucketName string) *googleBucket {
 	return &googleBucket{
 		Name: bucketName,
 	}
 }
 
 // NewClient ...
-func (g *googleBucket) newClient(ctx context.Context) (*storage.Client, error) {
+func (g *googleBucket) NewClient(ctx context.Context) (*storage.Client, error) {
 	client, err := storage.NewClient(ctx, option.WithoutAuthentication())
 	if err != nil {
 		return nil, err
@@ -33,8 +33,8 @@ func (g *googleBucket) newClient(ctx context.Context) (*storage.Client, error) {
 	return client, nil
 }
 
-// GetFiles ...
-func (g *googleBucket) getFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
+// GetFiles returns a list of file names within the Google bucket
+func (g *googleBucket) GetFiles(ctx context.Context, client *storage.Client, prefix, delimiter string) ([]string, error) {
 	it := client.Bucket(g.Name).Objects(ctx, &storage.Query{
 		Prefix:    prefix,
 		Delimiter: delimiter,
@@ -56,8 +56,8 @@ func (g *googleBucket) getFiles(ctx context.Context, client *storage.Client, pre
 	return files, nil
 }
 
-// DownloadFile ...
-func (g *googleBucket) downloadFile(ctx context.Context, client *storage.Client, destination, source string) error {
+// DownloadFile downloads a file from the bucket to a desination folder
+func (g *googleBucket) DownloadFile(ctx context.Context, client *storage.Client, destination, source string) error {
 
 	// create dir of destination
 	dir := filepath.Dir(destination)
@@ -82,5 +82,25 @@ func (g *googleBucket) downloadFile(ctx context.Context, client *storage.Client,
 	if err != nil {
 		return fmt.Errorf("error downloading file: %w", err)
 	}
+	return nil
+}
+
+// UploadFile uploads a file to the google bucket
+func (g *googleBucket) UploadFile(ctx context.Context, client *storage.Client, destination, source string) error {
+
+	upload := client.Bucket(g.Name).Object(destination).NewWriter(ctx)
+	defer upload.Close()
+
+	file, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("Error opening upload file: %w", err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(upload, file)
+	if err != nil {
+		return fmt.Errorf("Error uploading file: %w", err)
+	}
+
 	return nil
 }
