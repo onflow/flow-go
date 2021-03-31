@@ -18,7 +18,7 @@ func TestCanTry(t *testing.T) {
 		c := unittest.ChunkFixture(flow.Identifier{0x11}, 0)
 		c.Index = 0
 		status := ChunkRequestStatus{
-			Request: &fetcher.ChunkDataPackRequest{
+			ChunkDataPackRequest: &fetcher.ChunkDataPackRequest{
 				ChunkID:   unittest.IdentifierFixture(),
 				Height:    0,
 				Agrees:    []flow.Identifier{},
