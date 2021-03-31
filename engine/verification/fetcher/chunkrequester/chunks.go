@@ -29,7 +29,7 @@ type ChunkRequests struct {
 	*stdmap.Backend
 }
 
-func NewChunkRequestStatues(limit uint) *ChunkRequests {
+func NewChunkRequests(limit uint) *ChunkRequests {
 	chunks := &ChunkRequests{
 		Backend: stdmap.NewBackend(stdmap.WithLimit(limit)),
 	}
