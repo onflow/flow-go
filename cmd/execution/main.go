@@ -200,11 +200,11 @@ func main() {
 
 			return compactor, nil
 		}).
-		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			extraLogPath := path.Join(triedir, "extralogs")
 			err := os.MkdirAll(extraLogPath, 0777)
 			if err != nil {
-				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
+				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
 			}
 
 			extralog.ExtraLogDumpPath = extraLogPath
@@ -228,9 +228,6 @@ func main() {
 			)
 			computationManager = manager
 
-			return err
-		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
