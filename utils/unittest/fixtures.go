@@ -228,6 +228,10 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func WithoutGuarantee(payload *flow.Payload) {
+	payload.Guarantees = nil
+}
+
 func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }
@@ -809,15 +813,15 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 }
 
 func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 32)
+	sig := make([]byte, 48)
 	_, _ = crand.Read(sig)
 	return sig
 }
 
 func CombinedSignatureFixture(n int) crypto.Signature {
 	sigs := SignaturesFixture(n)
-	combiner := signature.NewCombiner()
-	sig, err := combiner.Join(sigs...)
+	combiner := signature.NewCombiner(48, 48)
+	sig, err := combiner.Join(sigs[0], sigs[1])
 	if err != nil {
 		panic(err)
 	}

@@ -8,27 +8,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createMSGT(t *testing.T) []byte {
-	msg, err := createMSG()
+func randomByteSliceT(t *testing.T, len uint) []byte {
+	msg, err := randomByteSlice(len)
 	require.NoError(t, err)
 	return msg
 }
 
-func createMSGB(b *testing.B) []byte {
-	msg, err := createMSG()
+func randomByteSliceB(b *testing.B) []byte {
+	msg, err := randomByteSlice(128)
 	if err != nil {
 		b.Fatal(err)
 	}
 	return msg
 }
 
-func createMSG() ([]byte, error) {
-	msg := make([]byte, 128)
+func randomByteSlice(len uint) ([]byte, error) {
+	msg := make([]byte, len)
 	n, err := rand.Read(msg)
 	if err != nil {
 		return nil, err
 	}
-	if n < len(msg) {
+	if uint(n) < len {
 		return nil, fmt.Errorf("insufficient random bytes")
 	}
 	return msg, nil
