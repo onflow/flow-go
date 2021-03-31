@@ -3,6 +3,7 @@ package validation
 import (
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -27,7 +28,7 @@ type SealValidationSuite struct {
 func (s *SealValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.verifier = &mock2.Verifier{}
-	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.PayloadsDB, s.ResultsDB, s.SealsDB,
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
 		s.Assigner, s.verifier, 1, metrics.NewNoopCollector())
 }
 
@@ -274,45 +275,167 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	require.Equal(s.T(), last.FinalState, seal3.FinalState)
 }
 
-// TestExtendSealNotConnected tests that proposed seals are rejected if they do not form a valid chain on
-// top of the last known seal on the branch.
-func (s *SealValidationSuite) TestExtendSealNotConnected() {
-	// B <- B1 <- B2 <- B3{R(B1), R(B2)} <- B4{S(R(B2))}
+// TestValidatePayload_SealsSkipBlock verifies that proposed seals
+// are rejected if the chain of proposed seals skips a block.
+// We test with the following known fork:
+//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)}
+// where S is the latest sealed block.
+// Now we consider the new candidate block X:
+//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <-X
+// It would be valid for X to seal the chain of execution results R(B0), R(B1), R(B2)
+// We test the two distinct failure cases:
+//  (i) X has no seal for the immediately next unsealed block B0
+// (ii) X has a seal for the immediately next unsealed block B0 but skips
+//      the seal for one of the following blocks (here B1)
+// In addition, we also run a valid test case to confirm the proper construction of the test
+func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
-	// insert 2 valid blocks
-	block1 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
-	block1.SetPayload(flow.Payload{})
-	s.Extend(&block1)
+	blocks := unittest.ChainFixtureFrom(4, s.LatestSealedBlock.Header)
 
-	block2 := unittest.BlockWithParentFixture(block1.Header)
-	block2.SetPayload(flow.Payload{})
-	s.Extend(&block2)
-
-	// insert block3 with receipts for block1 and block2
-	block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-	block2Receipt := unittest.ReceiptForBlockFixture(&block2)
-
-	block3 := unittest.BlockWithParentFixture(block2.Header)
-	block3.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta(), block2Receipt.Meta()},
-		Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult, &block2Receipt.ExecutionResult},
-	})
-	s.Extend(&block3)
-
-	// Insert block4 with a seal for block 2. Note that there is no seal
-	// for block1. The block should be rejected because it contains a seal
-	// that breaks the chain.
-	block2Seal := s.validSealForResult(&block2Receipt.ExecutionResult)
-
-	block4 := unittest.BlockWithParentFixture(block3.Header)
-	block4.SetPayload(flow.Payload{
-		Seals: []*flow.Seal{block2Seal},
+	// B3's payload contains results and receipts for B0, B1, B2
+	resultB0 := unittest.ExecutionResultFixture(unittest.WithBlock(blocks[0]), unittest.WithPreviousResult(*s.LatestExecutionResult))
+	receipts := unittest.ReceiptChainFor(blocks, resultB0)
+	blocks[3].SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipts[0].Meta(), receipts[1].Meta(), receipts[2].Meta()},
+		Results:  []*flow.ExecutionResult{&receipts[0].ExecutionResult, &receipts[1].ExecutionResult, &receipts[2].ExecutionResult},
 	})
 
-	_, err := s.sealValidator.Validate(&block4)
+	for _, b := range blocks {
+		s.Extend(b)
+	}
 
-	require.Error(s.T(), err)
-	require.True(s.T(), engine.IsInvalidInputError(err), err)
+	block0Seal := s.validSealForResult(&receipts[0].ExecutionResult)
+	block1Seal := s.validSealForResult(&receipts[1].ExecutionResult)
+	block2Seal := s.validSealForResult(&receipts[2].ExecutionResult)
+
+	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- X{Seal(R(B1))}
+	s.T().Run("no seal for the immediately next unsealed block", func(t *testing.T) {
+		X := unittest.BlockWithParentFixture(blocks[3].Header)
+		X.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{block1Seal},
+		})
+
+		_, err := s.sealValidator.Validate(&X)
+		require.Error(s.T(), err)
+		require.True(s.T(), engine.IsInvalidInputError(err), err)
+	})
+
+	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- X{Seal(R(B0)), Seal(R(B2))}
+	s.T().Run("seals skip one of the following blocks", func(t *testing.T) {
+		X := unittest.BlockWithParentFixture(blocks[3].Header)
+		X.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{block0Seal, block2Seal},
+		})
+
+		_, err := s.sealValidator.Validate(&X)
+		require.Error(s.T(), err)
+		require.True(s.T(), engine.IsInvalidInputError(err), err)
+	})
+
+	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- X{Seal(R(B0)), Seal(R(B1)), Seal(R(B2))}
+	s.T().Run("valid test case", func(t *testing.T) {
+		X := unittest.BlockWithParentFixture(blocks[3].Header)
+		X.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{block0Seal, block1Seal, block2Seal},
+		})
+
+		_, err := s.sealValidator.Validate(&X)
+		require.NoError(s.T(), err)
+	})
+}
+
+// TestExtendSeal_ExecutionDisconnected verifies that the Seal Validator only
+// accepts a seals, if their execution results connect.
+// Specifically, we test that the counter-example is rejected:
+//  * we have the chain in storage:
+//     S <- A{Result[S]_1, Result[S]_2, ReceiptMeta[S]_1, ReceiptMeta[S]_2}
+//           <- B{Result[A]_1, Result[A]_2, ReceiptMeta[A]_1, ReceiptMeta[A]_2}
+//             <- C{Result[B]_1, Result[B]_2, ReceiptMeta[B]_1, ReceiptMeta[B]_2}
+//                 <- D{Seal for Result[S]_1}
+//  * Note that we are explicitly testing the handling of an execution fork that
+//    was incorporated _before_ the seal
+//       Blocks:      S  <-----------   A    <-----------   B
+//      Results:   Result[S]_1  <-  Result[A]_1  <-  Result[B]_1 :: the root of this execution tree is sealed
+//                 Result[S]_2  <-  Result[A]_2  <-  Result[B]_2 :: the root of this execution tree conflicts with sealed result
+//  * Now we consider the new candidate block X:
+//     S <- A{..} <- B{..} <- C{..} <- D{..} <- X
+// We test the two distinct failure cases:
+//   (i) illegal to seal Result[A]_2, because it is _not_ derived from the sealed result
+//       (we verify checking of the payload seals with respect to the existing seals)
+//  (ii) illegal to seal Result[A]_1 followed by Result[B]_2, as Result[B]_2 not _not_ derived
+//       from the sealed result (we verify checking of the payload seals with respect to each other)
+// In addition, we also run a valid test case to confirm the proper construction of the test
+func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
+
+	blocks := []*flow.Block{&s.LatestSealedBlock} // slice with elements  [S, A, B, C, D]
+	blocks = append(blocks, unittest.ChainFixtureFrom(4, s.LatestSealedBlock.Header)...)
+	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_1, Result[A]_1, Result[B]_1, ...]
+	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[S]_2, Result[A]_2, Result[B]_2, ...]
+
+	for i := 1; i <= 3; i++ { // set payload for blocks A, B, C
+		blocks[i].SetPayload(flow.Payload{
+			Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
+			Receipts: []*flow.ExecutionReceiptMeta{receiptChain1[i-1].Meta(), receiptChain2[i-1].Meta()},
+		})
+	}
+	blocks[4].SetPayload(flow.Payload{
+		Seals: []*flow.Seal{unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))},
+	})
+	for i := 0; i <= 4; i++ {
+		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
+		// In each iteration, we only mange to reconnect one additional height
+		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain1)
+		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain2)
+	}
+
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+
+	// seals for inclusion in X
+	sealA1 := s.validSealForResult(&receiptChain1[1].ExecutionResult)
+	sealB1 := s.validSealForResult(&receiptChain1[2].ExecutionResult)
+	sealA2 := s.validSealForResult(&receiptChain2[1].ExecutionResult)
+	sealB2 := s.validSealForResult(&receiptChain2[2].ExecutionResult)
+
+	// S <- A{..} <- B{..} <- C{..} <- D{..} <- X{Seal for Result[A]_2}
+	s.T().Run("seals in candidate block does connect to latest sealed result of parent", func(t *testing.T) {
+		X := unittest.BlockWithParentFixture(blocks[4].Header)
+		X.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{sealA2},
+		})
+
+		_, err := s.sealValidator.Validate(&X)
+		require.Error(s.T(), err)
+		require.True(s.T(), engine.IsInvalidInputError(err), err)
+	})
+
+	// S <- A{..} <- B{..} <- C{..} <- D{..} <- X{Seal for Result[A]_1; Seal for Result[B]_2}
+	s.T().Run("sealed execution results within candidate block do not form a chain", func(t *testing.T) {
+		X := unittest.BlockWithParentFixture(blocks[4].Header)
+		X.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{sealA1, sealB2},
+		})
+
+		_, err := s.sealValidator.Validate(&X)
+		require.Error(s.T(), err)
+		require.True(s.T(), engine.IsInvalidInputError(err), err)
+	})
+
+	// S <- A{..} <- B{..} <- C{..} <- D{..} <- X{Seal for Result[A]_1; Seal for Result[B]_1}
+	s.T().Run("valid test case", func(t *testing.T) {
+		X := unittest.BlockWithParentFixture(blocks[4].Header)
+		X.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{sealA1, sealB1},
+		})
+
+		_, err := s.sealValidator.Validate(&X)
+		require.NoError(s.T(), err)
+	})
 }
 
 // TestExtendSealDuplicate tests that payloads containing duplicate seals are rejected.
