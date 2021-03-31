@@ -514,6 +514,7 @@ func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error
 
 	v, err := jsoncdc.Decode(b)
 	if err != nil {
+		err = errors.NewInvalidArgumentErrorf("argument is not json decodable: %w", err)
 		return nil, fmt.Errorf("decodeing argument failed: %w", err)
 	}
 
