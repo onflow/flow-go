@@ -7,7 +7,7 @@ import (
 // ChunkDataPackRequester encapsulates the logic of requesting a chunk data pack from an execution node.
 type ChunkDataPackRequester interface {
 	// Request makes the request of chunk data pack for the specified chunk ID from the target IDs.
-	Request(chunkID flow.Identifier, blockID flow.Identifier, targetIDs flow.IdentifierList) error
+	Request(request *ChunkDataPackRequest) error
 }
 
 // ChunkDataPackHandler encapsulates the logic of handling a requested chunk data pack upon its arrival.
@@ -22,4 +22,13 @@ type ChunkDataPackHandler interface {
 	// When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
 	// through HandleChunkDataPack).
 	NotifyChunkDataPackSealed(chunkID flow.Identifier)
+}
+
+// ChunkDataPackRequest is an internal data structure in fetcher engine that is passed between the engine
+// and requester module. It conveys required information for requesting a chunk data pack.
+type ChunkDataPackRequest struct {
+	ChunkID   flow.Identifier
+	Height    uint64            // block height of execution result of the chunk, used to drop chunk requests of sealed heights.
+	Agrees    []flow.Identifier // execution node ids that generated the result of chunk.
+	Disagrees []flow.Identifier // execution node ids that generated a conflicting result with result of chunk.
 }
