@@ -29,7 +29,7 @@ type VirtualMachine interface {
 
 type ViewCommitter interface {
 	// CommitView commits a views' register delta and returns a new state commitment and proof.
-	CommitView(context.Context, state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
+	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
 }
 
 // A BlockComputer executes the transactions in a block.
@@ -93,7 +93,7 @@ func (e *blockComputer) ExecuteBlock(
 		span.Finish()
 	}()
 
-	results, err := e.executeBlock(ctx, block, stateView, program)
+	results, err := e.executeBlock(span, block, stateView, program)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -104,7 +104,7 @@ func (e *blockComputer) ExecuteBlock(
 }
 
 func (e *blockComputer) executeBlock(
-	ctx context.Context,
+	blockSpan opentracing.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	programs *programs.Programs,
@@ -135,7 +135,7 @@ func (e *blockComputer) executeBlock(
 
 		// execute the first collection
 		colView = stateView.NewChild()
-		txIndex, err1 = e.executeCollection(ctx, txIndex, blockCtx, colView, programs, collections[0], res)
+		txIndex, err1 = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collections[0], res)
 		if err1 != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err1)
 		}
@@ -151,12 +151,12 @@ func (e *blockComputer) executeBlock(
 			colView = stateView.NewChild()
 
 			go func() {
-				txIndex, err1 = e.executeCollection(ctx, txIndex, blockCtx, colView, programs, collection, res)
+				txIndex, err1 = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collection, res)
 				wg.Done()
 			}()
 
 			go func() {
-				stateCommit, err2 = e.commitView(ctx, prevColView, stateCommit, res)
+				stateCommit, err2 = e.commitView(blockSpan, prevColView, stateCommit, res)
 				wg.Done()
 			}()
 
@@ -175,7 +175,7 @@ func (e *blockComputer) executeBlock(
 		}
 
 		// commit last view
-		stateCommit, err2 = e.commitView(ctx, prevColView, stateCommit, res)
+		stateCommit, err2 = e.commitView(blockSpan, prevColView, stateCommit, res)
 		if err2 != nil {
 			return nil, fmt.Errorf("failed to commit view while executing a collection: %w", err2)
 		}
@@ -185,11 +185,11 @@ func (e *blockComputer) executeBlock(
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	collectionView := stateView.NewChild()
-	_, err = e.executeSystemCollection(ctx, txIndex, collectionView, programs, res)
+	_, err = e.executeSystemCollection(blockSpan, txIndex, collectionView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
-	stateCommit, err = e.commitView(ctx, collectionView, stateCommit, res)
+	stateCommit, err = e.commitView(blockSpan, collectionView, stateCommit, res)
 	err = stateView.MergeView(collectionView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
@@ -199,26 +199,29 @@ func (e *blockComputer) executeBlock(
 }
 
 func (e *blockComputer) commitView(
-	ctx context.Context,
+	blockSpan opentracing.Span,
 	collectionView state.View,
 	state flow.StateCommitment,
 	res *execution.ComputationResult,
 ) (flow.StateCommitment, error) {
-	stateCommit, proof, err := e.committer.CommitView(ctx, collectionView, state)
+	span := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeTransaction)
+	defer span.Finish()
+
+	stateCommit, proof, err := e.committer.CommitView(collectionView, state)
 	res.AddStateCommitment(stateCommit)
 	res.AddProof(proof)
 	return stateCommit, err
 }
 
 func (e *blockComputer) executeSystemCollection(
-	ctx context.Context,
+	blockSpan opentracing.Span,
 	txIndex uint32,
 	collectionView state.View,
 	programs *programs.Programs,
 	res *execution.ComputationResult,
 ) (uint32, error) {
 
-	colSpan, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
+	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeTransaction)
 	defer colSpan.Finish()
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
@@ -234,7 +237,7 @@ func (e *blockComputer) executeSystemCollection(
 }
 
 func (e *blockComputer) executeCollection(
-	ctx context.Context,
+	blockSpan opentracing.Span,
 	txIndex uint32,
 	blockCtx fvm.Context,
 	collectionView state.View,
@@ -250,8 +253,7 @@ func (e *blockComputer) executeCollection(
 
 	// call tracing
 	startedAt := time.Now()
-	var colSpan opentracing.Span
-	colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
+	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeTransaction)
 	defer func() {
 		colSpan.SetTag("collection.txCount", len(collection.Transactions))
 		colSpan.LogFields(

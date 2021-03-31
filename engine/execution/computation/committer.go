@@ -1,7 +1,6 @@
 package computation
 
 import (
-	"context"
 	"fmt"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
@@ -9,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/trace"
 )
 
 type LedgerViewCommitter struct {
@@ -21,10 +19,7 @@ func NewLedgerViewCommitter(ldg ledger.Ledger, tracer module.Tracer) *LedgerView
 	return &LedgerViewCommitter{ldg: ldg, tracer: tracer}
 }
 
-func (s *LedgerViewCommitter) CommitView(ctx context.Context, view state.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-	defer span.Finish()
-
+func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
 	return CommitView(s.ldg, view, baseState)
 }
 
@@ -36,7 +31,6 @@ func CommitView(ldg ledger.Ledger, view state.View, baseState flow.StateCommitme
 		execState.RegisterIDSToKeys(ids),
 		execState.RegisterValuesToValues(values),
 	)
-
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
@@ -46,10 +40,7 @@ func CommitView(ldg ledger.Ledger, view state.View, baseState flow.StateCommitme
 		return nil, nil, err
 	}
 
-	allRegisters := view.AllRegisters()
-
-	query, err := makeQuery(baseState, allRegisters)
-
+	query, err := makeQuery(baseState, view.AllRegisters())
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
@@ -79,6 +70,6 @@ func NewNoopViewCommitter() *NoopViewCommitter {
 	return &NoopViewCommitter{}
 }
 
-func (n NoopViewCommitter) CommitView(context.Context, state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error) {
+func (n NoopViewCommitter) CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error) {
 	return nil, nil, nil
 }
