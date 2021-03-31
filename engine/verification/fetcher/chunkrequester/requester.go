@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -27,6 +28,7 @@ type Engine struct {
 	retryInterval time.Duration                // determines time in milliseconds for retrying chunk data requests.
 	pendingChunks *match.Chunks                // used to store all the pending chunks that assigned to this node
 	state         protocol.State               // used to check the last sealed height
+	headers       storage.Headers              // used to fetch the block header when chunk data is ready to be verified
 	con           network.Conduit              // used to send the chunk data request, and receive the response.
 }
 
@@ -122,12 +124,6 @@ func (e *Engine) onTimer() {
 
 	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending pendingChunks")
 
-	sealed, err := e.state.Sealed().Head()
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not get last sealed block")
-		return
-	}
-
 	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		e.log.Error().Err(err).Msg("could not get executors")
@@ -141,19 +137,18 @@ func (e *Engine) onTimer() {
 			Hex("chunk_id", logging.ID(chunkID)).
 			Hex("result_id", logging.ID(chunk.ExecutionResultID)).
 			Hex("block_id", logging.ID(chunk.Chunk.ChunkBody.BlockID)).
-			Uint64("height", chunk.Height).
 			Logger()
 
 		// if block has been sealed, then we can finish
-		isSealed := chunk.Height <= sealed.Height
-
-		if isSealed {
+		sealed, err := e.blockIsSealed(chunk.Chunk.ChunkBody.BlockID)
+		if sealed {
 			removed := e.pendingChunks.Rem(chunkID)
-			log.Info().Bool("removed", removed).Msg("chunk has been sealed, no longer needed")
+			log.Info().Bool("removed", removed).
+				Msg("chunk has been sealed, no longer needed")
 			continue
 		}
 
-		err := e.requestChunkDataPack(chunk, allExecutors)
+		err = e.requestChunkDataPack(chunk, allExecutors)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not request chunk data pack")
 			continue
@@ -161,6 +156,21 @@ func (e *Engine) onTimer() {
 
 		log.Info().Msg("chunk data requested")
 	}
+}
+
+func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return false, fmt.Errorf("could not get block header by ID: %w", err)
+	}
+
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return false, fmt.Errorf("could not get last sealed: %w", err)
+	}
+
+	sealed := header.Height <= lastSealed.Height
+	return sealed, nil
 }
 
 // requestChunkDataPack request the chunk data pack from the execution node.

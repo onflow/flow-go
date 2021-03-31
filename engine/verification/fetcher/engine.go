@@ -203,21 +203,6 @@ func (e *Engine) processChunk(index uint64, blockID flow.Identifier) {
 //	return nil
 //}
 
-func blockIsSealed(state protocol.State, headers storage.Headers, blockID flow.Identifier) (bool, *flow.Header, error) {
-	header, err := headers.ByBlockID(blockID)
-	if err != nil {
-		return false, nil, fmt.Errorf("could not get block header by ID: %w", err)
-	}
-
-	lastSealed, err := state.Sealed().Head()
-	if err != nil {
-		return false, nil, fmt.Errorf("could not get last sealed: %w", err)
-	}
-
-	sealed := header.Height <= lastSealed.Height
-	return sealed, header, nil
-}
-
 // return agrees and disagrees.
 // agrees are executors who made receipt with the same result as the given result id
 // disagrees are executors who made receipt with different result than the given result id
