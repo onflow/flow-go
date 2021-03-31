@@ -165,43 +165,43 @@ func (e *Engine) processChunk(index uint64, blockID flow.Identifier) {
 
 }
 
-//func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.Identifier) error {
-//	blockID := c.ChunkBody.BlockID
-//	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
-//	if err != nil {
-//		return fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
-//	}
-//
-//	var receipts []*flow.ExecutionReceipt
-//	copy(receipts, receiptsData)
-//
-//	agrees, disagrees := executorsOf(receipts, resultID)
-//	// chunk data pack request will only be sent to executors who produced the same result,
-//	// never to who produced different results.
-//	status := NewChunkStatus(c, resultID, header.Height, agrees, disagrees)
-//	added := e.pendingChunks.Add(status)
-//	if !added {
-//		return nil
-//	}
-//
-//	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-//	if err != nil {
-//		return fmt.Errorf("could not find executors: %w", err)
-//	}
-//
-//	err = e.requestChunkDataPack(status, allExecutors)
-//	if err != nil {
-//		return fmt.Errorf("could not request chunk data pack: %w", err)
-//	}
-//
-//	// requesting a chunk data pack is async, when we receive it
-//	// we will resume processing, and eventually call Notify
-//	// again.
-//	// in case we never receive the chunk data pack response, we need
-//	// to make sure Notify is still called, because the
-//	// consumer is still waiting for it to report finish processing,
-//	return nil
-//}
+func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.Identifier) error {
+	blockID := c.ChunkBody.BlockID
+	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
+	}
+
+	var receipts []*flow.ExecutionReceipt
+	copy(receipts, receiptsData)
+
+	agrees, disagrees := executorsOf(receipts, resultID)
+	// chunk data pack request will only be sent to executors who produced the same result,
+	// never to who produced different results.
+	status := NewChunkStatus(c, resultID, header.Height, agrees, disagrees)
+	added := e.pendingChunks.Add(status)
+	if !added {
+		return nil
+	}
+
+	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return fmt.Errorf("could not find executors: %w", err)
+	}
+
+	err = e.requestChunkDataPack(status, allExecutors)
+	if err != nil {
+		return fmt.Errorf("could not request chunk data pack: %w", err)
+	}
+
+	// requesting a chunk data pack is async, when we receive it
+	// we will resume processing, and eventually call Notify
+	// again.
+	// in case we never receive the chunk data pack response, we need
+	// to make sure Notify is still called, because the
+	// consumer is still waiting for it to report finish processing,
+	return nil
+}
 
 // return agrees and disagrees.
 // agrees are executors who made receipt with the same result as the given result id
@@ -218,31 +218,6 @@ func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) ([
 		}
 	}
 	return agrees, disagrees
-}
-
-func chooseChunkDataPackTarget(
-	allExecutors flow.IdentityList,
-	agrees []flow.Identifier,
-	disagrees []flow.Identifier,
-) []flow.Identifier {
-	// if there are enough receipts produced the same result (agrees), we will
-	// randomly pick 2 from them
-	if len(agrees) >= 2 {
-		return allExecutors.Filter(filter.HasNodeID(agrees...)).Sample(2).NodeIDs()
-	}
-
-	// since there is at least one agree, then usually, we just need one extra node
-	// as a backup.
-	// we pick the one extra node randomly from the rest nodes who we haven't received
-	// its receipt.
-	// In the case where all other ENs has produced different results, then we will only
-	// fetch from the one produced the same result (the only agree)
-	need := uint(2 - len(agrees))
-
-	nonResponders := allExecutors.Filter(
-		filter.Not(filter.HasNodeID(disagrees...))).Sample(need).NodeIDs()
-
-	return append(agrees, nonResponders...)
 }
 
 func (e *Engine) onChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
@@ -439,16 +414,39 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	return nil
 }
 
-// CanTry returns checks the history attempts and determine whether a chunk request
-// can be tried again.
-func CanTry(maxAttempt int, chunk *ChunkStatus) bool {
-	return chunk.Attempt < maxAttempt
-}
-
 // IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
 // Otherwise, it returns false.
 // In the current version, a chunk is a system chunk if it is the last chunk of the
 // execution result.
 func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
 	return chunkIndex == uint64(len(result.Chunks)-1)
+}
+
+func (e *Engine) requestChunkDataPack() {
+
+}
+
+func chooseChunkDataPackTarget(
+	allExecutors flow.IdentityList,
+	agrees []flow.Identifier,
+	disagrees []flow.Identifier,
+) flow.IdentityFilter {
+	// if there are enough receipts produced the same result (agrees), we will
+	// randomly pick 2 from them
+	if len(agrees) >= 2 {
+		return allExecutors.Filter(filter.HasNodeID(agrees...)).Sample(2).NodeIDs()
+	}
+
+	// since there is at least one agree, then usually, we just need one extra node
+	// as a backup.
+	// we pick the one extra node randomly from the rest nodes who we haven't received
+	// its receipt.
+	// In the case where all other ENs has produced different results, then we will only
+	// fetch from the one produced the same result (the only agree)
+	need := uint(2 - len(agrees))
+
+	nonResponders := allExecutors.Filter(
+		filter.Not(filter.HasNodeID(disagrees...))).Sample(need)
+
+	return nonResponders
 }
