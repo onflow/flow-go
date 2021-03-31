@@ -22,6 +22,8 @@ import (
 // Max number of execution nodes being asked for chunk data pack.
 const RequestTargetCount = 2
 
+// Engine is responsible of receiving chunk data pack requests, dispatching it to the execution nodes, receiving
+// the requested chunk data pack from execution nodes, and passing it to the registered handler.
 type Engine struct {
 	log             zerolog.Logger
 	me              module.Local
@@ -46,6 +48,10 @@ func New(log zerolog.Logger,
 		retryInterval: retryInterval,
 		handler:       handler,
 		state:         state,
+	}
+
+	if e.handler == nil {
+		return nil, fmt.Errorf("missing chunk data pack handler")
 	}
 
 	con, err := net.Register(engine.RequestChunks, e)
@@ -112,29 +118,49 @@ func (e *Engine) Done() <-chan struct{} {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	var err error
-
 	switch resource := event.(type) {
 	case *messages.ChunkDataResponse:
-		err = e.onChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
+		e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
-	}
-
-	if err != nil {
-		// logs the error instead of returning that.
-		// returning error would be projected at a higher level by network layer.
-		// however, this is an engine-level error, and not network layer error.
-		e.log.Debug().Err(err).Msg("engine could not process event successfully")
 	}
 
 	return nil
 }
 
+// handleChunkDataPack sends the received chunk data pack and its collection to the registered handler, and cleans up its request status.
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
+	chunkID := chunkDataPack.ChunkID
+	collectionID := collection.ID()
+	log := e.log.With().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Hex("collection_id", logging.ID(collectionID)).
+		Logger()
+
+	log.Debug().Msg("chunk data pack received")
+
+	// make sure we still need it.
+	_, exists := e.pendingRequests.ByID(chunkID)
+	if !exists {
+		log.Debug().Msg("chunk data pack is no longer needed, dropped")
+		return
+	}
+
+	// make sure we won't process duplicated chunk data pack.
+	removed := e.pendingRequests.Rem(chunkID)
+	if !removed {
+		log.Debug().Msg("chunk not found in mempool to be removed, likely a race condition")
+		return
+	}
+
+	e.handler.HandleChunkDataPack(originID, chunkDataPack, collection)
+	log.Info().Msg("successfully sent the chunk data pack to the handler")
+}
+
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *fetcher.ChunkDataPackRequest) {
 	status := &ChunkRequestStatus{
-		Request: request,
+		ChunkDataPackRequest: request,
 	}
 	added := e.pendingRequests.Add(status)
 	e.log.Debug().
