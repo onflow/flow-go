@@ -175,15 +175,11 @@ func (e Engine) blockIsSealed(height uint64) (bool, error) {
 	return sealed, nil
 }
 
-// requestChunkDataPack request the chunk data pack from the execution node.
-// the chunk data pack includes the collection and statecommitments that
-// needed to make a VerifiableChunk
+// requestChunkDataPack request the chunk data pack from the execution nodes.
 func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors flow.IdentityList) error {
-	chunkID := status.ID()
-
 	// creates chunk data pack request event
 	req := &messages.ChunkDataRequest{
-		ChunkID: chunkID,
+		ChunkID: status.ChunkID,
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
@@ -193,7 +189,7 @@ func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors f
 	err := e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf(
-			"could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
+			"could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
 	}
 
 	exists := e.pendingRequests.IncrementAttempt(status.ID())
@@ -202,31 +198,6 @@ func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors f
 	}
 
 	return nil
-}
-
-func chooseChunkDataPackTarget(
-	allExecutors flow.IdentityList,
-	agrees []flow.Identifier,
-	disagrees []flow.Identifier,
-) []flow.Identifier {
-	// if there are enough receipts produced the same result (agrees), we will
-	// randomly pick 2 from them
-	if len(agrees) >= 2 {
-		return allExecutors.Filter(filter.HasNodeID(agrees...)).Sample(2).NodeIDs()
-	}
-
-	// since there is at least one agree, then usually, we just need one extra node
-	// as a backup.
-	// we pick the one extra node randomly from the rest nodes who we haven't received
-	// its receipt.
-	// In the case where all other ENs has produced different results, then we will only
-	// fetch from the one produced the same result (the only agree)
-	need := uint(2 - len(agrees))
-
-	nonResponders := allExecutors.Filter(
-		filter.Not(filter.HasNodeID(disagrees...))).Sample(need).NodeIDs()
-
-	return append(agrees, nonResponders...)
 }
 
 // Ready initializes the engine and returns a channel that is closed when the initialization is done.
