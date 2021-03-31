@@ -198,9 +198,11 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 	return nil
 }
 
-// * bool: true if and only if the receipt is valid, which has not been processed before
-// error: any error indicates an unexpected problem in the protocol logic. The node's
-// internal state might be corrupted. Hence, returned errors should be treated as fatal.
+// processReceipt checks validity of the given receipt and adds it to the node's validated information.
+// Returns:
+// * bool: true iff receipt is new (previously unknown), and its validity can be confirmed
+// * error: any error indicates an unexpected problem in the protocol logic. The node's
+//   internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	startTime := time.Now()
 	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
@@ -259,7 +261,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	err = c.receiptValidator.Validate(receipt)
 	childSpan.Finish()
 
-	if validation.IsUnverifiableError(err) {
+	if engine.IsUnverifiableInputError(err) {
 		// If previous result is missing, we can't validate this receipt.
 		// Although we will request its previous receipt(s),
 		// we don't want to drop it now, because when the missing previous arrive

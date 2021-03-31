@@ -259,9 +259,9 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 	s.Assert().True(engine.IsInvalidInputError(err), err)
 }
 
-// TestMultiReceiptValidResultChain tests that multiple within one block payload
-// are accepted, where the receipts are building on top of each other
-// (i.e. their results form a chain).
+// TestMultiReceiptValidResultChain tests that multiple receipts and results
+// within one block payload are accepted, where the receipts are building on
+// top of each other (i.e. their results form a chain).
 // Say B(A) means block B has receipt for A:
 // * we have such chain in storage: G <- A <- B(A) <- C
 // * if a child block of C payload contains receipts and results for (B,C)

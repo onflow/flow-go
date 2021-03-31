@@ -50,17 +50,3 @@ func (_m *TransactionResults) ByBlockIDTransactionID(blockID flow.Identifier, tr
 
 	return r0, r1
 }
-
-// Store provides a mock function with given fields: blockID, transactionResult
-func (_m *TransactionResults) Store(blockID flow.Identifier, transactionResult *flow.TransactionResult) error {
-	ret := _m.Called(blockID, transactionResult)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.TransactionResult) error); ok {
-		r0 = rf(blockID, transactionResult)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}

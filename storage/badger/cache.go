@@ -30,6 +30,12 @@ func noStore(key interface{}, val interface{}) func(*badger.Txn) error {
 	}
 }
 
+func noopStore(key interface{}, val interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return nil
+	}
+}
+
 type retrieveFunc func(key interface{}) func(*badger.Txn) (interface{}, error)
 
 func withRetrieve(retrieve retrieveFunc) func(*Cache) {

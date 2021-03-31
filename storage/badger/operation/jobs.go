@@ -6,38 +6,38 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func RetrieveJobLatestIndex(queue string, index *int64) func(*badger.Txn) error {
+func RetrieveJobLatestIndex(queue string, index *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeJobQueuePointer, queue), index)
 }
 
-func InitJobLatestIndex(queue string, index int64) func(*badger.Txn) error {
+func InitJobLatestIndex(queue string, index uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeJobQueuePointer, queue), index)
 }
 
-func SetJobLatestIndex(queue string, index int64) func(*badger.Txn) error {
+func SetJobLatestIndex(queue string, index uint64) func(*badger.Txn) error {
 	return update(makePrefix(codeJobQueuePointer, queue), index)
 }
 
 // RetrieveJobAtIndex returns the entity at the given index
-func RetrieveJobAtIndex(queue string, index int64, entity *flow.Identifier) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeJobQueue, queue, uint64(index)), entity)
+func RetrieveJobAtIndex(queue string, index uint64, entity *flow.Identifier) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeJobQueue, queue, index), entity)
 }
 
 // InsertJobAtIndex insert an entity ID at the given index
-func InsertJobAtIndex(queue string, index int64, entity flow.Identifier) func(*badger.Txn) error {
-	return insert(makePrefix(codeJobQueue, queue, uint64(index)), entity)
+func InsertJobAtIndex(queue string, index uint64, entity flow.Identifier) func(*badger.Txn) error {
+	return insert(makePrefix(codeJobQueue, queue, index), entity)
 }
 
 // RetrieveProcessedIndex returns the processed index for a job consumer
-func RetrieveProcessedIndex(jobName string, processed *int64) func(*badger.Txn) error {
+func RetrieveProcessedIndex(jobName string, processed *uint64) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }
 
-func InsertProcessedIndex(jobName string, processed int64) func(*badger.Txn) error {
+func InsertProcessedIndex(jobName string, processed uint64) func(*badger.Txn) error {
 	return insert(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }
 
 // SetProcessedIndex updates the processed index for a job consumer with given index
-func SetProcessedIndex(jobName string, processed int64) func(*badger.Txn) error {
+func SetProcessedIndex(jobName string, processed uint64) func(*badger.Txn) error {
 	return update(makePrefix(codeJobConsumerProcessed, jobName), processed)
 }

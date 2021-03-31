@@ -254,6 +254,28 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 	ms.ResultsPL.AssertExpectations(ms.T())
 }
 
+// TestOnUnverifiableReceipt tests handling of receipts that are unverifiable
+// (e.g. if the parent result is unknown)
+func (ms *MatchingSuite) TestOnUnverifiableReceipt() {
+	// we use the same Receipt as in TestOnReceiptValid to ensure that the matching Core is not
+	// rejecting the receipt for any other reason
+	originID := ms.ExeID
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(originID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
+	)
+
+	// check that _expected_ failure case of invalid receipt is handled without error
+	ms.receiptValidator.On("Validate", receipt).Return(engine.NewUnverifiableInputError("missing parent result")).Once()
+	wasAdded, err := ms.matching.processReceipt(receipt)
+	ms.Require().NoError(err, "unverifiable receipt should be cached but not error")
+	ms.Require().False(wasAdded, "unverifiable receipt should be cached but not added to the node's validated information")
+
+	ms.receiptValidator.AssertExpectations(ms.T())
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
+}
+
 // try to submit an approval where the message origin is inconsistent with the message creator
 func (ms *MatchingSuite) TestApprovalInvalidOrigin() {
 	// approval from valid origin (i.e. a verification node) but with random ApproverID

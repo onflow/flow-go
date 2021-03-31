@@ -92,7 +92,7 @@ access(all) contract MyFavContract {
         self.items = []
     }
 
-    // items 
+    // items
     access(all) event NewItemAddedEvent(id: UInt32, metadata: {String: String})
 
     access(self) var itemCounter: UInt32
@@ -102,7 +102,7 @@ access(all) contract MyFavContract {
             pub let itemID: UInt32
 
             pub let metadata: {String: String}
-            
+
             init(_ metadata: {String: String}) {
                 self.itemID = MyFavContract.itemCounter
                 self.metadata = metadata
@@ -130,7 +130,7 @@ access(all) contract MyFavContract {
         }
     }
 
-    // heavy operations 
+    // heavy operations
     // computation heavy function
     access(all) fun ComputationHeavy() {
     	var s: Int256 = 1024102410241024
@@ -170,13 +170,13 @@ access(all) contract MyFavContract {
 const deployingMyFavContractScriptTemplate = `
 transaction {
   prepare(signer: AuthAccount) {
-    signer.setCode("%s".decodeHex())
+		signer.contracts.add(name: "%s", code: "%s".decodeHex())
   }
 }
 `
 
 func DeployingMyFavContractScript() []byte {
-	return []byte(fmt.Sprintf(deployingMyFavContractScriptTemplate, hex.EncodeToString([]byte(myFavContract))))
+	return []byte(fmt.Sprintf(deployingMyFavContractScriptTemplate, "MyFavContract", hex.EncodeToString([]byte(myFavContract))))
 
 }
 

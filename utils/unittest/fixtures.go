@@ -237,6 +237,10 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func WithoutGuarantee(payload *flow.Payload) {
+	payload.Guarantees = nil
+}
+
 func StateInteractionsFixture() *delta.Snapshot {
 	return &delta.NewView(nil).Interactions().Snapshot
 }
@@ -1297,7 +1301,9 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 	// after changing results we need to update IDs of results in receipt
 	for _, block := range blocks {
 		if len(block.Payload.Results) > 0 {
-			block.Payload.Receipts[0].ResultID = block.Payload.Results[0].ID()
+			for i, _ := range block.Payload.Receipts {
+				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
+			}
 		}
 	}
 }

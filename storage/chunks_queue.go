@@ -7,7 +7,7 @@ import (
 type ChunksQueue interface {
 	StoreChunkLocator(locator *chunks.Locator) (bool, error)
 
-	LatestIndex() (int64, error)
+	LatestIndex() (uint64, error)
 
-	AtIndex(index int64) (*chunks.Locator, error)
+	AtIndex(index uint64) (*chunks.Locator, error)
 }

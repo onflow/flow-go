@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -352,7 +353,7 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	// as tightly as possible to let Badger manage it.
 	// Note, that it does not guarantee atomicity as transactions has size limit
 	// but it's the closes thing to atomicity we could have
-	batch := s.db.NewWriteBatch()
+	batch := badgerstorage.NewBatch(s.db)
 
 	for _, chunkDataPack := range chunkDataPacks {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
@@ -399,15 +400,14 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		return fmt.Errorf("cannot index execution result: %w", err)
 	}
 
+	err = s.myReceipts.BatchStoreMyReceipt(executionReceipt, batch)
+	if err != nil {
+		return fmt.Errorf("could not persist execution result: %w", err)
+	}
+
 	err = batch.Flush()
 	if err != nil {
 		return fmt.Errorf("batch flush error: %w", err)
-	}
-
-	// TODO: move to the same batch write
-	err = s.myReceipts.StoreMyReceipt(executionReceipt)
-	if err != nil {
-		return fmt.Errorf("could not persist execution result: %w", err)
 	}
 
 	//outside batch because it requires read access

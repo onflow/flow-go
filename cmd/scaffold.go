@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-
 	"math/rand"
 	"os"
 	"os/signal"
@@ -549,6 +548,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
+			fvm.WithAccountStorageLimit(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts

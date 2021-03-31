@@ -58,7 +58,7 @@ func New(
 	}
 }
 
-func (e *Engine) withBlockConsumerNotifier(notifier module.ProcessingNotifier) {
+func (e *Engine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.blockConsumerNotifier = notifier
 }
 
@@ -191,19 +191,23 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	resultsById := block.Payload.ResultsById()
 
-	receiptFromMeta := func(meta *flow.ExecutionReceiptMeta) *flow.ExecutionReceipt {
-		if result, ok := resultsById[meta.ResultID]; ok {
-			return flow.ExecutionReceiptFromMeta(*meta, *result)
-		}
-
-		// TODO: add fetch of result from storage.
-		return nil
-	}
-
 	// performs chunk assigment on each receipt and pushes the assigned chunks to the
 	// chunks queue.
 	for _, meta := range block.Payload.Receipts {
-		receipt := receiptFromMeta(meta)
+
+		// This is a TEMPORARY SHORTCUT; mature solution will be implemented in
+		// https://github.com/dapperlabs/flow-go/issues/5397
+		result, isIncorporated := resultsById[meta.ResultID]
+		if !isIncorporated {
+			// Per protocol definition, a result is only incorporated once in each fork,
+			// specifically in the first block that contains an execution receipt committing to the result.
+			// Hence, if we find a receipt whose result is _not_ incorporated in this block, the result
+			// was incorporated in an ancestor block. Consequently, we have already verified the result
+			// previously and don't need to do it again.
+			continue
+		}
+
+		receipt := flow.ExecutionReceiptFromMeta(*meta, *result)
 		chunkList, err := e.receiptChunkAssignmentWithTracing(ctx, receipt, blockID)
 		resultID := receipt.ExecutionResult.ID()
 		if err != nil {
