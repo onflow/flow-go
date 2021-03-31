@@ -171,13 +171,7 @@ func (n *Node) computeAndStoreHash() {
 func (n *Node) computeHash(result *[]byte) {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
-		if n.payload != nil {
-			// LEAF node: defined by key-value pair
-			common.ComputeCompactValue(result, n.path, n.payload, n.height)
-			return
-		}
-		// ROOT NODE: no children, no key-value pair
-		copy(*result, common.GetDefaultHashForHeight(n.height))
+		common.ComputeCompactValue(result, n.path, n.payload, n.height)
 		return
 	}
 

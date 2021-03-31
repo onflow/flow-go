@@ -222,7 +222,7 @@ func (parentTrie *MTrie) update(
 			if bytes.Equal(p, parentPath) {
 				// the case where the leaf can be reused
 				if len(paths) == 1 {
-					if !bytes.Equal(parentNode.Payload().Value, payloads[i].Value) {
+					if !parentNode.Payload().Equals(&payloads[i]) {
 						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
 					}
 					// avoid creating a new node when the same payload is written

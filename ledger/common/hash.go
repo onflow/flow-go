@@ -137,10 +137,9 @@ func HashInterNodeIn(result *[]byte, hash1 []byte, hash2 []byte) {
 
 // ComputeCompactValue computes the value for the node considering the sub tree
 // to only include this value and default values. It writes the hash result to the result input.
-// UNCHECKED: payload!= nil
 func ComputeCompactValue(result *[]byte, path []byte, payload *ledger.Payload, nodeHeight int) {
 	// if register is unallocated: return default hash
-	if len(payload.Value) == 0 {
+	if payload == nil || len(payload.Value) == 0 {
 		copy(*result, GetDefaultHashForHeight(nodeHeight))
 		return
 	}
