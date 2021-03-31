@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/utils"
-	chmodel "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -103,24 +102,13 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	root, err := verNode.State.Params().Root()
 	require.NoError(t, err)
 
-	completeER := utils.CompleteExecutionResultFixture(t, chunkNum, chainID.Chain(), root)
-	result := &completeER.Receipt.ExecutionResult
-
+	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 	// stores block of execution result in state and mutate state accordingly
-	err = verNode.State.Extend(completeER.ReferenceBlock)
+	err = verNode.State.Extend(completeER.ReceiptsData[0].ReferenceBlock)
 	require.NoError(t, err)
 
 	// mocks chunk assignment
-	assignment := chmodel.NewAssignment()
-	for _, chunk := range result.Chunks {
-		assignees := make([]flow.Identifier, 0)
-		if IsAssigned(chunk.Index, len(result.Chunks)) {
-			assignees = append(assignees, verIdentity.NodeID)
-		}
-		assignment.Add(chunk, assignees)
-	}
-
-	assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
+	MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity}, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
 
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()
@@ -152,7 +140,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		chainID)
 
 	// send the ER from execution to verification node
-	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipt)
+	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.ContainerBlock.Payload.Receipts[0])
 	assert.Nil(t, err)
 
 	unittest.RequireReturnsBefore(t, conWG.Wait, 10*time.Second, "consensus nodes process")
@@ -174,7 +162,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
 
 	// receipt ID should be added to the ingested results mempool
-	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.Receipt.ExecutionResult.ID()))
+	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.ID()))
 
 	verNode.Done()
 	conNode.Done()

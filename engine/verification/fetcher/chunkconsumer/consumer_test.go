@@ -1,4 +1,4 @@
-package fetcher_test
+package chunkconsumer_test
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/engine/verification/fetcher"
+	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/module"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -21,7 +21,7 @@ import (
 // and its corresponding job can be converted back to the same locator.
 func TestChunkLocatorToJob(t *testing.T) {
 	locator := unittest.ChunkLocatorFixture(unittest.IdentifierFixture(), rand.Uint64())
-	actual, err := fetcher.JobToChunkLocator(fetcher.ChunkLocatorToJob(locator))
+	actual, err := chunkconsumer.JobToChunkLocator(chunkconsumer.ChunkLocatorToJob(locator))
 	require.NoError(t, err)
 	require.Equal(t, locator, actual)
 }
@@ -34,12 +34,12 @@ func TestProduceConsume(t *testing.T) {
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
-		neverFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
+		neverFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 		}
-		WithConsumer(t, neverFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, neverFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 
 			locators := unittest.ChunkLocatorListFixture(10)
@@ -65,17 +65,17 @@ func TestProduceConsume(t *testing.T) {
 		called := chunks.LocatorList{}
 		lock := &sync.Mutex{}
 		var finishAll sync.WaitGroup
-		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
+		alwaysFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 			finishAll.Add(1)
 			go func() {
-				finishProcessing.Notify(locator.ID())
+				notifier.Notify(locator.ID())
 				finishAll.Done()
 			}()
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 
 			locators := unittest.ChunkLocatorListFixture(10)
@@ -101,16 +101,16 @@ func TestProduceConsume(t *testing.T) {
 		lock := &sync.Mutex{}
 		var finishAll sync.WaitGroup
 		finishAll.Add(100)
-		alwaysFinish := func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator) {
+		alwaysFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
 			defer lock.Unlock()
 			called = append(called, locator)
 			go func() {
-				finishProcessing.Notify(locator.ID())
+				notifier.Notify(locator.ID())
 				finishAll.Done()
 			}()
 		}
-		WithConsumer(t, alwaysFinish, func(consumer *fetcher.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
+		WithConsumer(t, alwaysFinish, func(consumer *chunkconsumer.ChunkConsumer, chunksQueue *storage.ChunksQueue) {
 			<-consumer.Ready()
 			total := atomic.NewUint32(0)
 
@@ -137,23 +137,23 @@ func TestProduceConsume(t *testing.T) {
 
 func WithConsumer(
 	t *testing.T,
-	process func(fetcher.FinishProcessing, *chunks.Locator),
-	withConsumer func(*fetcher.ChunkConsumer, *storage.ChunksQueue),
+	process func(module.ProcessingNotifier, *chunks.Locator),
+	withConsumer func(*chunkconsumer.ChunkConsumer, *storage.ChunksQueue),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(3)
 
 		processedIndex := storage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := storage.NewChunkQueue(db)
-		ok, err := chunksQueue.Init(fetcher.DefaultJobIndex)
+		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
 
-		engine := &MockEngine{
+		engine := &mockChunkProcessor{
 			process: process,
 		}
 
-		consumer := fetcher.NewChunkConsumer(
+		consumer := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
 			processedIndex,
 			chunksQueue,
@@ -165,15 +165,16 @@ func WithConsumer(
 	})
 }
 
-type MockEngine struct {
-	finishProcessing fetcher.FinishProcessing
-	process          func(finishProcessing fetcher.FinishProcessing, locator *chunks.Locator)
+// mockChunkProcessor provides an AssignedChunkProcessor with a plug-and-play process method.
+type mockChunkProcessor struct {
+	notifier module.ProcessingNotifier
+	process  func(notifier module.ProcessingNotifier, locator *chunks.Locator)
 }
 
-func (e *MockEngine) ProcessMyChunk(locator *chunks.Locator) {
-	e.process(e.finishProcessing, locator)
+func (e *mockChunkProcessor) ProcessAssignedChunk(locator *chunks.Locator) {
+	e.process(e.notifier, locator)
 }
 
-func (e *MockEngine) WithFinishProcessing(finishProcessing fetcher.FinishProcessing) {
-	e.finishProcessing = finishProcessing
+func (e *mockChunkProcessor) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
+	e.notifier = notifier
 }
