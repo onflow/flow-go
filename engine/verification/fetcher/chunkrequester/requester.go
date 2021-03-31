@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
-	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -21,15 +20,15 @@ import (
 )
 
 type Engine struct {
-	log           zerolog.Logger
-	me            module.Local
-	unit          *engine.Unit
-	handler       fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
-	retryInterval time.Duration                // determines time in milliseconds for retrying chunk data requests.
-	pendingChunks *match.Chunks                // used to store all the pending chunks that assigned to this node
-	state         protocol.State               // used to check the last sealed height
-	headers       storage.Headers              // used to fetch the block header when chunk data is ready to be verified
-	con           network.Conduit              // used to send the chunk data request, and receive the response.
+	log             zerolog.Logger
+	me              module.Local
+	unit            *engine.Unit
+	handler         fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
+	retryInterval   time.Duration                // determines time in milliseconds for retrying chunk data requests.
+	pendingRequests *ChunkRequests               // used to store all the pending chunks that assigned to this node
+	state           protocol.State               // used to check the last sealed height
+	headers         storage.Headers              // used to fetch the block header when chunk data is ready to be verified
+	con             network.Conduit              // used to send the chunk data request, and receive the response.
 }
 
 func New(log zerolog.Logger,
@@ -113,16 +112,24 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-func (e *Engine) Request(chunkID flow.Identifier, blockID flow.Identifier, targetIDs flow.IdentifierList) error {
-	return nil
+// Request receives a chunk data pack request and adds it into the pending requests mempool.
+func (e *Engine) Request(request *fetcher.ChunkDataPackRequest) {
+	status := &ChunkRequestStatus{
+		Request: request,
+	}
+	added := e.pendingRequests.Add(status)
+	e.log.Debug().
+		Hex("chunk_id", logging.ID(request.ChunkID)).
+		Bool("added_to_pending_requests", added).
+		Msg("chunk data pack request arrived")
 }
 
 // onTimer should run periodically, it goes through all pending chunks, and requests their chunk data pack.
 // It also retries the chunk data request if the data hasn't been received for a while.
 func (e *Engine) onTimer() {
-	allChunks := e.pendingChunks.All()
+	allChunks := e.pendingRequests.All()
 
-	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending pendingChunks")
+	e.log.Debug().Int("total", len(allChunks)).Msg("start processing all pending pendingRequests")
 
 	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
@@ -142,7 +149,7 @@ func (e *Engine) onTimer() {
 		// if block has been sealed, then we can finish
 		sealed, err := e.blockIsSealed(chunk.Chunk.ChunkBody.BlockID)
 		if sealed {
-			removed := e.pendingChunks.Rem(chunkID)
+			removed := e.pendingRequests.Rem(chunkID)
 			log.Info().Bool("removed", removed).
 				Msg("chunk has been sealed, no longer needed")
 			continue
@@ -176,7 +183,7 @@ func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
 // requestChunkDataPack request the chunk data pack from the execution node.
 // the chunk data pack includes the collection and statecommitments that
 // needed to make a VerifiableChunk
-func (e *Engine) requestChunkDataPack(status *match.ChunkStatus, allExecutors flow.IdentityList) error {
+func (e *Engine) requestChunkDataPack(status *fetcher.ChunkStatus, allExecutors flow.IdentityList) error {
 	chunkID := status.ID()
 
 	// creates chunk data pack request event
@@ -185,7 +192,7 @@ func (e *Engine) requestChunkDataPack(status *match.ChunkStatus, allExecutors fl
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
-	targetIDs := chooseChunkDataPackTarget(allExecutors, e.Agrees, e.Disagrees)
+	targetIDs := chooseChunkDataPackTarget(allExecutors, status.Agrees, status.Disagrees)
 
 	// publishes the chunk data request to the network
 	err := e.con.Publish(req, targetIDs...)
@@ -194,12 +201,37 @@ func (e *Engine) requestChunkDataPack(status *match.ChunkStatus, allExecutors fl
 			"could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
 
-	exists := e.pendingChunks.IncrementAttempt(e.ID())
+	exists := e.pendingRequests.IncrementAttempt(status.ID())
 	if !exists {
 		return fmt.Errorf("chunk is no longer needed to be processed")
 	}
 
 	return nil
+}
+
+func chooseChunkDataPackTarget(
+	allExecutors flow.IdentityList,
+	agrees []flow.Identifier,
+	disagrees []flow.Identifier,
+) []flow.Identifier {
+	// if there are enough receipts produced the same result (agrees), we will
+	// randomly pick 2 from them
+	if len(agrees) >= 2 {
+		return allExecutors.Filter(filter.HasNodeID(agrees...)).Sample(2).NodeIDs()
+	}
+
+	// since there is at least one agree, then usually, we just need one extra node
+	// as a backup.
+	// we pick the one extra node randomly from the rest nodes who we haven't received
+	// its receipt.
+	// In the case where all other ENs has produced different results, then we will only
+	// fetch from the one produced the same result (the only agree)
+	need := uint(2 - len(agrees))
+
+	nonResponders := allExecutors.Filter(
+		filter.Not(filter.HasNodeID(disagrees...))).Sample(need).NodeIDs()
+
+	return append(agrees, nonResponders...)
 }
 
 // Ready initializes the engine and returns a channel that is closed when the initialization is done.
@@ -216,4 +248,10 @@ func (e *Engine) Ready() <-chan struct{} {
 // Done terminates the engine and returns a channel that is closed when the termination is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
+}
+
+// canTry returns checks the history attempts and determine whether a chunk request
+// can be tried again.
+func canTry(maxAttempt int, status ChunkRequestStatus) bool {
+	return status.Attempt < maxAttempt
 }
