@@ -197,6 +197,15 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 		return nil
 	}
 
+	// don't propagate collection guarantees if we are not currently staked
+	staked, err := protocol.IsNodeStakedAt(e.state.Final(), e.me.NodeID())
+	if err != nil {
+		return fmt.Errorf("could not check my staked status: %w", err)
+	}
+	if !staked {
+		return nil
+	}
+
 	// NOTE: there are two ways to go about this:
 	// - expect the collection nodes to propagate the guarantee to all consensus nodes;
 	// - ensure that we take care of propagating guarantees to other consensus nodes.
