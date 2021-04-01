@@ -896,7 +896,6 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			false,
 			1, // set maximum range to 1
 			nil,
-			nil,
 			suite.log,
 		)
 
