@@ -215,12 +215,12 @@ func (parentTrie *MTrie) update(
 	}
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
-		// check if the parent path node is among the updated paths
+		// check if the parent node path is among the updated paths
 		parentPath := parentNode.Path()
 		found := false
 		for i, p := range paths {
 			if bytes.Equal(p, parentPath) {
-				// the case where the leaf can be reused
+				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
 					if !parentNode.Payload().Equals(&payloads[i]) {
 						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
@@ -228,6 +228,7 @@ func (parentTrie *MTrie) update(
 					// avoid creating a new node when the same payload is written
 					return parentNode
 				}
+				// the case where the recursion carries on: len(paths)>1
 				found = true
 				break
 			}
@@ -237,7 +238,9 @@ func (parentTrie *MTrie) update(
 		}
 	}
 
-	// in the remaining code: len(paths)>1
+	// in the remaining code: the registers to update are strictly larger than 1:
+	//   - either len(paths)>1
+	//   - or len(paths) == 1 and compactLeaf!= nil
 
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
@@ -251,7 +254,7 @@ func (parentTrie *MTrie) update(
 	var lcompactLeaf, rcompactLeaf *node.Node
 	if compactLeaf != nil {
 		// if yes, check which branch it will go to.
-		if utils.Bit(compactLeaf.Path(), parentTrie.Height()-nodeHeight) == 0 {
+		if utils.Bit(compactLeaf.Path(), depth) == 0 {
 			lcompactLeaf = compactLeaf
 		} else {
 			rcompactLeaf = compactLeaf
