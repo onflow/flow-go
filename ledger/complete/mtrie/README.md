@@ -159,7 +159,7 @@ generates 2 new sub-tries (left and right), unless no update is required. A new 
 and points to the newly created left and right sub-tries. This is the generic recursion step (Step 0). This process continues 
 over the tree on a depth-first manner till it reaches a `nil` sub-trie or a leaf:
 
- - 1. a leaf means that we reached either a tree leaf (height zero) or a compactified leaf (height larger than zero). 
+ 1. a leaf means that we reached either a tree leaf (height zero) or a compactified leaf (height larger than zero). 
       - 1. If the leaf path is equal to the input path, then we have found the node with input `path` we're looking for. 
 This new node represents either a tree leaf or a compactified leaf. The tree update is done by creating
 a new node with the new input `payload`. 
@@ -169,7 +169,8 @@ both the new input `(path, payload)` and the old register represented by the old
 a new inter-node with `nil` children is created and the recursion is called on a lower level, but this 
 time carrying forward the old compactified node. The sub-tree that used to contain only one allocated 
 registered, will now contain two allocated registers and can't be represented by a compactified leaf anymore. 
- - 2. a `nil` sub-trie means that the sub-trie is empty and at least a new leaf will be created: 
+
+ 2. a `nil` sub-trie means that the sub-trie is empty and at least a new leaf will be created: 
       - 1. If there is only one leaf to create (either the one representing the input `(path, payload)`, 
 or the one representing a compactified leaf carried over from a higher height), then a new leaf is created.
 The new leaf either represents a tree leaf or a new trie compactified leaf. 
