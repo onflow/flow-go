@@ -142,8 +142,8 @@ const (
 	VERVerChunkVerify             SpanName = "ver.verify.ChunkVerifier.Verify"
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 	// fetcher engine
-	// children of VERProcessAssignedChunk
-	VERFetcherHandleChunkLocator SpanName = "ver.fetcher.handleAssignedChunkLocator"
+	VERFetcherHandleChunkLocator  SpanName = "ver.fetcher.handleAssignedChunkLocator"
+	VERFetcherHandleChunkDataPack SpanName = "ver.fetcher.handleAssignedChunkDataPack"
 
 	// Flow Virtual Machine
 	FVMVerifyTransaction            SpanName = "fvm.verifyTransaction"
