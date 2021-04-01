@@ -111,7 +111,7 @@ func (suite *Suite) RunTest(
 			suite.metrics,
 			nil,
 			false,
-			100,
+			backend.DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -286,7 +286,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			metrics,
 			connFactory, // passing in the connection factory
 			false,
-			100,
+			backend.DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -518,7 +518,7 @@ func (suite *Suite) TestExecuteScript() {
 			suite.metrics,
 			connFactory,
 			false,
-			100,
+			backend.DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)

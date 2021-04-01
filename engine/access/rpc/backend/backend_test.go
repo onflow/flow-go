@@ -87,7 +87,7 @@ func (suite *Suite) TestPing() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -111,7 +111,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -141,7 +141,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -176,7 +176,7 @@ func (suite *Suite) TestGetTransaction() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -207,7 +207,7 @@ func (suite *Suite) TestGetCollection() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -287,7 +287,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		metrics.NewNoopCollector(),
 		connFactory,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -401,7 +401,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -484,7 +484,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -521,7 +521,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -642,7 +642,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
-			100,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -668,7 +668,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
-			100,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -696,7 +696,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
-			100,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -798,7 +798,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
-			100,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -831,7 +831,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
-			100,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -863,7 +863,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
-			100,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -925,7 +925,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
-			100,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -993,7 +993,7 @@ func (suite *Suite) TestGetAccount() {
 		metrics.NewNoopCollector(),
 		connFactory,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -1060,7 +1060,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -1085,7 +1085,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
-		100,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)

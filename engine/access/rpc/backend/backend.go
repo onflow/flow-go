@@ -22,6 +22,9 @@ import (
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 3
 
+// DefaultMaxHeightRange is the default maximum size of range requests.
+const DefaultMaxHeightRange = 250
+
 var validENMap map[flow.Identifier]bool
 
 // Backends implements the Access API.
