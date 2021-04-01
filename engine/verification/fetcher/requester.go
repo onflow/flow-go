@@ -8,7 +8,7 @@ import (
 // ChunkDataPackRequester encapsulates the logic of requesting a chunk data pack from an execution node.
 type ChunkDataPackRequester interface {
 	// Request makes the request of chunk data pack for the specified chunk ID from the target IDs.
-	Request(request *ChunkDataPackRequest) error
+	Request(request *ChunkDataPackRequest)
 }
 
 // ChunkDataPackHandler encapsulates the logic of handling a requested chunk data pack upon its arrival.

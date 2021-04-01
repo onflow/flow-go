@@ -410,14 +410,27 @@ func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
 	return chunkIndex == uint64(len(result.Chunks)-1)
 }
 
+// requestChunkDataPack creates and dispatches a chunk data pack request to the requester module of the engine.
 func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
+	agrees, disagrees, err := e.getAgreeAndDisagreeExecutors(blockID, resultID)
+	if err != nil {
+		return fmt.Errorf("could not segregate the agree and disagree executors for result: %x of block: %x", resultID, blockID)
+	}
+
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not get header for block: %x", blockID)
+	}
 
 	request := &ChunkDataPackRequest{
-		ChunkID:   flow.Identifier{},
-		Height:    0,
-		Agrees:    nil,
-		Disagrees: nil,
+		ChunkID:   chunkID,
+		Height:    header.Height,
+		Agrees:    agrees,
+		Disagrees: disagrees,
 	}
+
+	e.requester.Request(request)
+	return nil
 }
 
 // getAgreeAndDisagreeExecutors segregates the execution nodes identifiers based on the given execution result id at the given block into agree and
