@@ -2,6 +2,7 @@ package approvals
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,7 +27,7 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 	return nil
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, assignment chunks.Assignment, authorizedVerifiers map[flow.Identifier]struct{}) *ApprovalCollector {
+func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, authorizedVerifiers map[flow.Identifier]struct{}) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := make(map[flow.Identifier]struct{})
