@@ -428,28 +428,3 @@ func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
 func (e *Engine) requestChunkDataPack() {
 
 }
-
-func chooseChunkDataPackTarget(
-	allExecutors flow.IdentityList,
-	agrees []flow.Identifier,
-	disagrees []flow.Identifier,
-) flow.IdentityFilter {
-	// if there are enough receipts produced the same result (agrees), we will
-	// randomly pick 2 from them
-	if len(agrees) >= 2 {
-		return allExecutors.Filter(filter.HasNodeID(agrees...)).Sample(2).NodeIDs()
-	}
-
-	// since there is at least one agree, then usually, we just need one extra node
-	// as a backup.
-	// we pick the one extra node randomly from the rest nodes who we haven't received
-	// its receipt.
-	// In the case where all other ENs has produced different results, then we will only
-	// fetch from the one produced the same result (the only agree)
-	need := uint(2 - len(agrees))
-
-	nonResponders := allExecutors.Filter(
-		filter.Not(filter.HasNodeID(disagrees...))).Sample(need)
-
-	return nonResponders
-}
