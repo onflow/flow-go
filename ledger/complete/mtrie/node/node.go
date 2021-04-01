@@ -28,15 +28,22 @@ import (
 // for performance reasons, we not not copy read.
 // TODO: optimized data structures might be able to reduce memory consumption
 type Node struct {
+	// Implementation Comments:
+	// Formally, a tree can hold up to 2^maxDepth number of registers. However,
+	// the current implementation and is designed to operate on a sparsely populated
+	// tree, holding much less than 2^64 registers.
+
 	lChild    *Node           // Left Child
 	rChild    *Node           // Right Child
 	height    int             // height where the Node is at
 	path      ledger.Path     // the storage path (leaf nodes only)
 	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
 	hashValue hash.Hash       // hash value of node (cached)
-	// TODO : to delete
+	// TODO : Atm, we don't support trees with dynamic depth.
+	//        Instead, this should be a forest-wide constant
 	maxDepth uint16 // captures the longest path from this node to compacted leafs in the subtree
-	// TODO : to delete
+	// TODO : migrate to book-keeping only in the tree root.
+	//        Update can just return the _change_ of regCount.
 	regCount uint64 // number of registers allocated in the subtree
 }
 
@@ -93,7 +100,7 @@ func NewLeaf(path ledger.Path,
 		maxDepth: 0,
 		regCount: uint64(1),
 	}
-	n.ComputeHash()
+	n.computeAndStoreHash()
 	return n
 }
 
@@ -120,43 +127,18 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
 		regCount: lRegCount + rRegCount,
 	}
-	n.ComputeHash()
+	n.computeAndStoreHash()
 	return n
 }
 
-// ComputeHash computes the hashValue for the given Node
-func (n *Node) ComputeHash() {
-	if n.lChild == nil && n.rChild == nil {
-		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
-		if n.payload != nil {
-			// LEAF node: defined by key-value pair
-			n.hashValue = hash.ComputeCompactValue(hash.Hash(n.path), n.payload.Value, n.height)
-			return
-		}
-		// ROOT NODE: no children, no key-value pair
-		n.hashValue = hash.GetDefaultHashForHeight(n.height)
-		return
-	}
-
-	// this is an INTERIOR node at least one of lChild or rChild is not nil.
-	var h1, h2 hash.Hash
-	if n.lChild != nil {
-		h1 = n.lChild.Hash()
-	} else {
-		h1 = hash.GetDefaultHashForHeight(n.height - 1)
-	}
-
-	if n.rChild != nil {
-		h2 = n.rChild.Hash()
-	} else {
-		h2 = hash.GetDefaultHashForHeight(n.height - 1)
-	}
-	n.hashValue = hash.HashInterNodeIn(h1, h2)
+// computeAndStoreHash computes the hashValue of this node and
+// stores it the hash internal field
+func (n *Node) computeAndStoreHash() {
+	n.hashValue = n.computeHash()
 }
 
-// computeHash computes the hashValue for the given node
-// and stores the value in result.
-func computeHash(n *Node) hash.Hash {
+// computeHash returns the hashValue of the node
+func (n *Node) computeHash() hash.Hash {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
 		if n.payload != nil {
@@ -184,25 +166,25 @@ func computeHash(n *Node) hash.Hash {
 }
 
 // VerifyCachedHash verifies the hash of a node is valid
-func (n *Node) verifyCachedHashRecursive() bool {
-	if n.lChild != nil {
-		if !n.lChild.verifyCachedHashRecursive() {
-			return false
-		}
+func verifyCachedHashRecursive(n *Node) bool {
+	if n == nil {
+		return true
 	}
-	if n.rChild != nil {
-		if !n.rChild.verifyCachedHashRecursive() {
-			return false
-		}
+	if !verifyCachedHashRecursive(n.lChild) {
+		return false
 	}
 
-	computedHash := computeHash(n)
+	if !verifyCachedHashRecursive(n.rChild) {
+		return false
+	}
+
+	computedHash := n.computeHash()
 	return n.hashValue == computedHash
 }
 
 // VerifyCachedHash verifies the hash of a node is valid
 func (n *Node) VerifyCachedHash() bool {
-	return n.verifyCachedHashRecursive()
+	return verifyCachedHashRecursive(n)
 }
 
 // Hash returns the Node's hash value.
@@ -298,21 +280,20 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 }
 
 // AllPayloads returns the payload of this node and all payloads of the subtrie
-// UNCHECKED : n != nil
 func (n *Node) AllPayloads() []ledger.Payload {
-	payloads := make([]ledger.Payload, 0)
-	recursiveAllPayload(&payloads, n)
-	return payloads
+	return n.appendSubtreePayloads([]ledger.Payload{})
 }
 
-func recursiveAllPayload(payloads *[]ledger.Payload, n *Node) {
+// appendSubtreePayloads appends the payloads of the subtree with this node as root
+// to the provided Payload slice. Follows same pattern as Go's native append method.
+func (n *Node) appendSubtreePayloads(result []ledger.Payload) []ledger.Payload {
 	if n == nil {
-		return
+		return result
 	}
 	if n.IsLeaf() {
-		*payloads = append(*payloads, *n.Payload())
-		return
+		return append(result, *n.Payload())
 	}
-	recursiveAllPayload(payloads, n.lChild)
-	recursiveAllPayload(payloads, n.rChild)
+	result = n.lChild.appendSubtreePayloads(result)
+	result = n.rChild.appendSubtreePayloads(result)
+	return result
 }

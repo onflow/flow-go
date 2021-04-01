@@ -135,13 +135,10 @@ func (p *Payload) Equals(other *Payload) bool {
 	if other == nil {
 		return false
 	}
-	if !p.Key.Equals(&other.Key) {
-		return false
+	if p.Key.Equals(&other.Key) && p.Value.Equals(other.Value) {
+		return true
 	}
-	if !p.Value.Equals(other.Value) {
-		return false
-	}
-	return true
+	return false
 }
 
 // DeepCopy returns a deep copy of the payload

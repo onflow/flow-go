@@ -124,3 +124,149 @@ func benchmarkStorage(steps int, b *testing.B) {
 	b.ReportMetric(float64(totalPTrieConstTimeMS/steps), "ptrie_const_time_(ms)")
 
 }
+
+// BenchmarkStorage benchmarks the performance of the storage layer
+func BenchmarkUpdate(b *testing.B) {
+	// key updates per iteration
+	numInsPerStep := 10000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(1)
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	led, err := complete.NewLedger(dir, 101, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+
+	state := led.InitialState()
+
+	keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := led.Set(update)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkStorage benchmarks the performance of the storage layer
+func BenchmarkRead(b *testing.B) {
+	// key updates per iteration
+	numInsPerStep := 10000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(1)
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	led, err := complete.NewLedger(dir, 101, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+
+	state := led.InitialState()
+
+	keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	newState, err := led.Set(update)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	query, err := ledger.NewQuery(newState, keys)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err = led.Get(query)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkStorage benchmarks the performance of the storage layer
+func BenchmarkProve(b *testing.B) {
+	// key updates per iteration
+	numInsPerStep := 10000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(1)
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	led, err := complete.NewLedger(dir, 101, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+
+	state := led.InitialState()
+
+	keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	newState, err := led.Set(update)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	query, err := ledger.NewQuery(newState, keys)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := led.Prove(query)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}

@@ -94,31 +94,35 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		return nil, err
 	}
 
-	// deduplicate keys
-	deduplicatedPaths := make([]ledger.Path, 0)
+	// deduplicate keys:
+	// Generally, we expect the VM to deduplicate reads and writes. Hence, the following is a pre-caution.
+	// TODO: We could take out the following de-duplication logic
+	//       Which increases the cost for duplicates but reduces read complexity without duplicates.
+	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
 	pathOrgIndex := make(map[string][]int)
 	for i, path := range r.Paths {
 		// only collect duplicated keys once
-		if _, ok := pathOrgIndex[string(path[:])]; !ok { // deduplication here is optional
+		indices, ok := pathOrgIndex[string(path[:])]
+		if !ok { // deduplication here is optional
 			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		// append the index
-		pathOrgIndex[string(path[:])] = append(pathOrgIndex[string(path[:])], i)
+		pathOrgIndex[string(path[:])] = append(indices, i)
 	}
 
-	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths
-
-	totalPayloadSize := 0
+	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
 
 	// reconstruct the payloads in the same key order that called the method
 	orderedPayloads := make([]*ledger.Payload, len(r.Paths))
+	totalPayloadSize := 0
 	for i, p := range deduplicatedPaths {
-		for _, j := range pathOrgIndex[string(p[:])] {
-			orderedPayloads[j] = payloads[i].DeepCopy()
-			totalPayloadSize += payloads[i].Size()
+		payload := payloads[i]
+		indices := pathOrgIndex[string(p[:])]
+		for _, j := range indices {
+			orderedPayloads[j] = payload.DeepCopy()
 		}
+		totalPayloadSize += len(indices) * payload.Size()
 	}
-
 	// TODO rename the metrics
 	f.metrics.ReadValuesSize(uint64(totalPayloadSize))
 
@@ -140,28 +144,31 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		return u.RootHash, nil
 	}
 
-	// sort and deduplicate paths (we only consider the last occurrence, and ignore the rest)
-	deduplicatedPaths := make([]ledger.Path, 0)
-	payloadMap := make(map[string]ledger.Payload)
+	// Deduplicate writes to the same register: we only retain the value of the last write
+	// Generally, we expect the VM to deduplicate reads and writes.
+	deduplicatedPaths := make([]ledger.Path, 0, len(u.Paths))
+	deduplicatedPayloads := make([]ledger.Payload, 0, len(u.Paths))
+	payloadMap := make(map[string]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
 	totalPayloadSize := 0
 	for i, path := range u.Paths {
-		// check if doesn't exist
-		if _, ok := payloadMap[string(path[:])]; !ok {
+		payload := u.Payloads[i]
+		// check if we already have encountered an update for the respective register
+		if idx, ok := payloadMap[string(path[:])]; ok {
+			oldPayload := deduplicatedPayloads[idx]
+			deduplicatedPayloads[idx] = *payload
+			totalPayloadSize += -oldPayload.Size() + payload.Size()
+		} else {
+			payloadMap[string(path[:])] = len(deduplicatedPaths)
 			deduplicatedPaths = append(deduplicatedPaths, path)
+			deduplicatedPayloads = append(deduplicatedPayloads, *u.Payloads[i])
+			totalPayloadSize += payload.Size()
 		}
-		payloadMap[string(path[:])] = *u.Payloads[i]
-		totalPayloadSize += u.Payloads[i].Size()
 	}
 
 	// TODO rename metrics names
 	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
-	payloads := make([]ledger.Payload, 0, len(deduplicatedPaths))
-	for _, path := range deduplicatedPaths {
-		payloads = append(payloads, payloadMap[string(path[:])])
-	}
-
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, payloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads)
 	if err != nil {
 		return emptyHash, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -221,7 +228,6 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 	// if we have to insert empty values
 	if len(notFoundPaths) > 0 {
-
 		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads)
 		if err != nil {
 			return nil, err
