@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -24,18 +23,11 @@ func getAccount(
 
 	account, err := accounts.Get(address)
 	if err != nil {
-		if errors.Is(err, state.ErrAccountNotFound) {
-			return nil, ErrAccountNotFound
-		}
-
 		return nil, err
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env, err := newEnvironment(ctx, vm, sth, programs)
-		if err != nil {
-			return nil, err
-		}
+		env := newEnvironment(ctx, vm, sth, programs)
 		balance, err := env.GetAccountBalance(common.BytesToAddress(address.Bytes()))
 		if err != nil {
 			return nil, err
