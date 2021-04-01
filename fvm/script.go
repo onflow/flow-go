@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -27,9 +28,8 @@ type ScriptProcedure struct {
 	Value     cadence.Value
 	Logs      []string
 	Events    []flow.Event
-	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
-	GasUsed uint64
-	Err     Error
+	GasUsed   uint64
+	Err       errors.Error
 }
 
 type ScriptProcessor interface {
@@ -47,13 +47,12 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
 		err := p.Process(vm, ctx, proc, sth, programs)
-		vmErr, fatalErr := handleError(err)
-		if fatalErr != nil {
-			return fatalErr
+		txError, failure := errors.SplitErrorTypes(err)
+		if failure != nil {
+			return failure
 		}
-
-		if vmErr != nil {
-			proc.Err = vmErr
+		if txError != nil {
+			proc.Err = txError
 			return nil
 		}
 	}
@@ -74,13 +73,8 @@ func (i ScriptInvocator) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env, err := newEnvironment(ctx, vm, sth, programs)
-	if err != nil {
-		return err
-	}
-
+	env := newEnvironment(ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])
-
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
 			Source:    proc.Script,
@@ -91,13 +85,14 @@ func (i ScriptInvocator) Process(
 			Location:  location,
 		},
 	)
+
 	if err != nil {
-		return err
+		return errors.HandleRuntimeError(err)
 	}
 
 	proc.Value = value
 	proc.Logs = env.getLogs()
 	proc.Events = env.Events()
-
+	proc.GasUsed = env.GetComputationUsed()
 	return nil
 }
