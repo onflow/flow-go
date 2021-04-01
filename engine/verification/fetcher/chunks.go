@@ -2,22 +2,15 @@ package fetcher
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 )
 
-// ChunkStatus is a data struct represents the current status of fetching
-// chunk data pack for the chunk.
+// ChunkStatus is a data struct represents the current status of fetching chunk data pack for the chunk.
 type ChunkStatus struct {
 	Chunk             *flow.Chunk
 	ExecutionResultID flow.Identifier
-	Height            uint64
-	Agrees            []flow.Identifier
-	Disagrees         []flow.Identifier
-	LastAttempt       time.Time
-	Attempt           int
 }
 
 func (s ChunkStatus) ID() flow.Identifier {
@@ -26,22 +19,6 @@ func (s ChunkStatus) ID() flow.Identifier {
 
 func (s ChunkStatus) Checksum() flow.Identifier {
 	return s.Chunk.ID()
-}
-
-func NewChunkStatus(
-	chunk *flow.Chunk,
-	resultID flow.Identifier,
-	height uint64,
-	agrees []flow.Identifier,
-	disagrees []flow.Identifier,
-) *ChunkStatus {
-	return &ChunkStatus{
-		Chunk:             chunk,
-		ExecutionResultID: resultID,
-		Height:            height,
-		Agrees:            agrees,
-		Disagrees:         disagrees,
-	}
 }
 
 type Chunks struct {
@@ -88,19 +65,4 @@ func (cs *Chunks) Add(chunk *ChunkStatus) bool {
 
 func (cs *Chunks) Rem(chunkID flow.Identifier) bool {
 	return cs.Backend.Rem(chunkID)
-}
-
-func (cs *Chunks) IncrementAttempt(chunkID flow.Identifier) bool {
-	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
-		entity, exists := backdata[chunkID]
-		if !exists {
-			return fmt.Errorf("not exist")
-		}
-		chunk := fromEntity(entity)
-		chunk.Attempt++
-		chunk.LastAttempt = time.Now()
-		return nil
-	})
-
-	return err == nil
 }
