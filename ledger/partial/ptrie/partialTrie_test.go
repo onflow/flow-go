@@ -2,9 +2,7 @@ package ptrie
 
 import (
 	"bytes"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -21,11 +19,7 @@ func withForest(
 	pathByteSize int,
 	numberOfActiveTries int, f func(t *testing.T, f *mtrie.Forest)) {
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := mtrie.NewForest(pathByteSize, dir, numberOfActiveTries, &metrics.NoopCollector{}, nil)
+	forest, err := mtrie.NewForest(pathByteSize, numberOfActiveTries, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	f(t, forest)
