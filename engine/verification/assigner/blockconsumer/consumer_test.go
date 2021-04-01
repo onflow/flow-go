@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -123,7 +124,7 @@ func withConsumer(
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 		s := testutil.CompleteStateFixture(t, collector, tracer, participants)
 
-		engine := &mockFinalizedBlockProcessor{
+		engine := &mockBlockProcessor{
 			process: process,
 		}
 
@@ -141,8 +142,8 @@ func withConsumer(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := utils.CompleteExecutionResultChainFixture(t, root, blockCount/2)
-		blocks := extendStateWithFinalizedBlocks(t, results, s.State)
+		results := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
+		blocks := test.ExtendStateWithFinalizedBlocks(t, results, s.State)
 		// makes sure that we generated a block chain of requested length.
 		require.Len(t, blocks, blockCount)
 
@@ -150,16 +151,16 @@ func withConsumer(
 	})
 }
 
-// mockFinalizedBlockProcessor provides a FinalizedBlockProcessor with a plug-and-play process method.
-type mockFinalizedBlockProcessor struct {
+// mockBlockProcessor provides a FinalizedBlockProcessor with a plug-and-play process method.
+type mockBlockProcessor struct {
 	notifier module.ProcessingNotifier
 	process  func(module.ProcessingNotifier, *flow.Block)
 }
 
-func (e *mockFinalizedBlockProcessor) ProcessFinalizedBlock(block *flow.Block) {
+func (e *mockBlockProcessor) ProcessFinalizedBlock(block *flow.Block) {
 	e.process(e.notifier, block)
 }
 
-func (e *mockFinalizedBlockProcessor) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
+func (e *mockBlockProcessor) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.notifier = notifier
 }
