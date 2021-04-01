@@ -1,13 +1,13 @@
 package fvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -15,25 +15,19 @@ import (
 func getAccount(
 	vm *VirtualMachine,
 	ctx Context,
-	st *state.State,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 	address flow.Address,
 ) (*flow.Account, error) {
-	accounts := state.NewAccounts(st)
+	accounts := state.NewAccounts(sth)
 
 	account, err := accounts.Get(address)
 	if err != nil {
-		if errors.Is(err, state.ErrAccountNotFound) {
-			return nil, ErrAccountNotFound
-		}
-
 		return nil, err
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env, err := newEnvironment(ctx, vm, st)
-		if err != nil {
-			return nil, err
-		}
+		env := newEnvironment(ctx, vm, sth, programs)
 		balance, err := env.GetAccountBalance(common.BytesToAddress(address.Bytes()))
 		if err != nil {
 			return nil, err

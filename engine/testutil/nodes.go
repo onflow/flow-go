@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
-	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -35,7 +34,9 @@ import (
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -82,7 +83,7 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	metrics := metrics.NewNoopCollector()
 
 	// creates state fixture and bootstrap it.
-	stateFixture := CompleteStateFixture(t, log, metrics, tracer, participants)
+	stateFixture := CompleteStateFixture(t, metrics, tracer, participants)
 
 	require.NoError(t, err)
 	for _, option := range options {
@@ -102,22 +103,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 	tracer module.Tracer,
 	chainID flow.ChainID) testmock.GenericNode {
 
-	// Generates test signing oracle for the nodes
-	// Disclaimer: it should not be used for practical applications
-	//
-	// uses identity of node as its seed
-	seed, err := json.Marshal(identity)
-	require.NoError(t, err)
-	// creates signing key of the node
-	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
-	require.NoError(t, err)
-
-	// sets staking public key of the node
-	identity.StakingPubKey = sk.PublicKey()
-
-	me, err := local.New(identity, sk)
-	require.NoError(t, err)
-
+	me := LocalFixture(t, identity)
 	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
 
 	return testmock.GenericNode{
@@ -139,19 +125,37 @@ func GenericNodeWithStateFixture(t testing.TB,
 	}
 }
 
+// LocalFixture creates and returns a Local module for given identity.
+func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
+	// Generates test signing oracle for the nodes
+	// Disclaimer: it should not be used for practical applications
+	//
+	// uses identity of node as its seed
+	seed, err := json.Marshal(identity)
+	require.NoError(t, err)
+	// creates signing key of the node
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+
+	// sets staking public key of the node
+	identity.StakingPubKey = sk.PublicKey()
+
+	me, err := local.New(identity, sk)
+	require.NoError(t, err)
+
+	return me
+}
+
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
-func CompleteStateFixture(t testing.TB, log zerolog.Logger, metric *metrics.NoopCollector, tracer module.Tracer,
+func CompleteStateFixture(t testing.TB, metric *metrics.NoopCollector, tracer module.Tracer,
 	participants flow.IdentityList) *testmock.StateFixture {
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
 	s := storage.InitAll(metric, db)
 	consumer := events.NewNoop()
 
-	root, result, seal := unittest.BootstrapFixture(participants)
-	stateRoot, err := badgerstate.NewStateRoot(root, result, seal, 0)
-	require.NoError(t, err)
-
-	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, stateRoot)
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
 	require.NoError(t, err)
 
 	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
@@ -252,7 +256,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
-	matchingEngine, err := matching.NewEngine(
+	sealingEngine, err := sealing.NewEngine(
 		node.Log,
 		node.Metrics,
 		node.Tracer,
@@ -274,7 +278,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		receiptValidator,
 		approvalValidator,
 		validation.DefaultRequiredApprovalsForSealValidation,
-		matching.DefaultEmergencySealingActive)
+		sealing.DefaultEmergencySealingActive)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{
@@ -284,7 +288,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Receipts:        receipts,
 		Seals:           seals,
 		IngestionEngine: ingestionEngine,
-		MatchingEngine:  matchingEngine,
+		SealingEngine:   sealingEngine,
 	}
 }
 
@@ -316,13 +320,17 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
-	eventsStorage := storage.NewEvents(node.DB)
-	serviceEventsStorage := storage.NewServiceEvents(node.DB)
-	txResultStorage := storage.NewTransactionResults(node.DB)
+	eventsStorage := storage.NewEvents(node.Metrics, node.DB)
+	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
+	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
+	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
+		return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
@@ -335,21 +343,29 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	dbDir := unittest.TempDir(t)
 
 	metricsCollector := &metrics.NoopCollector{}
-	ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), nil, completeLedger.DefaultPathFinderVersion)
+
+	diskWal, err := wal.NewDiskWAL(node.Log.With().Str("subcomponent", "wal").Logger(), nil, metricsCollector, dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(t, err)
+
+	ls, err := completeLedger.NewLedger(diskWal, 100, metricsCollector, node.Log.With().Str("compontent", "ledger").Logger(), completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
 	genesisHead, err := node.State.Final().Head()
 	require.NoError(t, err)
 
 	bootstrapper := bootstrapexec.NewBootstrapper(node.Log)
-	commit, err := bootstrapper.BootstrapLedger(ls, unittest.ServiceAccountPublicKey, unittest.GenesisTokenSupply, node.ChainID.Chain())
+	commit, err := bootstrapper.BootstrapLedger(
+		ls,
+		unittest.ServiceAccountPublicKey,
+		node.ChainID.Chain(),
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
 	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, collectionsStorage, chunkDataPackStorage, results, receipts, node.Headers, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.DB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -362,13 +378,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	blockFinder := fvm.NewBlockFinder(node.Headers)
 
@@ -386,6 +402,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		vm,
 		vmCtx,
+		computation.DefaultProgramsCacheSize,
 	)
 	require.NoError(t, err)
 
@@ -423,6 +440,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		deltas,
 		syncThreshold,
 		false,
+		checkStakedAtBlock,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -452,21 +470,23 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	return testmock.ExecutionNode{
-		GenericNode:     node,
-		MutableState:    followerState,
-		IngestionEngine: ingestionEngine,
-		FollowerEngine:  followerEng,
-		SyncEngine:      syncEngine,
-		ExecutionEngine: computation,
-		RequestEngine:   requestEngine,
-		ReceiptsEngine:  pusherEngine,
-		BadgerDB:        node.DB,
-		VM:              vm,
-		ExecutionState:  execState,
-		Ledger:          ls,
-		LevelDbDir:      dbDir,
-		Collections:     collectionsStorage,
-		Finalizer:       finalizer,
+		GenericNode:         node,
+		MutableState:        followerState,
+		IngestionEngine:     ingestionEngine,
+		FollowerEngine:      followerEng,
+		SyncEngine:          syncEngine,
+		ExecutionEngine:     computation,
+		RequestEngine:       requestEngine,
+		ReceiptsEngine:      pusherEngine,
+		BadgerDB:            node.DB,
+		VM:                  vm,
+		ExecutionState:      execState,
+		Ledger:              ls,
+		LevelDbDir:          dbDir,
+		Collections:         collectionsStorage,
+		Finalizer:           finalizer,
+		MyExecutionReceipts: myReceipts,
+		DiskWAL:             diskWal,
 	}
 }
 
@@ -699,9 +719,9 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.VerifierEngine == nil {
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		blockFinder := fvm.NewBlockFinder(node.Headers)
 

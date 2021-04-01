@@ -16,17 +16,18 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
-	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/fvm"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
@@ -102,28 +103,28 @@ type ConsensusNode struct {
 	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
-	MatchingEngine  *matching.Engine
+	SealingEngine   *sealing.Engine
 }
 
 func (cn ConsensusNode) Ready() {
 	<-cn.IngestionEngine.Ready()
-	<-cn.MatchingEngine.Ready()
+	<-cn.SealingEngine.Ready()
 }
 
 func (cn ConsensusNode) Done() {
 	<-cn.IngestionEngine.Done()
-	<-cn.MatchingEngine.Done()
+	<-cn.SealingEngine.Done()
 }
 
 type ComputerWrap struct {
 	*computation.Manager
-	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view *delta.View)
+	OnComputeBlock func(ctx context.Context, block *entity.ExecutableBlock, view fvmState.View)
 }
 
 func (c *ComputerWrap) ComputeBlock(
 	ctx context.Context,
 	block *entity.ExecutableBlock,
-	view *delta.View,
+	view fvmState.View,
 ) (*execution.ComputationResult, error) {
 	if c.OnComputeBlock != nil {
 		c.OnComputeBlock(ctx, block, view)
@@ -134,20 +135,22 @@ func (c *ComputerWrap) ComputeBlock(
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	MutableState    protocol.MutableState
-	IngestionEngine *ingestion.Engine
-	ExecutionEngine *ComputerWrap
-	RequestEngine   *requester.Engine
-	ReceiptsEngine  *executionprovider.Engine
-	FollowerEngine  *followereng.Engine
-	SyncEngine      *synchronization.Engine
-	BadgerDB        *badger.DB
-	VM              *fvm.VirtualMachine
-	ExecutionState  state.ExecutionState
-	Ledger          ledger.Ledger
-	LevelDbDir      string
-	Collections     storage.Collections
-	Finalizer       *consensus.Finalizer
+	MutableState        protocol.MutableState
+	IngestionEngine     *ingestion.Engine
+	ExecutionEngine     *ComputerWrap
+	RequestEngine       *requester.Engine
+	ReceiptsEngine      *executionprovider.Engine
+	FollowerEngine      *followereng.Engine
+	SyncEngine          *synchronization.Engine
+	DiskWAL             *wal.DiskWAL
+	BadgerDB            *badger.DB
+	VM                  *fvm.VirtualMachine
+	ExecutionState      state.ExecutionState
+	Ledger              ledger.Ledger
+	LevelDbDir          string
+	Collections         storage.Collections
+	Finalizer           *consensus.Finalizer
+	MyExecutionReceipts storage.MyExecutionReceipts
 }
 
 func (en ExecutionNode) Ready() {
@@ -158,6 +161,7 @@ func (en ExecutionNode) Ready() {
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
+		en.DiskWAL,
 	)
 }
 
@@ -170,6 +174,7 @@ func (en ExecutionNode) Done() {
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
+		en.DiskWAL,
 	)
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()

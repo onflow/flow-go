@@ -31,7 +31,7 @@ which forms a payload. A path is derived deterministically from the key part of 
 We define an **unallocated register** as holding no value, i.e. a nil payload or an empty value byte slice.
 By default, each register is unallocated. In contrast, an **allocated_ register**
 holds a non-nil payload and a value with positive storage size, i.e. a byte slice with length larger than zero.
-Note that we do not introduce the concept of registers values whose values are `nil`. 
+Note that we do not introduce the concept of registers with `nil` values. 
 
 The theoretical storage model is a *perfect*, *full*, *binary* Merkle tree, which
 spans _all_ registers (even if they are unallocated).   
@@ -45,7 +45,7 @@ Therefore, we have two different node types in the tree:
         Therefore, the leafs for all unallocated registers have the same hash.
         We refer to the hash of an unallocated register as `default hash at height 0`.
       - For  _allocated_ registers, the `hash` value is `H(path, value)` for `H` the hash function.
- * An **INTERIM** node is a vertex in the tree with
+ * An **INTERIM** node is a vertex in the tree:
     - it has exactly two children, called `LeftChild` and `RightChild`, which are both of the same height;
       the children can either be leafs or interim nodes. 
     - the `height` of an interim node `n` is `n.height = LeftChild.height + 1 = RightChild.height + 1`;
@@ -56,9 +56,9 @@ Therefore, we have two different node types in the tree:
 
 **Conventions:**
 * let `path[i]` be the bit with index `i` (we use zero-based indexing)
-* a `key` can be converted into its `integer representation` though big-endian ordering
+* a `path` can be converted into its `integer representation` through big-endian ordering
 * given a `path` and an index `i`, we define:
-  - the `prefix` as `path[:i]` (excluding the bit up to, but not including, the bit with index `i`)
+  - the `prefix` as `path[:i]` (excluding the bit with index `i`)
 * the tree's root node partitions the register set into two sub-sets 
   depending on value `path[0]` :
   - all registers `path[0] == 0` fall into the `LeftChild` subtree

@@ -24,9 +24,10 @@ import (
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
-	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/provider"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -111,8 +112,8 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
 			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
-			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", matching.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
-			flags.BoolVar(&emergencySealing, "emergency-sealing-active", matching.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
@@ -219,7 +220,7 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			receiptRequester, err = requester.New(
 				node.Logger,
@@ -230,13 +231,14 @@ func main() {
 				engine.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
-				// requester.WithBatchThreshold(100),
+				requester.WithRetryInitial(2*time.Second),
+				requester.WithRetryMaximum(30*time.Second),
 			)
 			if err != nil {
 				return nil, err
 			}
 
-			match, err := matching.NewEngine(
+			match, err := sealing.NewEngine(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
@@ -301,23 +303,23 @@ func main() {
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			// initialize the compliance engine
-			comp, err = compliance.New(
-				node.Logger,
+			core, err := compliance.NewCore(node.Logger,
 				node.Metrics.Engine,
 				node.Tracer,
 				node.Metrics.Mempool,
-				conMetrics,
-				node.Network,
-				node.Me,
+				node.Metrics.Compliance,
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
 				mutableState,
-				prov,
 				proposals,
-				syncCore,
-			)
+				syncCore)
+			if err != nil {
+				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -365,7 +367,7 @@ func main() {
 			beacon := signature.NewThresholdProvider(encoding.RandomBeaconTag, privateDKGData.RandomBeaconPrivKey)
 
 			// initialize the simple merger to combine staking & beacon signatures
-			merger := signature.NewCombiner()
+			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 
 			// initialize Main consensus committee's state
 			var committee hotstuff.Committee
@@ -386,10 +388,6 @@ func main() {
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
-			// initialize the indexer to add index for receipts by the executed block id.
-			// so that receipts can be found by block id.
-			indexer := matching.NewIndexer(node.Logger, node.Storage.Receipts, node.Storage.Payloads)
-
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
 				node.Logger,
@@ -397,7 +395,6 @@ func main() {
 				node.Tracer,
 				node.Storage.Index,
 				node.RootChainID,
-				indexer,
 			)
 			// make compliance engine as a FinalizationConsumer
 			// initialize the persister
@@ -457,7 +454,7 @@ func main() {
 			return sync, nil
 		}).
 		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			// created with matching engine
+			// created with sealing engine
 			return receiptRequester, nil
 		}).
 		Run()

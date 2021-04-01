@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -18,7 +19,8 @@ import (
 type BootstrapProcedure struct {
 	vm       *VirtualMachine
 	ctx      Context
-	st       *state.State
+	sth      *state.StateHolder
+	programs *programs.Programs
 	accounts *state.Accounts
 
 	// genesis parameters
@@ -104,17 +106,15 @@ func Bootstrap(
 	return bootstrapProcedure
 }
 
-func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, st *state.State) error {
+func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
-	b.st = st
+	b.sth = sth
+	b.programs = programs
 
 	// initialize the account addressing state
-	b.accounts = state.NewAccounts(st)
-	addressGenerator, err := state.NewStateBoundAddressGenerator(st, ctx.Chain)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
-	}
+	b.accounts = state.NewAccounts(b.sth)
+	addressGenerator := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
 	b.addressGenerator = addressGenerator
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
@@ -169,12 +169,12 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
 	}
-
 	return fungibleToken
 }
 
@@ -186,12 +186,12 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
 	}
-
 	return flowToken
 }
 
@@ -206,12 +206,12 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
 	}
-
 	return flowFees
 }
 
@@ -225,7 +225,8 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployStorageFeesTransaction(service, contract),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
@@ -243,7 +244,8 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy service account contract: %s", err.Error()))
@@ -257,7 +259,8 @@ func (b *BootstrapProcedure) mintInitialTokens(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to mint initial token supply: %s", err.Error()))
@@ -273,7 +276,8 @@ func (b *BootstrapProcedure) setupFees(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup fees: %s", err.Error()))
@@ -286,7 +290,8 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
-		b.st,
+		b.sth,
+		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", err.Error()))

@@ -8,11 +8,14 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -40,7 +43,13 @@ func benchmarkStorage(steps int, b *testing.B) {
 		b.Fatal(err)
 	}
 
-	led, err := complete.NewLedger(dir, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+	defer func() {
+		<-diskWal.Done()
+	}()
+
+	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	defer led.Done()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")

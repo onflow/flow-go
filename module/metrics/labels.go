@@ -3,6 +3,7 @@ package metrics
 const (
 	LabelChannel     = "topic"
 	LabelChain       = "chain"
+	LabelProposer    = "proposer"
 	EngineLabel      = "engine"
 	LabelResource    = "resource"
 	LabelMessage     = "message"
@@ -28,7 +29,7 @@ const (
 	EngineCompliance         = "compliance"
 	EngineConsensusProvider  = "consensus_provider"
 	EngineConsensusIngestion = "consensus_ingestion"
-	EngineMatching           = "matching"
+	EngineSealing            = "sealing"
 	EngineSynchronization    = "sync"
 	// common
 	EngineFollower = "follower"
@@ -44,6 +45,7 @@ const (
 	ResourceGuarantee                = "guarantee"
 	ResourceResult                   = "result"
 	ResourceReceipt                  = "receipt"
+	ResourceMyReceipt                = "my_receipt"
 	ResourceCollection               = "collection"
 	ResourceApproval                 = "approval"
 	ResourceSeal                     = "seal"
@@ -65,9 +67,11 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
-	ResourceApprovalQueue            = "matching_approval_queue"          // consensus node, matching engine
-	ResourceReceiptQueue             = "matching_receipt_queue"           // consensus node, matching engine
-	ResourceApprovalResponseQueue    = "matching_approval_response_queue" // consensus node, matching engine
+	ResourceApprovalQueue            = "sealing_approval_queue"          // consensus node, sealing engine
+	ResourceReceiptQueue             = "sealing_receipt_queue"           // consensus node, sealing engine
+	ResourceApprovalResponseQueue    = "sealing_approval_response_queue" // consensus node, sealing engine
+	ResourceBlockProposalQueue       = "compliance_proposal_queue"       // consensus node, compliance engine
+	ResourceBlockVoteQueue           = "compliance_vote_queue"           // consensus node, compliance engine
 )
 
 const (

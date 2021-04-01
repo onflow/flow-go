@@ -52,10 +52,9 @@ func TestHandler(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	rand.Seed(time.Now().UnixNano())
-	suite.log = zerolog.Logger{}
+	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
@@ -87,6 +86,8 @@ func (suite *Suite) TestPing() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -109,6 +110,8 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -122,10 +125,43 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	suite.Require().Equal(block.ParentID, header.ParentID)
 
 	suite.assertAllExpectations()
+
+}
+
+func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
+	// setup the snapshot mock
+	snap := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	suite.state.On("Sealed").Return(snap).Once()
+
+	backend := New(
+		suite.state,
+		nil, nil, nil, nil, nil,
+		nil, nil, nil,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		nil,
+		false,
+		nil,
+		nil,
+		suite.log,
+	)
+
+	// query the handler for the latest sealed snapshot
+	bytes, err := backend.GetLatestProtocolStateSnapshot(context.Background())
+	suite.Require().NoError(err)
+
+	// make sure the returned bytes is equal to the serialized snapshot
+	convertedSnapshot, err := convert.SnapshotToBytes(snap)
+	suite.Require().NoError(err)
+	suite.Require().Equal(bytes, convertedSnapshot)
+
+	// suite.assertAllExpectations()
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	// setup the mocks
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	block := unittest.BlockHeaderFixture()
 	suite.snapshot.On("Head").Return(&block, nil).Once()
 
@@ -137,6 +173,8 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -153,6 +191,8 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 }
 
 func (suite *Suite) TestGetTransaction() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	transaction := unittest.TransactionFixture()
 	expected := transaction.TransactionBody
 
@@ -170,6 +210,8 @@ func (suite *Suite) TestGetTransaction() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -182,6 +224,8 @@ func (suite *Suite) TestGetTransaction() {
 }
 
 func (suite *Suite) TestGetCollection() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	expected := unittest.CollectionFixture(1).Light()
 
 	suite.collections.
@@ -199,6 +243,8 @@ func (suite *Suite) TestGetCollection() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -213,6 +259,7 @@ func (suite *Suite) TestGetCollection() {
 // TestTransactionStatusTransition tests that the status of transaction changes from Finalized to Sealed
 // when the protocol state is updated
 func (suite *Suite) TestTransactionStatusTransition() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -221,6 +268,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
+	fixedENIDs := flow.IdentifierList{}
 
 	suite.snapshot.
 		On("Head").
@@ -245,14 +293,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
+	receipts := suite.setupReceipts(&block)
+	fixedENIDs = append(fixedENIDs, receipts[0].ExecutorID)
 
-	ids := unittest.IdentityListFixture(1)
-	receipt := unittest.ReceiptForBlockFixture(&block)
-	receipt.ExecutorID = ids[0].NodeID
-	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]*flow.ExecutionReceipt{receipt}, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+	suite.setupReceipts(&block)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -281,8 +325,12 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		metrics.NewNoopCollector(),
 		connFactory,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
+
+	preferredENIdentifiers = fixedENIDs
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -296,6 +344,9 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	// status should be finalized since the sealed blocks is smaller in height
 	suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
+
+	// block ID should be included in the response
+	suite.Assert().Equal(blockID, result.BlockID)
 
 	// Successfully return empty event list from here on
 	suite.execClient.
@@ -333,9 +384,10 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	suite.assertAllExpectations()
 }
 
-// TestTransactionExpiredStatusTransition tests that the status of transaction changes from Unknown to Expired
+// TestTransactionPendingToExpiredStatusTransition tests that the status of transaction changes from Pending to Expired
 // when enough blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -391,6 +443,8 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -446,6 +500,136 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.assertAllExpectations()
 }
 
+// TestTransactionPendingToFinalizedStatusTransition tests that the status of transaction changes from Finalized to Expired
+func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
+
+	ctx := context.Background()
+	collection := unittest.CollectionFixture(1)
+	transactionBody := collection.Transactions[0]
+	// block which will eventually contain the transaction
+	block := unittest.BlockFixture()
+	blockID := block.ID()
+	// reference block to which the transaction points to
+	refBlock := unittest.BlockFixture()
+	refBlockID := refBlock.ID()
+	refBlock.Header.Height = 2
+	transactionBody.SetReferenceBlockID(refBlockID)
+	txID := transactionBody.ID()
+
+	headBlock := unittest.BlockFixture()
+	headBlock.Header.Height = refBlock.Header.Height - 1 // head is behind the current refBlock
+
+	suite.snapshot.
+		On("Head").
+		Return(headBlock.Header, nil)
+
+	snapshotAtBlock := new(protocol.Snapshot)
+	snapshotAtBlock.On("Head").Return(refBlock.Header, nil)
+
+	suite.state.
+		On("AtBlockID", refBlockID).
+		Return(snapshotAtBlock, nil)
+
+	// transaction storage returns the corresponding transaction
+	suite.transactions.
+		On("ByID", txID).
+		Return(transactionBody, nil)
+
+	currentState := flow.TransactionStatusPending // marker for the current state
+	// collection storage returns a not found error if tx is pending, else it returns the collection light reference
+	suite.collections.
+		On("LightByTransactionID", txID).
+		Return(func(txID flow.Identifier) *flow.LightCollection {
+			if currentState == flow.TransactionStatusPending {
+				return nil
+			}
+			collLight := collection.Light()
+			return &collLight
+		},
+			func(txID flow.Identifier) error {
+				if currentState == flow.TransactionStatusPending {
+					return storage.ErrNotFound
+				}
+				return nil
+			})
+
+	// refBlock storage returns the corresponding refBlock
+	suite.blocks.
+		On("ByCollectionID", collection.ID()).
+		Return(&block, nil)
+
+	ids := unittest.IdentityListFixture(2)
+	receipt1 := unittest.ReceiptForBlockFixture(&block)
+	receipt1.ExecutorID = ids[0].NodeID
+	receipt2 := unittest.ReceiptForBlockFixture(&block)
+	receipt2.ExecutorID = ids[1].NodeID
+	receipt1.ExecutionResult = receipt2.ExecutionResult
+	suite.receipts.
+		On("ByBlockID", blockID).
+		Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
+
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+
+	exeEventReq := execproto.GetTransactionResultRequest{
+		BlockId:       blockID[:],
+		TransactionId: txID[:],
+	}
+
+	exeEventResp := execproto.GetTransactionResultResponse{
+		Events: nil,
+	}
+
+	// simulate that the execution node has not yet executed the transaction
+	suite.execClient.
+		On("GetTransactionResult", ctx, &exeEventReq).
+		Return(&exeEventResp, status.Errorf(codes.NotFound, "not found")).
+		Once()
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
+
+	backend := New(
+		suite.state,
+		suite.execClient,
+		nil,
+		nil,
+		suite.blocks,
+		suite.headers,
+		suite.collections,
+		suite.transactions,
+		suite.receipts,
+		suite.chainID,
+		metrics.NewNoopCollector(),
+		connFactory,
+		false,
+		nil,
+		nil,
+		suite.log,
+	)
+
+	// should return pending status when we have not observed collection for the transaction
+	suite.Run("pending", func() {
+		currentState = flow.TransactionStatusPending
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
+		suite.Assert().Equal(flow.TransactionStatusPending, result.Status)
+		// assert that no call to an execution node is made
+		suite.execClient.AssertNotCalled(suite.T(), "GetTransactionResult", mock.Anything, mock.Anything)
+	})
+
+	// should return finalized status when we have have observed collection for the transaction (after observing the
+	// a preceding sealed refBlock)
+	suite.Run("finalized", func() {
+		currentState = flow.TransactionStatusFinalized
+		result, err := backend.GetTransactionResult(ctx, txID)
+		suite.checkResponse(result, err)
+		suite.Assert().Equal(flow.TransactionStatusFinalized, result.Status)
+	})
+
+	suite.assertAllExpectations()
+}
+
 // TestTransactionResultUnknown tests that the status of transaction is reported as unknown when it is not found in the
 // local storage
 func (suite *Suite) TestTransactionResultUnknown() {
@@ -472,6 +656,8 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -484,6 +670,8 @@ func (suite *Suite) TestTransactionResultUnknown() {
 }
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	// setup the mocks
 	expected := unittest.BlockFixture()
 	header := expected.Header
@@ -507,6 +695,8 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -525,10 +715,14 @@ type mockCloser struct{}
 func (mc *mockCloser) Close() error { return nil }
 
 func (suite *Suite) TestGetEventsForBlockIDs() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	events := getEvents(10)
+	validExecutorIdentities := flow.IdentityList{}
 
 	setupStorage := func(n int) []*flow.Header {
 		headers := make([]*flow.Header, n)
+		ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 
 		for i := 0; i < n; i++ {
 			b := unittest.BlockFixture()
@@ -538,17 +732,23 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 			headers[i] = b.Header
 
-			r := unittest.ReceiptForBlockFixture(&b)
+			receipt1 := unittest.ReceiptForBlockFixture(&b)
+			receipt1.ExecutorID = ids[0].NodeID
+			receipt2 := unittest.ReceiptForBlockFixture(&b)
+			receipt2.ExecutorID = ids[1].NodeID
+			receipt1.ExecutionResult = receipt2.ExecutionResult
 			suite.receipts.
-				On("ByBlockIDAllExecutionReceipts", b.ID()).
-				Return([]*flow.ExecutionReceipt{r}, nil).Once()
+				On("ByBlockID", b.ID()).
+				Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil).Once()
+			validExecutorIdentities = append(validExecutorIdentities, ids...)
 		}
 
 		return headers
 	}
 	blockHeaders := setupStorage(5)
 
-	suite.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil).Once()
+	suite.snapshot.On("Identities", mock.Anything).Return(validExecutorIdentities, nil).Once()
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -602,8 +802,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create receipt mocks that always returns empty
 		receipts := new(storagemock.ExecutionReceipts)
 		receipts.
-			On("ByBlockIDAllExecutionReceipts", mock.Anything).
-			Return([]*flow.ExecutionReceipt{}, nil).Once()
+			On("ByBlockID", mock.Anything).
+			Return(flow.ExecutionReceiptList{}, nil).Once()
 
 		// create the handler
 		backend := New(
@@ -617,6 +817,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 
@@ -628,7 +830,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	})
 
 	suite.Run("with an execution node chosen using block ID", func() {
-
 		// create the handler
 		backend := New(
 			suite.state,
@@ -641,6 +842,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
+			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
 			suite.log,
 		)
 
@@ -665,6 +868,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
+			nil,
+			validENIDs.Strings(),
 			suite.log,
 		)
 
@@ -678,6 +883,8 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 }
 
 func (suite *Suite) TestGetEventsForHeightRange() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	ctx := context.Background()
 	var minHeight uint64 = 5
 	var maxHeight uint64 = 10
@@ -708,8 +915,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 	// use the static execution node
 	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]*flow.ExecutionReceipt{}, nil)
+		On("ByBlockID", mock.Anything).
+		Return(flow.ExecutionReceiptList{}, nil)
 
 	setupExecClient := func() []flow.BlockEvents {
 		blockIDs := make([]flow.Identifier, len(blockHeaders))
@@ -763,6 +970,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 
@@ -794,6 +1003,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 
@@ -824,6 +1035,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 
@@ -856,6 +1069,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			nil,
+			nil,
 			suite.log,
 		)
 
@@ -866,6 +1081,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 }
 
 func (suite *Suite) TestGetAccount() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
 	suite.Require().NoError(err)
@@ -904,14 +1120,7 @@ func (suite *Suite) TestGetAccount() {
 		Return(exeResp, nil).
 		Once()
 
-	ids := unittest.IdentityListFixture(1)
-	receipt := unittest.ReceiptForBlockFixture(&block)
-	receipt.ExecutorID = ids[0].NodeID
-	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", blockID).
-		Return([]*flow.ExecutionReceipt{receipt}, nil).Once()
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
-
+	receipts := suite.setupReceipts(&block)
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
@@ -928,8 +1137,12 @@ func (suite *Suite) TestGetAccount() {
 		metrics.NewNoopCollector(),
 		connFactory,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
+
+	preferredENIdentifiers = flow.IdentifierList{receipts[0].ExecutorID}
 
 	suite.Run("happy path - valid request and valid response", func() {
 		account, err := backend.GetAccountAtLatestBlock(ctx, address)
@@ -942,6 +1155,8 @@ func (suite *Suite) TestGetAccount() {
 }
 
 func (suite *Suite) TestGetAccountAtBlockHeight() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	height := uint64(5)
 	address := unittest.AddressFixture()
 	account := &entitiesproto.Account{
@@ -959,8 +1174,8 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		Once()
 
 	suite.receipts.
-		On("ByBlockIDAllExecutionReceipts", mock.Anything).
-		Return([]*flow.ExecutionReceipt{}, nil).Once()
+		On("ByBlockID", mock.Anything).
+		Return(flow.ExecutionReceiptList{}, nil).Once()
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -992,6 +1207,8 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -1006,6 +1223,8 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 }
 
 func (suite *Suite) TestGetNetworkParameters() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
 	expectedChainID := flow.Mainnet
 
 	backend := New(
@@ -1015,6 +1234,8 @@ func (suite *Suite) TestGetNetworkParameters() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		nil,
+		nil,
 		suite.log,
 	)
 
@@ -1027,45 +1248,91 @@ func (suite *Suite) TestGetNetworkParameters() {
 // that need to talk to an execution node.
 func (suite *Suite) TestExecutionNodesForBlockID() {
 
-	totalBlocks := 3
-	receiptPerBlock := 2
-	totalReceipts := receiptPerBlock * totalBlocks
+	totalReceipts := 5
 
-	blocks := unittest.BlockFixtures(totalBlocks)
-	blockIDExecNodeMap := make(map[flow.Identifier]flow.IdentityList, totalReceipts)
-	allExecutionIDs := make(flow.IdentityList, 0, totalReceipts) // assume each ER is generated by a unique exec node
+	block := unittest.BlockFixture()
 
-	// generate identitylist and receipts for each block and mark each receipt with a unique execution ID
-	for i := 0; i < totalBlocks; i++ {
+	// generate one execution node identities for each receipt assuming that each ER is generated by a unique exec node
+	allExecutionNodes := unittest.IdentityListFixture(totalReceipts, unittest.WithRole(flow.RoleExecution))
 
-		block := blocks[i]
-		ids := unittest.IdentityListFixture(receiptPerBlock)
-		blockIDExecNodeMap[block.ID()] = ids
-		allExecutionIDs = append(allExecutionIDs, ids...)
+	// one execution result for all receipts for this block
+	executionResult := unittest.ExecutionResultFixture()
 
-		receipts := make([]*flow.ExecutionReceipt, receiptPerBlock)
-		for j := 0; j < receiptPerBlock; j++ {
-			r := unittest.ReceiptForBlockFixture(block)
-			r.ExecutorID = ids[j].NodeID
-			receipts[j] = r
-		}
-		suite.receipts.
-			On("ByBlockIDAllExecutionReceipts", block.ID()).
-			Return(receipts, nil).Once()
+	// generate execution receipts
+	receipts := make(flow.ExecutionReceiptList, totalReceipts)
+	for j := 0; j < totalReceipts; j++ {
+		r := unittest.ReceiptForBlockFixture(&block)
+		r.ExecutorID = allExecutionNodes[j].NodeID
+		er := *executionResult
+		r.ExecutionResult = er
+		receipts[j] = r
 	}
+	suite.receipts.
+		On("ByBlockID", block.ID()).
+		Return(receipts, nil)
 
 	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
 			// apply the filter passed in to the list of all the execution nodes
-			return allExecutionIDs.Filter(filter)
+			return allExecutionNodes.Filter(filter)
 		},
 		func(flow.IdentityFilter) error { return nil })
 
-	testBlock := blocks[0]
-	expectedList := blockIDExecNodeMap[testBlock.ID()]
-	actualList, err := executionNodesForBlockID(testBlock.ID(), suite.receipts, suite.state)
-	require.NoError(suite.T(), err)
-	require.ElementsMatch(suite.T(), actualList, expectedList)
+	testExecutionNodesForBlockID := func(preferredENs, fixedENs, expectedENs flow.IdentityList) {
+		if preferredENs != nil {
+			preferredENIdentifiers = preferredENs.NodeIDs()
+		}
+		if fixedENs != nil {
+			fixedENIdentifiers = fixedENs.NodeIDs()
+		}
+		actualList, err := executionNodesForBlockID(block.ID(), suite.receipts, suite.state, suite.log)
+		require.NoError(suite.T(), err)
+		if expectedENs == nil {
+			expectedENs = flow.IdentityList{}
+		}
+		require.ElementsMatch(suite.T(), actualList, expectedENs)
+	}
+	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
+	// return an empty list
+	suite.Run("no preferred or fixed ENs", func() {
+		testExecutionNodesForBlockID(nil, nil, nil)
+	})
+	// if only preferred ENs are specified, the ExecutionNodesForBlockID function should
+	// return the preferred ENs list
+	suite.Run("two preferred ENs with zero fixed EN", func() {
+		// mark the first two ENs as preferred
+		preferredENs := allExecutionNodes[0:2]
+		expectedList := preferredENs
+		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
+	})
+	// if only fixed ENs are specified, the ExecutionNodesForBlockID function should
+	// return the fixed ENs list
+	suite.Run("two fixed ENs with zero preferred EN", func() {
+		// mark the first two ENs as fixed
+		fixedENs := allExecutionNodes[0:2]
+		expectedList := fixedENs
+		testExecutionNodesForBlockID(nil, fixedENs, expectedList)
+	})
+	// if both are specified, the ExecutionNodesForBlockID function should
+	// return the preferred ENs list
+	suite.Run("four fixed ENs of which two are preferred ENs", func() {
+		// mark the first four ENs as fixed
+		fixedENs := allExecutionNodes[0:5]
+		// mark the first two of the fixed ENs as preferred ENs
+		preferredENs := fixedENs[0:2]
+		expectedList := preferredENs
+		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
+	})
+	// if both are specified, but the preferred ENs don't match the ExecutorIDs in the ER,
+	// the ExecutionNodesForBlockID function should return the fixed ENs list
+	suite.Run("four fixed ENs of which two are preferred ENs", func() {
+		// mark the first two ENs as fixed
+		fixedENs := allExecutionNodes[0:2]
+		// specify two ENs not specified in the ERs as preferred
+		preferredENs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+		expectedList := fixedENs
+		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
+	})
 }
 
 func (suite *Suite) assertAllExpectations() {
@@ -1081,6 +1348,23 @@ func (suite *Suite) assertAllExpectations() {
 func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NoError(err)
 	suite.Require().NotNil(resp)
+}
+
+func (suite *Suite) setupReceipts(block *flow.Block) []*flow.ExecutionReceipt {
+	ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	receipt1 := unittest.ReceiptForBlockFixture(block)
+	receipt1.ExecutorID = ids[0].NodeID
+	receipt2 := unittest.ReceiptForBlockFixture(block)
+	receipt2.ExecutorID = ids[1].NodeID
+	receipt1.ExecutionResult = receipt2.ExecutionResult
+
+	receipts := flow.ExecutionReceiptList{receipt1, receipt2}
+	suite.receipts.
+		On("ByBlockID", block.ID()).
+		Return(receipts, nil)
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
+	return receipts
+
 }
 
 func getEvents(n int) []flow.Event {
