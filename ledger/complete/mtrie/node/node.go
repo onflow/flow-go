@@ -160,14 +160,14 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
-// computeAndStoreHash computes the hashValue of this node and
-// stores it the hash internal field
+// computeAndStoreHash computes the node's hash value and
+// stores the result in the nodes internal `hashValue` field
 func (n *Node) computeAndStoreHash() {
 	n.computeHash(&n.hashValue)
 }
 
-// computeAndStoreHash computes the hashValue of this node and
-// stores the output hash in the provided byte slice
+// computeHash computes the node's hash value and
+// stores the result in the provided byte slice
 func (n *Node) computeHash(result *[]byte) {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
