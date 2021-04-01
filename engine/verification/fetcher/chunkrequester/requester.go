@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -31,7 +30,6 @@ type Engine struct {
 	retryInterval   time.Duration                // determines time in milliseconds for retrying chunk data requests.
 	pendingRequests *ChunkRequests               // used to store all the pending chunks that assigned to this node
 	state           protocol.State               // used to check the last sealed height
-	headers         storage.Headers              // used to fetch the block header when chunk data is ready to be verified
 	con             network.Conduit              // used to send the chunk data request, and receive the response.
 }
 
@@ -186,6 +184,10 @@ func (e *Engine) onTimer() {
 
 		// if block has been sealed, then we can finish
 		sealed, err := e.blockIsSealed(request.Height)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not determine whether block has been sealed")
+		}
+
 		if sealed {
 			removed := e.pendingRequests.Rem(request.ID())
 			log.Info().
@@ -200,7 +202,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		log.Info().Msg("chunk data requested")
+		log.Info().Msg("chunk data pack requested")
 	}
 }
 
