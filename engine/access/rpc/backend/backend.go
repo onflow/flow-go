@@ -66,6 +66,7 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	maxHeightRange uint,
 	preferredExecutionNodeIDs []string,
 	log zerolog.Logger,
 ) *Backend {
@@ -105,10 +106,11 @@ func New(
 		backendEvents: backendEvents{
 			staticExecutionRPC: executionRPC,
 			state:              state,
-			blocks:             blocks,
+			headers:            headers,
 			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
 			log:                log,
+			maxHeightRange:     maxHeightRange,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,

@@ -36,6 +36,7 @@ type Config struct {
 	MaxMsgSize                int           // GRPC max message size
 	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
 	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
+	MaxHeightRange            uint          // max size of height range requests
 	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
 
 }
@@ -133,6 +134,7 @@ func New(log zerolog.Logger,
 		transactionMetrics,
 		connectionFactory,
 		retryEnabled,
+		config.MaxHeightRange,
 		config.PreferredExecutionNodeIDs,
 		log,
 	)
