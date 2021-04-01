@@ -48,14 +48,14 @@ const (
 	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
 
 	// Matching
-	CONMatchCheckSealing                        SpanName = "con.matching.checkSealing"
-	CONMatchCheckSealingSealableResults         SpanName = "con.matching.checkSealing.sealableResults"
-	CONMatchCheckSealingClearPools              SpanName = "con.matching.checkSealing.clearPools"
-	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.matching.checkSealing.requestPendingReceipts"
-	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.matching.checkSealing.requestPendingApprovals"
-	CONMatchOnReceipt                           SpanName = "con.matching.onReceipt"
-	CONMatchOnReceiptVal                        SpanName = "con.matching.onReceipt.validation"
-	CONMatchOnApproval                          SpanName = "con.matching.onApproval"
+	CONMatchCheckSealing                        SpanName = "con.sealing.checkSealing"
+	CONMatchCheckSealingSealableResults         SpanName = "con.sealing.checkSealing.sealableResults"
+	CONMatchCheckSealingClearPools              SpanName = "con.sealing.checkSealing.clearPools"
+	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.sealing.checkSealing.requestPendingReceipts"
+	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.sealing.checkSealing.requestPendingApprovals"
+	CONMatchOnReceipt                           SpanName = "con.sealing.onReceipt"
+	CONMatchOnReceiptVal                        SpanName = "con.sealing.onReceipt.validation"
+	CONMatchOnApproval                          SpanName = "con.sealing.onApproval"
 
 	// Builder
 	CONBuildOn                        SpanName = "con.builder"
