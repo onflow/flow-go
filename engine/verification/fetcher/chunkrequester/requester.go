@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
@@ -158,9 +157,10 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 }
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
-func (e *Engine) Request(request *fetcher.ChunkDataPackRequest) {
+func (e *Engine) Request(request *fetcher.ChunkDataPackRequest, targets flow.IdentityList) {
 	status := &ChunkRequestStatus{
 		ChunkDataPackRequest: request,
+		Targets:              targets,
 	}
 	added := e.pendingRequests.Add(status)
 	e.log.Debug().
@@ -178,11 +178,6 @@ func (e *Engine) onTimer() {
 		Int("total", len(pendingReqs)).
 		Msg("start processing all pending chunk data requests")
 
-	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not get executors")
-	}
-
 	for _, request := range pendingReqs {
 		log := e.log.With().
 			Hex("chunk_id", logging.ID(request.ID())).
@@ -199,7 +194,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		err = e.requestChunkDataPack(request, allExecutors)
+		err = e.requestChunkDataPack(request)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not request chunk data pack")
 			continue
@@ -221,7 +216,7 @@ func (e Engine) blockIsSealed(height uint64) (bool, error) {
 }
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
-func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors flow.IdentityList) error {
+func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus) error {
 	// creates chunk data pack request event
 	req := &messages.ChunkDataRequest{
 		ChunkID: status.ChunkID,
@@ -229,7 +224,7 @@ func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus, allExecutors f
 	}
 
 	// publishes the chunk data request to the network
-	targetIDs := status.SampleTargets(allExecutors, RequestTargetCount)
+	targetIDs := status.SampleTargets(RequestTargetCount)
 	err := e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
