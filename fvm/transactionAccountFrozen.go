@@ -34,18 +34,18 @@ func (c *TransactionAccountFrozenChecker) checkAccountNotFrozen(
 	for _, authorizer := range tx.Authorizers {
 		err := accounts.CheckAccountNotFrozen(authorizer)
 		if err != nil {
-			return fmt.Errorf("check account not frozen authorizer: %w", err)
+			return fmt.Errorf("checking frozen account failed: %w", err)
 		}
 	}
 
 	err := accounts.CheckAccountNotFrozen(tx.ProposalKey.Address)
 	if err != nil {
-		return fmt.Errorf("check account not frozen proposal: %w", err)
+		return fmt.Errorf("checking frozen account failed: %w", err)
 	}
 
 	err = accounts.CheckAccountNotFrozen(tx.Payer)
 	if err != nil {
-		return fmt.Errorf("check account not frozen payer: %w", err)
+		return fmt.Errorf("checking frozen account failed: %w", err)
 	}
 
 	return nil
@@ -75,7 +75,7 @@ func (c *TransactionAccountFrozenEnabler) Process(
 	for _, signature := range proc.Transaction.EnvelopeSignatures {
 		if signature.Address == serviceAddress {
 			ctx.AccountFreezeAvailable = true
-			return nil //we can bail out and save maybe some loops
+			return nil // we can bail out and save maybe some loops
 		}
 	}
 
