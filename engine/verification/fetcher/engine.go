@@ -203,23 +203,6 @@ func (e *Engine) processChunk(c *flow.Chunk, header *flow.Header, resultID flow.
 	return nil
 }
 
-// return agrees and disagrees.
-// agrees are executors who made receipt with the same result as the given result id
-// disagrees are executors who made receipt with different result than the given result id
-func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) ([]flow.Identifier, []flow.Identifier) {
-	agrees := make([]flow.Identifier, 0)
-	disagrees := make([]flow.Identifier, 0)
-	for _, receipt := range receipts {
-		executor := receipt.ExecutorID
-		if receipt.ExecutionResult.ID() == resultID {
-			agrees = append(agrees, executor)
-		} else {
-			disagrees = append(disagrees, executor)
-		}
-	}
-	return agrees, disagrees
-}
-
 func (e *Engine) onChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
 
 }
@@ -275,41 +258,6 @@ func (e *Engine) getResultByID(blockID flow.Identifier, resultID flow.Identifier
 	}
 
 	return nil, fmt.Errorf("no receipt found for the result %v", blockID)
-}
-
-func (e *Engine) makeVerifiableChunkData(
-	chunk *flow.Chunk,
-	header *flow.Header,
-	result *flow.ExecutionResult,
-	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection,
-) (*verification.VerifiableChunkData, error) {
-
-	// system chunk is the last chunk
-	isSystemChunk := IsSystemChunk(chunk.Index, result)
-	// computes the end state of the chunk
-	var endState flow.StateCommitment
-	if isSystemChunk {
-		// last chunk in a result is the system chunk and takes final state commitment
-		var ok bool
-		endState, ok = result.FinalStateCommitment()
-		if !ok {
-			return nil, fmt.Errorf("fatal: can not read final state commitment, likely a bug")
-		}
-	} else {
-		// any chunk except last takes the subsequent chunk's start state
-		endState = result.Chunks[chunk.Index+1].StartState
-	}
-
-	return &verification.VerifiableChunkData{
-		IsSystemChunk: isSystemChunk,
-		Chunk:         chunk,
-		Header:        header,
-		Result:        result,
-		Collection:    collection,
-		ChunkDataPack: chunkDataPack,
-		EndState:      endState,
-	}, nil
 }
 
 // HandleChunkDataPack is called by the chunk requester module everytime a new request chunk arrives.
@@ -417,6 +365,43 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk, result *flow.ExecutionResult,
 	return nil
 }
 
+// makeVerifiableChunkData creates and returns a verifiable chunk data for the chunk data.
+// The verifier engine, which is the last engine in the pipeline of verification, uses this verifiable
+// chunk data to verify it.
+func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
+	header *flow.Header,
+	result *flow.ExecutionResult,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+) (*verification.VerifiableChunkData, error) {
+
+	// system chunk is the last chunk
+	isSystemChunk := IsSystemChunk(chunk.Index, result)
+	// computes the end state of the chunk
+	var endState flow.StateCommitment
+	if isSystemChunk {
+		// last chunk in a result is the system chunk and takes final state commitment
+		var ok bool
+		endState, ok = result.FinalStateCommitment()
+		if !ok {
+			return nil, fmt.Errorf("fatal: can not read final state commitment, likely a bug")
+		}
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.Chunks[chunk.Index+1].StartState
+	}
+
+	return &verification.VerifiableChunkData{
+		IsSystemChunk: isSystemChunk,
+		Chunk:         chunk,
+		Header:        header,
+		Result:        result,
+		Collection:    collection,
+		ChunkDataPack: chunkDataPack,
+		EndState:      endState,
+	}, nil
+}
+
 // IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
 // Otherwise, it returns false.
 // In the current version, a chunk is a system chunk if it is the last chunk of the
@@ -425,6 +410,48 @@ func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
 	return chunkIndex == uint64(len(result.Chunks)-1)
 }
 
-func (e *Engine) requestChunkDataPack() {
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
 
+	request := &ChunkDataPackRequest{
+		ChunkID:   flow.Identifier{},
+		Height:    0,
+		Agrees:    nil,
+		Disagrees: nil,
+	}
+}
+
+// getAgreeAndDisagreeExecutors segregates the execution nodes identifiers based on the given execution result id at the given block into agree and
+// disagree sets.
+// The agree set contains the executors who made receipt with the same result as the given result id.
+// The disagree set contains the executors who made receipt with different result than the given result id.
+func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID flow.Identifier) (flow.IdentifierList, flow.IdentifierList, error) {
+	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
+	}
+
+	var receipts []*flow.ExecutionReceipt
+	copy(receipts, receiptsData)
+
+	agrees, disagrees := executorsOf(receipts, resultID)
+	return agrees, disagrees, nil
+}
+
+// executorsOf segregates the executors of the given receipts based on the given execution result id.
+// The agree set contains the executors who made receipt with the same result as the given result id.
+// The disagree set contains the executors who made receipt with different result than the given result id.
+func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) (flow.IdentifierList, flow.IdentifierList) {
+	var agrees flow.IdentifierList
+	var disagrees flow.IdentifierList
+
+	for _, receipt := range receipts {
+		executor := receipt.ExecutorID
+		if receipt.ExecutionResult.ID() == resultID {
+			agrees = append(agrees, executor)
+		} else {
+			disagrees = append(disagrees, executor)
+		}
+	}
+
+	return agrees, disagrees
 }
