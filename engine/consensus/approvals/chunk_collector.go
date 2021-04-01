@@ -16,7 +16,7 @@ type ChunkProcessingStatus struct {
 type ChunkApprovalCollector struct {
 	assignment          map[flow.Identifier]struct{}
 	authorizedVerifiers map[flow.Identifier]struct{}
-	chunkApprovals      flow.SignatureCollector
+	chunkApprovals      *flow.SignatureCollector
 	lock                sync.Mutex // lock to protect `chunkApprovals`
 }
 
@@ -41,7 +41,7 @@ func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{},
 	return &ChunkApprovalCollector{
 		assignment:          assignment,
 		authorizedVerifiers: authorizedVerifiers,
-		chunkApprovals:      flow.SignatureCollector{},
+		chunkApprovals:      flow.NewSignatureCollector(),
 		lock:                sync.Mutex{},
 	}
 }
