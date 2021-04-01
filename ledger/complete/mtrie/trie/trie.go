@@ -122,7 +122,7 @@ func (mt *MTrie) String() string {
 // TODO move consistency checks from Forest into Trie to obtain a safe, self-contained API
 func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 	payloads := make([]*ledger.Payload, len(paths)) // pre-allocate slice for the result
-	mt.read(payloads, paths, mt.root)
+	read(payloads, paths, mt.root)
 	return payloads
 }
 
@@ -131,7 +131,7 @@ func (mt *MTrie) UnsafeRead(paths []ledger.Path) []*ledger.Payload {
 // CAUTION:
 //  * while reading the payloads, `paths` is permuted IN-PLACE for optimized processing.
 //  * unchecked requirement: all paths must go through the `head` node
-func (mt *MTrie) read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
+func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	// check for empty paths
 	if len(paths) == 0 {
 		return
@@ -159,7 +159,7 @@ func (mt *MTrie) read(payloads []*ledger.Payload, paths []ledger.Path, head *nod
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	depth := mt.Height() - head.Height() // distance to the tree root
+	depth := hash.TreeMaxHeight - head.Height() // distance to the tree root
 	partitionIndex := splitPaths(paths, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
@@ -167,17 +167,17 @@ func (mt *MTrie) read(payloads []*ledger.Payload, paths []ledger.Path, head *nod
 	// read values from left and right subtrees in parallel
 	parallelRecursionThreshold := 32 // threshold to avoid the parallelization going too deep in the recursion
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
-		mt.read(lpayloads, lpaths, head.LeftChild())
-		mt.read(rpayloads, rpaths, head.RightChild())
+		read(lpayloads, lpaths, head.LeftChild())
+		read(rpayloads, rpaths, head.RightChild())
 	} else {
 		// concurrent read of left and right subtree
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
-			mt.read(lpayloads, lpaths, head.LeftChild())
+			read(lpayloads, lpaths, head.LeftChild())
 			wg.Done()
 		}()
-		mt.read(rpayloads, rpaths, head.RightChild())
+		read(rpayloads, rpaths, head.RightChild())
 		wg.Wait() // wait for all threads
 	}
 }
@@ -194,8 +194,7 @@ func (mt *MTrie) read(payloads []*ledger.Payload, paths []ledger.Path, head *nod
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	//updatedRoot := parentTrie.update(parentRoot.Height(), parentRoot, updatedPaths, updatedPayloads, nil)
-	updatedRoot := parentTrie.update(hash.TreeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil)
+	updatedRoot := update(hash.TreeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil)
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -209,7 +208,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 //   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
 //   * paths are NOT duplicated
-func (parentTrie *MTrie) update(
+func update(
 	nodeHeight int, parentNode *node.Node,
 	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node,
 ) *node.Node {
@@ -261,7 +260,7 @@ func (parentTrie *MTrie) update(
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	depth := parentTrie.Height() - nodeHeight // distance to the tree root
+	depth := hash.TreeMaxHeight - nodeHeight // distance to the tree root
 	partitionIndex := splitByPath(paths, payloads, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
@@ -290,17 +289,17 @@ func (parentTrie *MTrie) update(
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
-		lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
-		rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+		lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
+		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
 	} else {
 		// runtime optimization: process the left child is a separate thread
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			lChild = parentTrie.update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
+			lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
 		}()
-		rChild = parentTrie.update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
 		wg.Wait()
 	}
 
@@ -316,16 +315,16 @@ func (parentTrie *MTrie) update(
 // CAUTION: while updating, `paths` and `proofs` are permuted IN-PLACE for optimized processing.
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
 func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) {
-	mt.proofs(mt.root, paths, proofs)
+	prove(mt.root, paths, proofs)
 }
 
-// proofs traverses the subtree and stores proofs for the given register paths in
+// prove traverses the subtree and stores proofs for the given register paths in
 // the provided `proofs` slice
 // CAUTION: while updating, `paths` and `proofs` are permuted IN-PLACE for optimized processing.
 // UNSAFE: method requires the following conditions to be satisfied:
 //   * paths all share the same common prefix [0 : mt.maxHeight-1 - nodeHeight)
 //     (excluding the bit at index headHeight)
-func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
+func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 	// check for empty paths
 	if len(paths) == 0 {
 		return
@@ -360,7 +359,7 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	depth := mt.Height() - head.Height() // distance to the tree root
+	depth := hash.TreeMaxHeight - head.Height() // distance to the tree root
 	partitionIndex := splitTrieProofsByPath(paths, proofs, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
@@ -369,21 +368,21 @@ func (mt *MTrie) proofs(head *node.Node, paths []ledger.Path, proofs []*ledger.T
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: below the parallelRecursionThreshold, we proceed single-threaded
 		addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
-		mt.proofs(head.LeftChild(), lpaths, lproofs)
+		prove(head.LeftChild(), lpaths, lproofs)
 
 		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
-		mt.proofs(head.RightChild(), rpaths, rproofs)
+		prove(head.RightChild(), rpaths, rproofs)
 	} else {
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			addSiblingTrieHashToProofs(head.RightChild(), depth, lproofs)
-			mt.proofs(head.LeftChild(), lpaths, lproofs)
+			prove(head.LeftChild(), lpaths, lproofs)
 			wg.Done()
 		}()
 
 		addSiblingTrieHashToProofs(head.LeftChild(), depth, rproofs)
-		mt.proofs(head.RightChild(), rpaths, rproofs)
+		prove(head.RightChild(), rpaths, rproofs)
 		wg.Wait()
 	}
 }
