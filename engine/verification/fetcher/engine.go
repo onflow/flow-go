@@ -145,30 +145,28 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 	}
 }
 
-func (e *Engine) processChunkWithTracing(c *flow.Chunk, resultID flow.Identifier) error {
-	receiptsData, err := e.receiptsDB.ByBlockID(c.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve receipts for block: %v: %w", c.BlockID, err)
+func (e *Engine) processChunkWithTracing(chunk *flow.Chunk, resultID flow.Identifier) {
+	chunkID := chunk.ID()
+	log := e.log.With().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Hex("block_id", logging.ID(chunk.ChunkBody.BlockID)).
+		Hex("result_id", logging.ID(resultID)).
+		Logger()
+
+	// adds chunk status as a pending chunk to mempool.
+	status := &ChunkStatus{
+		Chunk:             chunk,
+		ExecutionResultID: resultID,
 	}
-
-	var receipts []*flow.ExecutionReceipt
-	copy(receipts, receiptsData)
-
-	agrees, disagrees := executorsOf(receipts, resultID)
-	// chunk data pack request will only be sent to executors who produced the same result,
-	// never to who produced different results.
-	status := NewChunkStatus(c, resultID, header.Height, agrees, disagrees)
 	added := e.pendingChunks.Add(status)
 	if !added {
-		return nil
+		// unless chunk consumer fails (on a bug) to deduplicate the chunks, it should not pass
+		// the same chunk locator twice to this fetcher engine.
+		log.Warn().Msg("skips processing an already existing pending chunk, possible data race")
+		return
 	}
 
-	allExecutors, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return fmt.Errorf("could not find executors: %w", err)
-	}
-
-	err = e.requestChunkDataPack(c.ID(), resultID, c.BlockID, allExecutors)
+	err = e.requestChunkDataPack(chunk.ID(), resultID, chunk.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not request chunk data pack: %w", err)
 	}
@@ -381,10 +379,7 @@ func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
 }
 
 // requestChunkDataPack creates and dispatches a chunk data pack request to the requester module of the engine.
-func (e *Engine) requestChunkDataPack(chunkID flow.Identifier,
-	resultID flow.Identifier,
-	blockID flow.Identifier,
-	allExecutors flow.IdentityList) error {
+func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
 	agrees, disagrees, err := e.getAgreeAndDisagreeExecutors(blockID, resultID)
 	if err != nil {
 		return fmt.Errorf("could not segregate the agree and disagree executors for result: %x of block: %x", resultID, blockID)
@@ -400,6 +395,11 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier,
 		Height:    header.Height,
 		Agrees:    agrees,
 		Disagrees: disagrees,
+	}
+
+	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return fmt.Errorf("could not fetch execution node ids at block: %x", blockID)
 	}
 
 	e.requester.Request(request, allExecutors)
