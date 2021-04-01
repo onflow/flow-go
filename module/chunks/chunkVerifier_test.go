@@ -7,20 +7,19 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-
-	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/fvm"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/chunks"
@@ -280,7 +279,7 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	case "failedTx":
 		// add updates to the ledger
 		_ = led.Set("00", "", "", []byte{'F'})
-		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
+		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		_, _ = led.Get("00", "", "")
 		_, _ = led.Get("05", "", "")
