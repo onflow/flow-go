@@ -626,7 +626,9 @@ type LongRunningDummyWAL struct {
 	updateFn func(update *ledger.TrieUpdate) error
 }
 
-func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) error { return w.updateFn(update) }
+func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+	return w.updateFn(update)
+}
 
 func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {
 	ret := make([]ledger.Payload, 0, len(p))
