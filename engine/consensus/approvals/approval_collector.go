@@ -9,17 +9,16 @@ import (
 
 type ApprovalCollector struct {
 	incorporatedBlockID           flow.Identifier
-	chunkCollectors               map[uint64]*ChunkApprovalCollector
+	chunkCollectors               []*ChunkApprovalCollector
 	assignmentAuthorizedVerifiers map[flow.Identifier]struct{}
 }
 
 func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	chunkIndex := approval.Body.ChunkIndex
-	collector, ok := c.chunkCollectors[chunkIndex]
-	if !ok {
+	if chunkIndex >= uint64(len(c.chunkCollectors)) {
 		return engine.NewInvalidInputErrorf("approval collector chunk index out of range: %v", chunkIndex)
 	}
-
+	collector := c.chunkCollectors[chunkIndex]
 	err := collector.ProcessApproval(approval)
 	if err != nil {
 		return fmt.Errorf("could not process approval: %w", err)
@@ -27,6 +26,19 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 	return nil
 }
 
-func NewApprovalCollector(assignment chunks.Assignment, ...) *ApprovalCollector {
-
+func NewApprovalCollector(result *flow.IncorporatedResult, assignment chunks.Assignment, authorizedVerifiers map[flow.Identifier]struct{}) *ApprovalCollector {
+	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
+	for _, chunk := range result.Result.Chunks {
+		chunkAssignment := make(map[flow.Identifier]struct{})
+		for _, id := range assignment.Verifiers(chunk) {
+			chunkAssignment[id] = struct{}{}
+		}
+		collector := NewChunkApprovalCollector(chunkAssignment, authorizedVerifiers)
+		chunkCollectors = append(chunkCollectors, collector)
+	}
+	return &ApprovalCollector{
+		incorporatedBlockID:           result.IncorporatedBlockID,
+		chunkCollectors:               chunkCollectors,
+		assignmentAuthorizedVerifiers: authorizedVerifiers,
+	}
 }
