@@ -14,18 +14,16 @@ func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
 	sth := state.NewStateHolder(state.NewState(view))
-	_, err := state.NewStateBoundAddressGenerator(sth, chain)
-	require.NoError(t, err)
+	env := state.NewStateBoundAddressGenerator(sth, chain)
+	require.NotNil(t, env)
 }
 
 func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
 	sth := state.NewStateHolder(state.NewState(view))
-	generator, err := state.NewStateBoundAddressGenerator(sth, chain)
-	require.NoError(t, err)
-
-	_, err = generator.NextAddress()
+	generator := state.NewStateBoundAddressGenerator(sth, chain)
+	_, err := generator.NextAddress()
 	require.NoError(t, err)
 
 	stateBytes, err := view.Get("", "", "account_address_state")
@@ -41,8 +39,7 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 
 	chain := flow.MonotonicEmulator.Chain()
 	sth := state.NewStateHolder(state.NewState(view))
-	generator, err := state.NewStateBoundAddressGenerator(sth, chain)
-	require.NoError(t, err)
+	generator := state.NewStateBoundAddressGenerator(sth, chain)
 
 	_, err = generator.NextAddress()
 	require.NoError(t, err)
