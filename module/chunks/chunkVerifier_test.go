@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 
 	"github.com/stretchr/testify/assert"
@@ -281,7 +282,7 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 	case "failedTx":
 		// add updates to the ledger
 		_ = led.Set("00", "", "", []byte{'F'})
-		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
+		tx.Err = &errors.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		_, _ = led.Get("00", "", "")
 		_, _ = led.Get("05", "", "")

@@ -1,4 +1,4 @@
-package fvm
+package errors
 
 import (
 	"errors"
@@ -31,6 +31,8 @@ const (
 	errCodeEventLimitExceededError = 20
 
 	errCodeEncodingUnsupportedValue = 30
+
+	errCodeAccountFrozen = 40
 
 	errCodeExecution        = 100
 	errCodeFVMInternalError = 200
@@ -286,51 +288,27 @@ func (e *EncodingUnsupportedValueError) Code() uint32 {
 	return errCodeEncodingUnsupportedValue
 }
 
+type AccountFrozenError struct {
+	Address flow.Address
+}
+
+func (e *AccountFrozenError) Error() string {
+	return fmt.Sprintf("account %s is frozen", e.Address)
+}
+
+func (e *AccountFrozenError) Code() uint32 {
+	return errCodeAccountFrozen
+}
+
 // FVMInternalError indicates that an internal error occurs during tx execution.
 type FVMInternalError struct {
-	msg string
+	Msg string
 }
 
 func (e *FVMInternalError) Error() string {
-	return e.msg
+	return e.Msg
 }
 
 func (e *FVMInternalError) Code() uint32 {
 	return errCodeFVMInternalError
-}
-
-func handleError(err error) (vmErr Error, fatalErr error) {
-	switch typedErr := err.(type) {
-	case runtime.Error:
-		// If the error originated from the runtime, handle separately
-		return handleRuntimeError(typedErr)
-	case Error:
-		// If the error is an fvm.Error, return as is
-		return typedErr, nil
-	default:
-		// All other errors are considered fatal
-		return nil, err
-	}
-}
-
-func handleRuntimeError(err runtime.Error) (vmErr Error, fatalErr error) {
-	innerErr := err.Err
-
-	// External errors are reported by the runtime but originate from the VM.
-	//
-	// External errors may be fatal or non-fatal, so additional handling
-	// is required.
-	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
-		if recoveredErr, ok := externalErr.Recovered.(error); ok {
-			// If the recovered value is an error, pass it to the original
-			// error handler to distinguish between fatal and non-fatal errors.
-			return handleError(recoveredErr)
-		}
-
-		// If the recovered value is not an error, bubble up the panic.
-		panic(externalErr.Recovered)
-	}
-
-	// All other errors are non-fatal Cadence errors.
-	return &ExecutionError{Err: err}, nil
 }

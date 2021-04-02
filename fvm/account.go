@@ -8,6 +8,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,7 +26,7 @@ func getAccount(
 	account, err := accounts.Get(address)
 	if err != nil {
 		if errors.Is(err, state.ErrAccountNotFound) {
-			return nil, ErrAccountNotFound
+			return nil, fvmErrors.ErrAccountNotFound
 		}
 
 		return nil, err

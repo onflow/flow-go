@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,7 +30,7 @@ type ScriptProcedure struct {
 	Events    []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed uint64
-	Err     Error
+	Err     errors.Error
 }
 
 type ScriptProcessor interface {

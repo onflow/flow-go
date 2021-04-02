@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -31,14 +32,6 @@ var (
 	ErrAccountNotFound          = errors.New("account not found")
 	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
 )
-
-type AccountFrozenError struct {
-	Address flow.Address
-}
-
-func (e *AccountFrozenError) Error() string {
-	return fmt.Sprintf("account %s is frozen", e.Address)
-}
 
 func keyPublicKey(index uint64) string {
 	return fmt.Sprintf("public_key_%d", index)
@@ -593,7 +586,7 @@ func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
 		return fmt.Errorf("cannot check acount freeze status: %w", err)
 	}
 	if frozen {
-		return &AccountFrozenError{Address: address}
+		return &fvmErrors.AccountFrozenError{Address: address}
 	}
 	return nil
 }
