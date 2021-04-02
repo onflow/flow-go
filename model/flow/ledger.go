@@ -2,6 +2,8 @@ package flow
 
 import (
 	"fmt"
+
+	"github.com/onflow/flow-go/model/fingerprint"
 )
 
 type RegisterID struct {
@@ -12,6 +14,13 @@ type RegisterID struct {
 
 func (r *RegisterID) String() string {
 	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
+}
+
+// Bytes returns a bytes representation of the RegisterID.
+//
+// the encoding uses the injective fingerprint module.
+func (r *RegisterID) Bytes() []byte {
+	return fingerprint.Fingerprint(r)
 }
 
 func NewRegisterID(owner, controller, key string) RegisterID {
