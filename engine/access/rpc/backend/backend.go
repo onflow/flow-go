@@ -23,8 +23,12 @@ import (
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 3
 
+// DefaultMaxHeightRange is the default maximum size of range requests.
+const DefaultMaxHeightRange = 250
+
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
+var validENMap map[flow.Identifier]bool
 
 // Backends implements the Access API.
 //
@@ -68,6 +72,7 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	maxHeightRange uint,
 	preferredExecutionNodeIDs []string,
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
@@ -108,10 +113,11 @@ func New(
 		backendEvents: backendEvents{
 			staticExecutionRPC: executionRPC,
 			state:              state,
-			blocks:             blocks,
+			headers:            headers,
 			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
 			log:                log,
+			maxHeightRange:     maxHeightRange,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
