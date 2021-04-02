@@ -3,6 +3,7 @@ package fvm
 import (
 	"github.com/onflow/cadence/runtime/common"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
@@ -81,7 +82,7 @@ func (d *TransactionStorageLimiter) Process(
 		}
 
 		if usage > capacity {
-			return &StorageCapacityExceededError{
+			return &errors.StorageCapacityExceededError{
 				Address:         address,
 				StorageUsed:     usage,
 				StorageCapacity: capacity,

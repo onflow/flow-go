@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
@@ -56,7 +57,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
 		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
-			return &InvalidProposalKeyPublicKeyDoesNotExistError{
+			return &fvmErrors.InvalidProposalKeyPublicKeyDoesNotExistError{
 				Address:  proposalKey.Address,
 				KeyIndex: proposalKey.KeyIndex,
 			}
@@ -66,7 +67,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	}
 
 	if accountKey.Revoked {
-		return &InvalidProposalKeyPublicKeyRevokedError{
+		return &fvmErrors.InvalidProposalKeyPublicKeyRevokedError{
 			Address:  proposalKey.Address,
 			KeyIndex: proposalKey.KeyIndex,
 		}
@@ -75,7 +76,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return &InvalidProposalKeySequenceNumberError{
+		return &fvmErrors.InvalidProposalKeySequenceNumberError{
 			Address:           proposalKey.Address,
 			KeyIndex:          proposalKey.KeyIndex,
 			CurrentSeqNumber:  accountKey.SeqNumber,

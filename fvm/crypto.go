@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -35,7 +36,7 @@ func (DefaultSignatureVerifier) Verify(
 ) (bool, error) {
 	hasher := newHasher(hashAlgo)
 	if hasher == nil {
-		return false, ErrInvalidHashAlgorithm
+		return false, errors.ErrInvalidHashAlgorithm
 	}
 
 	message = append(tag, message...)

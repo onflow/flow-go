@@ -17,6 +17,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -411,7 +412,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 	// skip limit if payer is service account
 	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
 		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
-			return &EventLimitExceededError{
+			return &fvmErrors.EventLimitExceededError{
 				TotalByteSize: e.totalEventByteSize,
 				Limit:         e.ctx.EventCollectionByteSizeLimit,
 			}

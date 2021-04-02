@@ -118,6 +118,14 @@ func WithGasLimit(limit uint64) Option {
 	}
 }
 
+// WithSignatureVerifier sets the signature verifier
+func WithSignatureVerifier(verifier SignatureVerifier) Option {
+	return func(ctx Context) Context {
+		ctx.SignatureVerifier = verifier
+		return ctx
+	}
+}
+
 // WithMaxStateKeySize sets the byte size limit for ledger keys
 func WithMaxStateKeySize(limit uint64) Option {
 	return func(ctx Context) Context {

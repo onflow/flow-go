@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -12,13 +13,11 @@ import (
 )
 
 type TransactionSignatureVerifier struct {
-	SignatureVerifier  SignatureVerifier
 	KeyWeightThreshold int
 }
 
 func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatureVerifier {
 	return &TransactionSignatureVerifier{
-		SignatureVerifier:  DefaultSignatureVerifier{},
 		KeyWeightThreshold: keyWeightThreshold,
 	}
 }
@@ -50,13 +49,14 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	tx := proc.Transaction
 	accounts := state.NewAccounts(sth)
 	if tx.Payer == flow.EmptyAddress {
-		return &MissingPayerError{}
+		return &fvmErrors.MissingPayerError{}
 	}
 
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool
 
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.aggregateAccountSignatures(
+		&ctx,
 		accounts,
 		tx.PayloadSignatures,
 		tx.PayloadMessage(),
@@ -70,6 +70,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	var proposalKeyVerifiedInEnvelope bool
 
 	envelopeWeights, proposalKeyVerifiedInEnvelope, err = v.aggregateAccountSignatures(
+		&ctx,
 		accounts,
 		tx.EnvelopeSignatures,
 		tx.EnvelopeMessage(),
@@ -82,7 +83,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	proposalKeyVerified := proposalKeyVerifiedInPayload || proposalKeyVerifiedInEnvelope
 
 	if !proposalKeyVerified {
-		return &InvalidProposalKeyMissingSignatureError{
+		return &fvmErrors.InvalidProposalKeyMissingSignatureError{
 			Address:  tx.ProposalKey.Address,
 			KeyIndex: tx.ProposalKey.KeyIndex,
 		}
@@ -97,18 +98,19 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		}
 
 		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
-			return &MissingSignatureError{addr}
+			return &fvmErrors.MissingSignatureError{addr}
 		}
 	}
 
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
-		return &MissingSignatureError{tx.Payer}
+		return &fvmErrors.MissingSignatureError{tx.Payer}
 	}
 
 	return nil
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
+	ctx *Context,
 	accounts *state.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
@@ -121,7 +123,7 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 	weights = make(map[flow.Address]int)
 
 	for _, txSig := range signatures {
-		accountKey, err := v.verifyAccountSignature(accounts, txSig, message)
+		accountKey, err := v.verifyAccountSignature(ctx, accounts, txSig, message)
 		if err != nil {
 			return nil, false, err
 		}
@@ -144,6 +146,7 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
 func (v *TransactionSignatureVerifier) verifyAccountSignature(
+	ctx *Context,
 	accounts *state.Accounts,
 	txSig flow.TransactionSignature,
 	message []byte,
@@ -151,7 +154,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	accountKey, err := accounts.GetPublicKey(txSig.Address, txSig.KeyIndex)
 	if err != nil {
 		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
-			return nil, &InvalidSignaturePublicKeyDoesNotExistError{
+			return nil, &fvmErrors.InvalidSignaturePublicKeyDoesNotExistError{
 				Address:  txSig.Address,
 				KeyIndex: txSig.KeyIndex,
 			}
@@ -161,13 +164,13 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	}
 
 	if accountKey.Revoked {
-		return nil, &InvalidSignaturePublicKeyRevokedError{
+		return nil, &fvmErrors.InvalidSignaturePublicKeyRevokedError{
 			Address:  txSig.Address,
 			KeyIndex: txSig.KeyIndex,
 		}
 	}
 
-	valid, err := v.SignatureVerifier.Verify(
+	valid, err := ctx.SignatureVerifier.Verify(
 		txSig.Signature,
 		nil, // TODO: include transaction signature tag
 		message,
@@ -175,8 +178,8 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		accountKey.HashAlgo,
 	)
 	if err != nil {
-		if errors.Is(err, ErrInvalidHashAlgorithm) {
-			return nil, &InvalidHashAlgorithmError{
+		if errors.Is(err, fvmErrors.ErrInvalidHashAlgorithm) {
+			return nil, &fvmErrors.InvalidHashAlgorithmError{
 				Address:  txSig.Address,
 				KeyIndex: txSig.KeyIndex,
 				HashAlgo: accountKey.HashAlgo,
@@ -187,7 +190,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 	}
 
 	if !valid {
-		return nil, &InvalidSignatureVerificationError{
+		return nil, &fvmErrors.InvalidSignatureVerificationError{
 			Address:  txSig.Address,
 			KeyIndex: txSig.KeyIndex,
 		}

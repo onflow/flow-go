@@ -16,6 +16,7 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -44,7 +45,7 @@ type TransactionProcedure struct {
 	ServiceEvents []flow.Event
 	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
 	GasUsed   uint64
-	Err       Error
+	Err       fvmErrors.Error
 	Retried   int
 	TraceSpan opentracing.Span
 }
@@ -173,7 +174,7 @@ func (i *TransactionInvocator) Process(
 
 			// drop delta
 			childState.View().DropDelta()
-			proc.Err = &FVMInternalError{msg}
+			proc.Err = &fvmErrors.FVMInternalError{msg}
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)

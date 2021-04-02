@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -49,7 +50,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			// Return an error for now, which will cause transactions to revert.
 			//
 			if encodingErr, ok := r.(interpreter.EncodingUnsupportedValueError); ok {
-				err = &EncodingUnsupportedValueError{
+				err = &fvmErrors.EncodingUnsupportedValueError{
 					Path:  encodingErr.Path,
 					Value: encodingErr.Value,
 				}
@@ -100,4 +101,40 @@ func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProc
 	}
 
 	return nil
+}
+
+func handleError(err error) (vmErr fvmErrors.Error, fatalErr error) {
+	switch typedErr := err.(type) {
+	case runtime.Error:
+		// If the error originated from the runtime, handle separately
+		return handleRuntimeError(typedErr)
+	case fvmErrors.Error:
+		// If the error is an fvm.Error, return as is
+		return typedErr, nil
+	default:
+		// All other fvmErrors are considered fatal
+		return nil, err
+	}
+}
+
+func handleRuntimeError(err runtime.Error) (vmErr fvmErrors.Error, fatalErr error) {
+	innerErr := err.Err
+
+	// External fvmErrors are reported by the runtime but originate from the VM.
+	//
+	// External fvmErrors may be fatal or non-fatal, so additional handling
+	// is required.
+	if externalErr, ok := innerErr.(interpreter.ExternalError); ok {
+		if recoveredErr, ok := externalErr.Recovered.(error); ok {
+			// If the recovered value is an error, pass it to the original
+			// error handler to distinguish between fatal and non-fatal fvmErrors.
+			return handleError(recoveredErr)
+		}
+
+		// If the recovered value is not an error, bubble up the panic.
+		panic(externalErr.Recovered)
+	}
+
+	// All other fvmErrors are non-fatal Cadence fvmErrors.
+	return &fvmErrors.ExecutionError{Err: err}, nil
 }
