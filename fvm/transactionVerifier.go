@@ -98,12 +98,12 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 		}
 
 		if !v.hasSufficientKeyWeight(payloadWeights, addr) {
-			return &fvmErrors.MissingSignatureError{addr}
+			return &fvmErrors.MissingSignatureError{Address: addr}
 		}
 	}
 
 	if !v.hasSufficientKeyWeight(envelopeWeights, tx.Payer) {
-		return &fvmErrors.MissingSignatureError{tx.Payer}
+		return &fvmErrors.MissingSignatureError{Address: tx.Payer}
 	}
 
 	return nil

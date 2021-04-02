@@ -174,7 +174,7 @@ func (i *TransactionInvocator) Process(
 
 			// drop delta
 			childState.View().DropDelta()
-			proc.Err = &fvmErrors.FVMInternalError{msg}
+			proc.Err = &fvmErrors.FVMInternalError{Msg: msg}
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
