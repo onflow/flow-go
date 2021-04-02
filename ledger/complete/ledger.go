@@ -162,11 +162,11 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	}()
 
 	newRootHash, err := l.forest.Update(trieUpdate)
+	walError := <-walChan
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
 	}
-
-	walError := <-walChan
 	if walError != nil {
 		return nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
