@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// VirtualMachine runs procedures
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
@@ -74,16 +75,15 @@ func (e *blockComputer) ExecuteBlock(
 	program *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
-	if e.tracer != nil {
-		span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
-		defer func() {
-			span.SetTag("block.collectioncount", len(block.CompleteCollections))
-			span.LogFields(
-				log.String("block.hash", block.ID().String()),
-			)
-			span.Finish()
-		}()
-	}
+	// call tracer
+	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
+	defer func() {
+		span.SetTag("block.collectioncount", len(block.CompleteCollections))
+		span.LogFields(
+			log.String("block.hash", block.ID().String()),
+		)
+		span.Finish()
+	}()
 
 	results, err := e.executeBlock(ctx, block, stateView, program)
 	if err != nil {
@@ -152,10 +152,8 @@ func (e *blockComputer) executeBlock(
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 
 	var colSpan opentracing.Span
-	if e.tracer != nil {
-		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
-		defer colSpan.Finish()
-	}
+	colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
+	defer colSpan.Finish()
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 
@@ -199,18 +197,17 @@ func (e *blockComputer) executeCollection(
 	collection *entity.CompleteCollection,
 ) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
 
+	// call tracing
 	startedAt := time.Now()
 	var colSpan opentracing.Span
-	if e.tracer != nil {
-		colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
-		defer func() {
-			colSpan.SetTag("collection.txcount", len(collection.Transactions))
-			colSpan.LogFields(
-				log.String("collection.hash", collection.Guarantee.CollectionID.String()),
-			)
-			colSpan.Finish()
-		}()
-	}
+	colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
+	defer func() {
+		colSpan.SetTag("collection.txCount", len(collection.Transactions))
+		colSpan.LogFields(
+			log.String("collection.hash", collection.Guarantee.CollectionID.String()),
+		)
+		colSpan.Finish()
+	}()
 
 	var (
 		events        []flow.Event
@@ -261,36 +258,22 @@ func (e *blockComputer) executeTransaction(
 	txIndex uint32,
 ) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {
 
+	startedAt := time.Now()
 	var txSpan opentracing.Span
 	var traceID string
+	// call tracing
+	txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
 
-	if e.tracer != nil {
-		txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-
-		if sc, ok := txSpan.Context().(jaeger.SpanContext); ok {
-			traceID = sc.TraceID().String()
-		}
-
-		defer func() {
-			// Attach runtime metrics to the transaction span.
-			//
-			// Each duration is the sum of all sub-programs in the transaction.
-			//
-			// For example, metrics.Parsed() returns the total time spent parsing the transaction itself,
-			// as well as any imported programs.
-			txSpan.SetTag("transaction.proposer", txBody.ProposalKey.Address.String())
-			txSpan.SetTag("transaction.payer", txBody.Payer.String())
-			txSpan.LogFields(
-				log.String("transaction.ID", txBody.ID().String()),
-				log.Int64(trace.EXEParseDurationTag, int64(txMetrics.Parsed())),
-				log.Int64(trace.EXECheckDurationTag, int64(txMetrics.Checked())),
-				log.Int64(trace.EXEInterpretDurationTag, int64(txMetrics.Interpreted())),
-				log.Int64(trace.EXEValueEncodingDurationTag, int64(txMetrics.ValueEncoded())),
-				log.Int64(trace.EXEValueDecodingDurationTag, int64(txMetrics.ValueDecoded())),
-			)
-			txSpan.Finish()
-		}()
+	if sc, ok := txSpan.Context().(jaeger.SpanContext); ok {
+		traceID = sc.TraceID().String()
 	}
+
+	defer func() {
+		txSpan.LogFields(
+			log.String("transaction.ID", txBody.ID().String()),
+		)
+		txSpan.Finish()
+	}()
 
 	e.log.Debug().
 		Hex("tx_id", logging.Entity(txBody)).
@@ -322,13 +305,16 @@ func (e *blockComputer) executeTransaction(
 		e.log.Debug().
 			Hex("tx_id", logging.Entity(txBody)).
 			Str("error_message", tx.Err.Error()).
-			Uint32("error_code", tx.Err.Code()).
+			Uint16("error_code", uint16(tx.Err.Code())).
 			Msg("transaction execution failed")
 	} else {
 		e.log.Debug().
 			Hex("tx_id", logging.Entity(txBody)).
 			Msg("transaction executed successfully")
 	}
+
+	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
+	defer mergeSpan.Finish()
 
 	if tx.Err == nil {
 		err := collectionView.MergeView(txView)
@@ -340,6 +326,7 @@ func (e *blockComputer) executeTransaction(
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
 		Str("traceID", traceID).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 
 	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil

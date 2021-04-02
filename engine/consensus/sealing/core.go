@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package matching
+package sealing
 
 import (
 	"context"
@@ -15,8 +15,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/engine/consensus/matching/sealingtracker"
-
+	"github.com/onflow/flow-go/engine/consensus/sealing/tracker"
 	"github.com/onflow/flow-go/state"
 
 	"github.com/onflow/flow-go/engine"
@@ -113,7 +112,7 @@ func NewCore(
 	approvalConduit network.Conduit,
 ) (*Core, error) {
 	c := &Core{
-		log:                                  log.With().Str("engine", "matching.Core").Logger(),
+		log:                                  log.With().Str("engine", "sealing.Core").Logger(),
 		coreMetrics:                          coreMetrics,
 		tracer:                               tracer,
 		mempool:                              mempool,
@@ -564,9 +563,9 @@ func (c *Core) CheckSealing() error {
 // function. It also filters out results that have an incorrect sub-graph.
 // It specifically returns the information for the next unsealed results which will
 // be useful for debugging the potential sealing halt issue
-func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.SealingTracker, error) {
+func (c *Core) sealableResults() (flow.IncorporatedResultList, *tracker.SealingTracker, error) {
 	// tracker to collection information about the _current_ sealing check.
-	sealingTracker := sealingtracker.NewSealingTracker(c.state)
+	sealingTracker := tracker.NewSealingTracker(c.state)
 
 	lastFinalized, err := c.state.Final().Head()
 	if err != nil {
@@ -582,7 +581,7 @@ func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.S
 			continue
 		}
 		if err != nil {
-			return nil, nil, fmt.Errorf("internal error matching chunk approvals to incorporated result: %w", err)
+			return nil, nil, fmt.Errorf("internal error sealing chunk approvals to incorporated result: %w", err)
 		}
 		sealableWithEnoughApprovals := sealingStatus.SufficientApprovalsForSealing
 		sealingTracker.Track(sealingStatus)
@@ -592,7 +591,7 @@ func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.S
 		if !sealableWithEnoughApprovals {
 			emergencySealable, err = c.emergencySealable(incorporatedResult, lastFinalized)
 			if err != nil {
-				return nil, nil, fmt.Errorf("internal error matching chunk approvals to incorporated result: %w", err)
+				return nil, nil, fmt.Errorf("internal error sealing chunk approvals to incorporated result: %w", err)
 			}
 			sealingStatus.SetQualifiesForEmergencySealing(emergencySealable)
 		}
@@ -633,10 +632,10 @@ func (c *Core) sealableResults() (flow.IncorporatedResultList, *sealingtracker.S
 //     have a child yet. Then, the chunk assignment cannot be computed.
 //   - All other errors are unexpected and symptoms of internal bugs, uncovered edge cases,
 //     or a corrupted internal node state. These are all fatal failures.
-func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (*sealingtracker.SealingRecord, error) {
+func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (*tracker.SealingRecord, error) {
 	// shortcut: if we don't require any approvals, any incorporatedResult has enough approvals
 	if c.requiredApprovalsForSealConstruction == 0 {
-		return sealingtracker.NewRecordWithSufficientApprovals(incorporatedResult), nil
+		return tracker.NewRecordWithSufficientApprovals(incorporatedResult), nil
 	}
 
 	// chunk assigment is based on the first block in the fork that incorporates the result
@@ -655,7 +654,7 @@ func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (
 	// To be valid, an Execution Receipt must have a system chunk, which is verified by the receipt
 	// validator. Encountering a receipt without any chunks is a fatal internal error, as such receipts
 	// should have never made it into the mempool in the first place. We explicitly check this here,
-	// so we don't have to worry about this edge case when matching approvals to chunks (below).
+	// so we don't have to worry about this edge case when sealing approvals to chunks (below).
 	if len(incorporatedResult.Result.Chunks) == 0 {
 		return nil, fmt.Errorf("incorporated result with zero chunks in mempool")
 	}
@@ -689,12 +688,12 @@ func (c *Core) hasEnoughApprovals(incorporatedResult *flow.IncorporatedResult) (
 
 		// abort checking approvals for incorporatedResult if current chunk has insufficient approvals
 		if incorporatedResult.NumberSignatures(chunk.Index) < c.requiredApprovalsForSealConstruction {
-			return sealingtracker.NewRecordWithInsufficientApprovals(incorporatedResult, chunk.Index), nil
+			return tracker.NewRecordWithInsufficientApprovals(incorporatedResult, chunk.Index), nil
 		}
 	}
 
 	// all chunks have sufficient approvals
-	return sealingtracker.NewRecordWithSufficientApprovals(incorporatedResult), nil
+	return tracker.NewRecordWithSufficientApprovals(incorporatedResult), nil
 }
 
 // emergencySealable determines whether an incorporated Result qualifies for "emergency sealing".
@@ -971,8 +970,8 @@ HEIGHT_LOOP:
 			continue
 		}
 
-		// Without the logic below, the matching engine would produce IncorporatedResults
-		// only from receipts received directly from ENs. Matching Core would not know about
+		// Without the logic below, the sealing engine would produce IncorporatedResults
+		// only from receipts received directly from ENs. sealing Core would not know about
 		// Receipts that are incorporated by other nodes in their blocks blocks (but never
 		// received directly from the EN). Also, Receipt might have been lost from the
 		// mempool during a node crash. Hence we check also if we have the receipts in

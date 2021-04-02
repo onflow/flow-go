@@ -259,7 +259,9 @@ type LedgerMetrics interface {
 
 	// ReadDurationPerItem records read time for single value (total duration / number of read values)
 	ReadDurationPerItem(duration time.Duration)
+}
 
+type WALMetrics interface {
 	// DiskSize records the amount of disk space used by the storage (in bytes)
 	DiskSize(uint64)
 }
@@ -285,6 +287,7 @@ type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
 	ProviderMetrics
+	WALMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished

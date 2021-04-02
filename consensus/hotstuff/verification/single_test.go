@@ -22,36 +22,37 @@ func TestSingleVote(t *testing.T) {
 	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
 	vote, err := signers[0].CreateVote(block)
 	require.NoError(t, err)
+	voter := identities[0]
 
 	// vote should be valid
-	valid, err := signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err := signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.True(t, valid, "original vote should be valid")
 
 	// vote on different block should be invalid
 	block.BlockID[0]++
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed block ID should be invalid")
 	block.BlockID[0]--
 
 	// vote with changed view should be invalid
 	block.View++
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed view should be invalid")
 	block.View--
 
 	// vote by different signer should be invalid
-	vote.SignerID = identities[1].NodeID
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	voter = identities[1]
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed identity should be invalid")
-	vote.SignerID = identities[0].NodeID
+	voter = identities[0]
 
 	// vote with changed signature should be invalid
 	vote.SigData[0]++
-	valid, err = signers[0].VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err = signers[0].VerifyVote(voter, vote.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "vote with changed signature should be invalid")
 	vote.SigData[0]--
@@ -78,8 +79,7 @@ func TestSingleProposalIsVote(t *testing.T) {
 func TestSingleQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	voterIDs := identities.NodeIDs()
-	minShares := (len(voterIDs)-1)/2 + 1
+	minShares := (len(identities)-1)/2 + 1
 	committeeState, stakingKeys, _ := MakeHotstuffCommitteeState(t, identities, false)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
@@ -92,7 +92,7 @@ func TestSingleQC(t *testing.T) {
 		votes = append(votes, vote)
 	}
 
-	// should be able to create QC from 4 votes and verify
+	// should be able to create QC from votes and verify
 	qc, err := signers[0].CreateQC(votes[:minShares])
 	require.NoError(t, err, "should be able to create QC from valid votes")
 
@@ -109,33 +109,50 @@ func TestSingleQC(t *testing.T) {
 	votes[0].BlockID[0]--
 
 	// should be able to verify valid QC
-	valid, err := signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err := signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.True(t, valid, "original QC should be valid")
 
-	// verification with missing identity should be invalid
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares-1], qc.SigData, block)
-	assert.Error(t, err, "verification with missing voter ID should not work")
+	// Verify QC with a totally different set of signers (to test the staking key aggregation)
+	qc_bis, err := signers[0].CreateQC(votes[len(votes)-minShares:])
+	require.NoError(t, err, "should be able to create QC from valid votes")
+	valid, err = signers[0].VerifyQC(identities[len(identities)-minShares:], qc_bis.SigData, block)
+	require.NoError(t, err)
+	assert.True(t, valid, "QC should be valid")
+
+	// Verify QC with a slightly different set of signers (to test the staking key aggregation)
+	for i := 0; i <= len(votes)-minShares; i++ {
+		qc_bis, err = signers[0].CreateQC(votes[i : i+minShares])
+		require.NoError(t, err, "should be able to create QC from valid votes")
+		valid, err = signers[0].VerifyQC(identities[i:i+minShares], qc_bis.SigData, block)
+		require.NoError(t, err)
+		assert.True(t, valid, "QC should be valid")
+	}
+
+	// verification with with not enough voters is invalid
+	valid, err = signers[0].VerifyQC(identities[:minShares-1], qc.SigData, block)
+	require.NoError(t, err)
+	assert.False(t, valid, "verification with missing voter ID should not work")
 
 	// verification with changed signature should fail
 	// TODO: change error handling so split failure and invalid signature are
 	// treated the same
 	qc.SigData[4]++
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err = signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed signature data should be invalid")
 	qc.SigData[4]--
 
 	// verification with changed block ID should fail
 	block.BlockID[0]++
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err = signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed block ID data should be invalid")
 	block.BlockID[0]--
 
 	// verification with changed view should fail
 	block.View++
-	valid, err = signers[0].VerifyQC(voterIDs[:minShares], qc.SigData, block)
+	valid, err = signers[0].VerifyQC(identities[:minShares], qc.SigData, block)
 	require.NoError(t, err)
 	assert.False(t, valid, "QC with changed block view data should be invalid")
 	block.View--

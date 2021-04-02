@@ -79,11 +79,12 @@ func createNodes(t *testing.T, n int, finalizedCount uint, tolerate int) ([]*Nod
 	root, result, seal := unittest.BootstrapFixture(participants)
 
 	// make root QC
-	sig1 := make([]byte, 32)
+	length := uint(32)
+	sig1 := make([]byte, length)
 	rand.Read(sig1[:])
-	sig2 := make([]byte, 32)
+	sig2 := make([]byte, length)
 	rand.Read(sig2[:])
-	c := &signature.Combiner{}
+	c := signature.NewCombiner(length, length)
 	combined, err := c.Join(sig1, sig2)
 	require.NoError(t, err)
 

@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -16,7 +17,7 @@ var (
 )
 
 func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
-	f := names[len(names)-1].(func(*testing.T, *LedgerWAL, *Checkpointer))
+	f := names[len(names)-1].(func(*testing.T, *DiskWAL, *Checkpointer))
 
 	fileNames := make([]string, len(names)-1)
 
@@ -27,18 +28,20 @@ func RunWithWALCheckpointerWithFiles(t *testing.T, names ...interface{}) {
 	unittest.RunWithTempDir(t, func(dir string) {
 		util.CreateFiles(t, dir, fileNames...)
 
-		wal, err := NewWAL(zerolog.Nop(), nil, dir, 10, pathByteSize, segmentSize)
+		wal, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 10, pathByteSize, segmentSize)
 		require.NoError(t, err)
 
 		checkpointer, err := wal.NewCheckpointer()
 		require.NoError(t, err)
 
 		f(t, wal, checkpointer)
+
+		<-wal.Done()
 	})
 }
 
 func Test_emptyDir(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, -1, latestCheckpoint)
@@ -53,7 +56,7 @@ func Test_emptyDir(t *testing.T) {
 
 // Prometheus WAL require files to be 8 characters, otherwise it gets confused
 func Test_noCheckpoints(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "00000000", "00000001", "00000002", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "00000000", "00000001", "00000002", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, -1, latestCheckpoint)
@@ -66,7 +69,7 @@ func Test_noCheckpoints(t *testing.T) {
 }
 
 func Test_someCheckpoints(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "00000000", "00000001", "00000002", "00000003", "00000004", "00000005", "checkpoint.00000002", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "00000000", "00000001", "00000002", "00000003", "00000004", "00000005", "checkpoint.00000002", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, 2, latestCheckpoint)
@@ -79,7 +82,7 @@ func Test_someCheckpoints(t *testing.T) {
 }
 
 func Test_loneCheckpoint(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, 5, latestCheckpoint)
@@ -92,7 +95,7 @@ func Test_loneCheckpoint(t *testing.T) {
 }
 
 func Test_lastCheckpointIsFoundByNumericValue(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000004", "checkpoint.00000006", "checkpoint.00000002", "checkpoint.00000001", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000004", "checkpoint.00000006", "checkpoint.00000002", "checkpoint.00000001", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, 6, latestCheckpoint)
@@ -100,7 +103,7 @@ func Test_lastCheckpointIsFoundByNumericValue(t *testing.T) {
 }
 
 func Test_checkpointWithoutPrecedingSegments(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "00000006", "00000007", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "00000006", "00000007", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, 5, latestCheckpoint)
@@ -113,7 +116,7 @@ func Test_checkpointWithoutPrecedingSegments(t *testing.T) {
 }
 
 func Test_checkpointWithSameSegment(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "00000005", "00000006", "00000007", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "00000005", "00000006", "00000007", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, 5, latestCheckpoint)
@@ -126,7 +129,7 @@ func Test_checkpointWithSameSegment(t *testing.T) {
 }
 
 func Test_listingCheckpoints(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000002", "00000003", "checkpoint.00000000", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000005", "checkpoint.00000002", "00000003", "checkpoint.00000000", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		listCheckpoints, err := checkpointer.Checkpoints()
 		require.NoError(t, err)
 		require.Len(t, listCheckpoints, 3)
@@ -135,7 +138,7 @@ func Test_listingCheckpoints(t *testing.T) {
 }
 
 func Test_NoGapBetweenSegmentsAndLastCheckpoint(t *testing.T) {
-	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000004", "00000006", "00000007", func(t *testing.T, wal *LedgerWAL, checkpointer *Checkpointer) {
+	RunWithWALCheckpointerWithFiles(t, "checkpoint.00000004", "00000006", "00000007", func(t *testing.T, wal *DiskWAL, checkpointer *Checkpointer) {
 		latestCheckpoint, err := checkpointer.LatestCheckpoint()
 		require.NoError(t, err)
 		require.Equal(t, 4, latestCheckpoint)
