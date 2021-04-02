@@ -1,4 +1,4 @@
-package matching
+package sealing
 
 import (
 	"fmt"
@@ -36,8 +36,8 @@ type (
 	EventSink chan *Event // Channel to push pending events
 )
 
-// Engine is a wrapper for matching `Core` which implements logic for
-// queuing and filtering network messages which later will be processed by matching engine.
+// Engine is a wrapper for sealing `Core` which implements logic for
+// queuing and filtering network messages which later will be processed by sealing engine.
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
@@ -144,7 +144,7 @@ func NewEngine(log zerolog.Logger,
 		indexDB, incorporatedResults, receipts, approvals, seals, pendingReceipts, assigner, receiptValidator, approvalValidator,
 		requiredApprovalsForSealConstruction, emergencySealingActive, approvalConduit)
 	if err != nil {
-		return nil, fmt.Errorf("failed to init matching engine: %w", err)
+		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
 
 	return e, nil
@@ -197,17 +197,17 @@ func (e *Engine) processEvents() {
 func (e *Engine) processPendingEvent(event *Event) {
 	switch event.Msg.(type) {
 	case *flow.ExecutionReceipt:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+		e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 		e.pendingReceipts.Push(event)
 	case *flow.ResultApproval:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval)
 		if e.requiredApprovalsForSealConstruction < 1 {
 			// if we don't require approvals to construct a seal, don't even process approvals.
 			return
 		}
 		e.pendingApprovals.Push(event)
 	case *messages.ApprovalResponse:
-		e.engineMetrics.MessageReceived(metrics.EngineMatching, metrics.MessageResultApproval)
+		e.engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageResultApproval)
 		if e.requiredApprovalsForSealConstruction < 1 {
 			// if we don't require approvals to construct a seal, don't even process approvals.
 			return
@@ -238,13 +238,13 @@ func (e *Engine) consumeEvents() {
 		select {
 		case event := <-e.receiptSink:
 			err = e.core.OnReceipt(event.OriginID, event.Msg.(*flow.ExecutionReceipt))
-			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageExecutionReceipt)
+			e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 		case event := <-e.approvalSink:
 			err = e.core.OnApproval(event.OriginID, event.Msg.(*flow.ResultApproval))
-			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+			e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
 		case event := <-e.requestedApprovalSink:
 			err = e.core.OnApproval(event.OriginID, &event.Msg.(*messages.ApprovalResponse).Approval)
-			e.engineMetrics.MessageHandled(metrics.EngineMatching, metrics.MessageResultApproval)
+			e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
 		case <-checkSealingTicker:
 			err = e.core.CheckSealing()
 		case <-e.unit.Quit():
@@ -254,7 +254,7 @@ func (e *Engine) consumeEvents() {
 			// Public methods of `Core` are supposed to handle all errors internally.
 			// Here if error happens it means that internal state is corrupted or we have caught
 			// exception while processing. In such case best just to abort the node.
-			e.log.Fatal().Err(err).Msgf("fatal internal error in matching core logic")
+			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
 		}
 	}
 }

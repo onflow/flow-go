@@ -1,4 +1,4 @@
-package matching
+package sealing
 
 import (
 	"os"
@@ -19,22 +19,22 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestMatchingEngineContext(t *testing.T) {
-	suite.Run(t, new(MatchingEngineSuite))
+func TestSealingEngineContext(t *testing.T) {
+	suite.Run(t, new(SealingEngineSuite))
 }
 
-type MatchingEngineSuite struct {
+type SealingEngineSuite struct {
 	unittest.BaseChainSuite
-	// misc SERVICE COMPONENTS which are injected into Matching Core
+	// misc SERVICE COMPONENTS which are injected into Sealing Core
 	requester         *mockmodule.Requester
 	receiptValidator  *mockmodule.ReceiptValidator
 	approvalValidator *mockmodule.ApprovalValidator
 
-	// Matching Engine
+	// Sealing Engine
 	engine *Engine
 }
 
-func (ms *MatchingEngineSuite) SetupTest() {
+func (ms *SealingEngineSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SUITE ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.SetupChain()
 
@@ -98,7 +98,7 @@ func (ms *MatchingEngineSuite) SetupTest() {
 
 // TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
 // Tests the whole processing pipeline.
-func (ms *MatchingEngineSuite) TestProcessValidReceipt() {
+func (ms *SealingEngineSuite) TestProcessValidReceipt() {
 	originID := ms.ExeID
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(originID),
@@ -118,7 +118,7 @@ func (ms *MatchingEngineSuite) TestProcessValidReceipt() {
 	err := ms.engine.Process(originID, receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
 
-	// matching engine has at least 100ms ticks for processing events
+	// sealing engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
 
 	ms.receiptValidator.AssertExpectations(ms.T())
@@ -127,8 +127,8 @@ func (ms *MatchingEngineSuite) TestProcessValidReceipt() {
 }
 
 // TestMultipleProcessingItems tests that the engine queues multiple receipts and approvals
-// and eventually feeds them into matching.Core for processing
-func (ms *MatchingEngineSuite) TestMultipleProcessingItems() {
+// and eventually feeds them into sealing.Core for processing
+func (ms *SealingEngineSuite) TestMultipleProcessingItems() {
 	originID := ms.ExeID
 
 	receipts := make([]*flow.ExecutionReceipt, 20)
@@ -182,7 +182,7 @@ func (ms *MatchingEngineSuite) TestMultipleProcessingItems() {
 
 	wg.Wait()
 
-	// matching engine has at least 100ms ticks for processing events
+	// sealing engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
 
 	ms.receiptValidator.AssertExpectations(ms.T())
