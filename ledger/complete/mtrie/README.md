@@ -145,72 +145,108 @@ operation are shared between the original `MTrie` and the updated `MTrie`. This 
 children of some new nodes of the new `Mtrie` point to existing sub-tries from the 
 original `Mtrie`.
 
-The update algorithm `NewTrieWithUpdates` takes a trie `m` as input along with a set of 
-pairs `(path, payload)`.
-It outputs a new trie `new_m` such that each payload `payload[i]` is stored at the path `path[i]`. 
+The update algorithm `NewTrieWithUpdates` takes a trie `m` as input along with a set of `K` 
+pairs: `(paths[k], payloads[k])` where `k = 0, 1, ..., K-1`.
+It outputs a new trie `new_m` such that each payload `payloads[k]` is stored at the path `paths[k]`. 
 Any path that is not included in the input pairs keeps the payload from the original input `m`.
 
-The algorithm is described first to update a single pair `(path, payload)`. The generalization to 
-an arbitrary higher number of pairs follows with a few updates. Given a root node of a trie, a path and a payload,
-we look for the register addressed by the given path in a recursive bottom-down manner. Each recursive step 
-operates at a certain height of the tree, starting from the root. Looking at the correct bit index of the path
-(`p[i]` with `i = 256 - height`), we move one height down to look for the path at the left or right sub-trie. Each step 
-generates 2 new sub-tries (left and right), unless no update is required. A new inter-node is created at each height level
-and points to the newly created left and right sub-tries. This is the generic recursion step (Step 0). This process continues 
-over the tree on a depth-first manner till it reaches a `nil` sub-trie or a leaf:
+We first describe the algorithm to perform only a single register update `(path, payload)` 
+and subsequently generalize to an arbitrary number of `K` register updates. 
+Given a root node of a trie, a path and a payload,
+we look for the register addressed by the given path in a recursive top-down manner. Each recursive step 
+operates at a certain height of the tree, starting from the root. Looking at the respective bit 
+`path[i]` (with `i = 256 - height`) of the path, we recursively descend into the left or right child to apply the update.
+For each node visited on the recursive descent, we create a new node at the respective hight to represent the updated 
+sub-trie. 
 
- 1. a leaf means that we reached either a tree leaf (height zero) or a compactified leaf (height larger than zero). 
-      - 1. If the leaf path is equal to the input path, then we have found the node with input `path` we're looking for. 
-This new node represents either a tree leaf or a compactified leaf. The tree update is done by creating
-a new node with the new input `payload`. 
-      - 2. However, if the leaf path is not equal to the input `path`, then 
-we are necessarily on a compactified leaf that needs to be further developed into a sub-tree in order to hold 
-both the new input `(path, payload)` and the old register represented by the old compactified leaf. This means
-a new inter-node with `nil` children is created and the recursion is called on a lower level, but this 
-time carrying forward the old compactified node. The sub-tree that used to contain only one allocated 
-registered, will now contain two allocated registers and can't be represented by a compactified leaf anymore. 
+We define the function `Update` to implement the recursive algorithm to apply the register update.
+`Update` takes as inputs:
+* the `node`, up to which the recursion has progressed in the existing trie (before the update). 
+* Height of `node`.
+* The update `(path, payload)` which is supposed to be written to this particular sub-trie.
+* (optional) The compactified leaf (denoted as `compactLeaf`) carried over from a larger height.
+  If no compactfied leaf is carried over, then `compactLeaf = nil`. (Initially, this value is `nil`. 
+  The recursive algorithm uses this parameter, when it needs to expand a compactified 
+  leaf into a sub-trie holding multiple registers.)
 
- 2. a `nil` sub-trie means that the sub-trie is empty and at least a new leaf will be created: 
-      - 1. If there is only one leaf to create (either the one representing the input `(path, payload)`, 
+
+During the recursion, we can encounter the following cases:
+* **Case 0: `node` is an interim node.** (generic recursion step) As described, we further descend down the left or right child, depending on the value of `path[i]`. 
+* **Case 1: `node` is a leaf.** A leaf can be either fully expanxded (height zero) or a compactified (height larger than zero). 
+  - **case 1.a: `node.path == path`**, i.e. the leaf's represents the register that we are looking to update. 
+    The tree update is done by creating a new node with the new input `payload`. 
+  - **case 1.b: `node.path ≠ path`**, i.e. the leaf represents a _different_ register than the one we want to update.
+    While the register with `path`, falls in the same sub-trie as the allocated register, it is still unallocated.  
+    This implies that `node` must be a compactified leaf. 
+    Therefore, in the updated trie, the previously compactified leaf has to be replaced by sub-trie containing
+    two allocated registers. Consequently, we create a new interim-node with `nil` children. We recursively proceed to 
+    write the contents of the previously existing register as well as the new register `(path, payload)` to the
+    interim-node's children. We set `compactLeaf := node` and continue the recursive construction 
+    of the new the sub-tree but use `node := nil` for the further recursion steps. 
+* **Case 2: `node == nil`**: A `nil` sub-trie means that the sub-trie is empty and at least a new leaf has to be created. 
+  - **case 2.a: there is only one leaf to create**. If there is only one leaf to create (either the one representing the input `(path, payload)`, 
 or the one representing a compactified leaf carried over from a higher height), then a new leaf is created.
-The new leaf either represents a tree leaf or a new trie compactified leaf. 
-      - 2. If there are 2 leafs to create (both the input `(path, payload)` and the compactified leaf carried over),
-then we are still at an inter-node height, we create a new inter-node, check the path index of both the input `path`
+The new leaf can be either fully expanded or compactified. 
+  - **case 2.b: there are 2 leafs to create**. If there are 2 leafs to create (both the input `(path, payload)` and the compactified leaf carried over),
+then we are still at an interim-node height. Hence, we create a new interim-node, check the path index of both the input `path`
 and the compactified node `path` and continue the recursion. Eventually the recursion calls will fall into 2.a 
-as we reach the first different bit index between the 2 paths. We note that this case is very similar to the 
-generic Step 0 above, but just called with a node == nil. 
+as we reach the first different bit index between the 2 paths. This case is very similar to the 
+generic case 0 above, but just called with a `node := nil`. 
 
-We define the following recursive step `Update` to implement `NewTrieWithUpdates`. 
-`Update` takes the current node where the recursion applies, the node height, the input pair `(path, payload)`
-as well as the possible compactified leaf carried over from higher heights. If no compactfied leaf is carried over, 
-the parameter is simply `nil`. We note that if the compactified leaf is not `nil`, the current node is necessarily `nil`. The inverse is also valid, if the current node is non `nil`, there is necessarily no compactified node carried over. 
-To generalize this algorithm to an arbitrary number of pairs `(path, payload)`, we make the following changes:
+#### General algorithm
+
+We now generalize this algorithm to an arbitrary number of `K` register updates: `(paths[k], payloads[k])` where `k = 0, 1, ..., K-1`.
  - `Update` takes a list (slice) of `paths` and `payloads`. 
- -  when moving to a lower height, paths are split into two groups depending on `p[i][k]` with `k = 256 - height`. 
-The first group has all bits `p[i][k] = 0` and goes into the left child recursion, while the second group has bits
-`p[i][k] = 1` and goes into the right child recursion. The split is done lineraly over the input paths to `Update`. 
-This results in sorting the overall input `paths` of `NewTrieWithUpdates` using an implicit quick sort.
+ -  When moving to a lower height, `paths` and `payloads` are partitioned depending on `paths[k][i]` with `i = 256 - height`. 
+    The first partition has all updates for registers with `paths[k][i] = 0` and goes into the left child recursion, while the second partition has the updates
+    pertaining to registers with `paths[k][i] = 1` and goes into the right child recursion. 
+    This results in sorting the overall input `paths` of `NewTrieWithUpdates` using an implicit quick sort.
  - if `len(paths) == 0` and there is no compact leaf carried over (`compactLeaf == nil`), no update will be done 
 and the original sub-trie can be re-used in the new trie.
- - Step 0 is very similar. An inter-node is created, the paths are split into left and right.
- - In Step 1, instead of comparing the path of the leaf with the unique input path, the leaf path is linearly searched within
-all the input paths. Step 1.a is when the leaf path is found among the inputs, step 1.b is when the leaf path is not found. We note that the linear search in the recursive step still gives a `O(n.log(n))` overall search complexity where `n` is the size of the input `paths`.
- - Step 1.a is now split into two subcases:
-    - when `len(paths) == 1`, a new node is created with the new updated payload. This would be a leaf in the new trie.
-    - when `len(paths) > 1`, we are necessarily on a compactified leaf and we don't care about its own payload as it will get
-updated by the new input payload. We therefore continue the recursion with `compactLeaf = nil` and the same input paths 
-and payloads.
- - Step 1.b is similar. If the leaf path is not found among the inputs, then we are on a compactified leaf and we call the recursion
-with the same inputs but with `compactLeaf` being set to the current node. 
- - Step 2.a checks for a single leaf to create. This check would become `len(paths) == 1 && compactLeaf == nil` or
-`len(paths) == 0 && compactLeaf != nil`.
- - Step 2.b is very similar. An inter-node is created, the paths are split into left and right, and the compact leaf
-is carried over into the left or right child. We note that this case is also very similar to Step 0 where the current node is `nil`. The pseudo-code below will treat case 0 and 2.b in the same code section. 
 
+
+* **Case 0: `node` is an interim node.** An interim-node is created, the paths are split into left and right.
+* **Case 1: `node` is a leaf.** Instead of comparing the path of the leaf with the unique input path, the leaf path is linearly searched within
+all the input paths. Step 1.a is when the leaf path is found among the inputs, Case 1.b is when the leaf path is not found. 
+  The linear search in the recursive step has an overall complexity `O(K)` (for all recursion steps combined). 
+  Case 1.a is now split into two subcases:
+    - **case 1.a.i: `node.path ∈ path` and `len(paths) == 1`**. A new node is created with the new updated payload. This would be a leaf in the new trie.
+    - **case 1.a.ii: `node.path ∈ path` and `len(paths) > 1`**. We are necessarily on a compactified leaf and we don't care about its own payload as it will get 
+      updated by the new input payload. We therefore continue the recursion with `compactLeaf = nil` and the same input paths 
+      and payloads.
+    - **case 1.b: `node.path ∉ path`**. If the leaf path is not found among the inputs, `node` must be a compactified leaf
+      (as multiple different registers fall in its respective sub-trie).  We call the recursion with the same inputs but 
+      with `compactLeaf` being set to the current node. 
+* **Case 2a: `node == nil` and there is only one leaf to create**, i.e. `len(paths) == 1 && compactLeaf == nil` or
+`len(paths) == 0 && compactLeaf ≠ nil`.
+* **Case 2b: there are 2 or more leafs to create**. An interim-node is created, the paths are split into left and right, and `compactLeaf`
+  is carried over into the left or right child. We note that this case is also very similar to Case 0 where the current node is `nil`.
+  The pseudo-code below will treat case 0 and 2.b in the same code section. 
+
+
+**Lemma**:
+_Consider a trie `m` before the update. If `m` holds at least one allocated register, the following condition holds for the `Update` algorithm: If `compactLeaf ≠ nil` then `node == nil`._
+
+**Corollary**:
+By inversion, the following condition must hold: _If `node ≠ nil` then `compactLeaf == nil`._
+
+Proof of Lemma:
+
+Initially, the `Update` algorithm starts with:
+* `node` is set to the trie root
+* `compactLeaf` is `nil`
+
+The algorithm then evaluates whether `node` is an interim-node (Case 0) or a compactified leaf (Case 1). The recursion continues
+in a deep-first-search manner. Lets consider the first recusion step where `compactLeaf` switches from `nil` (initial value)
+to a non-`nil` value. This switch happens only in Case 1b where we replace a compactified leaf by a trie holding multiple
+registers. By construction, a compactified leaf has no children as it represents a single register. Therefore, the subsequent
+recursion steps are carried out on `nil` values for `node`.
+
+Q.E.D.
 
 #### Further optimization and resource-exhaustion attack:
 In order to counter a resource-exhaustion attack where an existing allocated register is being updated with the same payload, resulting in creating new unnecessary nodes, we slightly adjust step 1.a. When `len(paths)==1` and the input path is equal to the current leaf path, we only create a new leaf if the input payload is different than the one stored initially in the leaf. If the two payloads are equal, we just re-cycle the initial leaf.
-Morever, we create a new inter-node from the left and right children only if the returned children are different than the original node children. If the children are equal, we just re-cycle the same inter-node. 
+Morever, we create a new interim-node from the left and right children only if the returned children are different than the original node children. If the children are equal, we just re-cycle the same interim-node. 
 
 #### Putting everything together:
 This results in the following algorithm:
@@ -223,7 +259,8 @@ function NewTrieWithUpdates(OriginalTrie MTrie, paths []Path, payloads []Payload
 
 function Update(height Int, node Node, paths []Path, payloads []Payload, compactLeaf Node) Node{
  if len(paths) == 0 {
-  // If a compactLeaf from a higher height is carried over, then we are necessarily in case 2.a (node == nil and only one register to create)
+  // If a compactLeaf from a higher height is carried over, then we are necessarily in case 2.a 
+  // (node == nil and only one register to create)
   if compactLeaf != nil {
    return NewLeaf(compactLeaf.path, compactLeaf.payload, height)
   }
@@ -231,70 +268,62 @@ function Update(height Int, node Node, paths []Path, payloads []Payload, compact
   return node
  }
 
- // The remaining sub-case of 2.a (node == nil and only one register to create), this time the register payload is the input and not the one from the compactified leaf carried over. 
- if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
+ // The remaining sub-case of 2.a (node == nil and only one register to create): 
+ // the register payload is the input and no compactified leaf is to be carried over. 
+ if len(paths) == 1 && node == nil && compactLeaf == nil {
   return NewLeaf(paths[0], payloads[0], height)
  }
 
- // case 1: we reach a non-nil leaf. As noted above, in this case compactLeaf is necessarily nil
+ // case 1: we reach a non-nil leaf. Per Corollary, compactLeaf is necessarily nil
  if node != nil && node.IsLeaf() { 
-  // case 1: check if the node node is among the updated paths
-  found = false
-  for i = range len(paths) {
-   // case 1.a : the node path is found among the inputs
-   if p[i] == node.path) {
-    // the first subcase of 1.a
-    if len(paths) == 1 {
+  if node.path ∈ paths {
+    if len(paths) == 1 { // case 1.a.i
      // the resource-exhaustion counter-measure
      if !node.payload == payloads[i] {
       return NewLeaf(paths[i], payloads[i], height)
      }
      return node  // re-cycle the same node
     }
-    // the second subcase of 1.a (len(paths)>1)
-    found = true
-    break
-   }
-  }
-
-  // Check whether we are still in 1.a or should switch to 1.b
-  if !found {
-   // Switch to 1.b: the node path was not found among the inputs and we should carry the node to lower heights as a compactLeaf parameter.
+    // case 1.a.ii: len(paths)>1
+    // Value of compactified leaf will be overwritten. Hence, we don't have to carry it forward. 
+  } else {
+   // case 1.b: node's path was not found among the inputs and we should carry the node to lower heights as a compactLeaf parameter.
    // Case 1.b can be written as Update(height, nil, paths, payload, node), but we can optimize and just continue the function to case 2.b with 
    // compactLeaf set as node
    compactLeaf = node
   }
-  // if the path is found, nothing to change, we remain in 1.a
  }
 
- // Below are the cases 2.b or the generic case 0: 
- //   - case 0: node != nil and there are many paths to update (len(paths)>1)
- //   - case 2.b: node == nil and there is more than one register to update : 
+ // The remaining logic below handles the remaining recursion step which is common for the 
+ // case 0: node ≠ nil and there are many paths to update (len(paths)>1)
+ // case 1.a.ii: node ≠ nil and node.path ∈ path and len(paths) > 1
+ // case 1.b: node ≠ nil and node.path ∉ path
+ // case 2.b: node == nil and there is more than one register to update: 
  //     - len(paths) == 1 and compactLeaf != nil 
- //     - or simply len(paths) > 1
+ //     - or alternatively len(paths) > 1
 
  // Split paths and payloads according to the bit of path[i] at index (256 - height):
  // lpaths contains all paths that have `0` at the bit index
  // rpaths contains all paths that have `1` at the bit index
  lpaths, rpaths, lpayloads, rpayloads = Split(paths, payloads, 256 - height)
 	
- // As part of case 2.b, check whether there is a compactLeaf that needs to get deep to height 0, check which side it should go:
+ // As part of cases 1.b and 2.b, we have to determine whether compactLeaf falls into the left or right sub-trie:
  if compactLeaf != nil {
   // if yes, check which branch it will go to.
-  if Bit(compactLeaf, 256-nodeHeight) == 0 {
+  if Bit(compactLeaf.path, 256 - height) == 0 {
    lcompactLeaf = compactLeaf
    rcompactLeaf = nil
   } else {
    lcompactLeaf = nil
    rcompactLeaf = compactLeaf
   } 
- } else {
+ } else { // for cases 0 and 1.a.ii, we don't have a compactified leaf to carry forward 
   lcompactLeaf = nil
   rcompactLeaf = nil
  }
 
- // the difference between case 0 and case 2.b
- if node != nil { // case 0
+ // the difference between cases with node ≠ nil vs the case with node == nil
+ if node != nil { // cases 0, 1.a.ii, and 1.b
   lchild = node.leftChild
   rchild = node.rightChild
  } else {  // case 2.b
@@ -302,11 +331,11 @@ function Update(height Int, node Node, paths []Path, payloads []Payload, compact
   rchild = nil
  }
 
- // recurse over each child
+ // recursive descent into the childred
  newlChild = Update(height-1, lchild, lpaths, lpayloads, lcompactLeaf)
  newrChild = Update(height-1, rchild, rpaths, rpayloads, rcompactLeaf)
 
- // mitigate storage exhaustion attack: avoids creating a new inter-node when the same
+ // mitigate storage exhaustion attack: avoids creating a new interim-node when the same
  // payload is re-written at a register, resulting in the same children being returned.
  if lChild == newlChild && rChild == newrChild {
   return node
