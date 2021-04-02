@@ -51,6 +51,7 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -106,6 +107,7 @@ func (suite *Suite) TestHistoricalTransaction() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)

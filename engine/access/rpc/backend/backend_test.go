@@ -87,6 +87,7 @@ func (suite *Suite) TestPing() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -110,6 +111,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -139,6 +141,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -173,6 +176,7 @@ func (suite *Suite) TestGetTransaction() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -203,6 +207,7 @@ func (suite *Suite) TestGetCollection() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -282,6 +287,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		metrics.NewNoopCollector(),
 		connFactory,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -395,6 +401,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -477,6 +484,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -513,6 +521,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -542,9 +551,9 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 		for i := 0; i < n; i++ {
 			b := unittest.BlockFixture()
-			suite.blocks.
-				On("ByID", b.ID()).
-				Return(&b, nil).Twice()
+			suite.headers.
+				On("ByBlockID", b.ID()).
+				Return(b.Header, nil).Twice()
 
 			headers[i] = b.Header
 
@@ -626,13 +635,14 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.state,
 			suite.execClient, // pass the default client
 			nil, nil,
-			suite.blocks,
-			nil, nil, nil,
+			nil,
+			suite.headers, nil, nil,
 			receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -651,13 +661,14 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.state,
 			nil,
 			nil, nil,
-			suite.blocks,
-			nil, nil, nil,
+			nil,
+			suite.headers, nil, nil,
 			suite.receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -678,13 +689,14 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.state,
 			nil, // no default client, hence the receipts storage should be looked up
 			nil, nil,
-			suite.blocks,
-			nil, nil, nil,
+			nil,
+			suite.headers, nil, nil,
 			suite.receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
 			false,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -719,9 +731,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		for i := min; i <= max; i++ {
 			b := unittest.BlockFixture()
 
-			suite.blocks.
+			suite.headers.
 				On("ByHeight", i).
-				Return(&b, nil).Once()
+				Return(b.Header, nil).Once()
 
 			headers = append(headers, b.Header)
 		}
@@ -780,12 +792,13 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("invalid request max height < min height", func() {
 		backend := New(
 			suite.state,
-			nil, nil, nil, nil, nil, nil, nil,
+			nil, nil, nil, nil, suite.headers, nil, nil,
 			suite.receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -818,6 +831,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -849,6 +863,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -858,6 +873,34 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		suite.assertAllExpectations()
 		suite.Require().Equal(expectedResp, actualResp)
+	})
+
+	// set max height range to 1 and request range of 2
+	suite.Run("invalid request exceeding max height range", func() {
+		headHeight = maxHeight - 1
+		setupHeadHeight(headHeight)
+		blockHeaders = setupStorage(minHeight, headHeight)
+
+		// create handler
+		backend := New(
+			suite.state,
+			suite.execClient,
+			nil, nil,
+			suite.blocks,
+			suite.headers,
+			nil, nil,
+			suite.receipts,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			nil,
+			false,
+			1, // set maximum range to 1
+			nil,
+			suite.log,
+		)
+
+		_, err := backend.GetEventsForHeightRange(ctx, string(flow.EventAccountCreated), minHeight, minHeight+1)
+		suite.Require().Error(err)
 	})
 
 	suite.Run("invalid request last_sealed_block_height < min height", func() {
@@ -882,6 +925,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			metrics.NewNoopCollector(),
 			nil,
 			false,
+			DefaultMaxHeightRange,
 			nil,
 			suite.log,
 		)
@@ -949,6 +993,7 @@ func (suite *Suite) TestGetAccount() {
 		metrics.NewNoopCollector(),
 		connFactory,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -1015,6 +1060,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
@@ -1039,6 +1085,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		suite.log,
 	)
