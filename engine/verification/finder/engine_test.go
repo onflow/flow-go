@@ -102,7 +102,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	completeER := utils.LightExecutionResultFixture(1)
 	suite.collection = completeER.ReceiptsData[0].Collections[0]
 	suite.block = completeER.ReceiptsData[0].ReferenceBlock
-	suite.receipt = completeER.ContainerBlock.Payload.Receipts[0]
+	suite.receipt = completeER.Receipts[0]
 	suite.chunk = suite.receipt.ExecutionResult.Chunks[0]
 	suite.chunkDataPack = completeER.ReceiptsData[0].ChunkDataPacks[0]
 
