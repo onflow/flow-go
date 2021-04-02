@@ -2,6 +2,7 @@ package approvals
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	"sync"
@@ -25,10 +26,11 @@ type AssignmentCollector struct {
 
 	// authorized approvers for this collector on execution
 	// used to check identity of approver
-	authorizedApprovers map[flow.Identifier]flow.Identity
+	authorizedApprovers map[flow.Identifier]*flow.Identity
 
 	assigner module.ChunkAssigner
 	state    protocol.State
+	verifier module.Verifier
 }
 
 func (c *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
@@ -43,7 +45,7 @@ func (c *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identi
 //   * have the Verification role and
 //   * have _positive_ weight and
 //   * are not ejected
-func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Identifier]struct{}, error) {
+func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
 	authorizedVerifierList, err := c.state.AtBlockID(blockID).Identities(
 		filter.And(
 			filter.HasRole(flow.RoleVerification),
@@ -56,7 +58,11 @@ func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier
 	if len(authorizedVerifierList) == 0 {
 		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
 	}
-	return authorizedVerifierList.Lookup(), nil
+	identities := make(map[flow.Identifier]*flow.Identity)
+	for _, identity := range authorizedVerifierList.Copy() {
+		identities[identity.NodeID] = identity
+	}
+	return identities, nil
 }
 
 func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
@@ -71,9 +77,19 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	}
 
 	// pre-select all authorized Verifiers at the block that incorporates the result
-	authorizedVerifiers, err := c.authorizedVerifiersAtBlock(incorporatedResult.IncorporatedBlockID)
+	authorizedVerifiersTmp, err := c.authorizedVerifiersAtBlock(incorporatedResult.IncorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not determine authorized verifiers: %w", err)
+	}
+
+	authorizedVerifiers := make(map[flow.Identifier]struct{})
+	for nodeID, _ := range authorizedVerifiersTmp {
+		authorizedVerifiers[nodeID] = struct{}{}
+	}
+
+	c.authorizedApprovers, err = c.authorizedVerifiersAtBlock(incorporatedResult.Result.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not determine authorized verifiers for sealing candidate: %w", err)
 	}
 
 	c.lock.Lock()
@@ -92,8 +108,36 @@ func (c *AssignmentCollector) allCollectors() []*ApprovalCollector {
 	return collectors
 }
 
+func (c *AssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
+	id := approval.Body.ID()
+	valid, err := c.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
+	if err != nil {
+		return fmt.Errorf("failed to verify signature: %w", err)
+	}
+
+	if !valid {
+		return engine.NewInvalidInputErrorf("invalid signature for (%x)", nodeIdentity.NodeID)
+	}
+
+	return nil
+}
+
+// validateApproval performs result level checks of flow.ResultApproval
+// checks:
+// 	verification node identity
+//  signature of verification node
+// returns nil on successful check
 func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) error {
-	// TODO: implement logic that is currently in approval_validator.go
+	identity, found := c.authorizedApprovers[approval.Body.ApproverID]
+	if !found {
+		return engine.NewInvalidInputErrorf("approval not from authorized verifier")
+	}
+
+	err := c.verifySignature(approval, identity)
+	if err != nil {
+		return fmt.Errorf("invalid approval signature: %w", err)
+	}
+
 	return nil
 }
 
