@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
@@ -101,7 +102,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		// create signer
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
 		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
-		merger := signature.NewCombiner()
+		merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconSigner, merger, participant.NodeID)
 		signers[i] = signer
 

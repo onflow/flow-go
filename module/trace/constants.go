@@ -48,14 +48,14 @@ const (
 	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
 
 	// Matching
-	CONMatchCheckSealing                        SpanName = "con.matching.checkSealing"
-	CONMatchCheckSealingSealableResults         SpanName = "con.matching.checkSealing.sealableResults"
-	CONMatchCheckSealingClearPools              SpanName = "con.matching.checkSealing.clearPools"
-	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.matching.checkSealing.requestPendingReceipts"
-	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.matching.checkSealing.requestPendingApprovals"
-	CONMatchOnReceipt                           SpanName = "con.matching.onReceipt"
-	CONMatchOnReceiptVal                        SpanName = "con.matching.onReceipt.validation"
-	CONMatchOnApproval                          SpanName = "con.matching.onApproval"
+	CONMatchCheckSealing                        SpanName = "con.sealing.checkSealing"
+	CONMatchCheckSealingSealableResults         SpanName = "con.sealing.checkSealing.sealableResults"
+	CONMatchCheckSealingClearPools              SpanName = "con.sealing.checkSealing.clearPools"
+	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.sealing.checkSealing.requestPendingReceipts"
+	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.sealing.checkSealing.requestPendingApprovals"
+	CONMatchOnReceipt                           SpanName = "con.sealing.onReceipt"
+	CONMatchOnReceiptVal                        SpanName = "con.sealing.onReceipt.validation"
+	CONMatchOnApproval                          SpanName = "con.sealing.onApproval"
 
 	// Builder
 	CONBuildOn                        SpanName = "con.builder"
@@ -100,16 +100,17 @@ const (
 	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
 	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
 	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
+	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
+	EXEGenerateChunkDataPacks             SpanName = "exe.state.generateChunkDataPacks"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
 	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
 	EXEPersistStateCommitment             SpanName = "exe.state.persistStateCommitment"
+	EXEPersistEvents                      SpanName = "exe.state.persistEvents"
 	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
 	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
-	EXEPersistStateInteractions           SpanName = "exe.state.persistStateInteractions"
-	EXERetrieveStateDelta                 SpanName = "exe.state.retrieveStateDelta"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 
@@ -143,9 +144,12 @@ const (
 	VERVerGenerateResultApproval  SpanName = "ver.verify.GenerateResultApproval"
 
 	// Flow Virtual Machine
-	FVMVerifyTransaction            SpanName = "fvm.verifyTransaction"
-	FVMSeqNumCheckTransaction       SpanName = "fvm.seqNumCheckTransaction"
-	FVMExecuteTransaction           SpanName = "fvm.executeTransaction"
+	FVMVerifyTransaction             SpanName = "fvm.verifyTransaction"
+	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
+	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
+	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
+	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
+
 	FVMEnvHash                      SpanName = "fvm.env.Hash"
 	FVMEnvValueExists               SpanName = "fvm.env.valueExists"
 	FVMEnvGetValue                  SpanName = "fvm.env.getValue"

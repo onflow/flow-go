@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,15 +19,16 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestComputeBlockWithStorage(t *testing.T) {
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 	execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
@@ -89,7 +89,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -121,9 +121,9 @@ func TestExecuteScript(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
 

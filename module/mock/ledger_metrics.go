@@ -13,11 +13,6 @@ type LedgerMetrics struct {
 	mock.Mock
 }
 
-// DiskSize provides a mock function with given fields: _a0
-func (_m *LedgerMetrics) DiskSize(_a0 uint64) {
-	_m.Called(_a0)
-}
-
 // ForestApproxMemorySize provides a mock function with given fields: bytes
 func (_m *LedgerMetrics) ForestApproxMemorySize(bytes uint64) {
 	_m.Called(bytes)

@@ -21,11 +21,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -39,7 +41,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -66,7 +68,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		// create an empty block
@@ -94,7 +96,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := new(computermock.VirtualMachine)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -111,7 +113,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
-				tx.Err = &fvm.MissingPayerError{}
+				tx.Err = fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided")
 				// create dummy events
 				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
 			}).
@@ -147,7 +149,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  "no payer address provided",
+					ErrorMessage:  "[Error Code: 1053] invalid address (0000000000000000): no payer address provided",
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
@@ -216,9 +218,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(emittingRuntime)
+		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
@@ -277,9 +279,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -346,9 +348,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -423,8 +425,8 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	address := flow.HexToAddress("1234")
 	fag := &FixedAddressGenerator{Address: address}
 
-	rt := runtime.NewInterpreterRuntime()
-	vm := fvm.New(rt)
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
 	execCtx := fvm.NewContext(zerolog.Nop())
 
 	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
@@ -444,7 +446,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
