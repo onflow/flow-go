@@ -179,7 +179,7 @@ During the recursion, we can encounter the following cases:
     This implies that `node` must be a compactified leaf. 
     Therefore, in the updated trie, the previously compactified leaf has to be replaced by sub-trie containing
     two allocated registers. We recursively proceed to 
-    write the contents of the previously existing register as well as the new register `(path, payload)` by setting `node = nil`, `compactLeaf = node` and the same `height`. 
+    write the contents of the previously existing register as well as the new register `(path, payload)` by setting `node = nil`, `compactLeaf = node` and using the same `height`. 
 * **Case 2: `node == nil`**: A `nil` sub-trie means that the sub-trie is empty and at least a new leaf has to be created. 
   - **case 2.a: there is only one leaf to create**. If there is only one leaf to create (either the one representing the input `(path, payload)`, 
 or the one representing a compactified leaf carried over from a higher height), then a new leaf is created.
@@ -187,7 +187,7 @@ The new leaf can be either fully expanded or compactified.
   - **case 2.b: there are 2 leafs to create**. If there are 2 leafs to create (both the input `(path, payload)` and the compactified leaf carried over),
 then we are still at an interim-node height. Hence, we create a new interim-node with `nil` children, check the path index of both the input `path`
 and the compactified node `path` and continue the recursion over the children. Eventually the recursion calls will fall into 2.a 
-as we reach the first different bit index between the 2 paths. This case is very similar to the 
+as we reach the first different bit index between the 2 paths. This case can be seen as a special case of the  
 generic case 0 above, but just called with a `node = nil`. 
 
 #### General algorithm
