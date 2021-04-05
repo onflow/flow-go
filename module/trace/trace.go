@@ -140,6 +140,8 @@ func (t *OpenTracer) RecordSpanFromParent(
 	logs []opentracing.LogRecord,
 	opts ...opentracing.StartSpanOption,
 ) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	end := time.Now()
 	start := end.Add(-duration)
 	opts = append(opts, opentracing.FollowsFrom(span.Context()))

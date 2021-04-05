@@ -121,97 +121,75 @@ func (e *blockComputer) executeBlock(
 
 	var txIndex uint32
 	var err error
-	var err1 error
-	var err2 error
 	var colView state.View
-	var prevColView state.View
 	var stateCommit flow.StateCommitment
 
-	stateCommit = block.StartState
+	var wg sync.WaitGroup
 
-	if len(collections) > 0 {
-
-		var wg sync.WaitGroup
-
-		// execute the first collection
-		colView = stateView.NewChild()
-		txIndex, err1 = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collections[0], res)
-		if err1 != nil {
-			return nil, fmt.Errorf("failed to execute collection: %w", err1)
-		}
-		prevColView = colView
-		err1 = stateView.MergeView(colView)
-		if err1 != nil {
-			return nil, fmt.Errorf("cannot merge view: %w", err1)
-		}
-
-		// executing collections
-		for _, collection := range collections[1:] {
-			wg.Add(2)
-			colView = stateView.NewChild()
-
-			go func() {
-				txIndex, err1 = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collection, res)
-				wg.Done()
-			}()
-
-			go func() {
-				stateCommit, err2 = e.commitView(blockSpan, prevColView, stateCommit, res)
-				wg.Done()
-			}()
-
-			wg.Wait()
-			if err1 != nil {
-				return nil, fmt.Errorf("failed to execute collection: %w", err1)
-			}
-			if err2 != nil {
-				return nil, fmt.Errorf("failed to commit view while executing a collection: %w", err2)
-			}
-			prevColView = colView
-			err = stateView.MergeView(colView)
+	bc := blockCommitter{committer: e.committer,
+		callBack: func(state flow.StateCommitment, proof []byte, err error) {
 			if err != nil {
-				return nil, fmt.Errorf("cannot merge view: %w", err)
+				panic(err)
 			}
-		}
+			res.AddStateCommitment(stateCommit)
+			res.AddProof(proof)
+			wg.Done()
+		},
+		state: block.StartState,
+		views: make(chan state.View, len(collections)+1),
+	}
 
-		// commit last view
-		stateCommit, err2 = e.commitView(blockSpan, prevColView, stateCommit, res)
-		if err2 != nil {
-			return nil, fmt.Errorf("failed to commit view while executing a collection: %w", err2)
+	go bc.Run()
+
+	for _, collection := range collections {
+		colView = stateView.NewChild()
+		txIndex, err = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collection, res)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute collection: %w", err)
+		}
+		wg.Add(1)
+		bc.Commit(colView)
+		err = stateView.MergeView(colView)
+		if err != nil {
+			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
 	}
 
-	// TODO make this part also parallel (right now it doesn't worth the time)
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
-	collectionView := stateView.NewChild()
-	_, err = e.executeSystemCollection(blockSpan, txIndex, collectionView, programs, res)
+	colView = stateView.NewChild()
+	_, err = e.executeSystemCollection(blockSpan, txIndex, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
-	stateCommit, err = e.commitView(blockSpan, collectionView, stateCommit, res)
-	err = stateView.MergeView(collectionView)
+	wg.Add(1)
+	bc.Commit(colView)
+	err = stateView.MergeView(colView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
+
+	// wait for all views to be committed
+	wg.Wait()
+	close(bc.views)
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	return res, nil
 }
 
-func (e *blockComputer) commitView(
-	blockSpan opentracing.Span,
-	collectionView state.View,
-	state flow.StateCommitment,
-	res *execution.ComputationResult,
-) (flow.StateCommitment, error) {
-	span := e.tracer.StartSpanFromParent(blockSpan, trace.EXECommitDelta)
-	defer span.Finish()
+// func (e *blockComputer) commitView(
+// 	blockSpan opentracing.Span,
+// 	collectionView state.View,
+// 	state flow.StateCommitment,
+// 	res *execution.ComputationResult,
+// ) (flow.StateCommitment, error) {
+// 	span := e.tracer.StartSpanFromParent(blockSpan, trace.EXECommitDelta)
+// 	defer span.Finish()
 
-	stateCommit, proof, err := e.committer.CommitView(collectionView, state)
-	res.AddStateCommitment(stateCommit)
-	res.AddProof(proof)
-	return stateCommit, err
-}
+// 	stateCommit, proof, err := e.committer.CommitView(collectionView, state)
+// 	res.AddStateCommitment(stateCommit)
+// 	res.AddProof(proof)
+// 	return stateCommit, err
+// }
 
 func (e *blockComputer) executeSystemCollection(
 	blockSpan opentracing.Span,
@@ -367,4 +345,25 @@ func (e *blockComputer) executeTransaction(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 	return nil
+}
+
+// call back to update the result and increment the wait group
+type blockCommitter struct {
+	committer ViewCommitter
+	callBack  func(state flow.StateCommitment, proof []byte, err error)
+	state     flow.StateCommitment
+	views     chan state.View
+}
+
+// pass the queue and clean up instead
+func (bc *blockCommitter) Run() {
+	for view := range bc.views {
+		stateCommit, proof, err := bc.committer.CommitView(view, bc.state)
+		bc.callBack(stateCommit, proof, err)
+		bc.state = stateCommit
+	}
+}
+
+func (bc *blockCommitter) Commit(view state.View) {
+	bc.views <- view
 }
