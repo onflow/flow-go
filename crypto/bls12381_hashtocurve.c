@@ -451,9 +451,6 @@ static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
 
 // This is a testing funstion for the Optimized SwU core
 void opswu_test(uint8_t *out, const uint8_t *msg, int len){
-    if (len != Fp_BYTES) {
-            RLC_THROW(ERR_NO_BUFFER);
-    }
     fp_t t;
     bn_t tmp;
     bn_new(tmp);

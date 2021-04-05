@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
-	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
@@ -103,17 +103,17 @@ type ConsensusNode struct {
 	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
-	MatchingEngine  *matching.Engine
+	SealingEngine   *sealing.Engine
 }
 
 func (cn ConsensusNode) Ready() {
 	<-cn.IngestionEngine.Ready()
-	<-cn.MatchingEngine.Ready()
+	<-cn.SealingEngine.Ready()
 }
 
 func (cn ConsensusNode) Done() {
 	<-cn.IngestionEngine.Done()
-	<-cn.MatchingEngine.Done()
+	<-cn.SealingEngine.Done()
 }
 
 type ComputerWrap struct {

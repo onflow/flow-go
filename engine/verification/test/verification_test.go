@@ -140,7 +140,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		chainID)
 
 	// send the ER from execution to verification node
-	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.ContainerBlock.Payload.Receipts[0])
+	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipts[0])
 	assert.Nil(t, err)
 
 	unittest.RequireReturnsBefore(t, conWG.Wait, 10*time.Second, "consensus nodes process")
@@ -162,7 +162,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
 
 	// receipt ID should be added to the ingested results mempool
-	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.ID()))
+	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.Receipts[0].ExecutionResult.ID()))
 
 	verNode.Done()
 	conNode.Done()
