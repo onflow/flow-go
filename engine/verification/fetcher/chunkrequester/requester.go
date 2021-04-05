@@ -156,7 +156,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *verification.ChunkDataPackRequest, targets flow.IdentityList) {
-	status := &ChunkRequestStatus{
+	status := &verification.ChunkRequestStatus{
 		ChunkDataPackRequest: request,
 		Targets:              targets,
 	}
@@ -218,7 +218,7 @@ func (e Engine) blockIsSealed(height uint64) (bool, error) {
 }
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
-func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus) error {
+func (e *Engine) requestChunkDataPack(status *verification.ChunkRequestStatus) error {
 	// creates chunk data pack request event
 	req := &messages.ChunkDataRequest{
 		ChunkID: status.ChunkID,
@@ -242,6 +242,6 @@ func (e *Engine) requestChunkDataPack(status *ChunkRequestStatus) error {
 
 // canTry returns checks the history attempts and determine whether a chunk request
 // can be tried again.
-func canTry(maxAttempt int, status ChunkRequestStatus) bool {
+func canTry(maxAttempt int, status verification.ChunkRequestStatus) bool {
 	return status.Attempt < maxAttempt
 }
