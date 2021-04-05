@@ -33,6 +33,18 @@ type AssignmentCollector struct {
 	verifier module.Verifier
 }
 
+func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assigner module.ChunkAssigner,
+	sigVerifier module.Verifier) *AssignmentCollector {
+	collector := &AssignmentCollector{
+		resultID:   resultID,
+		collectors: make(map[flow.Identifier]*ApprovalCollector),
+		state:      state,
+		assigner:   assigner,
+		verifier:   sigVerifier,
+	}
+	return collector
+}
+
 func (c *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
