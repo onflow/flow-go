@@ -17,14 +17,13 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Max number of execution nodes being asked for chunk data pack.
+// Max number of execution nodes being asked for a chunk data pack.
 const RequestTargetCount = 2
 
 // Engine is responsible of receiving chunk data pack requests, dispatching it to the execution nodes, receiving
 // the requested chunk data pack from execution nodes, and passing it to the registered handler.
 type Engine struct {
 	log             zerolog.Logger
-	me              module.Local
 	unit            *engine.Unit
 	handler         fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
 	retryInterval   time.Duration                // determines time in milliseconds for retrying chunk data requests.
@@ -62,7 +61,7 @@ func New(log zerolog.Logger,
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.log.Fatal().Msg("engine is not supposed to be invoked on SubmitLocal")
 }
 
 // Submit submits the given event from the node with the given origin ID
