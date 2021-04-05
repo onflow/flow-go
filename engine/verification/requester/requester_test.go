@@ -1,4 +1,4 @@
-package chunkrequester
+package requester
 
 import (
 	"testing"
