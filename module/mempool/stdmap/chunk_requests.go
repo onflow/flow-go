@@ -1,37 +1,35 @@
-package chunkrequester
+package stdmap
 
 import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/model/verification"
 )
 
 type ChunkRequests struct {
-	*stdmap.Backend
+	*Backend
 }
 
 func NewChunkRequests(limit uint) *ChunkRequests {
 	chunks := &ChunkRequests{
-		Backend: stdmap.NewBackend(stdmap.WithLimit(limit)),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 	return chunks
 }
 
-func fromEntity(entity flow.Entity) *ChunkRequestStatus {
-	chunk, ok := entity.(*ChunkRequestStatus)
+func fromEntity(entity flow.Entity) *verification.ChunkRequestStatus {
+	chunk, ok := entity.(*verification.ChunkRequestStatus)
 	if !ok {
 		panic(fmt.Sprintf("could not convert the entity into chunk status from the mempool: %v", entity))
 	}
 	return chunk
 }
 
-func (cs *ChunkRequests) All() []*ChunkRequestStatus {
+func (cs *ChunkRequests) All() []*verification.ChunkRequestStatus {
 	all := cs.Backend.All()
-	allChunks := make([]*ChunkRequestStatus, 0, len(all))
+	allChunks := make([]*verification.ChunkRequestStatus, 0, len(all))
 	for _, entity := range all {
 		chunk := fromEntity(entity)
 		allChunks = append(allChunks, chunk)
@@ -39,7 +37,7 @@ func (cs *ChunkRequests) All() []*ChunkRequestStatus {
 	return allChunks
 }
 
-func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*ChunkRequestStatus, bool) {
+func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkRequestStatus, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
 		return nil, false
@@ -48,7 +46,7 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*ChunkRequestStatus, boo
 	return chunk, true
 }
 
-func (cs *ChunkRequests) Add(chunk *ChunkRequestStatus) bool {
+func (cs *ChunkRequests) Add(chunk *verification.ChunkRequestStatus) bool {
 	return cs.Backend.Add(chunk)
 }
 
