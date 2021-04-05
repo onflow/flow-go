@@ -151,7 +151,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 // SubmitResult submits the final public result of the DKG protocol. This
 // represents the group public key and the node's local computation of the
-// public keys for each DKG participant
+// public keys for each DKG participant. Serialized pub keys are encoded as hex.
 func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
 
 	ctx := context.Background()
