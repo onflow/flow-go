@@ -58,7 +58,7 @@ func New(
 	}
 }
 
-func (e *Engine) withBlockConsumerNotifier(notifier module.ProcessingNotifier) {
+func (e *Engine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.blockConsumerNotifier = notifier
 }
 

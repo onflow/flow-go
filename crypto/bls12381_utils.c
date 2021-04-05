@@ -237,7 +237,7 @@ static int fp_get_sign(fp_t y) {
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
-    const int G1_size = (G1_BYTES/(SERIALIZATION+1));
+    const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
 
     if (len!=G1_size) {
         RLC_THROW(ERR_NO_BUFFER);
@@ -246,7 +246,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
  
     if (ep_is_infty(a)) {
             // set the infinity bit
-            bin[0] = (SERIALIZATION << 7) | 0x40;
+            bin[0] = (G1_SERIALIZATION << 7) | 0x40;
             memset(bin+1, 0, G1_size-1);
             return;
     }
@@ -256,7 +256,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
         ep_norm(t, a);
         fp_write_bin(bin, Fp_BYTES, t->x);
 
-        if (SERIALIZATION == COMPRESSED) {
+        if (G1_SERIALIZATION == COMPRESSED) {
             bin[0] |= (fp_get_sign(t->y) << 5);
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
@@ -265,7 +265,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
         RLC_THROW(ERR_CAUGHT);
     }
 
-    bin[0] |= (SERIALIZATION << 7);
+    bin[0] |= (G1_SERIALIZATION << 7);
     ep_free(t);
  }
 
@@ -276,7 +276,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
-    const int G1_size = (G1_BYTES/(SERIALIZATION+1));
+    const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
     if (len!=G1_size) {
         return RLC_ERR;
     }
@@ -314,7 +314,7 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 	fp_read_bin(a->x, temp, Fp_BYTES);
     free(temp);
 
-    if (SERIALIZATION == UNCOMPRESSED) {
+    if (G1_SERIALIZATION == UNCOMPRESSED) {
         fp_read_bin(a->y, bin + Fp_BYTES, Fp_BYTES);
         return RLC_OK;
     }
@@ -343,7 +343,7 @@ static int fp2_get_sign(fp2_t y) {
 void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
     ep2_t t;
     ep2_null(t);
-    const int G2_size = (G2_BYTES/(SERIALIZATION+1));
+    const int G2_size = (G2_BYTES/(G2_SERIALIZATION+1));
 
     if (len!=G2_size) {
         RLC_THROW(ERR_NO_BUFFER);
@@ -352,7 +352,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
  
     if (ep2_is_infty((ep2_st *)a)) {
             // set the infinity bit
-            bin[0] = (SERIALIZATION << 7) | 0x40;
+            bin[0] = (G2_SERIALIZATION << 7) | 0x40;
             memset(bin+1, 0, G2_size-1);
             return;
     }
@@ -362,7 +362,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
         ep2_norm(t, (ep2_st *)a);
         fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
 
-        if (SERIALIZATION == COMPRESSED) {
+        if (G2_SERIALIZATION == COMPRESSED) {
             bin[0] |= (fp2_get_sign(t->y) << 5);
         } else {
             fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
@@ -371,14 +371,14 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
         RLC_THROW(ERR_CAUGHT);
     }
 
-    bin[0] |= (SERIALIZATION << 7);
+    bin[0] |= (G2_SERIALIZATION << 7);
     ep_free(t);
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
-    const int G2size = (G2_BYTES/(SERIALIZATION+1));
+    const int G2size = (G2_BYTES/(G2_SERIALIZATION+1));
     if (len!=G2size) {
         return RLC_ERR;
     }
@@ -416,7 +416,7 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     fp2_read_bin(a->x, temp, 2*Fp_BYTES);
     free(temp);
 
-    if (SERIALIZATION == UNCOMPRESSED) {
+    if (G2_SERIALIZATION == UNCOMPRESSED) {
         fp2_read_bin(a->y, bin + 2*Fp_BYTES, 2*Fp_BYTES);
         return RLC_OK;
     }

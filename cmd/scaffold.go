@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-
 	"math/rand"
 	"os"
 	"os/signal"
@@ -465,8 +464,9 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not load root block from protocol state")
 		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
 			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
+				rootBlockFromState.ID(),
 				fnb.RootBlock.ID(),
-				fnb.RootBlock.ID())
+			)
 		}
 	} else {
 		// Bootstrap!

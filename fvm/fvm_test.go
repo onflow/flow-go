@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -52,11 +52,11 @@ func (vmt vmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		rt := runtime.NewInterpreterRuntime()
+		rt := fvm.NewInterpreterRuntime()
 
 		chain := flow.Testnet.Chain()
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
@@ -161,11 +161,11 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Testnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -285,11 +285,11 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -309,6 +309,36 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+	})
+
+	t.Run("account update with checker heavy contract", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployCheckerHeavyTransaction(accounts[0], chain)
 
 		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		txBody.SetPayer(chain.ServiceAddress())
@@ -350,8 +380,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "code deployment requires authorization from specific accounts")
-		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
@@ -377,8 +407,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "code deployment requires authorization from specific accounts")
-		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 }
 
@@ -386,11 +416,11 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -496,11 +526,11 @@ func TestBlockContext_ExecuteTransaction_GasLimit(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -620,7 +650,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				assert.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+				assert.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
@@ -689,11 +719,11 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -763,11 +793,11 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -933,11 +963,11 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 	const count = 100
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1026,7 +1056,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		var account *flow.Account
 		account, err = vm.GetAccount(ctx, address, ledger, programs)
-		assert.Equal(t, fvm.ErrAccountNotFound, err)
+		assert.True(t, errors.IsAccountNotFoundError(err))
 		assert.Nil(t, account)
 	})
 }
@@ -1035,11 +1065,11 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	header := flow.Header{Height: 42}
 
@@ -1086,11 +1116,11 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.MonotonicEmulator.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1443,11 +1473,11 @@ func TestWithServiceAccount(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 
 	chain := flow.Mainnet.Chain()
 
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctxA := fvm.NewContext(
 		zerolog.Nop(),
@@ -1490,9 +1520,9 @@ func TestEventLimits(t *testing.T) {
 
 	t.Parallel()
 
-	rt := runtime.NewInterpreterRuntime()
+	rt := fvm.NewInterpreterRuntime()
 	chain := flow.Mainnet.Chain()
-	vm := fvm.New(rt)
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
@@ -1689,7 +1719,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
-			require.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+			require.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
 
 			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
 
@@ -1732,7 +1762,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				require.IsType(t, &fvm.ExecutionError{}, tx.Err)
+				require.IsType(t, &errors.CadenceRuntimeError{}, tx.Err)
 
 				// send it again
 				tx = fvm.Transaction(txBody, 0)
@@ -1740,8 +1770,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				require.Equal(t, (&fvm.InvalidProposalKeySequenceNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(1), tx.Err.(*fvm.InvalidProposalKeySequenceNumberError).CurrentSeqNumber)
+				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(1), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
 }
