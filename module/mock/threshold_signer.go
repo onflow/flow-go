@@ -12,6 +12,29 @@ type ThresholdSigner struct {
 	mock.Mock
 }
 
+// Reconstruct provides a mock function with given fields: size, shares, indices
+func (_m *ThresholdSigner) Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
+	ret := _m.Called(size, shares, indices)
+
+	var r0 crypto.Signature
+	if rf, ok := ret.Get(0).(func(uint, []crypto.Signature, []uint) crypto.Signature); ok {
+		r0 = rf(size, shares, indices)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(crypto.Signature)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(uint, []crypto.Signature, []uint) error); ok {
+		r1 = rf(size, shares, indices)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Sign provides a mock function with given fields: msg
 func (_m *ThresholdSigner) Sign(msg []byte) (crypto.Signature, error) {
 	ret := _m.Called(msg)

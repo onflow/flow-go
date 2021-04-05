@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
@@ -141,6 +142,7 @@ type ExecutionNode struct {
 	ReceiptsEngine      *executionprovider.Engine
 	FollowerEngine      *followereng.Engine
 	SyncEngine          *synchronization.Engine
+	DiskWAL             *wal.DiskWAL
 	BadgerDB            *badger.DB
 	VM                  *fvm.VirtualMachine
 	ExecutionState      state.ExecutionState
@@ -159,6 +161,7 @@ func (en ExecutionNode) Ready() {
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
+		en.DiskWAL,
 	)
 }
 
@@ -171,6 +174,7 @@ func (en ExecutionNode) Done() {
 		en.FollowerEngine,
 		en.RequestEngine,
 		en.SyncEngine,
+		en.DiskWAL,
 	)
 	os.RemoveAll(en.LevelDbDir)
 	en.GenericNode.Done()

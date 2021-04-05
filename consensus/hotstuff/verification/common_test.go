@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	module_mock "github.com/onflow/flow-go/module/mock"
@@ -57,19 +57,20 @@ func MakeBeaconSigner(t *testing.T,
 	committee hotstuff.Committee,
 	signerID flow.Identifier,
 	stakingPriv crypto.PrivateKey,
-	beaconKey crypto.PrivateKey) *CombinedSigner {
+	beaconPriv crypto.PrivateKey) *CombinedSigner {
 
 	local, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)
+
+	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 	staking := signature.NewAggregationProvider("test_staking", local)
-	verifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-	combiner := signature.NewCombiner()
+	thresholdVerifier := signature.NewThresholdVerifier("test_beacon")
+	thresholdSigner := signature.NewThresholdProvider("test_beacon", beaconPriv)
+	thresholdSignerStore := &module_mock.ThresholdSignerStore{}
+	thresholdSignerStore.On("GetThresholdSigner", mock.Anything).Return(thresholdSigner, nil)
 
-	beacon := signature.NewThresholdProvider(encoding.RandomBeaconTag, beaconKey)
-	signerStore := &module_mock.ThresholdSignerStore{}
-	signerStore.On("GetThresholdSigner", mock.Anything).Return(beacon, nil)
+	signer := NewCombinedSigner(committee, staking, thresholdVerifier, combiner, thresholdSignerStore, signerID)
 
-	signer := NewCombinedSigner(committee, staking, verifier, combiner, signerStore, signerID)
 	return signer
 }
 

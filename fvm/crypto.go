@@ -69,8 +69,6 @@ func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.Signin
 		return crypto.ECDSAP256
 	case runtime.SignatureAlgorithmECDSA_Secp256k1:
 		return crypto.ECDSASecp256k1
-	case runtime.SignatureAlgorithmBLS_BLS12381:
-		return crypto.BLSBLS12381
 	default:
 		return crypto.UnknownSigningAlgorithm
 	}
@@ -83,8 +81,6 @@ func CryptoToRuntimeSigningAlgorithm(s crypto.SigningAlgorithm) runtime.Signatur
 		return runtime.SignatureAlgorithmECDSA_P256
 	case crypto.ECDSASecp256k1:
 		return runtime.SignatureAlgorithmECDSA_Secp256k1
-	case crypto.BLSBLS12381:
-		return runtime.SignatureAlgorithmBLS_BLS12381
 	default:
 		return runtime.SignatureAlgorithmUnknown
 	}
@@ -101,8 +97,6 @@ func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgori
 		return hash.SHA2_384
 	case runtime.HashAlgorithmSHA3_384:
 		return hash.SHA3_384
-	case runtime.HashAlgorithmKMAC_128:
-		return hash.KMAC128
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
@@ -119,8 +113,6 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 		return runtime.HashAlgorithmSHA2_384
 	case hash.SHA3_384:
 		return runtime.HashAlgorithmSHA3_384
-	case hash.KMAC128:
-		return runtime.HashAlgorithmKMAC_128
 	default:
 		return runtime.HashAlgorithmUnknown
 	}

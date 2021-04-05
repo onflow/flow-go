@@ -110,19 +110,27 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 }
 
 func (h *ProgramsHandler) Cleanup() error {
-
 	stackLen := len(h.viewsStack)
 
 	if stackLen == 0 {
 		return nil
 	}
 
-	for i := stackLen; i > 0; i-- {
+	for i := stackLen - 1; i > 0; i-- {
 		entry := h.viewsStack[i]
 		err := h.viewsStack[i-1].state.MergeState(entry.state)
 		if err != nil {
 			return fmt.Errorf("cannot merge state while cleanup: %w", err)
 		}
 	}
-	return h.masterState.State().MergeState(h.viewsStack[0].state)
+
+	err := h.initialState.MergeState(h.viewsStack[0].state)
+	if err != nil {
+		return err
+	}
+
+	// reset the stack
+	h.viewsStack = nil
+	h.masterState.SetActiveState(h.initialState)
+	return nil
 }

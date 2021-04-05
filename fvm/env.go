@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -136,7 +137,7 @@ func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetValue)
 		sp.LogFields(
-			traceLog.String("owner", string(owner)),
+			traceLog.String("owner", hex.EncodeToString(owner)),
 			traceLog.String("key", string(key)),
 		)
 		defer sp.Finish()
@@ -152,6 +153,10 @@ func (e *hostEnv) GetValue(owner, key []byte) ([]byte, error) {
 func (e *hostEnv) SetValue(owner, key, value []byte) error {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvSetValue)
+		sp.LogFields(
+			traceLog.String("owner", hex.EncodeToString(owner)),
+			traceLog.String("key", string(key)),
+		)
 		defer sp.Finish()
 	}
 
@@ -836,6 +841,10 @@ func (e *hostEnv) ValueDecoded(duration time.Duration) {
 
 func (e *hostEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	// commit changes and return a list of updated keys
+	err := e.programs.Cleanup()
+	if err != nil {
+		return nil, err
+	}
 	return e.contracts.Commit()
 }
 

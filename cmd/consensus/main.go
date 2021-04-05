@@ -29,6 +29,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -451,7 +452,7 @@ func main() {
 			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 
 			// initialize the simple merger to combine staking & beacon signatures
-			merger := signature.NewCombiner()
+			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 
 			// initialize Main consensus committee's state
 			var committee hotstuff.Committee
@@ -463,7 +464,7 @@ func main() {
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 
-			signerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
+			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
@@ -472,7 +473,7 @@ func main() {
 				staking,
 				thresholdVerifier,
 				merger,
-				signerStore,
+				thresholdSignerStore,
 				node.NodeID,
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
