@@ -78,7 +78,7 @@ type FlowNetwork struct {
 	root         *flow.Block
 	result       *flow.ExecutionResult
 	seal         *flow.Seal
-	BootstrapDir string
+	bootstrapDir string
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -349,6 +349,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
+	fmt.Printf("bootstrapDir: %s \n", bootstrapDir)
+
 	root, result, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
@@ -363,7 +365,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		root:         root,
 		seal:         seal,
 		result:       result,
-		BootstrapDir: bootstrapDir,
+		bootstrapDir: bootstrapDir,
 	}
 
 	// add each node to the network
@@ -537,8 +539,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
-func (net *FlowNetwork) WriteRootSnapshot(data []byte) error {
-	err := WriteJSON(filepath.Join(net.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot), data)
+func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) error {
+
+	// TODO: uset the `convert` module to do this
+	encodable := snapshot.Encodable()
+	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), encodable)
 	if err != nil {
 		return err
 	}

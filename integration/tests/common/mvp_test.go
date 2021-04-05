@@ -17,7 +17,6 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go-sdk/templates"
 
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -44,7 +43,6 @@ func TestMVP_Bootstrap(t *testing.T) {
 	defer cancel()
 
 	flowNetwork.Start(ctx)
-	defer flowNetwork.Remove()
 
 	initialRoot := flowNetwork.Root()
 	chain := initialRoot.Header.ChainID.Chain()
@@ -52,26 +50,21 @@ func TestMVP_Bootstrap(t *testing.T) {
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
 
+	// run mvp test to build a few blocks
 	runMVPTest(t, ctx, flowNetwork)
 
 	// download root snapshot from access node
 	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(t, err)
 
-	// verify that the downloaded snapshot is not for the genesis block
+	// verify that the downloaded snapshot is not for the root block
 	header, err := snapshot.Head()
 	assert.True(t, header.ID() != initialRoot.Header.ID())
 
-	// overrite bootstrap public root information file with the latest snapshot
-	bytes, err := convert.SnapshotToBytes(snapshot)
+	err = flowNetwork.WriteRootSnapshot(snapshot)
 	require.NoError(t, err)
 
-	err = flowNetwork.WriteRootSnapshot(bytes)
-	require.NoError(t, err)
-
-	flowNetwork.StopContainers()
-	flowNetwork.RemoveContainers()
-
+	flowNetwork.Remove()
 	flowNetwork.Start(ctx)
 
 	// Run MVP tests
@@ -134,7 +127,6 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	//create new account to deploy Counter to
 	accountPrivateKey := RandomPrivateKey()
 
-	require.NoError(t, err)
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
 		SetHashAlgo(sdkcrypto.SHA3_256).
