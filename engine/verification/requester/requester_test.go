@@ -43,6 +43,7 @@ func setupTest() *RequesterEngineTestSuite {
 		pendingRequests: &mempool.ChunkRequests{},
 		state:           &protocol.State{},
 		verIdentity:     unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
+		con:             &mocknetwork.Conduit{},
 	}
 
 	return r
@@ -78,7 +79,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	// we remove pending request on receiving this response
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(true).Once()
 
-	s.handler.On("HandleChunkDataPack", originID, response.ChunkDataPack, response.Collection).Return().Once()
+	s.handler.On("HandleChunkDataPack", originID, &response.ChunkDataPack, &response.Collection).Return().Once()
 
 	err := e.Process(originID, response)
 	require.Nil(t, err)
