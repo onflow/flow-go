@@ -38,14 +38,16 @@ func New(log zerolog.Logger,
 	state protocol.State,
 	net module.Network,
 	retryInterval time.Duration,
+	pendingRequests mempool.ChunkRequests,
 	handler fetcher.ChunkDataPackHandler) (*Engine, error) {
 
 	e := &Engine{
-		unit:          engine.NewUnit(),
-		log:           log.With().Str("engine", "requester").Logger(),
-		retryInterval: retryInterval,
-		handler:       handler,
-		state:         state,
+		unit:            engine.NewUnit(),
+		log:             log.With().Str("engine", "requester").Logger(),
+		retryInterval:   retryInterval,
+		handler:         handler,
+		state:           state,
+		pendingRequests: pendingRequests,
 	}
 
 	if e.handler == nil {
