@@ -412,10 +412,10 @@ func (e *hostEnv) ProgramLog(message string) error {
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvEmitEvent)
-		defer sp.Finish()
-	}
+	// if e.isTraceable() {
+	// 	sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvEmitEvent)
+	// 	defer sp.Finish()
+	// }
 
 	if e.transactionEnv == nil {
 		return errors.NewOperationNotSupportedError("EmitEvent")
@@ -452,10 +452,10 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 }
 
 func (e *hostEnv) GenerateUUID() (uint64, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGenerateUUID)
-		defer sp.Finish()
-	}
+	// if e.isTraceable() {
+	// 	sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGenerateUUID)
+	// 	defer sp.Finish()
+	// }
 
 	if e.uuidGenerator == nil {
 		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
