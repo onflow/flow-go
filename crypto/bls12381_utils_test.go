@@ -103,18 +103,28 @@ func TestOpSwuHashToG1(t *testing.T) {
 		"1243affd90a88d6c1c68748f7855d18acec21331f84abbadbfc13b55e8f9f011c6cffdcce173e4f37841e7ebe2d73f82",
 		"027c48089c1c93756b0820f7cec9fcd7d5c31c7c47825eb5e9d90ed9d82fdd31b4aeca2b94d48033a260aa4e0651820e",
 	}
-	expected := []string{
-		"acb46e12d85fc2f7ac9dbb68c3d62d206a2f0a90d85d25c13e3c6fdf8f0b44096c3ba3ecdcd57d95c5ad0727d6025188",
-		"b6251e8d37663a78eed9ad6f1a0eb1915733a74acc2e1b4428d63aa78b765786f3ff56f6abace6ae88494f138acf8eca",
-		"accd59ffa4cbe6d721d4b4a41c8f12d7d8a9e2bd60e218471c45d6c340feb2b1e193932c4169945f40dc214a9e1766fe",
-		"821671a9cbbbf73c429d32bf9a07b64141118a00301d8a1a07de587818d788b37ed0b568c6ede80bd31426bafc142981",
+	var expected []string
+	if serializationG1 == compressed {
+		expected = []string{
+			"acb46e12d85fc2f7ac9dbb68c3d62d206a2f0a90d85d25c13e3c6fdf8f0b44096c3ba3ecdcd57d95c5ad0727d6025188",
+			"b6251e8d37663a78eed9ad6f1a0eb1915733a74acc2e1b4428d63aa78b765786f3ff56f6abace6ae88494f138acf8eca",
+			"accd59ffa4cbe6d721d4b4a41c8f12d7d8a9e2bd60e218471c45d6c340feb2b1e193932c4169945f40dc214a9e1766fe",
+			"821671a9cbbbf73c429d32bf9a07b64141118a00301d8a1a07de587818d788b37ed0b568c6ede80bd31426bafc142981",
+		}
+	} else {
+		expected = []string{
+			"0cb46e12d85fc2f7ac9dbb68c3d62d206a2f0a90d85d25c13e3c6fdf8f0b44096c3ba3ecdcd57d95c5ad0727d6025188192b6d0ab1fba7f71e777764a5b2758b255533ad743d4420892eeb01d4fca183c8fcf8379e8af6b6e10f46152d4fc894",
+			"16251e8d37663a78eed9ad6f1a0eb1915733a74acc2e1b4428d63aa78b765786f3ff56f6abace6ae88494f138acf8eca0dac56ebe57e5c34eae9c1016b660b38f7285ff50a1cf1089a50150aaf5a6c96a4fd3950dc49e384f12e45691d9cfac1",
+			"0ccd59ffa4cbe6d721d4b4a41c8f12d7d8a9e2bd60e218471c45d6c340feb2b1e193932c4169945f40dc214a9e1766fe192a96341516edac8fefb60bc3a3e208ada81926082c59d2ead61a1c6dd1dc5b92e3ced1aec2816698fb4c0657f9beb9",
+			"021671a9cbbbf73c429d32bf9a07b64141118a00301d8a1a07de587818d788b37ed0b568c6ede80bd31426bafc142981065d82aff97cd769c8bcee50616cf88009b26e2ce196af41a6fe5de7b097b5f2acfb429294e7c91a5059f7b2ede6511b",
+		}
 	}
 
 	output := make([]byte, SignatureLenBLSBLS12381)
 	for i, msg := range inputs {
 		input, _ := hex.DecodeString(msg)
 		OpSwUUnitTest(output, input)
-		assert.Equal(t, hex.EncodeToString(output), expected[i], "hash to G1 is not equal to the expected value")
+		assert.Equal(t, expected[i], hex.EncodeToString(output), "hash to G1 is not equal to the expected value")
 	}
 }
 

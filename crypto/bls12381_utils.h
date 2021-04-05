@@ -34,7 +34,8 @@ typedef uint8_t byte;
 // Compressed and uncompressed points
 #define COMPRESSED      1
 #define UNCOMPRESSED    0
-#define SERIALIZATION   COMPRESSED
+#define G1_SERIALIZATION   COMPRESSED
+#define G2_SERIALIZATION   COMPRESSED
 
 // Subgroup membership check method
 #define EXP_ORDER 0
