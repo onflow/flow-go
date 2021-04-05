@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -154,7 +155,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 }
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
-func (e *Engine) Request(request *fetcher.ChunkDataPackRequest, targets flow.IdentityList) {
+func (e *Engine) Request(request *verification.ChunkDataPackRequest, targets flow.IdentityList) {
 	status := &ChunkRequestStatus{
 		ChunkDataPackRequest: request,
 		Targets:              targets,
