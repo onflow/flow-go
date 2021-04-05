@@ -1,8 +1,6 @@
 package approvals
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,10 +18,7 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 		return engine.NewInvalidInputErrorf("approval collector chunk index out of range: %v", chunkIndex)
 	}
 	collector := c.chunkCollectors[chunkIndex]
-	err := collector.ProcessApproval(approval)
-	if err != nil {
-		return fmt.Errorf("could not process approval: %w", err)
-	}
+	_ = collector.ProcessApproval(approval)
 	return nil
 }
 

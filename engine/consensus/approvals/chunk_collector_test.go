@@ -41,7 +41,28 @@ func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.verID))
-	err := collector.ProcessApproval(approval)
-	require.NoError(s.T(), err)
+	status := collector.ProcessApproval(approval)
+	require.True(s.T(), status.approvalProcessed)
+	require.Equal(s.T(), uint(1), *status.numberOfApprovals)
 	require.Equal(s.T(), uint(1), collector.chunkApprovals.NumberSignatures())
+}
+
+func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssignment() {
+	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.verID))
+	delete(s.chunkAssignment, s.verID)
+	status := collector.ProcessApproval(approval)
+	require.False(s.T(), status.approvalProcessed)
+	require.Nil(s.T(), status.numberOfApprovals)
+	require.Equal(s.T(), uint(0), collector.chunkApprovals.NumberSignatures())
+}
+
+func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidVerifier() {
+	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.verID))
+	delete(s.authorizedVerifiers, s.verID)
+	status := collector.ProcessApproval(approval)
+	require.False(s.T(), status.approvalProcessed)
+	require.Nil(s.T(), status.numberOfApprovals)
+	require.Equal(s.T(), uint(0), collector.chunkApprovals.NumberSignatures())
 }
