@@ -124,7 +124,6 @@ func (e *blockComputer) executeBlock(
 
 	var txIndex uint32
 	var err error
-	var colView state.View
 	var wg sync.WaitGroup
 
 	bc := blockCommitter{
@@ -147,7 +146,7 @@ func (e *blockComputer) executeBlock(
 	defer close(bc.views)
 
 	for _, collection := range collections {
-		colView = stateView.NewChild()
+		colView := stateView.NewChild()
 		txIndex, err = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collection, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
@@ -162,7 +161,7 @@ func (e *blockComputer) executeBlock(
 
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
-	colView = stateView.NewChild()
+	colView := stateView.NewChild()
 	_, err = e.executeSystemCollection(blockSpan, txIndex, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
