@@ -128,12 +128,12 @@ func (e *blockComputer) executeBlock(
 
 	bc := blockCommitter{committer: e.committer,
 		callBack: func(state flow.StateCommitment, proof []byte, err error) {
+			defer wg.Done()
 			if err != nil {
 				panic(err)
 			}
 			res.AddStateCommitment(stateCommit)
 			res.AddProof(proof)
-			wg.Done()
 		},
 		state: block.StartState,
 		views: make(chan state.View, len(collections)+1),
