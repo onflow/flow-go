@@ -43,7 +43,7 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.verID))
 	status := collector.ProcessApproval(approval)
 	require.True(s.T(), status.approvalProcessed)
-	require.Equal(s.T(), uint(1), *status.numberOfApprovals)
+	require.Equal(s.T(), uint(1), status.numberOfApprovals)
 	require.Equal(s.T(), uint(1), collector.chunkApprovals.NumberSignatures())
 }
 
@@ -53,7 +53,7 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssign
 	delete(s.chunkAssignment, s.verID)
 	status := collector.ProcessApproval(approval)
 	require.False(s.T(), status.approvalProcessed)
-	require.Nil(s.T(), status.numberOfApprovals)
+	require.Equal(s.T(), uint(0), status.numberOfApprovals)
 	require.Equal(s.T(), uint(0), collector.chunkApprovals.NumberSignatures())
 }
 
@@ -63,6 +63,21 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidVerifier() 
 	delete(s.authorizedVerifiers, s.verID)
 	status := collector.ProcessApproval(approval)
 	require.False(s.T(), status.approvalProcessed)
-	require.Nil(s.T(), status.numberOfApprovals)
+	require.Equal(s.T(), uint(0), status.numberOfApprovals)
 	require.Equal(s.T(), uint(0), collector.chunkApprovals.NumberSignatures())
+}
+
+func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApprovals() {
+	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
+	var status ChunkProcessingStatus
+	sigCollector := flow.NewSignatureCollector()
+	for verID := range s.authorizedVerifiers {
+		approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(verID))
+		status = collector.ProcessApproval(approval)
+		require.True(s.T(), status.approvalProcessed)
+		sigCollector.Add(approval.Body.ApproverID, approval.Body.AttestationSignature)
+	}
+
+	require.Equal(s.T(), uint(len(s.authorizedVerifiers)), status.numberOfApprovals)
+	require.Equal(s.T(), sigCollector.ToAggregatedSignature(), collector.GetAggregatedSignature())
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type ChunkProcessingStatus struct {
-	numberOfApprovals *uint
+	numberOfApprovals uint
 	approvalProcessed bool
 }
 
@@ -23,7 +23,7 @@ type ChunkApprovalCollector struct {
 // ProcessApproval performs processing and bookkeeping of single approval
 func (c *ChunkApprovalCollector) ProcessApproval(approval *flow.ResultApproval) ChunkProcessingStatus {
 	status := ChunkProcessingStatus{
-		numberOfApprovals: nil,
+		numberOfApprovals: 0,
 		approvalProcessed: false,
 	}
 
@@ -35,16 +35,19 @@ func (c *ChunkApprovalCollector) ProcessApproval(approval *flow.ResultApproval) 
 		return status
 	}
 
-	var numbersOfApprovals uint
 	c.lock.Lock()
+	defer c.lock.Unlock()
 	c.chunkApprovals.Add(approverID, approval.Body.AttestationSignature)
-	numbersOfApprovals = c.chunkApprovals.NumberSignatures()
-	c.lock.Unlock()
-
 	status.approvalProcessed = true
-	status.numberOfApprovals = &numbersOfApprovals
+	status.numberOfApprovals = c.chunkApprovals.NumberSignatures()
 
 	return status
+}
+
+func (c *ChunkApprovalCollector) GetAggregatedSignature() flow.AggregatedSignature {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return c.chunkApprovals.ToAggregatedSignature()
 }
 
 func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{},
