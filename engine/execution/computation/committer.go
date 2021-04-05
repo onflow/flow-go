@@ -70,6 +70,6 @@ func NewNoopViewCommitter() *NoopViewCommitter {
 	return &NoopViewCommitter{}
 }
 
-func (n NoopViewCommitter) CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error) {
-	return nil, nil, nil
+func (n NoopViewCommitter) CommitView(_ state.View, s flow.StateCommitment) (flow.StateCommitment, []byte, error) {
+	return s, nil, nil
 }

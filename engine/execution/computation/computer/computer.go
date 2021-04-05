@@ -118,13 +118,13 @@ func (e *blockComputer) executeBlock(
 		Events:             make([]flow.Event, 0),
 		ServiceEvents:      make([]flow.Event, 0),
 		TransactionResults: make([]flow.TransactionResult, 0),
+		StateCommitments:   make([]flow.StateCommitment, 0),
+		Proofs:             make([][]byte, 0),
 	}
 
 	var txIndex uint32
 	var err error
 	var colView state.View
-	var stateCommit flow.StateCommitment
-
 	var wg sync.WaitGroup
 
 	bc := blockCommitter{
@@ -138,7 +138,7 @@ func (e *blockComputer) executeBlock(
 			if err != nil {
 				panic(err)
 			}
-			res.AddStateCommitment(stateCommit)
+			res.AddStateCommitment(state)
 			res.AddProof(proof)
 		},
 	}
