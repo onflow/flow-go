@@ -1,24 +1,23 @@
-package chunkrequester
+package stdmap
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestCanTry evaluates that when maxAttempt is set to 3, canTry will only return true for the first 3 times.
-func TestCanTry(t *testing.T) {
-	t.Run("maxAttempt=3", func(t *testing.T) {
-		maxAttempt := 3
+// TestIncrementStatus evaluates that calling increment attempt several times updates the status attempts.
+func TestIncrementStatus(t *testing.T) {
+	increments := 5
+	t.Run("5 times increment", func(t *testing.T) {
 		requests := NewChunkRequests(10)
-		c := unittest.ChunkFixture(flow.Identifier{0x11}, 0)
-		c.Index = 0
-		status := ChunkRequestStatus{
-			ChunkDataPackRequest: &fetcher.ChunkDataPackRequest{
+
+		status := &verification.ChunkRequestStatus{
+			ChunkDataPackRequest: &verification.ChunkDataPackRequest{
 				ChunkID:   unittest.IdentifierFixture(),
 				Height:    0,
 				Agrees:    []flow.Identifier{},
@@ -27,13 +26,20 @@ func TestCanTry(t *testing.T) {
 			Attempt: 0,
 		}
 
-		requests.Add(&status)
+		// stores
+		ok := requests.Add(status)
+		require.True(t, ok)
 
-		var results []bool
-		for i := 0; i < 5; i++ {
-			results = append(results, canTry(maxAttempt, status))
-			requests.IncrementAttempt(status.ID())
+		// increments attempts
+		for i := 0; i < increments; i++ {
+			ok = requests.IncrementAttempt(status.ID())
+			require.True(t, ok)
+
 		}
-		require.Equal(t, []bool{true, true, true, false, false}, results)
+
+		// retrieves updated status
+		status, ok = requests.ByID(status.ID())
+		require.True(t, ok)
+		require.Equal(t, status.Attempt, increments)
 	})
 }
