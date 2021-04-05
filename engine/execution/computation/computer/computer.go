@@ -127,7 +127,12 @@ func (e *blockComputer) executeBlock(
 
 	var wg sync.WaitGroup
 
-	bc := blockCommitter{committer: e.committer,
+	bc := blockCommitter{
+		committer: e.committer,
+		blockSpan: blockSpan,
+		tracer:    e.tracer,
+		state:     block.StartState,
+		views:     make(chan state.View, len(collections)+1),
 		callBack: func(state flow.StateCommitment, proof []byte, err error) {
 			defer wg.Done()
 			if err != nil {
@@ -136,11 +141,10 @@ func (e *blockComputer) executeBlock(
 			res.AddStateCommitment(stateCommit)
 			res.AddProof(proof)
 		},
-		state: block.StartState,
-		views: make(chan state.View, len(collections)+1),
 	}
 
 	go bc.Run()
+	defer close(bc.views)
 
 	for _, collection := range collections {
 		colView = stateView.NewChild()
@@ -172,25 +176,9 @@ func (e *blockComputer) executeBlock(
 
 	// wait for all views to be committed
 	wg.Wait()
-	close(bc.views)
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	return res, nil
 }
-
-// func (e *blockComputer) commitView(
-// 	blockSpan opentracing.Span,
-// 	collectionView state.View,
-// 	state flow.StateCommitment,
-// 	res *execution.ComputationResult,
-// ) (flow.StateCommitment, error) {
-// 	span := e.tracer.StartSpanFromParent(blockSpan, trace.EXECommitDelta)
-// 	defer span.Finish()
-
-// 	stateCommit, proof, err := e.committer.CommitView(collectionView, state)
-// 	res.AddStateCommitment(stateCommit)
-// 	res.AddProof(proof)
-// 	return stateCommit, err
-// }
 
 func (e *blockComputer) executeSystemCollection(
 	blockSpan opentracing.Span,
@@ -350,18 +338,22 @@ func (e *blockComputer) executeTransaction(
 
 // call back to update the result and increment the wait group
 type blockCommitter struct {
+	tracer    module.Tracer
 	committer ViewCommitter
 	callBack  func(state flow.StateCommitment, proof []byte, err error)
 	state     flow.StateCommitment
 	views     chan state.View
+	blockSpan opentracing.Span
 }
 
 // pass the queue and clean up instead
 func (bc *blockCommitter) Run() {
 	for view := range bc.views {
+		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
 		stateCommit, proof, err := bc.committer.CommitView(view, bc.state)
 		bc.callBack(stateCommit, proof, err)
 		bc.state = stateCommit
+		span.Finish()
 	}
 }
 
