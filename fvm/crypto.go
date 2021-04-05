@@ -7,8 +7,11 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const runtimeUserDomainTag = "user"
 
 type SignatureVerifier interface {
 	Verify(
@@ -35,7 +38,7 @@ func (DefaultSignatureVerifier) Verify(
 ) (bool, error) {
 	hasher := newHasher(hashAlgo)
 	if hasher == nil {
-		return false, ErrInvalidHashAlgorithm
+		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 	}
 
 	message = append(tag, message...)
@@ -131,24 +134,23 @@ func verifySignatureFromRuntime(
 ) (bool, error) {
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
-		return false, fmt.Errorf("invalid signature algorithm: %s", signatureAlgorithm)
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
+
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
-		return false, fmt.Errorf("invalid hash algorithm: %s", hashAlgorithm)
+		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return false, err
+		return false, errors.NewValueErrorf(string(rawPublicKey), "cannot decode public key: %w", err)
 	}
 
 	tag := parseRuntimeDomainTag(rawTag)
 	if tag == nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
-		return false, fmt.Errorf("invalid domain tag: %s", rawTag)
+		return false, errors.NewValueErrorf(string(rawTag), "invalid domain tag")
 	}
 
 	valid, err := verifier.Verify(
@@ -159,14 +161,11 @@ func verifySignatureFromRuntime(
 		hashAlgo,
 	)
 	if err != nil {
-		// TODO: improve error passing https://github.com/onflow/cadence/issues/202
 		return false, err
 	}
 
 	return valid, nil
 }
-
-const runtimeUserDomainTag = "user"
 
 func parseRuntimeDomainTag(tag string) []byte {
 	if tag == runtimeUserDomainTag {

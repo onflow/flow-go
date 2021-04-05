@@ -1,4 +1,4 @@
-package sealingtracker
+package tracker
 
 import (
 	"github.com/onflow/flow-go/model/flow"

@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -21,7 +22,8 @@ func TestBootstrapLedger(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
+		wal := &fixtures.NoopWAL{}
+		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
@@ -52,7 +54,8 @@ func TestBootstrapLedger_ZeroTokenSupply(t *testing.T) {
 		chain := flow.Mainnet.Chain()
 
 		metricsCollector := &metrics.NoopCollector{}
-		ls, err := completeLedger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
+		wal := &fixtures.NoopWAL{}
+		ls, err := completeLedger.NewLedger(wal, 100, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		stateCommitment, err := NewBootstrapper(zerolog.Nop()).BootstrapLedger(
