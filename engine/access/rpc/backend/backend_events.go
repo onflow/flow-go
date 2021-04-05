@@ -2,7 +2,6 @@ package backend
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -58,18 +57,18 @@ func (b *backendEvents) GetEventsForHeightRange(
 	}
 
 	// find the block headers for all the blocks between min and max height (inclusive)
-	blockHeaders := make([]*flow.Header, 0)
+	blockIDs := make([]flow.Identifier, 0, endHeight-startHeight+1)
 
 	for i := startHeight; i <= endHeight; i++ {
-		header, err := b.headers.ByHeight(i)
+		blockID, err := b.headers.IDByHeight(i)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 		}
 
-		blockHeaders = append(blockHeaders, header)
+		blockIDs = append(blockIDs, blockID)
 	}
 
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockIDs, eventType)
 }
 
 // GetEventsForBlockIDs retrieves events for all the specified block IDs that have the given type
@@ -79,32 +78,15 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 ) ([]flow.BlockEvents, error) {
 
-	// find the block headers for all the block IDs
-	blockHeaders := make([]*flow.Header, 0)
-	for _, blockID := range blockIDs {
-		header, err := b.headers.ByBlockID(blockID)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
-		}
-
-		blockHeaders = append(blockHeaders, header)
-	}
-
 	// forward the request to the execution node
-	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
+	return b.getBlockEventsFromExecutionNode(ctx, blockIDs, eventType)
 }
 
 func (b *backendEvents) getBlockEventsFromExecutionNode(
 	ctx context.Context,
-	blockHeaders []*flow.Header,
+	blockIDs []flow.Identifier,
 	eventType string,
 ) ([]flow.BlockEvents, error) {
-
-	// create an execution API request for events at block ID
-	blockIDs := make([]flow.Identifier, len(blockHeaders))
-	for i := range blockIDs {
-		blockIDs[i] = blockHeaders[i].ID()
-	}
 
 	if len(blockIDs) == 0 {
 		return []flow.BlockEvents{}, nil
@@ -152,7 +134,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	// convert execution node api result to access node api result
-	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders)
+	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockIDs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to verify retrieved events from execution node: %v", err)
 	}
@@ -162,34 +144,33 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 
 // verifyAndConvertToAccessEvents converts execution node api result to access node api result, and verifies that the results contains
 // results from each block that was requested
-func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDsResponse_Result, requestedBlockHeaders []*flow.Header) ([]flow.BlockEvents, error) {
-	if len(execEvents) != len(requestedBlockHeaders) {
+func verifyAndConvertToAccessEvents(execEvents []*execproto.GetEventsForBlockIDsResponse_Result, requestedBlockIDs []flow.Identifier) ([]flow.BlockEvents, error) {
+	if len(execEvents) != len(requestedBlockIDs) {
 		return nil, errors.New("number of results does not match number of blocks requested")
 	}
 
-	reqestedBlockHeaderSet := map[string]*flow.Header{}
-	for _, header := range requestedBlockHeaders {
-		reqestedBlockHeaderSet[header.ID().String()] = header
+	// ensure that each block we requested appears exactly once
+	// TODO we should remove from the set in the loop, and check that the set has len 0 after the loop
+	requestedBlockHeaderSet := map[flow.Identifier]struct{}{}
+	for _, blockID := range requestedBlockIDs {
+		requestedBlockHeaderSet[blockID] = struct{}{}
 	}
 
 	results := make([]flow.BlockEvents, len(execEvents))
 
 	for i, result := range execEvents {
-		header, expected := reqestedBlockHeaderSet[hex.EncodeToString(result.GetBlockId())]
+		blockID := flow.BytesToIdentifier(result.GetBlockId())
+		_, expected := requestedBlockHeaderSet[blockID]
 		if !expected {
 			return nil, fmt.Errorf("unexpected blockID from exe node %x", result.GetBlockId())
 		}
-		if result.GetBlockHeight() != header.Height {
-			return nil, fmt.Errorf("unexpected block height %d for block %x from exe node",
-				result.GetBlockHeight(),
-				result.GetBlockId())
-		}
 
 		results[i] = flow.BlockEvents{
-			BlockID:        header.ID(),
-			BlockHeight:    header.Height,
-			BlockTimestamp: header.Timestamp,
-			Events:         convert.MessagesToEvents(result.GetEvents()),
+			BlockID:     blockID,
+			BlockHeight: result.GetBlockHeight(),
+			// TODO omitted to avoid needing to look up entire header
+			//BlockTimestamp: header.Timestamp,
+			Events: convert.MessagesToEvents(result.GetEvents()),
 		}
 	}
 

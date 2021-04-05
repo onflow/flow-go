@@ -39,6 +39,14 @@ func HexStringToIdentifier(hexString string) (Identifier, error) {
 	return identifier, nil
 }
 
+// BytesToIdentifier converts a byte slice to an identifier. The byte slice must
+// contain exactly 32 bytes.
+func BytesToIdentifier(bytes []byte) Identifier {
+	var id Identifier
+	copy(id[:], bytes)
+	return id
+}
+
 // String returns the hex string representation of the identifier.
 func (id Identifier) String() string {
 	return hex.EncodeToString(id[:])
