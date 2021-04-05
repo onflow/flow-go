@@ -223,8 +223,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 // submitTx submits a transaction to the flow network and checks that the
 // transaction is signed
-func (c *Client) submitTx(tx *sdk.Transaction) (sdk.Identifier, error) {
-	ctx := context.Background()
+func (c *Client) submitTx(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
 
 	// check if the transaction has a signature
 	if len(tx.EnvelopeSignatures) == 0 {
