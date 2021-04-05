@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
@@ -28,7 +29,7 @@ type Engine struct {
 	unit            *engine.Unit
 	handler         fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
 	retryInterval   time.Duration                // determines time in milliseconds for retrying chunk data requests.
-	pendingRequests *ChunkRequests               // used to store all the pending chunks that assigned to this node
+	pendingRequests mempool.ChunkRequests        // used to store all the pending chunks that assigned to this node
 	state           protocol.State               // used to check the last sealed height
 	con             network.Conduit              // used to send the chunk data request, and receive the response.
 }
@@ -238,10 +239,4 @@ func (e *Engine) requestChunkDataPack(status *verification.ChunkRequestStatus) e
 	}
 
 	return nil
-}
-
-// canTry returns checks the history attempts and determine whether a chunk request
-// can be tried again.
-func canTry(maxAttempt int, status verification.ChunkRequestStatus) bool {
-	return status.Attempt < maxAttempt
 }
