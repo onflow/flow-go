@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/model/flow"
+	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -25,9 +26,9 @@ type RequesterEngineTestSuite struct {
 	log             zerolog.Logger
 	handler         fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
 	retryInterval   time.Duration                // determines time in milliseconds for retrying chunk data requests.
-	pendingRequests *ChunkRequests               // used to store all the pending chunks that assigned to this node
+	pendingRequests mempool.ChunkRequests        // used to store all the pending chunks that assigned to this node
 	state           *protocol.State              // used to check the last sealed height
-	con             mocknetwork.Conduit          // used to send chunk data request, and receive the response
+	con             *mocknetwork.Conduit         // used to send chunk data request, and receive the response
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -39,7 +40,7 @@ func setupTest() *RequesterEngineTestSuite {
 		log:             unittest.Logger(),
 		handler:         &mockfetcher.ChunkDataPackHandler{},
 		retryInterval:   100 * time.Millisecond,
-		pendingRequests: NewChunkRequests(100),
+		pendingRequests: mempool.ChunkRequests{},
 		state:           &protocol.State{},
 		verIdentity:     unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
 	}
