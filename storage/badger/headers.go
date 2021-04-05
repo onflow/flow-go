@@ -108,6 +108,17 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	return h.ByBlockID(blockID.(flow.Identifier))
 }
 
+func (h *Headers) IDByHeight(height uint64) (flow.Identifier, error) {
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := h.heightCache.Get(height)(tx)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not get id by height: %w", err)
+	}
+	return blockID.(flow.Identifier), nil
+}
+
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
 	var blockIDs []flow.Identifier
 	err := h.db.View(procedure.LookupBlockChildren(parentID, &blockIDs))
