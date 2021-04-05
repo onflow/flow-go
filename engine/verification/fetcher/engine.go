@@ -10,10 +10,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -364,7 +364,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 		return fmt.Errorf("could not get header for block: %x", blockID)
 	}
 
-	request := &ChunkDataPackRequest{
+	request := &verification.ChunkDataPackRequest{
 		ChunkID:   chunkID,
 		Height:    header.Height,
 		Agrees:    agrees,
