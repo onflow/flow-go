@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
-	"github.com/onflow/flow-go/engine/consensus/matching"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
@@ -103,22 +103,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 	tracer module.Tracer,
 	chainID flow.ChainID) testmock.GenericNode {
 
-	// Generates test signing oracle for the nodes
-	// Disclaimer: it should not be used for practical applications
-	//
-	// uses identity of node as its seed
-	seed, err := json.Marshal(identity)
-	require.NoError(t, err)
-	// creates signing key of the node
-	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
-	require.NoError(t, err)
-
-	// sets staking public key of the node
-	identity.StakingPubKey = sk.PublicKey()
-
-	me, err := local.New(identity, sk)
-	require.NoError(t, err)
-
+	me := LocalFixture(t, identity)
 	stubnet := stub.NewNetwork(stateFixture.State, me, hub)
 
 	return testmock.GenericNode{
@@ -138,6 +123,27 @@ func GenericNodeWithStateFixture(t testing.TB,
 		ChainID:        chainID,
 		ProtocolEvents: stateFixture.ProtocolEvents,
 	}
+}
+
+// LocalFixture creates and returns a Local module for given identity.
+func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
+	// Generates test signing oracle for the nodes
+	// Disclaimer: it should not be used for practical applications
+	//
+	// uses identity of node as its seed
+	seed, err := json.Marshal(identity)
+	require.NoError(t, err)
+	// creates signing key of the node
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	require.NoError(t, err)
+
+	// sets staking public key of the node
+	identity.StakingPubKey = sk.PublicKey()
+
+	me, err := local.New(identity, sk)
+	require.NoError(t, err)
+
+	return me
 }
 
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
@@ -250,7 +256,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
-	matchingEngine, err := matching.NewEngine(
+	sealingEngine, err := sealing.NewEngine(
 		node.Log,
 		node.Metrics,
 		node.Tracer,
@@ -272,7 +278,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		receiptValidator,
 		approvalValidator,
 		validation.DefaultRequiredApprovalsForSealValidation,
-		matching.DefaultEmergencySealingActive)
+		sealing.DefaultEmergencySealingActive)
 	require.Nil(t, err)
 
 	return testmock.ConsensusNode{
@@ -282,7 +288,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		Receipts:        receipts,
 		Seals:           seals,
 		IngestionEngine: ingestionEngine,
-		MatchingEngine:  matchingEngine,
+		SealingEngine:   sealingEngine,
 	}
 }
 
