@@ -65,7 +65,6 @@ func TestTimeStampRetrieve(t *testing.T) {
 		timeStamp, err := headers.TimestampByBlockID(header.ID())
 		require.NoError(t, err)
 		expectedTimeStamp := header.Timestamp
-		expectedTimeStamp = expectedTimeStamp.UTC()
 		require.Equal(t, expectedTimeStamp, timeStamp)
 	})
 }

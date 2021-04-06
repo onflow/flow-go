@@ -118,7 +118,17 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 }
 
 func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
-	return h.cache.Put(header.ID(), header)
+	return func(tx *badger.Txn) error {
+		err := h.cache.Put(header.ID(), header)(tx)
+		if err != nil {
+			return err
+		}
+		err = h.timeStampCache.Put(header.ID(), header.Timestamp)(tx)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
@@ -204,4 +214,8 @@ func (h *Headers) TimestampByBlockID(blockID flow.Identifier) (time.Time, error)
 		return time.Time{}, fmt.Errorf("could not look up timestamp for BlockID %s: %w", blockID.String(), err)
 	}
 	return timeStamp.(time.Time), nil
+}
+
+func (h *Headers) indexTimeStampByID(blockID flow.Identifier, timeStamp time.Time) error {
+	return operation.RetryOnConflict(h.db.Update, h.timeStampCache.Put(blockID, timeStamp))
 }
