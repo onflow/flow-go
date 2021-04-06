@@ -127,8 +127,8 @@ func (e *blockComputer) executeBlock(
 	var err error
 	var wg sync.WaitGroup
 
-	stateCommitments := make([]flow.StateCommitment, len(collections)+1)
-	proofs := make([][]byte, len(collections)+1)
+	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
+	proofs := make([][]byte, 0, len(collections)+1)
 
 	bc := blockCommitter{
 		committer: e.committer,
