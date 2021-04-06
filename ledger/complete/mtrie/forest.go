@@ -199,7 +199,11 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	return ledger.RootHash(newTrie.RootHash()), nil
 }
 
-// Proofs returns a batch proof for the given paths
+// Proofs returns a batch proof for the given paths.
+//
+// Proofs must provide proofs in an order not correlated to the path order in the query.
+// In the current implementation, input paths in the TrieRead `r` are sorted in an ascendent order,
+// The output proofs are provided following the order of the sorted paths.
 func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 	// no path, empty batchproof
@@ -213,28 +217,18 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		return nil, err
 	}
 
-	deduplicatedPaths := make([]ledger.Path, 0)
 	notFoundPaths := make([]ledger.Path, 0)
 	notFoundPayloads := make([]ledger.Payload, 0)
-	pathOrgIndex := make(map[string][]int)
 	for i, path := range r.Paths {
 		// check key sizes
 		if len(path) != f.pathByteSize {
 			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
 		}
-		// only collect duplicated keys once
-		if _, ok := pathOrgIndex[string(path)]; !ok {
-			deduplicatedPaths = append(deduplicatedPaths, path)
-			pathOrgIndex[string(path)] = []int{i}
 
-			// add it only once if is empty
-			if retPayloads[i].IsEmpty() {
-				notFoundPaths = append(notFoundPaths, path)
-				notFoundPayloads = append(notFoundPayloads, *ledger.EmptyPayload())
-			}
-		} else {
-			// handles duplicated keys
-			pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
+		// add if empty
+		if retPayloads[i].IsEmpty() {
+			notFoundPaths = append(notFoundPaths, path)
+			notFoundPayloads = append(notFoundPayloads, *ledger.EmptyPayload())
 		}
 	}
 
@@ -257,24 +251,8 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		stateTrie = newTrie
 	}
 
-	bp := ledger.NewTrieBatchProofWithEmptyProofs(len(deduplicatedPaths))
-
-	for _, p := range bp.Proofs {
-		p.Flags = make([]byte, f.pathByteSize)
-		p.Inclusion = false
-	}
-
-	stateTrie.UnsafeProofs(deduplicatedPaths, bp.Proofs)
-
-	// reconstruct the proofs in the same key order that called the method
-	retbp := ledger.NewTrieBatchProofWithEmptyProofs(len(r.Paths))
-	for i, p := range deduplicatedPaths {
-		for _, j := range pathOrgIndex[string(p)] {
-			retbp.Proofs[j] = bp.Proofs[i]
-		}
-	}
-
-	return retbp, nil
+	bp := stateTrie.UnsafeProofs(r.Paths, f.pathByteSize)
+	return bp, nil
 }
 
 // PathLength return the length [in bytes] the trie operates with.

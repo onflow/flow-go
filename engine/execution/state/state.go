@@ -309,6 +309,7 @@ func (s *state) GetProof(
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
+	// Get proofs in an arbitrary order, not correlated to the register ID order in the query.
 	proof, err := s.ls.Prove(query)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get proof: %w", err)
