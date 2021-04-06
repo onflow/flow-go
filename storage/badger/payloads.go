@@ -72,7 +72,7 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 
 		// store all payload receipts
 		for _, meta := range payload.Receipts {
-			// ATTENTION: this is broken from perspective if we have execution receipt which points an execution result
+			// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
 			// which is not included in current payload but was incorporated in one of previous blocks.
 			// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
 			// and execution result is decoupled.

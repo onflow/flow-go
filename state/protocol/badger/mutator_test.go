@@ -362,7 +362,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		receipt := unittest.ExecutionReceiptFixture()
 
 		// force the receipt validator to refuse this payload
-		validator.On("ValidatePayload", mock.Anything).Return(engine.NewInvalidInputError("")).Once()
+ 	validator.On("ValidatePayload", &block3).Return(engine.NewInvalidInputError("")).Once()
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
