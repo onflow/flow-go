@@ -106,3 +106,29 @@ func TestHandleChunkDataPack_NonExistingRequest(t *testing.T) {
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
 	s.pendingRequests.AssertNotCalled(t, "Rem")
 }
+
+// TestHandleChunkDataPack_NonExistingRequest evaluates that failing to remove a received chunk data pack's request
+// from the memory terminates the procedure of handling a chunk data pack without passing it to the handler.
+// The request for a chunk data pack may be removed from the memory if duplicate copies of a requested chunk data pack arrive
+// concurrently. Then the mutex lock on pending requests mempool allows only one of those requested chunk data packs to remove the
+// request and pass to handler. While handling the other ones gracefully terminated.
+func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	response := unittest.ChunkDataResponseFixture()
+	originID := unittest.IdentifierFixture()
+
+	// we have a request pending for this response chunk ID
+	s.pendingRequests.On("ByID", response.ChunkDataPack.ChunkID).Return(&verification.ChunkRequestStatus{}, true).Once()
+	// however by the time we try remove it, the request status has gone.
+	// this can happen when duplicate chunk data packs are coming concurrently.
+	// the concurrency is safe with pending requests mempool lock.
+	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
+
+	err := e.Process(originID, response)
+	require.Nil(t, err)
+
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con)
+	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
+}
