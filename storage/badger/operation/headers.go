@@ -3,6 +3,8 @@
 package operation
 
 import (
+	"time"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -92,4 +94,15 @@ func FindHeaders(filter func(header *flow.Header) bool, found *[]flow.Header) fu
 		}
 		return check, create, handle
 	})
+}
+
+
+// IndexTimestampByBlockID indexes a block ID by its timestamp
+func IndexTimestampByBlockID(blockID flow.Identifier, timeStamp time.Time) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexTimeStampByBlockID, blockID), timeStamp)
+}
+
+// LookupTimeStampByBlockID looks up a block ID by a timestamp.
+func LookupTimeStampByBlockID(blockID flow.Identifier, timeStamp *time.Time) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexTimeStampByBlockID, blockID), timeStamp)
 }

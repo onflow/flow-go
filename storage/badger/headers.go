@@ -4,6 +4,7 @@ package badger
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -28,7 +29,11 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
 		blockID := key.(flow.Identifier)
 		header := val.(*flow.Header)
-		return operation.InsertHeader(blockID, header)
+		err := operation.InsertHeader(blockID, header)
+		if err != nil {
+			err = operation.IndexTimestampByBlockID(blockID, header.Timestamp)
+		}
+		return err
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
@@ -171,4 +176,13 @@ func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
 func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	return operation.BatchIndexBlockByChunkID(headerID, chunkID)(writeBatch)
+}
+
+func (h *Headers) TimestampByBlockID(blockID flow.Identifier) (time.Time, error) {
+	var timeStamp time.Time
+	err := h.db.View(operation.LookupTimeStampByBlockID(blockID, &timeStamp))
+	if err != nil {
+		return time.Time{}, fmt.Errorf("could not look up timestamp for BlockID %s: %w", blockID.String(), err)
+	}
+	return timeStamp, nil
 }

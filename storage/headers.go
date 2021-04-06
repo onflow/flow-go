@@ -3,6 +3,8 @@
 package storage
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -33,4 +35,7 @@ type Headers interface {
 
 	// Finds the ID of the block corresponding to given chunk ID
 	IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
+
+	// Finds the Block time stamp by block ID
+	TimestampByBlockID(blockID flow.Identifier) (time.Time, error)
 }

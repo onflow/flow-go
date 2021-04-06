@@ -47,15 +47,16 @@ const (
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs
-	codeBlockChildren       = 50 // index mapping block ID to children blocks
-	codePayloadGuarantees   = 52 // index mapping block ID to payload guarantees
-	codePayloadSeals        = 53 // index mapping block ID to payload seals
-	codeCollectionBlock     = 54 // index mapping collection ID to block ID
-	codeOwnBlockReceipt     = 55 // index mapping block ID to execution receipt ID for execution nodes
-	codeBlockEpochStatus    = 56 // index mapping block ID to epoch status
-	codePayloadReceipts     = 57 // index mapping block ID  to payload receipts
-	codeAllBlockReceipts    = 58 // index mapping of blockID to multiple receipts
-	codeIndexBlockByChunkID = 59 // index mapping chunk ID to block ID
+	codeBlockChildren           = 50 // index mapping block ID to children blocks
+	codePayloadGuarantees       = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals            = 53 // index mapping block ID to payload seals
+	codeCollectionBlock         = 54 // index mapping collection ID to block ID
+	codeOwnBlockReceipt         = 55 // index mapping block ID to execution receipt ID for execution nodes
+	codeBlockEpochStatus        = 56 // index mapping block ID to epoch status
+	codePayloadReceipts         = 57 // index mapping block ID  to payload receipts
+	codeAllBlockReceipts        = 58 // index mapping of blockID to multiple receipts
+	codeIndexBlockByChunkID     = 59 // index mapping chunk ID to block ID
+	codeIndexTimeStampByBlockID = 73 // index mapping time stamp to block ID
 
 	// codes related to epoch information
 	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID

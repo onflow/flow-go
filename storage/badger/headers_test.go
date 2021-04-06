@@ -50,3 +50,22 @@ func TestHeaderRetrieveWithoutStore(t *testing.T) {
 		require.True(t, errors.Is(err, storage.ErrNotFound))
 	})
 }
+
+func TestTimeStampRetrieve(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		headers := badgerstorage.NewHeaders(metrics, db)
+
+		block := unittest.BlockFixture()
+
+		// store header
+		err := headers.Store(block.Header)
+		require.NoError(t, err)
+
+		timeStamp, err := headers.TimestampByBlockID(block.ID())
+		require.NoError(t, err)
+		expectedTimeStamp := block.Header.Timestamp
+		expectedTimeStamp = expectedTimeStamp.UTC()
+		require.Equal(t, expectedTimeStamp, timeStamp)
+	})
+}
