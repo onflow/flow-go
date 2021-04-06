@@ -86,3 +86,23 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler)
 }
+
+// TestHandleChunkDataPack_NonExistingRequest evaluates that receiving a chunk data pack response that does not have any request attached
+// is dropped without passing it to the handler.
+func TestHandleChunkDataPack_NonExistingRequest(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	response := unittest.ChunkDataResponseFixture()
+	originID := unittest.IdentifierFixture()
+
+	// we have a request pending for this response chunk ID
+	s.pendingRequests.On("ByID", response.ChunkDataPack.ChunkID).Return(nil, false).Once()
+
+	err := e.Process(originID, response)
+	require.Nil(t, err)
+
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con)
+	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
+	s.pendingRequests.AssertNotCalled(t, "Rem")
+}
