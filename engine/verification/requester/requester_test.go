@@ -1,6 +1,7 @@
 package requester
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -227,4 +228,48 @@ func toChunkIDs(chunkToCollectionIDs map[flow.Identifier]flow.Identifier) flow.I
 	}
 
 	return chunkIDs
+}
+
+// mockConduitForChunkDataPackRequest mocks given conduit for requesting chunk data packs for given chunk IDs.
+// Each chunk should be requested exactly `count` many time.
+// Upon request, the given request handler is invoked.
+// Also, the entire process should not exceed longer than the specified timeout.
+func mockConduitForChunkDataPackRequest(t *testing.T,
+	con *mocknetwork.Conduit,
+	chunkIDs flow.IdentifierList,
+	count int,
+	requestHandler func(response *messages.ChunkDataRequest),
+	handlerTimeout time.Duration) {
+
+	// counts number of requests for each chunk data pack
+	reqCount := make(map[flow.Identifier]int)
+	for _, chunkID := range chunkIDs {
+		reqCount[chunkID] = 0
+	}
+	wg := &sync.WaitGroup{}
+
+	// to counter race condition in concurrent invocations of Run
+	mutex := &sync.Mutex{}
+	wg.Add(1)
+
+	con.On("Publish", testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		mutex.Lock()
+		defer mutex.Unlock()
+
+		// requested chunk id from network should belong to list of chunk id requests the engine received.
+		// also, it should not be repeated below a maximum threshold
+		req, ok := args[0].(*messages.ChunkDataRequest)
+		require.True(t, ok)
+		require.Contains(t, chunkIDs, req.ChunkID)
+		require.LessOrEqual(t, reqCount[req.ChunkID], count)
+		reqCount[req.ChunkID]++
+
+		go func() {
+			requestHandler(req)
+			wg.Done()
+		}()
+
+	}).Return(nil).Times(count * len(chunkIDs)) // each chunk requested count time.
+
+	unittest.RequireReturnsBefore(t, wg.Wait, handlerTimeout, "could not request and handle chunks on time")
 }
