@@ -103,27 +103,11 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	chunkCollectionIdMap := chunkToCollectionIdMap(t, responses)
 	chunkIDs := toChunkIDs(chunkCollectionIdMap)
 
-	// maps keep track of distinct invocations per chunk ID
-	removedRequests := make(map[flow.Identifier]struct{})
-
 	// we have a request pending for this response chunk ID
 	mockPendingRequestsExistence(t, s.pendingRequests, chunkIDs)
-
 	// we remove pending request on receiving this response
-	s.pendingRequests.On("Rem", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
-		// we should have already requested this chunk data pack
-		require.Contains(t, chunkIDs, chunkID)
-
-		// invocation should be distinct per chunk ID
-		_, ok = removedRequests[chunkID]
-		require.False(t, ok)
-		removedRequests[chunkID] = struct{}{}
-	}).
-		Return(true).
-		Times(count)
-
+	mockPendingRequestsRemoval(t, s.pendingRequests, chunkIDs)
+	// we pass each chunk data pack and its collection to chunk data pack handler
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 
 	for _, response := range responses {
@@ -249,10 +233,7 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 // It evaluates that, each chunk ID should be passed only once accompanied with specified collection.
 func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler,
 	chunkToCollectionIDs map[flow.Identifier]flow.Identifier) {
-	chunkIDs := flow.IdentifierList{}
-	for chunkID := range chunkToCollectionIDs {
-		chunkIDs = append(chunkIDs, chunkID)
-	}
+	chunkIDs := toChunkIDs(chunkToCollectionIDs)
 	handledChunks := make(map[flow.Identifier]struct{})
 
 	handler.On("HandleChunkDataPack", testifymock.Anything, testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
@@ -290,5 +271,26 @@ func mockPendingRequestsExistence(t *testing.T, pendingRequests *mempool.ChunkRe
 		require.False(t, ok)
 		retrievedRequests[chunkID] = struct{}{}
 	}).Return(&verification.ChunkRequestStatus{}, true).
+		Times(len(chunkIDs))
+}
+
+// mockPendingRequestsRemoval mocks chunk requests mempool for being queried for affirmative removal of each chunk ID once.
+func mockPendingRequestsRemoval(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
+	// maps keep track of distinct invocations per chunk ID
+	removedRequests := make(map[flow.Identifier]struct{})
+
+	// we remove pending request on receiving this response
+	pendingRequests.On("Rem", testifymock.Anything).Run(func(args testifymock.Arguments) {
+		chunkID, ok := args[0].(flow.Identifier)
+		require.True(t, ok)
+		// we should have already requested this chunk data pack
+		require.Contains(t, chunkIDs, chunkID)
+
+		// invocation should be distinct per chunk ID
+		_, ok = removedRequests[chunkID]
+		require.False(t, ok)
+		removedRequests[chunkID] = struct{}{}
+	}).
+		Return(true).
 		Times(len(chunkIDs))
 }
