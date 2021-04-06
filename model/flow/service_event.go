@@ -31,7 +31,14 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 // encoding and decoding.
 type ServiceEvent struct {
 	Type  string
-	Event interface{}
+	Event Entity
+}
+
+// Equals checks the equality of two service events
+// it returns true if both types are the same and both Event.ID()s
+// are the same
+func (se *ServiceEvent) Equals(other *ServiceEvent) bool {
+	return se.Type == other.Type && se.Event.ID() == other.Event.ID()
 }
 
 func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
@@ -57,7 +64,7 @@ func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	var event interface{}
+	var event Entity
 	switch tp {
 	case ServiceEventSetup:
 		setup := new(EpochSetup)
@@ -107,7 +114,7 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 		return err
 	}
 
-	var event interface{}
+	var event Entity
 	switch tp {
 	case ServiceEventSetup:
 		setup := new(EpochSetup)

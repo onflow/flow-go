@@ -66,6 +66,11 @@ func (setup *EpochSetup) ID() Identifier {
 	return MakeID(setup)
 }
 
+// Checksum is the same functionality as ID for this entity
+func (setup *EpochSetup) Checksum() Identifier {
+	return setup.ID()
+}
+
 // EpochCommit is a service event emitted when epoch setup has been completed.
 // When an EpochCommit event is emitted, the network is ready to transition to
 // the epoch.
@@ -180,6 +185,11 @@ func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 // ID returns the hash of the event contents.
 func (commit *EpochCommit) ID() Identifier {
 	return MakeID(commit)
+}
+
+// Checksum provides the same functionality as ID for this entity
+func (commit *EpochCommit) Checksum() Identifier {
+	return commit.ID()
 }
 
 type DKGParticipant struct {

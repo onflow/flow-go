@@ -58,7 +58,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 		transactions = append(transactions, tx)
 	}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState)
+	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState, false)
 }
 
 // SystemChunkVerify verifies a given VerifiableChunk corresponding to a system chunk.
@@ -80,14 +80,16 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 		fvm.WithBlockHeader(vc.Header),
 	)
 
-	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState)
+	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState, true)
 }
 
-func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk *flow.Chunk,
+func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context,
+	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
 	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
+	endState flow.StateCommitment,
+	isSystemChunk bool) ([]byte, chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
@@ -143,8 +145,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return values[0], nil
 	}
 
+	serviceEvents := make([]flow.Event, 0)
 	chunkView := delta.NewView(getRegister)
-
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
@@ -163,6 +165,39 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			err = chunkView.MergeView(txView)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+			}
+
+			if isSystemChunk {
+				serviceEvents = append(serviceEvents, tx.ServiceEvents...)
+			}
+
+		}
+	}
+
+	if isSystemChunk {
+		// more events than expected
+		if len(result.ServiceEvents) > len(serviceEvents) {
+			return nil, chmodels.NewCFNonMatchingServiceEvents(nil, &result.ServiceEvents[len(serviceEvents)], chIndex, execResID), nil
+		}
+
+		// missing some events
+		if len(result.ServiceEvents) < len(serviceEvents) {
+			sv := serviceEvents[len(result.ServiceEvents)]
+			converted, err := flow.ConvertServiceEvent(sv)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not convert service event: %w", err)
+			}
+			return nil, chmodels.NewCFNonMatchingServiceEvents(converted, nil, chIndex, execResID), nil
+		}
+
+		for i, sv := range serviceEvents {
+			converted, err := flow.ConvertServiceEvent(sv)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not convert service event: %w", err)
+			}
+
+			if !result.ServiceEvents[i].Equals(converted) {
+				return nil, chmodels.NewCFNonMatchingServiceEvents(converted, &result.ServiceEvents[i], chIndex, execResID), nil
 			}
 		}
 	}
