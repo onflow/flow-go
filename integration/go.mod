@@ -11,7 +11,7 @@ require (
 	github.com/go-openapi/strfmt v0.19.5 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/onflow/cadence v0.14.4
-	github.com/onflow/flow-go v0.14.1-0.20210313151753-5612cf6db7ad // replaced by version on-disk
+	github.com/onflow/flow-go v0.15.4 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.17.0
 	github.com/onflow/flow-go/crypto v0.12.0 // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
