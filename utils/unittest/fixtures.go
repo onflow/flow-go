@@ -950,24 +950,28 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 // ChunkDataResponseFixture creates a chunk data response with a single-transaction collection, and random chunk ID.
 // Use options to customize the response.
 func ChunkDataResponseFixture(opts ...func(response *messages.ChunkDataResponse)) *messages.ChunkDataResponse {
-	return &messages.ChunkDataResponse{
+	cdp := &messages.ChunkDataResponse{
 		ChunkDataPack: *ChunkDataPackFixture(IdentifierFixture()),
 		Collection:    CollectionFixture(1),
 		Nonce:         rand.Uint64(),
 	}
+
+	for _, opt := range opts {
+		opt(cdp)
+	}
+
+	cdp.ChunkDataPack.CollectionID = cdp.Collection.ID()
+
+	return cdp
 }
 
 // ChunkDataResponsesFixture creates a list of chunk data responses each with a single-transaction collection, and random chunk ID.
-func ChunkDataResponsesFixture(n int) ([]*messages.ChunkDataResponse, flow.IdentifierList) {
+func ChunkDataResponsesFixture(n int) []*messages.ChunkDataResponse {
 	lst := make([]*messages.ChunkDataResponse, 0, n)
-	chunkIDs := flow.IdentifierList{}
 	for i := 0; i < n; i++ {
-		cdpf := ChunkDataResponseFixture()
-		lst = append(lst, cdpf)
-		chunkIDs = append(chunkIDs, cdpf.ChunkDataPack.ChunkID)
+		lst = append(lst, ChunkDataResponseFixture())
 	}
-
-	return lst, chunkIDs
+	return lst
 }
 
 func WithChunkID(id flow.Identifier) func(response *messages.ChunkDataResponse) {

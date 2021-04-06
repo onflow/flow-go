@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mock"
@@ -88,15 +89,18 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 }
 
 // TestHandleChunkDataPack_HappyPath_Multiple evaluates the happy path of receiving several requested chunk data packs.
-// Each chunk data pack should be handled once by being passed to the registered handler, and the resources should be cleaned up.
+// Each chunk data pack should be handled once by being passed to the registered handler,
+// the chunk ID and collection ID should match the response, and the resources should be cleaned up.
 func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
 	// creates list of chunk data pack responses
 	count := 10
-	responses, chunkIDs := unittest.ChunkDataResponsesFixture(count)
+	responses := unittest.ChunkDataResponsesFixture(count)
 	originID := unittest.IdentifierFixture()
+	chunkCollectionIdMap := chunkToCollectionIdMap(t, responses)
+	chunkIDs := toChunkIDs(chunkCollectionIdMap)
 
 	// maps keep track of distinct invocations per chunk ID
 	retrievedRequests := make(map[flow.Identifier]struct{})
@@ -136,12 +140,13 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	s.handler.On("HandleChunkDataPack", originID, testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
 		chunk, ok := args[1].(*flow.ChunkDataPack)
 		require.True(t, ok)
-		_, ok = args[2].(*flow.Collection)
+		collection, ok := args[2].(*flow.Collection)
 		require.True(t, ok)
 
-		// we should have already requested this chunk data pack
+		// we should have already requested this chunk data pack, and collection ID should be the same.
 		chunkID := chunk.ID()
 		require.Contains(t, chunkIDs, chunkID)
+		require.Equal(t, chunkCollectionIdMap[chunkID], collection.ID())
 
 		// invocation should be distinct per chunk ID
 		_, ok = handledChunks[chunkID]
@@ -200,4 +205,26 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con)
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
+}
+
+// chunkToCollectionIdMap is a test helper that extracts a chunkID -> collectionID map from chunk data responses.
+func chunkToCollectionIdMap(t *testing.T, responses []*messages.ChunkDataResponse) map[flow.Identifier]flow.Identifier {
+	chunkCollectionMap := make(map[flow.Identifier]flow.Identifier)
+	for _, response := range responses {
+		_, ok := chunkCollectionMap[response.ChunkDataPack.ChunkID]
+		require.False(t, ok, "duplicate chunk ID found in fixture")
+		chunkCollectionMap[response.ChunkDataPack.ChunkID] = response.ChunkDataPack.CollectionID
+	}
+
+	return chunkCollectionMap
+}
+
+// toChunkIDs is a test helper that extracts the chunk IDs from a chunk ID -> collection ID map.
+func toChunkIDs(chunkToCollectionIDs map[flow.Identifier]flow.Identifier) flow.IdentifierList {
+	chunkIDs := flow.IdentifierList{}
+	for chunkID := range chunkToCollectionIDs {
+		chunkIDs = append(chunkIDs, chunkID)
+	}
+
+	return chunkIDs
 }
