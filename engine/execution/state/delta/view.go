@@ -106,7 +106,6 @@ func (v *View) DropDelta() {
 	v.delta = NewDelta()
 }
 
-// TODO optimize this
 func (v *View) AllRegisters() []flow.RegisterID {
 	return v.Interactions().AllRegisters()
 }

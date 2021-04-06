@@ -211,47 +211,6 @@ func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 	return delta.NewView(LedgerGetRegister(s.ls, commitment))
 }
 
-func CommitView(ldg ledger.Ledger, view delta.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
-	ids, values := view.Delta().RegisterUpdates()
-
-	update, err := ledger.NewUpdate(
-		baseState,
-		RegisterIDSToKeys(ids),
-		RegisterValuesToValues(values),
-	)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
-	}
-
-	newCommit, err := ldg.Set(update)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	allRegisters := view.Interactions().AllRegisters()
-
-	query, err := makeQuery(baseState, allRegisters)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
-	}
-
-	proof, err := ldg.Prove(query)
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot get proof: %w", err)
-	}
-
-	return newCommit, proof, nil
-}
-
-func (s *state) CommitView(ctx context.Context, view delta.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-	defer span.Finish()
-
-	return CommitView(s.ls, view, baseState)
-}
-
 func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
