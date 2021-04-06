@@ -216,5 +216,6 @@ func (s *ClientSuite) TestDKGContractClient() {
 	block, err := s.emulator.GetLatestBlock()
 	require.NoError(s.T(), err)
 	messages, err := s.client.ReadBroadcast(0, block.ID())
+	require.NoError(s.T(), err)
 	assert.True(s.T(), len(messages) == 1)
 }

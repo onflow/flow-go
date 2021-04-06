@@ -82,6 +82,10 @@ func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk
 		return nil, err
 	}
 
+	if scriptResult.Error != nil {
+		return nil, fmt.Errorf("error in script: %w", scriptResult.Error)
+	}
+
 	return scriptResult.Value, nil
 }
 

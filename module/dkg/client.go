@@ -133,22 +133,26 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 		return nil, fmt.Errorf("could not execute read broadcast script: %v", err)
 	}
 
+	fmt.Printf("%v", value)
 	// conversion failing... returning nil
-	fmt.Println(value)
+	if value == nil {
+		return nil, fmt.Errorf("execute script value is nil")
+	}
+	fmt.Printf("%v", value)
 
-	// values := value.ToGoValue().([]dkgContractMsg)
+	values := value.ToGoValue().([]dkgContractMsg)
 
-	// messages := make([]model.DKGMessage, len(values))
-	// for _, val := range values {
-	// 	jsonString := val.content
+	messages := make([]model.DKGMessage, len(values))
+	for _, val := range values {
+		jsonString := val.content
 
-	// 	var msg model.DKGMessage
-	// 	err := json.Unmarshal([]byte(jsonString), &msg)
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
-	// 	}
-	// 	messages = append(messages, msg)
-	// }
+		var msg model.DKGMessage
+		err := json.Unmarshal([]byte(jsonString), &msg)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
+		}
+		messages = append(messages, msg)
+	}
 
 	return []model.DKGMessage{}, nil
 }
