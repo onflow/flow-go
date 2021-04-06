@@ -949,9 +949,9 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 
 // ChunkDataResponseFixture creates a chunk data response with a single-transaction collection, and random chunk ID.
 // Use options to customize the response.
-func ChunkDataResponseFixture(opts ...func(response *messages.ChunkDataResponse)) *messages.ChunkDataResponse {
+func ChunkDataResponseFixture(chunkID flow.Identifier, opts ...func(*messages.ChunkDataResponse)) *messages.ChunkDataResponse {
 	cdp := &messages.ChunkDataResponse{
-		ChunkDataPack: *ChunkDataPackFixture(IdentifierFixture()),
+		ChunkDataPack: *ChunkDataPackFixture(chunkID),
 		Collection:    CollectionFixture(1),
 		Nonce:         rand.Uint64(),
 	}
@@ -966,23 +966,63 @@ func ChunkDataResponseFixture(opts ...func(response *messages.ChunkDataResponse)
 }
 
 // ChunkDataResponsesFixture creates a list of chunk data responses each with a single-transaction collection, and random chunk ID.
-func ChunkDataResponsesFixture(n int) []*messages.ChunkDataResponse {
+func ChunkDataResponsesFixture(n int, opts ...func(*messages.ChunkDataResponse)) []*messages.ChunkDataResponse {
 	lst := make([]*messages.ChunkDataResponse, 0, n)
 	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkDataResponseFixture())
+		lst = append(lst, ChunkDataResponseFixture(IdentifierFixture(), opts...))
 	}
 	return lst
-}
-
-func WithChunkID(id flow.Identifier) func(response *messages.ChunkDataResponse) {
-	return func(response *messages.ChunkDataResponse) {
-		response.ChunkDataPack = *ChunkDataPackFixture(id)
-	}
 }
 
 func WithTransactionNum(num int) func(response *messages.ChunkDataResponse) {
 	return func(response *messages.ChunkDataResponse) {
 		response.Collection = CollectionFixture(num)
+	}
+}
+
+// ChunkDataPackRequestFixture creates a chunk data request with some default values, i.e., one agree execution node, one disagree execution node,
+// and height of zero.
+// Use options to customize the request.
+func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.
+	ChunkDataPackRequest {
+	req := &verification.ChunkDataPackRequest{
+		ChunkID:   chunkID,
+		Height:    0,
+		Agrees:    IdentifierListFixture(1),
+		Disagrees: IdentifierListFixture(1),
+	}
+
+	for _, opt := range opts {
+		opt(req)
+	}
+
+	return req
+}
+
+// ChunkDataPackRequestsFixture creates a list of chunk data requests.
+func ChunkDataPackRequestsFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
+	lst := make([]*verification.ChunkDataPackRequest, 0, n)
+	for i := 0; i < n; i++ {
+		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
+	}
+	return lst
+}
+
+func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Height = height
+	}
+}
+
+func WithAgrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Agrees = list
+	}
+}
+
+func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Disagrees = list
 	}
 }
 

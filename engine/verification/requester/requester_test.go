@@ -73,7 +73,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	response := unittest.ChunkDataResponseFixture()
+	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
 	// we have a request pending for this response chunk ID
@@ -123,7 +123,7 @@ func TestHandleChunkDataPack_NonExistingRequest(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	response := unittest.ChunkDataResponseFixture()
+	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
 	// we have a request pending for this response chunk ID
@@ -146,7 +146,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	response := unittest.ChunkDataResponseFixture()
+	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
 	// we have a request pending for this response chunk ID
@@ -161,6 +161,10 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con)
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
+}
+
+func TestRequestPendingChunkDataPacks_HappyPath(t *testing.T) {
+
 }
 
 // chunkToCollectionIdMap is a test helper that extracts a chunkID -> collectionID map from chunk data responses.
