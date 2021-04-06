@@ -16,7 +16,8 @@ type ApprovalCollector struct {
 	lock                                 sync.RWMutex               // lock for modifying aggregatedSignatures
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, authorizedVerifiers map[flow.Identifier]struct{}, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
+func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment,
+	authorizedVerifiers map[flow.Identifier]struct{}, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := make(map[flow.Identifier]struct{})
@@ -31,6 +32,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.As
 		chunkCollectors:                      chunkCollectors,
 		assignmentAuthorizedVerifiers:        authorizedVerifiers,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
+		aggregatedSignatures:                 make([]flow.AggregatedSignature, result.Result.Chunks.Len()),
 	}
 }
 

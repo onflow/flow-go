@@ -19,11 +19,12 @@ type ResultApprovalProcessor interface {
 
 // implementation of ResultApprovalProcessor
 type resultApprovalProcessor struct {
-	collectors map[flow.Identifier]*AssignmentCollector // contains a mapping of ResultID to AssignmentCollector
-	lock       sync.RWMutex                             // lock for collectors
-	assigner   module.ChunkAssigner
-	state      protocol.State
-	verifier   module.Verifier
+	collectors                           map[flow.Identifier]*AssignmentCollector // contains a mapping of ResultID to AssignmentCollector
+	lock                                 sync.RWMutex                             // lock for collectors
+	assigner                             module.ChunkAssigner
+	state                                protocol.State
+	verifier                             module.Verifier
+	requiredApprovalsForSealConstruction uint
 }
 
 func (p *resultApprovalProcessor) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
@@ -53,7 +54,7 @@ func (p *resultApprovalProcessor) getCollector(resultID flow.Identifier) *Assign
 func (p *resultApprovalProcessor) createCollector(resultID flow.Identifier) *AssignmentCollector {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.verifier)
+	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.verifier, p.requiredApprovalsForSealConstruction)
 	p.collectors[resultID] = collector
 	return collector
 }

@@ -19,28 +19,28 @@ type AssignmentCollector struct {
 	// collectors is a mapping IncorporatedBlockID -> ApprovalCollector
 	// for every incorporated result we will track approvals separately
 	collectors map[flow.Identifier]*ApprovalCollector
-
-	lock sync.RWMutex
+	lock       sync.RWMutex // lock for protecting collectors map
 
 	//approvalsCache ApprovalsCache
 
 	// authorized approvers for this collector on execution
 	// used to check identity of approver
-	authorizedApprovers map[flow.Identifier]*flow.Identity
-
-	assigner module.ChunkAssigner
-	state    protocol.State
-	verifier module.Verifier
+	authorizedApprovers                  map[flow.Identifier]*flow.Identity
+	assigner                             module.ChunkAssigner
+	state                                protocol.State
+	verifier                             module.Verifier
+	requiredApprovalsForSealConstruction uint
 }
 
 func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assigner module.ChunkAssigner,
-	sigVerifier module.Verifier) *AssignmentCollector {
+	sigVerifier module.Verifier, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
 	collector := &AssignmentCollector{
-		resultID:   resultID,
-		collectors: make(map[flow.Identifier]*ApprovalCollector),
-		state:      state,
-		assigner:   assigner,
-		verifier:   sigVerifier,
+		resultID:                             resultID,
+		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
+		state:                                state,
+		assigner:                             assigner,
+		verifier:                             sigVerifier,
+		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 	return collector
 }
@@ -106,7 +106,8 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.collectors[incorporatedResult.IncorporatedBlockID] = NewApprovalCollector(incorporatedResult, assignment, authorizedVerifiers)
+	c.collectors[incorporatedResult.IncorporatedBlockID] = NewApprovalCollector(incorporatedResult, assignment,
+		authorizedVerifiers, c.requiredApprovalsForSealConstruction)
 	return nil
 }
 
