@@ -104,23 +104,10 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	chunkIDs := toChunkIDs(chunkCollectionIdMap)
 
 	// maps keep track of distinct invocations per chunk ID
-	retrievedRequests := make(map[flow.Identifier]struct{})
 	removedRequests := make(map[flow.Identifier]struct{})
 
 	// we have a request pending for this response chunk ID
-	s.pendingRequests.On("ByID", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
-		// we should have already requested this chunk data pack
-		require.Contains(t, chunkIDs, chunkID)
-
-		// invocation should be distinct per chunk ID
-		_, ok = retrievedRequests[chunkID]
-		require.False(t, ok)
-		retrievedRequests[chunkID] = struct{}{}
-	}).
-		Return(&verification.ChunkRequestStatus{}, true).
-		Times(count)
+	mockPendingRequestsExistence(t, s.pendingRequests, chunkIDs)
 
 	// we remove pending request on receiving this response
 	s.pendingRequests.On("Rem", testifymock.Anything).Run(func(args testifymock.Arguments) {
@@ -284,4 +271,24 @@ func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHa
 		require.False(t, ok)
 		handledChunks[chunkID] = struct{}{}
 	}).Return().Times(len(chunkIDs))
+}
+
+// mockPendingRequestsExistence mocks chunk requests mempool for being queried for affirmative existence of each chunk ID once.
+func mockPendingRequestsExistence(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
+	// maps keep track of distinct invocations per chunk ID
+	retrievedRequests := make(map[flow.Identifier]struct{})
+
+	// we have a request pending for this response chunk ID
+	pendingRequests.On("ByID", testifymock.Anything).Run(func(args testifymock.Arguments) {
+		chunkID, ok := args[0].(flow.Identifier)
+		require.True(t, ok)
+		// we should have already requested this chunk data pack
+		require.Contains(t, chunkIDs, chunkID)
+
+		// invocation should be distinct per chunk ID
+		_, ok = retrievedRequests[chunkID]
+		require.False(t, ok)
+		retrievedRequests[chunkID] = struct{}{}
+	}).Return(&verification.ChunkRequestStatus{}, true).
+		Times(len(chunkIDs))
 }
