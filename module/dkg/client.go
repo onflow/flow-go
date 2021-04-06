@@ -17,7 +17,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
+	model "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -49,7 +49,7 @@ func NewClient(flowClient module.DKGSDKClientWrapper, signer sdkcrypto.Signer, d
 // DKG. The message is broadcast by submitting a transaction to the DKG
 // smart contract. An error is returned if the transaction has failed has
 // failed
-func (c *Client) Broadcast(msg messages.DKGMessage) error {
+func (c *Client) Broadcast(msg model.DKGMessage) error {
 
 	ctx := context.Background()
 
@@ -90,7 +90,7 @@ func (c *Client) Broadcast(msg messages.DKGMessage) error {
 	}
 
 	// submit signed transaction to node
-	txID, err := c.submitTx(tx)
+	txID, err := c.submitTx(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
@@ -118,7 +118,7 @@ func (c *Client) Broadcast(msg messages.DKGMessage) error {
 // ReadBroadcast reads the broadcast messages from the smart contract.
 // Messages are returned in the order in which they were broadcast (received
 // and stored in the smart contract)
-func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.DKGMessage, error) {
+func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.DKGMessage, error) {
 
 	type dkgContractMsg struct {
 		nodeID  string
@@ -134,11 +134,11 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	}
 	values := value.(cadence.Array).Values
 
-	messages := make([]messages.DKGMessage, len(values))
+	messages := make([]model.DKGMessage, len(values))
 	for _, val := range values {
-		jsonString := val.(dkgContractMsg).content
+		jsonString := val.ToGoValue().(dkgContractMsg).content
 
-		var msg messages.DKGMessage
+		var msg model.DKGMessage
 		err := json.Unmarshal([]byte(jsonString), &msg)
 		if err != nil {
 			return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
@@ -196,7 +196,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	}
 
 	// submit signed transaction to node
-	txID, err := c.submitTx(tx)
+	txID, err := c.submitTx(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
@@ -226,7 +226,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 func (c *Client) submitTx(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
 
 	// check if the transaction has a signature
-	if len(tx.EnvelopeSignatures) == 0 {
+	if len(tx.PayloadSignatures) == 0 {
 		return sdk.EmptyID, fmt.Errorf("can not submit an unsigned transaction")
 	}
 
