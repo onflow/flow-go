@@ -164,7 +164,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  "[Error Code: 1053] invalid address (0000000000000000): no payer address provided",
+					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
