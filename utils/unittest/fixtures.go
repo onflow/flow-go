@@ -1303,7 +1303,7 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 	// after changing results we need to update IDs of results in receipt
 	for _, block := range blocks {
 		if len(block.Payload.Results) > 0 {
-			for i, _ := range block.Payload.Receipts {
+			for i := range block.Payload.Receipts {
 				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
 			}
 		}
