@@ -29,7 +29,7 @@ const (
 	EngineCompliance         = "compliance"
 	EngineConsensusProvider  = "consensus_provider"
 	EngineConsensusIngestion = "consensus_ingestion"
-	EngineMatching           = "matching"
+	EngineSealing            = "sealing"
 	EngineSynchronization    = "sync"
 	// common
 	EngineFollower = "follower"
@@ -68,11 +68,11 @@ const (
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
 	ResourceDKGKey                   = "dkg-key"
-	ResourceApprovalQueue            = "matching_approval_queue"          // consensus node, matching engine
-	ResourceReceiptQueue             = "matching_receipt_queue"           // consensus node, matching engine
-	ResourceApprovalResponseQueue    = "matching_approval_response_queue" // consensus node, matching engine
-	ResourceBlockProposalQueue       = "compliance_proposal_queue"        // consensus node, compliance engine
-	ResourceBlockVoteQueue           = "compliance_vote_queue"            // consensus node, compliance engine
+	ResourceApprovalQueue            = "sealing_approval_queue"          // consensus node, sealing engine
+	ResourceReceiptQueue             = "sealing_receipt_queue"           // consensus node, sealing engine
+	ResourceApprovalResponseQueue    = "sealing_approval_response_queue" // consensus node, sealing engine
+	ResourceBlockProposalQueue       = "compliance_proposal_queue"       // consensus node, compliance engine
+	ResourceBlockVoteQueue           = "compliance_vote_queue"           // consensus node, compliance engine
 )
 
 const (

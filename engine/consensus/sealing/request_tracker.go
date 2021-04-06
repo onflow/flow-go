@@ -1,4 +1,4 @@
-package matching
+package sealing
 
 import (
 	"math/rand"
