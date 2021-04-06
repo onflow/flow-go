@@ -957,6 +957,19 @@ func ChunkDataResponseFixture(opts ...func(response *messages.ChunkDataResponse)
 	}
 }
 
+// ChunkDataResponsesFixture creates a list of chunk data responses each with a single-transaction collection, and random chunk ID.
+func ChunkDataResponsesFixture(n int) ([]*messages.ChunkDataResponse, flow.IdentifierList) {
+	lst := make([]*messages.ChunkDataResponse, 0, n)
+	chunkIDs := flow.IdentifierList{}
+	for i := 0; i < n; i++ {
+		cdpf := ChunkDataResponseFixture()
+		lst = append(lst, cdpf)
+		chunkIDs = append(chunkIDs, cdpf.ChunkDataPack.ChunkID)
+	}
+
+	return lst, chunkIDs
+}
+
 func WithChunkID(id flow.Identifier) func(response *messages.ChunkDataResponse) {
 	return func(response *messages.ChunkDataResponse) {
 		response.ChunkDataPack = *ChunkDataPackFixture(id)
