@@ -120,10 +120,6 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 // and stored in the smart contract)
 func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.DKGMessage, error) {
 
-	type dkgContractMsg struct {
-		content string
-	}
-
 	ctx := context.Background()
 
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
@@ -132,21 +128,17 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 		return nil, fmt.Errorf("could not execute read broadcast script: %v", err)
 	}
 
-	fmt.Printf("%v", value)
-	// conversion failing... returning nil
-	if value == nil {
-		return nil, fmt.Errorf("execute script value is nil")
-	}
-	fmt.Printf("%v", value)
+	fmt.Printf("%v", value.(cadence.Array).Values[0].(cadence.Struct).Fields[1].String())
 
-	values := value.ToGoValue().([]dkgContractMsg)
+	values := value.(cadence.Array).Values
 
 	messages := make([]model.DKGMessage, len(values))
 	for _, val := range values {
-		jsonString := val.content
+		message := val.(cadence.Struct)
+		content := message.Fields[1]
 
 		var msg model.DKGMessage
-		err := json.Unmarshal([]byte(jsonString), &msg)
+		err := json.Unmarshal([]byte(content.String()), &msg)
 		if err != nil {
 			return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
 		}

@@ -113,7 +113,7 @@ func (s *ClientSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.A
 func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.Value {
 	result, err := s.emulator.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
-	assert.True(s.T(), result.Succeeded())
+	require.True(s.T(), result.Succeeded())
 	return result.Value
 }
 
