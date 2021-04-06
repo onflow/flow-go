@@ -106,7 +106,6 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	// maps keep track of distinct invocations per chunk ID
 	retrievedRequests := make(map[flow.Identifier]struct{})
 	removedRequests := make(map[flow.Identifier]struct{})
-	handledChunks := make(map[flow.Identifier]struct{})
 
 	// we have a request pending for this response chunk ID
 	s.pendingRequests.On("ByID", testifymock.Anything).Run(func(args testifymock.Arguments) {
@@ -138,22 +137,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 		Return(true).
 		Times(count)
 
-	s.handler.On("HandleChunkDataPack", originID, testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunk, ok := args[1].(*flow.ChunkDataPack)
-		require.True(t, ok)
-		collection, ok := args[2].(*flow.Collection)
-		require.True(t, ok)
-
-		// we should have already requested this chunk data pack, and collection ID should be the same.
-		chunkID := chunk.ID()
-		require.Contains(t, chunkIDs, chunkID)
-		require.Equal(t, chunkCollectionIdMap[chunkID], collection.ID())
-
-		// invocation should be distinct per chunk ID
-		_, ok = handledChunks[chunkID]
-		require.False(t, ok)
-		handledChunks[chunkID] = struct{}{}
-	}).Return().Times(count)
+	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 
 	for _, response := range responses {
 		err := e.Process(originID, response)
@@ -272,4 +256,32 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 	}).Return(nil).Times(count * len(chunkIDs)) // each chunk requested count time.
 
 	unittest.RequireReturnsBefore(t, wg.Wait, handlerTimeout, "could not request and handle chunks on time")
+}
+
+// mockChunkDataPackHandler mocks chunk data pack handler for receiving a set of chunk ids.
+// It evaluates that, each chunk ID should be passed only once accompanied with specified collection.
+func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler,
+	chunkToCollectionIDs map[flow.Identifier]flow.Identifier) {
+	chunkIDs := flow.IdentifierList{}
+	for chunkID := range chunkToCollectionIDs {
+		chunkIDs = append(chunkIDs, chunkID)
+	}
+	handledChunks := make(map[flow.Identifier]struct{})
+
+	handler.On("HandleChunkDataPack", testifymock.Anything, testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		chunk, ok := args[1].(*flow.ChunkDataPack)
+		require.True(t, ok)
+		collection, ok := args[2].(*flow.Collection)
+		require.True(t, ok)
+
+		// we should have already requested this chunk data pack, and collection ID should be the same.
+		chunkID := chunk.ID()
+		require.Contains(t, chunkIDs, chunkID)
+		require.Equal(t, chunkToCollectionIDs[chunkID], collection.ID())
+
+		// invocation should be distinct per chunk ID
+		_, ok = handledChunks[chunkID]
+		require.False(t, ok)
+		handledChunks[chunkID] = struct{}{}
+	}).Return().Times(len(chunkIDs))
 }
