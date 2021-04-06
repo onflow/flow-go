@@ -18,10 +18,11 @@ import (
 
 // Headers implements a simple read-only header storage around a badger DB.
 type Headers struct {
-	db           *badger.DB
-	cache        *Cache
-	heightCache  *Cache
-	chunkIDCache *Cache
+	db             *badger.DB
+	cache          *Cache
+	heightCache    *Cache
+	chunkIDCache   *Cache
+	timeStampCache *Cache
 }
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
@@ -29,11 +30,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
 		blockID := key.(flow.Identifier)
 		header := val.(*flow.Header)
-		err := operation.InsertHeader(blockID, header)
-		if err != nil {
-			err = operation.IndexTimestampByBlockID(blockID, header.Timestamp)
-		}
-		return err
+		return operation.InsertHeader(blockID, header)
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
@@ -48,6 +45,12 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		chunkID := key.(flow.Identifier)
 		blockID := val.(flow.Identifier)
 		return operation.IndexBlockIDByChunkID(chunkID, blockID)
+	}
+
+	storeTimeStamp := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+		blockID := key.(flow.Identifier)
+		timestamp := val.(time.Time)
+		return operation.IndexTimestampByBlockID(blockID, timestamp)
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -77,6 +80,15 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 		}
 	}
 
+	retrieveTimeStamp := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
+		blockID := key.(flow.Identifier)
+		var timeStamp time.Time
+		return func(tx *badger.Txn) (interface{}, error) {
+			err := operation.LookupTimeStampByBlockID(blockID, &timeStamp)(tx)
+			return timeStamp, err
+		}
+	}
+
 	h := &Headers{
 		db: db,
 		cache: newCache(collector,
@@ -94,6 +106,11 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(storeChunkID),
 			withRetrieve(retrieveChunkID),
+			withResource(metrics.ResourceFinalizedHeight)),
+		timeStampCache: newCache(collector,
+			withLimit(4*flow.DefaultTransactionExpiry),
+			withStore(storeTimeStamp),
+			withRetrieve(retrieveTimeStamp),
 			withResource(metrics.ResourceFinalizedHeight)),
 	}
 

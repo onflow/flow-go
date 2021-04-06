@@ -2,6 +2,7 @@ package badger_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -56,15 +57,18 @@ func TestTimeStampRetrieve(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		headers := badgerstorage.NewHeaders(metrics, db)
 
-		block := unittest.BlockFixture()
+		header := unittest.BlockHeaderFixture()
+		fmt.Println(header.Timestamp)
+		fmt.Println(header.Timestamp.UTC())
 
 		// store header
-		err := headers.Store(block.Header)
+		err := headers.Store(&header)
 		require.NoError(t, err)
 
-		timeStamp, err := headers.TimestampByBlockID(block.ID())
+		timeStamp, err := headers.TimestampByBlockID(header.ID())
 		require.NoError(t, err)
-		expectedTimeStamp := block.Header.Timestamp
+		fmt.Println(timeStamp)
+		expectedTimeStamp := header.Timestamp
 		expectedTimeStamp = expectedTimeStamp.UTC()
 		require.Equal(t, expectedTimeStamp, timeStamp)
 	})
