@@ -1,4 +1,4 @@
-package computation
+package committer
 
 import (
 	"fmt"
@@ -25,11 +25,11 @@ func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCo
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		proof, err2 = CollectProofs(s.ldg, view, baseState)
+		proof, err2 = s.collectProofs(view, baseState)
 		wg.Done()
 	}()
 
-	newCommit, err1 = CommitView(s.ldg, view, baseState)
+	newCommit, err1 = s.commitView(view, baseState)
 	wg.Wait()
 
 	if err1 != nil {
@@ -41,7 +41,7 @@ func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCo
 	return
 }
 
-func CommitView(ldg ledger.Ledger, view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, err error) {
+func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, err error) {
 	ids, values := view.RegisterUpdates()
 	update, err := ledger.NewUpdate(
 		baseState,
@@ -52,10 +52,10 @@ func CommitView(ldg ledger.Ledger, view state.View, baseState flow.StateCommitme
 		return nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	return ldg.Set(update)
+	return s.ldg.Set(update)
 }
 
-func CollectProofs(ldg ledger.Ledger, view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
+func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
 	allIds := view.AllRegisters()
 	keys := make([]ledger.Key, len(allIds))
 	for i, id := range allIds {
@@ -67,16 +67,5 @@ func CollectProofs(ldg ledger.Ledger, view state.View, baseState flow.StateCommi
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
-	return ldg.Prove(query)
-}
-
-type NoopViewCommitter struct {
-}
-
-func NewNoopViewCommitter() *NoopViewCommitter {
-	return &NoopViewCommitter{}
-}
-
-func (n NoopViewCommitter) CommitView(_ state.View, s flow.StateCommitment) (flow.StateCommitment, []byte, error) {
-	return s, nil, nil
+	return s.ldg.Prove(query)
 }
