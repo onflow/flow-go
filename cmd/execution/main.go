@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -221,7 +222,7 @@ func main() {
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 
-			committer := computation.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
+			committer := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
 			manager, err := computation.New(
 				node.Logger,
 				collector,
@@ -233,6 +234,9 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 			)
+			if err != nil {
+				return nil, err
+			}
 			computationManager = manager
 
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
