@@ -127,6 +127,9 @@ func (e *blockComputer) executeBlock(
 	var err error
 	var wg sync.WaitGroup
 
+	stateCommitments := make([]flow.StateCommitment, len(collections)+1)
+	proofs := make([][]byte, len(collections)+1)
+
 	bc := blockCommitter{
 		committer: e.committer,
 		blockSpan: blockSpan,
@@ -138,8 +141,8 @@ func (e *blockComputer) executeBlock(
 			if err != nil {
 				panic(err)
 			}
-			res.AddStateCommitment(state)
-			res.AddProof(proof)
+			stateCommitments = append(stateCommitments, state)
+			proofs = append(proofs, proof)
 		},
 	}
 
@@ -177,6 +180,8 @@ func (e *blockComputer) executeBlock(
 	// wait for all views to be committed
 	wg.Wait()
 	res.StateReads = stateView.(*delta.View).ReadsCount()
+	res.StateCommitments = stateCommitments
+	res.Proofs = proofs
 	return res, nil
 }
 
