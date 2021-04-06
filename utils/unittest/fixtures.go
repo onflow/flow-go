@@ -201,9 +201,11 @@ func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
 func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
-	receipt := ExecutionReceiptFixture()
-	payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
-	payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+	for i := 0; i < 10; i++ {
+		receipt := ExecutionReceiptFixture()
+		payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
+		payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+	}
 }
 
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
