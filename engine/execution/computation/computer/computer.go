@@ -126,6 +126,7 @@ func (e *blockComputer) executeBlock(
 	var txIndex uint32
 	var err error
 	var wg sync.WaitGroup
+	wg.Add(1)
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
@@ -146,8 +147,10 @@ func (e *blockComputer) executeBlock(
 		},
 	}
 
-	go bc.Run()
-	defer close(bc.views)
+	go func() {
+		bc.Run()
+		wg.Done()
+	}()
 
 	for _, collection := range collections {
 		colView := stateView.NewChild()
@@ -155,7 +158,6 @@ func (e *blockComputer) executeBlock(
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
-		wg.Add(1)
 		bc.Commit(colView)
 		err = stateView.MergeView(colView)
 		if err != nil {
@@ -170,18 +172,19 @@ func (e *blockComputer) executeBlock(
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
-	wg.Add(1)
 	bc.Commit(colView)
 	err = stateView.MergeView(colView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
 
-	// wait for all views to be committed
+	// close the views and wait for all views to be committed
+	close(bc.views)
 	wg.Wait()
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
 	res.Proofs = proofs
+
 	return res, nil
 }
 

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
+
 	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -33,10 +35,10 @@ func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCo
 	wg.Wait()
 
 	if err1 != nil {
-		err = err1
+		err = multierror.Append(err, err1)
 	}
 	if err2 != nil {
-		err = err1
+		err = multierror.Append(err, err2)
 	}
 	return
 }
