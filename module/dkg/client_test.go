@@ -29,8 +29,6 @@ type ClientSuite struct {
 
 	client *Client
 
-	nodeAddress sdk.Address
-
 	env            templates.Environment
 	emulator       *emulator.Blockchain
 	emulatorClient *EmulatorClient

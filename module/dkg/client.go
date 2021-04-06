@@ -121,7 +121,6 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.DKGMessage, error) {
 
 	type dkgContractMsg struct {
-		nodeID  string
 		content string
 	}
 
@@ -154,7 +153,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 		messages = append(messages, msg)
 	}
 
-	return []model.DKGMessage{}, nil
+	return messages, nil
 }
 
 // SubmitResult submits the final public result of the DKG protocol. This
