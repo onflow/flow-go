@@ -138,7 +138,6 @@ func (e *blockComputer) executeBlock(
 		state:     block.StartState,
 		views:     make(chan state.View, len(collections)+1),
 		callBack: func(state flow.StateCommitment, proof []byte, err error) {
-			defer wg.Done()
 			if err != nil {
 				panic(err)
 			}
