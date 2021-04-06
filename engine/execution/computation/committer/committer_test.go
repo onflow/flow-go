@@ -3,14 +3,15 @@ package committer_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	led "github.com/onflow/flow-go/ledger"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
 	"github.com/onflow/flow-go/module/trace"
 	utils "github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func TestLedgerViewCommitter(t *testing.T) {
