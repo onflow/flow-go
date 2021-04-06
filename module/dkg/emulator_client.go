@@ -92,14 +92,14 @@ func (c *EmulatorClient) Submit(tx *sdk.Transaction) error {
 		return err
 	}
 
-	_, err = c.blockchain.ExecuteNextTransaction()
+	result, err := c.blockchain.ExecuteNextTransaction()
 	if err != nil {
 		return err
 	}
 
-	// if !result.Succeeded() {
-	// 	return fmt.Errorf("transaction did not succeeded")
-	// }
+	if !result.Succeeded() {
+		return fmt.Errorf("transaction did not succeeded")
+	}
 
 	_, err = c.blockchain.CommitBlock()
 	if err != nil {

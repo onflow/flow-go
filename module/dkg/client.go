@@ -84,7 +84,7 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 	}
 
 	// sign payload using account signer
-	err = tx.SignPayload(c.accountAddress, int(c.accountKeyIndex), c.signer)
+	err = tx.SignEnvelope(c.accountAddress, int(c.accountKeyIndex), c.signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
@@ -132,21 +132,25 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	if err != nil {
 		return nil, fmt.Errorf("could not execute read broadcast script: %v", err)
 	}
-	values := value.(cadence.Array).Values
 
-	messages := make([]model.DKGMessage, len(values))
-	for _, val := range values {
-		jsonString := val.ToGoValue().(dkgContractMsg).content
+	// conversion failing... returning nil
+	fmt.Println(value)
 
-		var msg model.DKGMessage
-		err := json.Unmarshal([]byte(jsonString), &msg)
-		if err != nil {
-			return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
-		}
-		messages = append(messages, msg)
-	}
+	// values := value.ToGoValue().([]dkgContractMsg)
 
-	return messages, nil
+	// messages := make([]model.DKGMessage, len(values))
+	// for _, val := range values {
+	// 	jsonString := val.content
+
+	// 	var msg model.DKGMessage
+	// 	err := json.Unmarshal([]byte(jsonString), &msg)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
+	// 	}
+	// 	messages = append(messages, msg)
+	// }
+
+	return []model.DKGMessage{}, nil
 }
 
 // SubmitResult submits the final public result of the DKG protocol. This
@@ -190,7 +194,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	}
 
 	// sign payload using account signer
-	err = tx.SignPayload(c.accountAddress, int(c.accountKeyIndex), c.signer)
+	err = tx.SignEnvelope(c.accountAddress, int(c.accountKeyIndex), c.signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
@@ -226,7 +230,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 func (c *Client) submitTx(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
 
 	// check if the transaction has a signature
-	if len(tx.PayloadSignatures) == 0 {
+	if len(tx.EnvelopeSignatures) == 0 {
 		return sdk.EmptyID, fmt.Errorf("can not submit an unsigned transaction")
 	}
 
