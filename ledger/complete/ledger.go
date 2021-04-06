@@ -155,14 +155,20 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	l.metrics.UpdateCount()
 	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
-	err = l.wal.RecordUpdate(trieUpdate)
-	if err != nil {
-		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
-	}
+	walChan := make(chan error)
+
+	go func() {
+		walChan <- l.wal.RecordUpdate(trieUpdate)
+	}()
 
 	newRootHash, err := l.forest.Update(trieUpdate)
+	walError := <-walChan
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
+	}
+	if walError != nil {
+		return nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
