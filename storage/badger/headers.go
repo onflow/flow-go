@@ -196,10 +196,12 @@ func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch s
 }
 
 func (h *Headers) TimestampByBlockID(blockID flow.Identifier) (time.Time, error) {
-	var timeStamp time.Time
-	err := h.db.View(operation.LookupTimeStampByBlockID(blockID, &timeStamp))
+	tx := h.db.NewTransaction(false)
+	defer tx.Discard()
+
+	timeStamp, err := h.timeStampCache.Get(blockID)(tx)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("could not look up timestamp for BlockID %s: %w", blockID.String(), err)
 	}
-	return timeStamp, nil
+	return timeStamp.(time.Time), nil
 }
