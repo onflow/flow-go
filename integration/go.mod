@@ -13,6 +13,7 @@ require (
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
 	github.com/ethereum/go-ethereum v1.10.1 // indirect
+	github.com/go-openapi/strfmt v0.20.1 // indirect
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
