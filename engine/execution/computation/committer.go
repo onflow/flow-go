@@ -2,6 +2,7 @@ package computation
 
 import (
 	"fmt"
+	"sync"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/state"
@@ -19,48 +20,56 @@ func NewLedgerViewCommitter(ldg ledger.Ledger, tracer module.Tracer) *LedgerView
 	return &LedgerViewCommitter{ldg: ldg, tracer: tracer}
 }
 
-func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
-	return CommitView(s.ldg, view, baseState)
+func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, proof []byte, err error) {
+	var err1, err2 error
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		newCommit, err1 = CommitView(s.ldg, view, baseState)
+		wg.Done()
+	}()
+	go func() {
+		proof, err2 = CollectProofs(s.ldg, view, baseState)
+		wg.Done()
+	}()
+
+	wg.Wait()
+	if err1 != nil {
+		err = err1
+	}
+	if err2 != nil {
+		err = err1
+	}
+	return
 }
 
-func CommitView(ldg ledger.Ledger, view state.View, baseState flow.StateCommitment) (flow.StateCommitment, []byte, error) {
+func CommitView(ldg ledger.Ledger, view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, err error) {
 	ids, values := view.RegisterUpdates()
-
 	update, err := ledger.NewUpdate(
 		baseState,
 		execState.RegisterIDSToKeys(ids),
 		execState.RegisterValuesToValues(values),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	newCommit, err := ldg.Set(update)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	query, err := makeQuery(baseState, view.AllRegisters())
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create ledger query: %w", err)
-	}
-
-	proof, err := ldg.Prove(query)
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot get proof: %w", err)
-	}
-
-	return newCommit, proof, nil
+	return ldg.Set(update)
 }
 
-func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.Query, error) {
-
-	keys := make([]ledger.Key, len(ids))
-	for i, id := range ids {
+func CollectProofs(ldg ledger.Ledger, view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
+	allIds := view.AllRegisters()
+	keys := make([]ledger.Key, len(allIds))
+	for i, id := range allIds {
 		keys[i] = execState.RegisterIDToKey(id)
 	}
 
-	return ledger.NewQuery(commitment, keys)
+	query, err := ledger.NewQuery(baseState, keys)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create ledger query: %w", err)
+	}
+
+	return ldg.Prove(query)
 }
 
 type NoopViewCommitter struct {

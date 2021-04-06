@@ -841,10 +841,10 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	if e.isTraceable() {
-		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetSigningAccounts)
-		defer sp.Finish()
-	}
+	// if e.isTraceable() {
+	// 	sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetSigningAccounts)
+	// 	defer sp.Finish()
+	// }
 	if e.transactionEnv == nil {
 		return nil, errors.NewOperationNotSupportedError("GetSigningAccounts")
 	}

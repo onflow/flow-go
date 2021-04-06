@@ -28,8 +28,9 @@ type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
 }
 
+// ViewCommitter commits views's deltas to the ledger and collects the proofs
 type ViewCommitter interface {
-	// CommitView commits a views' register delta and returns a new state commitment and proof.
+	// CommitView commits a views' register delta and collects proofs
 	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
 }
 
@@ -335,7 +336,6 @@ func (e *blockComputer) executeTransaction(
 	return nil
 }
 
-// call back to update the result and increment the wait group
 type blockCommitter struct {
 	tracer    module.Tracer
 	committer ViewCommitter
@@ -345,7 +345,6 @@ type blockCommitter struct {
 	blockSpan opentracing.Span
 }
 
-// pass the queue and clean up instead
 func (bc *blockCommitter) Run() {
 	for view := range bc.views {
 		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
