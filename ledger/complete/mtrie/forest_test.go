@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"sort"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
@@ -792,7 +794,9 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	maxPayloadByteSize := 10
 	rep := 10
 	maxNumPathsPerStep := 10
-	rand.Seed(time.Now().UnixNano())
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
+	t.Log(seed)
 
 	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
@@ -813,7 +817,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 		// test reading for non-existing keys
 		nonExistingPaths := make([]ledger.Path, 0)
-		for _, p := range paths {
+		otherPaths := utils.RandomPathsRandLen(maxNumPathsPerStep, pathByteSize)
+		for _, p := range otherPaths {
 			if _, ok := latestPayloadByPath[string(p)]; !ok {
 				nonExistingPaths = append(nonExistingPaths, p)
 			}
@@ -843,14 +848,32 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		proofPaths = append(proofPaths, paths...)
 		proofPaths = append(proofPaths, nonExistingPaths...)
 
+		// shuffle the order of `proofPaths` to run `Proofs` on non-sorted input paths
+		rand.Shuffle(len(proofPaths), func(i, j int) {
+			proofPaths[i], proofPaths[j] = proofPaths[j], proofPaths[i]
+		})
+
+		// sort `proofPaths` into another slice
+		sortedPaths := make([]ledger.Path, len(proofPaths))
+		copy(sortedPaths, proofPaths)
+		sort.Slice(sortedPaths, func(i, j int) bool {
+			return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
+		})
+
 		read = &ledger.TrieRead{RootHash: activeRoot, Paths: proofPaths}
 		batchProof, err := forest.Proofs(read)
 		require.NoError(t, err, "error generating proofs")
-		require.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
+		assert.True(t, common.VerifyTrieBatchProof(batchProof, activeRoot))
 
+		// check `Proofs` has sorted the input paths.
+		// this check is needed to not weaken the SPoCK secret entropy,
+		// when `Proofs` is used to generate chunk data.
+		assert.Equal(t, sortedPaths, read.Paths)
+
+		// build a partial trie from batch proofs and check the root hash is equal
 		psmt, err := ptrie.NewPSMT(activeRoot, pathByteSize, batchProof)
 		require.NoError(t, err, "error building partial trie")
-		require.True(t, bytes.Equal(psmt.RootHash(), activeRoot))
+		assert.Equal(t, psmt.RootHash(), activeRoot)
 
 		// check payloads for all existing paths
 		allPaths := make([]ledger.Path, 0, len(latestPayloadByPath))
@@ -864,7 +887,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		retPayloads, err = forest.Read(read)
 		require.NoError(t, err)
 		for i, v := range allPayloads {
-			require.True(t, bytes.Equal(encoding.EncodePayload(v), encoding.EncodePayload(retPayloads[i])))
+			assert.True(t, v.Equals(retPayloads[i]))
 		}
 	}
 }
@@ -889,14 +912,32 @@ func TestProofGenerationInclusion(t *testing.T) {
 	paths := []ledger.Path{p1, p2, p3, p4}
 	payloads := []*ledger.Payload{v1, v2, v3, v4}
 
+	// shuffle the order of `proofPaths` to run `Proofs` on non-sorted input paths
+	rand.Shuffle(len(paths), func(i, j int) {
+		paths[i], paths[j] = paths[j], paths[i]
+	})
+
+	// sort `proofPaths` into another slice
+	sortedPaths := make([]ledger.Path, len(paths))
+	copy(sortedPaths, paths)
+	sort.Slice(sortedPaths, func(i, j int) bool {
+		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
+	})
+
 	update := &ledger.TrieUpdate{RootHash: emptyRoot, Paths: paths, Payloads: payloads}
 	updatedRoot, err := forest.Update(update)
 	require.NoError(t, err)
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	proof, err := forest.Proofs(read)
-
 	require.NoError(t, err)
-	require.True(t, common.VerifyTrieBatchProof(proof, ledger.State(updatedRoot)))
+
+	// verify batch proofs.
+	assert.True(t, common.VerifyTrieBatchProof(proof, ledger.State(updatedRoot)))
+
+	// check `Proofs` has sorted the input paths.
+	// this check is needed to not weaken the SPoCK secret entropy,
+	// when `Proofs` is used to generate chunk data.
+	assert.Equal(t, sortedPaths, read.Paths)
 }
 
 func payloadBySlices(keydata []byte, valuedata []byte) *ledger.Payload {
