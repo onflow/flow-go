@@ -67,12 +67,13 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
-	ResourceDKGKey                   = "dkg-key"
-	ResourceApprovalQueue            = "sealing_approval_queue"          // consensus node, sealing engine
-	ResourceReceiptQueue             = "sealing_receipt_queue"           // consensus node, sealing engine
-	ResourceApprovalResponseQueue    = "sealing_approval_response_queue" // consensus node, sealing engine
-	ResourceBlockProposalQueue       = "compliance_proposal_queue"       // consensus node, compliance engine
-	ResourceBlockVoteQueue           = "compliance_vote_queue"           // consensus node, compliance engine
+
+	ResourceDKGKey                = "dkg-key"
+	ResourceApprovalQueue         = "sealing_approval_queue"          // consensus node, sealing engine
+	ResourceReceiptQueue          = "sealing_receipt_queue"           // consensus node, sealing engine
+	ResourceApprovalResponseQueue = "sealing_approval_response_queue" // consensus node, sealing engine
+	ResourceBlockProposalQueue    = "compliance_proposal_queue"       // consensus node, compliance engine
+	ResourceBlockVoteQueue        = "compliance_vote_queue"           // consensus node, compliance engine
 )
 
 const (
