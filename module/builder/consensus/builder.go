@@ -470,7 +470,6 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 // ExecutionResult. Results that are in includedResults are skipped.
 // We also limit the number of receipts to maxReceiptCount.
 func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
-	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, len(receipts))
 	results := make([]*flow.ExecutionResult, 0)
 
 	count := uint(len(receipts))
@@ -478,6 +477,8 @@ func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.I
 	if count > maxReceiptCount {
 		count = maxReceiptCount
 	}
+
+	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, count)
 
 	for i := uint(0); i < count; i++ {
 		receipt := receipts[i]

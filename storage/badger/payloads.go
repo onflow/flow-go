@@ -123,36 +123,28 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 		}
 
 		// retrieve receipts
-		receipts := make([]*flow.ExecutionReceipt, 0, len(idx.ReceiptIDs))
-		// multiple receipts can refer to one execution result, avoid duplicating by using map
-		resultsLookup := make(map[flow.Identifier]*flow.ExecutionResult)
+		receipts := make([]*flow.ExecutionReceiptMeta, 0, len(idx.ReceiptIDs))
 		for _, recID := range idx.ReceiptIDs {
 			receipt, err := p.receipts.byID(recID)(tx)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve receipt (%x): %w", recID, err)
+				return nil, fmt.Errorf("could not retrieve receipt %x: %w", recID, err)
 			}
-			receipts = append(receipts, receipt)
-			if _, ok := resultsLookup[receipt.ExecutionResult.ID()]; !ok {
-				resultsLookup[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
-			}
+			receipts = append(receipts, receipt.Meta())
 		}
 
-		metas := make([]*flow.ExecutionReceiptMeta, len(receipts))
-		results := make([]*flow.ExecutionResult, 0, len(resultsLookup))
-		for i, receipt := range receipts {
-			meta := receipt.Meta()
-			metas[i] = meta
-			// we need to do this to preserve order of results in payload
-			if result, found := resultsLookup[meta.ResultID]; found {
-				results = append(results, result)
-				delete(resultsLookup, meta.ResultID)
+		// retrieve results
+		results := make([]*flow.ExecutionResult, 0, len(idx.ResultIDs))
+		for _, resID := range idx.ResultIDs {
+			result, err := p.results.byID(resID)(tx)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve result %x: %w", resID, err)
 			}
+			results = append(results, result)
 		}
-
 		payload := &flow.Payload{
 			Seals:      seals,
 			Guarantees: guarantees,
-			Receipts:   metas,
+			Receipts:   receipts,
 			Results:    results,
 		}
 
