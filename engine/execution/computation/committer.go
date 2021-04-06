@@ -23,17 +23,15 @@ func NewLedgerViewCommitter(ldg ledger.Ledger, tracer module.Tracer) *LedgerView
 func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, proof []byte, err error) {
 	var err1, err2 error
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		newCommit, err1 = CommitView(s.ldg, view, baseState)
-		wg.Done()
-	}()
+	wg.Add(1)
 	go func() {
 		proof, err2 = CollectProofs(s.ldg, view, baseState)
 		wg.Done()
 	}()
 
+	newCommit, err1 = CommitView(s.ldg, view, baseState)
 	wg.Wait()
+
 	if err1 != nil {
 		err = err1
 	}
