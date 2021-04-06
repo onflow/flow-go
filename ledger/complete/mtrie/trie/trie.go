@@ -296,10 +296,15 @@ func (parentTrie *MTrie) update(
 }
 
 // UnsafeProofs provides proofs for the given paths.
+//
 // CAUTION: while updating, `paths` and `proofs` are permuted IN-PLACE for optimized processing.
 // UNSAFE: requires _all_ paths to have a length of mt.Height bits.
-func (mt *MTrie) UnsafeProofs(paths []ledger.Path, proofs []*ledger.TrieProof) {
-	mt.proofs(mt.root, paths, proofs)
+// Paths in the input query don't have to be deduplicated, though deduplication would
+// result in allocating less dynamic memory to store the proofs.
+func (mt *MTrie) UnsafeProofs(paths []ledger.Path, pathByteSize int) *ledger.TrieBatchProof {
+	batchProofs := ledger.NewTrieBatchProofWithEmptyProofs(len(paths), pathByteSize)
+	mt.proofs(mt.root, paths, batchProofs.Proofs)
+	return batchProofs
 }
 
 // proofs traverses the subtree and stores proofs for the given register paths in

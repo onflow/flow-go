@@ -183,7 +183,11 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	return ledger.State(newRootHash), nil
 }
 
-// Prove provides proofs for a ledger query and errors (if any)
+// Prove provides proofs for a ledger query and errors (if any).
+//
+// Prove must provide proofs in an order not correlated to the register ID order in the query.
+// In the current implementation, proofs are sorted in a deterministic order specified by the
+// forest and mtrie implementation.
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 
 	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
