@@ -31,7 +31,7 @@ import (
 type Node struct {
 	// Implementation Comments:
 	// Formally, a tree can hold up to 2^maxDepth number of registers. However,
-	// the current implementation and is designed to operate on a sparsely populated
+	// the current implementation is designed to operate on a sparsely populated
 	// tree, holding much less than 2^64 registers.
 
 	lChild    *Node           // Left Child
@@ -47,9 +47,6 @@ type Node struct {
 	//        Update can just return the _change_ of regCount.
 	regCount uint64 // number of registers allocated in the subtree
 }
-
-// why depth is in 16 bits?
-// is 64 bits enough for regCount?
 
 // NewNode creates a new Node.
 // UNCHECKED requirement: combination of values must conform to
