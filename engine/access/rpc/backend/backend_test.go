@@ -143,6 +143,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
 		metrics.NewNoopCollector(),
 		nil,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		nil,
 		suite.log,
@@ -610,6 +611,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		metrics.NewNoopCollector(),
 		connFactory,
 		false,
+		DefaultMaxHeightRange,
 		nil,
 		nil,
 		suite.log,
@@ -1101,6 +1103,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			nil,
 			false,
 			1, // set maximum range to 1
+			nil,
 			nil,
 			suite.log,
 		)
