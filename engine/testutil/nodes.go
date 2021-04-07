@@ -25,6 +25,7 @@ import (
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
@@ -394,6 +395,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
+	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
 	computationEngine, err := computation.New(
 		node.Log,
@@ -404,6 +406,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		vm,
 		vmCtx,
 		computation.DefaultProgramsCacheSize,
+		committer,
 	)
 	require.NoError(t, err)
 
