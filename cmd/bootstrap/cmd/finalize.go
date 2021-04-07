@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -113,8 +114,13 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
-	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+	unsortedStakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
+
+	// sort the node list by NodeID
+	stakingNodes := sort.Sort(unsortedStakingNodes, func(i, j int) bool {
+		return unsortedStakingNodes[i].NodeID < unsortedStakingNodes[j].NodeID
+	})
+	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(sortedStakingNodes))
 	log.Info().Msg("")
 
 	log.Info().Msg("running DKG for consensus nodes")
