@@ -164,7 +164,23 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 }
 
 func TestRequestPendingChunkDataPacks_HappyPath(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
 
+	aggrees := unittest.IdentifierListFixture(2)
+	disaggrees := unittest.IdentifierListFixture(2)
+	status := unittest.ChunkRequestStatusListFixture(1,
+		unittest.WithHeight(10),
+		unittest.WithAgrees(aggrees),
+		unittest.WithDisagrees(disaggrees))
+	s.pendingRequests.On("All").Return(status)
+	mockLastSealedHeight(s.state, 5)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status))
+
+	<-e.Ready()
+	wg := mockConduitForChunkDataPackRequest(t, s.con, flow.GetIDs(status), 1, func(response *messages.ChunkDataRequest) {})
+	unittest.RequireReturnsBefore(t, wg.Wait, 3*s.retryInterval, "could not request and handle chunks on time")
+	<-e.Done()
 }
 
 // chunkToCollectionIdMap is a test helper that extracts a chunkID -> collectionID map from chunk data responses.
@@ -197,8 +213,7 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 	con *mocknetwork.Conduit,
 	chunkIDs flow.IdentifierList,
 	count int,
-	requestHandler func(response *messages.ChunkDataRequest),
-	handlerTimeout time.Duration) {
+	requestHandler func(response *messages.ChunkDataRequest)) *sync.WaitGroup {
 
 	// counts number of requests for each chunk data pack
 	reqCount := make(map[flow.Identifier]int)
@@ -209,7 +224,7 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 
 	// to counter race condition in concurrent invocations of Run
 	mutex := &sync.Mutex{}
-	wg.Add(1)
+	wg.Add(count * len(chunkIDs))
 
 	con.On("Publish", testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
 		mutex.Lock()
@@ -230,7 +245,7 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 
 	}).Return(nil).Times(count * len(chunkIDs)) // each chunk requested count time.
 
-	unittest.RequireReturnsBefore(t, wg.Wait, handlerTimeout, "could not request and handle chunks on time")
+	return wg
 }
 
 // mockChunkDataPackHandler mocks chunk data pack handler for receiving a set of chunk ids.
@@ -297,4 +312,34 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 	}).
 		Return(true).
 		Times(len(chunkIDs))
+}
+
+// mockPendingRequestsIncAttempt mocks chunk requests mempool for increasing the attempts on given chunk ids each once.
+func mockPendingRequestsIncAttempt(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
+	// maps keep track of distinct invocations per chunk ID
+	attemptRequests := make(map[flow.Identifier]struct{})
+
+	pendingRequests.On("IncrementAttempt", testifymock.Anything).Run(func(args testifymock.Arguments) {
+		chunkID, ok := args[0].(flow.Identifier)
+		require.True(t, ok)
+		// we should have already requested this chunk data pack
+		require.Contains(t, chunkIDs, chunkID)
+
+		// invocation should be distinct per chunk ID
+		_, ok = attemptRequests[chunkID]
+		require.False(t, ok)
+		attemptRequests[chunkID] = struct{}{}
+	}).
+		Return(true).
+		Times(len(chunkIDs))
+
+}
+
+// mockLastSealedHeight mocks the protocol state for the specified last sealed height.
+func mockLastSealedHeight(state *protocol.State, height uint64) {
+	snapshot := &protocol.Snapshot{}
+	header := unittest.BlockHeaderFixture()
+	header.Height = height
+	state.On("Sealed").Return(snapshot)
+	snapshot.On("Head").Return(&header, nil)
 }
