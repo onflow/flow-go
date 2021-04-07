@@ -185,7 +185,34 @@ func TestRequestPendingChunkDataPack_HappyPath(t *testing.T) {
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status))
 
 	<-e.Ready()
-	wg := mockConduitForChunkDataPackRequest(t, s.con, flow.GetIDs(status), 1, func(response *messages.ChunkDataRequest) {})
+	wg := mockConduitForChunkDataPackRequest(t, s.con, status, 1, func(response *messages.ChunkDataRequest) {})
+	unittest.RequireReturnsBefore(t, wg.Wait, 3*s.retryInterval, "could not request and handle chunks on time")
+	<-e.Done()
+}
+
+// TestRequestPendingChunkDataPack_HappyPath_Multiple evaluates happy path of having a multiple pending chunk requests.
+// The chunk belongs to a non-sealed block.
+// On timer interval, the chunk request should be dispatched to the set of execution nodes agree with the execution
+// result the chunk belongs to.
+func TestRequestPendingChunkDataPack_HappyPath_Multiple(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	// creates 10 chunk request status each with 2 agree targets and 3 disagree targets.
+	// chunk belongs to a block at height 10, but the last sealed block is at height 5, so
+	// the chunk request should be dispatched.
+	aggrees := unittest.IdentifierListFixture(2)
+	disaggrees := unittest.IdentifierListFixture(3)
+	status := unittest.ChunkRequestStatusListFixture(10,
+		unittest.WithHeight(10),
+		unittest.WithAgrees(aggrees),
+		unittest.WithDisagrees(disaggrees))
+	mockLastSealedHeight(s.state, 5)
+	s.pendingRequests.On("All").Return(status)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status))
+
+	<-e.Ready()
+	wg := mockConduitForChunkDataPackRequest(t, s.con, status, 1, func(response *messages.ChunkDataRequest) {})
 	unittest.RequireReturnsBefore(t, wg.Wait, 3*s.retryInterval, "could not request and handle chunks on time")
 	<-e.Done()
 }
@@ -218,22 +245,24 @@ func toChunkIDs(chunkToCollectionIDs map[flow.Identifier]flow.Identifier) flow.I
 // Also, the entire process should not exceed longer than the specified timeout.
 func mockConduitForChunkDataPackRequest(t *testing.T,
 	con *mocknetwork.Conduit,
-	chunkIDs flow.IdentifierList,
+	reqList []*verification.ChunkRequestStatus,
 	count int,
 	requestHandler func(response *messages.ChunkDataRequest)) *sync.WaitGroup {
 
 	// counts number of requests for each chunk data pack
 	reqCount := make(map[flow.Identifier]int)
-	for _, chunkID := range chunkIDs {
-		reqCount[chunkID] = 0
+	reqMap := make(map[flow.Identifier]*verification.ChunkRequestStatus)
+	for _, status := range reqList {
+		reqCount[status.ChunkID] = 0
+		reqMap[status.ChunkID] = status
 	}
 	wg := &sync.WaitGroup{}
 
 	// to counter race condition in concurrent invocations of Run
 	mutex := &sync.Mutex{}
-	wg.Add(count * len(chunkIDs))
+	wg.Add(count * len(reqList))
 
-	con.On("Publish", testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
+	con.On("Publish", testifymock.Anything, testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
@@ -241,16 +270,25 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 		// also, it should not be repeated below a maximum threshold
 		req, ok := args[0].(*messages.ChunkDataRequest)
 		require.True(t, ok)
-		require.Contains(t, chunkIDs, req.ChunkID)
+		require.Contains(t, flow.GetIDs(reqList), req.ChunkID)
 		require.LessOrEqual(t, reqCount[req.ChunkID], count)
 		reqCount[req.ChunkID]++
+
+		// requested chunk ids should only be passed to agreed execution nodes
+		target1, ok := args[1].(flow.Identifier)
+		require.True(t, ok)
+		require.Contains(t, reqMap[req.ChunkID].Agrees, target1)
+
+		target2, ok := args[2].(flow.Identifier)
+		require.True(t, ok)
+		require.Contains(t, reqMap[req.ChunkID].Agrees, target2)
 
 		go func() {
 			requestHandler(req)
 			wg.Done()
 		}()
 
-	}).Return(nil).Times(count * len(chunkIDs)) // each chunk requested count time.
+	}).Return(nil).Times(count * len(reqList)) // each chunk requested count time.
 
 	return wg
 }
