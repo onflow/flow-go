@@ -102,7 +102,7 @@ func (c *EmulatorClient) Submit(tx *sdk.Transaction) error {
 	}
 
 	if !result.Succeeded() {
-		return fmt.Errorf("transaction did not succeeded")
+		return fmt.Errorf("transaction did not succeeded: %v", result.Error)
 	}
 
 	_, err = c.blockchain.CommitBlock()

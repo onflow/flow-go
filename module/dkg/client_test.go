@@ -51,11 +51,6 @@ func (s *ClientSuite) SetupTest() {
 	s.emulator = emulator
 	s.emulatorClient = NewEmulatorClient(emulator)
 
-	// key, signer := test.AccountKeyGenerator().NewWithSigner()
-	// address, err := s.emulator.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
-	// require.NoError(s.T(), err)
-	// s.nodeAddress = address
-
 	// deploy contract
 	s.deployDKGContract()
 
@@ -66,27 +61,28 @@ func (s *ClientSuite) SetupTest() {
 	s.setUpAdmin()
 }
 
-func (s *ClientSuite) TestSubmitResult() {
-	numberOfKeys := 5
+// TestBroadcast broadcasts and messages and verifies that no errors are thrown
+// Note: Contract functionality tested by `flow-core-contracts`
+func (s *ClientSuite) TestBroadcast() {
+	nodeID := unittest.IdentifierFixture()
+	dkgNodeIDStrings := make([]cadence.Value, 1)
+	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
 
-	// generate list of public keys
-	publicKeys := make([]crypto.PublicKey, numberOfKeys)
-	for i := 0; i < numberOfKeys; i++ {
-		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
-		publicKeys = append(publicKeys, privateKey.PublicKey())
-	}
+	// start dkf with 1 participant
+	s.startDKGWithParticipants(dkgNodeIDStrings)
 
-	// create a group public key
-	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
+	// create participant resource
+	s.createParticipant(nodeID.String())
 
-	err := s.client.SubmitResult(groupPublicKey, publicKeys)
-	require.NoError(s.T(), err)
+	// broadcast messsage a random broadcast message and verify that there were no errors
+	msg := messages.NewDKGMessage(1, unittest.RandomBytes(10), "integration-dkg-epoch-1")
+	err := s.client.Broadcast(msg)
+	assert.NoError(s.T(), err)
 }
 
-// TestDKGContractClient submits a broadcast to the DKG contract, reads the broadcast
-// to verify what we broadcasted was what was received and verify that the `fromIndex`
-// behaves as expected.
-func (s *ClientSuite) TestDKGContractClient() {
+// TestDKGContractClient submits a single broadcast to the DKG contract, reads the broadcast
+// to verify what we broadcasted was what was received
+func (s *ClientSuite) TestBroadcastReadSingle() {
 
 	// dkg partcipant node ID and participants
 	nodeID := unittest.IdentifierFixture()
@@ -122,6 +118,38 @@ func (s *ClientSuite) TestDKGContractClient() {
 	assert.Equal(s.T(), dkgEpochID, broadcastedMsg.DKGInstanceID)
 	assert.Equal(s.T(), msgData, broadcastedMsg.Data)
 	assert.Equal(s.T(), originID, broadcastedMsg.Orig)
+}
+
+func (s *ClientSuite) TestSubmitResult() {
+	nodeID := unittest.IdentifierFixture()
+	dkgNodeIDStrings := make([]cadence.Value, 1)
+	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
+
+	// start dkf with 1 participant
+	s.startDKGWithParticipants(dkgNodeIDStrings)
+
+	// create participant resource
+	s.createParticipant(nodeID.String())
+
+	// broadcast messsage a random broadcast message and verify that there were no errors
+	msg := messages.NewDKGMessage(1, unittest.RandomBytes(10), "integration-dkg-epoch-1")
+	err := s.client.Broadcast(msg)
+	assert.NoError(s.T(), err)
+
+	numberOfKeys := 1
+
+	// generate list of public keys
+	publicKeys := make([]crypto.PublicKey, 0, numberOfKeys)
+	for i := 0; i < numberOfKeys; i++ {
+		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
+		publicKeys = append(publicKeys, privateKey.PublicKey())
+	}
+
+	// create a group public key
+	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
+
+	err = s.client.SubmitResult(groupPublicKey, publicKeys)
+	require.NoError(s.T(), err)
 }
 
 func (s *ClientSuite) deployDKGContract() {

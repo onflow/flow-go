@@ -184,7 +184,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 	// Note: We need to make sure that we pull the keys out in the same order that
 	// we have done here. Group Public key first followed by the individual public keys
-	finalSubmission := make([]cadence.Value, len(publicKeys))
+	finalSubmission := make([]cadence.Value, 0, len(publicKeys))
 	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()))
 	for _, publicKey := range publicKeys {
 		finalSubmission = append(finalSubmission, cadence.NewString(publicKey.String()))
@@ -195,7 +195,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		return fmt.Errorf("could not add argument to transaction: %v", err)
 	}
 
-	// sign payload using account signer
+	// sign envelope using account signer
 	err = tx.SignEnvelope(c.accountAddress, int(c.accountKeyIndex), c.signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
