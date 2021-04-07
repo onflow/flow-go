@@ -980,6 +980,49 @@ func WithTransactionNum(num int) func(response *messages.ChunkDataResponse) {
 	}
 }
 
+func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
+	opts ...func(request *verification.ChunkRequestStatus)) *verification.ChunkRequestStatus {
+	status := &verification.ChunkRequestStatus{
+		ChunkDataPackRequest: request,
+		Targets:              IdentityListFixture(1),
+		LastAttempt:          time.Time{},
+		Attempt:              0,
+	}
+
+	for _, opt := range opts {
+		opt(status)
+	}
+
+	return status
+}
+
+// ChunkRequestStatusListFixture creates and returns a list of chunk request status fixtures.
+func ChunkRequestStatusListFixture(n int, opts ...func(*verification.ChunkRequestStatus)) []*verification.ChunkRequestStatus {
+	lst := make([]*verification.ChunkRequestStatus, 0, n)
+	for i := 0; i <= n; i++ {
+		lst = append(lst, ChunkRequestStatusFixture(ChunkDataPackRequestFixture(IdentifierFixture()), opts...))
+	}
+	return lst
+}
+
+func WithHeight(height uint64) func(*verification.ChunkRequestStatus) {
+	return func(request *verification.ChunkRequestStatus) {
+		request.Height = height
+	}
+}
+
+func WithAgrees(list flow.IdentifierList) func(*verification.ChunkRequestStatus) {
+	return func(request *verification.ChunkRequestStatus) {
+		request.Agrees = list
+	}
+}
+
+func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkRequestStatus) {
+	return func(request *verification.ChunkRequestStatus) {
+		request.Disagrees = list
+	}
+}
+
 // ChunkDataPackRequestFixture creates a chunk data request with some default values, i.e., one agree execution node, one disagree execution node,
 // and height of zero.
 // Use options to customize the request.
@@ -1006,24 +1049,6 @@ func ChunkDataPackRequestsFixture(n int, opts ...func(*verification.ChunkDataPac
 		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
 	}
 	return lst
-}
-
-func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
-	return func(request *verification.ChunkDataPackRequest) {
-		request.Height = height
-	}
-}
-
-func WithAgrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
-	return func(request *verification.ChunkDataPackRequest) {
-		request.Agrees = list
-	}
-}
-
-func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
-	return func(request *verification.ChunkDataPackRequest) {
-		request.Disagrees = list
-	}
 }
 
 func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
