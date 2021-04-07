@@ -202,10 +202,14 @@ func (s *ClientSuite) TestDKGContractClient() {
 		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID.String()))})
 	assert.Equal(s.T(), cadence.NewBool(true), result)
 
+	// DKG message fields
+	msgData := unittest.RandomBytes(10)
+	dkgEpochID := "integration-dkg-epoch-1"
+	originID := uint64(1)
+
 	// submit a broadcast messsage a random broadcast message
 	// and verify that there were no errors
-	msgData := unittest.RandomBytes(10)
-	msg := messages.NewDKGMessage(1, msgData, "integration-dkg-epoch-1")
+	msg := messages.NewDKGMessage(int(originID), msgData, dkgEpochID)
 	err = s.client.Broadcast(msg)
 	assert.NoError(s.T(), err)
 
@@ -213,7 +217,13 @@ func (s *ClientSuite) TestDKGContractClient() {
 	// from the latest block
 	block, err := s.emulator.GetLatestBlock()
 	require.NoError(s.T(), err)
+
 	messages, err := s.client.ReadBroadcast(0, block.ID())
 	require.NoError(s.T(), err)
 	assert.Len(s.T(), messages, 1)
+
+	broadcastedMsg := messages[0]
+	assert.Equal(s.T(), dkgEpochID, broadcastedMsg.DKGInstanceID)
+	assert.Equal(s.T(), msgData, broadcastedMsg.Data)
+	assert.Equal(s.T(), originID, broadcastedMsg.Orig)
 }
