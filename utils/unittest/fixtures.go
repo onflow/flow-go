@@ -999,7 +999,7 @@ func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
 // ChunkRequestStatusListFixture creates and returns a list of chunk request status fixtures.
 func ChunkRequestStatusListFixture(n int, opts ...func(*verification.ChunkRequestStatus)) []*verification.ChunkRequestStatus {
 	lst := make([]*verification.ChunkRequestStatus, 0, n)
-	for i := 0; i <= n; i++ {
+	for i := 0; i < n; i++ {
 		lst = append(lst, ChunkRequestStatusFixture(ChunkDataPackRequestFixture(IdentifierFixture()), opts...))
 	}
 	return lst

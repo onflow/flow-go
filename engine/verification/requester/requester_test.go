@@ -163,18 +163,25 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
 }
 
-func TestRequestPendingChunkDataPacks_HappyPath(t *testing.T) {
+// TestRequestPendingChunkDataPack_HappyPath evaluates happy path of having a single pending chunk request.
+// The chunk belongs to a non-sealed block.
+// On timer interval, the chunk request should be dispatched to the set of execution nodes agree with the execution
+// result the chunk belongs to.
+func TestRequestPendingChunkDataPack_HappyPath(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
+	// creates a chunk request status with 2 agree targets and 2 disagree targets.
+	// chunk belongs to a block at height 10, but the last sealed block is at height 5, so
+	// the chunk request should be dispatched.
 	aggrees := unittest.IdentifierListFixture(2)
 	disaggrees := unittest.IdentifierListFixture(2)
 	status := unittest.ChunkRequestStatusListFixture(1,
 		unittest.WithHeight(10),
 		unittest.WithAgrees(aggrees),
 		unittest.WithDisagrees(disaggrees))
-	s.pendingRequests.On("All").Return(status)
 	mockLastSealedHeight(s.state, 5)
+	s.pendingRequests.On("All").Return(status)
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status))
 
 	<-e.Ready()
