@@ -65,6 +65,7 @@ type testingContext struct {
 	snapshot            *protocol.Snapshot
 	identity            *flow.Identity
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
+	collectionRequester *module.MockRequester
 }
 
 func runWithEngine(t *testing.T, f func(testingContext)) {
@@ -178,6 +179,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		blocks:              blocks,
 		collections:         collections,
 		state:               protocolState,
+		collectionRequester: request,
 		conduit:             conduit,
 		collectionConduit:   collectionConduit,
 		computationManager:  computationManager,
@@ -209,8 +211,10 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 			Return(newStateCommitment, nil)
 
 		ctx.executionState.
-			On("GetRegistersWithProofs", mock.Anything, mock.Anything, mock.Anything).
+			On("GetProof", mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, nil, nil)
+
+		//proof, err := e.execState.GetProof(childCtx, chunk.StartState, allRegisters)
 	}
 
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
@@ -395,13 +399,22 @@ func TestExecuteOneBlock(t *testing.T) {
 func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
+		colSigner := unittest.IdentifierFixture()
+
 		// A <- B <- C
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentFixture()
 
-		blockC := unittest.ExecutableBlockFixtureWithParent(nil, blockB.Block.Header)
+		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
 		blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
+
+		logBlocks(map[string]*entity.ExecutableBlock{
+			"B": blockB,
+			"C": blockC,
+		})
+
+		collection := blockC.Collections()[0].Collection()
 
 		commits := make(map[flow.Identifier]flow.StateCommitment)
 		commits[blockB.Block.Header.ParentID] = blockB.StartState
@@ -430,6 +443,29 @@ func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 			wg.Done()
 			require.True(t, wasBExecuted)
 		}, blockC, unittest.IdentifierFixture(), true)
+
+		// make sure collection requests are sent
+		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
+		// it should return fine
+		gomock.InOrder(
+			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
+				// make sure request for collection from block C are sent before block B finishes execution
+				require.False(t, wasBExecuted)
+				return nil, storageerr.ErrNotFound
+			}),
+			ctx.collections.EXPECT().ByID(blockC.Collections()[0].Guarantee.CollectionID).DoAndReturn(func(_ flow.Identifier) (*flow.Collection, error) {
+				return &collection, nil
+			}),
+		)
+
+		ctx.collectionRequester.EXPECT().EntityByID(gomock.Any(), gomock.Any()).DoAndReturn(func(_ flow.Identifier, _ flow.IdentityFilter) {
+			// parallel run to avoid deadlock, ingestion engine is thread-safe
+			go func() {
+				err := ctx.engine.handleCollection(unittest.IdentifierFixture(), &collection)
+				require.NoError(t, err)
+			}()
+		})
+		ctx.collections.EXPECT().Store(&collection)
 
 		times := 4
 

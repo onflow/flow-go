@@ -454,7 +454,8 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	// if it's not added, it means the block is not a new block, it already
 	// exists in the queue, then bail
 	if !added {
-		log.Debug().Msg("block already exists in the execution queue")
+		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
+			Msg("block already exists in the execution queue")
 		return nil
 	}
 
@@ -842,8 +843,8 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // G
 func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
-		if queue.TryAdd(blockify) {
-			return queue, false
+		if stored, new := queue.TryAdd(blockify); stored {
+			return queue, new
 		}
 	}
 	return newQueue(blockify, queues)
