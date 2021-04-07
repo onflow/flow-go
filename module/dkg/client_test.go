@@ -215,5 +215,5 @@ func (s *ClientSuite) TestDKGContractClient() {
 	require.NoError(s.T(), err)
 	messages, err := s.client.ReadBroadcast(0, block.ID())
 	require.NoError(s.T(), err)
-	assert.True(s.T(), len(messages) == 1)
+	assert.Len(s.T(), messages, 1)
 }

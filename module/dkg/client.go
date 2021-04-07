@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
@@ -65,6 +66,7 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
 
+	// construct transaction to send dkg whiteboard message to contract
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
 		SetGasLimit(9999).
@@ -78,12 +80,14 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 	if err != nil {
 		return fmt.Errorf("could not marshal DKG messages struct: %v", err)
 	}
+
+	// add dkg message json encoded string to tx args
 	err = tx.AddArgument(cadence.NewString(string(data)))
 	if err != nil {
 		return fmt.Errorf("could not add whiteboard dkg message to transaction: %w", err)
 	}
 
-	// sign payload using account signer
+	// sign envelope using account signer
 	err = tx.SignEnvelope(c.accountAddress, int(c.accountKeyIndex), c.signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
@@ -122,27 +126,30 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 	ctx := context.Background()
 
+	// construct read latest broadcast messages transaction
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
 	value, err := c.flowClient.ExecuteScriptAtBlockID(ctx, sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
 	if err != nil {
-		return nil, fmt.Errorf("could not execute read broadcast script: %v", err)
+		return nil, fmt.Errorf("could not execute read broadcast script: %w", err)
 	}
-
-	fmt.Printf("%v", value.(cadence.Array).Values[0].(cadence.Struct).Fields[1].String())
-
 	values := value.(cadence.Array).Values
 
-	messages := make([]model.DKGMessage, len(values))
+	// unpack return from contract to `model.DKGMessage`
+	messages := make([]model.DKGMessage, 0)
 	for _, val := range values {
-		message := val.(cadence.Struct)
-		content := message.Fields[1]
 
-		var msg model.DKGMessage
-		err := json.Unmarshal([]byte(content.String()), &msg)
+		content := val.(cadence.Struct).Fields[1]
+		jsonString, err := strconv.Unquote(content.String())
 		if err != nil {
-			return nil, fmt.Errorf("could not unmarshal dkg message: %v", err)
+			return nil, fmt.Errorf("could not unquote json string: %w", err)
 		}
-		messages = append(messages, msg)
+
+		var flowMsg model.DKGMessage
+		err = json.Unmarshal([]byte(jsonString), &flowMsg)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshal dkg message: %w", err)
+		}
+		messages = append(messages, flowMsg)
 	}
 
 	return messages, nil
