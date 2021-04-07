@@ -185,7 +185,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 // Prove provides proofs for a ledger query and errors (if any).
 //
-// Prove must provide proofs in an order not correlated to the register ID order in the query.
+// Proves are generally _not_ provided in the register order of the query.
 // In the current implementation, proofs are sorted in a deterministic order specified by the
 // forest and mtrie implementation.
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {

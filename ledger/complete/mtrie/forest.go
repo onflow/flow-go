@@ -201,7 +201,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 
 // Proofs returns a batch proof for the given paths.
 //
-// Proofs must provide proofs in an order not correlated to the path order in the query.
+// Proves are generally _not_ provided in the register order of the query.
 // In the current implementation, input paths in the TrieRead `r` are sorted in an ascendent order,
 // The output proofs are provided following the order of the sorted paths.
 func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
