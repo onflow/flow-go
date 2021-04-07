@@ -163,38 +163,20 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
 }
 
-// TestRequestPendingChunkDataPack_HappyPath evaluates happy path of having a single pending chunk request.
+// TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
 // The chunk belongs to a non-sealed block.
-// On timer interval, the chunk request should be dispatched to the set of execution nodes agree with the execution
+// On timer interval, the chunk requests should be dispatched to the set of execution nodes agree with the execution
 // result the chunk belongs to.
-func TestRequestPendingChunkDataPack_HappyPath(t *testing.T) {
-	s := setupTest()
-	e := newRequesterEngine(t, s)
-
-	// creates a chunk request status with 2 agree targets and 2 disagree targets.
-	// chunk belongs to a block at height 10, but the last sealed block is at height 5, so
-	// the chunk request should be dispatched.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(2)
-	status := unittest.ChunkRequestStatusListFixture(1,
-		unittest.WithHeight(10),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
-	mockLastSealedHeight(s.state, 5)
-	s.pendingRequests.On("All").Return(status)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status))
-
-	<-e.Ready()
-	wg := mockConduitForChunkDataPackRequest(t, s.con, status, 1, func(response *messages.ChunkDataRequest) {})
-	unittest.RequireReturnsBefore(t, wg.Wait, 3*s.retryInterval, "could not request and handle chunks on time")
-	<-e.Done()
+func TestRequestPendingChunkDataPack(t *testing.T) {
+	testRequestPendingChunkDataPack(t, 1, 1)   // one request each one attempt
+	testRequestPendingChunkDataPack(t, 10, 1)  // 10 requests each one attempt
+	testRequestPendingChunkDataPack(t, 10, 10) // 10 requests each 10 attempts
 }
 
-// TestRequestPendingChunkDataPack_HappyPath_Multiple evaluates happy path of having a multiple pending chunk requests.
-// The chunk belongs to a non-sealed block.
-// On timer interval, the chunk request should be dispatched to the set of execution nodes agree with the execution
-// result the chunk belongs to.
-func TestRequestPendingChunkDataPack_HappyPath_Multiple(t *testing.T) {
+// testRequestPendingChunkDataPack is a test helper that evaluates happy path of having a number of chunk requests pending.
+// The test waits enough so that the required number of attempts is made on the chunks.
+// The chunks belongs to a non-sealed block.
+func testRequestPendingChunkDataPack(t *testing.T, requests int, attempts int) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
@@ -203,17 +185,19 @@ func TestRequestPendingChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	// the chunk request should be dispatched.
 	aggrees := unittest.IdentifierListFixture(2)
 	disaggrees := unittest.IdentifierListFixture(3)
-	status := unittest.ChunkRequestStatusListFixture(10,
+	status := unittest.ChunkRequestStatusListFixture(requests,
 		unittest.WithHeight(10),
 		unittest.WithAgrees(aggrees),
 		unittest.WithDisagrees(disaggrees))
 	mockLastSealedHeight(s.state, 5)
 	s.pendingRequests.On("All").Return(status)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status))
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), attempts)
 
 	<-e.Ready()
-	wg := mockConduitForChunkDataPackRequest(t, s.con, status, 1, func(response *messages.ChunkDataRequest) {})
-	unittest.RequireReturnsBefore(t, wg.Wait, 3*s.retryInterval, "could not request and handle chunks on time")
+
+	wg := mockConduitForChunkDataPackRequest(t, s.con, status, attempts, func(response *messages.ChunkDataRequest) {})
+	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
+
 	<-e.Done()
 }
 
@@ -359,24 +343,17 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 		Times(len(chunkIDs))
 }
 
-// mockPendingRequestsIncAttempt mocks chunk requests mempool for increasing the attempts on given chunk ids each once.
-func mockPendingRequestsIncAttempt(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
-	// maps keep track of distinct invocations per chunk ID
-	attemptRequests := make(map[flow.Identifier]struct{})
-
+// mockPendingRequestsIncAttempt mocks chunk requests mempool for increasing the attempts on given chunk ids.
+func mockPendingRequestsIncAttempt(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList, attempts int) {
 	pendingRequests.On("IncrementAttempt", testifymock.Anything).Run(func(args testifymock.Arguments) {
 		chunkID, ok := args[0].(flow.Identifier)
 		require.True(t, ok)
 		// we should have already requested this chunk data pack
 		require.Contains(t, chunkIDs, chunkID)
 
-		// invocation should be distinct per chunk ID
-		_, ok = attemptRequests[chunkID]
-		require.False(t, ok)
-		attemptRequests[chunkID] = struct{}{}
 	}).
 		Return(true).
-		Times(len(chunkIDs))
+		Times(len(chunkIDs) * attempts)
 
 }
 
