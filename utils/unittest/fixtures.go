@@ -688,9 +688,9 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 }
 
 // WithNodeID adds a node ID with the given first byte to an identity.
-func WithNodeID(b byte) func(*flow.Identity) {
+func WithNodeID(id flow.Identifier) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		identity.NodeID = flow.Identifier{b}
+		identity.NodeID = id
 	}
 }
 
@@ -982,9 +982,10 @@ func WithTransactionNum(num int) func(response *messages.ChunkDataResponse) {
 
 func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
 	opts ...func(request *verification.ChunkRequestStatus)) *verification.ChunkRequestStatus {
+
 	status := &verification.ChunkRequestStatus{
 		ChunkDataPackRequest: request,
-		Targets:              IdentityListFixture(1),
+		Targets:              flow.IdentityList{},
 		LastAttempt:          time.Time{},
 		Attempt:              0,
 	}
@@ -992,6 +993,18 @@ func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
 	for _, opt := range opts {
 		opt(status)
 	}
+
+	// creates identity fixtures for target ids as union of agrees and disagrees
+	// TODO: remove this inner fixture once we have filter for identifier list.
+	targets := flow.IdentityList{}
+	for _, id := range request.Agrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	}
+	for _, id := range request.Disagrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	}
+
+	status.Targets = targets
 
 	return status
 }
