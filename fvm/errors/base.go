@@ -15,6 +15,11 @@ type InvalidAddressError struct {
 	err     error
 }
 
+// Address returns the invalid address
+func (e InvalidAddressError) Address() flow.Address {
+	return e.address
+}
+
 // NewInvalidAddressErrorf constructs a new InvalidAddressError
 func NewInvalidAddressErrorf(address flow.Address, msg string, args ...interface{}) *InvalidAddressError {
 	return &InvalidAddressError{address: address, err: fmt.Errorf(msg, args...)}
@@ -172,6 +177,11 @@ type AccountAuthorizationError struct {
 // NewAccountAuthorizationErrorf constructs a new AccountAuthorizationError
 func NewAccountAuthorizationErrorf(address flow.Address, msg string, args ...interface{}) *AccountAuthorizationError {
 	return &AccountAuthorizationError{address: address, err: fmt.Errorf(msg, args...)}
+}
+
+// Address returns the address of an account without enough authorization
+func (e AccountAuthorizationError) Address() flow.Address {
+	return e.address
 }
 
 func (e AccountAuthorizationError) Error() string {
