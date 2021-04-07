@@ -395,15 +395,17 @@ func TestExecuteOneBlock(t *testing.T) {
 func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 	runWithEngine(t, func(ctx testingContext) {
 
-		// A <- B
+		// A <- B <- C
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
 		blockB.StartState = unittest.StateCommitmentFixture()
 
-		// blockA's start state is its parent's state commitment,
-		// and blockA's parent has been executed.
+		blockC := unittest.ExecutableBlockFixtureWithParent(nil, blockB.Block.Header)
+		blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
+
 		commits := make(map[flow.Identifier]flow.StateCommitment)
 		commits[blockB.Block.Header.ParentID] = blockB.StartState
+		//commits[blockC.Block.Header.ParentID] = blockC.StartState
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
 
@@ -419,6 +421,10 @@ func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 			wg.Done()
 		}, blockB, unittest.IdentifierFixture(), true)
 
+		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
+			wg.Done()
+		}, blockC, unittest.IdentifierFixture(), true)
+
 		times := 4
 
 		wg.Add(1) // wait for block B to be executed
@@ -426,6 +432,10 @@ func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 			err := ctx.engine.handleBlock(context.Background(), blockB.Block)
 			require.NoError(t, err)
 		}
+		wg.Add(1) // wait for block C to be executed
+		// add extra block to ensure the execution can continue after duplicated blocks
+		err := ctx.engine.handleBlock(context.Background(), blockC.Block)
+		require.NoError(t, err)
 		wgPut.Done()
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
