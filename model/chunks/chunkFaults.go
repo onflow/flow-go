@@ -82,14 +82,13 @@ func NewCFNonMatchingFinalState(expected []byte, computed []byte, chInx uint64, 
 // CFNonMatchingServiceEvents is returned when the service events reported in execution result
 // doesn't match the ones produced by executing the system chunk.
 type CFNonMatchingServiceEvents struct {
-	expectedEvent *flow.ServiceEvent
-	resultEvent   *flow.ServiceEvent
-	execResID     flow.Identifier
-	chunkIndex    uint64
+	execResID  flow.Identifier
+	chunkIndex uint64
+	msg        string
 }
 
 func (cf CFNonMatchingServiceEvents) String() string {
-	return fmt.Sprintf("a service event doesn't match, expected event [%v] but got [%v] from the result", cf.expectedEvent, cf.resultEvent)
+	return fmt.Sprintf("service events doesn't match (resultID: %x), %s", cf.execResID, cf.msg)
 }
 
 // ChunkIndex returns chunk index of the faulty chunk
@@ -103,11 +102,11 @@ func (cf CFNonMatchingServiceEvents) ExecutionResultID() flow.Identifier {
 }
 
 // NewCFNonMatchingServiceEvents creates a new instance of Chunk Fault (NonMatchingServiceEvents)
-func NewCFNonMatchingServiceEvents(expectedEvent *flow.ServiceEvent, resultEvent *flow.ServiceEvent, chInx uint64, execResID flow.Identifier) *CFNonMatchingServiceEvents {
-	return &CFNonMatchingServiceEvents{expectedEvent: expectedEvent,
-		resultEvent: resultEvent,
-		chunkIndex:  chInx,
-		execResID:   execResID}
+func NewCFNonMatchingServiceEvents(chInx uint64, execResID flow.Identifier, msg string) *CFNonMatchingServiceEvents {
+	return &CFNonMatchingServiceEvents{
+		msg:        msg,
+		chunkIndex: chInx,
+		execResID:  execResID}
 }
 
 // CFInvalidVerifiableChunk is returned when a verifiable chunk is invalid

@@ -175,21 +175,12 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context,
 	}
 
 	if isSystemChunk {
-		// more events than expected
-		if len(result.ServiceEvents) > len(serviceEvents) {
-			return nil, chmodels.NewCFNonMatchingServiceEvents(nil, &result.ServiceEvents[len(serviceEvents)], chIndex, execResID), nil
+		// checking sizes prevents reporting more events by result approvals as we iterate over ones computed here
+		if len(result.ServiceEvents) != len(serviceEvents) {
+			return nil, chmodels.NewCFNonMatchingServiceEvents(chIndex, execResID, "service event sizes does not match"), nil
 		}
 
 		// missing some events
-		if len(result.ServiceEvents) < len(serviceEvents) {
-			sv := serviceEvents[len(result.ServiceEvents)]
-			converted, err := flow.ConvertServiceEvent(sv)
-			if err != nil {
-				return nil, nil, fmt.Errorf("could not convert service event: %w", err)
-			}
-			return nil, chmodels.NewCFNonMatchingServiceEvents(converted, nil, chIndex, execResID), nil
-		}
-
 		for i, sv := range serviceEvents {
 			converted, err := flow.ConvertServiceEvent(sv)
 			if err != nil {
@@ -197,7 +188,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context,
 			}
 
 			if !result.ServiceEvents[i].Equals(converted) {
-				return nil, chmodels.NewCFNonMatchingServiceEvents(converted, &result.ServiceEvents[i], chIndex, execResID), nil
+				return nil, chmodels.NewCFNonMatchingServiceEvents(chIndex, execResID, "a service event does not match"), nil
 			}
 		}
 	}
@@ -253,10 +244,11 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	result *flow.ExecutionResult,
 	header *flow.Header,
 	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
+	endState flow.StateCommitment,
+	isSystemChunk bool) ([]byte, chmodels.ChunkFault, error) {
 
-	// build a block context
+	// build a block context (this should match what exec node has)
 	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
 
-	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState)
+	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState, isSystemChunk)
 }
