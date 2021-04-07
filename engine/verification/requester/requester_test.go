@@ -1,4 +1,4 @@
-package requester
+package requester_test
 
 import (
 	"sync"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
+	"github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
@@ -52,16 +53,15 @@ func setupTest() *RequesterEngineTestSuite {
 }
 
 // newRequesterEngine returns a requester engine for testing.
-func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *Engine {
+func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.Engine {
 	net := &mock.Network{}
 	// mocking the network registration of the engine
 	net.On("Register", engine.RequestChunks, testifymock.Anything).
 		Return(s.con, nil).
 		Once()
 
-	e, err := New(s.log, s.state, net, s.retryInterval, s.pendingRequests, s.handler)
+	e, err := requester.New(s.log, s.state, net, s.retryInterval, s.pendingRequests, s.handler)
 	require.NoError(t, err)
-
 	testifymock.AssertExpectationsForObjects(t, net)
 
 	return e
@@ -104,9 +104,9 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	chunkIDs := toChunkIDs(chunkCollectionIdMap)
 
 	// we have a request pending for this response chunk ID
-	mockPendingRequestsExistence(t, s.pendingRequests, chunkIDs)
+	mockPendingRequestsByID(t, s.pendingRequests, chunkIDs)
 	// we remove pending request on receiving this response
-	mockPendingRequestsRemoval(t, s.pendingRequests, chunkIDs)
+	mockPendingRequestsRem(t, s.pendingRequests, chunkIDs)
 	// we pass each chunk data pack and its collection to chunk data pack handler
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 
@@ -258,8 +258,8 @@ func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHa
 	}).Return().Times(len(chunkIDs))
 }
 
-// mockPendingRequestsExistence mocks chunk requests mempool for being queried for affirmative existence of each chunk ID once.
-func mockPendingRequestsExistence(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
+// mockPendingRequestsByID mocks chunk requests mempool for being queried for affirmative existence of each chunk ID once.
+func mockPendingRequestsByID(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
 	// maps keep track of distinct invocations per chunk ID
 	retrievedRequests := make(map[flow.Identifier]struct{})
 
@@ -278,8 +278,8 @@ func mockPendingRequestsExistence(t *testing.T, pendingRequests *mempool.ChunkRe
 		Times(len(chunkIDs))
 }
 
-// mockPendingRequestsRemoval mocks chunk requests mempool for being queried for affirmative removal of each chunk ID once.
-func mockPendingRequestsRemoval(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
+// mockPendingRequestsRem mocks chunk requests mempool for being queried for affirmative removal of each chunk ID once.
+func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
 	// maps keep track of distinct invocations per chunk ID
 	removedRequests := make(map[flow.Identifier]struct{})
 
