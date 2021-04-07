@@ -543,12 +543,12 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	vmOpts := []fvm.Option{
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
+		fvm.WithAccountStorageLimit(true),
 	}
 	if fnb.RootChainID == flow.Testnet {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
-			fvm.WithAccountStorageLimit(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts
