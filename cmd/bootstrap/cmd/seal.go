@@ -53,5 +53,9 @@ func constructRootResultAndSeal(
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
 	seal := run.GenerateRootSeal(result)
 
+	if seal.ResultID != result.ID() {
+		log.Fatal().Msgf("root block seal (%v) mismatch with result id: (%v)", seal.ResultID, result.ID())
+	}
+
 	return result, seal
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 var (
@@ -187,6 +189,31 @@ func finalize(cmd *cobra.Command, args []string) {
 	// write snapshot to disk
 	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
+
+	// read snapshot and verify consistency
+	rootSnapshot, err := loadRootProtocolSnapshot(model.PathRootProtocolStateSnapshot)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to load seralized root protocol")
+	}
+
+	savedResult, savedSeal, err := rootSnapshot.SealedResult()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not load sealed result")
+	}
+
+	if savedSeal.ID() != seal.ID() {
+		log.Fatal().Msgf("inconsistent seralization of the root seal: %v != %v", savedSeal.ID(), seal.ID())
+	}
+
+	if savedResult.ID() != result.ID() {
+		log.Fatal().Msgf("inconsistent seralization of the root result: %v != %v", savedResult.ID(), result.ID())
+	}
+
+	if savedSeal.ResultID != savedResult.ID() {
+		log.Fatal().Msgf("mismatch saved seal's resultID  %v and result %v", savedSeal.ResultID, savedResult.ID())
+	}
+
+	log.Info().Msg("saved result and seal are matching")
 
 	// copy files only if the directories differ
 	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", flagOutdir).Msg("attempting to copy private key files")
@@ -399,4 +426,20 @@ func validateStakingPubKey(key encodable.StakingPubKey) encodable.StakingPubKey 
 
 func validateStake(stake uint64) (uint64, bool) {
 	return stake, stake > 0
+}
+
+// loadRootProtocolSnapshot loads the root protocol snapshot from disk
+func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
+	data, err := io.ReadFile(filepath.Join(flagOutdir, path))
+	if err != nil {
+		return nil, err
+	}
+
+	var snapshot inmem.EncodableSnapshot
+	err = json.Unmarshal(data, &snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	return inmem.SnapshotFromEncodable(snapshot), nil
 }
