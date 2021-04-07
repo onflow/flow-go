@@ -61,60 +61,9 @@ func (s *ClientSuite) SetupTest() {
 
 	// Note: using DKG address as DKG participant to avoid funding a new account key
 	s.client = NewClient(s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
-}
 
-func (s *ClientSuite) deployDKGContract() {
-
-	// create new account keys for the DKG contract
-	accountKey, signer := test.AccountKeyGenerator().NewWithSigner()
-	code := contracts.FlowDKG()
-
-	// deploy the contract to the emulator
-	dkgAddress, err := s.emulator.CreateAccount([]*sdk.AccountKey{accountKey}, []sdktemplates.Contract{
-		{
-			Name:   "FlowDKG",
-			Source: string(code),
-		},
-	})
-	require.NoError(s.T(), err)
-
-	env := templates.Environment{
-		DkgAddress: dkgAddress.Hex(),
-	}
-
-	s.env = env
-	s.dkgAddress = dkgAddress
-	s.dkgAccountKey = accountKey
-	s.dkgSigner = signer
-}
-
-func (s *ClientSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) {
-
-	// sign transaction with each signer
-	for i := len(signerAddresses) - 1; i >= 0; i-- {
-		signerAddress := signerAddresses[i]
-		signer := signers[i]
-
-		if i == 0 {
-			err := tx.SignEnvelope(signerAddress, 0, signer)
-			require.NoError(s.T(), err)
-		} else {
-			err := tx.SignPayload(signerAddress, 0, signer)
-			require.NoError(s.T(), err)
-
-		}
-	}
-
-	// submit transaction
-	err := s.emulatorClient.Submit(tx)
-	require.NoError(s.T(), err)
-}
-
-func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.Value {
-	result, err := s.emulator.ExecuteScript(script, arguments)
-	require.NoError(s.T(), err)
-	require.True(s.T(), result.Succeeded())
-	return result.Value
+	// set up admin resource
+	s.setUpAdmin()
 }
 
 func (s *ClientSuite) TestSubmitResult() {
@@ -144,21 +93,83 @@ func (s *ClientSuite) TestDKGContractClient() {
 	dkgNodeIDStrings := make([]cadence.Value, 1)
 	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
 
+	// start dkf with 1 participant
+	s.startDKGWithParticipants(dkgNodeIDStrings)
+
+	// create participant resource
+	s.createParticipant(nodeID.String())
+
+	// DKG message fields
+	msgData := unittest.RandomBytes(10)
+	dkgEpochID := "integration-dkg-epoch-1"
+	originID := uint64(1)
+
+	// broadcast messsage a random broadcast message and verify that there were no errors
+	msg := messages.NewDKGMessage(int(originID), msgData, dkgEpochID)
+	err := s.client.Broadcast(msg)
+	assert.NoError(s.T(), err)
+
+	// read latest broadcast messages
+	block, err := s.emulator.GetLatestBlock()
+	require.NoError(s.T(), err)
+
+	// verify the data recieved with data sent
+	messages, err := s.client.ReadBroadcast(0, block.ID())
+	require.NoError(s.T(), err)
+	assert.Len(s.T(), messages, 1)
+
+	broadcastedMsg := messages[0]
+	assert.Equal(s.T(), dkgEpochID, broadcastedMsg.DKGInstanceID)
+	assert.Equal(s.T(), msgData, broadcastedMsg.Data)
+	assert.Equal(s.T(), originID, broadcastedMsg.Orig)
+}
+
+func (s *ClientSuite) deployDKGContract() {
+
+	// create new account keys for the DKG contract
+	accountKey, signer := test.AccountKeyGenerator().NewWithSigner()
+	code := contracts.FlowDKG()
+
+	// deploy the contract to the emulator
+	dkgAddress, err := s.emulator.CreateAccount([]*sdk.AccountKey{accountKey}, []sdktemplates.Contract{
+		{
+			Name:   "FlowDKG",
+			Source: string(code),
+		},
+	})
+	require.NoError(s.T(), err)
+
+	env := templates.Environment{
+		DkgAddress: dkgAddress.Hex(),
+	}
+
+	s.env = env
+	s.dkgAddress = dkgAddress
+	s.dkgAccountKey = accountKey
+	s.dkgSigner = signer
+}
+
+func (s *ClientSuite) setUpAdmin() {
+
 	// set up admin resource
-	setUpAdminTx := sdk.NewTransaction().
+	tx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
 		SetGasLimit(9999).
 		SetProposalKey(s.emulator.ServiceKey().Address, s.emulator.ServiceKey().Index,
 			s.emulator.ServiceKey().SequenceNumber).
 		SetPayer(s.emulator.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
-	s.signAndSubmit(setUpAdminTx,
+
+	s.signAndSubmit(tx,
 		[]sdk.Address{s.emulator.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{s.emulator.ServiceKey().Signer(), s.dkgSigner},
 	)
+}
+
+func (s *ClientSuite) startDKGWithParticipants(nodeIDs []cadence.Value) {
 
 	// start DKG using admin resource
-	startDKGTx := sdk.NewTransaction().
+	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
 		SetGasLimit(9999).
 		SetProposalKey(s.emulator.ServiceKey().Address, s.emulator.ServiceKey().Index,
@@ -166,17 +177,20 @@ func (s *ClientSuite) TestDKGContractClient() {
 		SetPayer(s.emulator.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
 
-	err := startDKGTx.AddArgument(cadence.NewArray(dkgNodeIDStrings))
+	err := tx.AddArgument(cadence.NewArray(nodeIDs))
 	require.NoError(s.T(), err)
 
-	s.signAndSubmit(startDKGTx,
+	s.signAndSubmit(tx,
 		[]sdk.Address{s.emulator.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{s.emulator.ServiceKey().Signer(), s.dkgSigner},
 	)
 
 	// sanity check: verify that DKG was started with correct node IDs
 	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
-	assert.Equal(s.T(), cadence.NewArray(dkgNodeIDStrings), result)
+	assert.Equal(s.T(), cadence.NewArray(nodeIDs), result)
+}
+
+func (s *ClientSuite) createParticipant(nodeID string) {
 
 	// create DKG partcipant
 	createParticipantTx := sdk.NewTransaction().
@@ -187,9 +201,9 @@ func (s *ClientSuite) TestDKGContractClient() {
 		SetPayer(s.emulator.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
 
-	err = createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
+	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
-	err = createParticipantTx.AddArgument(cadence.NewString(nodeID.String()))
+	err = createParticipantTx.AddArgument(cadence.NewString(nodeID))
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(createParticipantTx,
@@ -198,32 +212,40 @@ func (s *ClientSuite) TestDKGContractClient() {
 	)
 
 	// verify that nodeID was registered
-	result = s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
-		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID.String()))})
+	result := s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
+		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID))})
 	assert.Equal(s.T(), cadence.NewBool(true), result)
 
-	// DKG message fields
-	msgData := unittest.RandomBytes(10)
-	dkgEpochID := "integration-dkg-epoch-1"
-	originID := uint64(1)
+}
 
-	// submit a broadcast messsage a random broadcast message
-	// and verify that there were no errors
-	msg := messages.NewDKGMessage(int(originID), msgData, dkgEpochID)
-	err = s.client.Broadcast(msg)
-	assert.NoError(s.T(), err)
+func (s *ClientSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) {
 
-	// read the broadcast message and verify that the data recieved
-	// from the latest block
-	block, err := s.emulator.GetLatestBlock()
+	// sign transaction with each signer
+	for i := len(signerAddresses) - 1; i >= 0; i-- {
+		signerAddress := signerAddresses[i]
+		signer := signers[i]
+
+		if i == 0 {
+			err := tx.SignEnvelope(signerAddress, 0, signer)
+			require.NoError(s.T(), err)
+		} else {
+			err := tx.SignPayload(signerAddress, 0, signer)
+			require.NoError(s.T(), err)
+
+		}
+	}
+
+	// submit transaction
+	err := s.emulatorClient.Submit(tx)
 	require.NoError(s.T(), err)
+}
 
-	messages, err := s.client.ReadBroadcast(0, block.ID())
+func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.Value {
+
+	// execute script
+	result, err := s.emulator.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
-	assert.Len(s.T(), messages, 1)
+	require.True(s.T(), result.Succeeded())
 
-	broadcastedMsg := messages[0]
-	assert.Equal(s.T(), dkgEpochID, broadcastedMsg.DKGInstanceID)
-	assert.Equal(s.T(), msgData, broadcastedMsg.Data)
-	assert.Equal(s.T(), originID, broadcastedMsg.Orig)
+	return result.Value
 }
