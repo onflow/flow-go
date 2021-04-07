@@ -405,7 +405,7 @@ func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 
 		commits := make(map[flow.Identifier]flow.StateCommitment)
 		commits[blockB.Block.Header.ParentID] = blockB.StartState
-		//commits[blockC.Block.Header.ParentID] = blockC.StartState
+
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
 
@@ -416,13 +416,19 @@ func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 		wgPut := sync.WaitGroup{}
 		wgPut.Add(1)
 
+		// add extra flag to make sure B was indeed executed before C
+		wasBExecuted := false
+
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wgPut.Wait()
 			wg.Done()
+
+			wasBExecuted = true
 		}, blockB, unittest.IdentifierFixture(), true)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
+			require.True(t, wasBExecuted)
 		}, blockC, unittest.IdentifierFixture(), true)
 
 		times := 4
@@ -444,6 +450,9 @@ func TestBlocksArentExecutedMultipleTimes(t *testing.T) {
 		require.False(t, more)
 
 		_, ok := commits[blockB.ID()]
+		require.True(t, ok)
+
+		_, ok = commits[blockC.ID()]
 		require.True(t, ok)
 
 	})
