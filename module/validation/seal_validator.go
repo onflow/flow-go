@@ -30,11 +30,12 @@ type sealValidator struct {
 	seals                                storage.Seals
 	headers                              storage.Headers
 	payloads                             storage.Payloads
+	results                              storage.ExecutionResults
 	requiredApprovalsForSealVerification uint
 	metrics                              module.ConsensusMetrics
 }
 
-func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
+func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, results storage.ExecutionResults, seals storage.Seals,
 	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint, metrics module.ConsensusMetrics) *sealValidator {
 
 	rv := &sealValidator{
@@ -42,6 +43,7 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 		assigner:                             assigner,
 		verifier:                             verifier,
 		headers:                              headers,
+		results:                              results,
 		seals:                                seals,
 		payloads:                             payloads,
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
@@ -142,6 +144,19 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// collect IDs of blocks on the fork (from parent to last sealed)
 	var blockIDs []flow.Identifier
 
+	resultsById := candidate.Payload.ResultsById()
+	fetchResult := func(resultID flow.Identifier) *flow.ExecutionResult {
+		res, ok := resultsById[resultID]
+		if !ok {
+			res, err := s.results.ByID(resultID)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("no result in storage: %v", resultID)
+			}
+			return res
+		}
+		return res
+	}
+
 	// loop through the fork backwards from the parent block
 	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
@@ -158,7 +173,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 
 		// Collect execution results from receipts.
 		for _, receipt := range payload.Receipts {
-			resultID := receipt.ExecutionResult.ID()
+			resultID := receipt.ResultID
+			result := fetchResult(resultID)
 			// unsealedResults should contain the _first_ appearance of the
 			// ExecutionResult. We are traversing the fork backwards, so we can
 			// overwrite any previously recorded result.
@@ -170,8 +186,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			// we are still using a temporary sealing logic where the
 			// IncorporatedBlockID is expected to be the result's block ID.
 			unsealedResults[resultID] = flow.NewIncorporatedResult(
-				receipt.ExecutionResult.BlockID,
-				&receipt.ExecutionResult,
+				result.BlockID,
+				result,
 			)
 
 		}
