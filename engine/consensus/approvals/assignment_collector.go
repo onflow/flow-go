@@ -163,7 +163,7 @@ func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) e
 	// TODO: add approval into cache before processing.
 
 	for _, collector := range c.allCollectors() {
-		err := collector.ProcessApproval(approval)
+		_, err := collector.ProcessApproval(approval)
 		if err != nil {
 			return fmt.Errorf("could not process assignment for collector %v: %w", collector.incorporatedBlockID, err)
 		}

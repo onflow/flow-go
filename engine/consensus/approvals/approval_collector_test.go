@@ -49,9 +49,33 @@ func (s *ApprovalCollectorTestSuite) SetupTest() {
 func (s *ApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	collector := NewApprovalCollector(s.incorporatedResult, s.chunkAssignment, s.authorizedVerifiers, 3)
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunks[0].Index), unittest.WithApproverID(s.verID))
-	err := collector.ProcessApproval(approval)
+	status, err := collector.ProcessApproval(approval)
+	require.False(s.T(), status.SufficientApprovalsForSealing)
+	require.Nil(s.T(), status.AggregatedSignatures)
 	require.NoError(s.T(), err)
-	//require.True(s.T(), status.approvalProcessed)
-	//require.Equal(s.T(), uint(1), status.numberOfApprovals)
-	//require.Equal(s.T(), uint(1), collector.chunkApprovals.NumberSignatures())
+}
+
+func (s *ApprovalCollectorTestSuite) TestProcessApproval_CollectSealingRecord() {
+	collector := NewApprovalCollector(s.incorporatedResult, s.chunkAssignment, s.authorizedVerifiers, uint(len(s.authorizedVerifiers)))
+	expectedSignatures := make([]flow.AggregatedSignature, s.incorporatedResult.Result.Chunks.Len())
+	for i := 0; i < s.chunks.Len(); i++ {
+		chunk := s.chunks[i]
+		var status *SealingRecord
+		var err error
+		sigCollector := flow.NewSignatureCollector()
+		for verID, _ := range s.authorizedVerifiers {
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
+			status, err = collector.ProcessApproval(approval)
+			require.NoError(s.T(), err)
+			sigCollector.Add(approval.Body.ApproverID, approval.Body.AttestationSignature)
+		}
+		expectedSignatures[i] = sigCollector.ToAggregatedSignature()
+
+		if i == s.chunks.Len()-1 {
+			require.True(s.T(), status.SufficientApprovalsForSealing)
+			require.ElementsMatch(s.T(), expectedSignatures, status.AggregatedSignatures)
+		} else {
+			require.False(s.T(), status.SufficientApprovalsForSealing)
+		}
+	}
 }
