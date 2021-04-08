@@ -19,7 +19,7 @@ func NewChunkRequests(limit uint) *ChunkRequests {
 	return chunks
 }
 
-func fromEntity(entity flow.Entity) *verification.ChunkRequestStatus {
+func chunkRequestStatus(entity flow.Entity) *verification.ChunkRequestStatus {
 	chunk, ok := entity.(*verification.ChunkRequestStatus)
 	if !ok {
 		panic(fmt.Sprintf("could not convert the entity into chunk status from the mempool: %v", entity))
@@ -31,7 +31,7 @@ func (cs *ChunkRequests) All() []*verification.ChunkRequestStatus {
 	all := cs.Backend.All()
 	allChunks := make([]*verification.ChunkRequestStatus, 0, len(all))
 	for _, entity := range all {
-		chunk := fromEntity(entity)
+		chunk := chunkRequestStatus(entity)
 		allChunks = append(allChunks, chunk)
 	}
 	return allChunks
@@ -42,7 +42,7 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkReque
 	if !exists {
 		return nil, false
 	}
-	chunk := fromEntity(entity)
+	chunk := chunkRequestStatus(entity)
 	return chunk, true
 }
 
@@ -60,7 +60,7 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		chunk := fromEntity(entity)
+		chunk := chunkRequestStatus(entity)
 		chunk.Attempt++
 		chunk.LastAttempt = time.Now()
 		return nil
