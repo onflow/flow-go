@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 )
 
+// ChunkRequests is an in-memory storage for maintaining chunk requests data objects.
 type ChunkRequests interface {
 	ByID(chunkID flow.Identifier) (*verification.ChunkRequestStatus, bool)
 	Add(chunk *verification.ChunkRequestStatus) bool
