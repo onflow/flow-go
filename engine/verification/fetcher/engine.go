@@ -31,7 +31,6 @@ type Engine struct {
 	log                   zerolog.Logger
 	metrics               module.VerificationMetrics
 	tracer                module.Tracer
-	me                    module.Local
 	verifier              network.Engine            // the verifier engine
 	state                 protocol.State            // used to verify the request origin
 	pendingChunks         mempool.ChunkStatuses     // used to store all the pending chunks that assigned to this node
@@ -60,7 +59,6 @@ func New(
 		metrics:       metrics,
 		tracer:        tracer,
 		log:           log.With().Str("engine", "fetcher").Logger(),
-		me:            me,
 		verifier:      verifier,
 		state:         state,
 		pendingChunks: pendingChunks,
