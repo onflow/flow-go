@@ -195,27 +195,12 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Identifier]flow.StateCommitment, onPersisted func(blockID flow.Identifier, commit flow.StateCommitment), executableBlock *entity.ExecutableBlock, previousExecutionResultID flow.Identifier, expectBroadcast bool) {
 	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
-	newStateCommitment := unittest.StateCommitmentFixture()
-	if len(computationResult.StateSnapshots) == 0 { // if block was empty, no new state commitment is produced
-		newStateCommitment = executableBlock.StartState
-	}
+	newStateCommitment := executableBlock.StartState
 
 	ctx.computationManager.
 		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).Run(func(args mock.Arguments) {
 	}).
 		Return(computationResult, nil).Once()
-
-	for _, view := range computationResult.StateSnapshots {
-		ctx.executionState.
-			On("CommitDelta", mock.Anything, view.Delta, executableBlock.StartState).
-			Return(newStateCommitment, nil)
-
-		ctx.executionState.
-			On("GetProof", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil, nil, nil)
-
-		//proof, err := e.execState.GetProof(childCtx, chunk.StartState, allRegisters)
-	}
 
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
 

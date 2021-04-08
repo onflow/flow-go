@@ -66,7 +66,7 @@ func TestQueue(t *testing.T) {
 		assert.Equal(t, 3, size)
 		assert.Equal(t, uint64(2), height)
 
-		stored, new = queue.TryAdd(f) //parent not stored yet
+		stored, _ = queue.TryAdd(f) //parent not stored yet
 		assert.False(t, stored)
 
 		stored, new = queue.TryAdd(d)
