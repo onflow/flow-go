@@ -350,7 +350,8 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 	// container block contains the execution receipt and points back to reference block
 	// as its parent.
 	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
-	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
+	containerBlock.Payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
+	containerBlock.Payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
 
 	return &CompleteExecutionReceipt{
 		ContainerBlock: &containerBlock,
@@ -450,8 +451,7 @@ func ContainerBlockFixture(parent *flow.Header, results []*flow.ExecutionResult)
 
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(parent)
-	containerBlock.Payload.Receipts = receipts
-	containerBlock.Header.PayloadHash = containerBlock.Payload.Hash()
+	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
 	return &containerBlock, receipts
 }
