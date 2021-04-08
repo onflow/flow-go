@@ -192,6 +192,47 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 	<-e.Done()
 }
 
+// TestCompleteRequestingUnsealedChunkCycle evaluates a complete life cycle of receiving a chunk request by the requester.
+// The requester should submit the request to the network (on its timer overflow), and receive the response back and send it to
+// the registered handler.
+//
+// It should also clean the request from memory.
+func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	sealedHeight := uint64(10)
+	// Creates a single chunk request with its corresponding response.
+	// The chunk belongs to an unsealed block.
+	aggrees := unittest.IdentifierListFixture(2)
+	disaggrees := unittest.IdentifierListFixture(3)
+	status := unittest.ChunkRequestStatusListFixture(1,
+		unittest.WithHeightGreaterThan(sealedHeight),
+		unittest.WithAgrees(aggrees),
+		unittest.WithDisagrees(disaggrees))
+	response := unittest.ChunkDataResponseFixture(status[0].ChunkID)
+	chunkCollectionIdMap := chunkToCollectionIdMap(t, []*messages.ChunkDataResponse{response})
+
+	// mocks the requester pipeline
+	mockLastSealedHeight(s.state, sealedHeight)
+	s.pendingRequests.On("All").Return(status)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
+	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
+	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(status))
+	mockPendingRequestsByID(t, s.pendingRequests, flow.GetIDs(status))
+
+	<-e.Ready()
+
+	// we wait till the engine submits the chunk request to the network, and receive the response
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, status, 1, func(request *messages.ChunkDataRequest) {
+		err := e.Process(status[0].Agrees[0], response)
+		require.NoError(t, err)
+	})
+	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
+
+	<-e.Done()
+}
+
 // TestRequestPendingChunkSealedBlock_Hybrid evaluates the situation that requester has some pending chunk requests belonging to sealed blocks
 // (i.e., sealed chunks), and some pending chunk requests belonging to unsealed blocks (i.e., unsealed chunks).
 //
@@ -225,7 +266,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(sealedStatus))
 	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(sealedStatus))
 	// unsealed requests should be submitted to the network once
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedStatus, 1, func(response *messages.ChunkDataRequest) {})
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedStatus, 1, func(*messages.ChunkDataRequest) {})
 
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
@@ -264,7 +305,7 @@ func testRequestPendingChunkDataPack(t *testing.T, requests int, attempts int) {
 
 	<-e.Ready()
 
-	wg := mockConduitForChunkDataPackRequest(t, s.con, status, attempts, func(response *messages.ChunkDataRequest) {})
+	wg := mockConduitForChunkDataPackRequest(t, s.con, status, attempts, func(*messages.ChunkDataRequest) {})
 	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	<-e.Done()
@@ -300,7 +341,7 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 	con *mocknetwork.Conduit,
 	reqList []*verification.ChunkRequestStatus,
 	count int,
-	requestHandler func(response *messages.ChunkDataRequest)) *sync.WaitGroup {
+	requestHandler func(*messages.ChunkDataRequest)) *sync.WaitGroup {
 
 	// counts number of requests for each chunk data pack
 	reqCount := make(map[flow.Identifier]int)
@@ -341,7 +382,9 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 			wg.Done()
 		}()
 
-	}).Return(nil).Times(count * len(reqList)) // each chunk requested count time.
+	}).
+		Return(nil).
+		Times(count * len(reqList)) // each chunk requested count time.
 
 	return wg
 }
