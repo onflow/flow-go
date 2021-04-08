@@ -1,10 +1,10 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -35,6 +35,31 @@ func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Sea
 }
 
 func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*badger.Txn) error {
+	// For correct payloads, the execution result is part of the payload or it's already stored
+	// in storage. If execution result is not present in either of those places, we error.
+	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
+	// which is not included in current payload but was incorporated in one of previous blocks.
+	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
+	// and execution result is decoupled.
+	resultsById := payload.ResultsById()
+	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
+	var err error
+	for _, meta := range payload.Receipts {
+		result, ok := resultsById[meta.ResultID]
+		if !ok {
+			result, err = p.results.ByID(meta.ResultID)
+			if err != nil {
+				if errors.Is(err, badger.ErrKeyNotFound) {
+					err = fmt.Errorf("invalid payload referencing unknown execution result %v", meta.ResultID)
+				}
+				return func(*badger.Txn) error {
+					return err
+				}
+			}
+		}
+		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
+	}
+
 	return func(tx *badger.Txn) error {
 
 		// make sure all payload guarantees are stored
@@ -53,30 +78,8 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 			}
 		}
 
-		resultsById := payload.ResultsById()
-
-		// At this point we can be sure that execution result is part of the payload or it's already
-		// stored in storage. If execution result is not present in both of those places it means that there is
-		// a protocol violation and we are in inconsistent state.
-		receiptFromMeta := func(meta *flow.ExecutionReceiptMeta) *flow.ExecutionReceipt {
-			if result, ok := resultsById[meta.ResultID]; ok {
-				return flow.ExecutionReceiptFromMeta(*meta, *result)
-			}
-
-			result, err := p.results.ByID(meta.ResultID)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("could not retrieve result %v from storage", meta.ResultID)
-			}
-			return flow.ExecutionReceiptFromMeta(*meta, *result)
-		}
-
 		// store all payload receipts
-		for _, meta := range payload.Receipts {
-			// ATTENTION: this is broken from perspective if we have execution receipt which points an execution result
-			// which is not included in current payload but was incorporated in one of previous blocks.
-			// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
-			// and execution result is decoupled.
-			receipt := receiptFromMeta(meta)
+		for _, receipt := range fullReceipts {
 			err := p.receipts.store(receipt)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)
@@ -123,36 +126,28 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 		}
 
 		// retrieve receipts
-		receipts := make([]*flow.ExecutionReceipt, 0, len(idx.ReceiptIDs))
-		// multiple receipts can refer to one execution result, avoid duplicating by using map
-		resultsLookup := make(map[flow.Identifier]*flow.ExecutionResult)
+		receipts := make([]*flow.ExecutionReceiptMeta, 0, len(idx.ReceiptIDs))
 		for _, recID := range idx.ReceiptIDs {
 			receipt, err := p.receipts.byID(recID)(tx)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve receipt (%x): %w", recID, err)
+				return nil, fmt.Errorf("could not retrieve receipt %x: %w", recID, err)
 			}
-			receipts = append(receipts, receipt)
-			if _, ok := resultsLookup[receipt.ExecutionResult.ID()]; !ok {
-				resultsLookup[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
-			}
+			receipts = append(receipts, receipt.Meta())
 		}
 
-		metas := make([]*flow.ExecutionReceiptMeta, len(receipts))
-		results := make([]*flow.ExecutionResult, 0, len(resultsLookup))
-		for i, receipt := range receipts {
-			meta := receipt.Meta()
-			metas[i] = meta
-			// we need to do this to preserve order of results in payload
-			if result, found := resultsLookup[meta.ResultID]; found {
-				results = append(results, result)
-				delete(resultsLookup, meta.ResultID)
+		// retrieve results
+		results := make([]*flow.ExecutionResult, 0, len(idx.ResultIDs))
+		for _, resID := range idx.ResultIDs {
+			result, err := p.results.byID(resID)(tx)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve result %x: %w", resID, err)
 			}
+			results = append(results, result)
 		}
-
 		payload := &flow.Payload{
 			Seals:      seals,
 			Guarantees: guarantees,
-			Receipts:   metas,
+			Receipts:   receipts,
 			Results:    results,
 		}
 

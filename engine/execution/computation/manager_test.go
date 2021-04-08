@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -88,7 +90,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -139,7 +141,7 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize)
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -161,7 +163,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize)
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)

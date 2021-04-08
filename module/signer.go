@@ -24,5 +24,5 @@ type AggregatingSigner interface {
 type ThresholdSigner interface {
 	ThresholdVerifier
 	Sign(msg []byte) (crypto.Signature, error)
-	Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error)
+	Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error)
 }

@@ -114,10 +114,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	// initialize the account addressing state
 	b.accounts = state.NewAccounts(b.sth)
-	addressGenerator, err := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create address generator: %s", err.Error()))
-	}
+	addressGenerator := state.NewStateBoundAddressGenerator(b.sth, ctx.Chain)
 	b.addressGenerator = addressGenerator
 
 	service := b.createServiceAccount(b.serviceAccountPublicKey)
@@ -178,7 +175,6 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
 	}
-
 	return fungibleToken
 }
 
@@ -196,7 +192,6 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
 	}
-
 	return flowToken
 }
 
@@ -217,7 +212,6 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
 	}
-
 	return flowFees
 }
 

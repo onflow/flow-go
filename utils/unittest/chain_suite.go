@@ -523,10 +523,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.SealsIndex[block.ID()] = seal
 	}
 
-	resultsByID := block.Payload.ResultsById()
-
-	for _, receipt := range block.Payload.Receipts {
-		result := resultsByID[receipt.ResultID]
+	for _, result := range block.Payload.Results {
 		// Exec Receipt for block with valid subgraph
 		// ATTENTION:
 		// Here, IncorporatedBlockID (the first argument) should be set

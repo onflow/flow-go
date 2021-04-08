@@ -217,12 +217,12 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// use it to identify receipts that are for blocks not in the fork.
 	forkBlocks := make(map[flow.Identifier]struct{})
 
-	// Set of the execution tree with root latestSealedResult.
+	// Sub-Set of the execution tree: only contains `ExecutionResult`s that descent from latestSealedResult.
 	// Used for detecting duplicates and results with invalid parent results.
 	executionTree := make(map[flow.Identifier]*flow.ExecutionResult)
 	executionTree[lastSeal.ResultID] = latestSealedResult
 
-	// Set of previously included results. Used for detecting duplicates.
+	// Set of previously included receipts. Used for detecting duplicates.
 	forkReceipts := make(map[flow.Identifier]struct{})
 
 	// Start from the lowest unsealed block and walk the chain upwards until we
@@ -251,7 +251,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 			if _, ok := executionTree[result.PreviousResultID]; !ok {
 				// We only collect results that directly descend from the last sealed result.
 				// Because Results are listed in an order that satisfies the parent-first
-				// relationship, we can skip all results whose parent are unknown.
+				// relationship, we can skip all results whose parents are unknown.
 				continue
 			}
 			executionTree[resultID] = result

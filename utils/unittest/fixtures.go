@@ -201,9 +201,11 @@ func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
 func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
-	receipt := ExecutionReceiptFixture()
-	payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
-	payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+	for i := 0; i < 10; i++ {
+		receipt := ExecutionReceiptFixture()
+		payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
+		payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+	}
 }
 
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
@@ -815,15 +817,15 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 }
 
 func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 32)
+	sig := make([]byte, 48)
 	_, _ = crand.Read(sig)
 	return sig
 }
 
 func CombinedSignatureFixture(n int) crypto.Signature {
 	sigs := SignaturesFixture(n)
-	combiner := signature.NewCombiner()
-	sig, err := combiner.Join(sigs...)
+	combiner := signature.NewCombiner(48, 48)
+	sig, err := combiner.Join(sigs[0], sigs[1])
 	if err != nil {
 		panic(err)
 	}
@@ -1301,7 +1303,7 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 	// after changing results we need to update IDs of results in receipt
 	for _, block := range blocks {
 		if len(block.Payload.Results) > 0 {
-			for i, _ := range block.Payload.Receipts {
+			for i := range block.Payload.Receipts {
 				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
 			}
 		}

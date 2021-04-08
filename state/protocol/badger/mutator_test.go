@@ -361,14 +361,15 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		// Add a receipt for block 2
 		receipt := unittest.ExecutionReceiptFixture()
 
-		// force the receipt validator to refuse this payload
-		validator.On("ValidatePayload", mock.Anything).Return(engine.NewInvalidInputError("")).Once()
-
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
 			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 		})
+
+		// force the receipt validator to refuse this payload
+		validator.On("ValidatePayload", &block3).Return(engine.NewInvalidInputError("")).Once()
+
 		err = state.Extend(&block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)

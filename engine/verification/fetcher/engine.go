@@ -26,17 +26,17 @@ import (
 // from the execution nodes who produced the receipts, and when the chunk data pack are
 // received, it passes the verifiable chunk data to verifier engine to verify the chunk.
 type Engine struct {
-	unit             *engine.Unit
-	log              zerolog.Logger
-	metrics          module.VerificationMetrics
-	tracer           module.Tracer
-	me               module.Local
-	verifier         network.Engine   // the verifier engine
-	state            protocol.State   // used to verify the request origin
-	pendingChunks    *Chunks          // used to store all the pending chunks that assigned to this node
-	con              network.Conduit  // used to send the chunk data request
-	headers          storage.Headers  // used to fetch the block header when chunk data is ready to be verified
-	finishProcessing FinishProcessing // to report a chunk has been processed
+	unit                  *engine.Unit
+	log                   zerolog.Logger
+	metrics               module.VerificationMetrics
+	tracer                module.Tracer
+	me                    module.Local
+	verifier              network.Engine            // the verifier engine
+	state                 protocol.State            // used to verify the request origin
+	pendingChunks         *Chunks                   // used to store all the pending chunks that assigned to this node
+	con                   network.Conduit           // used to send the chunk data request
+	headers               storage.Headers           // used to fetch the block header when chunk data is ready to be verified
+	chunkConsumerNotifier module.ProcessingNotifier // to report a chunk has been processed
 
 	receiptsDB    storage.ExecutionReceipts // used to find executor of the chunk
 	retryInterval time.Duration             // determines time in milliseconds for retrying chunk data requests
@@ -82,14 +82,14 @@ func New(
 	return e, nil
 }
 
-func (e *Engine) WithFinishProcessing(finishProcessing FinishProcessing) {
-	e.finishProcessing = finishProcessing
+func (e *Engine) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
+	e.chunkConsumerNotifier = notifier
 }
 
 // Ready initializes the engine and returns a channel that is closed when the initialization is done
 func (e *Engine) Ready() <-chan struct{} {
-	if e.finishProcessing == nil {
-		panic("missing finishProcessing callback in verification match engine")
+	if e.chunkConsumerNotifier == nil {
+		panic("missing chunk consumer notifier callback in verification fetcher engine")
 	}
 
 	delay := time.Duration(0)
@@ -168,8 +168,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // multiple workers might be calling it concurrently.
 // It skips chunks for sealed blocks.
 // It fetches the chunk data pack, once received, verifier engine will be verifying
-// Once a chunk has been processed, it will call the FinishProcessing callback to notify
-// the chunkconsumer in order to process the next chunk.
+// Once a chunk has been processed, it will call the processing notifier callback to notify
+// the chunk consumer in order to process the next chunk.
 func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 	chunkID := c.ID()
 	blockID := c.ChunkBody.BlockID
@@ -183,14 +183,14 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 
 	if err != nil {
 		lg.Error().Err(err).Msg("could not check if block is sealed")
-		e.finishProcessing.Notify(chunkID)
+		e.chunkConsumerNotifier.Notify(chunkID)
 		return
 	}
 
 	// skip sealed blocks
 	if sealed {
 		lg.Debug().Msg("skip sealed chunk")
-		e.finishProcessing.Notify(chunkID)
+		e.chunkConsumerNotifier.Notify(chunkID)
 		return
 	}
 
@@ -201,7 +201,7 @@ func (e *Engine) ProcessMyChunk(c *flow.Chunk, resultID flow.Identifier) {
 	if err != nil {
 		lg.Error().Err(err).Msg("could not process chunk")
 		// we report finish processing this chunk even if it failed
-		e.finishProcessing.Notify(chunkID)
+		e.chunkConsumerNotifier.Notify(chunkID)
 	} else {
 		lg.Info().Msgf("processing chunk")
 	}
@@ -423,7 +423,7 @@ func (e *Engine) onChunkDataPack(
 
 	// whenever we removed a chunk from pending chunks, we need to
 	// report that the job has been finished eventually
-	defer e.finishProcessing.Notify(chunkID)
+	defer e.chunkConsumerNotifier.Notify(chunkID)
 
 	resultID := status.ExecutionResultID
 	err = e.verifyChunkWithChunkDataPack(chunk, resultID, chunkDataPack, collection)
@@ -550,6 +550,14 @@ func (e *Engine) makeVerifiableChunkData(
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
 	}, nil
+}
+
+// HandleChunkDataPack is called by the chunk requester module everytime a new request chunk arrives.
+// The chunks are supposed to be deduplicated by the requester. So invocation of this method indicates arrival of a distinct
+// requested chunk.
+func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+	// TODO implement the logic
+	return nil
 }
 
 // CanTry returns checks the history attempts and determine whether a chunk request

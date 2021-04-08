@@ -98,11 +98,7 @@ func run(*cobra.Command, []string) {
 
 	sth := state.NewStateHolder(state.NewState(ldg))
 	accounts := state.NewAccounts(sth)
-	finalGenerator, err := state.NewStateBoundAddressGenerator(sth, chain)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot get current address state")
-	}
-
+	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
 	finalState := finalGenerator.Bytes()
 
 	generator := chain.NewAddressGenerator()
