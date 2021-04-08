@@ -197,6 +197,11 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	header := candidate.Header
 	payload := candidate.Payload
 
+	// return if nothing to validate
+	if len(payload.Receipts) == 0 && len(payload.Results) == 0 {
+		return nil
+	}
+
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
 	lastSeal, err := v.seals.ByBlockID(header.ParentID)
