@@ -373,6 +373,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		err = state.Extend(&block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
+		validator.AssertExpectations(t)
 	})
 }
 
