@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 )
 
+// ChunkStatuses is an in-memory storage for maintaining the chunk status data objects.
 type ChunkStatuses struct {
 	*Backend
 }
@@ -45,8 +46,8 @@ func (cs *ChunkStatuses) ByID(chunkID flow.Identifier) (*verification.ChunkStatu
 	return chunk, true
 }
 
-func (cs *ChunkStatuses) Add(chunk *verification.ChunkStatus) bool {
-	return cs.Backend.Add(chunk)
+func (cs *ChunkStatuses) Add(status *verification.ChunkStatus) bool {
+	return cs.Backend.Add(status)
 }
 
 func (cs *ChunkStatuses) Rem(chunkID flow.Identifier) bool {
