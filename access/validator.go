@@ -120,19 +120,19 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 
 func (v *TransactionValidator) checkTxSizeLimit(tx *flow.TransactionBody) error {
 	txSize := uint64(tx.ByteSize())
-	// the reason we don't whitelist the service account completely is
-	// since we can't verify the signature here yet.
-	if tx.Payer == v.serviceAccountAddress {
-		// check the max on the collection size
-		if txSize >= v.options.MaxCollectionByteSize {
-			return InvalidTxByteSizeError{
-				Actual:  txSize,
-				Maximum: v.options.MaxCollectionByteSize,
-			}
+	// first check compatibility to collection byte size
+	// this guarantees liveness
+	if txSize >= v.options.MaxCollectionByteSize {
+		return InvalidTxByteSizeError{
+			Actual:  txSize,
+			Maximum: v.options.MaxCollectionByteSize,
 		}
+	}
+	// this logic need the reason we don't greenlist the service account against the collection size
+	// limits is we can't verify the signature here yet.
+	if tx.Payer == v.serviceAccountAddress {
 		return nil
 	}
-
 	if txSize > v.options.MaxTxSizeLimit {
 		return InvalidTxByteSizeError{
 			Actual:  txSize,
