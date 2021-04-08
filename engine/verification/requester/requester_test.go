@@ -163,6 +163,34 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
 }
 
+// TestRequestPendingChunkSealedBlock evaluates that requester engine drops pending requests for chunks belonging to
+// sealed blocks, and also notifies the handler that this requested chunk has been sealed, so it no longer requests
+// from the network it.
+func TestRequestPendingChunkSealedBlock(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	// creates a single chunk request status that belongs to a sealed height.
+	aggrees := unittest.IdentifierListFixture(2)
+	disaggrees := unittest.IdentifierListFixture(3)
+	status := unittest.ChunkRequestStatusListFixture(1,
+		unittest.WithHeight(5),
+		unittest.WithAgrees(aggrees),
+		unittest.WithDisagrees(disaggrees))
+	mockLastSealedHeight(s.state, 10)
+	s.pendingRequests.On("All").Return(status)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
+
+	<-e.Ready()
+
+	wg := mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(status))
+	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2)*s.retryInterval, "could not request remove pending chunk on time")
+
+	// requester does not call publish to disseminate the request for this chunk.
+	s.con.AssertNotCalled(t, "Publish")
+	<-e.Done()
+}
+
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
 // The chunk belongs to a non-sealed block.
 // On timer interval, the chunk requests should be dispatched to the set of execution nodes agree with the execution
@@ -181,12 +209,12 @@ func testRequestPendingChunkDataPack(t *testing.T, requests int, attempts int) {
 	e := newRequesterEngine(t, s)
 
 	// creates 10 chunk request status each with 2 agree targets and 3 disagree targets.
-	// chunk belongs to a block at height 10, but the last sealed block is at height 5, so
+	// chunk belongs to a block at heights greater than 5, but the last sealed block is at height 5, so
 	// the chunk request should be dispatched.
 	aggrees := unittest.IdentifierListFixture(2)
 	disaggrees := unittest.IdentifierListFixture(3)
 	status := unittest.ChunkRequestStatusListFixture(requests,
-		unittest.WithHeight(10),
+		unittest.WithHeightGreaterThan(5),
 		unittest.WithAgrees(aggrees),
 		unittest.WithDisagrees(disaggrees))
 	mockLastSealedHeight(s.state, 5)
@@ -323,10 +351,12 @@ func mockPendingRequestsByID(t *testing.T, pendingRequests *mempool.ChunkRequest
 }
 
 // mockPendingRequestsRem mocks chunk requests mempool for being queried for affirmative removal of each chunk ID once.
-func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
+func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) *sync.WaitGroup {
 	// maps keep track of distinct invocations per chunk ID
 	removedRequests := make(map[flow.Identifier]struct{})
 
+	wg := &sync.WaitGroup{}
+	wg.Add(len(chunkIDs))
 	// we remove pending request on receiving this response
 	pendingRequests.On("Rem", testifymock.Anything).Run(func(args testifymock.Arguments) {
 		chunkID, ok := args[0].(flow.Identifier)
@@ -338,9 +368,13 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 		_, ok = removedRequests[chunkID]
 		require.False(t, ok)
 		removedRequests[chunkID] = struct{}{}
+
+		wg.Done()
 	}).
 		Return(true).
 		Times(len(chunkIDs))
+
+	return wg
 }
 
 // mockPendingRequestsIncAttempt mocks chunk requests mempool for increasing the attempts on given chunk ids.
