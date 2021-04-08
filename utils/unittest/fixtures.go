@@ -974,12 +974,6 @@ func ChunkDataResponsesFixture(n int, opts ...func(*messages.ChunkDataResponse))
 	return lst
 }
 
-func WithTransactionNum(num int) func(response *messages.ChunkDataResponse) {
-	return func(response *messages.ChunkDataResponse) {
-		response.Collection = CollectionFixture(num)
-	}
-}
-
 func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
 	opts ...func(request *verification.ChunkRequestStatus)) *verification.ChunkRequestStatus {
 
