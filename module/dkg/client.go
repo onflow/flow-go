@@ -28,14 +28,14 @@ type Client struct {
 	dkgContractAddress string
 	accountAddress     sdk.Address
 	accountKeyIndex    uint
-	flowClient         module.DKGSDKClientWrapper
+	flowClient         module.SDKClientWrapper
 	signer             sdkcrypto.Signer
 
 	env templates.Environment // the required contract addresses to be used by the Flow SDK
 }
 
 // NewClient initializes a new client to the Flow DKG contract
-func NewClient(flowClient module.DKGSDKClientWrapper, signer sdkcrypto.Signer, dkgContractAddress, accountAddress string, accountKeyIndex uint) *Client {
+func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgContractAddress, accountAddress string, accountKeyIndex uint) *Client {
 	return &Client{
 		flowClient:         flowClient,
 		dkgContractAddress: dkgContractAddress,
@@ -184,7 +184,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 	// Note: We need to make sure that we pull the keys out in the same order that
 	// we have done here. Group Public key first followed by the individual public keys
-	finalSubmission := make([]cadence.Value, len(publicKeys))
+	finalSubmission := []cadence.Value{}
 	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()))
 	for _, publicKey := range publicKeys {
 		finalSubmission = append(finalSubmission, cadence.NewString(publicKey.String()))

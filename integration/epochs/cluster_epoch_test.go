@@ -13,6 +13,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
+	emulatormod "github.com/onflow/flow-go/module/emulator"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -29,7 +30,7 @@ type ClusterEpochTestSuite struct {
 
 	env            templates.Environment
 	blockchain     *emulator.Blockchain
-	emulatorClient *EmulatorClient
+	emulatorClient *emulatormod.EmulatorClient
 
 	// Quorum Certificate deployed account and address
 	qcAddress    sdk.Address
@@ -47,13 +48,7 @@ func (s *ClusterEpochTestSuite) SetupTest() {
 	blockchain, err := emulator.NewBlockchain()
 	require.NoError(s.T(), err)
 	s.blockchain = blockchain
-
-	// create client instance
-	client := &EmulatorClient{
-		blockchain: blockchain,
-	}
-	s.emulatorClient = client
-
+	s.emulatorClient = emulatormod.NewEmulatorClient(blockchain)
 	s.deployEpochQCContract()
 }
 

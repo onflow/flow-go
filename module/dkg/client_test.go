@@ -21,17 +21,18 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/messages"
+	emulatormod "github.com/onflow/flow-go/module/emulator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type ClientSuite struct {
 	suite.Suite
 
-	client *Client
+	contractClient *Client
 
 	env            templates.Environment
-	emulator       *emulator.Blockchain
-	emulatorClient *EmulatorClient
+	blockchain     *emulator.Blockchain
+	emulatorClient *emulatormod.EmulatorClient
 
 	dkgAddress    sdk.Address
 	dkgAccountKey *sdk.AccountKey
@@ -45,22 +46,17 @@ func TestDKGClient(t *testing.T) {
 // Setup Test creates the blockchain client, the emulated blockchain and deploys
 // the DKG contract to the emulator
 func (s *ClientSuite) SetupTest() {
-	emulator, err := emulator.NewBlockchain()
+	blockchain, err := emulator.NewBlockchain()
 	require.NoError(s.T(), err)
 
-	s.emulator = emulator
-	s.emulatorClient = NewEmulatorClient(emulator)
-
-	// key, signer := test.AccountKeyGenerator().NewWithSigner()
-	// address, err := s.emulator.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
-	// require.NoError(s.T(), err)
-	// s.nodeAddress = address
+	s.blockchain = blockchain
+	s.emulatorClient = emulatormod.NewEmulatorClient(blockchain)
 
 	// deploy contract
 	s.deployDKGContract()
 
 	// Note: using DKG address as DKG participant to avoid funding a new account key
-	s.client = NewClient(s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	s.contractClient = NewClient(s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
 }
 
 func (s *ClientSuite) deployDKGContract() {
@@ -70,7 +66,7 @@ func (s *ClientSuite) deployDKGContract() {
 	code := contracts.FlowDKG()
 
 	// deploy the contract to the emulator
-	dkgAddress, err := s.emulator.CreateAccount([]*sdk.AccountKey{accountKey}, []sdktemplates.Contract{
+	dkgAddress, err := s.blockchain.CreateAccount([]*sdk.AccountKey{accountKey}, []sdktemplates.Contract{
 		{
 			Name:   "FlowDKG",
 			Source: string(code),
@@ -111,7 +107,7 @@ func (s *ClientSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.A
 }
 
 func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.Value {
-	result, err := s.emulator.ExecuteScript(script, arguments)
+	result, err := s.blockchain.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
 	require.True(s.T(), result.Succeeded())
 	return result.Value
@@ -121,7 +117,7 @@ func (s *ClientSuite) TestSubmitResult() {
 	numberOfKeys := 5
 
 	// generate list of public keys
-	publicKeys := make([]crypto.PublicKey, numberOfKeys)
+	publicKeys := []crypto.PublicKey{}
 	for i := 0; i < numberOfKeys; i++ {
 		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
 		publicKeys = append(publicKeys, privateKey.PublicKey())
@@ -130,7 +126,7 @@ func (s *ClientSuite) TestSubmitResult() {
 	// create a group public key
 	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
 
-	err := s.client.SubmitResult(groupPublicKey, publicKeys)
+	err := s.contractClient.SubmitResult(groupPublicKey, publicKeys)
 	require.NoError(s.T(), err)
 }
 
@@ -148,30 +144,30 @@ func (s *ClientSuite) TestDKGContractClient() {
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
 		SetGasLimit(9999).
-		SetProposalKey(s.emulator.ServiceKey().Address, s.emulator.ServiceKey().Index,
-			s.emulator.ServiceKey().SequenceNumber).
-		SetPayer(s.emulator.ServiceKey().Address).
+		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+			s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
 	s.signAndSubmit(setUpAdminTx,
-		[]sdk.Address{s.emulator.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.emulator.ServiceKey().Signer(), s.dkgSigner},
+		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
 
 	// start DKG using admin resource
 	startDKGTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartDKGScript(s.env)).
 		SetGasLimit(9999).
-		SetProposalKey(s.emulator.ServiceKey().Address, s.emulator.ServiceKey().Index,
-			s.emulator.ServiceKey().SequenceNumber).
-		SetPayer(s.emulator.ServiceKey().Address).
+		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+			s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
 
 	err := startDKGTx.AddArgument(cadence.NewArray(dkgNodeIDStrings))
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(startDKGTx,
-		[]sdk.Address{s.emulator.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.emulator.ServiceKey().Signer(), s.dkgSigner},
+		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
 
 	// sanity check: verify that DKG was started with correct node IDs
@@ -182,9 +178,9 @@ func (s *ClientSuite) TestDKGContractClient() {
 	createParticipantTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
 		SetGasLimit(9999).
-		SetProposalKey(s.emulator.ServiceKey().Address, s.emulator.ServiceKey().Index,
-			s.emulator.ServiceKey().SequenceNumber).
-		SetPayer(s.emulator.ServiceKey().Address).
+		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+			s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
 
 	err = createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
@@ -193,8 +189,8 @@ func (s *ClientSuite) TestDKGContractClient() {
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(createParticipantTx,
-		[]sdk.Address{s.emulator.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.emulator.ServiceKey().Signer(), s.dkgSigner},
+		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
 
 	// verify that nodeID was registered
@@ -210,15 +206,15 @@ func (s *ClientSuite) TestDKGContractClient() {
 	// submit a broadcast messsage a random broadcast message
 	// and verify that there were no errors
 	msg := messages.NewDKGMessage(int(originID), msgData, dkgEpochID)
-	err = s.client.Broadcast(msg)
+	err = s.contractClient.Broadcast(msg)
 	assert.NoError(s.T(), err)
 
 	// read the broadcast message and verify that the data recieved
 	// from the latest block
-	block, err := s.emulator.GetLatestBlock()
+	block, err := s.blockchain.GetLatestBlock()
 	require.NoError(s.T(), err)
 
-	messages, err := s.client.ReadBroadcast(0, block.ID())
+	messages, err := s.contractClient.ReadBroadcast(0, block.ID())
 	require.NoError(s.T(), err)
 	assert.Len(s.T(), messages, 1)
 
