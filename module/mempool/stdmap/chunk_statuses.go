@@ -1,67 +1,51 @@
-package fetcher
+package stdmap
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/model/verification"
 )
 
-// ChunkStatus is a data struct represents the current status of fetching chunk data pack for the chunk.
-type ChunkStatus struct {
-	Chunk             *flow.Chunk
-	ExecutionResultID flow.Identifier
-	Ctx               context.Context
-}
-
-func (s ChunkStatus) ID() flow.Identifier {
-	return s.Chunk.ID()
-}
-
-func (s ChunkStatus) Checksum() flow.Identifier {
-	return s.Chunk.ID()
-}
-
 type Chunks struct {
-	*stdmap.Backend
+	*Backend
 }
 
-func NewChunks(limit uint) *Chunks {
+func NewChunkStatuses(limit uint) *Chunks {
 	chunks := &Chunks{
-		Backend: stdmap.NewBackend(stdmap.WithLimit(limit)),
+		Backend: NewBackend(WithLimit(limit)),
 	}
 	return chunks
 }
 
-func fromEntity(entity flow.Entity) *ChunkStatus {
-	chunk, ok := entity.(*ChunkStatus)
+func chunkStatus(entity flow.Entity) *verification.ChunkStatus {
+	chunk, ok := entity.(*verification.ChunkStatus)
 	if !ok {
 		panic(fmt.Sprintf("could not convert the entity into chunk status from the mempool: %v", entity))
 	}
 	return chunk
 }
 
-func (cs *Chunks) All() []*ChunkStatus {
+func (cs *Chunks) All() []*verification.ChunkStatus {
 	all := cs.Backend.All()
-	allChunks := make([]*ChunkStatus, 0, len(all))
+	allChunks := make([]*verification.ChunkStatus, 0, len(all))
 	for _, entity := range all {
-		chunk := fromEntity(entity)
+		chunk := chunkStatus(entity)
 		allChunks = append(allChunks, chunk)
 	}
 	return allChunks
 }
 
-func (cs *Chunks) ByID(chunkID flow.Identifier) (*ChunkStatus, bool) {
+func (cs *Chunks) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
 		return nil, false
 	}
-	chunk := fromEntity(entity)
+	chunk := chunkStatus(entity)
 	return chunk, true
 }
 
-func (cs *Chunks) Add(chunk *ChunkStatus) bool {
+func (cs *Chunks) Add(chunk *verification.ChunkStatus) bool {
 	return cs.Backend.Add(chunk)
 }
 
