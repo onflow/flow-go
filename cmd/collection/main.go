@@ -97,11 +97,11 @@ func main() {
 				"rate limit for each payer (transactions/collection)")
 			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 				"set of payer addresses which are omitted from rate limiting")
-			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", builder.DefaultMaxCollectionSize,
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", flow.DefaultMaxCollectionSize,
 				"maximum number of transactions in proposed collections")
-			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", builder.DefaultMaxCollectionByteSize,
+			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", flow.DefaultMaxCollectionByteSize,
 				"maximum byte size of the proposed collection")
-			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", builder.DefaultMaxCollectionTotalGas,
+			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
 				"maximum total amount of maxgas of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")

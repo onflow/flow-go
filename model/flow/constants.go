@@ -22,6 +22,15 @@ const DefaultMaxGasLimit = 9999
 // DefaultMaxTxSizeLimit is the default maximum transaction byte size. (1.5MB)
 const DefaultMaxTxSizeLimit = 1500000
 
+// DefaultMaxCollectionByteSize is the default maximum value for a collection byte size.
+const DefaultMaxCollectionByteSize = 1750000 // ~1.75MB. This is slightly higher than the limit on single tx size, which is 1.5MB
+
+// DefaultMaxCollectionTotalGas is the default maximum value for total gas allowed to be included in a collection.
+const DefaultMaxCollectionTotalGas = 10000000 // 10M
+
+// DefaultMaxCollectionSize is the default maximum number of transactions allowed inside a collection.
+const DefaultMaxCollectionSize = 100
+
 // DefaultAuctionWindow defines the length of the auction window at the beginning of
 // an epoch, during which nodes can bid for seats in the committee. Valid epoch events
 // such as setup and commit can only be submitted after this window has passed.
