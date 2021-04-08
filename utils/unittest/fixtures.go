@@ -1024,6 +1024,12 @@ func WithHeight(height uint64) func(*verification.ChunkRequestStatus) {
 	}
 }
 
+func WithHeightGreaterThan(height uint64) func(*verification.ChunkRequestStatus) {
+	return func(request *verification.ChunkRequestStatus) {
+		request.Height = rand.Uint64() + height + 1
+	}
+}
+
 func WithAgrees(list flow.IdentifierList) func(*verification.ChunkRequestStatus) {
 	return func(request *verification.ChunkRequestStatus) {
 		request.Agrees = list
