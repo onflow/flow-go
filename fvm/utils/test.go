@@ -19,6 +19,7 @@ func NewSimpleView() *SimpleView {
 		Ledger: &MapLedger{
 			Registers:       make(map[string]flow.RegisterEntry),
 			RegisterTouches: make(map[string]bool),
+			RegisterUpdated: make(map[string]bool),
 		},
 	}
 }
@@ -73,6 +74,25 @@ func (v *SimpleView) Get(owner, controller, key string) (flow.RegisterValue, err
 	return nil, nil
 }
 
+// returns all the registers that has been touched
+func (v *SimpleView) AllRegisters() []flow.RegisterID {
+	res := make([]flow.RegisterID, 0, len(v.Ledger.RegisterTouches))
+	for k := range v.Ledger.RegisterTouches {
+		res = append(res, v.Ledger.Registers[k].Key)
+	}
+	return res
+}
+
+func (v *SimpleView) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
+	ids := make([]flow.RegisterID, 0, len(v.Ledger.RegisterUpdated))
+	values := make([]flow.RegisterValue, 0, len(v.Ledger.RegisterUpdated))
+	for k := range v.Ledger.RegisterUpdated {
+		ids = append(ids, v.Ledger.Registers[k].Key)
+		values = append(values, v.Ledger.Registers[k].Value)
+	}
+	return ids, values
+}
+
 func (v *SimpleView) Touch(owner, controller, key string) error {
 	return v.Ledger.Touch(owner, controller, key)
 }
@@ -87,6 +107,7 @@ func (v *SimpleView) Delete(owner, controller, key string) error {
 type MapLedger struct {
 	Registers       map[string]flow.RegisterEntry
 	RegisterTouches map[string]bool
+	RegisterUpdated map[string]bool
 }
 
 // NewMapLedger returns an instance of map ledger (should only be used for testing)
@@ -94,12 +115,14 @@ func NewMapLedger() *MapLedger {
 	return &MapLedger{
 		Registers:       make(map[string]flow.RegisterEntry),
 		RegisterTouches: make(map[string]bool),
+		RegisterUpdated: make(map[string]bool),
 	}
 }
 
 func (m *MapLedger) Set(owner, controller, key string, value flow.RegisterValue) error {
 	k := fullKey(owner, controller, key)
 	m.RegisterTouches[k] = true
+	m.RegisterUpdated[k] = true
 	m.Registers[k] = flow.RegisterEntry{
 		Key: flow.RegisterID{
 			Owner:      owner,

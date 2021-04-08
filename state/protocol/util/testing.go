@@ -26,6 +26,7 @@ import (
 func MockReceiptValidator() module.ReceiptValidator {
 	validator := &modulemock.ReceiptValidator{}
 	validator.On("Validate", mock.Anything).Return(nil)
+	validator.On("ValidatePayload", mock.Anything).Return(nil)
 	return validator
 }
 
