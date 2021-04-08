@@ -193,9 +193,10 @@ func (e *Engine) onTimer() {
 
 		if sealed {
 			removed := e.pendingRequests.Rem(request.ID())
+			e.handler.NotifyChunkDataPackSealed(request.ID())
 			log.Info().
 				Bool("removed", removed).
-				Msg("drops requesting chunk of a seald block")
+				Msg("drops requesting chunk of a sealed block")
 			continue
 		}
 
