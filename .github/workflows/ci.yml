@@ -5,11 +5,12 @@ on:
     branches: 
       - master
       - feature/dkg
+      - feature/epochs
   pull_request:
     branches:
       - master
       - feature/dkg
-
+      - feature/epochs
 jobs:
   golangci:
     name: Lint
