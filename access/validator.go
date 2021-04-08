@@ -53,9 +53,9 @@ type TransactionValidationOptions struct {
 	// MaxAddressIndex is a simple spam prevention measure. It rejects any
 	// transactions referencing an address with index newer than the specified
 	// maximum. A zero value indicates no address checking.
-	MaxAddressIndex       uint64
-	MaxTxSizeLimit        uint64
-	MaxCollectionByteSize uint64
+	MaxAddressIndex        uint64
+	MaxTransactionByteSize uint64
+	MaxCollectionByteSize  uint64
 }
 
 type TransactionValidator struct {
@@ -133,10 +133,10 @@ func (v *TransactionValidator) checkTxSizeLimit(tx *flow.TransactionBody) error 
 	if tx.Payer == v.serviceAccountAddress {
 		return nil
 	}
-	if txSize > v.options.MaxTxSizeLimit {
+	if txSize > v.options.MaxTransactionByteSize {
 		return InvalidTxByteSizeError{
 			Actual:  txSize,
-			Maximum: v.options.MaxTxSizeLimit,
+			Maximum: v.options.MaxTransactionByteSize,
 		}
 	}
 	return nil

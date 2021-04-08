@@ -16,11 +16,11 @@ const DefaultTransactionExpiry = 10 * 60
 // collection node and being included in a collection and block.
 const DefaultTransactionExpiryBuffer = 30
 
-// DefaultMaxGasLimit is the default maximum value for the transaction gas limit.
-const DefaultMaxGasLimit = 9999
+// DefaultMaxTransactionGasLimit is the default maximum value for the transaction gas limit.
+const DefaultMaxTransactionGasLimit = 9999
 
-// DefaultMaxTxSizeLimit is the default maximum transaction byte size. (~1.5MB)
-const DefaultMaxTxSizeLimit = 1_500_000
+// DefaultMaxTransactionByteSize is the default maximum transaction byte size. (~1.5MB)
+const DefaultMaxTransactionByteSize = 1_500_000
 
 // DefaultMaxCollectionByteSize is the default maximum value for a collection byte size.
 const DefaultMaxCollectionByteSize = 3_000_000 // ~3MB. This is should always be higher than the limit on single tx size.

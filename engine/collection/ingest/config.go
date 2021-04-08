@@ -19,18 +19,19 @@ type Config struct {
 	// (we always send to at least one)
 	PropagationRedundancy uint
 	// the maximum transaction byte size limit
-	MaxTxSizeLimit uint64
+	MaxTransactionByteSize uint64
 	// maximum collection byte size, it acts as hard limit max for the tx size.
 	MaxCollectionByteSize uint64
 }
 
 func DefaultConfig() Config {
 	return Config{
-		ExpiryBuffer:          flow.DefaultTransactionExpiryBuffer,
-		MaxGasLimit:           flow.DefaultMaxGasLimit,
-		CheckScriptsParse:     true,
-		MaxAddressIndex:       10_000_000,
-		PropagationRedundancy: 2,
-		MaxCollectionByteSize: flow.DefaultMaxCollectionByteSize,
+		ExpiryBuffer:           flow.DefaultTransactionExpiryBuffer,
+		MaxGasLimit:            flow.DefaultMaxTransactionGasLimit,
+		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
+		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
+		CheckScriptsParse:      true,
+		MaxAddressIndex:        10_000_000,
+		PropagationRedundancy:  2,
 	}
 }

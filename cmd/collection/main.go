@@ -81,8 +81,8 @@ func main() {
 				"maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 				"the address the ingress server listens on")
-			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxGasLimit,
-				"maximum per-transaction gas limit")
+			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
+				"maximum per-transaction computation limit (gas limit)")
 			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
 				"whether we check that inbound transactions are parse-able")
 			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
