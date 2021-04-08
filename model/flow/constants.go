@@ -19,14 +19,14 @@ const DefaultTransactionExpiryBuffer = 30
 // DefaultMaxGasLimit is the default maximum value for the transaction gas limit.
 const DefaultMaxGasLimit = 9999
 
-// DefaultMaxTxSizeLimit is the default maximum transaction byte size. (1.5MB)
-const DefaultMaxTxSizeLimit = 1500000
+// DefaultMaxTxSizeLimit is the default maximum transaction byte size. (~1.5MB)
+const DefaultMaxTxSizeLimit = 1_500_000
 
 // DefaultMaxCollectionByteSize is the default maximum value for a collection byte size.
-const DefaultMaxCollectionByteSize = 1750000 // ~1.75MB. This is slightly higher than the limit on single tx size, which is 1.5MB
+const DefaultMaxCollectionByteSize = 3_000_000 // ~3MB. This is should always be higher than the limit on single tx size.
 
 // DefaultMaxCollectionTotalGas is the default maximum value for total gas allowed to be included in a collection.
-const DefaultMaxCollectionTotalGas = 10000000 // 10M
+const DefaultMaxCollectionTotalGas = 10_000_000 // 10M
 
 // DefaultMaxCollectionSize is the default maximum number of transactions allowed inside a collection.
 const DefaultMaxCollectionSize = 100
@@ -34,13 +34,13 @@ const DefaultMaxCollectionSize = 100
 // DefaultAuctionWindow defines the length of the auction window at the beginning of
 // an epoch, during which nodes can bid for seats in the committee. Valid epoch events
 // such as setup and commit can only be submitted after this window has passed.
-const DefaultAuctionWindow = 50000
+const DefaultAuctionWindow = 50_000
 
 // DefaultGracePeriod defines the minimum number of views before the final view of
 // an epoch where we need to have an epoch setup and an epoch commit event. This is
 // in order to give all nodes the chance to have the information before entering
 // the next epoch.
-const DefaultGracePeriod = 25000
+const DefaultGracePeriod = 25_000
 
 // DefaultValueLogGCFrequency is the default frequency in blocks that we call the
 // badger value log GC. Equivalent to 10 mins for a 1 second block time
