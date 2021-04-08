@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -33,11 +34,11 @@ type Engine struct {
 	me                    module.Local
 	verifier              network.Engine            // the verifier engine
 	state                 protocol.State            // used to verify the request origin
-	pendingChunks         *Chunks                   // used to store all the pending chunks that assigned to this node
+	pendingChunks         mempool.ChunkStatuses     // used to store all the pending chunks that assigned to this node
 	headers               storage.Headers           // used to fetch the block header when chunk data is ready to be verified
 	chunkConsumerNotifier module.ProcessingNotifier // to report a chunk has been processed
 	results               storage.ExecutionResults  // to retrieve execution result of an assigned chunk
-	receiptsDB            storage.ExecutionReceipts // used to find executor of the chunk
+	receipts              storage.ExecutionReceipts // used to find executor of the chunk
 	requester             ChunkDataPackRequester    // used to request chunk data packs from network
 }
 
@@ -48,9 +49,12 @@ func New(
 	me module.Local,
 	verifier network.Engine,
 	state protocol.State,
-	chunks *Chunks,
+	pendingChunks mempool.ChunkStatuses,
 	headers storage.Headers,
-) (*Engine, error) {
+	results storage.ExecutionResults,
+	receipts storage.ExecutionReceipts,
+	requester ChunkDataPackRequester,
+) *Engine {
 	e := &Engine{
 		unit:          engine.NewUnit(),
 		metrics:       metrics,
@@ -59,11 +63,14 @@ func New(
 		me:            me,
 		verifier:      verifier,
 		state:         state,
-		pendingChunks: chunks,
+		pendingChunks: pendingChunks,
 		headers:       headers,
+		results:       results,
+		receipts:      receipts,
+		requester:     requester,
 	}
 
-	return e, nil
+	return e
 }
 
 func (e *Engine) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
@@ -130,7 +137,7 @@ func (e *Engine) processAssignedChunk(ctx context.Context, locator *chunks.Locat
 	log.Debug().Msg("result and chunk for locator retrieved")
 
 	// adds chunk status as a pending chunk to mempool.
-	status := &ChunkStatus{
+	status := &verification.ChunkStatus{
 		Chunk:             chunk,
 		ExecutionResultID: locator.ResultID,
 		Ctx:               ctx,
@@ -247,7 +254,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 
 // validatedAndFetch validates the chunk data pack and if it passes the validation, retrieves and returns its chunk status as well as the
 // execution result.
-func (e *Engine) validatedAndFetch(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) (*ChunkStatus,
+func (e *Engine) validatedAndFetch(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) (*verification.ChunkStatus,
 	*flow.ExecutionResult, error) {
 
 	// make sure we still need it
@@ -273,7 +280,7 @@ func (e *Engine) validatedAndFetch(originID flow.Identifier, chunkDataPack *flow
 
 // getResultByID
 func (e *Engine) getResultByID(blockID flow.Identifier, resultID flow.Identifier) (*flow.ExecutionResult, error) {
-	receipts, err := e.receiptsDB.ByBlockID(blockID)
+	receipts, err := e.receipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get receipts by block ID: %w", err)
 	}
@@ -385,7 +392,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 // The agree set contains the executors who made receipt with the same result as the given result id.
 // The disagree set contains the executors who made receipt with different result than the given result id.
 func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID flow.Identifier) (flow.IdentifierList, flow.IdentifierList, error) {
-	receiptsData, err := e.receiptsDB.ByBlockID(blockID)
+	receiptsData, err := e.receipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
 	}
