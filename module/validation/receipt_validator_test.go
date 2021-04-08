@@ -705,3 +705,23 @@ func (s *ReceiptValidationSuite) TestExtendReceiptsDuplicate() {
 		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 }
+
+// `TestValidateReceiptAfterBootstrap` tests a special case when we try to produce a new block
+// after genesis with empty payload.
+func (s *ReceiptValidationSuite) TestValidateReceiptAfterBootstrap() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// G
+	blocks, result0, seal := unittest.ChainFixture(0)
+	s.SealsIndex[blocks[0].ID()] = seal
+
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+	s.PersistedResults[result0.ID()] = result0
+
+	candidate := unittest.BlockWithParentFixture(blocks[0].Header)
+	err := s.receiptValidator.ValidatePayload(&candidate)
+	s.Require().NoError(err)
+}

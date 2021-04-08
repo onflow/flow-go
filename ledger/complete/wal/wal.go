@@ -3,6 +3,7 @@ package wal
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	prometheusWAL "github.com/m4ksio/wal/wal"
 	"github.com/prometheus/client_golang/prometheus"
@@ -11,42 +12,51 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 const SegmentSize = 32 * 1024 * 1024
 
-type LedgerWAL struct {
+type DiskWAL struct {
 	wal            *prometheusWAL.WAL
 	paused         bool
 	forestCapacity int
 	pathByteSize   int
 	log            zerolog.Logger
+	// disk size reading can be time consuming, so limit how often its read
+	diskUpdateLimiter *time.Ticker
+	metrics           module.WALMetrics
+	dir               string
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
-func NewWAL(logger zerolog.Logger, reg prometheus.Registerer, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*LedgerWAL, error) {
+func NewDiskWAL(logger zerolog.Logger, reg prometheus.Registerer, metrics module.WALMetrics, dir string, forestCapacity int, pathByteSize int, segmentSize int) (*DiskWAL, error) {
 	w, err := prometheusWAL.NewSize(logger, reg, dir, segmentSize, false)
 	if err != nil {
 		return nil, err
 	}
-	return &LedgerWAL{
-		wal:            w,
-		paused:         false,
-		forestCapacity: forestCapacity,
-		pathByteSize:   pathByteSize,
-		log:            logger,
+	return &DiskWAL{
+		wal:               w,
+		paused:            false,
+		forestCapacity:    forestCapacity,
+		pathByteSize:      pathByteSize,
+		log:               logger,
+		diskUpdateLimiter: time.NewTicker(5 * time.Second),
+		metrics:           metrics,
+		dir:               dir,
 	}, nil
 }
 
-func (w *LedgerWAL) PauseRecord() {
+func (w *DiskWAL) PauseRecord() {
 	w.paused = true
 }
 
-func (w *LedgerWAL) UnpauseRecord() {
+func (w *DiskWAL) UnpauseRecord() {
 	w.paused = false
 }
 
-func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+func (w *DiskWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 	if w.paused {
 		return nil
 	}
@@ -58,10 +68,27 @@ func (w *LedgerWAL) RecordUpdate(update *ledger.TrieUpdate) error {
 	if err != nil {
 		return fmt.Errorf("error while recording update in LedgerWAL: %w", err)
 	}
+
+	select {
+	case <-w.diskUpdateLimiter.C:
+		diskSize, err := w.DiskSize()
+		if err != nil {
+			w.log.Warn().Err(err).Msg("error while checking forest disk size")
+		} else {
+			w.metrics.DiskSize(diskSize)
+		}
+	default: //don't block
+	}
+
 	return nil
 }
 
-func (w *LedgerWAL) RecordDelete(rootHash ledger.RootHash) error {
+// DiskSize returns the amount of disk space used by the storage (in bytes)
+func (w *DiskWAL) DiskSize() (uint64, error) {
+	return io.DirSize(w.dir)
+}
+
+func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
 	if w.paused {
 		return nil
 	}
@@ -76,7 +103,7 @@ func (w *LedgerWAL) RecordDelete(rootHash ledger.RootHash) error {
 	return nil
 }
 
-func (w *LedgerWAL) ReplayOnForest(forest *mtrie.Forest) error {
+func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	return w.Replay(
 		func(forestSequencing *flattener.FlattenedForest) error {
 			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
@@ -100,11 +127,11 @@ func (w *LedgerWAL) ReplayOnForest(forest *mtrie.Forest) error {
 	)
 }
 
-func (w *LedgerWAL) Segments() (first, last int, err error) {
+func (w *DiskWAL) Segments() (first, last int, err error) {
 	return prometheusWAL.Segments(w.wal.Dir())
 }
 
-func (w *LedgerWAL) Replay(
+func (w *DiskWAL) Replay(
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(ledger.RootHash) error,
@@ -116,7 +143,7 @@ func (w *LedgerWAL) Replay(
 	return w.replay(from, to, checkpointFn, updateFn, deleteFn, true)
 }
 
-func (w *LedgerWAL) ReplayLogsOnly(
+func (w *DiskWAL) ReplayLogsOnly(
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(update *ledger.TrieUpdate) error,
 	deleteFn func(rootHash ledger.RootHash) error,
@@ -128,7 +155,7 @@ func (w *LedgerWAL) ReplayLogsOnly(
 	return w.replay(from, to, checkpointFn, updateFn, deleteFn, false)
 }
 
-func (w *LedgerWAL) replay(
+func (w *DiskWAL) replay(
 	from, to int,
 	checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
 	updateFn func(update *ledger.TrieUpdate) error,
@@ -283,10 +310,46 @@ func getPossibleCheckpoints(allCheckpoints []int, from, to int) []int {
 }
 
 // NewCheckpointer returns a Checkpointer for this WAL
-func (w *LedgerWAL) NewCheckpointer() (*Checkpointer, error) {
+func (w *DiskWAL) NewCheckpointer() (*Checkpointer, error) {
 	return NewCheckpointer(w, w.pathByteSize, w.forestCapacity), nil
 }
 
-func (w *LedgerWAL) Close() error {
-	return w.wal.Close()
+func (w *DiskWAL) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+	close(ready)
+	return ready
+}
+
+// Done implements interface module.ReadyDoneAware
+// it closes all the open write-ahead log files.
+func (w *DiskWAL) Done() <-chan struct{} {
+	err := w.wal.Close()
+	if err != nil {
+		w.log.Err(err).Msg("error while closing WAL")
+	}
+	done := make(chan struct{})
+	close(done)
+	return done
+}
+
+type LedgerWAL interface {
+	module.ReadyDoneAware
+
+	NewCheckpointer() (*Checkpointer, error)
+	PauseRecord()
+	UnpauseRecord()
+	RecordUpdate(update *ledger.TrieUpdate) error
+	RecordDelete(rootHash ledger.RootHash) error
+	ReplayOnForest(forest *mtrie.Forest) error
+	Segments() (first, last int, err error)
+	Replay(
+		checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+		updateFn func(update *ledger.TrieUpdate) error,
+		deleteFn func(ledger.RootHash) error,
+	) error
+	ReplayLogsOnly(
+		checkpointFn func(forestSequencing *flattener.FlattenedForest) error,
+		updateFn func(update *ledger.TrieUpdate) error,
+		deleteFn func(rootHash ledger.RootHash) error,
+	) error
 }

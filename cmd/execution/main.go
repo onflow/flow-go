@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -30,9 +31,11 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	wal "github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -86,6 +89,7 @@ func main() {
 		syncThreshold               int
 		extensiveLog                bool
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
+		diskWAL                     *wal.DiskWAL
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -113,7 +117,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
@@ -122,34 +126,6 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 			)
-			return err
-		}).
-		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
-			extraLogPath := path.Join(triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
-			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			rt := fvm.NewInterpreterRuntime()
-
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-
-			manager, err := computation.New(
-				node.Logger,
-				collector,
-				node.Tracer,
-				node.Me,
-				node.State,
-				vm,
-				vmCtx,
-				cadenceExecutionCache,
-			)
-			computationManager = manager
-
 			return err
 		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -179,6 +155,10 @@ func main() {
 				return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
 			}
 			return nil
+		}).
+		Component("Write-Ahead Log", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(), node.MetricsRegisterer, collector, triedir, int(mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+			return diskWAL, err
 		}).
 		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -215,7 +195,7 @@ func main() {
 				}
 			}
 
-			ledgerStorage, err = ledger.NewLedger(triedir, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), node.MetricsRegisterer, ledger.DefaultPathFinderVersion)
+			ledgerStorage, err = ledger.NewLedger(diskWAL, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
 		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -229,6 +209,36 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			extraLogPath := path.Join(triedir, "extralogs")
+			err := os.MkdirAll(extraLogPath, 0777)
+			if err != nil {
+				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
+			}
+
+			extralog.ExtraLogDumpPath = extraLogPath
+
+			rt := fvm.NewInterpreterRuntime()
+
+			vm := fvm.NewVirtualMachine(rt)
+			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+
+			committer := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
+			manager, err := computation.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Me,
+				node.State,
+				vm,
+				vmCtx,
+				cadenceExecutionCache,
+				committer,
+			)
+			if err != nil {
+				return nil, err
+			}
+			computationManager = manager
+
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
@@ -338,7 +348,7 @@ func main() {
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner()
+			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee

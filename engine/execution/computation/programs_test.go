@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -95,7 +97,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -162,7 +164,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)

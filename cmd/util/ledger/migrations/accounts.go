@@ -199,6 +199,14 @@ func (v *view) Payloads() []ledger.Payload {
 	return v.Ledger.Payloads()
 }
 
+func (v *view) AllRegisters() []flow.RegisterID {
+	panic("AllRegisters is not implemented")
+}
+
+func (v *view) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
+	panic("RegisterUpdates is not implemented")
+}
+
 type led struct {
 	payloads map[string]ledger.Payload
 }
