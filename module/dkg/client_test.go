@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -64,9 +63,14 @@ func (s *ClientSuite) SetupTest() {
 // TestBroadcast broadcasts and messages and verifies that no errors are thrown
 // Note: Contract functionality tested by `flow-core-contracts`
 func (s *ClientSuite) TestBroadcast() {
+
+	// dkg node ids and paricipant node id
 	nodeID := unittest.IdentifierFixture()
 	dkgNodeIDStrings := make([]cadence.Value, 1)
 	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
+
+	// create DKG message fixture
+	msg := unittest.DKGMessageFixture()
 
 	// start dkf with 1 participant
 	s.startDKGWithParticipants(dkgNodeIDStrings)
@@ -75,8 +79,7 @@ func (s *ClientSuite) TestBroadcast() {
 	s.createParticipant(nodeID.String())
 
 	// broadcast messsage a random broadcast message and verify that there were no errors
-	msg := messages.NewDKGMessage(1, unittest.RandomBytes(10), "integration-dkg-epoch-1")
-	err := s.client.Broadcast(msg)
+	err := s.client.Broadcast(*msg)
 	assert.NoError(s.T(), err)
 }
 
@@ -95,14 +98,11 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	// create participant resource
 	s.createParticipant(nodeID.String())
 
-	// DKG message fields
-	msgData := unittest.RandomBytes(10)
-	dkgEpochID := "integration-dkg-epoch-1"
-	originID := uint64(1)
+	// create DKG message fixture
+	msg := unittest.DKGMessageFixture()
 
 	// broadcast messsage a random broadcast message and verify that there were no errors
-	msg := messages.NewDKGMessage(int(originID), msgData, dkgEpochID)
-	err := s.client.Broadcast(msg)
+	err := s.client.Broadcast(*msg)
 	assert.NoError(s.T(), err)
 
 	// read latest broadcast messages
@@ -115,9 +115,9 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	assert.Len(s.T(), messages, 1)
 
 	broadcastedMsg := messages[0]
-	assert.Equal(s.T(), dkgEpochID, broadcastedMsg.DKGInstanceID)
-	assert.Equal(s.T(), msgData, broadcastedMsg.Data)
-	assert.Equal(s.T(), originID, broadcastedMsg.Orig)
+	assert.Equal(s.T(), msg.DKGInstanceID, broadcastedMsg.DKGInstanceID)
+	assert.Equal(s.T(), msg.Data, broadcastedMsg.Data)
+	assert.Equal(s.T(), msg.Orig, broadcastedMsg.Orig)
 }
 
 func (s *ClientSuite) TestSubmitResult() {
@@ -131,9 +131,11 @@ func (s *ClientSuite) TestSubmitResult() {
 	// create participant resource
 	s.createParticipant(nodeID.String())
 
+	// create DKG message fixture
+	msg := unittest.DKGMessageFixture()
+
 	// broadcast messsage a random broadcast message and verify that there were no errors
-	msg := messages.NewDKGMessage(1, unittest.RandomBytes(10), "integration-dkg-epoch-1")
-	err := s.client.Broadcast(msg)
+	err := s.client.Broadcast(*msg)
 	assert.NoError(s.T(), err)
 
 	numberOfKeys := 1
