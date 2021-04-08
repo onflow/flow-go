@@ -7,12 +7,12 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 )
 
-type Chunks struct {
+type ChunkStatuses struct {
 	*Backend
 }
 
-func NewChunkStatuses(limit uint) *Chunks {
-	chunks := &Chunks{
+func NewChunkStatuses(limit uint) *ChunkStatuses {
+	chunks := &ChunkStatuses{
 		Backend: NewBackend(WithLimit(limit)),
 	}
 	return chunks
@@ -26,7 +26,7 @@ func chunkStatus(entity flow.Entity) *verification.ChunkStatus {
 	return chunk
 }
 
-func (cs *Chunks) All() []*verification.ChunkStatus {
+func (cs *ChunkStatuses) All() []*verification.ChunkStatus {
 	all := cs.Backend.All()
 	allChunks := make([]*verification.ChunkStatus, 0, len(all))
 	for _, entity := range all {
@@ -36,7 +36,7 @@ func (cs *Chunks) All() []*verification.ChunkStatus {
 	return allChunks
 }
 
-func (cs *Chunks) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
+func (cs *ChunkStatuses) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
 		return nil, false
@@ -45,10 +45,10 @@ func (cs *Chunks) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool
 	return chunk, true
 }
 
-func (cs *Chunks) Add(chunk *verification.ChunkStatus) bool {
+func (cs *ChunkStatuses) Add(chunk *verification.ChunkStatus) bool {
 	return cs.Backend.Add(chunk)
 }
 
-func (cs *Chunks) Rem(chunkID flow.Identifier) bool {
+func (cs *ChunkStatuses) Rem(chunkID flow.Identifier) bool {
 	return cs.Backend.Rem(chunkID)
 }
