@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -66,8 +67,8 @@ func (s *ClientSuite) TestBroadcast() {
 
 	// dkg node ids and paricipant node id
 	nodeID := unittest.IdentifierFixture()
-	dkgNodeIDStrings := make([]cadence.Value, 1)
-	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
+	dkgNodeIDStrings := make([]flow.Identifier, 1)
+	dkgNodeIDStrings[0] = nodeID
 
 	// create DKG message fixture
 	msg := unittest.DKGMessageFixture()
@@ -76,7 +77,7 @@ func (s *ClientSuite) TestBroadcast() {
 	s.startDKGWithParticipants(dkgNodeIDStrings)
 
 	// create participant resource
-	s.createParticipant(nodeID.String())
+	s.createParticipant(nodeID)
 
 	// broadcast messsage a random broadcast message and verify that there were no errors
 	err := s.client.Broadcast(*msg)
@@ -89,14 +90,14 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 
 	// dkg partcipant node ID and participants
 	nodeID := unittest.IdentifierFixture()
-	dkgNodeIDStrings := make([]cadence.Value, 1)
-	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
+	dkgNodeIDStrings := make([]flow.Identifier, 1)
+	dkgNodeIDStrings[0] = nodeID
 
 	// start dkf with 1 participant
 	s.startDKGWithParticipants(dkgNodeIDStrings)
 
 	// create participant resource
-	s.createParticipant(nodeID.String())
+	s.createParticipant(nodeID)
 
 	// create DKG message fixture
 	msg := unittest.DKGMessageFixture()
@@ -122,14 +123,14 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 
 func (s *ClientSuite) TestSubmitResult() {
 	nodeID := unittest.IdentifierFixture()
-	dkgNodeIDStrings := make([]cadence.Value, 1)
-	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
+	dkgNodeIDStrings := make([]flow.Identifier, 1)
+	dkgNodeIDStrings[0] = nodeID
 
 	// start dkf with 1 participant
 	s.startDKGWithParticipants(dkgNodeIDStrings)
 
 	// create participant resource
-	s.createParticipant(nodeID.String())
+	s.createParticipant(nodeID)
 
 	// create DKG message fixture
 	msg := unittest.DKGMessageFixture()
@@ -196,7 +197,13 @@ func (s *ClientSuite) setUpAdmin() {
 	)
 }
 
-func (s *ClientSuite) startDKGWithParticipants(nodeIDs []cadence.Value) {
+func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
+
+	// convert node identifiers to candece.Value to be passed in as TX argument
+	valueNodeIDs := make([]cadence.Value, 0, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+		valueNodeIDs = append(valueNodeIDs, cadence.NewString(nodeID.String()))
+	}
 
 	// start DKG using admin resource
 	tx := sdk.NewTransaction().
@@ -207,7 +214,7 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []cadence.Value) {
 		SetPayer(s.emulator.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
 
-	err := tx.AddArgument(cadence.NewArray(nodeIDs))
+	err := tx.AddArgument(cadence.NewArray(valueNodeIDs))
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(tx,
@@ -217,10 +224,10 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []cadence.Value) {
 
 	// sanity check: verify that DKG was started with correct node IDs
 	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
-	assert.Equal(s.T(), cadence.NewArray(nodeIDs), result)
+	assert.Equal(s.T(), cadence.NewArray(valueNodeIDs), result)
 }
 
-func (s *ClientSuite) createParticipant(nodeID string) {
+func (s *ClientSuite) createParticipant(nodeID flow.Identifier) {
 
 	// create DKG partcipant
 	createParticipantTx := sdk.NewTransaction().
@@ -233,7 +240,7 @@ func (s *ClientSuite) createParticipant(nodeID string) {
 
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
-	err = createParticipantTx.AddArgument(cadence.NewString(nodeID))
+	err = createParticipantTx.AddArgument(cadence.NewString(nodeID.String()))
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(createParticipantTx,
@@ -243,7 +250,7 @@ func (s *ClientSuite) createParticipant(nodeID string) {
 
 	// verify that nodeID was registered
 	result := s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
-		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID))})
+		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID.String()))})
 	assert.Equal(s.T(), cadence.NewBool(true), result)
 
 }
