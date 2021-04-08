@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/flow"
 	emulatormod "github.com/onflow/flow-go/module/emulator"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -57,6 +57,8 @@ func (s *ClientSuite) SetupTest() {
 
 	// Note: using DKG address as DKG participant to avoid funding a new account key
 	s.contractClient = NewClient(s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+
+	s.setUpAdmin()
 }
 
 func (s *ClientSuite) deployDKGContract() {
@@ -84,6 +86,167 @@ func (s *ClientSuite) deployDKGContract() {
 	s.dkgSigner = signer
 }
 
+// TestBroadcast broadcasts and messages and verifies that no errors are thrown
+// Note: Contract functionality tested by `flow-core-contracts`
+func (s *ClientSuite) TestBroadcast() {
+
+	// dkg node ids and paricipant node id
+	nodeID := unittest.IdentifierFixture()
+	dkgNodeIDStrings := make([]flow.Identifier, 1)
+	dkgNodeIDStrings[0] = nodeID
+
+	// start dkf with 1 participant
+	s.startDKGWithParticipants(dkgNodeIDStrings)
+
+	// create participant resource
+	s.createParticipant(nodeID)
+
+	// create DKG message fixture
+	msg := unittest.DKGMessageFixture()
+
+	// broadcast messsage a random broadcast message and verify that there were no errors
+	err := s.contractClient.Broadcast(*msg)
+	assert.NoError(s.T(), err)
+}
+
+// TestDKGContractClient submits a single broadcast to the DKG contract, reads the broadcast
+// to verify what we broadcasted was what was received
+func (s *ClientSuite) TestBroadcastReadSingle() {
+
+	// dkg partcipant node ID and participants
+	nodeID := unittest.IdentifierFixture()
+	dkgNodeIDStrings := make([]flow.Identifier, 1)
+	dkgNodeIDStrings[0] = nodeID
+
+	// start dkf with 1 participant
+	s.startDKGWithParticipants(dkgNodeIDStrings)
+
+	// create participant resource
+	s.createParticipant(nodeID)
+
+	// create DKG message fixture
+	msg := unittest.DKGMessageFixture()
+
+	// broadcast messsage a random broadcast message and verify that there were no errors
+	err := s.contractClient.Broadcast(*msg)
+	assert.NoError(s.T(), err)
+
+	// read latest broadcast messages
+	block, err := s.blockchain.GetLatestBlock()
+	require.NoError(s.T(), err)
+
+	// verify the data recieved with data sent
+	messages, err := s.contractClient.ReadBroadcast(0, block.ID())
+	require.NoError(s.T(), err)
+	assert.Len(s.T(), messages, 1)
+
+	broadcastedMsg := messages[0]
+	assert.Equal(s.T(), msg.DKGInstanceID, broadcastedMsg.DKGInstanceID)
+	assert.Equal(s.T(), msg.Data, broadcastedMsg.Data)
+	assert.Equal(s.T(), msg.Orig, broadcastedMsg.Orig)
+}
+
+func (s *ClientSuite) TestSubmitResult() {
+	nodeID := unittest.IdentifierFixture()
+	dkgNodeIDStrings := make([]flow.Identifier, 1)
+	dkgNodeIDStrings[0] = nodeID
+
+	// start dkf with 1 participant
+	s.startDKGWithParticipants(dkgNodeIDStrings)
+
+	// create participant resource
+	s.createParticipant(nodeID)
+
+	numberOfKeys := 1
+
+	// generate list of public keys
+	publicKeys := make([]crypto.PublicKey, 0, numberOfKeys)
+	for i := 0; i < numberOfKeys; i++ {
+		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
+		publicKeys = append(publicKeys, privateKey.PublicKey())
+	}
+
+	// create a group public key
+	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
+
+	err := s.contractClient.SubmitResult(groupPublicKey, publicKeys)
+	require.NoError(s.T(), err)
+}
+
+func (s *ClientSuite) setUpAdmin() {
+
+	// set up admin resource
+	setUpAdminTx := sdk.NewTransaction().
+		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
+		SetGasLimit(9999).
+		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+			s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
+		AddAuthorizer(s.dkgAddress)
+	s.signAndSubmit(setUpAdminTx,
+		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+	)
+}
+
+func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
+
+	// convert node identifiers to candece.Value to be passed in as TX argument
+	valueNodeIDs := make([]cadence.Value, 0, len(nodeIDs))
+	for _, nodeID := range nodeIDs {
+		valueNodeIDs = append(valueNodeIDs, cadence.NewString(nodeID.String()))
+	}
+
+	// start DKG using admin resource
+	startDKGTx := sdk.NewTransaction().
+		SetScript(templates.GenerateStartDKGScript(s.env)).
+		SetGasLimit(9999).
+		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+			s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
+		AddAuthorizer(s.dkgAddress)
+
+	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
+	require.NoError(s.T(), err)
+
+	s.signAndSubmit(startDKGTx,
+		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+	)
+
+	// sanity check: verify that DKG was started with correct node IDs
+	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
+	assert.Equal(s.T(), cadence.NewArray(valueNodeIDs), result)
+}
+
+func (s *ClientSuite) createParticipant(nodeID flow.Identifier) {
+
+	// create DKG partcipant
+	createParticipantTx := sdk.NewTransaction().
+		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
+		SetGasLimit(9999).
+		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
+			s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
+		AddAuthorizer(s.dkgAddress)
+
+	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
+	require.NoError(s.T(), err)
+	err = createParticipantTx.AddArgument(cadence.NewString(nodeID.String()))
+	require.NoError(s.T(), err)
+
+	s.signAndSubmit(createParticipantTx,
+		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+	)
+
+	// verify that nodeID was registered
+	result := s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
+		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID.String()))})
+	assert.Equal(s.T(), cadence.NewBool(true), result)
+
+}
+
 func (s *ClientSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) {
 
 	// sign transaction with each signer
@@ -107,119 +270,11 @@ func (s *ClientSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.A
 }
 
 func (s *ClientSuite) executeScript(script []byte, arguments [][]byte) cadence.Value {
+
+	// execute script
 	result, err := s.blockchain.ExecuteScript(script, arguments)
 	require.NoError(s.T(), err)
 	require.True(s.T(), result.Succeeded())
+
 	return result.Value
-}
-
-func (s *ClientSuite) TestSubmitResult() {
-	numberOfKeys := 5
-
-	// generate list of public keys
-	publicKeys := []crypto.PublicKey{}
-	for i := 0; i < numberOfKeys; i++ {
-		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
-		publicKeys = append(publicKeys, privateKey.PublicKey())
-	}
-
-	// create a group public key
-	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
-
-	err := s.contractClient.SubmitResult(groupPublicKey, publicKeys)
-	require.NoError(s.T(), err)
-}
-
-// TestDKGContractClient submits a broadcast to the DKG contract, reads the broadcast
-// to verify what we broadcasted was what was received and verify that the `fromIndex`
-// behaves as expected.
-func (s *ClientSuite) TestDKGContractClient() {
-
-	// dkg partcipant node ID and participants
-	nodeID := unittest.IdentifierFixture()
-	dkgNodeIDStrings := make([]cadence.Value, 1)
-	dkgNodeIDStrings[0] = cadence.NewString(nodeID.String())
-
-	// set up admin resource
-	setUpAdminTx := sdk.NewTransaction().
-		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
-			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
-		AddAuthorizer(s.dkgAddress)
-	s.signAndSubmit(setUpAdminTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
-	)
-
-	// start DKG using admin resource
-	startDKGTx := sdk.NewTransaction().
-		SetScript(templates.GenerateStartDKGScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
-			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
-		AddAuthorizer(s.dkgAddress)
-
-	err := startDKGTx.AddArgument(cadence.NewArray(dkgNodeIDStrings))
-	require.NoError(s.T(), err)
-
-	s.signAndSubmit(startDKGTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
-	)
-
-	// sanity check: verify that DKG was started with correct node IDs
-	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
-	assert.Equal(s.T(), cadence.NewArray(dkgNodeIDStrings), result)
-
-	// create DKG partcipant
-	createParticipantTx := sdk.NewTransaction().
-		SetScript(templates.GenerateCreateDKGParticipantScript(s.env)).
-		SetGasLimit(9999).
-		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
-			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address).
-		AddAuthorizer(s.dkgAddress)
-
-	err = createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
-	require.NoError(s.T(), err)
-	err = createParticipantTx.AddArgument(cadence.NewString(nodeID.String()))
-	require.NoError(s.T(), err)
-
-	s.signAndSubmit(createParticipantTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
-	)
-
-	// verify that nodeID was registered
-	result = s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
-		[][]byte{jsoncdc.MustEncode(cadence.String(nodeID.String()))})
-	assert.Equal(s.T(), cadence.NewBool(true), result)
-
-	// DKG message fields
-	msgData := unittest.RandomBytes(10)
-	dkgEpochID := "integration-dkg-epoch-1"
-	originID := uint64(1)
-
-	// submit a broadcast messsage a random broadcast message
-	// and verify that there were no errors
-	msg := messages.NewDKGMessage(int(originID), msgData, dkgEpochID)
-	err = s.contractClient.Broadcast(msg)
-	assert.NoError(s.T(), err)
-
-	// read the broadcast message and verify that the data recieved
-	// from the latest block
-	block, err := s.blockchain.GetLatestBlock()
-	require.NoError(s.T(), err)
-
-	messages, err := s.contractClient.ReadBroadcast(0, block.ID())
-	require.NoError(s.T(), err)
-	assert.Len(s.T(), messages, 1)
-
-	broadcastedMsg := messages[0]
-	assert.Equal(s.T(), dkgEpochID, broadcastedMsg.DKGInstanceID)
-	assert.Equal(s.T(), msgData, broadcastedMsg.Data)
-	assert.Equal(s.T(), originID, broadcastedMsg.Orig)
 }

@@ -1302,3 +1302,12 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 		}
 	}
 }
+
+// DKGMessageFixture creates a single DKG message with random fields
+func DKGMessageFixture() *messages.DKGMessage {
+	return &messages.DKGMessage{
+		Orig:          uint64(rand.Int()),
+		Data:          RandomBytes(10),
+		DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
+	}
+}
