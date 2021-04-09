@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/testingdock"
@@ -122,27 +124,38 @@ func (net *FlowNetwork) Remove() {
 }
 
 // StopContainers stops all containers in the network, without removing them. This allows containers to be
-// restarted. To remove them, call `RemoveContainers`.
+// restarted. To remove them, call RemoveContainers.
 func (net *FlowNetwork) StopContainers() {
 	if net == nil || net.suite == nil {
 		return
 	}
 
 	err := net.suite.Close()
-	if err != nil {
-		net.t.Log("failed to stop network", err)
-	}
+	assert.NoError(net.t, err)
 }
 
-// RemoveContainers removes all the containers in the network. Containers need to be stopped first using `Stop`.
+// RemoveContainers removes all the containers in the network. Containers need to be stopped first using StopContainers.
 func (net *FlowNetwork) RemoveContainers() {
 	if net == nil || net.suite == nil {
 		return
 	}
 
 	err := net.suite.Remove()
-	if err != nil {
-		net.t.Log("failed to remove containers", err)
+	assert.NoError(net.t, err)
+}
+
+// DropDBs resets the protocol state database for all containers in the network.
+func (net *FlowNetwork) DropDBs() {
+	if net == nil || net.suite == nil {
+		return
+	}
+	// clear data directories
+	for _, c := range net.Containers {
+		flowDBDir := path.Join(c.datadir, DefaultFlowDBDir)
+		err := os.RemoveAll(flowDBDir)
+		assert.NoError(net.t, err)
+		err = os.Mkdir(flowDBDir, 0700)
+		assert.NoError(net.t, err)
 	}
 }
 
@@ -154,9 +167,7 @@ func (net *FlowNetwork) Cleanup() {
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
-		if err != nil {
-			net.t.Log("failed to cleanup", err)
-		}
+		assert.NoError(net.t, err)
 	}
 }
 
@@ -176,9 +187,7 @@ func (net *FlowNetwork) ContainerByID(id flow.Identifier) *Container {
 // Otherwise fails the test.
 func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
-	if !exists {
-		net.t.FailNow()
-	}
+	require.True(net.t, exists)
 	return container
 }
 

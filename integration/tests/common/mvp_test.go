@@ -59,12 +59,16 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 	// verify that the downloaded snapshot is not for the root block
 	header, err := snapshot.Head()
+	require.NoError(t, err)
 	assert.True(t, header.ID() != initialRoot.Header.ID())
+
+	flowNetwork.StopContainers()
+	flowNetwork.RemoveContainers()
+	flowNetwork.DropDBs()
 
 	err = flowNetwork.WriteRootSnapshot(snapshot)
 	require.NoError(t, err)
 
-	flowNetwork.Remove()
 	flowNetwork.Start(ctx)
 
 	// Run MVP tests
