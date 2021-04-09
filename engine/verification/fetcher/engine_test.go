@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/verification/fetcher"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
@@ -34,7 +36,7 @@ type FetcherEngineTestSuite struct {
 	chunkConsumerNotifier *module.ProcessingNotifier        // to report a chunk has been processed
 	results               *storage.ExecutionResults         // to retrieve execution result of an assigned chunk
 	receipts              *storage.ExecutionReceipts        // used to find executor of the chunk
-	requester             *mockfetcher.ChunkDataPackHandler // used to request chunk data packs from network
+	requester             *mockfetcher.ChunkDataPackRequester // used to request chunk data packs from network
 }
 
 // setupTest initiates a test suite prior to each test.
@@ -50,10 +52,31 @@ func setupTest() *FetcherEngineTestSuite {
 		chunkConsumerNotifier: &module.ProcessingNotifier{},
 		results:               &storage.ExecutionResults{},
 		receipts:              &storage.ExecutionReceipts{},
-		requester:             &mockfetcher.ChunkDataPackHandler{},
+		requester:             &mockfetcher.ChunkDataPackRequester{},
 	}
 
 	return s
+}
+
+// newFetcherEngine returns a fetcher engine for testing.
+func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
+	e := fetcher.New(s.log,
+		s.metrics,
+		s.tracer,
+		s.verifier,
+		s.state,
+		s.pendingChunks,
+		s.headers,
+		s.results,
+		s.receipts,
+		s.requester)
+	return e
+}
+
+// TestFetcherEngineHappyPathCycle
+func TestFetcherEngineHappyPathCycle(t *testing.T) {
+	s := setupTest()
+	e :=
 }
 
 // mockResultsByIDs mocks the results storage for affirmative querying of result IDs.
