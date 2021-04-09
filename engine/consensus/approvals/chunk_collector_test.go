@@ -15,32 +15,23 @@ func TestChunkApprovalCollector(t *testing.T) {
 }
 
 type ChunkApprovalCollectorTestSuite struct {
-	suite.Suite
-	verID               flow.Identifier
-	chunk               *flow.Chunk
-	chunkAssignment     map[flow.Identifier]struct{}
-	authorizedVerifiers map[flow.Identifier]struct{}
+	BaseApprovalsTestSuite
+	chunk           *flow.Chunk
+	chunkAssignment map[flow.Identifier]struct{}
 }
 
 func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
-	blockID := unittest.IdentifierFixture()
-	s.chunk = unittest.ChunkFixture(blockID, 0)
-
-	verifiers := make(flow.IdentifierList, 0)
-	s.authorizedVerifiers = make(map[flow.Identifier]struct{})
+	s.BaseApprovalsTestSuite.SetupTest()
+	s.chunk = s.Chunks[0]
 	s.chunkAssignment = make(map[flow.Identifier]struct{})
-	for i := 0; i < 5; i++ {
-		id := unittest.IdentifierFixture()
-		verifiers = append(verifiers, id)
-		s.authorizedVerifiers[id] = struct{}{}
-		s.chunkAssignment[id] = struct{}{}
+	for _, verifier := range s.ChunksAssignment.Verifiers(s.chunk) {
+		s.chunkAssignment[verifier] = struct{}{}
 	}
-	s.verID = verifiers[0]
 }
 
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
-	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.verID))
+	collector := NewChunkApprovalCollector(s.chunkAssignment, s.AuthorizedVerifiers)
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	status := collector.ProcessApproval(approval)
 	require.True(s.T(), status.approvalProcessed)
 	require.Equal(s.T(), uint(1), status.numberOfApprovals)
@@ -48,9 +39,9 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 }
 
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssignment() {
-	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.verID))
-	delete(s.chunkAssignment, s.verID)
+	collector := NewChunkApprovalCollector(s.chunkAssignment, s.AuthorizedVerifiers)
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
+	delete(s.chunkAssignment, s.VerID)
 	status := collector.ProcessApproval(approval)
 	require.False(s.T(), status.approvalProcessed)
 	require.Equal(s.T(), uint(0), status.numberOfApprovals)
@@ -58,9 +49,9 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssign
 }
 
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidVerifier() {
-	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.verID))
-	delete(s.authorizedVerifiers, s.verID)
+	collector := NewChunkApprovalCollector(s.chunkAssignment, s.AuthorizedVerifiers)
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
+	delete(s.AuthorizedVerifiers, s.VerID)
 	status := collector.ProcessApproval(approval)
 	require.False(s.T(), status.approvalProcessed)
 	require.Equal(s.T(), uint(0), status.numberOfApprovals)
@@ -68,16 +59,16 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidVerifier() 
 }
 
 func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApprovals() {
-	collector := NewChunkApprovalCollector(s.chunkAssignment, s.authorizedVerifiers)
+	collector := NewChunkApprovalCollector(s.chunkAssignment, s.AuthorizedVerifiers)
 	var status ChunkProcessingStatus
 	sigCollector := flow.NewSignatureCollector()
-	for verID := range s.authorizedVerifiers {
+	for verID := range s.AuthorizedVerifiers {
 		approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(verID))
 		status = collector.ProcessApproval(approval)
 		require.True(s.T(), status.approvalProcessed)
 		sigCollector.Add(approval.Body.ApproverID, approval.Body.AttestationSignature)
 	}
 
-	require.Equal(s.T(), uint(len(s.authorizedVerifiers)), status.numberOfApprovals)
+	require.Equal(s.T(), uint(len(s.AuthorizedVerifiers)), status.numberOfApprovals)
 	require.Equal(s.T(), sigCollector.ToAggregatedSignature(), collector.GetAggregatedSignature())
 }
