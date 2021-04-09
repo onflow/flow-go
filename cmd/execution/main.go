@@ -79,6 +79,7 @@ func main() {
 		checkpointsToKeep           uint
 		stateDeltasLimit            uint
 		cadenceExecutionCache       uint
+		chdpCacheSize               uint
 		requestInterval             time.Duration
 		preferredExeNodeIDStr       string
 		syncByBlocks                bool
@@ -100,6 +101,7 @@ func main() {
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
+			flags.UintVar(&chdpCacheSize, "chdp-cache", 100, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
@@ -229,7 +231,7 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, chdpCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
