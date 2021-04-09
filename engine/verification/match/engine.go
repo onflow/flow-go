@@ -425,6 +425,15 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 		targetIDs = append(targetIDs, other)
 	}
 
+	// TEMP: skip sending chunk data pack requests to avoid overloading ENs
+	// This is OK because RAs are not yet used in the sealing process.
+	e.log.Warn().
+		Hex("block_id", c.Chunk.BlockID[:]).
+		Uint64("chunk_index", c.Chunk.Index).
+		Msg("skipping sending chunk data pack request")
+
+	return nil
+
 	// publishes the chunk data request to the network
 	err = e.con.Publish(req, targetIDs...)
 	if err != nil {
