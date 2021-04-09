@@ -109,6 +109,21 @@ func mockReceiptsBlockID(t *testing.T,
 	return agreeReceipts, disagreeReceipts, agreeExecutors, disagreeExecutors
 }
 
+// mockHeadersByBlockID is a test helper that mocks headers storage ByBlockID method for a header for given block ID
+// at the given height.
+func mockHeadersByBlockID(headers *storage.Headers, blockID flow.Identifier, height uint64) {
+	header := unittest.BlockHeaderFixture()
+	header.Height = height
+	headers.On("ByBlockID", blockID).Return(&header, nil)
+}
+
+// mockStateAtBlockIDForExecutors is a test helper that mocks state at the block ID with the given execution nodes identities.
+func mockStateAtBlockIDForExecutors(state *protocol.State, blockID flow.Identifier, executors flow.IdentityList) {
+	snapshot := &protocol.Snapshot{}
+	state.On("AtBlockID", blockID).Return(snapshot)
+	snapshot.On("Identities", mock.Anything).Return(executors, nil)
+}
+
 // mockPendingChunksAdd mocks the add method of pending chunks for expecting only the specified list of chunk statuses.
 // Each chunk status should be added only once.
 // It should return the specified added boolean variable as the result of mocking.
