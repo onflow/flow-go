@@ -246,9 +246,11 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 // We can seal a result if and only if _all_ of the following conditions are satisfied:
 //  (0) We have collected a sufficient number of approvals for each of the result's chunks.
 //  (1) The result must have been previously incorporated in the fork, which we are extending.
-//  (2) The result must be for a block in the fork, which we are extending.
-//  (3) The result must be for an _unsealed_ block.
-//  (4) The result's parent must have been previously sealed (either by a seal in an ancestor
+//      Note: The protocol dictates that all incorporated results must be for ancestor blocks
+//            in the respective fork. Hence, a result being incorporated in the fork, implies
+//            that the result must be for a block in this fork.
+//  (2) The result must be for an _unsealed_ block.
+//  (3) The result's parent must have been previously sealed (either by a seal in an ancestor
 //      block or by a seal included earlier in the block that we are constructing).
 // To limit block size, we cap the number of seals to maxSealCount.
 func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
@@ -267,17 +269,14 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	}
 	lastSealedHeight := latestSealedBlock.Height
 
-	// STEP I: Collect the seals for all results that satisfy (0), (1), (2), and (3).
+	// STEP I: Collect the seals for all results that satisfy (0), (1), and (2).
 	//         The will give us a _superset_ of all seals that can be included.
 	// Implementation:
-	// Note that conditions (0), (1), (2), and (3) apply to the results.
 	//  * We walk the fork backwards and check each block for incorporated results.
 	//    - Therefore, all results that we encounter satisfy condition (1).
-	//    - The protocol dictates that all incorporated results must be for blocks in the fork.
-	//      Hence, the results also satisfy condition (2).
 	//  * We only consider results, whose executed block has a height _strictly larger_
 	//    than the lastSealedHeight.
-	//    - Thereby, we guarantee that condition (3) is satisfied.
+	//    - Thereby, we guarantee that condition (2) is satisfied.
 	//  * We only consider results for which we have a candidate seals in the sealPool.
 	//    - Thereby, we guarantee that condition (0) is satisfied, because candidate seals
 	//      are only generated and stored in the mempool once sufficient approvals are collected.
@@ -291,7 +290,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			return fmt.Errorf("could not retrieve block %x: %w", header.ID(), err)
 		}
 
-		// enforce condition (1):
+		// enforce condition (1): only consider seals for results that are incorporated in the fork
 		for _, result := range block.Payload.Results {
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
@@ -306,13 +305,16 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 				result,
 			)
 
-			// enforce condition (0):
+			// enforce condition (0): candidate seals are only constructed once sufficient
+			// have been collected. Hence, any incorporated result for which we find a
+			// candidate seal satisfy condition (0)
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
 			if !ok {
 				continue
 			}
 
-			// enforce condition (2):
+			// enforce condition (2): the block is unsealed (in this fork) if and only if
+			// its height is _strictly larger_ than the lastSealedHeight.
 			executedBlock, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
 			if err != nil {
 				return fmt.Errorf("could not get header of block %x: %w", incorporatedResult.Result.BlockID, err)
@@ -336,9 +338,9 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	if err != nil {
 		return nil, fmt.Errorf("error traversing unsealed section of fork: %w", err)
 	}
-	// All the seals in sealsSuperset are for results that satisfy (0), (1), (2), and (3).
+	// All the seals in sealsSuperset are for results that satisfy (0), (1), and (2).
 
-	// STEP II: Select only the seals from sealsSuperset that also satisfy condition (4).
+	// STEP II: Select only the seals from sealsSuperset that also satisfy condition (3).
 	// We do this by starting with the last sealed result in the fork. Then, we check whether we
 	// have a seal for the child block (at latestSealedBlock.Height +1), which connects to the
 	// sealed result. If we find such a seal, we can now consider the child block sealed.
@@ -350,7 +352,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			break
 		}
 
-		// enforce condition (4):
+		// enforce condition (3):
 		candidateSeal, ok := connectingSeal(sealsSuperset[lastSealedHeight+1], lastSeal)
 		if !ok {
 			break
