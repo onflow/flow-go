@@ -4,6 +4,7 @@ package badger_test
 
 import (
 	"errors"
+
 	"math/rand"
 	"testing"
 	"time"
@@ -139,7 +140,8 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 		})
 		err = state.Extend(&block2)
 		require.NoError(t, err)
@@ -300,157 +302,6 @@ func TestExtendInvalidChainID(t *testing.T) {
 	})
 }
 
-// Test that Extend will refuse payloads that contain duplicate receipts, where
-// duplicates can be in another block on the fork, or within the payload.
-func TestExtendReceiptsDuplicate(t *testing.T) {
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
-
-		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block2)
-		require.NoError(t, err)
-
-		receipt := unittest.ReceiptForBlockFixture(&block2)
-
-		// B1 <- B2 <- B3{R(B2)} <- B4{R(B2)}
-		t.Run("duplicate receipt in different block", func(t *testing.T) {
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
-			})
-			err = state.Extend(&block3)
-			require.NoError(t, err)
-
-			block4 := unittest.BlockWithParentFixture(block3.Header)
-			block4.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{receipt},
-			})
-			err = state.Extend(&block4)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
-
-		// B1 <- B2 <- B3{R(B2), R(B2)}
-		t.Run("duplicate receipt in same block", func(t *testing.T) {
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(flow.Payload{
-				Receipts: []*flow.ExecutionReceipt{
-					receipt,
-					receipt,
-				},
-			})
-			err = state.Extend(&block3)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
-		})
-
-	})
-}
-
-// Test that Extend will refuse payloads that contain receipts for blocks that
-// are already sealed on the fork, but will accept receipts for blocks that are
-// sealed on another fork.
-func TestExtendReceiptsSealedBlock(t *testing.T) {
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
-		head, err := rootSnapshot.Head()
-		require.NoError(t, err)
-
-		// create block2
-		block2 := unittest.BlockWithParentFixture(head)
-		block2.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block2)
-		require.NoError(t, err)
-
-		block2Receipt := unittest.ReceiptForBlockFixture(&block2)
-
-		// B1<--B2<--B3{R{B2)}<--B4{S(R(B2))}<--B5{R'(B2)}
-
-		// create block3 with a receipt for block2
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block2Receipt},
-		})
-		err = state.Extend(&block3)
-		require.NoError(t, err)
-
-		// create a seal for block2
-		seal2 := unittest.Seal.Fixture(unittest.Seal.WithResult(&block2Receipt.ExecutionResult))
-
-		// create block4 containing a seal for block2
-		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{seal2},
-		})
-		err = state.Extend(&block4)
-		require.NoError(t, err)
-
-		// insert another receipt for block 2, which is now the highest sealed
-		// block, and ensure that the receipt is rejected
-		receipt := unittest.ReceiptForBlockFixture(&block2)
-		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt},
-		})
-		err = state.Extend(&block5)
-		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
-
-		// B1<--B2<--B3{R{B2)}<--B4{S(R(B2))}<--B5{R'(B2)}
-		//       |
-		//       +---B6{R''(B2)}
-
-		// insert another receipt for B2 but in a separate fork. The fact that
-		// B2 is sealed on a separate fork should not cause the receipt to be
-		// rejected
-		block6 := unittest.BlockWithParentFixture(block2.Header)
-		block6.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt},
-		})
-		err = state.Extend(&block6)
-		require.NoError(t, err)
-	})
-}
-
-// Test that Extend will reject payloads that contain receipts for blocks that
-// are not on the fork
-//
-// B1<--B2<--B3
-//      |
-//      +----B4{R(B3)}
-func TestExtendReceiptsBlockNotOnFork(t *testing.T) {
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	head, err := rootSnapshot.Head()
-	require.NoError(t, err)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
-		// create block2
-		block2 := unittest.BlockWithParentFixture(head)
-		block2.Payload.Guarantees = nil
-		block2.Header.PayloadHash = block2.Payload.Hash()
-		err := state.Extend(&block2)
-		require.NoError(t, err)
-
-		// create block3
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block3)
-		require.NoError(t, err)
-
-		block3Receipt := unittest.ReceiptForBlockFixture(&block3)
-
-		block4 := unittest.BlockWithParentFixture(block2.Header)
-		block4.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block3Receipt},
-		})
-		err = state.Extend(&block4)
-		require.Error(t, err)
-		require.True(t, st.IsInvalidExtensionError(err), err)
-	})
-}
-
 func TestExtendReceiptsNotSorted(t *testing.T) {
 	// Todo: this test needs to be updated:
 	// We don't require the receipts to be sorted by height anymore
@@ -475,13 +326,15 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 		err = state.Extend(&block3)
 		require.NoError(t, err)
 
+		receiptA := unittest.ReceiptForBlockFixture(&block3)
+		receiptB := unittest.ReceiptForBlockFixture(&block2)
+
 		// insert a block with payload receipts not sorted by block height.
 		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.Payload.Guarantees = nil
-		block4.Payload.Receipts = append(block4.Payload.Receipts,
-			unittest.ReceiptForBlockFixture(&block3),
-			unittest.ReceiptForBlockFixture(&block2),
-		)
+		block4.Payload = &flow.Payload{
+			Receipts: []*flow.ExecutionReceiptMeta{receiptA.Meta(), receiptB.Meta()},
+			Results:  []*flow.ExecutionResult{&receiptA.ExecutionResult, &receiptB.ExecutionResult},
+		}
 		block4.Header.PayloadHash = block4.Payload.Hash()
 		err = state.Extend(&block4)
 		require.Error(t, err)
@@ -493,9 +346,11 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 	validator := &mockmodule.ReceiptValidator{}
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
-	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+	util.RunWithFullProtocolStateAndValidator(t, rootSnapshot, validator, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
+
+		validator.On("ValidatePayload", mock.Anything).Return(nil).Once()
 
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
@@ -506,16 +361,19 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		// Add a receipt for block 2
 		receipt := unittest.ExecutionReceiptFixture()
 
-		// force the receipt validator to refuse this receipt
-		validator.On("Validate", mock.Anything).Return(engine.NewInvalidInputError(""))
-
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 		})
+
+		// force the receipt validator to refuse this payload
+		validator.On("ValidatePayload", &block3).Return(engine.NewInvalidInputError("")).Once()
+
 		err = state.Extend(&block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
+		validator.AssertExpectations(t)
 	})
 }
 
@@ -541,13 +399,19 @@ func TestExtendReceiptsValid(t *testing.T) {
 
 		receipt3a := unittest.ReceiptForBlockFixture(&block3)
 		receipt3b := unittest.ReceiptForBlockFixture(&block3)
+		receipt3c := unittest.ReceiptForBlockFixture(&block4)
 
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{
-				receipt3a,
-				receipt3b,
-				unittest.ReceiptForBlockFixture(&block4),
+			Receipts: []*flow.ExecutionReceiptMeta{
+				receipt3a.Meta(),
+				receipt3b.Meta(),
+				receipt3c.Meta(),
+			},
+			Results: []*flow.ExecutionResult{
+				&receipt3a.ExecutionResult,
+				&receipt3b.ExecutionResult,
+				&receipt3c.ExecutionResult,
 			},
 		})
 		err = state.Extend(&block5)
@@ -624,9 +488,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt1},
-		})
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 		err = state.Extend(&block2)
 		require.NoError(t, err)
 		err = state.Finalize(block2.ID())
@@ -693,9 +555,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// block 5 contains the receipt for block 2
 		block5 := unittest.BlockWithParentFixture(block4.Header)
-		block5.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt2},
-		})
+		block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2)))
 
 		err = state.Extend(&block5)
 		require.NoError(t, err)
@@ -844,7 +704,8 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 		})
 		err = state.Extend(&block3)
 		require.NoError(t, err)
@@ -856,7 +717,8 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
 		block4.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block2Receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
 		})
 		err = state.Extend(&block4)
 		require.NoError(t, err)
@@ -948,9 +810,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
-		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt},
-		})
+		block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block1Receipt)))
 		err = state.Extend(&block3)
 		require.NoError(t, err)
 
@@ -960,9 +820,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
-		block4.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block2Receipt},
-		})
+		block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block2Receipt)))
 		err = state.Extend(&block4)
 		require.NoError(t, err)
 
@@ -1248,9 +1106,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// add a block containing a receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt1},
-		})
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 		err = state.Extend(&block2)
 		require.NoError(t, err)
 		err = state.Finalize(block2.ID())
@@ -1298,9 +1154,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 
 		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt},
-		})
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block1Receipt)))
 
 		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
 		block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -1556,9 +1410,7 @@ func TestSealed(t *testing.T) {
 
 		// block 2 contains receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt1},
-		})
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 		err = state.Extend(&block2)
 		require.NoError(t, err)
 		err = state.Finalize(block2.ID())

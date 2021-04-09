@@ -136,7 +136,7 @@ func createNode(
 	indexDB := storage.NewIndex(metrics, db)
 	resultsDB := storage.NewExecutionResults(metrics, db)
 	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB)
-	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB)
+	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)

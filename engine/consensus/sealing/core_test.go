@@ -151,7 +151,7 @@ func (ms *SealingSuite) TestOnReceiptPendingResult() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
+	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// setup the results mempool to check if we attempted to insert the
 	// incorporated result, and return false as if it was already in the mempool
@@ -180,7 +180,7 @@ func (ms *SealingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 		unittest.WithExecutorID(originID),
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil)
+	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
 	// Persistent storage layer for Receipts has the receipt already stored
 	ms.ReceiptsDB.On("Store", receipt).Return(storage.ErrAlreadyExists).Once()
@@ -208,7 +208,7 @@ func (ms *SealingSuite) TestOnReceiptValid() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 
 	// Expect the receipt to be added to mempool and persistent storage
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
@@ -240,18 +240,40 @@ func (ms *SealingSuite) TestOnReceiptInvalid() {
 	)
 
 	// check that _expected_ failure case of invalid receipt is handled without error
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(engine.NewInvalidInputError("")).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(engine.NewInvalidInputError("")).Once()
 	_, err := ms.sealing.processReceipt(receipt)
 	ms.Require().NoError(err, "invalid receipt should be dropped but not error")
 
 	// check that _unexpected_ failure case causes the error to be escalated
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(fmt.Errorf("")).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(fmt.Errorf("")).Once()
 	_, err = ms.sealing.processReceipt(receipt)
 	ms.Require().Error(err, "unexpected errors should be escalated")
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
 	ms.ResultsPL.AssertExpectations(ms.T())
+}
+
+// TestOnUnverifiableReceipt tests handling of receipts that are unverifiable
+// (e.g. if the parent result is unknown)
+func (ms *SealingSuite) TestOnUnverifiableReceipt() {
+	// we use the same Receipt as in TestOnReceiptValid to ensure that the matching Core is not
+	// rejecting the receipt for any other reason
+	originID := ms.ExeID
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(originID),
+		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
+	)
+
+	// check that _expected_ failure case of invalid receipt is handled without error
+	ms.receiptValidator.On("Validate", receipt).Return(engine.NewUnverifiableInputError("missing parent result")).Once()
+	wasAdded, err := ms.sealing.processReceipt(receipt)
+	ms.Require().NoError(err, "unverifiable receipt should be cached but not error")
+	ms.Require().False(wasAdded, "unverifiable receipt should be cached but not added to the node's validated information")
+
+	ms.receiptValidator.AssertExpectations(ms.T())
+	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
+	ms.ResultsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
 }
 
 // try to submit an approval where the message origin is inconsistent with the message creator
@@ -533,9 +555,7 @@ func (ms *SealingSuite) TestSealableResultsEmergencySealingMultipleCandidates() 
 		result := unittest.ExecutionResultFixture(unittest.WithBlock(ms.LatestFinalizedBlock))
 		receipt1 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
 		receipt2 := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
-		block.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt1, receipt2},
-		})
+		block.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1, receipt2)))
 		ms.ReceiptsDB.On("ByBlockID", result.BlockID).Return(flow.ExecutionReceiptList{receipt1, receipt2}, nil)
 		// TODO: replace this with block.ID(), for now IncoroporatedBlockID == ExecutionResult.BlockID
 		emergencySealingCandidates[i] = result.BlockID

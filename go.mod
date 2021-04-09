@@ -37,7 +37,8 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.14.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2-0.20210326212504-f350f3f9428d
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.2-0.20210326212504-f350f3f9428d
 	github.com/onflow/flow-go-sdk v0.17.0
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
@@ -51,7 +52,7 @@ require (
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
-	github.com/uber/jaeger-lib v2.3.0+incompatible // indirect
+	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.6.0

@@ -4,12 +4,13 @@ on:
   push:
     branches: 
       - master
+      - feature/epochs
       - feature/dkg
   pull_request:
     branches:
       - master
+      - feature/epochs
       - feature/dkg
-
 jobs:
   golangci:
     name: Lint
