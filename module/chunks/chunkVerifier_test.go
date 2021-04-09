@@ -104,9 +104,9 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	assert.True(s.T(), ok)
 }
 
-// TestFailedTx tests verification behavior in case
-// of failed transaction. if a transaction fails, it should
-// still change the state commitment.
+// TestFailedTx tests verification behaviour in case
+// of failed transaction. if a transaction fails, it shouldn't
+// change the state commitment.
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("failedTx"))
 	assert.NotNil(s.T(), vch)
@@ -278,7 +278,7 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
 		// add updates to the ledger
-		_ = led.Set("05", "", "", []byte{'B'})
+		_ = led.Set("00", "", "", []byte{'F'})
 		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		_, _ = led.Get("00", "", "")
