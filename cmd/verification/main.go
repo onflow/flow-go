@@ -36,7 +36,7 @@ const (
 	// requestInterval represents the time interval in milliseconds that the
 	// match engine retries sending resource requests to the network
 	// this value is set following this issue (3443)
-	requestInterval = 1000 * time.Millisecond
+	requestInterval = 30 * time.Second
 
 	// processInterval represents the time interval in milliseconds that the
 	// finder engine iterates over the execution receipts ready to process
