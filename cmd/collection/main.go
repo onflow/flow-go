@@ -83,6 +83,10 @@ func main() {
 				"the address the ingress server listens on")
 			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
 				"maximum per-transaction computation limit (gas limit)")
+			flags.Uint64Var(&ingestConf.MaxTransactionByteSize, "ingest-max-tx-byte-size", flow.DefaultMaxTransactionByteSize,
+				"maximum per-transaction byte size")
+			flags.Uint64Var(&ingestConf.MaxCollectionByteSize, "ingest-max-col-byte-size", flow.DefaultMaxCollectionByteSize,
+				"maximum per-collection byte size")
 			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
 				"whether we check that inbound transactions are parse-able")
 			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
