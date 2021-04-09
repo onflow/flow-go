@@ -11,6 +11,7 @@ import (
 type BaseApprovalsTestSuite struct {
 	suite.Suite
 
+	Block               flow.Header
 	VerID               flow.Identifier
 	Chunks              flow.ChunkList
 	ChunksAssignment    *chunks.Assignment
@@ -19,11 +20,11 @@ type BaseApprovalsTestSuite struct {
 }
 
 func (s *BaseApprovalsTestSuite) SetupTest() {
-	blockID := unittest.IdentifierFixture()
+	s.Block = unittest.BlockHeaderFixture()
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]struct{})
 	s.ChunksAssignment = chunks.NewAssignment()
-	s.Chunks = unittest.ChunkListFixture(50, blockID)
+	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID())
 
 	for j := 0; j < 5; j++ {
 		id := unittest.IdentifierFixture()
@@ -37,7 +38,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 
 	s.VerID = verifiers[0]
 	result := unittest.ExecutionResultFixture()
-	result.BlockID = blockID
+	result.BlockID = s.Block.ID()
 	result.Chunks = s.Chunks
 	s.IncorporatedResult = unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(result))
 }
