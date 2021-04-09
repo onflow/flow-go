@@ -771,6 +771,8 @@ github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1
 github.com/onflow/cadence v0.14.2/go.mod h1:EEXKRNuW5C2E1wRM4fLhfqoTgXohPFieXwOGJubz1Jg=
 github.com/onflow/cadence v0.14.4 h1:l5HQTGEcbPXZQEjIB0kFxVI8OmBgNHujLKAMSs/JvEQ=
 github.com/onflow/cadence v0.14.4/go.mod h1:Jzno1fQNpJB16RUiodjAN4QuwuMC0dt8cLtjcxp+iI4=
+github.com/onflow/cadence v0.14.5 h1:okiOSdFnEkoVf9IWD+pp+bKs5g0WzvaPCwhCoviDC9k=
+github.com/onflow/cadence v0.14.5/go.mod h1:Jzno1fQNpJB16RUiodjAN4QuwuMC0dt8cLtjcxp+iI4=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1 h1:nmIDPf94F9Ecx6ecGyd4uYBUl4LluntWLvtwAJYt4tw=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.1/go.mod h1:4zE/4A+5zyahxSFccQmcBqzp4ONXIwvGHaOKN8h8CRM=
 github.com/onflow/flow-ft/lib/go/contracts v0.4.0 h1:M1I4z027GHOLcjkj9lL2UUUpZpEAF90hY5gRqvFGAPg=
