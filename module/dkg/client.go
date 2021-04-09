@@ -185,9 +185,9 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	// Note: We need to make sure that we pull the keys out in the same order that
 	// we have done here. Group Public key first followed by the individual public keys
 	finalSubmission := make([]cadence.Value, 0, len(publicKeys))
-	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()))
+	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()[2:]))
 	for _, publicKey := range publicKeys {
-		finalSubmission = append(finalSubmission, cadence.NewString(publicKey.String()))
+		finalSubmission = append(finalSubmission, cadence.NewString(publicKey.String()[2:]))
 	}
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
