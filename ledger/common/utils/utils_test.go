@@ -1,14 +1,18 @@
 package utils
 
 import (
+	"bytes"
 	"math/big"
 	"math/bits"
 	"math/rand"
+	"sort"
 	"time"
 
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/ledger"
 )
 
 func TestBitTools(t *testing.T) {
@@ -64,4 +68,50 @@ func TestBitTools(t *testing.T) {
 		randomBig.SetBytes(bytes)
 		assert.Equal(t, 0, randomBig.Cmp(&b))
 	})
+}
+
+func TestSplitByPath(t *testing.T) {
+	seed := time.Now().UnixNano()
+	t.Logf("rand seed is %d", seed)
+	rand.Seed(seed)
+
+	const pathsNumber = 100
+	const redundantPaths = 10
+	const pathsSize = 32
+	randomIndex := rand.Intn(pathsSize)
+
+	// create path slice with redundant paths
+	paths := make([]ledger.Path, 0, pathsNumber)
+	for i := 0; i < pathsNumber-redundantPaths; i++ {
+		p := make([]byte, pathsSize)
+		rand.Read(p)
+		paths = append(paths, p)
+	}
+	for i := 0; i < redundantPaths; i++ {
+		paths = append(paths, paths[i])
+	}
+
+	// save a sorted paths copy for later check
+	sortedPaths := make([]ledger.Path, len(paths))
+	copy(sortedPaths, paths)
+	sort.Slice(sortedPaths, func(i, j int) bool {
+		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
+	})
+
+	// split paths
+	index := SplitPaths(paths, randomIndex)
+
+	// check correctness
+	for i := 0; i < index; i++ {
+		assert.Equal(t, Bit(paths[i], randomIndex), 0)
+	}
+	for i := index; i < len(paths); i++ {
+		assert.Equal(t, Bit(paths[i], randomIndex), 1)
+	}
+
+	// check the multi-set didn't change
+	sort.Slice(paths, func(i, j int) bool {
+		return bytes.Compare(paths[i], paths[j]) < 0
+	})
+	assert.Equal(t, paths, sortedPaths)
 }
