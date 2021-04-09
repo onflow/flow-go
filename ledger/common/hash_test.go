@@ -46,7 +46,17 @@ func Test_ComputeCompactValue(t *testing.T) {
 	l1 := common.HashInterNode(common.GetDefaultHashForHeight(l), h)
 	l2 := common.HashInterNode(l1, common.GetDefaultHashForHeight(l+1))
 	l3 := common.HashInterNode(common.GetDefaultHashForHeight(l+2), l2)
-	assert.Equal(t, l3, common.ComputeCompactValue(path, p, nodeHeight))
+	result := make([]byte, common.HashLen)
+	common.ComputeCompactValue(&result, path, p, nodeHeight)
+	assert.Equal(t, l3, result)
+
+	// test a nil payload
+	common.ComputeCompactValue(&result, path, nil, nodeHeight)
+	assert.Equal(t, result, common.GetDefaultHashForHeight(nodeHeight))
+	// test an empty payload
+	p.Value = ledger.Value([]byte{})
+	common.ComputeCompactValue(&result, path, p, nodeHeight)
+	assert.Equal(t, result, common.GetDefaultHashForHeight(nodeHeight))
 }
 
 func TestHash(t *testing.T) {
