@@ -311,10 +311,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// transaction that will change state and succeed, used to test that state commitment changes
 	// genesis <- block1 [tx1] <- block2 [tx2] <- block3 [tx3] <- child
 	_, col1, block1, proposal1, seq := deployContractBlock(t, conID, colID, chain, seq, genesis, genesis)
-
-	// we don't set the proper sequence number of this one
-	_, col2, block2, proposal2, _ := makePanicBlock(t, conID, colID, chain, uint64(0), block1.Header, genesis)
-
+	_, col2, block2, proposal2, seq := makePanicBlock(t, conID, colID, chain, seq, block1.Header, genesis)
 	_, col3, block3, proposal3, seq := makeSuccessBlock(t, conID, colID, chain, seq, block2.Header, genesis)
 
 	_, _, _, proposal4, _ := makeSuccessBlock(t, conID, colID, chain, seq, block3.Header, genesis)
