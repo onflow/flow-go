@@ -142,7 +142,7 @@ func VerificationHappyPath(t *testing.T,
 			defer verWG.Done()
 			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
 			require.NoError(t, err)
-		}(verNode, completeER.ContainerBlock.Payload.Receipts[0])
+		}(verNode, completeER.Receipts[0])
 	}
 
 	// requires all verification nodes process the receipt
@@ -231,7 +231,7 @@ func SetupMockExeNode(t *testing.T,
 
 	// determines the expected number of result chunk data pack requests
 	chunkDataPackCount := 0
-	chunks := completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.Chunks
+	chunks := completeER.Receipts[0].ExecutionResult.Chunks
 	chunksNum := len(chunks)
 	for _, chunk := range chunks {
 		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
@@ -304,7 +304,7 @@ func SetupMockConsensusNode(t *testing.T,
 	chainID flow.ChainID) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
-	chunks := completeER.ContainerBlock.Payload.Receipts[0].ExecutionResult.Chunks
+	chunks := completeER.Receipts[0].ExecutionResult.Chunks
 	chunksNum := len(chunks)
 	for _, chunk := range chunks {
 		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
@@ -462,7 +462,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	visited := make(map[flow.Identifier]struct{})
 
 	for _, completeER := range completeERs {
-		for _, receipt := range completeER.ContainerBlock.Payload.Receipts {
+		for _, receipt := range completeER.Receipts {
 			a := chunks.NewAssignment()
 
 			_, duplicate := visited[receipt.ExecutionResult.ID()]

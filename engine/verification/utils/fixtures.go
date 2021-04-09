@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
@@ -39,8 +40,12 @@ type ExecutionReceiptData struct {
 // data required to verify its execution receipts.
 // TODO update this as needed based on execution requirements
 type CompleteExecutionReceipt struct {
-	ContainerBlock *flow.Block             // block that contains execution receipt of reference block
-	ReceiptsData   []*ExecutionReceiptData // execution receipts data of the container block
+	ContainerBlock *flow.Block // block that contains execution receipt of reference block
+
+	// TODO: this is a temporary field to support finder engine logic
+	// It should be removed once we replace finder engine.
+	Receipts     []*flow.ExecutionReceipt // copy of execution receipts in container block
+	ReceiptsData []*ExecutionReceiptData  // execution receipts data of the container block
 }
 
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
@@ -149,10 +154,11 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		// create state.View
 		view := delta.NewView(state.LedgerGetRegister(led, startStateCommitment))
+		committer := committer.NewLedgerViewCommitter(led, trace.NewNoopTracer())
 		programs := programs.NewEmptyPrograms()
 
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), log)
+		bc, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), log, committer)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
@@ -344,10 +350,12 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 	// container block contains the execution receipt and points back to reference block
 	// as its parent.
 	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
-	containerBlock.Payload.Receipts = []*flow.ExecutionReceipt{receipt}
+	containerBlock.Payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
+	containerBlock.Payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
 
 	return &CompleteExecutionReceipt{
 		ContainerBlock: &containerBlock,
+		Receipts:       []*flow.ExecutionReceipt{receipt},
 		ReceiptsData: []*ExecutionReceiptData{
 			{
 				ReferenceBlock: &referenceBlock,
@@ -385,9 +393,10 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
 		allResults, allData, head := ExecutionResultsFromParentBlockFixture(t, parent, builder)
-		containerBlock := ContainerBlockFixture(head, allResults)
+		containerBlock, receipts := ContainerBlockFixture(head, allResults)
 		completeERs = append(completeERs, &CompleteExecutionReceipt{
 			ContainerBlock: containerBlock,
+			Receipts:       receipts,
 			ReceiptsData:   allData,
 		})
 
@@ -430,8 +439,9 @@ func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, bu
 
 // ContainerBlockFixture builds and returns a block that contains an execution receipt for the
 // input result.
-func ContainerBlockFixture(parent *flow.Header, results []*flow.ExecutionResult) *flow.Block {
+func ContainerBlockFixture(parent *flow.Header, results []*flow.ExecutionResult) (*flow.Block, []*flow.ExecutionReceipt) {
 	receipts := make([]*flow.ExecutionReceipt, 0, len(results))
+
 	for _, result := range results {
 		receipts = append(receipts, &flow.ExecutionReceipt{
 			ExecutorID:      unittest.IdentifierFixture(),
@@ -441,8 +451,7 @@ func ContainerBlockFixture(parent *flow.Header, results []*flow.ExecutionResult)
 
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(parent)
-	containerBlock.Payload.Receipts = receipts
-	containerBlock.Header.PayloadHash = containerBlock.Payload.Hash()
+	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
-	return &containerBlock
+	return &containerBlock, receipts
 }
