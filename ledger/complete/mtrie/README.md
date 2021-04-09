@@ -145,7 +145,7 @@ operation are shared between the original `MTrie` and the updated `MTrie`. This 
 children of some new nodes of the new `Mtrie` point to existing sub-tries from the 
 original `Mtrie`.
 
-The update algorithm `NewTrieWithUpdates` takes a trie `m` as input along with a set of `K` 
+The update algorithm takes a trie `m` as input along with a set of `K` 
 pairs: `(paths[k], payloads[k])` where `k = 0, 1, ..., K-1`.
 It outputs a new trie `new_m` such that each payload `payloads[k]` is stored at the path `paths[k]`.  
 Any path that is not included in the input pairs keeps the payload from the original input `m`.
@@ -200,7 +200,7 @@ We now generalize this algorithm to an arbitrary number of `K` register updates:
  -  When moving to a lower height, `paths` and `payloads` are partitioned depending on `paths[k][i]` with `i = 256 - height`. 
     The first partition has all updates for registers with `paths[k][i] = 0` and goes into the left child recursion, while the second partition has the updates
     pertaining to registers with `paths[k][i] = 1` and goes into the right child recursion. 
-    This results in sorting the overall input `paths` of `NewTrieWithUpdates` using an implicit quick sort.
+    This results in sorting the overall input `paths` using an implicit quick sort.
  - if `len(paths) == 0` and there is no compact leaf carried over (`compactLeaf == nil`), no update will be done 
 and the original sub-trie can be re-used in the new trie.
 
