@@ -178,9 +178,26 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	valid, err := v.SignatureVerifier.Verify(
+	validWOTag, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
-		nil, // TODO: include transaction signature tag
+		nil,
+		message,
+		accountKey.PublicKey,
+		accountKey.HashAlgo,
+	)
+	if err != nil {
+		if sType == envelopeSignature {
+			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
+		}
+		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
+	}
+	if validWOTag {
+		return &accountKey, nil
+	}
+
+	validWTag, err := v.SignatureVerifier.Verify(
+		txSig.Signature,
+		flow.TransactionDomainTag[:],
 		message,
 		accountKey.PublicKey,
 		accountKey.HashAlgo,
@@ -192,15 +209,15 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	if !valid {
-		err = fmt.Errorf("signature is not valid")
-		if sType == envelopeSignature {
-			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
-		}
-		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
+	if validWTag {
+		return &accountKey, nil
 	}
 
-	return &accountKey, nil
+	err = fmt.Errorf("signature is not valid")
+	if sType == envelopeSignature {
+		return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
+	}
+	return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 }
 
 func (v *TransactionSignatureVerifier) hasSufficientKeyWeight(
