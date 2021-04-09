@@ -95,7 +95,8 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 	block := &flow.Block{
 		Header: &header,
 		Payload: &flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 		},
 	}
 	return block, assignment
@@ -156,7 +157,7 @@ func newBlockHappyPath(t *testing.T) {
 	containerBlock, assignment := createContainerBlock(
 		test.WithChunks(
 			test.WithAssignee(s.myID())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 1) // one chunk should be assigned
@@ -202,7 +203,7 @@ func newBlockUnstaked(t *testing.T) {
 			test.WithAssignee(unittest.IdentifierFixture()),
 			test.WithAssignee(unittest.IdentifierFixture()),
 			test.WithAssignee(unittest.IdentifierFixture())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
@@ -235,7 +236,7 @@ func newBlockNoChunk(t *testing.T) {
 
 	// creates a container block, with a single receipt, that contains no chunks.
 	containerBlock, assignment := createContainerBlock()
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
@@ -275,7 +276,7 @@ func newBlockNoAssignedChunk(t *testing.T) {
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
 			test.WithAssignee(unittest.IdentifierFixture()))) // assigned to others
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 0) // no chunk should be assigned
@@ -315,7 +316,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 			test.WithAssignee(s.myID()),                     // assigned to me
 			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
 			test.WithAssignee(s.myID())))                    // assigned to me
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 3) // 3 chunks should be assigned
@@ -353,7 +354,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	// to verification node.
 	containerBlock, assignment := createContainerBlock(
 		test.WithChunks(test.WithAssignee(s.myID())))
-	result := &containerBlock.Payload.Receipts[0].ExecutionResult
+	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
 	require.Equal(t, chunksNum, 1)
