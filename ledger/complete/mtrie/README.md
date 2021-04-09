@@ -241,12 +241,14 @@ In order to counter a resource-exhaustion attack where an existing allocated reg
 Morever, we create a new interim-node from the left and right children only if the returned children are different than the original node children. If the children are equal, we just re-cycle the same interim-node. 
 
 #### Putting everything together:
-This results in the following `Update` algorithm. When applying the updates `(paths, payloads)` to a trie with root node `root` 
-(at height 256), the root node of the updated trie is returned by `Update(256, root, paths, payloads, nil)`.
+This results in the following algorithm:
 
-
-```golang
-FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compactLeaf Node) Node {
+```
+function NewTrieWithUpdates(OriginalTrie MTrie, paths []Path, payloads []Payload) MTrie {
+ newMtrieRoot  = Update(256, OriginalTrie.root, paths, payloads, nil)
+ return  MTrie( root: newMtrieRoot)
+}
+function Update(height Int, node Node, paths []Path, payloads []Payload, compactLeaf Node) Node{
  if len(paths) == 0 {
   // If a compactLeaf from a higher height is carried over, then we are necessarily in case 2.a 
   // (node == nil and only one register to create)
@@ -256,13 +258,11 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
   // No updates to make, re-use the same sub-trie
   return node
  }
- 
  // The remaining sub-case of 2.a (node == nil and only one register to create): 
  // the register payload is the input and no compactified leaf is to be carried over. 
  if len(paths) == 1 && node == nil && compactLeaf == nil {
   return NewLeaf(paths[0], payloads[0], height)
  }
- 
  // case 1: we reach a non-nil leaf. Per Lemma, compactLeaf is necessarily nil
  if node != nil && node.IsLeaf() { 
   if node.path ∈ paths {
@@ -283,8 +283,7 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
    compactLeaf = node
   }
  }
- 
- // The remaining logic below handles the remaining recursion step which is common for the 
+/ The remaining logic below handles the remaining recursion step which is common for the 
  // case 0: node ≠ nil and there are many paths to update (len(paths)>1)
  // case 1.a.ii: node ≠ nil and node.path ∈ path and len(paths) > 1
  // case 1.b: node ≠ nil and node.path ∉ path
@@ -311,7 +310,6 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
   lcompactLeaf = nil
   rcompactLeaf = nil
  }
- 
  // the difference between cases with node ≠ nil vs the case with node == nil
  if node != nil { // cases 0, 1.a.ii, and 1.b
   lchild = node.leftChild
@@ -320,11 +318,9 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
   lchild = nil
   rchild = nil
  }
- 
  // recursive descent into the childred
  newlChild = Update(height-1, lchild, lpaths, lpayloads, lcompactLeaf)
  newrChild = Update(height-1, rchild, rpaths, rpayloads, rcompactLeaf)
- 
  // mitigate storage exhaustion attack: avoids creating a new interim-node when the same
  // payload is re-written at a register, resulting in the same children being returned.
  if lChild == newlChild && rChild == newrChild {

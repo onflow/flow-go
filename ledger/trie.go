@@ -187,13 +187,13 @@ type TrieProof struct {
 }
 
 // NewTrieProof creates a new instance of Trie Proof
-func NewTrieProof(pathByteSize int) *TrieProof {
+func NewTrieProof() *TrieProof {
 	return &TrieProof{
 		Path:      make([]byte, 0),
 		Payload:   EmptyPayload(),
 		Interims:  make([][]byte, 0),
 		Inclusion: false,
-		Flags:     make([]byte, pathByteSize),
+		Flags:     make([]byte, 0),
 		Steps:     0,
 	}
 }
@@ -269,10 +269,10 @@ func NewTrieBatchProof() *TrieBatchProof {
 
 // NewTrieBatchProofWithEmptyProofs creates an instance of Batchproof
 // filled with n newly created proofs (empty)
-func NewTrieBatchProofWithEmptyProofs(numberOfProofs int, pathByteSize int) *TrieBatchProof {
+func NewTrieBatchProofWithEmptyProofs(numberOfProofs int) *TrieBatchProof {
 	bp := NewTrieBatchProof()
 	for i := 0; i < numberOfProofs; i++ {
-		bp.AppendProof(NewTrieProof(pathByteSize))
+		bp.AppendProof(NewTrieProof())
 	}
 	return bp
 }

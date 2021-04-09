@@ -98,7 +98,7 @@ func RootHashFixture() ledger.RootHash {
 
 // TrieProofFixture returns a trie proof fixture
 func TrieProofFixture() (*ledger.TrieProof, ledger.State) {
-	p := ledger.NewTrieProof(0)
+	p := ledger.NewTrieProof()
 	p.Path = PathByUint16(330)
 	p.Payload = LightPayload8('A', 'A')
 	p.Inclusion = true

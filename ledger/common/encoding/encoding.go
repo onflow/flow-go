@@ -613,7 +613,7 @@ func DecodeTrieProof(encodedProof []byte) (*ledger.TrieProof, error) {
 }
 
 func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
-	pInst := ledger.NewTrieProof(0)
+	pInst := ledger.NewTrieProof()
 
 	// Inclusion flag
 	byteInclusion, rest, err := utils.ReadSlice(inp, 1)

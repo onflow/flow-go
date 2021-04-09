@@ -1092,7 +1092,6 @@ func (e *Engine) saveExecutionResults(
 		// chunkDataPack
 
 		sp := e.tracer.StartSpanFromParent(span, trace.EXEGenerateChunkDataPacks)
-		// get all deduplicated register IDs
 		allRegisters := view.AllRegisters()
 		proof, err := e.execState.GetProof(childCtx, chunk.StartState, allRegisters)
 		if err != nil {
@@ -1280,11 +1279,7 @@ func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
 	return res
 }
 
-// generateChunkDataPack creates a chunk data pack from the given inputs.
-//
-// `proof` includes proofs for all registers read to execute the chunck.
-// Register proofs order must not be correlated to the order of register reads during
-// the chunk execution in order to enforce the SPoCK secret high entropy.
+// generateChunkDataPack creates a chunk data pack
 func generateChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
