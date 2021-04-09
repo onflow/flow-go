@@ -29,14 +29,23 @@ import (
 // for performance reasons, we not not copy read.
 // TODO: optimized data structures might be able to reduce memory consumption
 type Node struct {
+	// Implementation Comments:
+	// Formally, a tree can hold up to 2^maxDepth number of registers. However,
+	// the current implementation is designed to operate on a sparsely populated
+	// tree, holding much less than 2^64 registers.
+
 	lChild    *Node           // Left Child
 	rChild    *Node           // Right Child
 	height    int             // height where the Node is at
 	path      ledger.Path     // the storage path (leaf nodes only)
 	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
 	hashValue []byte          // hash value of node (cached)
-	maxDepth  uint16          // captures the longest path from this node to compacted leafs in the subtree
-	regCount  uint64          // number of registers allocated in the subtree
+	// TODO : Atm, we don't support trees with dynamic depth.
+	//        Instead, this should be a forest-wide constant
+	maxDepth uint16 // captures the longest path from this node to compacted leafs in the subtree
+	// TODO : migrate to book-keeping only in the tree root.
+	//        Update can just return the _change_ of regCount.
+	regCount uint64 // number of registers allocated in the subtree
 }
 
 // NewNode creates a new Node.
@@ -59,16 +68,21 @@ func NewNode(height int,
 	if len(path) > 0 {
 		p = path.DeepCopy()
 	}
+
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
 		height:    height,
 		path:      p,
 		payload:   pl,
-		hashValue: hashValue,
+		hashValue: make([]byte, 0, common.HashLen),
 		maxDepth:  maxDepth,
 		regCount:  regCount,
 	}
+	n.hashValue = append(n.hashValue, hashValue...)
+	// pad the hash to Hashlen
+	paddingLen := common.HashLen - len(hashValue)
+	n.hashValue = append(n.hashValue, common.EmptyHash[:paddingLen]...)
 	return n
 }
 
@@ -81,11 +95,11 @@ func NewEmptyTreeRoot(height int) *Node {
 		height:    height,
 		path:      nil,
 		payload:   nil,
-		hashValue: nil,
+		hashValue: make([]byte, 0, common.HashLen),
 		maxDepth:  0,
 		regCount:  0,
 	}
-	n.hashValue = n.computeHash()
+	n.hashValue = append(n.hashValue, common.GetDefaultHashForHeight(height)...)
 	return n
 }
 
@@ -101,20 +115,22 @@ func NewLeaf(path ledger.Path,
 	}
 
 	n := &Node{
-		lChild:   nil,
-		rChild:   nil,
-		height:   height,
-		path:     path.DeepCopy(),
-		payload:  payload.DeepCopy(),
-		maxDepth: 0,
-		regCount: regCount,
+		lChild:    nil,
+		rChild:    nil,
+		height:    height,
+		path:      path.DeepCopy(),
+		payload:   payload.DeepCopy(),
+		maxDepth:  0,
+		regCount:  regCount,
+		hashValue: make([]byte, common.HashLen),
 	}
-	n.hashValue = n.computeHash()
+	n.computeAndStoreHash()
 	return n
 }
 
 // NewInterimNode creates a new Node with the provided value and no children.
 // UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
+// UNCHECKED requirement: if lchild != nil then height = lchild.height + 1, and same for rchild
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	var lMaxDepth, rMaxDepth uint16
 	var lRegCount, rRegCount uint64
@@ -128,58 +144,74 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	}
 
 	n := &Node{
-		lChild:   lchild,
-		rChild:   rchild,
-		height:   height,
-		path:     nil,
-		payload:  nil,
-		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
-		regCount: lRegCount + rRegCount,
+		lChild:    lchild,
+		rChild:    rchild,
+		height:    height,
+		path:      nil,
+		payload:   nil,
+		maxDepth:  utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
+		regCount:  lRegCount + rRegCount,
+		hashValue: make([]byte, common.HashLen),
 	}
-	n.hashValue = n.computeHash()
+	n.computeAndStoreHash()
 	return n
 }
 
-// computeHash computes the hashValue for the given Node
-// we kept it this way to stay compatible with the previous versions
-func (n *Node) computeHash() []byte {
+// computeAndStoreHash computes the node's hash value and
+// stores the result in the nodes internal `hashValue` field
+func (n *Node) computeAndStoreHash() {
+	n.computeHash(&n.hashValue)
+}
+
+// computeHash computes the node's hash value and
+// stores the result in the provided byte slice
+func (n *Node) computeHash(result *[]byte) {
 	if n.lChild == nil && n.rChild == nil {
 		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
-		if n.payload != nil {
-			// LEAF node: defined by key-value pair
-			return common.ComputeCompactValue(n.path, n.payload, n.height)
-		}
-		// ROOT NODE: no children, no key-value pair
-		return common.GetDefaultHashForHeight(n.height)
+		common.ComputeCompactValue(result, n.path, n.payload, n.height)
+		return
 	}
 
 	// this is an INTERIOR node at least one of lChild or rChild is not nil.
-	h1 := common.GetDefaultHashForHeight(n.height - 1)
+	var h1, h2 []byte
 	if n.lChild != nil {
 		h1 = n.lChild.Hash()
+	} else {
+		h1 = common.GetDefaultHashForHeight(n.height - 1)
 	}
-	h2 := common.GetDefaultHashForHeight(n.height - 1)
+
 	if n.rChild != nil {
 		h2 = n.rChild.Hash()
+	} else {
+		h2 = common.GetDefaultHashForHeight(n.height - 1)
 	}
-	return common.HashInterNode(h1, h2)
+	common.HashInterNodeIn(result, h1, h2)
 }
 
-func (n *Node) VerifyCachedHash() bool {
+// VerifyCachedHash verifies the hash of a node is valid
+func (n *Node) verifyCachedHashRecursive(computedHash *[]byte) bool {
 	if n.lChild != nil {
-		if !n.lChild.VerifyCachedHash() {
+		if !n.lChild.verifyCachedHashRecursive(computedHash) {
 			return false
 		}
 	}
 	if n.rChild != nil {
-		if !n.rChild.VerifyCachedHash() {
+		if !n.rChild.verifyCachedHashRecursive(computedHash) {
 			return false
 		}
 	}
+
 	if n.hashValue != nil {
-		return bytes.Equal(n.hashValue, n.computeHash())
+		n.computeHash(computedHash)
+		return bytes.Equal(n.hashValue, *computedHash)
 	}
 	return true
+}
+
+// VerifyCachedHash verifies the hash of a node is valid
+func (n *Node) VerifyCachedHash() bool {
+	computedHash := make([]byte, common.HashLen)
+	return n.verifyCachedHashRecursive(&computedHash)
 }
 
 // Hash returns the Node's hash value.
@@ -219,7 +251,7 @@ func (n *Node) RightChild() *Node { return n.rChild }
 // IsLeaf returns true if and only if Node is a LEAF.
 func (n *Node) IsLeaf() bool {
 	// Per definition, a node is a leaf if and only if it has defined path
-	return n.path != nil && len(n.path) > 0
+	return len(n.path) > 0
 }
 
 // FmtStr provides formatted string representation of the Node and sub tree
@@ -243,19 +275,19 @@ func (n *Node) FmtStr(prefix string, subpath string) string {
 
 // AllPayloads returns the payload of this node and all payloads of the subtrie
 func (n *Node) AllPayloads() []ledger.Payload {
-	payloads := make([]ledger.Payload, 0)
+	return n.appendSubtreePayloads([]ledger.Payload{})
+}
+
+// appendSubtreePayloads appends the payloads of the subtree with this node as root
+// to the provided Payload slice. Follows same pattern as Go's native append method.
+func (n *Node) appendSubtreePayloads(result []ledger.Payload) []ledger.Payload {
+	if n == nil {
+		return result
+	}
 	if n.IsLeaf() {
-		payloads = append(payloads, *n.Payload())
+		return append(result, *n.Payload())
 	}
-
-	if lChild := n.LeftChild(); lChild != nil {
-		cp := lChild.AllPayloads()
-		payloads = append(payloads, cp...)
-	}
-
-	if rChild := n.RightChild(); rChild != nil {
-		cp := rChild.AllPayloads()
-		payloads = append(payloads, cp...)
-	}
-	return payloads
+	result = n.lChild.appendSubtreePayloads(result)
+	result = n.rChild.appendSubtreePayloads(result)
+	return result
 }
