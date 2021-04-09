@@ -64,6 +64,51 @@ func mockResultsByIDs(results *storage.ExecutionResults, list []*flow.ExecutionR
 	}
 }
 
+// mockReceiptsBlockID is a test helper that mocks the execution receipts mempool on ByBlockID method
+// that returns two list of receipts for given block ID.
+// First set of receipts are agree receipts, that have the same result ID as the given result.
+// Second set of receipts are disagree receipts, that have a different result ID as the given result.
+//
+// It also returns the list of distinct executor node identities for all those receipts.
+func mockReceiptsBlockID(t *testing.T,
+	blockID flow.Identifier,
+	receipts *storage.ExecutionReceipts,
+	result *flow.ExecutionResult,
+	agrees int,
+	disagrees int) (flow.ExecutionReceiptList, flow.ExecutionReceiptList, flow.IdentityList, flow.IdentityList) {
+
+	agreeReceipts := flow.ExecutionReceiptList{}
+	disagreeReceipts := flow.ExecutionReceiptList{}
+	agreeExecutors := flow.IdentityList{}
+	disagreeExecutors := flow.IdentityList{}
+
+	for i := 0; i < agrees; i++ {
+		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
+		require.NotContains(t, agreeExecutors.NodeIDs(), receipt.ExecutorID)
+		agreeExecutors = append(agreeExecutors, unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleExecution),
+			unittest.WithNodeID(receipt.ExecutorID)))
+		agreeReceipts = append(agreeReceipts, receipt)
+	}
+
+	for i := 0; i < disagrees; i++ {
+		disagreeResult := unittest.ExecutionResultFixture()
+		require.NotEqual(t, disagreeResult.ID(), result.ID())
+
+		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(disagreeResult))
+		require.NotContains(t, disagreeExecutors.NodeIDs(), receipt.ExecutorID)
+		disagreeExecutors = append(disagreeExecutors, unittest.IdentityFixture(
+			unittest.WithRole(flow.RoleExecution),
+			unittest.WithNodeID(receipt.ExecutorID)))
+		disagreeReceipts = append(disagreeReceipts, receipt)
+	}
+
+	all := append(agreeReceipts, disagreeReceipts...)
+
+	receipts.On("ByBlockID", blockID).Return(all, nil)
+	return agreeReceipts, disagreeReceipts, agreeExecutors, disagreeExecutors
+}
+
 // mockPendingChunksAdd mocks the add method of pending chunks for expecting only the specified list of chunk statuses.
 // Each chunk status should be added only once.
 // It should return the specified added boolean variable as the result of mocking.
