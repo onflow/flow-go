@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"fmt"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,10 +35,6 @@ type ClusterEpochTestSuite struct {
 	qcAddress    sdk.Address
 	qcAccountKey *sdk.AccountKey
 	qcSigner     sdkcrypto.Signer
-}
-
-func TestClusterEpoch(t *testing.T) {
-	suite.Run(t, new(ClusterEpochTestSuite))
 }
 
 // SetupTest creates an instance of the emulated chain and deploys the EpochQC contract
