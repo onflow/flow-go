@@ -42,7 +42,7 @@ func NewRootQCVoter(
 		signer: signer,
 		state:  state,
 		client: client,
-		wait:   time.Second * 10,
+		wait:   time.Second * 1,
 	}
 	return voter
 }

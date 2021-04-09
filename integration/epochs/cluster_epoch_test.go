@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -104,7 +105,7 @@ func (s *ClusterEpochTestSuite) PublishVoter() {
 	// sign and publish voter transaction
 	publishVoterTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishVoterScript(s.env)).
-		SetGasLimit(100).
+		SetGasLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -121,45 +122,28 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 	// submit admin transaction to start voting
 	startVotingTx := sdk.NewTransaction().
 		SetScript(templates.GenerateStartVotingScript(s.env)).
-		SetGasLimit(100).
+		SetGasLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.qcAddress)
 
-	clusterIndices := make([]cadence.Value, clusterCount)
-	clusterNodeWeights := make([]cadence.Value, clusterCount)
-	clusterNodeIDs := make([]cadence.Value, clusterCount)
+	numberOfClusters := 1
+	numberOfNodesPerCluster := 1
+	clusterNodeIDStrings := make([][]string, numberOfClusters)
 
-	// for each cluster add node ids to transaction arguments
-	for index, cluster := range clustering {
-
-		// create cadence value
-		clusterIndices = append(clusterIndices, cadence.NewUInt16(uint16(index)))
-
-		// create list of string node ids
-		nodeIDs := make([]cadence.Value, nodesPerCluster)
-		nodeWeights := make([]cadence.Value, nodesPerCluster)
-
-		for _, node := range cluster {
-			nodeIDs = append(nodeIDs, cadence.NewString(node.NodeID.String()))
-			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.Stake))
-		}
-
-		clusterNodeIDs[index] = cadence.NewArray(nodeIDs)
-		clusterNodeWeights[index] = cadence.NewArray(nodeWeights)
-	}
+	clusters := initClusters(clusterNodeIDStrings, numberOfClusters, numberOfNodesPerCluster)
 
 	// add cluster indicies to tx argument
-	err := startVotingTx.AddArgument(cadence.NewArray(clusterIndices))
+	err := startVotingTx.AddArgument(cadence.NewArray(clusters[0]))
 	require.NoError(s.T(), err)
 
 	// add cluster node ids to tx argument
-	err = startVotingTx.AddArgument(cadence.NewArray(clusterNodeIDs))
+	err = startVotingTx.AddArgument(cadence.NewArray(clusters[1]))
 	require.NoError(s.T(), err)
 
 	// add cluster weight to tx argument
-	err = startVotingTx.AddArgument(cadence.NewArray(clusterNodeWeights))
+	err = startVotingTx.AddArgument(cadence.NewArray(clusters[2]))
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(startVotingTx,
@@ -168,27 +152,25 @@ func (s *ClusterEpochTestSuite) StartVoting(clustering flow.ClusterList, cluster
 }
 
 // CreateVoterResource creates the Voter resource in cadence for a cluster node
-func (s *ClusterEpochTestSuite) CreateVoterResource(clusterNodes []*ClusterNode) {
+func (s *ClusterEpochTestSuite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier, nodeSigner sdkcrypto.Signer) {
 
-	for _, node := range clusterNodes {
-		registerVoterTx := sdk.NewTransaction().
-			SetScript(templates.GenerateCreateVoterScript(s.env)).
-			SetGasLimit(100).
-			SetProposalKey(s.blockchain.ServiceKey().Address,
-				s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
-			SetPayer(s.blockchain.ServiceKey().Address).
-			AddAuthorizer(node.Address)
+	registerVoterTx := sdk.NewTransaction().
+		SetScript(templates.GenerateCreateVoterScript(s.env)).
+		SetGasLimit(100).
+		SetProposalKey(s.blockchain.ServiceKey().Address,
+			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address).
+		AddAuthorizer(address)
 
-		err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
-		require.NoError(s.T(), err)
+	err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
+	require.NoError(s.T(), err)
 
-		err = registerVoterTx.AddArgument(cadence.NewString(node.NodeID.String()))
-		require.NoError(s.T(), err)
+	err = registerVoterTx.AddArgument(cadence.NewString(nodeID.String()))
+	require.NoError(s.T(), err)
 
-		s.SignAndSubmit(registerVoterTx,
-			[]sdk.Address{s.blockchain.ServiceKey().Address, node.Address},
-			[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), node.Signer})
-	}
+	s.SignAndSubmit(registerVoterTx,
+		[]sdk.Address{s.blockchain.ServiceKey().Address, address},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), nodeSigner})
 }
 
 func (s *ClusterEpochTestSuite) StopVoting() {
@@ -234,11 +216,42 @@ func (s *ClusterEpochTestSuite) SignAndSubmit(tx *sdk.Transaction, signerAddress
 		} else {
 			err := tx.SignPayload(signerAddress, 0, signer)
 			require.NoError(s.T(), err)
-
 		}
 	}
 
 	// submit transaction
 	err := s.emulatorClient.Submit(tx)
 	require.NoError(s.T(), err)
+}
+
+// This function initializes Cluster records in order to pass the cluster information
+// as an argument to the startVoting transaction
+func initClusters(clusterNodeIDStrings [][]string, numberOfClusters, numberOfNodesPerCluster int) [][]cadence.Value {
+	clusterIndices := make([]cadence.Value, numberOfClusters)
+	clusterNodeIDs := make([]cadence.Value, numberOfClusters)
+	clusterNodeWeights := make([]cadence.Value, numberOfClusters)
+
+	for i := 0; i < numberOfClusters; i++ {
+
+		clusterIndices[i] = cadence.NewUInt16(uint16(i))
+
+		nodeIDs := make([]cadence.Value, numberOfNodesPerCluster)
+		nodeWeights := make([]cadence.Value, numberOfNodesPerCluster)
+
+		for j := 0; j < numberOfNodesPerCluster; j++ {
+			nodeID := fmt.Sprintf("%064d", i*numberOfNodesPerCluster+j)
+
+			nodeIDs[j] = cadence.NewString(nodeID)
+
+			// default weight per node
+			nodeWeights[j] = cadence.NewUInt64(uint64(100))
+
+		}
+
+		clusterNodeIDs[i] = cadence.NewArray(nodeIDs)
+		clusterNodeWeights[i] = cadence.NewArray(nodeWeights)
+
+	}
+
+	return [][]cadence.Value{clusterIndices, clusterNodeIDs, clusterNodeWeights}
 }
