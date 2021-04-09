@@ -18,8 +18,6 @@ import (
 var (
 	flagExecutionStateDir string
 	flagOutputDir         string
-	flagBlockHash         string
-	flagDatadir           string
 	flagStateCommitment   string
 )
 
