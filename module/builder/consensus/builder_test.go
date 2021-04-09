@@ -51,9 +51,8 @@ type BuilderSuite struct {
 
 	// storage for dbs
 	headers map[flow.Identifier]*flow.Header
-	//heights map[uint64]*flow.Header
-	index  map[flow.Identifier]*flow.Index
-	blocks map[flow.Identifier]*flow.Block
+	index   map[flow.Identifier]*flow.Index
+	blocks  map[flow.Identifier]*flow.Block
 
 	lastSeal *flow.Seal
 
