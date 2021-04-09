@@ -2,6 +2,7 @@ package approvals
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/mempool"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -24,6 +25,7 @@ type resultApprovalProcessor struct {
 	assigner                             module.ChunkAssigner
 	state                                protocol.State
 	verifier                             module.Verifier
+	seals                                mempool.IncorporatedResultSeals
 	requiredApprovalsForSealConstruction uint
 }
 
@@ -54,7 +56,8 @@ func (p *resultApprovalProcessor) getCollector(resultID flow.Identifier) *Assign
 func (p *resultApprovalProcessor) createCollector(resultID flow.Identifier) *AssignmentCollector {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.verifier, p.requiredApprovalsForSealConstruction)
+	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier,
+		p.requiredApprovalsForSealConstruction)
 	p.collectors[resultID] = collector
 	return collector
 }

@@ -1,6 +1,8 @@
 package approvals
 
 import (
+	"fmt"
+	"github.com/onflow/flow-go/module/mempool"
 	"sync"
 
 	"github.com/onflow/flow-go/engine"
@@ -8,44 +10,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type SealingRecord struct {
-	// aggregated signature for every chunk with sufficient number of approvals
-	AggregatedSignatures []flow.AggregatedSignature
-
-	// SufficientApprovalsForSealing: True iff all chunks in the result have
-	// sufficient approvals
-	SufficientApprovalsForSealing bool
-}
-
-func NewRecordWithSufficientApprovals(signatures map[uint64]flow.AggregatedSignature) *SealingRecord {
-	sigs := make([]flow.AggregatedSignature, len(signatures))
-	for chunkIndex, sig := range signatures {
-		sigs[chunkIndex] = sig
-	}
-	return &SealingRecord{
-		AggregatedSignatures:          sigs,
-		SufficientApprovalsForSealing: true,
-	}
-}
-
-func NewRecordWithInSufficientApprovals() *SealingRecord {
-	return &SealingRecord{
-		AggregatedSignatures:          nil,
-		SufficientApprovalsForSealing: false,
-	}
-}
-
 type ApprovalCollector struct {
 	incorporatedBlockID                  flow.Identifier
+	incorporatedResult                   *flow.IncorporatedResult
 	numberOfChunks                       int
 	chunkCollectors                      []*ChunkApprovalCollector
 	assignmentAuthorizedVerifiers        map[flow.Identifier]struct{}
 	requiredApprovalsForSealConstruction uint                                // min number of approvals required for constructing a candidate seal
 	aggregatedSignatures                 map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
 	lock                                 sync.RWMutex                        // lock for modifying aggregatedSignatures
+	seals                                mempool.IncorporatedResultSeals     // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment,
+func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals,
 	authorizedVerifiers map[flow.Identifier]struct{}, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
@@ -58,11 +35,13 @@ func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.As
 	}
 	return &ApprovalCollector{
 		incorporatedBlockID:                  result.IncorporatedBlockID,
+		incorporatedResult:                   result,
 		numberOfChunks:                       result.Result.Chunks.Len(),
 		chunkCollectors:                      chunkCollectors,
 		assignmentAuthorizedVerifiers:        authorizedVerifiers,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		aggregatedSignatures:                 make(map[uint64]flow.AggregatedSignature, result.Result.Chunks.Len()),
+		seals:                                seals,
 	}
 }
 
@@ -73,35 +52,75 @@ func (c *ApprovalCollector) hasEnoughApprovals(chunkIndex uint64) bool {
 	return found
 }
 
-func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) (*SealingRecord, error) {
+func (c *ApprovalCollector) sealResult() error {
+	// get final state of execution result
+	finalState, ok := c.incorporatedResult.Result.FinalStateCommitment()
+	if !ok {
+		// message correctness should have been checked before: failure here is an internal implementation bug
+		return fmt.Errorf("failed to get final state commitment from Execution Result")
+	}
+
+	aggregatedSigs := make([]flow.AggregatedSignature, c.numberOfChunks)
+
+	c.lock.RLock()
+	for chunkIndex, sig := range c.aggregatedSignatures {
+		aggregatedSigs[chunkIndex] = sig
+	}
+	c.lock.RUnlock()
+
+	// TODO: Check SPoCK proofs
+
+	// generate & store seal
+	seal := &flow.Seal{
+		BlockID:                c.incorporatedResult.Result.BlockID,
+		ResultID:               c.incorporatedResult.Result.ID(),
+		FinalState:             finalState,
+		AggregatedApprovalSigs: aggregatedSigs,
+	}
+
+	// we don't care if the seal is already in the mempool
+	_, err := c.seals.Add(&flow.IncorporatedResultSeal{
+		IncorporatedResult: c.incorporatedResult,
+		Seal:               seal,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to store IncorporatedResultSeal in mempool: %w", err)
+	}
+
+	return nil
+}
+
+func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	chunkIndex := approval.Body.ChunkIndex
 	if chunkIndex >= uint64(len(c.chunkCollectors)) {
-		return nil, engine.NewInvalidInputErrorf("approval collector chunk index out of range: %v", chunkIndex)
+		return engine.NewInvalidInputErrorf("approval collector chunk index out of range: %v", chunkIndex)
 	}
 	// there is no need to process approval if we have already enough info for sealing
 	if c.hasEnoughApprovals(chunkIndex) {
-		return NewRecordWithInSufficientApprovals(), nil
+		return nil
 	}
 
 	collector := c.chunkCollectors[chunkIndex]
 	status := collector.ProcessApproval(approval)
 	if status.numberOfApprovals >= c.requiredApprovalsForSealConstruction {
 		c.collectAggregatedSignature(chunkIndex, collector)
-		return c.checkSealingStatus(), nil
+		return c.trySealResult()
 	}
 
-	return NewRecordWithInSufficientApprovals(), nil
+	return nil
 }
 
-func (c *ApprovalCollector) checkSealingStatus() *SealingRecord {
+func (c *ApprovalCollector) trySealResult() error {
 	c.lock.RLock()
-	defer c.lock.RUnlock()
+	collectedSignatures := len(c.aggregatedSignatures)
+	c.lock.RUnlock()
 
-	if len(c.aggregatedSignatures) == c.numberOfChunks {
-		return NewRecordWithSufficientApprovals(c.aggregatedSignatures)
+	if collectedSignatures < c.numberOfChunks {
+		// some signatures are missing
+		return nil
 	}
 
-	return NewRecordWithInSufficientApprovals()
+	return c.sealResult()
 }
 
 func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, collector *ChunkApprovalCollector) {
