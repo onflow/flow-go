@@ -393,7 +393,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
 	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts)
+	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
