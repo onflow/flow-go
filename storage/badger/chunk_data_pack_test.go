@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +17,7 @@ import (
 
 func TestChunkDataPack(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := badgerstorage.NewChunkDataPacks(db)
+		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, 100)
 
 		// attempt to get an invalid
 		_, err := store.ByChunkID(unittest.IdentifierFixture())

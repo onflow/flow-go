@@ -110,7 +110,20 @@ func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 	}
 }
 
-// Put will add an resource to the cache with the given ID.
+func (c *Cache) Remove(key interface{}) {
+	c.cache.Remove(key)
+}
+
+// Insert will add an resource directly to the cache with the given ID
+func (c *Cache) Insert(key interface{}, resource interface{}) {
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(key, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
+}
+
+// Put will return Badger tx which adds an resource to the cache with the given ID.
 func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
@@ -120,12 +133,7 @@ func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) err
 			return fmt.Errorf("could not store resource: %w", err)
 		}
 
-		// cache the resource and eject least recently used one if we reached limit
-		evicted := c.cache.Add(key, resource)
-		if !evicted {
-			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-		}
-
+		c.Insert(key, resource)
 		return nil
 	}
 }
