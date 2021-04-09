@@ -3,10 +3,11 @@ package common
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go/fvm"
 	"testing"
 	"time"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/flow-go/fvm"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -23,13 +24,18 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	collectionConfigs := []func(*testnet.NodeConfig){
+	baseCollectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
-	consensusConfigs := append(collectionConfigs,
+	collectionConfigs := append(baseCollectionConfigs,
+		testnet.WithAdditionalFlag("--access-address=asd.asd"),
+		testnet.WithAdditionalFlag("--qc-contract-address=asd.asd"),
+	)
+
+	consensusConfigs := append(baseCollectionConfigs,
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.DebugLevel),
@@ -109,7 +115,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetReferenceBlockID(sdk.Identifier(root.ID())).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress)
-	
+
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
 	require.NoError(t, err)
@@ -173,7 +179,6 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	fundCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), fundAccountTx.ID())
 	require.NoError(t, err)
 	t.Log(fundCreationTxRes)
-
 
 	accountClient, err := testnet.NewClientWithKey(
 		fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]),
