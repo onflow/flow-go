@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -635,8 +634,6 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	}
 
 	for _, b := range blocks {
-		fmt.Println("storing block ", b.ID())
-
 		bs.storeBlock(b)
 	}
 	bs.sealDB = &storage.Seals{}
@@ -648,7 +645,6 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
 
-		fmt.Println("building on block ", blocks[4].ID())
 		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
 		bs.Require().NoError(err)
 		bs.Assert().Empty(bs.assembled.Seals, "should not have included seal for conflicting execution fork")
@@ -661,7 +657,6 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
 		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
 
-		fmt.Println("building on block ", blocks[4].ID())
 		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
 		bs.Require().NoError(err)
 		bs.Assert().ElementsMatch([]*flow.Seal{sealResultA_1.Seal, sealResultB_1.Seal}, bs.assembled.Seals, "valid fork should have been sealed")
@@ -1201,9 +1196,5 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatingBlockID),
 	)
 	pendingSeals[incorporatedResultSeal.ID()] = incorporatedResultSeal
-
-	fmt.Println("> adding result seal with result ID            ", result.ID())
-	fmt.Println("  adding result seal with incorporated block ID", incorporatingBlockID)
-
 	return incorporatedResultSeal
 }

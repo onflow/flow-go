@@ -8,13 +8,12 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/state"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -306,9 +305,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 				result.BlockID,
 				result,
 			)
-
-			fmt.Println("> looking for result seal with result ID            ", result.ID())
-			fmt.Println("  looking for result seal with incorporated block ID", result.BlockID)
 
 			// enforce condition (0):
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
