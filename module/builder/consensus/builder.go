@@ -307,6 +307,9 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 				result,
 			)
 
+			fmt.Println("> looking for result seal with result ID            ", result.ID())
+			fmt.Println("  looking for result seal with incorporated block ID", result.BlockID)
+
 			// enforce condition (0):
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
 			if !ok {
@@ -350,26 +353,28 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		if uint(len(seals)) >= b.cfg.maxSealCount {
 			break
 		}
-		// stop if we don't have any seals for the immediately next unsealed block
-		sealsForNextBlock, ok := sealsSuperset[lastSealedHeight+1]
+
+		// enforce condition (4):
+		candidateSeal, ok := connectingSeal(sealsSuperset[lastSealedHeight+1], lastSeal)
 		if !ok {
 			break
 		}
-
-		// enforce condition (4):
-		for _, candidateSeal := range sealsForNextBlock {
-			if candidateSeal.IncorporatedResult.Result.PreviousResultID != lastSeal.ResultID {
-				continue
-			}
-
-			// found a seal for a result that is computed from the already sealed result
-			seals = append(seals, candidateSeal.Seal)
-			lastSeal = candidateSeal.Seal
-			lastSealedHeight += 1
-			break
-		}
+		seals = append(seals, candidateSeal)
+		lastSeal = candidateSeal
+		lastSealedHeight += 1
 	}
 	return seals, nil
+}
+
+// connectingSeal looks through `sealsForNextBlock`. It checks whether the
+// sealed result directly descends from the lastSealed result.
+func connectingSeal(sealsForNextBlock []*flow.IncorporatedResultSeal, lastSealed *flow.Seal) (*flow.Seal, bool) {
+	for _, candidateSeal := range sealsForNextBlock {
+		if candidateSeal.IncorporatedResult.Result.PreviousResultID == lastSealed.ResultID {
+			return candidateSeal.Seal, true
+		}
+	}
+	return nil, false
 }
 
 type InsertableReceipts struct {

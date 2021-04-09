@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -51,9 +52,9 @@ type BuilderSuite struct {
 
 	// storage for dbs
 	headers map[flow.Identifier]*flow.Header
-	heights map[uint64]*flow.Header
-	index   map[flow.Identifier]*flow.Index
-	blocks  map[flow.Identifier]*flow.Block
+	//heights map[uint64]*flow.Header
+	index  map[flow.Identifier]*flow.Index
+	blocks map[flow.Identifier]*flow.Block
 
 	lastSeal *flow.Seal
 
@@ -84,7 +85,7 @@ type BuilderSuite struct {
 
 func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 	bs.headers[block.ID()] = block.Header
-	bs.heights[block.Header.Height] = block.Header
+	//bs.heights[block.Header.Height] = block.Header
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
 }
@@ -649,6 +650,8 @@ func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
 //       from the sealed result (we verify checking of the payload seals with respect to each other)
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (bs *BuilderSuite) TestValidatePayload_ExecutionDisconnected() {
+	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
+
 	blockF := bs.blocks[bs.finalID]
 	blocks := []*flow.Block{blockF}
 	blocks = append(blocks, unittest.ChainFixtureFrom(4, blockF.Header)...)              // elements  [F, A, B, C, D]
@@ -661,7 +664,8 @@ func (bs *BuilderSuite) TestValidatePayload_ExecutionDisconnected() {
 			Receipts: []*flow.ExecutionReceiptMeta{receiptChain1[i-1].Meta(), receiptChain2[i-1].Meta()},
 		})
 	}
-	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[0].ExecutionResult))
+	sealedResult := receiptChain1[0].ExecutionResult
+	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
 	blocks[4].SetPayload(flow.Payload{ // set payload for block D
 		Seals: []*flow.Seal{sealF},
 	})
@@ -673,11 +677,14 @@ func (bs *BuilderSuite) TestValidatePayload_ExecutionDisconnected() {
 	}
 
 	for _, b := range blocks {
+		fmt.Println("storing block ", b.ID())
+
 		bs.storeBlock(b)
 	}
 	bs.sealDB = &storage.Seals{}
 	bs.build.seals = bs.sealDB
 	bs.sealDB.On("ByBlockID", mock.Anything).Return(sealF, nil)
+	bs.resultByID[sealedResult.ID()] = &sealedResult
 
 	//// seals for inclusion in X
 	//sealA1 := unittest.Seal.Fixture(unittest.Seal.WithResult(&receiptChain1[1].ExecutionResult))
@@ -688,10 +695,40 @@ func (bs *BuilderSuite) TestValidatePayload_ExecutionDisconnected() {
 	bs.T().Run("verify test setup by providing seal that can be included", func(t *testing.T) {
 		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 		sealResultA_1 := storeSealForIncorporatedResult(&receiptChain1[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		//storeSealForIncorporatedResult(&receiptChain1[0].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		//storeSealForIncorporatedResult(&receiptChain1[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		//storeSealForIncorporatedResult(&receiptChain1[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		//storeSealForIncorporatedResult(&receiptChain2[0].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		//storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		//storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
 
-		_, err := bs.build.BuildOn(bs.parentID, bs.setter)
+		fmt.Println("building on block ", blocks[4].ID())
+		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
 		bs.Require().NoError(err)
-		bs.Assert().ElementsMatch([]*flow.Seal{sealResultA_1.Seal}, bs.assembled.Seals, "should have included only beginning of broken chain")
+		bs.Assert().ElementsMatch([]*flow.Seal{sealResultA_1.Seal}, bs.assembled.Seals, "seal sealResultA_1 should have been included")
+	})
+
+	bs.T().Run("verify that execution fork conflicting with sealed result is not sealed", func(t *testing.T) {
+		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+
+		fmt.Println("building on block ", blocks[4].ID())
+		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
+		bs.Require().NoError(err)
+		bs.Assert().Empty(bs.assembled.Seals, "should not have included seal for conflicting execution fork")
+	})
+
+	bs.T().Run("verify that multiple execution forks are properly handled", func(t *testing.T) {
+		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+		sealResultA_1 := storeSealForIncorporatedResult(&receiptChain1[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		sealResultB_1 := storeSealForIncorporatedResult(&receiptChain1[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+
+		fmt.Println("building on block ", blocks[4].ID())
+		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
+		bs.Require().NoError(err)
+		bs.Assert().ElementsMatch([]*flow.Seal{sealResultA_1.Seal, sealResultB_1.Seal}, bs.assembled.Seals, "valid fork should have been sealed")
 	})
 
 	//// F <- A{..} <- B{..} <- C{..} <- D{..} <- X{Seal for Result[A]_2}
@@ -1247,7 +1284,7 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 	// is the block the result pertains to (here parentBlock). In later
 	// development phases, we will change the logic such that IncorporatedBlockID
 	// references the block which actually incorporates the result.
-	// Then, the following line can simnply be removed
+	// Then, the following line can simply be removed
 	incorporatingBlockID = result.BlockID
 
 	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
@@ -1255,6 +1292,9 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatingBlockID),
 	)
 	pendingSeals[incorporatedResultSeal.ID()] = incorporatedResultSeal
+
+	fmt.Println("> adding result seal with result ID            ", result.ID())
+	fmt.Println("  adding result seal with incorporated block ID", incorporatingBlockID)
 
 	return incorporatedResultSeal
 }
