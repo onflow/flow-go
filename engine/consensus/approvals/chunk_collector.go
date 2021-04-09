@@ -14,10 +14,20 @@ type ChunkProcessingStatus struct {
 // ChunkApprovalCollector implements logic for checking chunks against assignments as
 // well as accumulating signatures of already checked approvals.
 type ChunkApprovalCollector struct {
-	assignment          map[flow.Identifier]struct{}
-	authorizedVerifiers map[flow.Identifier]struct{}
-	chunkApprovals      *flow.SignatureCollector
-	lock                sync.Mutex // lock to protect `chunkApprovals`
+	assignment          map[flow.Identifier]struct{} // set of verifiers that were assigned to current chunk
+	authorizedVerifiers map[flow.Identifier]struct{} // set of authorized verifiers that are authorized for current incorporated result
+	chunkApprovals      *flow.SignatureCollector     // accumulator of signatures for current collector
+	lock                sync.Mutex                   // lock to protect `chunkApprovals`
+}
+
+func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{},
+	authorizedVerifiers map[flow.Identifier]struct{}) *ChunkApprovalCollector {
+	return &ChunkApprovalCollector{
+		assignment:          assignment,
+		authorizedVerifiers: authorizedVerifiers,
+		chunkApprovals:      flow.NewSignatureCollector(),
+		lock:                sync.Mutex{},
+	}
 }
 
 // ProcessApproval performs processing and bookkeeping of single approval
@@ -48,14 +58,4 @@ func (c *ChunkApprovalCollector) GetAggregatedSignature() flow.AggregatedSignatu
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return c.chunkApprovals.ToAggregatedSignature()
-}
-
-func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{},
-	authorizedVerifiers map[flow.Identifier]struct{}) *ChunkApprovalCollector {
-	return &ChunkApprovalCollector{
-		assignment:          assignment,
-		authorizedVerifiers: authorizedVerifiers,
-		chunkApprovals:      flow.NewSignatureCollector(),
-		lock:                sync.Mutex{},
-	}
 }

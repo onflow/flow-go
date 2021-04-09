@@ -2,14 +2,14 @@ package approvals
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/state/protocol"
 	"sync"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // AssignmentCollector encapsulates the processing of approvals for one
@@ -98,7 +98,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	}
 
 	authorizedVerifiers := make(map[flow.Identifier]struct{})
-	for nodeID, _ := range authorizedVerifiersTmp {
+	for nodeID := range authorizedVerifiersTmp {
 		authorizedVerifiers[nodeID] = struct{}{}
 	}
 
@@ -111,6 +111,9 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	defer c.lock.Unlock()
 	c.collectors[incorporatedResult.IncorporatedBlockID] = NewApprovalCollector(incorporatedResult, assignment, c.seals,
 		authorizedVerifiers, c.requiredApprovalsForSealConstruction)
+
+	// TODO: process approvals that were stored in cache
+
 	return nil
 }
 
@@ -157,13 +160,11 @@ func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) er
 	return nil
 }
 
-func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) error {
+func (c *AssignmentCollector) processApproval(approval *flow.ResultApproval) error {
 	err := c.validateApproval(approval)
 	if err != nil {
 		return fmt.Errorf("could not validate approval: %w", err)
 	}
-
-	// TODO: add approval into cache before processing.
 
 	for _, collector := range c.allCollectors() {
 		err := collector.ProcessApproval(approval)
@@ -171,5 +172,12 @@ func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) e
 			return fmt.Errorf("could not process assignment for collector %v: %w", collector.incorporatedBlockID, err)
 		}
 	}
+
 	return nil
+}
+
+func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) error {
+	// TODO: add approval into cache before processing.
+
+	return c.processApproval(approval)
 }

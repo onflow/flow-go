@@ -2,14 +2,17 @@ package approvals
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/mempool"
 	"sync"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
+// ApprovalCollector is responsible for distributing work to chunk collectors,
+// collecting aggregated signatures for chunks that reached seal construction threshold,
+// creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
 	incorporatedBlockID                  flow.Identifier
 	incorporatedResult                   *flow.IncorporatedResult

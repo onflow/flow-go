@@ -1,14 +1,16 @@
 package approvals
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 func TestApprovalCollector(t *testing.T) {
@@ -45,7 +47,7 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_SealResult() {
 		chunk := s.Chunks[i]
 		var err error
 		sigCollector := flow.NewSignatureCollector()
-		for verID, _ := range s.AuthorizedVerifiers {
+		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
 			err = s.collector.ProcessApproval(approval)
 			require.NoError(s.T(), err)

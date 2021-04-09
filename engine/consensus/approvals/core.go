@@ -2,11 +2,11 @@ package approvals
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/mempool"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
