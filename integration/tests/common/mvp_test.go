@@ -30,9 +30,10 @@ func TestMVP_Network(t *testing.T) {
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
+	// TODO: replace these with actual values. Curerntly using random values as they are not required by the MVP tests
 	collectionConfigs := append(baseCollectionConfigs,
-		testnet.WithAdditionalFlag("--access-address=asd.asd"),
-		testnet.WithAdditionalFlag("--qc-contract-address=asd.asd"),
+		testnet.WithAdditionalFlag("--access-address=null"),
+		testnet.WithAdditionalFlag("--qc-contract-address=null"),
 	)
 
 	consensusConfigs := append(baseCollectionConfigs,
