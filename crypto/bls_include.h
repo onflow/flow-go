@@ -11,8 +11,8 @@
 // Signature, Public key and Private key lengths 
 #define FULL_SIGNATURE_LEN  G1_BYTES
 #define FULL_PK_LEN         G2_BYTES
-#define SIGNATURE_LEN       (FULL_SIGNATURE_LEN/(SERIALIZATION+1))
-#define PK_LEN              (FULL_PK_LEN/(SERIALIZATION+1))
+#define SIGNATURE_LEN       (FULL_SIGNATURE_LEN/(G1_SERIALIZATION+1))
+#define PK_LEN              (FULL_PK_LEN/(G2_SERIALIZATION+1))
 #define SK_BITS             (Fr_BITS)
 #define SK_LEN              BITS_TO_BYTES(SK_BITS)    
 

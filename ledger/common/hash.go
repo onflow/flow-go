@@ -11,12 +11,15 @@ import (
 )
 
 // default value and default hash value for a default node
-var defaultLeafHash []byte
+var defaultLeafHash hash.Hash
 
 const defaultHashLen = 257
 
 // HashLen is the default output hash length in bytes
-const HashLen = 32
+const HashLen = hash.HashLenSha3_256
+
+// EmptyHash is a hash with all zeroes, used for padding
+var EmptyHash [HashLen]byte
 
 // we are currently supporting paths of a size up to 32 bytes. I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256. A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
 var defaultHashes [defaultHashLen][]byte
@@ -25,7 +28,6 @@ var defaultHashes [defaultHashLen][]byte
 var log zerolog.Logger
 
 func init() {
-
 	log = zerolog.New(os.Stderr)
 
 	hasher := hash.NewSHA3_256()
@@ -58,6 +60,7 @@ func GetDefaultHashForHeight(height int) []byte {
 //
 // path must be a 32 byte slice.
 // note that we don't include the keys here as they are already included in the path
+// TODO: delete this function after refactoring ptrie
 func HashLeaf(path []byte, value []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
 	if len(path) != HashLen {
@@ -67,15 +70,16 @@ func HashLeaf(path []byte, value []byte) []byte {
 		_, _ = hasher.Write(value)
 		return hasher.SumHash()
 	}
-	var out [HashLen]byte
+	out := make([]byte, HashLen)
 	hasher := new256()
 	hasher.hash256Plus(&out, path, value) // path is always 256 bits
-	return out[:]
+	return out
 }
 
 // HashInterNode generates hash value for intermediate nodes (SHA3-256).
 //
 // hash1 and hash2 must each be a 32 byte slice.
+// TODO: delete this function after refactoring ptrie
 func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 	// TODO: this is a sanity check and should be removed soon
 	if len(hash1) != HashLen || len(hash2) != HashLen {
@@ -86,33 +90,72 @@ func HashInterNode(hash1 []byte, hash2 []byte) []byte {
 		_, _ = hasher.Write(hash2)
 		return hasher.SumHash()
 	}
-	var out [HashLen]byte
+	out := make([]byte, HashLen)
 	hasher := new256()
 	hasher.hash256plus256(&out, hash1, hash2) // hash1 and hash2 are 256 bits
-	return out[:]
+	return out
 }
 
-// ComputeCompactValue computes the value for the node considering the sub tree to only include this value and default values.
-func ComputeCompactValue(path []byte, payload *ledger.Payload, nodeHeight int) []byte {
+// HashLeafIn generates hash value for leaf nodes (SHA3-256)
+// and stores the hash value in the provided result slice
+//
+// path must be a 32 byte slice.
+// note that we don't include the keys here as they are already included in the path
+func HashLeafIn(result *[]byte, path []byte, value []byte) {
+	// TODO: this is a sanity check and should be removed soon
+	if len(path) != HashLen {
+		log.Warn().Msgf("HashLeaf path input should be 32 bytes, got %d", len(path))
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(path)
+		_, _ = hasher.Write(value)
+		copy(*result, hasher.SumHash())
+		return
+	}
+	hasher := new256()
+	hasher.hash256Plus(result, path, value) // path is always 256 bits
+}
+
+// HashInterNodeIn generates hash value for intermediate nodes (SHA3-256)
+// and stores the hash value in the provided result slice
+//
+// result slice can be equal to hash1 or hash2.
+// hash1 and hash2 must each be a 32 byte slice.
+func HashInterNodeIn(result *[]byte, hash1 []byte, hash2 []byte) {
+	// TODO: this is a sanity check and should be removed soon
+	if len(hash1) != HashLen || len(hash2) != HashLen {
+		log.Warn().Msgf("HashInterNode inputs should be 32 bytes, got %d and %d",
+			len(hash1), len(hash2))
+		hasher := hash.NewSHA3_256()
+		_, _ = hasher.Write(hash1)
+		_, _ = hasher.Write(hash2)
+		copy(*result, hasher.SumHash())
+		return
+	}
+	hasher := new256()
+	hasher.hash256plus256(result, hash1, hash2) // hash1 and hash2 are 256 bits
+}
+
+// ComputeCompactValue computes the value for the node considering the sub tree
+// to only include this value and default values. It writes the hash result to the result input.
+func ComputeCompactValue(result *[]byte, path []byte, payload *ledger.Payload, nodeHeight int) {
 	// if register is unallocated: return default hash
-	if len(payload.Value) == 0 {
-		return GetDefaultHashForHeight(nodeHeight)
+	if payload == nil || len(payload.Value) == 0 {
+		copy(*result, GetDefaultHashForHeight(nodeHeight))
+		return
 	}
 
 	// register is allocated
 	treeHeight := 8 * len(path)
-	// TODO Change this later to include the key as well
-	// for now is just the value to make it compatible with previous code
-	computedHash := HashLeaf(path, payload.Value) // we first compute the hash of the fully-expanded leaf
-	for h := 1; h <= nodeHeight; h++ {            // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+
+	HashLeafIn(result, path, payload.Value) // we first compute the hash of the fully-expanded leaf
+	for h := 1; h <= nodeHeight; h++ {      // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
 		bit := utils.Bit(path, treeHeight-h)
 		if bit == 1 { // right branching
-			computedHash = HashInterNode(GetDefaultHashForHeight(h-1), computedHash)
+			HashInterNodeIn(result, GetDefaultHashForHeight(h-1), *result)
 		} else { // left branching
-			computedHash = HashInterNode(computedHash, GetDefaultHashForHeight(h-1))
+			HashInterNodeIn(result, *result, GetDefaultHashForHeight(h-1))
 		}
 	}
-	return computedHash
 }

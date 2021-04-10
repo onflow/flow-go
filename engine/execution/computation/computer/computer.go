@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -22,8 +23,15 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+// VirtualMachine runs procedures
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
+}
+
+// ViewCommitter commits views's deltas to the ledger and collects the proofs
+type ViewCommitter interface {
+	// CommitView commits a views' register delta and collects proofs
+	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
 }
 
 // A BlockComputer executes the transactions in a block.
@@ -38,6 +46,7 @@ type blockComputer struct {
 	tracer         module.Tracer
 	log            zerolog.Logger
 	systemChunkCtx fvm.Context
+	committer      ViewCommitter
 }
 
 // NewBlockComputer creates a new block executor.
@@ -47,6 +56,7 @@ func NewBlockComputer(
 	metrics module.ExecutionMetrics,
 	tracer module.Tracer,
 	logger zerolog.Logger,
+	committer ViewCommitter,
 ) (BlockComputer, error) {
 
 	systemChunkCtx := fvm.NewContextFromParent(
@@ -63,6 +73,7 @@ func NewBlockComputer(
 		tracer:         tracer,
 		log:            logger,
 		systemChunkCtx: systemChunkCtx,
+		committer:      committer,
 	}, nil
 }
 
@@ -84,7 +95,7 @@ func (e *blockComputer) ExecuteBlock(
 		span.Finish()
 	}()
 
-	results, err := e.executeBlock(ctx, block, stateView, program)
+	results, err := e.executeBlock(span, block, stateView, program)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -95,111 +106,128 @@ func (e *blockComputer) ExecuteBlock(
 }
 
 func (e *blockComputer) executeBlock(
-	ctx context.Context,
+	blockSpan opentracing.Span,
 	block *entity.ExecutableBlock,
 	stateView state.View,
 	programs *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
-
 	collections := block.Collections()
-
-	var gasUsed uint64
-
-	interactions := make([]*delta.SpockSnapshot, len(collections)+1)
-
-	events := make([]flow.Event, 0)
-	serviceEvents := make([]flow.Event, 0)
-	blockTxResults := make([]flow.TransactionResult, 0)
+	res := &execution.ComputationResult{
+		ExecutableBlock:    block,
+		Events:             make([]flow.Event, 0),
+		ServiceEvents:      make([]flow.Event, 0),
+		TransactionResults: make([]flow.TransactionResult, 0),
+		StateCommitments:   make([]flow.StateCommitment, 0),
+		Proofs:             make([][]byte, 0),
+	}
 
 	var txIndex uint32
+	var err error
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	for i, collection := range collections {
+	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
+	proofs := make([][]byte, 0, len(collections)+1)
 
-		collectionView := stateView.NewChild()
+	bc := blockCommitter{
+		committer: e.committer,
+		blockSpan: blockSpan,
+		tracer:    e.tracer,
+		state:     block.StartState,
+		views:     make(chan state.View, len(collections)+1),
+		callBack: func(state flow.StateCommitment, proof []byte, err error) {
+			if err != nil {
+				panic(err)
+			}
+			stateCommitments = append(stateCommitments, state)
+			proofs = append(proofs, proof)
+		},
+	}
 
-		e.log.Debug().
-			Hex("block_id", logging.Entity(block)).
-			Hex("collection_id", logging.Entity(collection.Guarantee)).
-			Msg("executing collection")
+	go func() {
+		bc.Run()
+		wg.Done()
+	}()
 
-		collEvents, collServiceEvents, txResults, nextIndex, gas, err := e.executeCollection(
-			ctx, txIndex, blockCtx, collectionView, programs, collection,
-		)
+	for _, collection := range collections {
+		colView := stateView.NewChild()
+		txIndex, err = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collection, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
-
-		gasUsed += gas
-
-		txIndex = nextIndex
-		events = append(events, collEvents...)
-		serviceEvents = append(serviceEvents, collServiceEvents...)
-		blockTxResults = append(blockTxResults, txResults...)
-
-		interactions[i] = collectionView.(*delta.View).Interactions()
-
-		err = stateView.MergeView(collectionView)
+		bc.Commit(colView)
+		err = stateView.MergeView(colView)
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
 	}
 
-	// system chunk
-	systemChunkView := stateView.NewChild()
+	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
-
-	var colSpan opentracing.Span
-	colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeSystemCollection)
-	defer colSpan.Finish()
-
-	serviceAddress := e.vmCtx.Chain.ServiceAddress()
-
-	tx := fvm.SystemChunkTransaction(serviceAddress)
-
-	txMetrics := fvm.NewMetricsCollector()
-
-	txEvents, txServiceEvents, txResult, txGas, err := e.executeTransaction(tx, colSpan, txMetrics, systemChunkView, programs, e.systemChunkCtx, txIndex)
+	colView := stateView.NewChild()
+	_, err = e.executeSystemCollection(blockSpan, txIndex, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
-
-	events = append(events, txEvents...)
-	serviceEvents = append(serviceEvents, txServiceEvents...)
-	blockTxResults = append(blockTxResults, txResult)
-	gasUsed += txGas
-	interactions[len(interactions)-1] = systemChunkView.(*delta.View).Interactions()
-
-	err = stateView.MergeView(systemChunkView)
+	bc.Commit(colView)
+	err = stateView.MergeView(colView)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot merge view: %w", err)
 	}
 
-	return &execution.ComputationResult{
-		ExecutableBlock:   block,
-		StateSnapshots:    interactions,
-		Events:            events,
-		ServiceEvents:     serviceEvents,
-		TransactionResult: blockTxResults,
-		GasUsed:           gasUsed,
-		StateReads:        stateView.(*delta.View).ReadsCount(),
-	}, nil
+	// close the views and wait for all views to be committed
+	close(bc.views)
+	wg.Wait()
+	res.StateReads = stateView.(*delta.View).ReadsCount()
+	res.StateCommitments = stateCommitments
+	res.Proofs = proofs
+
+	return res, nil
+}
+
+func (e *blockComputer) executeSystemCollection(
+	blockSpan opentracing.Span,
+	txIndex uint32,
+	collectionView state.View,
+	programs *programs.Programs,
+	res *execution.ComputationResult,
+) (uint32, error) {
+
+	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
+	defer colSpan.Finish()
+
+	serviceAddress := e.vmCtx.Chain.ServiceAddress()
+	tx := fvm.SystemChunkTransaction(serviceAddress)
+	txMetrics := fvm.NewMetricsCollector()
+	err := e.executeTransaction(tx, colSpan, txMetrics, collectionView, programs, e.systemChunkCtx, txIndex, res)
+	txIndex++
+	if err != nil {
+		return txIndex, err
+	}
+	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
+	return txIndex, err
 }
 
 func (e *blockComputer) executeCollection(
-	ctx context.Context,
+	blockSpan opentracing.Span,
 	txIndex uint32,
 	blockCtx fvm.Context,
 	collectionView state.View,
 	programs *programs.Programs,
 	collection *entity.CompleteCollection,
-) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, error) {
+	res *execution.ComputationResult,
+) (uint32, error) {
+
+	e.log.Debug().
+		Hex("block_id", logging.Entity(blockCtx.BlockHeader)).
+		Hex("collection_id", logging.Entity(collection.Guarantee)).
+		Msg("executing collection")
 
 	// call tracing
 	startedAt := time.Now()
-	var colSpan opentracing.Span
-	colSpan, _ = e.tracer.StartSpanFromContext(ctx, trace.EXEComputeCollection)
+	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
 	defer func() {
 		colSpan.SetTag("collection.txCount", len(collection.Transactions))
 		colSpan.LogFields(
@@ -208,43 +236,23 @@ func (e *blockComputer) executeCollection(
 		colSpan.Finish()
 	}()
 
-	var (
-		events        []flow.Event
-		serviceEvents []flow.Event
-		txResults     []flow.TransactionResult
-		gasUsed       uint64
-	)
-
 	txMetrics := fvm.NewMetricsCollector()
-
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics), fvm.WithTracer(e.tracer))
-
 	for _, txBody := range collection.Transactions {
-
-		txEvents, txServiceEvents, txResult, txGasUsed, err :=
-			e.executeTransaction(txBody, colSpan, txMetrics, collectionView, programs, txCtx, txIndex)
-
+		err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, programs, txCtx, txIndex, res)
 		txIndex++
-		events = append(events, txEvents...)
-		serviceEvents = append(serviceEvents, txServiceEvents...)
-		txResults = append(txResults, txResult)
-		gasUsed += txGasUsed
-
 		if err != nil {
-			return nil, nil, nil, txIndex, 0, err
+			return txIndex, err
 		}
 	}
-
+	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 	e.log.Info().Str("collectionID", collection.Guarantee.CollectionID.String()).
 		Str("blockID", collection.Guarantee.ReferenceBlockID.String()).
 		Int("numberOfTransactions", len(collection.Transactions)).
-		Int("numberOfEvents", len(events)).
-		Int("numberOfServiceEvents", len(serviceEvents)).
-		Uint64("totalGasUsed", gasUsed).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
 
-	return events, serviceEvents, txResults, txIndex, gasUsed, nil
+	return txIndex, nil
 }
 
 func (e *blockComputer) executeTransaction(
@@ -255,7 +263,8 @@ func (e *blockComputer) executeTransaction(
 	programs *programs.Programs,
 	ctx fvm.Context,
 	txIndex uint32,
-) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {
+	res *execution.ComputationResult,
+) error {
 
 	startedAt := time.Now()
 	var txSpan opentracing.Span
@@ -284,17 +293,15 @@ func (e *blockComputer) executeTransaction(
 	tx.SetTraceSpan(txSpan)
 
 	err := e.vm.Run(ctx, tx, txView, programs)
+	if err != nil {
+		return fmt.Errorf("failed to execute transaction: %w", err)
+	}
 
 	if e.metrics != nil {
 		e.metrics.TransactionParsed(txMetrics.Parsed())
 		e.metrics.TransactionChecked(txMetrics.Checked())
 		e.metrics.TransactionInterpreted(txMetrics.Interpreted())
 	}
-
-	if err != nil {
-		return nil, nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to execute transaction: %w", err)
-	}
-
 	txResult := flow.TransactionResult{
 		TransactionID: tx.ID,
 	}
@@ -304,7 +311,7 @@ func (e *blockComputer) executeTransaction(
 		e.log.Debug().
 			Hex("tx_id", logging.Entity(txBody)).
 			Str("error_message", tx.Err.Error()).
-			Uint32("error_code", tx.Err.Code()).
+			Uint16("error_code", uint16(tx.Err.Code())).
 			Msg("transaction execution failed")
 	} else {
 		e.log.Debug().
@@ -318,15 +325,42 @@ func (e *blockComputer) executeTransaction(
 	if tx.Err == nil {
 		err := collectionView.MergeView(txView)
 		if err != nil {
-			return nil, nil, txResult, 0, err
+			return err
 		}
-
 	}
+
+	res.AddEvents(tx.Events)
+	res.AddServiceEvents(tx.ServiceEvents)
+	res.AddTransactionResult(&txResult)
+	res.AddGasUsed(tx.GasUsed)
+
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
 		Str("traceID", traceID).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
+	return nil
+}
 
-	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil
+type blockCommitter struct {
+	tracer    module.Tracer
+	committer ViewCommitter
+	callBack  func(state flow.StateCommitment, proof []byte, err error)
+	state     flow.StateCommitment
+	views     chan state.View
+	blockSpan opentracing.Span
+}
+
+func (bc *blockCommitter) Run() {
+	for view := range bc.views {
+		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
+		stateCommit, proof, err := bc.committer.CommitView(view, bc.state)
+		bc.callBack(stateCommit, proof, err)
+		bc.state = stateCommit
+		span.Finish()
+	}
+}
+
+func (bc *blockCommitter) Commit(view state.View) {
+	bc.views <- view
 }
