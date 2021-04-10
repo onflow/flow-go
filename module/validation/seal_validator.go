@@ -138,7 +138,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// blocks; CAUTION: some of these incorporated results might already be sealed.
 	incorporatedResults := make(map[flow.Identifier]*flow.IncorporatedResult)
 
-	// IDs of unsealed blocks on the fork (ordered in increasing height)
+	// IDs of unsealed blocks on the fork
 	var unsealedBlockIDs []flow.Identifier
 
 	// Traverse fork starting from the lowest unsealed block (included) up to the parent block (included).
@@ -172,7 +172,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		return sealedID != header.ParentID
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("internal error collecting incorporated results from unsealed fork: %w", err)
 	}
 
 	// We do _not_ add the results from the candidate block's own payload to incorporatedResults.
@@ -180,8 +180,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// its chunk assignment for verification. Therefore a seal can only be added in the
 	// next block or after. In other words, a receipt and its seal can't be the same block.
 
-	// Iterate through the unsealed blocks, starting at the one with lowest height
-	// and try to create a chain of valid  seals.
+	// Iterate through the unsealed blocks, starting at the one with lowest
+	// height and try to create a chain of valid seals.
 	latestSeal := lastSealUpToParent
 	for _, blockID := range unsealedBlockIDs {
 		// if there are no more seals left, we can exit earlier
@@ -227,9 +227,9 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		latestSeal = seal
 	}
 
-	// at this point, no seals should be left
+	// it is illegal to include more seals than there are unsealed blocks in the fork
 	if len(byBlock) > 0 {
-		return nil, engine.NewInvalidInputErrorf("not all seals connected to state (left: %d)", len(byBlock))
+		return nil, engine.NewInvalidInputErrorf("more seals then unsealed blocks in fork (left: %d)", len(byBlock))
 	}
 
 	return latestSeal, nil
