@@ -152,7 +152,7 @@ func main() {
 		}).
 		Module("stake checking function", func(node *cmd.FlowNodeBuilder) error {
 			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
-				return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+				return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 			}
 			return nil
 		}).
