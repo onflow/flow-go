@@ -197,8 +197,10 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 		return nil
 	}
 
+	final := e.state.Final()
+
 	// don't propagate collection guarantees if we are not currently staked
-	staked, err := protocol.IsNodeStakedAt(e.state.Final(), e.me.NodeID())
+	staked, err := protocol.IsNodeStakedAt(final, e.me.NodeID())
 	if err != nil {
 		return fmt.Errorf("could not check my staked status: %w", err)
 	}
@@ -217,7 +219,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	// consensus node committee than over the collection clusters.
 
 	// select all the consensus nodes on the network as our targets
-	committee, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
+	committee, err := final.Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get committee: %w", err)
 	}
