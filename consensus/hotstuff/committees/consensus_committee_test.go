@@ -23,7 +23,9 @@ import (
 func TestConsensus_InvalidSigner(t *testing.T) {
 
 	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	realNonCommitteeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithStake(0))
+	unstakedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithStake(0))
+	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
+	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	fakeID := unittest.IdentifierFixture()
 	blockID := unittest.IdentifierFixture()
 
@@ -45,7 +47,9 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	state.On("AtBlockID", blockID).Return(snapshot)
 
 	snapshot.On("Identity", realIdentity.NodeID).Return(realIdentity, nil)
-	snapshot.On("Identity", realNonCommitteeIdentity.NodeID).Return(realNonCommitteeIdentity, nil)
+	snapshot.On("Identity", unstakedConsensusIdentity.NodeID).Return(unstakedConsensusIdentity, nil)
+	snapshot.On("Identity", ejectedConsensusIdentity.NodeID).Return(ejectedConsensusIdentity, nil)
+	snapshot.On("Identity", validNonConsensusIdentity.NodeID).Return(validNonConsensusIdentity, nil)
 	snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
 
 	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
@@ -57,8 +61,20 @@ func TestConsensus_InvalidSigner(t *testing.T) {
 	})
 
 	t.Run("existent but non-committee-member identity should return ErrInvalidSigner", func(t *testing.T) {
-		_, err := com.Identity(blockID, realNonCommitteeIdentity.NodeID)
-		require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		t.Run("unstaked consensus node", func(t *testing.T) {
+			_, err := com.Identity(blockID, unstakedConsensusIdentity.NodeID)
+			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		})
+
+		t.Run("ejected consensus node", func(t *testing.T) {
+			_, err := com.Identity(blockID, ejectedConsensusIdentity.NodeID)
+			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		})
+
+		t.Run("otherwise valid non-consensus node", func(t *testing.T) {
+			_, err := com.Identity(blockID, validNonConsensusIdentity.NodeID)
+			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		})
 	})
 
 	t.Run("should be able to retrieve real identity", func(t *testing.T) {

@@ -657,6 +657,12 @@ func WithStake(stake uint64) func(*flow.Identity) {
 	}
 }
 
+func WithEjected(ejected bool) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Ejected = ejected
+	}
+}
+
 // WithAddress sets the network address of identity fixture.
 func WithAddress(address string) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
