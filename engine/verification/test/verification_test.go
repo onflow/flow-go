@@ -6,9 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodel "github.com/onflow/flow-go/model/chunks"
@@ -18,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestHappyPath considers the happy path of Finder-Match-Verify engines.
@@ -51,6 +50,7 @@ func TestHappyPath(t *testing.T) {
 		t.Run(fmt.Sprintf("%d-verification node %d-chunk number", tc.verNodeCount, tc.chunkCount), func(t *testing.T) {
 			mu.Lock()
 			defer mu.Unlock()
+			t.Skip("this test is skipped as match engine does not request chunk data pack on this branch")
 
 			collector := metrics.NewNoopCollector()
 			VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount, collector, collector)
@@ -62,6 +62,7 @@ func TestHappyPath(t *testing.T) {
 // path assuming a single collection (including transactions on counter example)
 // are submitted to the verification node.
 func TestSingleCollectionProcessing(t *testing.T) {
+	t.Skip("this test is skipped as match engine does not request chunk data pack on this branch")
 	chainID := flow.Testnet
 	chunkNum := 1
 

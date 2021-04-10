@@ -213,6 +213,7 @@ func (suite *MatchEngineTestSuite) OnVerifiableChunkSentMetricCalledNTimes(n int
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func (suite *MatchEngineTestSuite) TestChunkVerified() {
+	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
@@ -338,6 +339,7 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 // Multiple Assignments: When receives a ER, and 2 chunks out of 3 are assigned to me,
 // it will produce 2 verifiable chunks.
 func (suite *MatchEngineTestSuite) TestMultiAssignment() {
+	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
@@ -412,6 +414,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 // TestDuplication checks that when the engine receives 2 ER for the same block,
 // which only has 1 chunk, only 1 verifiable chunk will be produced.
 func (suite *MatchEngineTestSuite) TestDuplication() {
+	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
@@ -492,6 +495,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 // the execution node fails to return data for the first 2 requests,
 // and successful to return in the 3rd try, a verifiable chunk will be produced
 func (suite *MatchEngineTestSuite) TestRetry() {
+	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
@@ -566,6 +570,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
 // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 func (suite *MatchEngineTestSuite) TestMaxRetry() {
+	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(3)
 	// create a execution result that assigns to me
 	result, assignment := test.CreateExecutionResult(
@@ -621,6 +626,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 // Concurrency: When 10 different ER are received concurrently, chunks from both
 // results will be processed
 func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
+	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	ers := make([]*flow.ExecutionResult, 0)
@@ -703,6 +709,7 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 // Concurrency: When chunk data pack are sent concurrently, match engine is able to receive
 // all of them, and process concurrently.
 func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
+	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
