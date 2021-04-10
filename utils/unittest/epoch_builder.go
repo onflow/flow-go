@@ -153,7 +153,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	// Define receipts and seals for block B payload. They will be nil if A is
 	// the root block
 	var receiptA *flow.ExecutionReceipt
-	var prevReceipts []*flow.ExecutionReceipt
+	var prevReceipts []*flow.ExecutionReceiptMeta
+	var prevResults []*flow.ExecutionResult
 	var sealsForPrev []*flow.Seal
 
 	aBlock, ok := builder.blocks[A.ID()]
@@ -161,11 +162,15 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		// A is not the root block. B will contain a receipt for A, and a seal
 		// for the receipt contained in A.
 		receiptA = ReceiptForBlockFixture(aBlock)
-		prevReceipts = []*flow.ExecutionReceipt{
-			receiptA,
+		prevReceipts = []*flow.ExecutionReceiptMeta{
+			receiptA.Meta(),
 		}
+		prevResults = []*flow.ExecutionResult{
+			&receiptA.ExecutionResult,
+		}
+		resultByID := aBlock.Payload.ResultsById()
 		sealsForPrev = []*flow.Seal{
-			Seal.Fixture(Seal.WithResult(&aBlock.Payload.Receipts[0].ExecutionResult)),
+			Seal.Fixture(Seal.WithResult(resultByID[aBlock.Payload.Receipts[0].ResultID])),
 		}
 	}
 
@@ -182,6 +187,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	B := BlockWithParentFixture(A)
 	B.SetPayload(flow.Payload{
 		Receipts: prevReceipts,
+		Results:  prevResults,
 		Seals:    sealsForPrev,
 	})
 	builder.addBlock(&B)
@@ -201,7 +207,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		}
 	}
 	C.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receiptB},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
+		Results:  []*flow.ExecutionResult{&receiptB.ExecutionResult},
 		Seals:    sealsForA,
 	})
 	builder.addBlock(&C)
@@ -215,7 +222,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seal.WithResult(&receiptB.ExecutionResult),
 	)
 	D.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receiptC},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptC.Meta()},
+		Results:  []*flow.ExecutionResult{&receiptC.ExecutionResult},
 		Seals:    []*flow.Seal{sealForB},
 	})
 	builder.addBlock(&D)
@@ -239,7 +247,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seal.WithResult(&receiptC.ExecutionResult),
 	)
 	E.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receiptD},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptD.Meta()},
+		Results:  []*flow.ExecutionResult{&receiptD.ExecutionResult},
 		Seals:    []*flow.Seal{sealForC},
 	})
 	builder.addBlock(&E)
@@ -254,7 +263,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seal.WithResult(&receiptD.ExecutionResult),
 	)
 	F.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receiptE},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptE.Meta()},
+		Results:  []*flow.ExecutionResult{&receiptE.ExecutionResult},
 		Seals:    []*flow.Seal{sealForD},
 	})
 	builder.addBlock(&F)
@@ -268,7 +278,8 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		Seal.WithResult(&receiptE.ExecutionResult),
 	)
 	G.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receiptF},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptF.Meta()},
+		Results:  []*flow.ExecutionResult{&receiptF.ExecutionResult},
 		Seals:    []*flow.Seal{sealForE},
 	})
 
@@ -306,13 +317,17 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	A := BlockWithParentFixture(final)
 	// first view is not necessarily exactly final view of previous epoch
 	A.Header.View = finalView + (rand.Uint64() % 4) + 1
+	finalReceipt := ReceiptForBlockFixture(finalBlock)
 	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{
-			ReceiptForBlockFixture(finalBlock),
+		Receipts: []*flow.ExecutionReceiptMeta{
+			finalReceipt.Meta(),
+		},
+		Results: []*flow.ExecutionResult{
+			&finalReceipt.ExecutionResult,
 		},
 		Seals: []*flow.Seal{
 			Seal.Fixture(
-				Seal.WithResult(&finalBlock.Payload.Receipts[0].ExecutionResult),
+				Seal.WithResult(finalBlock.Payload.Results[0]),
 			),
 		},
 	})

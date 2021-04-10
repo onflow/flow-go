@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -116,7 +117,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
@@ -125,34 +126,6 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 			)
-			return err
-		}).
-		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
-			extraLogPath := path.Join(triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
-			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			rt := fvm.NewInterpreterRuntime()
-
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-
-			manager, err := computation.New(
-				node.Logger,
-				collector,
-				node.Tracer,
-				node.Me,
-				node.State,
-				vm,
-				vmCtx,
-				cadenceExecutionCache,
-			)
-			computationManager = manager
-
 			return err
 		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -236,6 +209,36 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			extraLogPath := path.Join(triedir, "extralogs")
+			err := os.MkdirAll(extraLogPath, 0777)
+			if err != nil {
+				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
+			}
+
+			extralog.ExtraLogDumpPath = extraLogPath
+
+			rt := fvm.NewInterpreterRuntime()
+
+			vm := fvm.NewVirtualMachine(rt)
+			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+
+			committer := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
+			manager, err := computation.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Me,
+				node.State,
+				vm,
+				vmCtx,
+				cadenceExecutionCache,
+				committer,
+			)
+			if err != nil {
+				return nil, err
+			}
+			computationManager = manager
+
 			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
