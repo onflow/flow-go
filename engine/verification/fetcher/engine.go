@@ -45,7 +45,6 @@ func New(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
 	tracer module.Tracer,
-	me module.Local,
 	verifier network.Engine,
 	state protocol.State,
 	pendingChunks mempool.ChunkStatuses,
