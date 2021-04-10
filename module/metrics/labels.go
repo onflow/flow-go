@@ -72,6 +72,7 @@ const (
 	ResourceApprovalResponseQueue    = "matching_approval_response_queue" // consensus node, matching engine
 	ResourceBlockProposalQueue       = "compliance_proposal_queue"        // consensus node, compliance engine
 	ResourceBlockVoteQueue           = "compliance_vote_queue"            // consensus node, compliance engine
+	ResourceChunkDataPack            = "chunk_data_pack"                  // execution node
 )
 
 const (
