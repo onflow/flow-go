@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -30,7 +31,8 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 		db: db,
 		cache: newCache(collector,
 			withStore(noopStore),
-			withRetrieve(retrieve)),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceEvents)),
 	}
 }
 
