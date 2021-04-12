@@ -48,8 +48,7 @@ func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgC
 
 // Broadcast broadcasts a message to all other nodes participating in the
 // DKG. The message is broadcast by submitting a transaction to the DKG
-// smart contract. An error is returned if the transaction has failed has
-// failed
+// smart contract. An error is returned if the transaction has failed.
 func (c *Client) Broadcast(msg model.DKGMessage) error {
 
 	ctx := context.Background()
