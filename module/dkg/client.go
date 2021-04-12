@@ -195,7 +195,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
 	if err != nil {
-		return fmt.Errorf("could not add argument to transaction: %v", err)
+		return fmt.Errorf("could not add argument to transaction: %w", err)
 	}
 
 	// sign envelope using account signer
