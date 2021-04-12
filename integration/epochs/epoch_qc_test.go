@@ -46,7 +46,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	// initial cluster and total node count
 	epochCounter := uint64(1)
 	clusterCount := 3
-	nodesPerCluster := 1
+	nodesPerCluster := 10
 
 	s.SetupTest()
 

@@ -120,8 +120,6 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
 	for result.Status != sdk.TransactionStatusSealed {
 
-		fmt.Println("trying to vote")
-
 		result, err = c.client.GetTransactionResult(ctx, txID)
 		if err != nil {
 			return fmt.Errorf("could not get transaction result: %w", err)
