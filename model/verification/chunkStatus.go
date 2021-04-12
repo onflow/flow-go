@@ -20,3 +20,5 @@ func (s ChunkStatus) ID() flow.Identifier {
 func (s ChunkStatus) Checksum() flow.Identifier {
 	return s.Chunk.ID()
 }
+
+type ChunkStatusList []*ChunkStatus
