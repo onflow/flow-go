@@ -75,13 +75,13 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 	return e
 }
 
-// TestSkipDuplicateChunkLocator evaluates that if fetcher engine receives a duplicate chunk status
+// TestSkipDuplicateChunkStatus evaluates that if fetcher engine receives a duplicate chunk status
 // for which it already has a pending chunk status in memory, it drops the duplicate and notifies consumer
 // that it is done with processing that chunk.
 //
 // Note that fetcher engine relies on chunk consumer to perform the deduplication, and provide distinct chunk
 // locators. So, this test evaluates a rare unhappy path that its occurrence would indicate a data race.
-func TestSkipDuplicateChunkLocator(t *testing.T) {
+func TestSkipDuplicateChunkStatus(t *testing.T) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
