@@ -134,7 +134,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	values := value.(cadence.Array).Values
 
 	// unpack return from contract to `model.DKGMessage`
-	messages := make([]model.DKGMessage, 0)
+	messages := make([]model.DKGMessage, 0, len(values))
 	for _, val := range values {
 
 		content := val.(cadence.Struct).Fields[1]
