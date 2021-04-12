@@ -95,8 +95,10 @@ func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 
 		// get it from the database
 		resource, err := c.retrieve(key)(tx)
-		if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
 			c.metrics.CacheNotFound(c.resource)
+		}
+		if err != nil {
 			return nil, fmt.Errorf("could not retrieve resource: %w", err)
 		}
 
