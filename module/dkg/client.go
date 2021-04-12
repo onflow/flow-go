@@ -52,7 +52,8 @@ func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgC
 // smart contract. An error is returned if the transaction has failed.
 func (c *Client) Broadcast(msg model.DKGMessage) error {
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultDKGClientTxTimeout)
+	defer cancel()
 
 	// get account for given address
 	account, err := c.flowClient.GetAccount(ctx, c.accountAddress, grpc.EmptyCallOption{})
@@ -201,7 +202,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
 	if err != nil {
-		return fmt.Errorf("could not add argument to transaction: %v", err)
+		return fmt.Errorf("could not add argument to transaction: %w", err)
 	}
 
 	// sign envelope using account signer
