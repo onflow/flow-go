@@ -56,7 +56,7 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 	// get account for given address
 	account, err := c.flowClient.GetAccount(ctx, c.accountAddress, grpc.EmptyCallOption{})
 	if err != nil {
-		return fmt.Errorf("could not get account details: %v", err)
+		return fmt.Errorf("could not get account details: %w", err)
 	}
 
 	// get latest sealed block to execute transaction
