@@ -157,15 +157,13 @@ func (s *ClientSuite) TestSubmitResult() {
 	// create participant resource
 	s.createParticipant(nodeID)
 
-	numberOfKeys := 1
-
 	// generate list of public keys
-	publicKeys := make([]crypto.PublicKey, 0, numberOfKeys)
-	for i := 0; i < numberOfKeys; i++ {
+	numberOfNodes := len(dkgNodeIDStrings)
+	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes)
+	for i := 0; i < numberOfNodes; i++ {
 		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
 		publicKeys = append(publicKeys, privateKey.PublicKey())
 	}
-
 	// create a group public key
 	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
 

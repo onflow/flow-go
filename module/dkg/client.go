@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	model "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/epochs"
 )
 
 // Client is a client to the Flow DKG contract. Allows functionality to Broadcast,
@@ -112,7 +113,7 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 		}
 
 		// wait 1 second before trying again.
-		time.Sleep(time.Second)
+		time.Sleep(epochs.TransactionSubmissionTimeout)
 	}
 
 	if result.Error != nil {
@@ -188,9 +189,14 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	// Note: We need to make sure that we pull the keys out in the same order that
 	// we have done here. Group Public key first followed by the individual public keys
 	finalSubmission := make([]cadence.Value, 0, len(publicKeys))
-	finalSubmission = append(finalSubmission, cadence.NewString(groupPublicKey.String()[2:]))
+
+	// initially append group public key
+	trimmedGroupHexString := trim0x(groupPublicKey.String())
+	finalSubmission = append(finalSubmission, cadence.NewString(trimmedGroupHexString))
+
 	for _, publicKey := range publicKeys {
-		finalSubmission = append(finalSubmission, cadence.NewString(publicKey.String()[2:]))
+		trimmedHexString := trim0x(publicKey.String())
+		finalSubmission = append(finalSubmission, cadence.NewString(trimmedHexString))
 	}
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
@@ -246,4 +252,18 @@ func (c *Client) submitTx(ctx context.Context, tx *sdk.Transaction) (sdk.Identif
 	}
 
 	return tx.ID(), nil
+}
+
+// trim0x trims the `0x` if it exists from a hexadecimal string
+// This method is required as the DKG contract expects key legths of 192 bytes
+// the `PublicKey.String()` method returns the hexadecimal string representation of the
+// public key prefixed with `0x` resulting in length of 194 bytes.
+func trim0x(hexString string) string {
+
+	prefix := hexString[:2]
+	if prefix == "0x" {
+		return hexString[2:]
+	}
+
+	return hexString
 }
