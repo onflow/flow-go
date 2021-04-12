@@ -416,6 +416,7 @@ func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID 
 
 // blockIsSealed returns true if the block at specified height by block ID is sealed.
 func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
+	// TODO: as an optimization, we can keep record of last sealed height on a local variable.
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return false, fmt.Errorf("could not get block header: %w", err)
