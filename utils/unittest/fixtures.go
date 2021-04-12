@@ -805,6 +805,17 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 	}
 }
 
+// ChunkStatusListToChunkLocatorFixture extracts chunk locators from a list of chunk statuses.
+func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorList {
+	locators := chunks.LocatorList{}
+	for _, status := range statuses {
+		locator := ChunkLocatorFixture(status.ExecutionResultID, status.Chunk.Index)
+		locators = append(locators, locator)
+	}
+
+	return locators
+}
+
 func SignatureFixture() crypto.Signature {
 	sig := make([]byte, 32)
 	_, _ = crand.Read(sig)
