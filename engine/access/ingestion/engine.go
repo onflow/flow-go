@@ -254,16 +254,10 @@ func (e *Engine) trackFinalizedMetricForBlock(hb *model.Block) {
 }
 
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.ExecutionReceipt) error {
-
-	// persist the execution receipt locally
+	// persist the execution receipt locally, storing will also index the receipt
 	err := e.executionReceipts.Store(r)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
-	}
-	// index the receipt with the receipt block ID and the execution ID
-	err = e.executionReceipts.IndexByExecutor(r)
-	if err != nil {
-		return fmt.Errorf("failed to index execution receipt: %w", err)
 	}
 
 	e.trackExecutedMetricForReceipt(r)

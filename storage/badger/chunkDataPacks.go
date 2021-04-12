@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -34,6 +35,11 @@ func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
 		return fmt.Errorf("could not remove chunk datapack: %w", err)
 	}
 	return nil
+}
+
+func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
+	writeBatch := batch.GetWriter()
+	return operation.BatchInsertChunkDataPack(c)(writeBatch)
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {

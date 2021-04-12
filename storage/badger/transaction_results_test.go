@@ -10,41 +10,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 
 	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
-func TestStoringTransactionResults(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
-
-		blockID := unittest.IdentifierFixture()
-		txResults := make([]*flow.TransactionResult, 0)
-		for i := 0; i < 10; i++ {
-			txID := unittest.IdentifierFixture()
-			expected := &flow.TransactionResult{
-				TransactionID: txID,
-				ErrorMessage:  fmt.Sprintf("a runtime error %d", i),
-			}
-			txResults = append(txResults, expected)
-		}
-		for _, txResult := range txResults {
-			err := store.Store(blockID, txResult)
-			require.Nil(t, err)
-		}
-		for _, txResult := range txResults {
-			actual, err := store.ByBlockIDTransactionID(blockID, txResult.TransactionID)
-			require.Nil(t, err)
-			assert.Equal(t, txResult, actual)
-		}
-	})
-}
-
 func TestBatchStoringTransactionResults(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewTransactionResults(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
@@ -56,10 +32,23 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 			}
 			txResults = append(txResults, expected)
 		}
-		err := store.BatchStore(blockID, txResults)
-		require.Nil(t, err)
+		writeBatch := bstorage.NewBatch(db)
+		err := store.BatchStore(blockID, txResults, writeBatch)
+		require.NoError(t, err)
+
+		err = writeBatch.Flush()
+		require.NoError(t, err)
+
 		for _, txResult := range txResults {
 			actual, err := store.ByBlockIDTransactionID(blockID, txResult.TransactionID)
+			require.Nil(t, err)
+			assert.Equal(t, txResult, *actual)
+		}
+
+		// test loading from database
+		newStore := bstorage.NewTransactionResults(metrics, db, 1000)
+		for _, txResult := range txResults {
+			actual, err := newStore.ByBlockIDTransactionID(blockID, txResult.TransactionID)
 			require.Nil(t, err)
 			assert.Equal(t, txResult, *actual)
 		}
@@ -68,7 +57,8 @@ func TestBatchStoringTransactionResults(t *testing.T) {
 
 func TestReadingNotStoreTransaction(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
+		metrics := metrics.NewNoopCollector()
+		store := bstorage.NewTransactionResults(metrics, db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txID := unittest.IdentifierFixture()
@@ -76,4 +66,14 @@ func TestReadingNotStoreTransaction(t *testing.T) {
 		_, err := store.ByBlockIDTransactionID(blockID, txID)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 	})
+}
+
+func TestKeyConversion(t *testing.T) {
+	blockID := unittest.IdentifierFixture()
+	txID := unittest.IdentifierFixture()
+	key := bstorage.KeyFromBlockIDTransactionID(blockID, txID)
+	bID, tID, err := bstorage.KeyToBlockIDTransactionID(key)
+	require.NoError(t, err)
+	require.Equal(t, blockID, bID)
+	require.Equal(t, txID, tID)
 }

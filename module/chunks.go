@@ -9,6 +9,10 @@ import (
 // ChunkAssigner presents an interface for assigning chunks to the verifier nodes
 type ChunkAssigner interface {
 	// Assign generates the assignment
+	// error returns:
+	//  * NoValidChildBlockError indicates that no valid child block is known
+	//    (which contains the block's source of randomness)
+	//  * unexpected errors should be considered symptoms of internal bugs
 	Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chmodels.Assignment, error)
 }
 

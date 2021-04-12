@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	// ReferenceImplPathByteSize is the path length in reference implementation: 2 bytes.
+	// ReferenceImplPathByteSize is the path length in reference implementation: 32 bytes.
 	// Please do NOT CHANGE.
-	ReferenceImplPathByteSize = 2
+	ReferenceImplPathByteSize = 32
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
@@ -24,7 +24,7 @@ func Test_EmptyTrie(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	expectedRootHashHex := "6e24e2397f130d9d17bef32b19a77b8f5bcf03fb7e9e75fd89b8a455675d574a"
+	expectedRootHashHex := "568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(emptyTrie.RootHash()))
 }
 
@@ -36,11 +36,11 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.TwoBytesPath(0)
+	path := utils.PathByUint16LeftPadded(0)
 	payload := utils.LightPayload(11, 12345)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "ff472d38a97b3b1786c4dfffa0005370aa3c16805d342ed7618876df7101f760"
+	expectedRootHashHex := "b30c99cc3e027a6ff463876c638041b1c55316ed935f1b3699e52a2c3e3eaaab"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
 }
 
@@ -52,11 +52,16 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.TwoBytesPath(65535)
+	// build a path with all 1s
+	b := make([]byte, 32)
+	for i := 0; i < len(b); i++ {
+		b[i] = uint8(255)
+	}
+	path := ledger.Path(b)
 	payload := utils.LightPayload(12346, 54321)
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "d1fb1c7c84bcd02205fbc7bdf73ee8e943b8bb4b7db6bcc26ae7af67e507fb8d"
+	expectedRootHashHex := "4313d22bcabbf21b1cfb833d38f1921f06a91e7198a6672bc68fa24eaaa1a961"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rightPopulatedTrie.RootHash()))
 }
 
@@ -68,11 +73,11 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	path := utils.TwoBytesPath(56809)
+	path := utils.PathByUint16LeftPadded(56809)
 	payload := utils.LightPayload(12346, 59656)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "b44a9a00c182ba2203fca6886c4c99b854f9f8279a9978b180ad10e82362e412"
+	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(leftPopulatedTrie.RootHash()))
 }
 
@@ -89,32 +94,32 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, 12001))
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
-	expectedRootHashHex := "18a7c33a0ecf148274f860246f23dffdc6d15dc846e0ae34f6887a43ec67124c"
+	expectedRootHashHex := "74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
-// Test_FullTrie tests whether the root hash of a fully-populated trie storing
-// matches the formal specification.
+// Test_FullTrie tests whether the root hash of a trie,
+// whose left-most 65536 registers are populated, matches the formal specification.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_FullTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie, err := trie.NewEmptyMTrie(ReferenceImplPathByteSize)
 	require.NoError(t, err)
 
-	// allocate single random register
-	capacity := 65536
+	// allocate 65536 left-most registers
+	numberRegisters := 65536
 	rng := &LinearCongruentialGenerator{seed: 0}
-	paths := make([]ledger.Path, 0, capacity)
-	payloads := make([]ledger.Payload, 0, capacity)
-	for i := 0; i < capacity; i++ {
-		paths = append(paths, utils.TwoBytesPath(uint16(i)))
+	paths := make([]ledger.Path, 0, numberRegisters)
+	payloads := make([]ledger.Payload, 0, numberRegisters)
+	for i := 0; i < numberRegisters; i++ {
+		paths = append(paths, utils.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
 		payload := utils.LightPayload(temp, temp)
 		payloads = append(payloads, *payload)
 	}
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
-	expectedRootHashHex := "0a1e74e7a4dfcc916dcafbd3f1c826280f047cd5608295f01a32c9af5949898f"
+	expectedRootHashHex := "6b3a48d672744f5586c571c47eae32d7a4a3549c1d4fa51a0acfd7b720471de9"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
@@ -122,26 +127,26 @@ func Test_FullTrie(t *testing.T) {
 // The expected root hashes are coming from a reference implementation in python and is hard-coded here.
 func Test_UpdateTrie(t *testing.T) {
 	expectedRootHashes := []string{
-		"a8dc0574fdeeaab4b5d3b2a798c19bee5746337a9aea735ebc4dfd97311503c5",
-		"6fb27c151f44ba50128c2a6b5ecec19343edf7b68b7b733b64cb5df3c0de4a8b",
-		"1c3fccdf4a7e4234b9fb9c576e2a919bca259600056c4f14317bde7f22ad2c5d",
-		"5ea61ef89f333a8695057ef3d650745b61c5ffeabc9663c5f1c288b755ff43da",
-		"42bcd108195c12eb0122fac0389128a5b5073c1ab8717c225e1f6a9c8b8bc7b6",
-		"194d139211362feb28ad1bd56f4c030228748c0045ad6d47665d450b66fb3da2",
-		"f5f5cef0b91fdf0cfb10d535b122df7e4b5cb6df47fcf69f3cde80ef2dd23674",
-		"28d7a59926dcd6025c744660b95cef52955e6413727a628b314da0e5b4c02ba6",
-		"24869a02eecb3f56c37979eee9868170ed78d571f896245ca308dcb59eb8f09d",
-		"99f3bbd9fbf19c3a3560c62d845ee6e4f8abc086dd891429c7f297470783a50e",
-		"fa53339233bce843b6938f22556bdc9395a401dbabc163185386f750810ea993",
-		"93828998941ce554a5c2e780d9951d179e83b28df1ef9c0d6479c176fe3b4a7f",
-		"7dde1add8114622f8f01714c1dafae50718e20aad673a043b04b37f5e3ff57a0",
-		"aba0dfcd53f8768a9b146b2f50b6ce43d47c45e1b961d9f64a65b2492906543b",
-		"950a669dfc88bb8fff0497f677a095da75b506c5f759ebdd31ea0f7536eb81e7",
-		"18a7c33a0ecf148274f860246f23dffdc6d15dc846e0ae34f6887a43ec67124c",
-		"9574e25612daebf7dcd3e61c707a3fc6a2f23976776befc7671c17b3820db89b",
-		"a490e00118ded37c89c358372c118b3b197a7693a294be438bb6557b65fb2265",
-		"0f158d9b863a903f59b3e7b7fb35caf595789912b7dae41cb74f986d7b6f247f",
-		"a5730e2e89daa48e01802bc83eb14c6ea52f5f38760ad2e844f8f038cbe87c8a",
+		"08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd",
+		"2f4b0f490fa05e5b3bbd43176e367c3e9b64cdb710e45d4508fff11759d7a08e",
+		"668811792995cd960e7e343540a360682ac375f7ec5533f774c464cd6b34adc9",
+		"169c145eaeda2038a0e409068a12cb26bde5e890115ad1ef624f422007fb2d2a",
+		"8f87b503a706d9eaf50873030e0e627850c841cc0cf382187b81ba26cec57588",
+		"faacc057336e10e13ff6f5667aefc3ac9d9d390b34ee50391a6f7f305dfdf761",
+		"049e035735a13fee09a3c36a7f567daf05baee419ac90ade538108492d80b279",
+		"bb8340a9772ab6d6aa4862b23c8bb830da226cdf6f6c26f1e1e850077be600af",
+		"8b9b7eb5c489bf4aeffd86d3a215dc045856094d0abe5cf7b4cc3f835d499168",
+		"6514743e986f20fcf22a02e50ba352a5bfde50fe949b57b990aeb863cfcd81d1",
+		"33c3d386e1c7c707f727fdeb65c52117537d175da9ab3f60a0a576301d20756e",
+		"09df0bc6eee9d0f76df05d19b2ac550cde8c4294cd6eafaa1332718bd62e912f",
+		"8b1fccbf7d1eca093441305ebff72d3f12b8b7cce5b4f89d6f464fc5df83b0d3",
+		"0830e2d015742e284c56075050e94d3ff9618a46f28aa9066379f012e45c05fc",
+		"9d95255bb75dddc317deda4e45223aa4a5ac02eaa537dc9e602d6f03fa26d626",
+		"74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa",
+		"c06903580432a27dee461e9022a6546cb4ddec2f8598c48429e9ba7a96a892da",
+		"a117f94e9cc6114e19b7639eaa630304788979cf92037736bbeb23ed1504638a",
+		"d382c97020371d8788d4c27971a89f1617f9bbf21c49c922f1b683cc36a4646c",
+		"ce633e9ca6329d6984c37a46e0a479bb1841674c2db00970dacfe035882d4aba",
 	}
 
 	// Make new Trie (independently of MForest):
@@ -150,20 +155,28 @@ func Test_UpdateTrie(t *testing.T) {
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
-	path := utils.TwoBytesPath(rng.next())
+	path := utils.PathByUint16LeftPadded(rng.next())
 	temp := rng.next()
 	payload := utils.LightPayload(temp, temp)
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
-	expectedRootHashHex := "a8dc0574fdeeaab4b5d3b2a798c19bee5746337a9aea735ebc4dfd97311503c5"
+	expectedRootHashHex := "08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 
+	var paths []ledger.Path
+	var payloads []ledger.Payload
 	for r := 0; r < 20; r++ {
-		paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
+		paths, payloads = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
 		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
 		require.NoError(t, err)
 		require.Equal(t, expectedRootHashes[r], hex.EncodeToString(updatedTrie.RootHash()))
 	}
+	// update with the same registers with the same values
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
+	require.NoError(t, err)
+	require.Equal(t, expectedRootHashes[19], hex.EncodeToString(updatedTrie.RootHash()))
+	// check the root node pointers are equal
+	require.True(t, updatedTrie.RootNode() == newTrie.RootNode())
 }
 
 // Test_UnallocateRegisters tests whether unallocating registers matches the formal specification.
@@ -190,13 +203,16 @@ func Test_UnallocateRegisters(t *testing.T) {
 	require.NoError(t, err)
 
 	// this should be identical to the first 99 registers never been written
-	expectedRootHashHex := "ce4883f826deaec46317901b7a274a2f9706bc1d1b2cf6869ca1447afb23b2d5"
-	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
+	expectedRootHashHex := "d81e27a93f2bef058395f70e00fb5d3c8e426e22b3391d048b34017e1ecb483e"
+	comparisonTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
 	require.NoError(t, err)
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisionTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisonTrie.RootHash()))
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 
+// simple Linear congruential RNG
+// https://en.wikipedia.org/wiki/Linear_congruential_generator
+// with configuration for 16bit output used by Microsoft Visual Basic 6 and earlier
 type LinearCongruentialGenerator struct {
 	seed uint64
 }
@@ -213,7 +229,7 @@ func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([
 	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
 	for i := 0; i < number; i++ {
-		path := utils.TwoBytesPath(rng.next())
+		path := utils.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
 		t := rng.next()
 		payload := utils.LightPayload(t, t)

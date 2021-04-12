@@ -21,6 +21,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -80,15 +81,19 @@ func main() {
 				"maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 				"the address the ingress server listens on")
-			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxGasLimit,
-				"maximum per-transaction gas limit")
+			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
+				"maximum per-transaction computation limit (gas limit)")
+			flags.Uint64Var(&ingestConf.MaxTransactionByteSize, "ingest-max-tx-byte-size", flow.DefaultMaxTransactionByteSize,
+				"maximum per-transaction byte size")
+			flags.Uint64Var(&ingestConf.MaxCollectionByteSize, "ingest-max-col-byte-size", flow.DefaultMaxCollectionByteSize,
+				"maximum per-collection byte size")
 			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
 				"whether we check that inbound transactions are parse-able")
 			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
 				"expiry buffer for inbound transactions")
 			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
 				"how many additional cluster members we propagate transactions to")
-			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 1_000_000,
+			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 10_000_000,
 				"the maximum address index allowed in transactions")
 			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
 				"expiry buffer for transactions in proposed collections")
@@ -96,11 +101,11 @@ func main() {
 				"rate limit for each payer (transactions/collection)")
 			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
 				"set of payer addresses which are omitted from rate limiting")
-			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", builder.DefaultMaxCollectionSize,
+			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", flow.DefaultMaxCollectionSize,
 				"maximum number of transactions in proposed collections")
-			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", builder.DefaultMaxCollectionByteSize,
+			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", flow.DefaultMaxCollectionByteSize,
 				"maximum byte size of the proposed collection")
-			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", builder.DefaultMaxCollectionTotalGas,
+			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
 				"maximum total amount of maxgas of transactions in proposed collections")
 			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
 				"the initial timeout for the hotstuff pacemaker")
@@ -164,7 +169,7 @@ func main() {
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner()
+			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee

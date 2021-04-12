@@ -1,21 +1,23 @@
 package fvm_test
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestTransactionStorageLimiter_Process(t *testing.T) {
 	t.Run("capacity > storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 99),
@@ -25,15 +27,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
-
+		}, nil, sm, programs.NewEmptyPrograms())
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 100),
@@ -43,15 +44,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
-
+		}, nil, sm, programs.NewEmptyPrograms())
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -61,15 +61,14 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
-
+		}, nil, sm, programs.NewEmptyPrograms())
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("non account registers are ignored", func(t *testing.T) {
 		owner := ""
-		st := newMockState(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -79,15 +78,15 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
+		}, nil, sm, programs.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
 	t.Run("account registers without exists are ignored", func(t *testing.T) {
 		owner := string(flow.HexToAddress("1").Bytes())
-		st := newMockState(
+		sm := newMockStateHolder(
 			[]string{owner},
 			[]OwnerKeyValue{
 				storageUsed(owner, 101),
@@ -96,9 +95,9 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 			GetStorageCapacityFuncFactory: mockGetStorageCapacityFuncFactory,
 		}
 
-		err := d.Process(nil, fvm.Context{
+		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, st)
+		}, nil, sm, programs.NewEmptyPrograms())
 
 		require.NoError(t, err)
 	})
@@ -126,25 +125,32 @@ func accountExists(owner string) OwnerKeyValue {
 	}
 }
 
-func newMockState(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.State {
+func newMockStateHolder(updatedKeys []string, ownerKeyStorageValue []OwnerKeyValue) *state.StateHolder {
 
-	ledger := state.NewMapLedger()
-	s := state.NewState(ledger)
+	view := utils.NewSimpleView()
+	s := state.NewState(view)
+	sm := state.NewStateHolder(s)
 
 	for _, okv := range ownerKeyStorageValue {
-		_ = s.Set(okv.Owner, "", okv.Key, utils.Uint64ToBinary(okv.Value))
+		_ = s.Set(okv.Owner, "", okv.Key, uint64ToBinary(okv.Value))
 	}
-	_ = s.Commit()
 
 	for _, key := range updatedKeys {
 		_ = s.Set(key, "", "", []byte("1"))
 	}
 
-	return s
+	return sm
 }
 
-func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.State) (func(address common.Address) (value uint64, err error), error) {
+func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateHolder, _ *programs.Programs) (func(address common.Address) (value uint64, err error), error) {
 	return func(address common.Address) (value uint64, err error) {
 		return 100, nil
 	}, nil
+}
+
+// uint64ToBinary converst a uint64 to a byte slice (big endian)
+func uint64ToBinary(integer uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, integer)
+	return b
 }

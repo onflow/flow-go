@@ -2,9 +2,7 @@ package ptrie
 
 import (
 	"bytes"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -21,11 +19,7 @@ func withForest(
 	pathByteSize int,
 	numberOfActiveTries int, f func(t *testing.T, f *mtrie.Forest)) {
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := mtrie.NewForest(pathByteSize, dir, numberOfActiveTries, &metrics.NoopCollector{}, nil)
+	forest, err := mtrie.NewForest(pathByteSize, numberOfActiveTries, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	f(t, forest)
@@ -33,12 +27,12 @@ func withForest(
 
 func TestPartialTrieEmptyTrie(t *testing.T) {
 
-	pathByteSize := 2
+	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
 		// add path1 to the empty trie
 		// 00000000...0 (0)
-		path1 := utils.TwoBytesPath(0)
+		path1 := utils.PathByUint16(0)
 		payload1 := utils.LightPayload('A', 'a')
 
 		paths := []ledger.Path{path1}
@@ -85,14 +79,14 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 func TestPartialTrieLeafUpdates(t *testing.T) {
 
-	pathByteSize := 2
+	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.TwoBytesPath(0)
+		path1 := utils.PathByUint16(0)
 		payload1 := utils.LightPayload('A', 'a')
 		updatedPayload1 := utils.LightPayload('B', 'b')
 
-		path2 := utils.TwoBytesPath(1)
+		path2 := utils.PathByUint16(1)
 		payload2 := utils.LightPayload('C', 'c')
 		updatedPayload2 := utils.LightPayload('D', 'd')
 
@@ -130,18 +124,18 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 
 func TestPartialTrieMiddleBranching(t *testing.T) {
 
-	pathByteSize := 2
+	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.TwoBytesPath(0)
+		path1 := utils.PathByUint16(0)
 		payload1 := utils.LightPayload('A', 'a')
 		updatedPayload1 := utils.LightPayload('B', 'b')
 
-		path2 := utils.TwoBytesPath(2)
+		path2 := utils.PathByUint16(2)
 		payload2 := utils.LightPayload('C', 'c')
 		updatedPayload2 := utils.LightPayload('D', 'd')
 
-		path3 := utils.TwoBytesPath(8)
+		path3 := utils.PathByUint16(8)
 		payload3 := utils.LightPayload('E', 'e')
 		updatedPayload3 := utils.LightPayload('F', 'f')
 
@@ -186,14 +180,14 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 
 func TestPartialTrieRootUpdates(t *testing.T) {
 
-	pathByteSize := 2
+	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.TwoBytesPath(0)
+		path1 := utils.PathByUint16(0)
 		payload1 := utils.LightPayload('A', 'a')
 		updatedPayload1 := utils.LightPayload('B', 'b')
 		//  10000....0
-		path2 := utils.TwoBytesPath(32768)
+		path2 := utils.PathByUint16(32768)
 		payload2 := utils.LightPayload('C', 'c')
 		updatedPayload2 := utils.LightPayload('D', 'd')
 
@@ -236,16 +230,16 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 }
 
 func TestMixProof(t *testing.T) {
-	pathByteSize := 2
+	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := utils.TwoBytesPath(0)
+		path1 := utils.PathByUint16(0)
 		payload1 := utils.LightPayload('A', 'a')
 
-		path2 := utils.TwoBytesPath(2)
+		path2 := utils.PathByUint16(2)
 		updatedPayload2 := utils.LightPayload('D', 'd')
 
-		path3 := utils.TwoBytesPath(8)
+		path3 := utils.PathByUint16(8)
 		payload3 := utils.LightPayload('E', 'e')
 
 		paths := []ledger.Path{path1, path3}
@@ -285,7 +279,7 @@ func TestMixProof(t *testing.T) {
 }
 
 func TestRandomProofs(t *testing.T) {
-	pathByteSize := 2 // key size of 16 bits
+	pathByteSize := 32 // key size of 16 bits
 	minPayloadSize := 2
 	maxPayloadSize := 10
 	experimentRep := 20
@@ -293,7 +287,9 @@ func TestRandomProofs(t *testing.T) {
 		withForest(t, pathByteSize, experimentRep+1, func(t *testing.T, f *mtrie.Forest) {
 
 			// generate some random paths and payloads
-			rand.Seed(time.Now().UnixNano())
+			seed := time.Now().UnixNano()
+			rand.Seed(seed)
+			t.Logf("rand seed is %x", seed)
 			numberOfPaths := rand.Intn(256) + 1
 			paths := utils.RandomPaths(numberOfPaths, pathByteSize)
 			payloads := utils.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
