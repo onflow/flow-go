@@ -81,7 +81,7 @@ func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier
 }
 
 func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
-	if collector := c.collectorByBlockID(incorporatedResult.IncorporatedBlockID); collector == nil {
+	if collector := c.collectorByBlockID(incorporatedResult.IncorporatedBlockID); collector != nil {
 		return nil
 	}
 
