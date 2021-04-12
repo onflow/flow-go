@@ -115,6 +115,10 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 		time.Sleep(time.Second)
 	}
 
+	if result.Error != nil {
+		return fmt.Errorf("error executing transaction: %w", result.Error)
+	}
+
 	return nil
 }
 
