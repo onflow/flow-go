@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
+	"testing"
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/stretchr/testify/require"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -530,6 +532,12 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	}
 }
 
+func WithChunks(n uint) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.Chunks = ChunkListFixture(n, result.BlockID)
+	}
+}
+
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
@@ -815,17 +823,28 @@ func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) 
 	return locators
 }
 
-// ChunkStatusListFixture returns a list of chunk statuses as test fixture.
-// Each chunk status belongs to a different block and execution result.
-// Each chunk status also only contains a single collection.
-func ChunkStatusListFixture(n int) verification.ChunkStatusList {
+// ChunkStatusListFixture receives a set of execution results, and samples `n` chunk out of each result and
+// creates a chunk status for them.
+// It returns the list of sampled chunk statuses for all results.
+func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int) verification.ChunkStatusList {
 	statuses := verification.ChunkStatusList{}
-	for i := 0; i < n; i++ {
-		status := &verification.ChunkStatus{
-			Chunk:             ChunkFixture(IdentifierFixture(), 1),
-			ExecutionResultID: IdentifierFixture(),
+
+	for _, result := range results {
+		// result should have enough chunk to sample
+		require.GreaterOrEqual(t, len(result.Chunks), n)
+
+		var chunkList flow.ChunkList
+		copy(chunkList, result.Chunks)
+		rand.Shuffle(len(chunkList), func(i, j int) { chunkList[i], chunkList[j] = chunkList[j], chunkList[i] })
+
+		resultID := result.ID()
+		for _, chunk := range chunkList {
+			status := &verification.ChunkStatus{
+				Chunk:             ChunkFixture(result.BlockID, uint(chunk.Index)),
+				ExecutionResultID: resultID,
+			}
+			statuses = append(statuses, status)
 		}
-		statuses = append(statuses, status)
 	}
 
 	return statuses
