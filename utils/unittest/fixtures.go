@@ -538,6 +538,15 @@ func WithChunks(n uint) func(*flow.ExecutionResult) {
 	}
 }
 
+func ExecutionResultListFixture(n int, opts ...func(*flow.ExecutionResult)) []*flow.ExecutionResult {
+	results := make([]*flow.ExecutionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, ExecutionResultFixture(opts...))
+	}
+
+	return results
+}
+
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
@@ -833,14 +842,14 @@ func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int
 		// result should have enough chunk to sample
 		require.GreaterOrEqual(t, len(result.Chunks), n)
 
-		var chunkList flow.ChunkList
+		chunkList := make(flow.ChunkList, 2)
 		copy(chunkList, result.Chunks)
 		rand.Shuffle(len(chunkList), func(i, j int) { chunkList[i], chunkList[j] = chunkList[j], chunkList[i] })
 
 		resultID := result.ID()
-		for _, chunk := range chunkList {
+		for _, chunk := range chunkList[:n] {
 			status := &verification.ChunkStatus{
-				Chunk:             ChunkFixture(result.BlockID, uint(chunk.Index)),
+				Chunk:             chunk,
 				ExecutionResultID: resultID,
 			}
 			statuses = append(statuses, status)
