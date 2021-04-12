@@ -221,7 +221,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 
 		// check that the sealed execution results form a chain
 		if incorporatedResult.Result.PreviousResultID != latestSeal.ResultID {
-			return nil, engine.NewInvalidInputErrorf("sealed execution results do not form a chain")
+			return nil, engine.NewInvalidInputErrorf("sealed execution results for block %x does not connect to previously sealed result", blockID)
 		}
 
 		latestSeal = seal

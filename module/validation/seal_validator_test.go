@@ -34,11 +34,18 @@ func (s *SealValidationSuite) SetupTest() {
 
 // TestSealValid tests submitting of valid seal
 func (s *SealValidationSuite) TestSealValid() {
+	// the BaseChainSuite creates the following fork
+	//   RootBlock <- LatestSealedBlock <- LatestFinalizedBlock
+	// with `LatestExecutionResult` as ExecutionResult for LatestSealedBlock
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
 	)
+
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
@@ -124,10 +131,16 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 // is 0, a seal which has 0 signatures for at least one chunk will be accepted,
 // and that the emergency-seal metric will be incremented.
 func (s *SealValidationSuite) TestSealEmergencySeal() {
+	// the BaseChainSuite creates the following fork
+	//   RootBlock <- LatestSealedBlock <- LatestFinalizedBlock
+	// with `LatestExecutionResult` as ExecutionResult for LatestSealedBlock
 	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
 	)
 	blockParent.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
@@ -238,12 +251,28 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
-// TestHighestSeal tests that Validate will pick the seal corresponding to the highest block when
-// the payload contains multiple seals that are not ordered.
+// TestHighestSeal tests that Validate will pick the seal corresponding to the
+// highest block when the payload contains multiple seals that are not ordered.
+// We test with the following known fork:
+//    ... <- B1 <- B2 <- B3{Receipt(B2), Result(B2)} <- B4{Receipt(B3), Result(B3)}
+// with
+//  * B1 is the latest sealed block: we use s.LatestSealedBlock,
+//    which has the result s.LatestExecutionResult
+//  * B2 is the latest finalized block: we use s.LatestFinalizedBlock
+// Now we consider the new candidate block B5:
+//    ... <- B4 <-B5{ SealResult(B3), SealResult(B2) }
+// Note that the order of the seals is specifically reversed. We expect that
+// the validator handles this without error.
 func (s *SealValidationSuite) TestHighestSeal() {
 	// take finalized block and build a receipt for it
 	block3 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
-	block2Receipt := unittest.ReceiptForBlockFixture(s.LatestFinalizedBlock)
+	block2Receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
+	)
 	block3.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
@@ -251,7 +280,13 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	s.Extend(&block3)
 
 	// create and insert block4 containing a receipt for block3
-	block3Receipt := unittest.ReceiptForBlockFixture(&block3)
+	block3Receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(&block3),
+			unittest.WithPreviousResult(block2Receipt.ExecutionResult),
+		)),
+	)
 	block4 := unittest.BlockWithParentFixture(block3.Header)
 	block4.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{block3Receipt.Meta()},
