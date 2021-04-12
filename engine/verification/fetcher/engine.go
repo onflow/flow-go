@@ -133,6 +133,19 @@ func (e *Engine) processAssignedChunk(ctx context.Context, locator *chunks.Locat
 
 	log.Debug().Msg("result and chunk for locator retrieved")
 
+	// if block has been sealed, then we can finish
+	sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not determine whether block has been sealed")
+	}
+
+	if sealed {
+		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
+		log.Info().
+			Msg("drops requesting chunk of a sealed block")
+		return
+	}
+
 	// adds chunk status as a pending chunk to mempool.
 	status := &verification.ChunkStatus{
 		Chunk:             chunk,

@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -85,12 +86,14 @@ func TestSkipDuplicateChunkStatus(t *testing.T) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
-	// creates a single chunk locator.
-	results := unittest.ExecutionResultListFixture(1)
-	statuses := unittest.ChunkStatusListFixture(t, results, 1)
+	// creates a single chunk locator, and mocks its corresponding block unsealed.
+	header := unittest.BlockHeaderFixture()
+	result := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(header.ID()))
+	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+	mockBlockSealingStatus(s.state, s.headers, &header, false)
 
-	mockResultsByIDs(s.results, results, 1)
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{result}, 1)
 	// mocks duplicate chunk exists on pending chunks, i.e., returning false on adding
 	// same locators.
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, false)
@@ -221,4 +224,14 @@ func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier
 		seen[chunkID] = struct{}{}
 
 	}).Return().Times(len(chunkIDs))
+}
+
+// mockBlockSealingStatus mocks protocol state sealing status at height of given block header.
+func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, header *flow.Header, sealed bool) {
+	headers.On("ByBlockID", header.ID()).Return(header, nil)
+	if sealed {
+		test.MockLastSealedHeight(state, header.Height+1)
+	} else {
+		test.MockLastSealedHeight(state, header.Height-1)
+	}
 }

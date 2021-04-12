@@ -290,15 +290,27 @@ func GenesisFixture(identities flow.IdentityList) *flow.Block {
 	return genesis
 }
 
-func BlockHeaderFixture() flow.Header {
+func WithHeaderHeight(height uint64) func(header *flow.Header) {
+	return func(header *flow.Header) {
+		header.Height = height
+	}
+}
+
+func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
 	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))
-	return BlockHeaderWithParentFixture(&flow.Header{
+	header := BlockHeaderWithParentFixture(&flow.Header{
 		ChainID:  flow.Emulator,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
 	})
+
+	for _, opt := range opts {
+		opt(&header)
+	}
+
+	return header
 }
 
 func BlockHeaderFixtureOnChain(chainID flow.ChainID) flow.Header {
@@ -547,6 +559,15 @@ func ExecutionResultListFixture(n int, opts ...func(*flow.ExecutionResult)) []*f
 	return results
 }
 
+func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.BlockID = blockID
+		for _, chunk := range result.Chunks {
+			chunk.BlockID = blockID
+		}
+	}
+}
+
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
@@ -558,6 +579,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	for _, apply := range opts {
 		apply(result)
 	}
+
 	return result
 }
 
