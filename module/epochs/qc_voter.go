@@ -127,7 +127,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		err = voter.client.SubmitVote(ctx, vote)
 		if err != nil {
 			log.Error().Err(err).Msg("could not submit vote - retrying...")
-			continue
+			return fmt.Errorf("could not submit vote: %w", err)
 		}
 
 		log.Info().Msg("successfully submitted vote - exiting QC vote process...")
