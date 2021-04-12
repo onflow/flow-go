@@ -1,6 +1,8 @@
 package fetcher_test
 
 import (
+	"bytes"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -8,7 +10,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -29,13 +30,13 @@ type FetcherEngineTestSuite struct {
 	log                   zerolog.Logger
 	metrics               *metrics.NoopCollector
 	tracer                *trace.NoopTracer
-	verifier              *mocknetwork.Engine               // the verifier engine
-	state                 *protocol.State                   // used to verify the request origin
-	pendingChunks         *mempool.ChunkStatuses            // used to store all the pending chunks that assigned to this node
-	headers               *storage.Headers                  // used to fetch the block header when chunk data is ready to be verified
-	chunkConsumerNotifier *module.ProcessingNotifier        // to report a chunk has been processed
-	results               *storage.ExecutionResults         // to retrieve execution result of an assigned chunk
-	receipts              *storage.ExecutionReceipts        // used to find executor of the chunk
+	verifier              *mocknetwork.Engine                 // the verifier engine
+	state                 *protocol.State                     // used to verify the request origin
+	pendingChunks         *mempool.ChunkStatuses              // used to store all the pending chunks that assigned to this node
+	headers               *storage.Headers                    // used to fetch the block header when chunk data is ready to be verified
+	chunkConsumerNotifier *module.ProcessingNotifier          // to report a chunk has been processed
+	results               *storage.ExecutionResults           // to retrieve execution result of an assigned chunk
+	receipts              *storage.ExecutionReceipts          // used to find executor of the chunk
 	requester             *mockfetcher.ChunkDataPackRequester // used to request chunk data packs from network
 }
 
@@ -70,20 +71,36 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 		s.results,
 		s.receipts,
 		s.requester)
+
+	e.WithChunkConsumerNotifier(s.chunkConsumerNotifier)
 	return e
 }
 
 // TestFetcherEngineHappyPathCycle
-func TestFetcherEngineHappyPathCycle(t *testing.T) {
+func TestSkipDuplicateChunkLocator(t *testing.T) {
 	s := setupTest()
-	e :=
+	e := newFetcherEngine(s)
+
+	results := unittest.ExecutionResultListFixture(1)
+	statuses := unittest.ChunkStatusListFixture(t, results, 1)
+	fmt.Printf("%v\n", flow.GetIDs(statuses))
+	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+
+	mockResultsByIDs(s.results, results, 1)
+
+	// mocks duplicate chunk exists on pending chunks, i.e., returning false on adding
+	// same locators.
+	mockPendingChunksAdd(t, s.pendingChunks, statuses, false)
+
+	e.ProcessAssignedChunk(locators[0])
+
 }
 
 // mockResultsByIDs mocks the results storage for affirmative querying of result IDs.
 // Each result should be queried by the specified number of times.
 func mockResultsByIDs(results *storage.ExecutionResults, list []*flow.ExecutionResult, times int) {
 	for _, result := range list {
-		results.On("ByID", result.ID()).Return(results).Times(times)
+		results.On("ByID", result.ID()).Return(result, nil).Times(times)
 	}
 }
 
@@ -158,18 +175,44 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 		mu.Lock()
 		defer mu.Unlock()
 
-		status, ok := args[0].(*verification.ChunkStatus)
+		actual, ok := args[0].(*verification.ChunkStatus)
 		require.True(t, ok)
 
 		// there should be a matching chunk status with the received one.
-		statusID := status.ID()
-		for _, s := range list {
-			if s.Chunk.ID() == statusID {
-				require.Equal(t, status.ExecutionResultID, s.ExecutionResultID)
+		statusID := actual.Chunk.ID()
+		fmt.Printf("%x\n", statusID)
+
+		for _, expected := range list {
+			expectedID := expected.Chunk.ID()
+			fmt.Printf("%x\n", expectedID)
+			if bytes.Equal(expectedID[:], statusID[:]) {
+				require.Equal(t, expected.ExecutionResultID, actual.ExecutionResultID)
 				return
 			}
 		}
 
 		require.Fail(t, "tried adding an unexpected chunk status to mempool")
 	}).Return(added).Times(len(list))
+}
+
+// mockChunkConsumerNotifier mocks the notify method of processing notifier to be notified exactly once per
+// given chunk IDs.
+func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier, chunkIDs []*verification.ChunkStatus, added bool) {
+	mu := &sync.Mutex{}
+	seen := make(map[flow.Identifier]struct{})
+	notifier.On("Notify", mock.Anything).Run(func(args mock.Arguments) {
+		// to provide mutual exclusion under concurrent invocations.
+		mu.Lock()
+		defer mu.Unlock()
+
+		chunkID, ok := args[0].(flow.Identifier)
+		require.True(t, ok)
+		require.Contains(t, chunkIDs, chunkID, "tried calling notifier on an unexpected chunk ID")
+
+		// each chunk should be notified once
+		_, ok = seen[chunkID]
+		require.False(t, ok)
+		seen[chunkID] = struct{}{}
+
+	}).Return().Times(len(chunkIDs))
 }
