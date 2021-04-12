@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/module/metrics"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -58,7 +59,8 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 		cache: newCache(collector,
 			withLimit(transactionResultsCacheSize),
 			withStore(noopStore),
-			withRetrieve(retrieve)),
+			withRetrieve(retrieve),
+			withResource(metrics.ResourceTransactionResults)),
 	}
 }
 
