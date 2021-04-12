@@ -1,10 +1,6 @@
 package hash
 
 import (
-	"os"
-
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
@@ -32,12 +28,7 @@ const defaultHashesNum = TreeMaxHeight + 1
 // array to store all default hashes
 var defaultHashes [defaultHashesNum]Hash
 
-// TODO: remove once the hashing with 32-bytes input is tested
-var log zerolog.Logger
-
 func init() {
-
-	log = zerolog.New(os.Stderr)
 
 	hasher := hash.NewSHA3_256()
 	copy(defaultLeafHash[:], hasher.ComputeHash([]byte("default:")))

@@ -34,8 +34,7 @@ import (
 //     between v and a tree leaf. The height of a tree is the height of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type MTrie struct {
-	root         *node.Node
-	pathByteSize int
+	root *node.Node
 }
 
 // NewEmptyMTrie returns an empty Mtrie (root is an empty node)
@@ -58,9 +57,6 @@ func NewMTrie(root *node.Node) (*MTrie, error) {
 // Height returns the height of the trie, which
 // is the height of its root node.
 func (mt *MTrie) Height() int {
-	if mt.root == nil {
-		return hash.TreeMaxHeight
-	}
 	return mt.root.Height()
 }
 
@@ -78,23 +74,19 @@ func (mt *MTrie) StringRootHash() string {
 
 // RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
 // Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) RootHash() ledger.RootHash { return ledger.RootHash(mt.root.Hash()) }
+func (mt *MTrie) RootHash() ledger.RootHash {
+	return ledger.RootHash(mt.root.Hash())
+}
 
 // AllocatedRegCount returns the number of allocated registers in the trie.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) AllocatedRegCount() uint64 {
-	if mt.root == nil {
-		return 0
-	}
 	return mt.root.RegCount()
 }
 
 // MaxDepth returns the length of the longest branch from root to leaf.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) MaxDepth() uint16 {
-	if mt.root == nil {
-		return 0
-	}
 	return mt.root.MaxDepth()
 }
 

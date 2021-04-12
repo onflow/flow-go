@@ -17,12 +17,6 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
-const (
-	// ReferenceImplPathByteSize is the path length in reference implementation: 32 bytes.
-	// Please do NOT CHANGE.
-	ReferenceImplPathByteSize = 32
-)
-
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
