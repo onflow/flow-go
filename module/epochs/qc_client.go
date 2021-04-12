@@ -126,6 +126,10 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		time.Sleep(time.Second)
 	}
 
+	if result.Error != nil {
+		return fmt.Errorf("error executing transaction: %w", result.Error)
+	}
+
 	return nil
 }
 
