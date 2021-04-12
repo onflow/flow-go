@@ -51,7 +51,8 @@ func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgC
 // smart contract. An error is returned if the transaction has failed.
 func (c *Client) Broadcast(msg model.DKGMessage) error {
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultDKGClientTxTimeout)
+	defer cancel()
 
 	// get account for given address
 	account, err := c.flowClient.GetAccount(ctx, c.accountAddress, grpc.EmptyCallOption{})
