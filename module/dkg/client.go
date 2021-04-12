@@ -52,7 +52,7 @@ func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgC
 // smart contract. An error is returned if the transaction has failed.
 func (c *Client) Broadcast(msg model.DKGMessage) error {
 
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultDKGClientTxTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
 	defer cancel()
 
 	// get account for given address
@@ -113,8 +113,8 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 			return fmt.Errorf("broadcast dkg message transaction has expired")
 		}
 
-		// wait 1 second before trying again.
-		time.Sleep(epochs.TransactionSubmissionTimeout)
+		// wait before trying again.
+		time.Sleep(epochs.TransactionStatusRetryTimeout)
 	}
 
 	if result.Error != nil {

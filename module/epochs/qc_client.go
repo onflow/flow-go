@@ -21,6 +21,10 @@ import (
 // TransactionSubmissionTimeout is the time after which we return an error.
 const TransactionSubmissionTimeout = 5 * time.Minute
 
+// TransactionStatusRetryTimeout is the time after which the status of a transaction
+// is checked again
+const TransactionStatusRetryTimeout = 1 * time.Second
+
 // QCContractClient is a client to the Quorum Certificate contract. Allows the client to
 // functionality to submit a vote and check if collection node has voted already.
 type QCContractClient struct {
@@ -123,7 +127,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		}
 
 		// wait 1 second before trying again.
-		time.Sleep(time.Second)
+		time.Sleep(TransactionStatusRetryTimeout)
 	}
 
 	if result.Error != nil {
