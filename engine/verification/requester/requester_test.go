@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/rs/zerolog"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -177,7 +178,7 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithHeight(5),
 		unittest.WithAgrees(aggrees),
 		unittest.WithDisagrees(disaggrees))
-	mockLastSealedHeight(s.state, 10)
+	test.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(status)
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
 
@@ -214,7 +215,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	chunkCollectionIdMap := chunkToCollectionIdMap(t, []*messages.ChunkDataResponse{response})
 
 	// mocks the requester pipeline
-	mockLastSealedHeight(s.state, sealedHeight)
+	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(status)
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
@@ -256,7 +257,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 		unittest.WithDisagrees(disaggrees))
 	status := append(sealedStatus, unsealedStatus...)
 
-	mockLastSealedHeight(s.state, sealedHeight)
+	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(status)
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
 
@@ -299,7 +300,7 @@ func testRequestPendingChunkDataPack(t *testing.T, requests int, attempts int) {
 		unittest.WithHeightGreaterThan(5),
 		unittest.WithAgrees(aggrees),
 		unittest.WithDisagrees(disaggrees))
-	mockLastSealedHeight(s.state, 5)
+	test.MockLastSealedHeight(s.state, 5)
 	s.pendingRequests.On("All").Return(status)
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), attempts)
 
@@ -493,13 +494,4 @@ func mockPendingRequestsIncAttempt(t *testing.T, pendingRequests *mempool.ChunkR
 		Return(true).
 		Times(len(chunkIDs) * attempts)
 
-}
-
-// mockLastSealedHeight mocks the protocol state for the specified last sealed height.
-func mockLastSealedHeight(state *protocol.State, height uint64) {
-	snapshot := &protocol.Snapshot{}
-	header := unittest.BlockHeaderFixture()
-	header.Height = height
-	state.On("Sealed").Return(snapshot)
-	snapshot.On("Head").Return(&header, nil)
 }
