@@ -401,6 +401,22 @@ func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID 
 	return agrees, disagrees, nil
 }
 
+// blockIsSealed returns true if the block at specified height by block ID is sealed.
+func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
+	header, err := e.headers.ByBlockID(blockID)
+	if err != nil {
+		return false, fmt.Errorf("could not get block header: %w", err)
+	}
+
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		return false, fmt.Errorf("could not get last sealed: %w", err)
+	}
+
+	sealed := header.Height <= lastSealed.Height
+	return sealed, nil
+}
+
 // executorsOf segregates the executors of the given receipts based on the given execution result id.
 // The agree set contains the executors who made receipt with the same result as the given result id.
 // The disagree set contains the executors who made receipt with different result than the given result id.
