@@ -30,6 +30,12 @@ func noStore(key interface{}, val interface{}) func(*badger.Txn) error {
 	}
 }
 
+func noopStore(key interface{}, val interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		return nil
+	}
+}
+
 type retrieveFunc func(key interface{}) func(*badger.Txn) (interface{}, error)
 
 func withRetrieve(retrieve retrieveFunc) func(*Cache) {
@@ -106,10 +112,10 @@ func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 
 // Put will add an resource to the cache with the given ID.
 func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
-		// try to store the resource
-		err := c.store(key, resource)(tx)
+	return func(tx *badger.Txn) error {
+		err := storeOps(tx) // execute operations to store recourse
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}

@@ -29,15 +29,16 @@ type ProviderEngine interface {
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
 type Engine struct {
-	unit          *engine.Unit
-	log           zerolog.Logger
-	tracer        module.Tracer
-	receiptCon    network.Conduit
-	state         protocol.State
-	execState     state.ReadOnlyExecutionState
-	me            module.Local
-	chunksConduit network.Conduit
-	metrics       module.ExecutionMetrics
+	unit               *engine.Unit
+	log                zerolog.Logger
+	tracer             module.Tracer
+	receiptCon         network.Conduit
+	state              protocol.State
+	execState          state.ReadOnlyExecutionState
+	me                 module.Local
+	chunksConduit      network.Conduit
+	metrics            module.ExecutionMetrics
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
 }
 
 func New(
@@ -48,18 +49,20 @@ func New(
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
-		unit:      engine.NewUnit(),
-		log:       log,
-		tracer:    tracer,
-		state:     state,
-		me:        me,
-		execState: execState,
-		metrics:   metrics,
+		unit:               engine.NewUnit(),
+		log:                log,
+		tracer:             tracer,
+		state:              state,
+		me:                 me,
+		execState:          execState,
+		metrics:            metrics,
+		checkStakedAtBlock: checkStakedAtBlock,
 	}
 
 	var err error
@@ -196,9 +199,18 @@ func (e *Engine) onChunkDataRequest(
 }
 
 func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
+
 	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
+	}
+
+	stakedAt, err := e.checkStakedAtBlock(blockID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
+	}
+	if !stakedAt {
+		return nil, engine.NewInvalidInputErrorf("this node is not staked at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
 	}
 
 	origin, err := e.state.AtBlockID(blockID).Identity(originID)
@@ -212,7 +224,7 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 	}
 
 	if origin.Stake == 0 {
-		return nil, engine.NewInvalidInputErrorf("node %s is not staked for the epoch corresponding to the requested chunk data pack", origin.NodeID)
+		return nil, engine.NewInvalidInputErrorf("node %s is not staked at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
 	}
 	return origin, nil
 }

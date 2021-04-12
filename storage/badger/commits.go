@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
@@ -26,7 +27,7 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 		blockID := key.(flow.Identifier)
 		var commit flow.StateCommitment
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.LookupStateCommitment(blockID, &commit))
+			err := operation.LookupStateCommitment(blockID, &commit)(tx)
 			return commit, err
 		}
 	}
@@ -60,6 +61,13 @@ func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow
 
 func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
 	return operation.RetryOnConflict(c.db.Update, c.storeTx(blockID, commit))
+}
+
+func (c *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.BatchStorage) error {
+	// we can't cache while using batches, as it's unknown at this point when, and if
+	// the batch will be committed. Cache will be populated on read however.
+	writeBatch := batch.GetWriter()
+	return operation.BatchIndexStateCommitment(blockID, commit)(writeBatch)
 }
 
 func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {

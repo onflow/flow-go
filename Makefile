@@ -111,6 +111,8 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'Connector' -dir=network/p2p/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
@@ -122,6 +124,10 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ExecForkActor' --structname 'ExecForkActorMock' -dir=module/mempool/consensus/mock/ -case=underscore -output="./module/mempool/consensus/mock/" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/verification/fetcher/ -case=underscore -output="./engine/verification/fetcher/mock" -outpkg="mockfetcher"
+
+
+
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -283,6 +289,10 @@ docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap --target production \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" -t "$(CONTAINER_REGISTRY)/bootstrap:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
 
+PHONY: tool-bootstrap
+tool-bootstrap: docker-build-bootstrap
+	docker container create --name bootstrap $(CONTAINER_REGISTRY)/bootstrap:latest;docker container cp bootstrap:/bin/app ./bootstrap;docker container rm bootstrap
+
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --no-cache \
@@ -373,7 +383,7 @@ docker-run-ghost:
 	docker run -p 9000:9000 -p 3569:3569 "$(CONTAINER_REGISTRY)/ghost:latest" --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries ghost-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 PHONY: docker-all-tools
-docker-all-tools: tool-util tool-read-badger tool-read-protocol-state tool-remove-execution-fork
+docker-all-tools: tool-util tool-remove-execution-fork
 
 PHONY: docker-build-util
 docker-build-util:
@@ -382,25 +392,7 @@ docker-build-util:
 
 PHONY: tool-util
 tool-util: docker-build-util
-	docker container create --name util ${CONTAINER_REGISTRY)/util:latest;docker container cp util:/bin/app ./util;docker container rm util
-
-PHONY: docker-build-read-badger
-docker-build-read-badger:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=util/cmd/read-badger --target production \
-		-t "$(CONTAINER_REGISTRY)/read-badger:latest" -t "$(CONTAINER_REGISTRY)/read-badger:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/read-badger:$(IMAGE_TAG)" .
-
-PHONY: tool-read-badger
-tool-read-badger: docker-build-read-badger
-	docker container create --name read-badger ${CONTAINER_REGISTRY)/read-badger:latest;docker container cp read-badger:/bin/app ./read-badger;docker container rm read-badger
-
-PHONY: docker-build-read-protocol-state
-docker-build-read-protocol-state:
-	docker build -f cmd/Dockerfile --ssh default --build-arg TARGET=util/cmd/read-protocol-state --target production \
-		-t "$(CONTAINER_REGISTRY)/read-protocol-state:latest" -t "$(CONTAINER_REGISTRY)/read-protocol-state:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/read-protocol-state:$(IMAGE_TAG)" .
-
-PHONY: tool-read-protocol-state
-tool-read-protocol-state: docker-build-read-protocol-state
-	docker container create --name read-protocol-state ${CONTAINER_REGISTRY)/read-protocol-state:latest;docker container cp read-protocol-state:/bin/app ./read-protocol-state;docker container rm read-protocol-state
+	docker container create --name util $(CONTAINER_REGISTRY)/util:latest;docker container cp util:/bin/app ./util;docker container rm util
 
 PHONY: docker-build-remove-execution-fork
 docker-build-remove-execution-fork:
@@ -409,7 +401,7 @@ docker-build-remove-execution-fork:
 
 PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
-	docker container create --name remove-execution-fork ${CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
+	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
 # Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
 .PHONY: check-go-version

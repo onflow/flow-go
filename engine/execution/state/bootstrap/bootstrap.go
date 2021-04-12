@@ -5,13 +5,12 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -32,21 +31,23 @@ func NewBootstrapper(logger zerolog.Logger) *Bootstrapper {
 func (b *Bootstrapper) BootstrapLedger(
 	ledger ledger.Ledger,
 	servicePublicKey flow.AccountPublicKey,
-	initialTokenSupply cadence.UFix64,
 	chain flow.Chain,
+	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
 	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
+	programs := programs.NewEmptyPrograms()
 
-	vm := fvm.New(runtime.NewInterpreterRuntime())
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
 
 	ctx := fvm.NewContext(b.logger, fvm.WithChain(chain))
 
 	bootstrap := fvm.Bootstrap(
 		servicePublicKey,
-		fvm.WithInitialTokenSupply(initialTokenSupply),
+		opts...,
 	)
 
-	err := vm.Run(ctx, bootstrap, view)
+	err := vm.Run(ctx, bootstrap, view, programs)
 	if err != nil {
 		return flow.EmptyStateCommitment, err
 	}

@@ -1,13 +1,15 @@
 package run
 
 import (
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -30,16 +32,29 @@ func GenerateServiceAccountPrivateKey(seed []byte) (flow.AccountPrivateKey, erro
 func GenerateExecutionState(
 	dbDir string,
 	accountKey flow.AccountPublicKey,
-	tokenSupply cadence.UFix64,
 	chain flow.Chain,
+	bootstrapOptions ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
 	metricsCollector := &metrics.NoopCollector{}
 
-	ledgerStorage, err := ledger.NewLedger(dbDir, 100, metricsCollector, zerolog.Nop(), nil, ledger.DefaultPathFinderVersion)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return flow.EmptyStateCommitment, err
 	}
-	defer ledgerStorage.CloseStorage()
+	defer func() {
+		<-diskWal.Done()
+	}()
 
-	return bootstrap.NewBootstrapper(zerolog.Nop()).BootstrapLedger(ledgerStorage, accountKey, tokenSupply, chain)
+	ledgerStorage, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
+	if err != nil {
+		return flow.EmptyStateCommitment, err
+	}
+
+	return bootstrap.NewBootstrapper(
+		zerolog.Nop()).BootstrapLedger(
+		ledgerStorage,
+		accountKey,
+		chain,
+		bootstrapOptions...,
+	)
 }

@@ -225,69 +225,13 @@ func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *delta.View {
 	return r0
 }
 
-// PersistChunkDataPack provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) PersistChunkDataPack(_a0 context.Context, _a1 *flow.ChunkDataPack, _a2 flow.Identifier) error {
-	ret := _m.Called(_a0, _a1, _a2)
+// PersistExecutionState provides a mock function with given fields: ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results
+func (_m *ExecutionState) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+	ret := _m.Called(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ChunkDataPack, flow.Identifier) error); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// PersistExecutionReceipt provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) PersistExecutionReceipt(_a0 context.Context, _a1 *flow.ExecutionReceipt) error {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecutionReceipt) error); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// PersistExecutionResult provides a mock function with given fields: ctx, result
-func (_m *ExecutionState) PersistExecutionResult(ctx context.Context, result *flow.ExecutionResult) error {
-	ret := _m.Called(ctx, result)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.ExecutionResult) error); ok {
-		r0 = rf(ctx, result)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// PersistStateCommitment provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) PersistStateCommitment(_a0 context.Context, _a1 flow.Identifier, _a2 flow.StateCommitment) error {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, flow.StateCommitment) error); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// PersistStateInteractions provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) PersistStateInteractions(_a0 context.Context, _a1 flow.Identifier, _a2 []*delta.Snapshot) error {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, []*delta.Snapshot) error); ok {
-		r0 = rf(_a0, _a1, _a2)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.StateCommitment, []*flow.ChunkDataPack, *flow.ExecutionReceipt, []flow.Event, []flow.Event, []flow.TransactionResult) error); ok {
+		r0 = rf(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -2,147 +2,148 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
-	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module"
 )
 
 type VerificationCollector struct {
-	tracer          *trace.OpenTracer
-	storagePerChunk prometheus.Gauge // storage per chunk
+	tracer module.Tracer
+
+	// Assigner Engine
+	receivedFinalizedHeight prometheus.Gauge   // the last finalized height received by assigner engine
+	assignedChunksTotal     prometheus.Counter // total chunks assigned to this verification node
+	sentChunksTotal         prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
 
 	// Finder Engine
-	rcvReceiptsTotal         prometheus.Counter // total execution receipts arrived at finder engine
-	sntExecutionResultsTotal prometheus.Counter // total execution results processed by finder engine
+	receivedReceiptsTotal     prometheus.Counter // total execution receipts arrived at finder engine
+	sentExecutionResultsTotal prometheus.Counter // total execution results processed by finder engine
 
 	// Match Engine
-	rcvExecutionResultsTotal prometheus.Counter // total execution results received by match engine
-	sntVerifiableChunksTotal prometheus.Counter // total chunks matched by match engine and sent to verifier engine
-	rcvChunkDataPackTotal    prometheus.Counter // total chunk data packs received by match engine
-	reqChunkDataPackTotal    prometheus.Counter // total number of chunk data packs requested by match engine
+	receivedExecutionResultsTotal prometheus.Counter // total execution results received by match engine
+	sntVerifiableChunksTotal      prometheus.Counter // total chunks matched by match engine and sent to verifier engine
+	receivedChunkDataPackTotal    prometheus.Counter // total chunk data packs received by match engine
+	requestedChunkDataPackTotal   prometheus.Counter // total number of chunk data packs requested by match engine
 
 	// Verifier Engine
-	rcvVerifiableChunksTotal prometheus.Counter // total verifiable chunks received by verifier engine
-	resultApprovalsTotal     prometheus.Counter // total result approvals sent by verifier engine
+	receivedVerifiableChunksTotal prometheus.Counter // total verifiable chunks received by verifier engine
+	resultApprovalsTotal          prometheus.Counter // total result approvals sent by verifier engine
 
 }
 
-func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Registerer, log zerolog.Logger) *VerificationCollector {
+func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Registerer) *VerificationCollector {
+	// Assigner Engine
+	receivedFinalizedHeight := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:      "finalized_height",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "the last finalized height received by assigner engine",
+	})
 
-	// Finder Engine
-	rcvReceiptsTotals := promauto.NewCounter(prometheus.CounterOpts{
+	assignedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "chunk_assigned_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "total number of chunks assigned to verification node",
+	})
+
+	sentChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "processed_chunk_sent_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "total number chunks sent by assigner engine to chunk consumer",
+	})
+
+	// till new pipeline of assigner-fetcher-verifier is in place, we need to keep these metrics
+	// as they are. Though assigner and finder share this receivedReceiptsTotal, which should be refactored
+	// later.
+	// TODO rename name space to assigner
+	// Finder (and Assigner) Engine
+	receivedReceiptsTotals := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_receipt_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFinderEngine,
 		Help:      "total number of execution receipts received by finder engine",
 	})
-	err := registerer.Register(rcvReceiptsTotals)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvReceiptsTotals metric")
-	}
 
-	sntExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
+	// TODO remove metric once finer removed
+	sentExecutionResultsTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFinderEngine,
 		Help:      "total number of execution results sent by finder engine to match engine",
 	})
-	err = registerer.Register(sntExecutionResultsTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntExecutionResultsTotal metric")
-	}
 
 	// Match Engine
-	rcvExecutionResultsTotal := promauto.NewCounter(prometheus.CounterOpts{
+	receivedExecutionResultsTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "execution_result_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of execution results received by match engine from finder engine",
 	})
-	err = registerer.Register(rcvExecutionResultsTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvExecutionResultsTotal) metric")
-	}
 
-	sntVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sentVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of verifiable chunks sent by match engine to verifier engine",
 	})
-	err = registerer.Register(sntVerifiableChunksTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntVerifiableChunksTotal metric")
-	}
 
-	rcvChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
+	receivedChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of chunk data packs received by match engine",
 	})
-	err = registerer.Register(rcvChunkDataPackTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvChunkDataPackTotal metric")
-	}
 
-	reqChunkDataPackTotal := promauto.NewCounter(prometheus.CounterOpts{
+	requestedChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_requested_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemMatchEngine,
 		Help:      "total number of chunk data packs requested by match engine",
 	})
-	err = registerer.Register(reqChunkDataPackTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register reqChunkDataPackTotal metric")
-	}
 
 	// Verifier Engine
-	rcvVerifiableChunksTotal := promauto.NewCounter(prometheus.CounterOpts{
+	receivedVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
 		Help:      "total number verifiable chunks received by verifier engine from match engine",
 	})
-	err = registerer.Register(rcvVerifiableChunksTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register rcvVerifiableChunksTotal metric")
-	}
 
-	sntResultApprovalTotal := promauto.NewCounter(prometheus.CounterOpts{
+	sentResultApprovalTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "result_approvals_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
 		Help:      "total number of emitted result approvals by verifier engine",
 	})
-	err = registerer.Register(sntResultApprovalTotal)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register sntResultApprovalTotal metric")
-	}
 
-	// Storage
-	storagePerChunk := promauto.NewGauge(prometheus.GaugeOpts{
-		Name:      "storage_latest_chunk_size_bytes",
-		Namespace: namespaceVerification,
-		Help:      "latest ingested chunk resources storage (bytes)",
-	})
-	err = registerer.Register(storagePerChunk)
-	if err != nil {
-		log.Debug().Err(err).Msg("could not register storagePerChunk metric")
-	}
+	// registers all metrics and panics if any fails.
+	registerer.MustRegister(
+		receivedFinalizedHeight,
+		assignedChunksTotal,
+		sentChunksTotal,
+		receivedReceiptsTotals,
+		sentExecutionResultsTotal,
+		receivedExecutionResultsTotal,
+		sentVerifiableChunksTotal,
+		receivedChunkDataPackTotal,
+		requestedChunkDataPackTotal,
+		receivedVerifiableChunksTotal,
+		sentResultApprovalTotal)
 
 	vc := &VerificationCollector{
-		tracer:                   tracer,
-		rcvReceiptsTotal:         rcvReceiptsTotals,
-		sntExecutionResultsTotal: sntExecutionResultsTotal,
-		rcvExecutionResultsTotal: rcvExecutionResultsTotal,
-		sntVerifiableChunksTotal: sntVerifiableChunksTotal,
-		rcvVerifiableChunksTotal: rcvVerifiableChunksTotal,
-		resultApprovalsTotal:     sntResultApprovalTotal,
-		storagePerChunk:          storagePerChunk,
-		rcvChunkDataPackTotal:    rcvChunkDataPackTotal,
-		reqChunkDataPackTotal:    reqChunkDataPackTotal,
+		tracer:                        tracer,
+		receivedFinalizedHeight:       receivedFinalizedHeight,
+		assignedChunksTotal:           assignedChunksTotal,
+		sentChunksTotal:               sentChunksTotal,
+		receivedReceiptsTotal:         receivedReceiptsTotals,
+		sentExecutionResultsTotal:     sentExecutionResultsTotal,
+		receivedExecutionResultsTotal: receivedExecutionResultsTotal,
+		sntVerifiableChunksTotal:      sentVerifiableChunksTotal,
+		receivedVerifiableChunksTotal: receivedVerifiableChunksTotal,
+		resultApprovalsTotal:          sentResultApprovalTotal,
+		receivedChunkDataPackTotal:    receivedChunkDataPackTotal,
+		requestedChunkDataPackTotal:   requestedChunkDataPackTotal,
 	}
 
 	return vc
@@ -151,20 +152,20 @@ func NewVerificationCollector(tracer *trace.OpenTracer, registerer prometheus.Re
 // OnExecutionReceiptReceived is called whenever a new execution receipt arrives
 // at Finder engine. It increments total number of received receipts.
 func (vc *VerificationCollector) OnExecutionReceiptReceived() {
-	vc.rcvReceiptsTotal.Inc()
+	vc.receivedReceiptsTotal.Inc()
 }
 
 // OnExecutionResultSent is called whenever a new execution result is sent by
 // Finder engine to the match engine. It increments total number of sent execution results.
 func (vc *VerificationCollector) OnExecutionResultSent() {
-	vc.sntExecutionResultsTotal.Inc()
+	vc.sentExecutionResultsTotal.Inc()
 }
 
 // OnExecutionResultReceived is called whenever a new execution result is successfully received
 // by Match engine from Finder engine.
 // It increments the total number of received execution results.
 func (vc *VerificationCollector) OnExecutionResultReceived() {
-	vc.rcvExecutionResultsTotal.Inc()
+	vc.receivedExecutionResultsTotal.Inc()
 }
 
 // OnVerifiableChunkSent is called on a successful submission of matched chunk
@@ -177,19 +178,19 @@ func (vc *VerificationCollector) OnVerifiableChunkSent() {
 // OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
 // It increments the total number of chunk data packs received.
 func (vc *VerificationCollector) OnChunkDataPackReceived() {
-	vc.rcvChunkDataPackTotal.Inc()
+	vc.receivedChunkDataPackTotal.Inc()
 }
 
 // OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
 // It increments the total number of chunk data packs requested.
 func (vc *VerificationCollector) OnChunkDataPackRequested() {
-	vc.reqChunkDataPackTotal.Inc()
+	vc.requestedChunkDataPackTotal.Inc()
 }
 
 // OnVerifiableChunkReceived is called whenever a verifiable chunk is received by Verifier engine
 // from Match engine.It increments the total number of sent verifiable chunks.
 func (vc *VerificationCollector) OnVerifiableChunkReceived() {
-	vc.rcvVerifiableChunksTotal.Inc()
+	vc.receivedVerifiableChunksTotal.Inc()
 }
 
 // OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
@@ -199,14 +200,25 @@ func (vc *VerificationCollector) OnResultApproval() {
 	// fo by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine
 	vc.resultApprovalsTotal.Inc()
-
 }
 
-// LogVerifiableChunkSize is called whenever a verifiable chunk is shaped for a specific
-// chunk. It adds the size of the verifiable chunk to the histogram. A verifiable chunk is assumed
-// to capture all the resources needed to verify a chunk.
-// The purpose of this function is to track the overall chunk resources size on disk.
-// Todo wire this up to do monitoring (3183)
-func (vc *VerificationCollector) LogVerifiableChunkSize(size float64) {
-	vc.storagePerChunk.Set(size)
+// OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
+// It sets updates the latest finalized height processed at assigner engine.
+//
+// Note: it assumes blocks are coming to assigner engine in strictly increasing order of their height.
+func (vc *VerificationCollector) OnAssignerProcessFinalizedBlock(height uint64) {
+	vc.receivedFinalizedHeight.Set(float64(height))
+}
+
+// OnChunksAssigned is called whenever chunks assigned to this verification node by applying chunk assignment on an
+// execution result.
+// It increases the total number of assigned chunks by the input.
+func (vc *VerificationCollector) OnChunksAssigned(chunks int) {
+	vc.assignedChunksTotal.Add(float64(chunks))
+}
+
+// OnChunkProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
+// It increments the total number of sent chunks.
+func (vc *VerificationCollector) OnChunkProcessed() {
+	vc.sentChunksTotal.Inc()
 }

@@ -4,13 +4,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func GenerateRootSeal(result *flow.ExecutionResult, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Seal {
+func GenerateRootSeal(result *flow.ExecutionResult) *flow.Seal {
 	finalState := result.FinalStateCommitment()
 	seal := &flow.Seal{
-		BlockID:       result.BlockID,
-		ResultID:      result.ID(),
-		FinalState:    finalState,
-		ServiceEvents: []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()},
+		BlockID:    result.BlockID,
+		ResultID:   result.ID(),
+		FinalState: finalState,
 	}
 	return seal
 }

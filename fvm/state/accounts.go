@@ -2,30 +2,29 @@ package state
 
 import (
 	"bytes"
-	"errors"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const (
-	KeyExists         = "exists"
-	KeyCode           = "code"
-	KeyContractNames  = "contract_names"
-	KeyPublicKeyCount = "public_key_count"
-	KeyStorageUsed    = "storage_used"
-	uint64StorageSize = 8
-)
-
-var (
-	ErrAccountNotFound          = errors.New("account not found")
-	ErrAccountPublicKeyNotFound = errors.New("account public key not found")
+	KeyExists             = "exists"
+	KeyCode               = "code"
+	KeyContractNames      = "contract_names"
+	KeyPublicKeyCount     = "public_key_count"
+	KeyStorageUsed        = "storage_used"
+	KeyAccountFrozen      = "frozen"
+	uint64StorageSize     = 8
+	AccountFrozenValue    = 1
+	AccountNotFrozenValue = 0
 )
 
 func keyPublicKey(index uint64) string {
@@ -33,12 +32,12 @@ func keyPublicKey(index uint64) string {
 }
 
 type Accounts struct {
-	state *State
+	stateHolder *StateHolder
 }
 
-func NewAccounts(state *State) *Accounts {
+func NewAccounts(stateHolder *StateHolder) *Accounts {
 	return &Accounts{
-		state: state,
+		stateHolder: stateHolder,
 	}
 }
 
@@ -52,7 +51,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 	}
 
 	if !ok {
-		return nil, ErrAccountNotFound
+		return nil, errors.NewAccountNotFoundError(address)
 	}
 	contracts := make(map[string][]byte)
 	contractNames, err := a.getContractNames(address)
@@ -85,7 +84,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 func (a *Accounts) Exists(address flow.Address) (bool, error) {
 	exists, err := a.getValue(address, false, KeyExists)
 	if err != nil {
-		return false, newLedgerGetError(KeyExists, address, err)
+		return false, err
 	}
 
 	if len(exists) != 0 {
@@ -102,7 +101,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 		return err
 	}
 	if exists {
-		return fmt.Errorf("account with address %s already exists", newAddress.Hex())
+		return errors.NewAccountAlreadyExistsError(newAddress)
 	}
 
 	storageUsedByStorageUsed := uint64(RegisterSize(newAddress, false, KeyStorageUsed, make([]byte, uint64StorageSize)))
@@ -114,7 +113,7 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 	// mark that this account exists
 	err = a.setValue(newAddress, false, KeyExists, []byte{1})
 	if err != nil {
-		return fmt.Errorf("failed to update the ledger: %w", err)
+		return err
 	}
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
@@ -122,11 +121,11 @@ func (a *Accounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Ad
 func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
 	publicKey, err := a.getValue(address, true, keyPublicKey(keyIndex))
 	if err != nil {
-		return flow.AccountPublicKey{}, newLedgerGetError(keyPublicKey(keyIndex), address, err)
+		return flow.AccountPublicKey{}, err
 	}
 
 	if len(publicKey) == 0 {
-		return flow.AccountPublicKey{}, ErrAccountPublicKeyNotFound
+		return flow.AccountPublicKey{}, errors.NewAccountPublicKeyNotFoundError(address, keyIndex)
 	}
 
 	decodedPublicKey, err := flow.DecodeAccountPublicKey(publicKey, keyIndex)
@@ -140,7 +139,7 @@ func (a *Accounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.Acc
 func (a *Accounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 	countBytes, err := a.getValue(address, true, KeyPublicKeyCount)
 	if err != nil {
-		return 0, newLedgerGetError(KeyPublicKeyCount, address, err)
+		return 0, err
 	}
 
 	countInt := new(big.Int).SetBytes(countBytes)
@@ -186,12 +185,14 @@ func (a *Accounts) SetPublicKey(
 ) (encodedPublicKey []byte, err error) {
 	err = publicKey.Validate()
 	if err != nil {
-		return nil, fmt.Errorf("invalid public key: %w", err)
+		encoded, _ := publicKey.MarshalJSON()
+		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value: %w", err)
 	}
 
 	encodedPublicKey, err = flow.EncodeAccountPublicKey(publicKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode public key: %w", err)
+		encoded, _ := publicKey.MarshalJSON()
+		return nil, errors.NewValueErrorf(string(encoded), "invalid public key value: %w", err)
 	}
 
 	err = a.setValue(address, true, keyPublicKey(keyIndex), encodedPublicKey)
@@ -213,6 +214,15 @@ func (a *Accounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.Acco
 }
 
 func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
+
+	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
+		return errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
+	}
+
+	if !IsValidAccountKeySignAlgo(publicKey.SignAlgo) {
+		return errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
+	}
+
 	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
 		return err
@@ -226,7 +236,25 @@ func (a *Accounts) AppendPublicKey(address flow.Address, publicKey flow.AccountP
 	return a.setPublicKeyCount(address, count+1)
 }
 
-func contractKey(contractName string) string {
+func IsValidAccountKeySignAlgo(algo crypto.SigningAlgorithm) bool {
+	switch algo {
+	case crypto.ECDSAP256, crypto.ECDSASecp256k1:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidAccountKeyHashAlgo(algo hash.HashingAlgorithm) bool {
+	switch algo {
+	case hash.SHA2_256, hash.SHA3_256:
+		return true
+	default:
+		return false
+	}
+}
+
+func ContractKey(contractName string) string {
 	return fmt.Sprintf("%s.%s", KeyCode, contractName)
 }
 
@@ -234,9 +262,9 @@ func (a *Accounts) getContract(contractName string, address flow.Address) ([]byt
 
 	contract, err := a.getValue(address,
 		true,
-		contractKey(contractName))
+		ContractKey(contractName))
 	if err != nil {
-		return nil, newLedgerGetError(contractName, address, err)
+		return nil, err
 	}
 
 	return contract, nil
@@ -249,13 +277,13 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	}
 
 	if !ok {
-		return fmt.Errorf("account with address %s does not exist", address)
+		return errors.NewAccountNotFoundError(address)
 	}
 
 	var prevContract []byte
-	prevContract, err = a.getValue(address, true, contractKey(contractName))
+	prevContract, err = a.getValue(address, true, ContractKey(contractName))
 	if err != nil {
-		return fmt.Errorf("cannot retreive previous contract: %w", err)
+		return errors.NewContractNotFoundError(address, contractName)
 	}
 
 	// skip updating if the new contract equals the old
@@ -263,16 +291,12 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 		return nil
 	}
 
-	err = a.setValue(address, true, contractKey(contractName), contract)
+	err = a.setValue(address, true, ContractKey(contractName), contract)
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func newLedgerGetError(key string, address flow.Address, err error) error {
-	return fmt.Errorf("failed to read key %s on account %s: %w", key, address, err)
 }
 
 func (a *Accounts) setContractNames(contractNames contractNames, address flow.Address) error {
@@ -282,13 +306,14 @@ func (a *Accounts) setContractNames(contractNames contractNames, address flow.Ad
 	}
 
 	if !ok {
-		return fmt.Errorf("account with address %s does not exist", address)
+		return errors.NewAccountNotFoundError(address)
 	}
 	var buf bytes.Buffer
 	cborEncoder := cbor.NewEncoder(&buf)
 	err = cborEncoder.Encode(contractNames)
 	if err != nil {
-		return fmt.Errorf("cannot encode contract names")
+		msg := fmt.Sprintf("cannot encode contract names: %s", contractNames)
+		return errors.NewEncodingFailuref(msg, err)
 	}
 	newContractNames := buf.Bytes()
 
@@ -317,7 +342,7 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 		return 0, fmt.Errorf("account %s storage used is not initialized or not initialized correctly", address.Hex())
 	}
 
-	storageUsed, _, err := utils.ReadUint64(storageUsedRegister)
+	storageUsed, _, err := readUint64(storageUsedRegister)
 	if err != nil {
 		return 0, err
 	}
@@ -325,7 +350,7 @@ func (a *Accounts) GetStorageUsed(address flow.Address) (uint64, error) {
 }
 
 func (a *Accounts) setStorageUsed(address flow.Address, used uint64) error {
-	usedBinary := utils.Uint64ToBinary(used)
+	usedBinary := uint64ToBinary(used)
 	return a.setValue(address, false, KeyStorageUsed, usedBinary)
 }
 
@@ -335,9 +360,9 @@ func (a *Accounts) GetValue(address flow.Address, key string) (flow.RegisterValu
 
 func (a *Accounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
+		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 	}
-	return a.state.Get(string(address.Bytes()), "", key)
+	return a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 // SetValue sets a value in address' storage
@@ -352,9 +377,9 @@ func (a *Accounts) setValue(address flow.Address, isController bool, key string,
 	}
 
 	if isController {
-		return a.state.Set(string(address.Bytes()), string(address.Bytes()), key, value)
+		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value)
 	}
-	return a.state.Set(string(address.Bytes()), "", key, value)
+	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value)
 }
 
 func (a *Accounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -410,18 +435,18 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 	} else {
 		registerID = flow.NewRegisterID(string(address.Bytes()), "", key)
 	}
-	registerKey := state.RegisterIDToKey(registerID)
-	return registerKey.Size() + len(value)
+
+	return getRegisterIDSize(registerID) + len(value)
 }
 
 // TODO replace with touch
 // TODO handle errors
 func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.state.Get(string(address.Bytes()), string(address.Bytes()), key)
+		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 		return
 	}
-	_, _ = a.state.Get(string(address.Bytes()), "", key)
+	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {
@@ -432,7 +457,7 @@ func (a *Accounts) TouchContract(contractName string, address flow.Address) {
 	if contractNames.Has(contractName) {
 		a.touch(address,
 			true,
-			contractKey(contractName))
+			ContractKey(contractName))
 	}
 }
 
@@ -442,6 +467,7 @@ func (a *Accounts) GetContractNames(address flow.Address) ([]string, error) {
 }
 
 func (a *Accounts) getContractNames(address flow.Address) (contractNames, error) {
+	// TODO return fatal error if can't fetch
 	encContractNames, err := a.getValue(address, true, KeyContractNames)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get deployed contract names: %w", err)
@@ -496,6 +522,67 @@ func (a *Accounts) DeleteContract(contractName string, address flow.Address) err
 	}
 	contractNames.remove(contractName)
 	return a.setContractNames(contractNames, address)
+}
+
+// This tries to compute the amount bytes that will be used by the ledger
+// plus 2 on each part of the register id is due to header byte size needed
+// for encoding and decoding
+func getRegisterIDSize(inp flow.RegisterID) int {
+	size := 0
+	size += 2 + len(inp.Owner)
+	size += 2 + len(inp.Controller)
+	size += 2 + len(inp.Key)
+	return size
+}
+
+// uint64ToBinary converst a uint64 to a byte slice (big endian)
+func uint64ToBinary(integer uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, integer)
+	return b
+}
+
+// readUint64 reads a uint64 from the input and returns the rest
+func readUint64(input []byte) (value uint64, rest []byte, err error) {
+	if len(input) < 8 {
+		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint64", len(input))
+	}
+	return binary.BigEndian.Uint64(input[:8]), input[8:], nil
+}
+
+func (a *Accounts) GetAccountFrozen(address flow.Address) (bool, error) {
+	frozen, err := a.getValue(address, false, KeyAccountFrozen)
+	if err != nil {
+		return false, err
+	}
+
+	if len(frozen) == 0 {
+		return false, err
+	}
+
+	return frozen[0] != AccountNotFrozenValue, nil
+}
+
+func (a *Accounts) SetAccountFrozen(address flow.Address, frozen bool) error {
+
+	val := make([]byte, 1) //zero value for byte is 0
+	if frozen {
+		val[0] = AccountFrozenValue
+	}
+
+	return a.setValue(address, false, KeyAccountFrozen, val)
+}
+
+// handy function to error out if account is frozen
+func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
+	frozen, err := a.GetAccountFrozen(address)
+	if err != nil {
+		return fmt.Errorf("cannot check account freeze status: %w", err)
+	}
+	if frozen {
+		return errors.NewFrozenAccountError(address)
+	}
+	return nil
 }
 
 // contractNames container for a list of contract names. Should always be sorted.

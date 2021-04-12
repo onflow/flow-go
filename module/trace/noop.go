@@ -2,7 +2,7 @@ package trace
 
 import (
 	"context"
-	"io"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
@@ -12,7 +12,6 @@ import (
 
 // NoopTracer is the implementation of the Tracer interface
 type NoopTracer struct {
-	closer io.Closer
 	tracer *InternalTracer
 }
 
@@ -26,19 +25,14 @@ func NewNoopTracer() *NoopTracer {
 // Ready returns a channel that will close when the network stack is ready.
 func (t *NoopTracer) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	go func() {
-		close(ready)
-	}()
+	close(ready)
 	return ready
 }
 
 // Done returns a channel that will close when shutdown is complete.
 func (t *NoopTracer) Done() <-chan struct{} {
 	done := make(chan struct{})
-	go func() {
-		t.closer.Close()
-		close(done)
-	}()
+	close(done)
 	return done
 }
 
@@ -70,6 +64,15 @@ func (t *NoopTracer) StartSpanFromParent(
 	opts ...opentracing.StartSpanOption,
 ) opentracing.Span {
 	return &NoopSpan{t}
+}
+
+func (t *NoopTracer) RecordSpanFromParent(
+	span opentracing.Span,
+	operationName SpanName,
+	duration time.Duration,
+	logs []opentracing.LogRecord,
+	opts ...opentracing.StartSpanOption,
+) {
 }
 
 func (t *NoopTracer) WithSpanFromContext(ctx context.Context,

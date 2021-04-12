@@ -2,38 +2,55 @@ package state
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/onflow/flow-go/utils/slices"
 )
 
 const keyUUID = "uuid"
 
-type UUIDs struct {
-	state *State
+type UUIDGenerator struct {
+	stateHolder *StateHolder
 }
 
-func NewUUIDs(state *State) *UUIDs {
-	return &UUIDs{
-		state: state,
+func NewUUIDGenerator(stateHolder *StateHolder) *UUIDGenerator {
+	return &UUIDGenerator{
+		stateHolder: stateHolder,
 	}
 }
 
-func (u *UUIDs) GetUUID() (uint64, error) {
-	stateBytes, err := u.state.Get("", "", keyUUID)
+// GetUUID reads uint64 byte value for uuid from the state
+func (u *UUIDGenerator) GetUUID() (uint64, error) {
+	stateBytes, err := u.stateHolder.State().Get("", "", keyUUID)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("cannot get uuid byte from state: %w", err)
 	}
 	bytes := slices.EnsureByteSliceSize(stateBytes, 8)
 
 	return binary.BigEndian.Uint64(bytes), nil
 }
 
-func (u *UUIDs) SetUUID(uuid uint64) {
+// SetUUID sets a new uint64 byte value
+func (u *UUIDGenerator) SetUUID(uuid uint64) error {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	err := u.state.Set("", "", keyUUID, bytes)
-	// TODO return the error instead
+	err := u.stateHolder.State().Set("", "", keyUUID, bytes)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("cannot set uuid byte to state: %w", err)
 	}
+	return nil
+}
+
+// GenerateUUID generates a new uuid and persist the data changes into state
+func (u *UUIDGenerator) GenerateUUID() (uint64, error) {
+	uuid, err := u.GetUUID()
+	if err != nil {
+		return 0, fmt.Errorf("cannot generate UUID: %w", err)
+	}
+
+	err = u.SetUUID(uuid + 1)
+	if err != nil {
+		return 0, fmt.Errorf("cannot generate UUID: %w", err)
+	}
+	return uuid, nil
 }

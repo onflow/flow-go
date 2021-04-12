@@ -18,14 +18,20 @@ type Config struct {
 	// how many extra nodes in the responsible cluster we propagate transactions to
 	// (we always send to at least one)
 	PropagationRedundancy uint
+	// the maximum transaction byte size limit
+	MaxTransactionByteSize uint64
+	// maximum collection byte size, it acts as hard limit max for the tx size.
+	MaxCollectionByteSize uint64
 }
 
 func DefaultConfig() Config {
 	return Config{
-		ExpiryBuffer:          flow.DefaultTransactionExpiryBuffer,
-		MaxGasLimit:           flow.DefaultMaxGasLimit,
-		CheckScriptsParse:     true,
-		MaxAddressIndex:       1_000_000,
-		PropagationRedundancy: 2,
+		ExpiryBuffer:           flow.DefaultTransactionExpiryBuffer,
+		MaxGasLimit:            flow.DefaultMaxTransactionGasLimit,
+		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
+		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
+		CheckScriptsParse:      true,
+		MaxAddressIndex:        10_000_000,
+		PropagationRedundancy:  2,
 	}
 }

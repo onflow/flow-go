@@ -60,3 +60,13 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 
 	return assignments
 }
+
+func ClusterList(n uint, nodes flow.IdentityList) flow.ClusterList {
+	assignments := ClusterAssignment(n, nodes)
+	clusters, err := flow.NewClusterList(assignments, nodes.Filter(filter.HasRole(flow.RoleCollection)))
+	if err != nil {
+		panic(err)
+	}
+
+	return clusters
+}

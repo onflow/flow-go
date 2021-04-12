@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 // Forest holds several in-memory tries. As Forest is a storage-abstraction layer,
@@ -30,7 +29,6 @@ type Forest struct {
 	// there is no mechanism to load a trie from disk in case of a cache miss. Missing a
 	// needed trie in the forest might cause a fatal application logic error.
 	tries          *lru.Cache
-	dir            string
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie) error
 	metrics        module.LedgerMetrics
@@ -43,7 +41,7 @@ type Forest struct {
 // THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
-func NewForest(trieStorageDir string, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
+func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -64,7 +62,6 @@ func NewForest(trieStorageDir string, forestCapacity int, metrics module.LedgerM
 	}
 
 	forest := &Forest{tries: cache,
-		dir:            trieStorageDir,
 		forestCapacity: forestCapacity,
 		onTreeEvicted:  onTreeEvicted,
 		metrics:        metrics,
@@ -337,9 +334,4 @@ func (f *Forest) GetEmptyRootHash() ledger.RootHash {
 // Size returns the number of active tries in this store
 func (f *Forest) Size() int {
 	return f.tries.Len()
-}
-
-// DiskSize returns the disk size of the directory used by the forest (in bytes)
-func (f *Forest) DiskSize() (uint64, error) {
-	return io.DirSize(f.dir)
 }

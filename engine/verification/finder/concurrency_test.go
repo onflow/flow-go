@@ -176,12 +176,12 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 	parent, err := verNode.State.Final().Head()
 	require.NoError(suite.T(), err)
 
-	receipts := make([]utils.CompleteExecutionResult, receiptCount)
+	receipts := make([]*utils.CompleteExecutionReceipt, receiptCount)
 	results := make([]flow.ExecutionResult, receiptCount)
 	for i := 0; i < receiptCount; i++ {
-		completeER := utils.CompleteExecutionResultFixture(suite.T(), chunkCount, chainID.Chain(), parent)
+		completeER := utils.CompleteExecutionReceiptFixture(suite.T(), chunkCount, chainID.Chain(), parent)
 		receipts[i] = completeER
-		results[i] = completeER.Receipt.ExecutionResult
+		results[i] = completeER.Receipts[0].ExecutionResult
 	}
 
 	// sets up mock match engine that asserts:
@@ -245,7 +245,10 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 				}
 
 				senderWG.Done()
-			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
+			}(i,
+				completeER.Receipts[0].ExecutionResult.ID(),
+				completeER.ReceiptsData[0].ReferenceBlock,
+				completeER.Receipts[0])
 		}
 	}
 
@@ -390,7 +393,7 @@ func (suite *ConcurrencyTestSuite) bootstrapSystem(staked bool) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// bootstraps the system
-	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.log, suite.collector, suite.tracer, identities)
+	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.collector, suite.tracer, identities)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch

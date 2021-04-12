@@ -10,11 +10,11 @@ type ConsumerProgress struct {
 }
 
 // InitProcessedIndex provides a mock function with given fields: defaultIndex
-func (_m *ConsumerProgress) InitProcessedIndex(defaultIndex int64) error {
+func (_m *ConsumerProgress) InitProcessedIndex(defaultIndex uint64) error {
 	ret := _m.Called(defaultIndex)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(int64) error); ok {
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
 		r0 = rf(defaultIndex)
 	} else {
 		r0 = ret.Error(0)
@@ -24,14 +24,14 @@ func (_m *ConsumerProgress) InitProcessedIndex(defaultIndex int64) error {
 }
 
 // ProcessedIndex provides a mock function with given fields:
-func (_m *ConsumerProgress) ProcessedIndex() (int64, error) {
+func (_m *ConsumerProgress) ProcessedIndex() (uint64, error) {
 	ret := _m.Called()
 
-	var r0 int64
-	if rf, ok := ret.Get(0).(func() int64); ok {
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(int64)
+		r0 = ret.Get(0).(uint64)
 	}
 
 	var r1 error
@@ -45,11 +45,11 @@ func (_m *ConsumerProgress) ProcessedIndex() (int64, error) {
 }
 
 // SetProcessedIndex provides a mock function with given fields: processed
-func (_m *ConsumerProgress) SetProcessedIndex(processed int64) error {
+func (_m *ConsumerProgress) SetProcessedIndex(processed uint64) error {
 	ret := _m.Called(processed)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(int64) error); ok {
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
 		r0 = rf(processed)
 	} else {
 		r0 = ret.Error(0)

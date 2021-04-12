@@ -31,7 +31,7 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -41,7 +41,7 @@ func Test_Compactor(t *testing.T) {
 
 		t.Run("Compactor creates checkpoints eventually", func(t *testing.T) {
 
-			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, 32*1024)
+			wal, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -90,7 +90,7 @@ func Test_Compactor(t *testing.T) {
 
 				return from == 10 && to == 10 //make sure there is
 				// this is disk-based operation after all, so give it big timeout
-			}, 15*time.Second, 100*time.Millisecond)
+			}, 20*time.Second, 100*time.Millisecond)
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
@@ -104,7 +104,7 @@ func Test_Compactor(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "checkpoint.00000009"))
 
 			<-compactor.Done()
-			err = wal.Close()
+			<-wal.Done()
 			require.NoError(t, err)
 		})
 
@@ -126,11 +126,11 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewForest(dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
-			wal2, err := NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, 32*1024)
+			wal2, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			err = wal2.Replay(
@@ -147,8 +147,8 @@ func Test_Compactor(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			err = wal2.Close()
-			require.NoError(t, err)
+			<-wal2.Done()
+
 		})
 
 		t.Run("make sure forests are equal", func(t *testing.T) {
@@ -204,14 +204,14 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(dir, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
 
 		t.Run("Compactor creates checkpoints", func(t *testing.T) {
 
-			wal, err := NewWAL(zerolog.Nop(), nil, dir, size*10, pathByteSize, 32*1024)
+			wal, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
 			require.NoError(t, err)
 
 			// WAL segments are 32kB, so here we generate 2 keys 64kB each, times `size`
@@ -295,7 +295,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000017"))
 			require.FileExists(t, path.Join(dir, "checkpoint.00000019"))
 
-			err = wal.Close()
+			<-wal.Done()
 			require.NoError(t, err)
 		})
 	})

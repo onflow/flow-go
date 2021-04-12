@@ -160,7 +160,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
 	depth := hash.TreeMaxHeight - head.Height() // distance to the tree root
-	partitionIndex := splitPaths(paths, depth)
+	partitionIndex := SplitPaths(paths, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
 
@@ -497,7 +497,7 @@ func (mt *MTrie) IsAValidTrie() bool {
 //
 //  For instance, if `paths` contains the following 3 paths, and bitIndex is `1`:
 //  [[0,0,1,1], [0,1,0,1], [0,0,0,1]]
-//  then `SplitByPath` returns 1 and updates `paths` into:
+//  then `splitByPath` returns 1 and updates `paths` into:
 //  [[0,0,1,1], [0,0,0,1], [0,1,0,1]]
 func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) int {
 	i := 0
@@ -512,7 +512,7 @@ func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) i
 	return i
 }
 
-// splitPaths permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
+// SplitPaths permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
 // at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
 // is returned.
 //
@@ -520,7 +520,7 @@ func splitByPath(paths []ledger.Path, payloads []ledger.Payload, bitIndex int) i
 // with the pivot being the path with all zeros and 1 at bitIndex.
 // The comparison of paths is only based on the bit at bitIndex, the function therefore assumes all paths have
 // equal bits from 0 to bitIndex-1
-func splitPaths(paths []ledger.Path, bitIndex int) int {
+func SplitPaths(paths []ledger.Path, bitIndex int) int {
 	i := 0
 	for j, path := range paths {
 		bit := utils.Bit(path[:], bitIndex)

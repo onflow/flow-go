@@ -20,11 +20,12 @@ import (
 
 type backendEvents struct {
 	staticExecutionRPC execproto.ExecutionAPIClient
-	blocks             storage.Blocks
+	headers            storage.Headers
 	executionReceipts  storage.ExecutionReceipts
 	state              protocol.State
 	connFactory        ConnectionFactory
 	log                zerolog.Logger
+	maxHeightRange     uint
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -60,12 +61,12 @@ func (b *backendEvents) GetEventsForHeightRange(
 	blockHeaders := make([]*flow.Header, 0)
 
 	for i := startHeight; i <= endHeight; i++ {
-		block, err := b.blocks.ByHeight(i)
+		header, err := b.headers.ByHeight(i)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 		}
 
-		blockHeaders = append(blockHeaders, block.Header)
+		blockHeaders = append(blockHeaders, header)
 	}
 
 	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
@@ -81,12 +82,12 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	// find the block headers for all the block IDs
 	blockHeaders := make([]*flow.Header, 0)
 	for _, blockID := range blockIDs {
-		block, err := b.blocks.ByID(blockID)
+		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 		}
 
-		blockHeaders = append(blockHeaders, block.Header)
+		blockHeaders = append(blockHeaders, header)
 	}
 
 	// forward the request to the execution node
@@ -109,6 +110,11 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 		return []flow.BlockEvents{}, nil
 	}
 
+	// limit height range queries
+	if uint(len(blockIDs)) > b.maxHeightRange {
+		return nil, fmt.Errorf("requested block range (%d) exceeded maximum (%d)", len(blockIDs), b.maxHeightRange)
+	}
+
 	req := execproto.GetEventsForBlockIDsRequest{
 		Type:     eventType,
 		BlockIds: convert.IdentifiersToMessages(blockIDs),
@@ -117,7 +123,7 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	// choose the last block ID to find the list of execution nodes
 	lastBlockID := blockIDs[len(blockIDs)-1]
 
-	execNodes, err := executionNodesForBlockID(lastBlockID, b.executionReceipts, b.state)
+	execNodes, err := executionNodesForBlockID(lastBlockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
 	}

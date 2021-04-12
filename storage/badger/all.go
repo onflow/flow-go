@@ -14,7 +14,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)
 	receipts := NewExecutionReceipts(metrics, db, results)
-	payloads := NewPayloads(db, index, guarantees, seals, receipts)
+	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := NewBlocks(db, headers, payloads)
 	setups := NewEpochSetups(metrics, db)
 	epochCommits := NewEpochCommits(metrics, db)
@@ -23,9 +23,9 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	chunkDataPacks := NewChunkDataPacks(db)
 	commits := NewCommits(metrics, db)
 	transactions := NewTransactions(metrics, db)
-	transactionResults := NewTransactionResults(db)
+	transactionResults := NewTransactionResults(metrics, db, 10000)
 	collections := NewCollections(db, transactions)
-	events := NewEvents(db)
+	events := NewEvents(metrics, db)
 
 	return &storage.All{
 		Headers:            headers,

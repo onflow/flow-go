@@ -1,13 +1,19 @@
 package trie_test
 
 import (
+	"bytes"
 	"encoding/hex"
+	"math/rand"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
@@ -252,4 +258,52 @@ func deduplicateWrites(paths []ledger.Path, payloads []ledger.Payload) ([]ledger
 		dedupedPayloads = append(dedupedPayloads, payloads[payloadMapping[pathString]])
 	}
 	return dedupedPaths, dedupedPayloads
+}
+
+func TestSplitByPath(t *testing.T) {
+	seed := time.Now().UnixNano()
+	t.Logf("rand seed is %d", seed)
+	rand.Seed(seed)
+
+	const pathsNumber = 100
+	const redundantPaths = 10
+	const pathsSize = 32
+	randomIndex := rand.Intn(pathsSize)
+
+	// create path slice with redundant paths
+	paths := make([]ledger.Path, 0, pathsNumber)
+	for i := 0; i < pathsNumber-redundantPaths; i++ {
+		var p ledger.Path
+		rand.Read(p[:])
+		paths = append(paths, p)
+	}
+	for i := 0; i < redundantPaths; i++ {
+		paths = append(paths, paths[i])
+	}
+
+	// save a sorted paths copy for later check
+	sortedPaths := make([]ledger.Path, len(paths))
+	copy(sortedPaths, paths)
+	sort.Slice(sortedPaths, func(i, j int) bool {
+		return bytes.Compare(sortedPaths[i][:], sortedPaths[j][:]) < 0
+	})
+
+	// split paths
+	index := trie.SplitPaths(paths, randomIndex)
+
+	// check correctness
+	for i := 0; i < index; i++ {
+		assert.Equal(t, utils.Bit(paths[i][:], randomIndex), 0)
+	}
+	for i := index; i < len(paths); i++ {
+		assert.Equal(t, utils.Bit(paths[i][:], randomIndex), 1)
+	}
+
+	// check the multi-set didn't change
+	sort.Slice(paths, func(i, j int) bool {
+		return bytes.Compare(paths[i][:], paths[j][:]) < 0
+	})
+	for i := index; i < len(paths); i++ {
+		assert.Equal(t, paths[i], sortedPaths[i])
+	}
 }

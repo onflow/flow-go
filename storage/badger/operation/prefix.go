@@ -15,8 +15,9 @@ const (
 	codeMax = 1 // keeps track of the maximum key size
 
 	// codes for views with special meaning
-	codeStartedView = 10 // latest view hotstuff started
-	codeVotedView   = 11 // latest view hotstuff voted on
+	codeStartedView           = 10 // latest view hotstuff started
+	codeVotedView             = 11 // latest view hotstuff voted on
+	codeRootQuorumCertificate = 12
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height
@@ -46,19 +47,20 @@ const (
 
 	// codes for indexing multiple identifiers by identifier
 	// NOTE: 51 was used for identity indexes before epochs
-	codeBlockChildren               = 50 // index mapping block ID to children blocks
-	codePayloadGuarantees           = 52 // index mapping block ID to payload guarantees
-	codePayloadSeals                = 53 // index mapping block ID to payload seals
-	codeCollectionBlock             = 54 // index mapping collection ID to block ID
-	codeBlockExecutionReceipt       = 55 // index mapping block ID to execution receipt ID
-	codeBlockEpochStatus            = 56 // index mapping block ID to epoch status
-	codePayloadReceipts             = 57 // index mapping block ID  to payload receipts
-	codeExecutionIDExecutionReceipt = 58 // index mapping block ID, execution ID to execution receipt ID
-	codeIndexBlockByChunkID         = 59 // index mapping chunk ID to block ID
+	codeBlockChildren       = 50 // index mapping block ID to children blocks
+	codePayloadGuarantees   = 52 // index mapping block ID to payload guarantees
+	codePayloadSeals        = 53 // index mapping block ID to payload seals
+	codeCollectionBlock     = 54 // index mapping collection ID to block ID
+	codeOwnBlockReceipt     = 55 // index mapping block ID to execution receipt ID for execution nodes
+	codeBlockEpochStatus    = 56 // index mapping block ID to epoch status
+	codePayloadReceipts     = 57 // index mapping block ID  to payload receipts
+	codePayloadResults      = 58 // index mapping block ID to payload results
+	codeAllBlockReceipts    = 59 // index mapping of blockID to multiple receipts
+	codeIndexBlockByChunkID = 60 // index mapping chunk ID to block ID
 
 	// codes related to epoch information
-	codeEpochSetup  = 60 // EpochSetup service event, keyed by ID
-	codeEpochCommit = 61 // EpochCommit service event, keyed by ID
+	codeEpochSetup  = 61 // EpochSetup service event, keyed by ID
+	codeEpochCommit = 62 // EpochCommit service event, keyed by ID
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70

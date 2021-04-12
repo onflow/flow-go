@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -16,7 +17,7 @@ func constructRootResultAndSeal(
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData model.DKGData,
-) {
+) (*flow.ExecutionResult, *flow.Seal) {
 
 	var stateCommit flow.StateCommitment
 	stateCommitBytes, err := hex.DecodeString(rootCommit)
@@ -26,14 +27,20 @@ func constructRootResultAndSeal(
 	}
 
 	participants := model.ToIdentityList(participantNodes)
-	blockID := block.ID()
+
+	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err = rand.Read(randomSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not generate random source for epoch setup event")
+	}
 
 	epochSetup := &flow.EpochSetup{
 		Counter:      flagEpochCounter,
+		FirstView:    block.Header.View,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  assignments,
-		RandomSource: blockID[:],
+		RandomSource: randomSource,
 	}
 
 	dkgLookup := model.ToDKGLookup(dkgData, participants)
@@ -45,9 +52,8 @@ func constructRootResultAndSeal(
 		DKGParticipants: dkgLookup,
 	}
 
-	result := run.GenerateRootResult(block, stateCommit)
-	seal := run.GenerateRootSeal(result, epochSetup, epochCommit)
+	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
+	seal := run.GenerateRootSeal(result)
 
-	writeJSON(model.PathRootResult, result)
-	writeJSON(model.PathRootSeal, seal)
+	return result, seal
 }

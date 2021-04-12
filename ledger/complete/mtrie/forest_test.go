@@ -3,9 +3,7 @@ package mtrie
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -23,11 +21,7 @@ import (
 // TestTrieOperations tests adding removing and retrieving Trie from Forest
 func TestTrieOperations(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// Make new Trie (independently of MForest):
@@ -57,12 +51,8 @@ func TestTrieOperations(t *testing.T) {
 // written values can be retrieved from the updated trie.
 func TestTrieUpdate(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
 	metricsCollector := &metrics.NoopCollector{}
-	forest, err := NewForest(dir, 5, metricsCollector, nil)
+	forest, err := NewForest(5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := forest.GetEmptyRootHash()
 
@@ -93,11 +83,7 @@ func TestLeftEmptyInsert(t *testing.T) {
 	//    (X)  [~]      //
 	//////////////////////
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -157,12 +143,7 @@ func TestRightEmptyInsert(t *testing.T) {
 	//      /  \         //
 	//    [~]  (X)       //
 	///////////////////////
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 0000...
@@ -226,11 +207,7 @@ func TestExpansionInsert(t *testing.T) {
 	//         [~]        //
 	////////////////////////
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 100000...
@@ -291,11 +268,7 @@ func TestFullHouseInsert(t *testing.T) {
 	//    [~1]  [~2]     //
 	///////////////////////
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// paths p0 forms [~1]; p1 and p2 form [~2]
@@ -365,12 +338,7 @@ func TestLeafInsert(t *testing.T) {
 	//          /  \     //
 	//         ()  ()    //
 	///////////////////////
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 000...0000000100000000
@@ -405,12 +373,7 @@ func TestLeafInsert(t *testing.T) {
 // TestOverrideValue overrides an existing value in the trie (without any expansion)
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestOverrideValue(t *testing.T) {
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -449,11 +412,7 @@ func TestOverrideValue(t *testing.T) {
 // We expect that the _last_ written value is persisted in the Trie
 func TestDuplicateOverride(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -484,12 +443,7 @@ func TestDuplicateOverride(t *testing.T) {
 // TestReadSafety check if payload returned from a forest are safe against modification,
 // ie. copy of the data is returned, instead of a slice
 func TestReadSafety(t *testing.T) {
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -521,11 +475,7 @@ func TestReadSafety(t *testing.T) {
 // TestReadOrder tests that payloads from reading a trie are delivered in the order as specified by the paths
 func TestReadOrder(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(116), uint8(74)})
@@ -558,12 +508,7 @@ func TestReadOrder(t *testing.T) {
 // TestMixRead tests reading a mixture of set and unset registers.
 // We expect the default payload (nil) to be returned for unset registers.
 func TestMixRead(t *testing.T) {
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 01111101...
@@ -603,12 +548,7 @@ func TestMixRead(t *testing.T) {
 // TestReadWithDuplicatedKeys reads a the values for two keys, where both keys have the same value.
 // We expect that we receive the respective value twice in the return.
 func TestReadWithDuplicatedKeys(t *testing.T) {
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
@@ -636,12 +576,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 
 // TestReadNonExistingPath tests reading an unset path.
 func TestReadNonExistingPath(t *testing.T) {
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
@@ -664,12 +599,7 @@ func TestReadNonExistingPath(t *testing.T) {
 // that for each update, a new trie is added to the forest preserving the
 // updated values independently of the other update.
 func TestForkingUpdates(t *testing.T) {
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
@@ -729,12 +659,7 @@ func TestForkingUpdates(t *testing.T) {
 // Hence, the forest should de-duplicate the resulting two version of the identical trie
 // without an error.
 func TestIdenticalUpdateAppliedTwice(t *testing.T) {
-
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
@@ -775,7 +700,7 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 }
 
 // TestRandomUpdateReadProof repeats a sequence of actions update, read and proof random paths
-// this simulates the common patern of actions on flow
+// this simulates the common pattern of actions on flow
 func TestRandomUpdateReadProof(t *testing.T) {
 
 	minPayloadByteSize := 2
@@ -783,11 +708,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	rep := 10
 	maxNumPathsPerStep := 10
 	rand.Seed(time.Now().UnixNano())
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir) // clean up
 
-	forest, err := NewForest(dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	activeRoot := forest.GetEmptyRootHash()
@@ -867,12 +789,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 // TestProofGenerationInclusion tests that inclusion proofs generated by a Trie pass verification
 func TestProofGenerationInclusion(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
 	metricsCollector := &metrics.NoopCollector{}
-	forest, err := NewForest(dir, 5, metricsCollector, nil)
+	forest, err := NewForest(5, metricsCollector, nil)
 	require.NoError(t, err)
 	emptyRoot := forest.GetEmptyRootHash()
 

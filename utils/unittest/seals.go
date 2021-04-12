@@ -50,12 +50,6 @@ func (f *sealFactory) WithBlock(block *flow.Header) func(*flow.Seal) {
 	}
 }
 
-func (f *sealFactory) WithServiceEvents(events ...flow.ServiceEvent) func(*flow.Seal) {
-	return func(seal *flow.Seal) {
-		seal.ServiceEvents = events
-	}
-}
-
 func (f *sealFactory) AggregatedSignatureFixtures(number int) []flow.AggregatedSignature {
 	sigs := make([]flow.AggregatedSignature, 0, number)
 	for ; number > 0; number-- {
