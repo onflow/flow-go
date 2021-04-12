@@ -23,6 +23,9 @@ import (
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 3
 
+// DefaultMaxHeightRange is the default maximum size of range requests.
+const DefaultMaxHeightRange = 250
+
 var preferredENIdentifiers flow.IdentifierList
 var fixedENIdentifiers flow.IdentifierList
 
@@ -68,6 +71,7 @@ func New(
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
 	retryEnabled bool,
+	maxHeightRange uint,
 	preferredExecutionNodeIDs []string,
 	fixedExecutionNodeIDs []string,
 	log zerolog.Logger,
@@ -108,10 +112,11 @@ func New(
 		backendEvents: backendEvents{
 			staticExecutionRPC: executionRPC,
 			state:              state,
-			blocks:             blocks,
+			headers:            headers,
 			executionReceipts:  executionReceipts,
 			connFactory:        connFactory,
 			log:                log,
+			maxHeightRange:     maxHeightRange,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -172,9 +177,10 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
 			AllowEmptyReferenceBlockID:   false,
 			AllowUnknownReferenceBlockID: false,
-			MaxGasLimit:                  flow.DefaultMaxGasLimit,
 			CheckScriptsParse:            true,
-			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
+			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
+			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
+			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
 		},
 	)
 }

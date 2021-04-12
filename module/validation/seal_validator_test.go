@@ -27,7 +27,7 @@ type SealValidationSuite struct {
 func (s *SealValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.verifier = &mock2.Verifier{}
-	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.PayloadsDB, s.SealsDB,
+	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.PayloadsDB, s.ResultsDB, s.SealsDB,
 		s.Assigner, s.verifier, 1, metrics.NewNoopCollector())
 }
 
@@ -39,7 +39,8 @@ func (s *SealValidationSuite) TestSealValid() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 
 	s.Extend(&blockParent)
@@ -64,7 +65,8 @@ func (s *SealValidationSuite) TestSealInvalidBlockID() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 
 	s.Extend(&blockParent)
@@ -91,7 +93,8 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 
 	s.Extend(&blockParent)
@@ -126,7 +129,8 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 
 	s.Extend(&blockParent)
@@ -158,7 +162,8 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 
 	s.Extend(&blockParent)
@@ -185,7 +190,8 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 
 	s.Extend(&blockParent)
@@ -212,7 +218,8 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
 	)
 	blockParent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 
 	s.Extend(&blockParent)
@@ -237,7 +244,8 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	block3 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	block2Receipt := unittest.ReceiptForBlockFixture(s.LatestFinalizedBlock)
 	block3.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{block2Receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
 	})
 	s.Extend(&block3)
 
@@ -245,7 +253,8 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	block3Receipt := unittest.ReceiptForBlockFixture(&block3)
 	block4 := unittest.BlockWithParentFixture(block3.Header)
 	block4.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{block3Receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{block3Receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&block3Receipt.ExecutionResult},
 	})
 	s.Extend(&block4)
 
@@ -285,7 +294,8 @@ func (s *SealValidationSuite) TestExtendSealNotConnected() {
 
 	block3 := unittest.BlockWithParentFixture(block2.Header)
 	block3.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{block1Receipt, block2Receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta(), block2Receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult, &block2Receipt.ExecutionResult},
 	})
 	s.Extend(&block3)
 
@@ -315,7 +325,8 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 	block1Receipt := unittest.ReceiptForBlockFixture(&block1)
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block2.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{block1Receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 	})
 	s.Extend(&block2)
 
@@ -399,7 +410,8 @@ func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 		})
 		s.Extend(&block2)
 
@@ -436,7 +448,8 @@ func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
 		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
 		block3 := unittest.BlockWithParentFixture(block1.Header)
 		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceipt{block1Receipt},
+			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
+			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 		})
 		s.Extend(&block3)
 

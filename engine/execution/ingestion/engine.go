@@ -1014,20 +1014,11 @@ func (e *Engine) handleComputationResult(
 		Msg("received computation result")
 
 	// There is one result per transaction
-	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResult))
-
-	snapshots := make([]*delta.Snapshot, len(result.StateSnapshots))
-	for i, stateSnapshot := range result.StateSnapshots {
-		snapshots[i] = &stateSnapshot.Snapshot
-	}
+	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResults))
 
 	receipt, err := e.saveExecutionResults(
 		ctx,
-		result.ExecutableBlock,
-		result.StateSnapshots,
-		result.Events,
-		result.ServiceEvents,
-		result.TransactionResult,
+		result,
 		startState,
 	)
 	if err != nil {
@@ -1045,11 +1036,7 @@ func (e *Engine) handleComputationResult(
 // save the execution result of a block
 func (e *Engine) saveExecutionResults(
 	ctx context.Context,
-	executableBlock *entity.ExecutableBlock,
-	spockSnapshots []*delta.SpockSnapshot,
-	events []flow.Event,
-	serviceEvents []flow.Event,
-	txResults []flow.TransactionResult,
+	result *execution.ComputationResult,
 	startState flow.StateCommitment,
 ) (*flow.ExecutionReceipt, error) {
 
@@ -1057,75 +1044,60 @@ func (e *Engine) saveExecutionResults(
 	defer span.Finish()
 
 	originalState := startState
-	blockID := executableBlock.ID()
+	blockID := result.ExecutableBlock.ID()
 
 	// no need to persist the state interactions, since they are used only by state
 	// syncing, which is currently disabled
 
-	chunks := make([]*flow.Chunk, len(spockSnapshots))
-	chdps := make([]*flow.ChunkDataPack, len(spockSnapshots))
+	chunks := make([]*flow.Chunk, 0, len(result.StateCommitments))
+	chdps := make([]*flow.ChunkDataPack, 0, len(result.StateCommitments))
 
 	// TODO: check current state root == startState
 	var endState flow.StateCommitment = startState
 
-	for i, view := range spockSnapshots {
+	for i := range result.StateCommitments {
 		// TODO: deltas should be applied to a particular state
-		var err error
-		endState, err = e.execState.CommitDelta(childCtx, view.Delta, startState)
-		if err != nil {
-			return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
-		}
 
+		endState = result.StateCommitments[i]
 		var collectionID flow.Identifier
 
 		// account for system chunk being last
-		if i < len(spockSnapshots)-1 {
-			collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
-			completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
+		if i < len(result.StateCommitments)-1 {
+			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
+			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collectionID = completeCollection.Collection().ID()
 		} else {
 			collectionID = flow.ZeroID
 		}
 
+		// TODO use view.SpockSecret() as an input to spock generator
 		chunk := generateChunk(i, startState, endState, collectionID, blockID)
+		chunks = append(chunks, chunk)
 
 		// chunkDataPack
+		chdp := generateChunkDataPack(chunk, collectionID, result.Proofs[i])
+		chdps = append(chdps, chdp)
 
-		sp := e.tracer.StartSpanFromParent(span, trace.EXEGenerateChunkDataPacks)
-		// get all deduplicated register IDs
-		allRegisters := view.AllRegisters()
-		proof, err := e.execState.GetProof(childCtx, chunk.StartState, allRegisters)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"error reading registers with proofs for chunk number [%v] of block [%x] ", i, blockID,
-			)
-		}
-
-		chdps[i] = generateChunkDataPack(chunk, collectionID, proof)
-		sp.Finish()
-		// TODO use view.SpockSecret() as an input to spock generator
-		chunks[i] = chunk
 		startState = endState
-
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(childCtx, executableBlock.Block, chunks, endState, serviceEvents)
+	executionResult, err := e.generateExecutionResultForBlock(childCtx, result.ExecutableBlock.Block, chunks, endState, result.ServiceEvents)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
 
-	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, spockSnapshots)
+	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx, executableBlock.Block.Header, endState, chdps, executionReceipt, events, serviceEvents, txResults)
+	err = e.execState.PersistExecutionState(childCtx, result.ExecutableBlock.Block.Header, endState, chdps, executionReceipt, result.Events, result.ServiceEvents, result.TransactionResults)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(executableBlock)).
+		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", originalState).
 		Hex("final_state", endState).
 		Msg("saved computation results")

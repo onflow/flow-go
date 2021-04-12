@@ -53,24 +53,6 @@ type ReadOnlyExecutionState interface {
 	GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error)
 }
 
-// IsBlockExecuted returns whether the block has been executed.
-// it checks whether the state commitment exists in execution state.
-func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
-	_, err := state.StateCommitmentByBlockID(ctx, block)
-
-	// statecommitment exists means the block has been executed
-	if err == nil {
-		return true, nil
-	}
-
-	// statecommitment not exists means the block hasn't been executed yet
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, nil
-	}
-
-	return false, err
-}
-
 // TODO Many operations here are should be transactional, so we need to refactor this
 // to store a reference to DB and compose operations and procedures rather then
 // just being amalgamate of proxies for single transactions operation
@@ -553,4 +535,22 @@ func (s *state) GetHighestExecutedBlockID(ctx context.Context) (uint64, flow.Ide
 	}
 
 	return highest.Height, blockID, nil
+}
+
+// IsBlockExecuted returns whether the block has been executed.
+// it checks whether the state commitment exists in execution state.
+func IsBlockExecuted(ctx context.Context, state ReadOnlyExecutionState, block flow.Identifier) (bool, error) {
+	_, err := state.StateCommitmentByBlockID(ctx, block)
+
+	// statecommitment exists means the block has been executed
+	if err == nil {
+		return true, nil
+	}
+
+	// statecommitment not exists means the block hasn't been executed yet
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, nil
+	}
+
+	return false, err
 }
