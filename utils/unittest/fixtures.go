@@ -7,7 +7,6 @@ import (
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
-
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/verification"
@@ -814,6 +813,22 @@ func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) 
 	}
 
 	return locators
+}
+
+// ChunkStatusListFixture returns a list of chunk statuses as test fixture.
+// Each chunk status belongs to a different block and execution result.
+// Each chunk status also only contains a single collection.
+func ChunkStatusListFixture(n int) verification.ChunkStatusList {
+	statuses := verification.ChunkStatusList{}
+	for i := 0; i < n; i++ {
+		status := &verification.ChunkStatus{
+			Chunk:             ChunkFixture(IdentifierFixture(), 1),
+			ExecutionResultID: IdentifierFixture(),
+		}
+		statuses = append(statuses, status)
+	}
+
+	return statuses
 }
 
 func SignatureFixture() crypto.Signature {
