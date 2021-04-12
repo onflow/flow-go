@@ -18,12 +18,15 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// TransactionSubmissionTimeout is the time after which we return an error.
-const TransactionSubmissionTimeout = 5 * time.Minute
+const (
 
-// TransactionStatusRetryTimeout is the time after which the status of a transaction
-// is checked again
-const TransactionStatusRetryTimeout = 1 * time.Second
+	// TransactionSubmissionTimeout is the time after which we return an error.
+	TransactionSubmissionTimeout = 5 * time.Minute
+
+	// TransactionStatusRetryTimeout is the time after which the status of a
+	// transaction is checked again
+	TransactionStatusRetryTimeout = 1 * time.Second
+)
 
 // QCContractClient is a client to the Quorum Certificate contract. Allows the client to
 // functionality to submit a vote and check if collection node has voted already.
