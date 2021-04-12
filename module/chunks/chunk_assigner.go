@@ -72,7 +72,9 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 
 	// Get a list of verifiers
 	snapshot := p.protocolState.AtBlockID(blockID)
-	verifiers, err := snapshot.Identities(filter.And(filter.HasRole(flow.RoleVerification), filter.HasStake(true)))
+	verifiers, err := snapshot.Identities(filter.And(filter.HasRole(flow.RoleVerification),
+		filter.HasStake(true),
+		filter.Not(filter.Ejected)))
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}

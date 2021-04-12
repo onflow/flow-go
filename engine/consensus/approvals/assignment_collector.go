@@ -18,15 +18,12 @@ type AssignmentCollector struct {
 	resultID flow.Identifier
 
 	// collectors is a mapping IncorporatedBlockID -> ApprovalCollector
-	// for every incorporated result we will track approvals separately
 	collectors map[flow.Identifier]*ApprovalCollector
 	lock       sync.RWMutex // lock for protecting collectors map
 
 	//approvalsCache ApprovalsCache
 
-	// authorized approvers for this collector on execution
-	// used to check identity of approver
-	authorizedApprovers                  map[flow.Identifier]*flow.Identity
+	authorizedApprovers                  map[flow.Identifier]*flow.Identity // map of approvers pre-selected at block that is being sealed
 	assigner                             module.ChunkAssigner
 	state                                protocol.State
 	verifier                             module.Verifier
@@ -88,13 +85,13 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not determine chunk assignment: %w", err)
+		return engine.NewInvalidInputErrorf("could not determine chunk assignment: %w", err)
 	}
 
 	// pre-select all authorized Verifiers at the block that incorporates the result
 	authorizedVerifiersTmp, err := c.authorizedVerifiersAtBlock(incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not determine authorized verifiers: %w", err)
+		return engine.NewInvalidInputErrorf("could not determine authorized verifiers: %w", err)
 	}
 
 	authorizedVerifiers := make(map[flow.Identifier]struct{})
@@ -102,9 +99,10 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 		authorizedVerifiers[nodeID] = struct{}{}
 	}
 
+	// pre-select all authorized verifiers at the block that is being sealed
 	c.authorizedApprovers, err = c.authorizedVerifiersAtBlock(incorporatedResult.Result.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not determine authorized verifiers for sealing candidate: %w", err)
+		return engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
 	}
 
 	c.lock.Lock()

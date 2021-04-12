@@ -10,6 +10,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestChunkApprovalCollector performs isolated testing of ChunkApprovalCollector.
+// ChunkApprovalCollector has to process and cache signatures for result approvals that meet assignment.
+// ChunkApprovalCollector has to reject approvals with invalid assignment or from invalid verification node.
+// ChunkApprovalCollector is responsible for properly accumulating signatures and creating aggregated signature when requested.
 func TestChunkApprovalCollector(t *testing.T) {
 	suite.Run(t, new(ChunkApprovalCollectorTestSuite))
 }
@@ -32,6 +36,8 @@ func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 	s.collector = NewChunkApprovalCollector(s.chunkAssignment, s.AuthorizedVerifiers)
 }
 
+// TestProcessApproval_ValidApproval tests processing a valid approval. Expected to process it without error
+// and report status to caller.
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	status := s.collector.ProcessApproval(approval)
@@ -40,6 +46,8 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	require.Equal(s.T(), uint(1), s.collector.chunkApprovals.NumberSignatures())
 }
 
+// TestProcessApproval_InvalidChunkAssignment tests processing approval with invalid chunk assignment. Expected to
+// reject this approval, signature cache shouldn't be affected.
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssignment() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	delete(s.chunkAssignment, s.VerID)
@@ -49,6 +57,8 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssign
 	require.Equal(s.T(), uint(0), s.collector.chunkApprovals.NumberSignatures())
 }
 
+// TestProcessApproval_InvalidVerifier tests processing approval with invalid approver ID. Expected to
+// reject this approval, signature cache shouldn't be affected.
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidVerifier() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	delete(s.AuthorizedVerifiers, s.VerID)
@@ -58,6 +68,8 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidVerifier() 
 	require.Equal(s.T(), uint(0), s.collector.chunkApprovals.NumberSignatures())
 }
 
+// TestGetAggregatedSignature_MultipleApprovals tests processing approvals from different verifiers. Expected to provide a valid
+// aggregated sig that has `AttestationSignature` for every approval.
 func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApprovals() {
 	var status ChunkProcessingStatus
 	sigCollector := flow.NewSignatureCollector()
