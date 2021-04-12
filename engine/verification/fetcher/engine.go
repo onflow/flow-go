@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Fetch engine processes each chunk in the chunk job queue, fetches its chunk data pack
+// Engine Fetch engine processes each chunk in the chunk job queue, fetches its chunk data pack
 // from the execution nodes who produced the receipts, and when the chunk data pack are
 // received, it passes the verifiable chunk data to verifier engine to verify the chunk.
 type Engine struct {
