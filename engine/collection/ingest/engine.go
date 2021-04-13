@@ -55,12 +55,13 @@ func New(
 		access.NewProtocolStateBlocks(state),
 		chain,
 		access.TransactionValidationOptions{
-			Expiry:            flow.DefaultTransactionExpiry,
-			ExpiryBuffer:      config.ExpiryBuffer,
-			MaxGasLimit:       flow.DefaultMaxGasLimit,
-			MaxAddressIndex:   config.MaxAddressIndex,
-			CheckScriptsParse: config.CheckScriptsParse,
-			MaxTxSizeLimit:    flow.DefaultMaxTxSizeLimit,
+			Expiry:                 flow.DefaultTransactionExpiry,
+			ExpiryBuffer:           config.ExpiryBuffer,
+			MaxGasLimit:            config.MaxGasLimit,
+			MaxAddressIndex:        config.MaxAddressIndex,
+			CheckScriptsParse:      config.CheckScriptsParse,
+			MaxTransactionByteSize: config.MaxTransactionByteSize,
+			MaxCollectionByteSize:  config.MaxCollectionByteSize,
 		},
 	)
 
@@ -229,7 +230,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.TransactionBod
 
 		err := e.conduit.Multicast(tx, e.config.PropagationRedundancy+1, txCluster.NodeIDs()...)
 		if err != nil && !errors.Is(err, network.EmptyTargetList) {
-			// if mutlicast to a target cluster with at least one node failed, return an error
+			// if multicast to a target cluster with at least one node failed, return an error
 			return fmt.Errorf("could not route transaction to cluster: %w", err)
 		}
 		if err == nil {

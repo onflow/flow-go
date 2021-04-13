@@ -272,7 +272,7 @@ func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvResolveLocation)
 		defer sp.Finish()
 	}
@@ -400,7 +400,7 @@ func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Prog
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvProgramLog)
 		defer sp.Finish()
 	}
@@ -412,7 +412,8 @@ func (e *hostEnv) ProgramLog(message string) error {
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
-	if e.isTraceable() {
+	// only trace when extensive tracing
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvEmitEvent)
 		defer sp.Finish()
 	}
@@ -452,7 +453,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 }
 
 func (e *hostEnv) GenerateUUID() (uint64, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGenerateUUID)
 		defer sp.Finish()
 	}
@@ -507,7 +508,7 @@ func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 }
 
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvDecodeArgument)
 		defer sp.Finish()
 	}
@@ -595,7 +596,7 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 
 // GetCurrentBlockHeight returns the current block height.
 func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
 		defer sp.Finish()
 	}
@@ -609,7 +610,7 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
 func (e *hostEnv) UnsafeRandom() (uint64, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvUnsafeRandom)
 		defer sp.Finish()
 	}
@@ -841,7 +842,7 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetSigningAccounts)
 		defer sp.Finish()
 	}
