@@ -51,7 +51,7 @@ A **forest** holds a set of binary Merkle tries, given a parent trie and a batch
 ![forest image](/ledger/docs/forest.png?raw=true "forest")
 
 ### compact forest 
-A **compact forest** construct new trie after each update (copy on change) and reuses unchanged sub-tries from the parent.
+A **compact forest** constructs a new trie after each update (copy on change) and reuses unchanged sub-tries from the parent.
 
 ![compact forest image](/ledger/docs/reuse_sub_trees.gif?raw=true "compact forest")
 
