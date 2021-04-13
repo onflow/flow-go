@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -95,10 +97,10 @@ func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 
 		// get it from the database
 		resource, err := c.retrieve(key)(tx)
-		if errors.Is(err, storage.ErrNotFound) {
-			c.metrics.CacheNotFound(c.resource)
-		}
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				c.metrics.CacheNotFound(c.resource)
+			}
 			return nil, fmt.Errorf("could not retrieve resource: %w", err)
 		}
 
