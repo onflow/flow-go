@@ -47,9 +47,8 @@ const (
 	// failureThreshold represents the number of retries match engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// Currently setting the threshold to a very large value (corresponding to 100 days),
-	// which for all practical purposes is equivalent to the Verifier trying indefinitely.
-	failureThreshold = 10000000
+	// This value is currently set to account for a single 24-hour failure of an Execution node.
+	failureThreshold = 17500
 )
 
 func main() {
