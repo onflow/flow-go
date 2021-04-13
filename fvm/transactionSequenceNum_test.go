@@ -1,10 +1,10 @@
 package fvm_test
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTransactionSequenceNumProcess(t *testing.T) {
@@ -29,8 +28,6 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 
 		tx := flow.TransactionBody{}
 		tx.SetProposalKey(address, 0, 0)
-		err = signEnvelope(&tx, address, *privKey)
-		require.NoError(t, err)
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
@@ -56,8 +53,6 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx := flow.TransactionBody{}
 		// invalid sequence number is 2
 		tx.SetProposalKey(address, 0, 2)
-		err = signEnvelope(&tx, address, *privKey)
-		require.NoError(t, err)
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
@@ -96,19 +91,4 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		require.Equal(t, key.SeqNumber, uint64(0))
 	})
 
-}
-
-func signEnvelope(tx *flow.TransactionBody, account flow.Address, privateKey flow.AccountPrivateKey) error {
-	hasher, err := crypto.NewHasher(privateKey.HashAlgo)
-	if err != nil {
-		return fmt.Errorf("failed to create hasher: %w", err)
-	}
-
-	err = tx.SignEnvelope(account, 0, privateKey.PrivateKey, hasher)
-
-	if err != nil {
-		return fmt.Errorf("failed to sign transaction: %w", err)
-	}
-
-	return nil
 }
