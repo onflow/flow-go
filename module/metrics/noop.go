@@ -46,6 +46,7 @@ func (nc *NoopCollector) BlockSealed(*flow.Block)                               
 func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)                           {}
 func (nc *NoopCollector) CacheEntries(resource string, entries uint)                             {}
 func (nc *NoopCollector) CacheHit(resource string)                                               {}
+func (nc *NoopCollector) CacheNotFound(resource string)                                          {}
 func (nc *NoopCollector) CacheMiss(resource string)                                              {}
 func (nc *NoopCollector) MempoolEntries(resource string, entries uint)                           {}
 func (nc *NoopCollector) Register(resource string, entriesFunc module.EntriesFunc) error         { return nil }
