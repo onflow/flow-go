@@ -116,6 +116,7 @@ func (suite *MatchEngineTestSuite) SetupTest() {
 }
 
 func (suite *MatchEngineTestSuite) ChunkDataPackIsRequestedNTimes(timeout time.Duration,
+	executorID flow.Identifier,
 	n int, f func(*messages.ChunkDataRequest)) <-chan []*messages.ChunkDataRequest {
 	reqs := make([]*messages.ChunkDataRequest, 0)
 	c := make(chan []*messages.ChunkDataRequest, 1)
@@ -128,12 +129,16 @@ func (suite *MatchEngineTestSuite) ChunkDataPackIsRequestedNTimes(timeout time.D
 	// chunk data was requested once, and return the chunk data pack when requested
 	// called with 3 mock.Anything, the first is the request, the second and third are the 2
 	// execution nodes
-	suite.con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	suite.con.On("Publish", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
 		req := args.Get(0).(*messages.ChunkDataRequest)
 		reqs = append(reqs, req)
+
+		// chunk data request should be only dispatched to the executor ID
+		targetID := args.Get(1).(flow.Identifier)
+		require.Equal(suite.T(), targetID, executorID)
 
 		fmt.Printf("con.Submit is called for chunk:%v\n", req.ChunkID)
 
@@ -260,7 +265,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 1, suite.RespondChunkDataPack(e, en.ID()))
+	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 1, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunksC := suite.VerifierCalledNTimes(5*time.Second, 1)
@@ -383,7 +388,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 2, suite.RespondChunkDataPack(e, en.ID()))
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 2, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunksC := suite.VerifierCalledNTimes(5*time.Second, 2)
@@ -456,7 +461,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	// setup conduit to return requested chunk data packs
 	// return received requests
 	called := 0
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3,
 		func(req *messages.ChunkDataRequest) {
 			called++
 			if called >= 3 {
@@ -536,7 +541,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	// setup conduit to return requested chunk data packs
 	// return received requests
 	called := 0
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3,
 		func(req *messages.ChunkDataRequest) {
 			called++
 			if called >= 3 {
@@ -600,7 +605,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// never returned any chunk data pack
-	reqC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3, func(req *messages.ChunkDataRequest) {})
+	reqC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3, func(req *messages.ChunkDataRequest) {})
 
 	<-e.Ready()
 
@@ -673,7 +678,7 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, count, suite.RespondChunkDataPack(e, en.ID()))
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, count, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunkC := suite.VerifierCalledNTimes(5*time.Second, count)
@@ -750,7 +755,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	count := len(result.Chunks)
-	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, count, func(*messages.ChunkDataRequest) {})
+	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, count, func(*messages.ChunkDataRequest) {})
 
 	// check verifier's method is called
 	_ = suite.VerifierCalledNTimes(5*time.Second, count)
