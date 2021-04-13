@@ -45,9 +45,10 @@ func addSubcommands() {
 
 func loadExecutionState() *mtrie.Forest {
 
-	w, err := wal.NewWAL(
+	w, err := wal.NewDiskWAL(
 		zerolog.Nop(),
 		nil,
+		metrics.NewNoopCollector(),
 		flagExecutionStateDir,
 		complete.DefaultCacheSize,
 		pathfinder.PathByteSize,
@@ -56,8 +57,11 @@ func loadExecutionState() *mtrie.Forest {
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")
 	}
+	defer func() {
+		<-w.Done()
+	}()
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, flagExecutionStateDir, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}

@@ -53,7 +53,7 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results)
 	transactions := badger.NewTransactions(cacheMetrics, db)
 	headers := badger.NewHeaders(cacheMetrics, db)
-	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts)
+	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := badger.NewBlocks(db, headers, payloads)
 	collections := badger.NewCollections(db, transactions)
 

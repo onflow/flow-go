@@ -122,9 +122,13 @@ func FullBlockFixture() flow.Block {
 	block := BlockFixture()
 	payload := block.Payload
 	payload.Seals = Seal.Fixtures(10)
-	payload.Receipts = []*flow.ExecutionReceipt{
-		ExecutionReceiptFixture(),
-		ExecutionReceiptFixture(),
+	payload.Results = []*flow.ExecutionResult{
+		ExecutionResultFixture(),
+		ExecutionResultFixture(),
+	}
+	payload.Receipts = []*flow.ExecutionReceiptMeta{
+		ExecutionReceiptFixture(WithResult(payload.Results[0])).Meta(),
+		ExecutionReceiptFixture(WithResult(payload.Results[1])).Meta(),
 	}
 
 	header := block.Header
@@ -198,7 +202,11 @@ func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
 func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
-	payload.Receipts = []*flow.ExecutionReceipt{ExecutionReceiptFixture()}
+	for i := 0; i < 10; i++ {
+		receipt := ExecutionReceiptFixture()
+		payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
+		payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+	}
 }
 
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
@@ -215,7 +223,10 @@ func WithGuarantees(guarantees ...*flow.CollectionGuarantee) func(*flow.Payload)
 
 func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	return func(payload *flow.Payload) {
-		payload.Receipts = append(payload.Receipts, receipts...)
+		for _, receipt := range receipts {
+			payload.Receipts = append(payload.Receipts, receipt.Meta())
+			payload.Results = append(payload.Results, &receipt.ExecutionResult)
+		}
 	}
 }
 
@@ -882,15 +893,15 @@ func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int
 }
 
 func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 32)
+	sig := make([]byte, 48)
 	_, _ = crand.Read(sig)
 	return sig
 }
 
 func CombinedSignatureFixture(n int) crypto.Signature {
 	sigs := SignaturesFixture(n)
-	combiner := signature.NewCombiner()
-	sig, err := combiner.Join(sigs...)
+	combiner := signature.NewCombiner(48, 48)
+	sig, err := combiner.Join(sigs[0], sigs[1])
 	if err != nil {
 		panic(err)
 	}
@@ -1465,12 +1476,6 @@ func ReceiptChainFor(blocks []*flow.Block, result0 *flow.ExecutionResult) []*flo
 // so that all the blocks are connected.
 // blocks' height have to be in strict increasing order.
 func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.ExecutionReceipt) {
-	blocks[0].Header.PayloadHash = blocks[0].Payload.Hash()
-	receipts[0].ExecutionResult.BlockID = blocks[0].ID()
-	for _, chunk := range receipts[0].ExecutionResult.Chunks {
-		chunk.BlockID = blocks[0].ID()
-	}
-
 	for i := 1; i < len(blocks); i++ {
 		b := blocks[i]
 		p := i - 1
@@ -1485,6 +1490,15 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 		receipts[i].ExecutionResult.PreviousResultID = prevReceipt.ExecutionResult.ID()
 		for _, c := range receipts[i].ExecutionResult.Chunks {
 			c.BlockID = b.ID()
+		}
+	}
+
+	// after changing results we need to update IDs of results in receipt
+	for _, block := range blocks {
+		if len(block.Payload.Results) > 0 {
+			for i := range block.Payload.Receipts {
+				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
+			}
 		}
 	}
 }

@@ -41,10 +41,11 @@ import (
 // - it does a correct resource clean up of the pipeline after handling all incoming receipts
 func TestAssignerFetcherPipeline(t *testing.T) {
 	testcases := []struct {
-		blockCount int
-		ops        []utils.CompleteExecutionReceiptBuilderOpt
-		msg        string
-		staked     bool
+		blockCount      int
+		opts            []utils.CompleteExecutionReceiptBuilderOpt
+		msg             string
+		staked          bool
+		eventRepetition int // accounts for consumer being notified of a certain finalized block more than once.
 	}{
 		{
 			// read this test case in this way:
@@ -53,48 +54,63 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 			// The result has only one chunk.
 			// The verification node is staked
 			blockCount: 1,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(1),
 				utils.WithChunks(1),
 				utils.WithCopies(1),
 			},
-			staked: true,
-			msg:    "1 block, 1 result, 1 chunk, no duplicate, staked",
+			staked:          true,
+			eventRepetition: 1,
+			msg:             "1 block, 1 result, 1 chunk, no duplicate, staked, no event repetition",
 		},
 		{
 			blockCount: 1,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(1),
 				utils.WithChunks(1),
 				utils.WithCopies(1),
 			},
-			staked: false, // unstaked
-			msg:    "1 block, 1 result, 1 chunk, no duplicate, unstaked",
+			staked:          false, // unstaked
+			eventRepetition: 1,
+			msg:             "1 block, 1 result, 1 chunk, no duplicate, unstaked, no event repetition",
 		},
 		{
 			blockCount: 1,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(5),
 				utils.WithChunks(5),
 				utils.WithCopies(1),
 			},
-			staked: true,
-			msg:    "1 block, 5 result, 5 chunks, no duplicate, staked",
+			staked:          true,
+			eventRepetition: 1,
+			msg:             "1 block, 5 result, 5 chunks, no duplicate, staked, no event repetition",
 		},
 		{
 			blockCount: 10,
-			ops: []utils.CompleteExecutionReceiptBuilderOpt{
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
 				utils.WithResults(5),
 				utils.WithChunks(5),
 				utils.WithCopies(2),
 			},
-			staked: true,
-			msg:    "10 block, 5 result, 5 chunks, 1 duplicates, staked",
+			staked:          true,
+			eventRepetition: 1,
+			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, staked, no event repetition",
+		},
+		{
+			blockCount: 10,
+			opts: []utils.CompleteExecutionReceiptBuilderOpt{
+				utils.WithResults(5),
+				utils.WithChunks(5),
+				utils.WithCopies(2),
+			},
+			staked:          true,
+			eventRepetition: 3, // notifies consumer 3 times for each finalized block.
+			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, staked, with event repetition",
 		},
 	}
 
 	for _, tc := range testcases {
-		t.Run(fmt.Sprintf(tc.msg), func(t *testing.T) {
+		t.Run(tc.msg, func(t *testing.T) {
 			withConsumers(t, tc.staked, tc.blockCount, func(
 				blockConsumer *blockconsumer.BlockConsumer,
 				chunkConsumer *chunkconsumer.ChunkConsumer,
@@ -104,7 +120,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 				unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
 				unittest.RequireCloseBefore(t, blockConsumer.Ready(), time.Second, "could not start block consumer")
 
-				for i := 0; i < len(blocks); i++ {
+				for i := 0; i < len(blocks)*tc.eventRepetition; i++ {
 					// consumer is only required to be "notified" that a new finalized block available.
 					// It keeps track of the last finalized block it has read, and read the next height upon
 					// getting notified as follows:
@@ -115,7 +131,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 				unittest.RequireCloseBefore(t, blockConsumer.Done(), time.Second, "could not terminate block consumer")
 				unittest.RequireCloseBefore(t, chunkConsumer.Done(), time.Second, "could not terminate chunk consumer")
 
-			}, tc.ops...)
+			}, tc.opts...)
 		})
 	}
 }
@@ -263,11 +279,8 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 // As the return values, it returns the state, local module, and identity of verification node.
 func bootstrapSystem(t *testing.T, staked bool) (*testmock.StateFixture, module.Local, flow.Identity) {
 	// creates identities to bootstrap system with
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	identities := flow.IdentityList{colID, conID, exeID, verID}
+	identities := unittest.CompleteIdentitySet(verID)
 
 	// bootstraps the system
 	collector := &metrics.NoopCollector{}

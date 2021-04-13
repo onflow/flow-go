@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -379,8 +380,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "code deployment requires authorization from specific accounts")
-		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 
 	t.Run("account update with set code fails if not signed by service account", func(t *testing.T) {
@@ -406,8 +407,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 
 		assert.Error(t, tx.Err)
 
-		assert.Contains(t, tx.Err.Error(), "code deployment requires authorization from specific accounts")
-		assert.Equal(t, (&fvm.ExecutionError{}).Code(), tx.Err.Code())
+		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
+		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
 }
 
@@ -649,7 +650,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				assert.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+				assert.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
 			}))
 	t.Run("Increasing storage capacity works", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
 		run(
@@ -1055,7 +1056,7 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		var account *flow.Account
 		account, err = vm.GetAccount(ctx, address, ledger, programs)
-		assert.Equal(t, fvm.ErrAccountNotFound, err)
+		assert.True(t, errors.IsAccountNotFoundError(err))
 		assert.Nil(t, account)
 	})
 }
@@ -1718,7 +1719,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			err = vm.Run(ctx, tx, view, programs)
 			require.NoError(t, err)
 
-			require.Equal(t, (&fvm.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+			require.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
 
 			balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
 
@@ -1761,7 +1762,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				require.IsType(t, &fvm.ExecutionError{}, tx.Err)
+				require.IsType(t, &errors.CadenceRuntimeError{}, tx.Err)
 
 				// send it again
 				tx = fvm.Transaction(txBody, 0)
@@ -1769,8 +1770,8 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				require.Equal(t, (&fvm.InvalidProposalKeySequenceNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(1), tx.Err.(*fvm.InvalidProposalKeySequenceNumberError).CurrentSeqNumber)
+				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(1), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
 }

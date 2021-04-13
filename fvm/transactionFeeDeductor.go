@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/trace"
 )
 
 type TransactionFeeDeductor struct{}
@@ -19,6 +20,11 @@ func (d *TransactionFeeDeductor) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
+	if ctx.Tracer != nil && proc.TraceSpan != nil {
+		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMDeductTransactionFees)
+		defer span.Finish()
+	}
+
 	return d.deductFees(vm, ctx, proc.Transaction, sth, programs)
 }
 

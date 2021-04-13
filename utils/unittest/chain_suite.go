@@ -28,11 +28,12 @@ type BaseChainSuite struct {
 	Approvers  flow.IdentityList
 
 	// BLOCKS
-	RootBlock            flow.Block
-	LatestSealedBlock    flow.Block
-	LatestFinalizedBlock *flow.Block
-	UnfinalizedBlock     flow.Block
-	Blocks               map[flow.Identifier]*flow.Block
+	RootBlock             flow.Block
+	LatestSealedBlock     flow.Block
+	LatestFinalizedBlock  *flow.Block
+	UnfinalizedBlock      flow.Block
+	LatestExecutionResult *flow.ExecutionResult
+	Blocks                map[flow.Identifier]*flow.Block
 
 	// PROTOCOL STATE
 	State          *protocol.State
@@ -183,6 +184,8 @@ func (bc *BaseChainSuite) SetupChain() {
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RESULTS STORAGE ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.PersistedResults = make(map[flow.Identifier]*flow.ExecutionResult)
+	bc.LatestExecutionResult = ExecutionResultFixture(WithBlock(&bc.LatestSealedBlock))
+	bc.PersistedResults[bc.LatestExecutionResult.ID()] = bc.LatestExecutionResult
 	bc.ResultsDB = &storage.ExecutionResults{}
 	bc.ResultsDB.On("ByID", mock.Anything).Return(
 		func(resultID flow.Identifier) *flow.ExecutionResult {
@@ -271,7 +274,8 @@ func (bc *BaseChainSuite) SetupChain() {
 	)
 
 	bc.SealsIndex = make(map[flow.Identifier]*flow.Seal)
-	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.Header))
+	firtSeal := Seal.Fixture(Seal.WithBlock(bc.LatestSealedBlock.Header),
+		Seal.WithResult(bc.LatestExecutionResult))
 	for id, block := range bc.Blocks {
 		if id != bc.RootBlock.ID() {
 			bc.SealsIndex[block.ID()] = firtSeal
@@ -515,9 +519,11 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 
 func (bc *BaseChainSuite) Extend(block *flow.Block) {
 	bc.Blocks[block.ID()] = block
-	bc.SealsIndex[block.ID()] = bc.SealsIndex[block.Header.ParentID]
+	if seal, ok := bc.SealsIndex[block.Header.ParentID]; ok {
+		bc.SealsIndex[block.ID()] = seal
+	}
 
-	for _, receipt := range block.Payload.Receipts {
+	for _, result := range block.Payload.Results {
 		// Exec Receipt for block with valid subgraph
 		// ATTENTION:
 		// Here, IncorporatedBlockID (the first argument) should be set
@@ -525,8 +531,8 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		// ExecutionResult. However, in phase 2 of the sealing roadmap,
 		// we are still using a temporary sealing logic where the
 		// IncorporatedBlockID is expected to be the result's block ID.
-		incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(&receipt.ExecutionResult),
-			IncorporatedResult.WithIncorporatedBlockID(receipt.ExecutionResult.BlockID))
+		incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(result),
+			IncorporatedResult.WithIncorporatedBlockID(result.BlockID))
 
 		// assign each chunk to 50% of validation Nodes and generate respective approvals
 		assignment := chunks.NewAssignment()
@@ -548,8 +554,11 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.PendingApprovals[incorporatedResult.Result.ID()] = approvals
 		bc.PendingResults[incorporatedResult.Result.ID()] = incorporatedResult
 		bc.Assignments[incorporatedResult.Result.ID()] = assignment
-		bc.PersistedResults[receipt.ExecutionResult.ID()] = &receipt.ExecutionResult
+		bc.PersistedResults[result.ID()] = result
 		// TODO: adding receipt
+	}
+	for _, seal := range block.Payload.Seals {
+		bc.SealsIndex[block.ID()] = seal
 	}
 }
 

@@ -69,7 +69,7 @@ func new256() *state {
 }
 
 // copyOut copies ulint64s to a byte buffer.
-func (d *state) copyOut(out *[32]byte) {
+func (d *state) copyOut(out *[]byte) {
 	for i := 0; i < 4; i++ {
 		binary.LittleEndian.PutUint64((*out)[i<<3:], d.a[i])
 	}
@@ -86,7 +86,7 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 	}
 }
 
-func (d *state) hash256Plus(out *[32]byte, p1, p2 []byte) {
+func (d *state) hash256Plus(out *[]byte, p1, p2 []byte) {
 	//xorIn since p1 length is a multiple of 8
 	xorInAtIndex(d, p1, 0)
 	written := 32 // written uint64s in the state
@@ -124,7 +124,7 @@ func (d *state) hash256Plus(out *[32]byte, p1, p2 []byte) {
 
 // hash256plus256 absorbs two 256 bits slices of data into the hash's state
 // applies the permutation, and outpute the result in out
-func (d *state) hash256plus256(out *[32]byte, p1, p2 []byte) {
+func (d *state) hash256plus256(out *[]byte, p1, p2 []byte) {
 	xorIn512(d, p1, p2)
 	// permute
 	finalKeccakF1600(&d.a)

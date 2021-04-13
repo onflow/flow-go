@@ -2,8 +2,11 @@ package complete_test
 
 import (
 	"bytes"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,170 +17,178 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestNewLedger(t *testing.T) {
-	unittest.RunWithTempDir(t, func(dbDir string) {
-		metricsCollector := &metrics.NoopCollector{}
-		_, err := complete.NewLedger(dbDir, 100, metricsCollector, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-		assert.NoError(t, err)
-	})
+	metricsCollector := &metrics.NoopCollector{}
+	wal := &fixtures.NoopWAL{}
+	_, err := complete.NewLedger(wal, 100, metricsCollector, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	assert.NoError(t, err)
+
 }
 
 func TestLedger_Update(t *testing.T) {
 	t.Run("empty update", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(dbDir string) {
 
-			l, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-			require.NoError(t, err)
+		wal := &fixtures.NoopWAL{}
 
-			// create empty update
-			currentState := l.InitialState()
-			up, err := ledger.NewEmptyUpdate(currentState)
-			require.NoError(t, err)
+		l, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
 
-			newState, err := l.Set(up)
-			require.NoError(t, err)
+		// create empty update
+		currentState := l.InitialState()
+		up, err := ledger.NewEmptyUpdate(currentState)
+		require.NoError(t, err)
 
-			// state shouldn't change
-			assert.True(t, bytes.Equal(currentState, newState))
-		})
+		newState, err := l.Set(up)
+		require.NoError(t, err)
+
+		// state shouldn't change
+		assert.True(t, bytes.Equal(currentState, newState))
+
 	})
 
 	t.Run("non-empty update and query", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(dbDir string) {
-			// UpdateFixture
 
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-			require.NoError(t, err)
+		// UpdateFixture
+		wal := &fixtures.NoopWAL{}
+		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
 
-			curSC := led.InitialState()
+		curSC := led.InitialState()
 
-			u := utils.UpdateFixture()
-			u.SetState(curSC)
+		u := utils.UpdateFixture()
+		u.SetState(curSC)
 
-			newSc, err := led.Set(u)
-			require.NoError(t, err)
-			assert.False(t, bytes.Equal(curSC, newSc))
+		newSc, err := led.Set(u)
+		require.NoError(t, err)
+		assert.False(t, bytes.Equal(curSC, newSc))
 
-			q, err := ledger.NewQuery(newSc, u.Keys())
-			require.NoError(t, err)
+		q, err := ledger.NewQuery(newSc, u.Keys())
+		require.NoError(t, err)
 
-			retValues, err := led.Get(q)
-			require.NoError(t, err)
+		retValues, err := led.Get(q)
+		require.NoError(t, err)
 
-			for i, v := range u.Values() {
-				assert.Equal(t, v, retValues[i])
-			}
-		})
+		for i, v := range u.Values() {
+			assert.Equal(t, v, retValues[i])
+		}
 	})
 }
 
 func TestLedger_Get(t *testing.T) {
 	t.Run("empty query", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-			require.NoError(t, err)
 
-			curSC := led.InitialState()
-			q, err := ledger.NewEmptyQuery(curSC)
-			require.NoError(t, err)
+		wal := &fixtures.NoopWAL{}
 
-			retValues, err := led.Get(q)
-			require.NoError(t, err)
-			assert.Equal(t, len(retValues), 0)
-		})
+		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
+
+		curSC := led.InitialState()
+		q, err := ledger.NewEmptyQuery(curSC)
+		require.NoError(t, err)
+
+		retValues, err := led.Get(q)
+		require.NoError(t, err)
+		assert.Equal(t, len(retValues), 0)
 	})
 
 	t.Run("empty keys", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-			require.NoError(t, err)
 
-			curS := led.InitialState()
+		wal := &fixtures.NoopWAL{}
 
-			q := utils.QueryFixture()
-			q.SetState(curS)
+		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
 
-			retValues, err := led.Get(q)
-			require.NoError(t, err)
+		curS := led.InitialState()
 
-			assert.Equal(t, 2, len(retValues))
-			assert.Equal(t, 0, len(retValues[0]))
-			assert.Equal(t, 0, len(retValues[1]))
-		})
+		q := utils.QueryFixture()
+		q.SetState(curS)
+
+		retValues, err := led.Get(q)
+		require.NoError(t, err)
+
+		assert.Equal(t, 2, len(retValues))
+		assert.Equal(t, 0, len(retValues[0]))
+		assert.Equal(t, 0, len(retValues[1]))
+
 	})
 }
 
 func TestLedger_Proof(t *testing.T) {
 	t.Run("empty query", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-			require.NoError(t, err)
+		wal := &fixtures.NoopWAL{}
 
-			curSC := led.InitialState()
-			q, err := ledger.NewEmptyQuery(curSC)
-			require.NoError(t, err)
+		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
 
-			retProof, err := led.Prove(q)
-			require.NoError(t, err)
+		curSC := led.InitialState()
+		q, err := ledger.NewEmptyQuery(curSC)
+		require.NoError(t, err)
 
-			proof, err := encoding.DecodeTrieBatchProof(retProof)
-			require.NoError(t, err)
-			assert.Equal(t, 0, len(proof.Proofs))
-		})
+		retProof, err := led.Prove(q)
+		require.NoError(t, err)
+
+		proof, err := encoding.DecodeTrieBatchProof(retProof)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(proof.Proofs))
 	})
 
 	t.Run("non-existing keys", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-			require.NoError(t, err)
 
-			curS := led.InitialState()
-			q := utils.QueryFixture()
-			q.SetState(curS)
-			require.NoError(t, err)
+		wal := &fixtures.NoopWAL{}
 
-			retProof, err := led.Prove(q)
-			require.NoError(t, err)
+		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
 
-			proof, err := encoding.DecodeTrieBatchProof(retProof)
-			require.NoError(t, err)
-			assert.Equal(t, 2, len(proof.Proofs))
-			assert.True(t, common.VerifyTrieBatchProof(proof, curS))
-		})
+		curS := led.InitialState()
+		q := utils.QueryFixture()
+		q.SetState(curS)
+		require.NoError(t, err)
+
+		retProof, err := led.Prove(q)
+		require.NoError(t, err)
+
+		proof, err := encoding.DecodeTrieBatchProof(retProof)
+		require.NoError(t, err)
+		assert.Equal(t, 2, len(proof.Proofs))
+		assert.True(t, common.VerifyTrieBatchProof(proof, curS))
+
 	})
 
 	t.Run("existing keys", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
-			require.NoError(t, err)
 
-			curS := led.InitialState()
+		wal := &fixtures.NoopWAL{}
+		led, err := complete.NewLedger(wal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+		require.NoError(t, err)
 
-			u := utils.UpdateFixture()
-			u.SetState(curS)
+		curS := led.InitialState()
 
-			newSc, err := led.Set(u)
-			require.NoError(t, err)
-			assert.False(t, bytes.Equal(curS, newSc))
+		u := utils.UpdateFixture()
+		u.SetState(curS)
 
-			q, err := ledger.NewQuery(newSc, u.Keys())
-			require.NoError(t, err)
+		newSc, err := led.Set(u)
+		require.NoError(t, err)
+		assert.False(t, bytes.Equal(curS, newSc))
 
-			retProof, err := led.Prove(q)
-			require.NoError(t, err)
+		q, err := ledger.NewQuery(newSc, u.Keys())
+		require.NoError(t, err)
 
-			proof, err := encoding.DecodeTrieBatchProof(retProof)
-			require.NoError(t, err)
-			assert.Equal(t, 2, len(proof.Proofs))
-			assert.True(t, common.VerifyTrieBatchProof(proof, newSc))
-		})
+		retProof, err := led.Prove(q)
+		require.NoError(t, err)
+
+		proof, err := encoding.DecodeTrieBatchProof(retProof)
+		require.NoError(t, err)
+		assert.Equal(t, 2, len(proof.Proofs))
+		assert.True(t, common.VerifyTrieBatchProof(proof, newSc))
 	})
 }
 
@@ -193,8 +204,11 @@ func Test_WAL(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
+		diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, wal.SegmentSize)
+		require.NoError(t, err)
+
 		// cache size intentionally is set to size to test deletion
-		led, err := complete.NewLedger(dir, size, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
+		led, err := complete.NewLedger(diskWal, size, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		var state = led.InitialState()
@@ -221,9 +235,13 @@ func Test_WAL(t *testing.T) {
 			savedData[string(state)] = data
 		}
 
+		<-diskWal.Done()
 		<-led.Done()
 
-		led2, err := complete.NewLedger(dir, size+10, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
+		diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dir, size, pathfinder.PathByteSize, wal.SegmentSize)
+		require.NoError(t, err)
+
+		led2, err := complete.NewLedger(diskWal2, size+10, metricsCollector, logger, complete.DefaultPathFinderVersion)
 		require.NoError(t, err)
 
 		// random map iteration order is a benefit here
@@ -252,6 +270,7 @@ func Test_WAL(t *testing.T) {
 		s := led2.ForestSize()
 		assert.Equal(t, s, size)
 
+		<-diskWal2.Done()
 		<-led2.Done()
 	})
 }
@@ -277,7 +296,9 @@ func TestLedgerFunctionality(t *testing.T) {
 		histStorage := make(map[string]ledger.Value) // historic storage string(key, state) -> value
 		latestValue := make(map[string]ledger.Value) // key to value
 		unittest.RunWithTempDir(t, func(dbDir string) {
-			led, err := complete.NewLedger(dbDir, activeTries, metricsCollector, logger, nil, complete.DefaultPathFinderVersion)
+			diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dbDir, activeTries, pathfinder.PathByteSize, wal.SegmentSize)
+			require.NoError(t, err)
+			led, err := complete.NewLedger(diskWal, activeTries, metricsCollector, logger, complete.DefaultPathFinderVersion)
 			assert.NoError(t, err)
 			state := led.InitialState()
 			for i := 0; i < steps; i++ {
@@ -351,6 +372,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				}
 				state = newState
 			}
+			<-diskWal.Done()
 		})
 	}
 }
@@ -365,7 +387,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
-				led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				require.NoError(t, err)
+				led, err := complete.NewLedger(diskWal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
 				state := led.InitialState()
@@ -379,7 +403,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, newState, state)
 
-				led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				require.NoError(t, err)
+				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
 				q, err := ledger.NewQuery(state, u.Keys())
@@ -391,6 +417,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				for i, v := range u.Values() {
 					assert.Equal(t, v, retValues[i])
 				}
+
+				<-diskWal.Done()
+				<-diskWal2.Done()
 			})
 		})
 	})
@@ -402,7 +431,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
-				led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				require.NoError(t, err)
+				led, err := complete.NewLedger(diskWal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
 				state := led.InitialState()
@@ -415,7 +446,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
-				led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				require.NoError(t, err)
+				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
 				q, err := ledger.NewQuery(newState, u.Keys())
@@ -427,6 +460,8 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'C'}))
 				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
 
+				<-diskWal.Done()
+				<-diskWal2.Done()
 			})
 		})
 	})
@@ -438,7 +473,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 		unittest.RunWithTempDir(t, func(dbDir string) {
 			unittest.RunWithTempDir(t, func(dir2 string) {
 
-				led, err := complete.NewLedger(dbDir, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				require.NoError(t, err)
+				led, err := complete.NewLedger(diskWal, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
 				state := led.InitialState()
@@ -451,7 +488,9 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
 				require.NoError(t, err)
 
-				led2, err := complete.NewLedger(dir2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, nil, complete.DefaultPathFinderVersion)
+				diskWal2, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir2, 100, pathfinder.PathByteSize, wal.SegmentSize)
+				require.NoError(t, err)
+				led2, err := complete.NewLedger(diskWal2, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 				require.NoError(t, err)
 
 				q, err := ledger.NewQuery(newState, u.Keys())
@@ -463,9 +502,90 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				assert.Equal(t, retValues[0], ledger.Value([]byte{'D'}))
 				assert.Equal(t, retValues[1], ledger.Value([]byte{'B'}))
 
+				<-diskWal.Done()
+				<-diskWal2.Done()
 			})
 		})
 	})
+}
+
+func TestWALUpdateIsRunInParallel(t *testing.T) {
+
+	// The idea of this test is - WAL update should be run in parallel
+	// so we block it until we can find a new trie with expected state
+	// this doesn't really proves WAL update is run in parallel, but at least
+	// checks if its run after the trie update
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	w := &LongRunningDummyWAL{
+		updateFn: func(update *ledger.TrieUpdate) error {
+			wg.Wait() //wg will let work after the trie has been updated
+			return nil
+		},
+	}
+
+	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
+
+	values := []ledger.Value{[]byte{1, 2, 3}}
+	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
+	require.NoError(t, err)
+
+	// this state should correspond to fresh state with given update
+	decoded, err := hex.DecodeString("097b7f74413bc03200889c34c6979eacbad58345ef7c0c65e8057a071440df75")
+	expectedState := ledger.State(decoded)
+	require.NoError(t, err)
+
+	query, err := ledger.NewQuery(expectedState, []ledger.Key{key})
+	require.NoError(t, err)
+
+	go func() {
+		newState, err := led.Set(update)
+		require.NoError(t, err)
+		require.Equal(t, newState, expectedState)
+	}()
+
+	require.Eventually(t, func() bool {
+		retrievedValues, err := led.Get(query)
+		if err != nil {
+			return false
+		}
+
+		require.NoError(t, err)
+		require.Equal(t, values, retrievedValues)
+
+		wg.Done()
+
+		return true
+	}, 500*time.Millisecond, 5*time.Millisecond)
+}
+
+func TestWALUpdateFailuresBubbleUp(t *testing.T) {
+
+	theError := fmt.Errorf("error error")
+
+	w := &LongRunningDummyWAL{
+		updateFn: func(update *ledger.TrieUpdate) error {
+			return theError
+		},
+	}
+
+	led, err := complete.NewLedger(w, 100, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	key := ledger.NewKey([]ledger.KeyPart{ledger.NewKeyPart(0, []byte{1, 2, 3})})
+
+	values := []ledger.Value{[]byte{1, 2, 3}}
+	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
+	require.NoError(t, err)
+
+	_, err = led.Set(update)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, theError))
 }
 
 func valuesMatches(expected []ledger.Value, got []ledger.Value) bool {
@@ -499,6 +619,15 @@ func migrationByValue(p []ledger.Payload) ([]ledger.Payload, error) {
 		}
 	}
 	return ret, nil
+}
+
+type LongRunningDummyWAL struct {
+	fixtures.NoopWAL
+	updateFn func(update *ledger.TrieUpdate) error
+}
+
+func (w *LongRunningDummyWAL) RecordUpdate(update *ledger.TrieUpdate) error {
+	return w.updateFn(update)
 }
 
 func migrationByKey(p []ledger.Payload) ([]ledger.Payload, error) {

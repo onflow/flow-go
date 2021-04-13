@@ -28,13 +28,19 @@ type node struct {
 // newNode creates a new node with the provided value and no children
 func newNode(hashValue []byte, height int) *node {
 	n := new(node)
-	n.hashValue = hashValue
+	n.hashValue = make([]byte, 0, common.HashLen)
+	n.hashValue = append(n.hashValue, hashValue...)
+	// pad the hash to Hashlen
+	paddingLen := common.HashLen - len(hashValue)
+	n.hashValue = append(n.hashValue, common.EmptyHash[:paddingLen]...)
+
 	n.height = height
 	n.lChild = nil
 	n.rChild = nil
 	return n
 }
 
+// TODO: revisit this
 // ComputeValue recomputes value for this node in recursive manner
 func (n *node) HashValue() []byte {
 	// leaf node
