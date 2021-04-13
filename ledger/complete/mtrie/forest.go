@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 
 	lru "github.com/hashicorp/golang-lru"
 
@@ -88,11 +87,11 @@ func NewForest(pathByteSize int, forestCapacity int, metrics module.LedgerMetric
 }
 
 // Read reads values for an slice of paths and returns values and error (if any)
+// TODO: can be optimized further if we don't care about changing the order of the input r.Paths
 func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 
-	// no key no change
 	if len(r.Paths) == 0 {
-		return make([]*ledger.Payload, 0), nil
+		return []*ledger.Payload{}, nil
 	}
 
 	// lookup the trie by rootHash
@@ -101,8 +100,11 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 		return nil, err
 	}
 
-	// sort paths and deduplicate keys
-	sortedPaths := make([]ledger.Path, 0)
+	// deduplicate keys:
+	// Generally, we expect the VM to deduplicate reads and writes. Hence, the following is a pre-caution.
+	// TODO: We could take out the following de-duplication logic
+	//       Which increases the cost for duplicates but reduces read complexity without duplicates.
+	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
 	pathOrgIndex := make(map[string][]int)
 	for i, path := range r.Paths {
 		// check key sizes
@@ -110,32 +112,27 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
 		}
 		// only collect duplicated keys once
-		if _, ok := pathOrgIndex[string(path)]; !ok {
-			sortedPaths = append(sortedPaths, path)
-			pathOrgIndex[string(path)] = []int{i}
-		} else {
-			// handles duplicated keys
-			pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
+		indices, ok := pathOrgIndex[string(path)]
+		if !ok { // deduplication here is optional
+			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
+		// append the index
+		pathOrgIndex[string(path)] = append(indices, i)
 	}
 
-	sort.Slice(sortedPaths, func(i, j int) bool {
-		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
-	})
-
-	payloads := trie.UnsafeRead(sortedPaths)
-
-	totalPayloadSize := 0
+	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
 
 	// reconstruct the payloads in the same key order that called the method
 	orderedPayloads := make([]*ledger.Payload, len(r.Paths))
-	for i, p := range sortedPaths {
-		for _, j := range pathOrgIndex[string(p)] {
-			orderedPayloads[j] = payloads[i].DeepCopy()
-			totalPayloadSize += payloads[i].Size()
+	totalPayloadSize := 0
+	for i, p := range deduplicatedPaths {
+		payload := payloads[i]
+		indices := pathOrgIndex[string(p)]
+		for _, j := range indices {
+			orderedPayloads[j] = payload.DeepCopy()
 		}
+		totalPayloadSize += len(indices) * payload.Size()
 	}
-
 	// TODO rename the metrics
 	f.metrics.ReadValuesSize(uint64(totalPayloadSize))
 
@@ -153,40 +150,38 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	}
 
 	if len(u.Paths) == 0 { // no key no change
-		return parentTrie.RootHash(), nil
+		return u.RootHash, nil
 	}
 
-	// sort and deduplicate paths (we only consider the last occurrence, and ignore the rest)
-	sortedPaths := make([]ledger.Path, 0)
-	payloadMap := make(map[string]ledger.Payload)
+	// Deduplicate writes to the same register: we only retain the value of the last write
+	// Generally, we expect the VM to deduplicate reads and writes.
+	deduplicatedPaths := make([]ledger.Path, 0, len(u.Paths))
+	deduplicatedPayloads := make([]ledger.Payload, 0, len(u.Paths))
+	payloadMap := make(map[string]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
 	totalPayloadSize := 0
 	for i, path := range u.Paths {
 		// check path sizes
 		if len(path) != f.pathByteSize {
 			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
 		}
-		// check if doesn't exist
-		if _, ok := payloadMap[string(path)]; !ok {
-			sortedPaths = append(sortedPaths, path)
+		payload := u.Payloads[i]
+		// check if we already have encountered an update for the respective register
+		if idx, ok := payloadMap[string(path)]; ok {
+			oldPayload := deduplicatedPayloads[idx]
+			deduplicatedPayloads[idx] = *payload
+			totalPayloadSize += -oldPayload.Size() + payload.Size()
+		} else {
+			payloadMap[string(path)] = len(deduplicatedPaths)
+			deduplicatedPaths = append(deduplicatedPaths, path)
+			deduplicatedPayloads = append(deduplicatedPayloads, *u.Payloads[i])
+			totalPayloadSize += payload.Size()
 		}
-		payloadMap[string(path)] = *u.Payloads[i]
-		totalPayloadSize += u.Payloads[i].Size()
 	}
 
 	// TODO rename metrics names
 	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
-	// TODO we might be able to remove this
-	sort.Slice(sortedPaths, func(i, j int) bool {
-		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
-	})
-
-	sortedPayloads := make([]ledger.Payload, 0, len(sortedPaths))
-	for _, path := range sortedPaths {
-		sortedPayloads = append(sortedPayloads, payloadMap[string(path)])
-	}
-
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, sortedPaths, sortedPayloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -218,7 +213,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		return nil, err
 	}
 
-	sortedPaths := make([]ledger.Path, 0)
+	deduplicatedPaths := make([]ledger.Path, 0)
 	notFoundPaths := make([]ledger.Path, 0)
 	notFoundPayloads := make([]ledger.Payload, 0)
 	pathOrgIndex := make(map[string][]int)
@@ -229,7 +224,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		}
 		// only collect duplicated keys once
 		if _, ok := pathOrgIndex[string(path)]; !ok {
-			sortedPaths = append(sortedPaths, path)
+			deduplicatedPaths = append(deduplicatedPaths, path)
 			pathOrgIndex[string(path)] = []int{i}
 
 			// add it only once if is empty
@@ -241,7 +236,6 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 			// handles duplicated keys
 			pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
 		}
-
 	}
 
 	stateTrie, err := f.GetTrie(r.RootHash)
@@ -251,11 +245,6 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 	// if we have to insert empty values
 	if len(notFoundPaths) > 0 {
-
-		sort.Slice(notFoundPaths, func(i, j int) bool {
-			return bytes.Compare(notFoundPaths[i], notFoundPaths[j]) < 0
-		})
-
 		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads)
 		if err != nil {
 			return nil, err
@@ -268,22 +257,18 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		stateTrie = newTrie
 	}
 
-	sort.Slice(sortedPaths, func(i, j int) bool {
-		return bytes.Compare(sortedPaths[i], sortedPaths[j]) < 0
-	})
-
-	bp := ledger.NewTrieBatchProofWithEmptyProofs(len(sortedPaths))
+	bp := ledger.NewTrieBatchProofWithEmptyProofs(len(deduplicatedPaths))
 
 	for _, p := range bp.Proofs {
 		p.Flags = make([]byte, f.pathByteSize)
 		p.Inclusion = false
 	}
 
-	stateTrie.UnsafeProofs(sortedPaths, bp.Proofs)
+	stateTrie.UnsafeProofs(deduplicatedPaths, bp.Proofs)
 
 	// reconstruct the proofs in the same key order that called the method
 	retbp := ledger.NewTrieBatchProofWithEmptyProofs(len(r.Paths))
-	for i, p := range sortedPaths {
+	for i, p := range deduplicatedPaths {
 		for _, j := range pathOrgIndex[string(p)] {
 			retbp.Proofs[j] = bp.Proofs[i]
 		}
