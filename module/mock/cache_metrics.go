@@ -23,3 +23,8 @@ func (_m *CacheMetrics) CacheHit(resource string) {
 func (_m *CacheMetrics) CacheMiss(resource string) {
 	_m.Called(resource)
 }
+
+// CacheNotFound provides a mock function with given fields: resource
+func (_m *CacheMetrics) CacheNotFound(resource string) {
+	_m.Called(resource)
+}
