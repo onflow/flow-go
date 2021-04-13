@@ -144,6 +144,7 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	assert.Equal(s.T(), msg.DKGInstanceID, broadcastedMsg.DKGInstanceID)
 	assert.Equal(s.T(), msg.Data, broadcastedMsg.Data)
 	assert.Equal(s.T(), msg.Orig, broadcastedMsg.Orig)
+	assert.Equal(s.T(), msg.Signature, broadcastedMsg.Signature)
 }
 
 func (s *ClientSuite) TestSubmitResult() {
