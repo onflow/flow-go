@@ -76,9 +76,8 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 	return e
 }
 
-// TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
-// it drops it without processing it any further and and notifies consumer
-// that it is done with processing that chunk.
+// TestProcessAssignChunk_HappyPath evaluates behavior of fetcher engine respect to receiving a single assigned chunk,
+// it should request the chunk data.
 func TestProcessAssignChunk_HappyPath(t *testing.T) {
 	s := setupTest()
 	e := newFetcherEngine(s)
@@ -307,11 +306,18 @@ func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, hea
 	}
 }
 
+// mockRequester mocks the chunk data pack requester with the given chunk data pack requests.
+// Each chunk should be requested exactly once.
+// On reply, it invokes the handler function with the given collection and chunk data pack for the chunk ID.
 func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 	requests map[flow.Identifier]*verification.ChunkDataPackRequest,
-	allExecutors flow.IdentityList) {
+	chunkDataPacks map[flow.Identifier]*flow.ChunkDataPack,
+	collections map[flow.Identifier]*flow.Collection,
+	allExecutors flow.IdentityList, handler func(flow.Identifier, *flow.ChunkDataPack, *flow.Collection)) *sync.WaitGroup {
 
 	mu := sync.Mutex{}
+	wg := &sync.WaitGroup{}
+	wg.Add(len(requests))
 	requester.On("Request", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
@@ -327,5 +333,18 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 		actualExecutors, ok := args[1].(flow.IdentityList)
 		require.True(t, ok)
 		require.ElementsMatchf(t, allExecutors, actualExecutors, "execution nodes lists do not match")
+
+		go func() {
+			cdp, ok := chunkDataPacks[actualRequest.ChunkID]
+			require.True(t, ok)
+
+			collection, ok := collections[actualRequest.ChunkID]
+			require.True(t, ok)
+
+			handler(actualRequest.Agrees[0], cdp, collection)
+			wg.Done()
+		}()
 	}).Return().Times(len(requests))
+
+	return wg
 }
