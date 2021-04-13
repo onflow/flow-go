@@ -348,3 +348,21 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 
 	return wg
 }
+
+// chunkDataPackResponseFixture creates chunk data pack and collections for given chunks.
+func chunkDataPackResponseFixture(chunks flow.ChunkList) (map[flow.Identifier]*flow.ChunkDataPack,
+	map[flow.Identifier]*flow.Collection) {
+	chunkDataPacks := make(map[flow.Identifier]*flow.ChunkDataPack)
+	collections := make(map[flow.Identifier]*flow.Collection)
+
+	for _, chunk := range chunks {
+		chunkID := chunk.ID()
+		collection := unittest.CollectionFixture(1)
+		collections[chunkID] = &collection
+		chunkDataPacks[chunkID] = unittest.ChunkDataPackFixture(chunkID,
+			unittest.WithStartState(chunk.StartState),
+			unittest.WithCollectionID(collection.ID()))
+	}
+
+	return chunkDataPacks, collections
+}
