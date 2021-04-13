@@ -17,6 +17,16 @@ func NewApprovalsCache(limit uint) *ApprovalsCache {
 	}
 }
 
+func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
+	approval := c.Get(approvalID)
+	if approval == nil {
+		return nil
+	}
+
+	c.cache.Remove(approvalID)
+	return approval
+}
+
 func (c *ApprovalsCache) Ids() []flow.Identifier {
 	keys := c.cache.Keys()
 	result := make([]flow.Identifier, len(keys))
