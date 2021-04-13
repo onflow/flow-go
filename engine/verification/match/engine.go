@@ -395,7 +395,7 @@ func (e *Engine) onTimer() {
 
 }
 
-// requestChunkDataPack request the chunk data pack from the execution node.
+// requestChunkDataPack request the chunk data pack from the original execution node that executed the chunk.
 // the chunk data pack includes the collection and state commitments that
 // needed to make a VerifiableChunk
 func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
@@ -407,10 +407,8 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
-	targetIDs := []flow.Identifier{c.ExecutorID}
-
 	// publishes the chunk data request to the network
-	err := e.con.Publish(req, targetIDs...)
+	err := e.con.Publish(req, c.ExecutorID)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}

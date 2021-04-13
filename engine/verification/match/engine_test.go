@@ -560,6 +560,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	<-vchunkC
 
 	<-e.Done()
+
+	// pending chunk should be removed from memory once we have the request received.
+	require.Len(suite.T(), suite.chunks.All(), 0)
+
 	mock.AssertExpectationsForObjects(suite.T(),
 		suite.assigner,
 		suite.con,
