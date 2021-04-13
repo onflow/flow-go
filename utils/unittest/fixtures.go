@@ -1157,18 +1157,34 @@ func ChunkDataPackRequestsFixture(n int, opts ...func(*verification.ChunkDataPac
 	return lst
 }
 
-func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
+func WithCollectionID(collectionID flow.Identifier) func(*flow.ChunkDataPack) {
+	return func(cdp *flow.ChunkDataPack) {
+		cdp.CollectionID = collectionID
+	}
+}
 
+func WithStartState(startState flow.StateCommitment) func(*flow.ChunkDataPack) {
+	return func(cdp *flow.ChunkDataPack) {
+		cdp.StartState = startState
+	}
+}
+
+func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataPack)) *flow.ChunkDataPack {
 	//ids := utils.GetRandomRegisterIDs(1)
 	//values := utils.GetRandomValues(1, 1, 32)
-
-	return &flow.ChunkDataPack{
-		ChunkID:    identifier,
+	cdp := &flow.ChunkDataPack{
+		ChunkID:    chunkID,
 		StartState: StateCommitmentFixture(),
 		//RegisterTouches: []flow.RegisterTouch{{RegisterID: ids[0], Value: values[0], Proof: []byte{'p'}}},
 		Proof:        []byte{'p'},
 		CollectionID: IdentifierFixture(),
 	}
+
+	for _, opt := range opts {
+		opt(cdp)
+	}
+
+	return cdp
 }
 
 // SeedFixture returns a random []byte with length n
