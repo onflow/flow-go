@@ -1,12 +1,14 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/storage"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -87,11 +89,15 @@ func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 		}
 
 		// get it from the database
-		c.metrics.CacheMiss(c.resource)
 		resource, err := c.retrieve(key)(tx)
 		if err != nil {
+			if errors.Is(err, storage.ErrNotFound) {
+				c.metrics.CacheNotFound(c.resource)
+			}
 			return nil, fmt.Errorf("could not retrieve resource: %w", err)
 		}
+
+		c.metrics.CacheMiss(c.resource)
 
 		// cache the resource and eject least recently used one if we reached limit
 		evicted := c.cache.Add(key, resource)
