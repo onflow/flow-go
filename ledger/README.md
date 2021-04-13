@@ -33,26 +33,32 @@ A path is a unique address of a node storing a payload. Paths are derived from t
 Get: Fetching a payload from the binary Merkle tree is by traversing the tree based on path bits. (0: left branch, 1: right branch)
 
 Update: Updates to the tree starts with traversing the tree to the leaf node, updating payload, hash value of that node and hash value of all the ancestor nodes (nodes on higher level connected to this node).
+
 ![update image](/ledger/docs/tree_update.gif?raw=true "update")
 
-Prove: A binary Merkle tree can provide an inclusion proof for any given payload. A Merkle proof in this context includes all the information needed to walk through a tree branch from an specific leaf node (key) up to the root of the tree (yellow node hash values are needed for inclusion proof for the green node). 
+Prove: A binary Merkle tree can provide an inclusion proof for any given payload. A Merkle proof in this context includes all the information needed to walk through a tree branch from an specific leaf node (key) up to the root of the tree (yellow node hash values are needed for inclusion proof for the green node).
+
 ![proof image](/ledger/docs/proof.png?raw=true "proof")
 
 ### binary Merkle *trie*
 A binary Merkle trie in this context is defined as a compact version of binary Merkle tree, providing exact same functionality but don’t store unnecessary nodes.
+
 ![binary partial trie image](/ledger/docs/trie_update.gif?raw=true "binary partial trie")
 
 ### forest 
-A forest holds a set of binary Merkle tries, given a parent trie and a batch of updates it creates a new binary merkle trie and adds it to the forest. 
+A forest holds a set of binary Merkle tries, given a parent trie and a batch of updates it creates a new binary merkle trie and adds it to the forest.
+
 ![forest image](/ledger/docs/forest.png?raw=true "forest")
 
 ### compact forest 
 A compact forest construct new trie after each update (copy on change) and reuses unchanged sub-tries from the parent.
+
 ![compact forest image](/ledger/docs/reuse_sub_trees.gif?raw=true "compact forest")
 
 ### path finder 
 Path finder deterministically compute a path for a given payload. Path finder is responsible to make sure the trie grows in balance and relevant data are stored nearby so that the proof size can be optimized.
 
 ### partial binary Merkle trie
-A partial Merkle trie is similar to a Merkel trie but only keeping a subset of nodes and having intermediate nodes without the full subtrie. It can be constructed from batch of inclusion and non-inclusion proofs. It provides functionality to verify outcome of updates to a trie without the need to have the full trie. 
+A partial Merkle trie is similar to a Merkel trie but only keeping a subset of nodes and having intermediate nodes without the full subtrie. It can be constructed from batch of inclusion and non-inclusion proofs. It provides functionality to verify outcome of updates to a trie without the need to have the full trie.
+
 ![partial trie image](/ledger/docs/partial_trie.png?raw=true "partial trie")
