@@ -76,6 +76,9 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 	return e
 }
 
+// TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
+// it drops it without processing it any further and and notifies consumer
+// that it is done with processing that chunk.
 func TestSkipChunkOfSealedBlock(t *testing.T) {
 	s := setupTest()
 	e := newFetcherEngine(s)
