@@ -327,7 +327,6 @@ func (e *blockComputer) executeTransaction(
 		if err != nil {
 			return err
 		}
-
 	}
 
 	res.AddEvents(tx.Events)
