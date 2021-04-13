@@ -199,7 +199,7 @@ func (e *Engine) validateChunkDataPack(
 	// 2. start state must match
 	if !bytes.Equal(chunkDataPack.StartState, chunk.ChunkBody.StartState) {
 		return engine.NewInvalidInputErrorf(
-			"expecting chunk data pakc's start state: %v, but got: %v",
+			"expecting chunk data pack's start state: %v, but got: %v",
 			chunk.ChunkBody.StartState, chunkDataPack.StartState)
 	}
 
@@ -264,7 +264,9 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 
 // validatedAndFetch validates the chunk data pack and if it passes the validation, retrieves and returns its chunk status as well as the
 // execution result.
-func (e *Engine) validatedAndFetch(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) (*verification.ChunkStatus,
+func (e *Engine) validatedAndFetch(originID flow.Identifier,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) (*verification.ChunkStatus,
 	*flow.ExecutionResult, error) {
 
 	// make sure we still need it
