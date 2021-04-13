@@ -12,12 +12,12 @@ This package provides two ledger implementations:
 ## Definitions 
 
 ### binary Merkle tree
-![binary Merkle tree image](/ledger/docs/binary_merkle_tree.png?raw=true "binary Merkle tree" )  <!-- .element height="20%" width="20%" -->
+![binary Merkle tree image](/ledger/docs/binary_merkle_tree.png?raw=true "binary Merkle tree" )<!-- .element height="20%" width="20%" -->
 
 In this context a binary Merkle tree is defined as a full binary tree with an specific hight including three type of nodes:
 
 - leaf nodes: holds a payload (data), a path (where the node is located), and a hash value (hash of path and payload content)
-![leaf node image](/ledger/docs/leaf_node.png) <!-- .element height="10%" width="10%" -->
+![leaf node image](/ledger/docs/leaf_node.png)<!-- .element height="10%" width="10%" -->
 
 - empty leaf nodes: doesn't hold any data and only stores a path, and a default hash value based on the height of tree
 ![empty leaf node image](/ledger/docs/empty_leaf_node.png)
