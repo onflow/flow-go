@@ -166,12 +166,15 @@ func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicK
 func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
 	}
@@ -183,12 +186,15 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 
 	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
 
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
 	}
@@ -203,12 +209,15 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 		flowToken.HexWithPrefix(),
 	)
 
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to deploy fees contract: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
 	}
@@ -222,12 +231,15 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	)
 
 	// deploy storage fees contract on the service account
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployStorageFeesTransaction(service, contract),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
 	}
@@ -241,12 +253,15 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		service.HexWithPrefix(),
 	)
 
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to deploy service account contract: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy service account contract: %s", err.Error()))
 	}
@@ -256,12 +271,15 @@ func (b *BootstrapProcedure) mintInitialTokens(
 	service, fungibleToken, flowToken flow.Address,
 	initialSupply cadence.UFix64,
 ) {
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to mint initial token supply: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to mint initial token supply: %s", err.Error()))
 	}
@@ -273,12 +291,15 @@ func (b *BootstrapProcedure) setupFees(
 	addressCreationFee,
 	minimumStorageReservation cadence.UFix64,
 ) {
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to setup fees: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup fees: %s", err.Error()))
 	}
@@ -287,12 +308,15 @@ func (b *BootstrapProcedure) setupFees(
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	service, fungibleToken, flowToken, feeContract flow.Address,
 ) {
-	_, err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
 		b.sth,
 		b.programs,
 	)
+	if txError != nil {
+		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", txError.Error()))
+	}
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", err.Error()))
 	}
