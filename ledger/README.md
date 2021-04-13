@@ -22,7 +22,7 @@ In this context a binary Merkle tree is defined as a full binary tree with an sp
 
 - intermediate nodes: holds a path and a hash value which is defined as hash of hash value of left and right children.
 
-![leaf node image](/ledger/docs/node_types.png.png)
+![node types image](/ledger/docs/node_types.png)
 
 A path is a unique address of a node storing a payload. Paths are derived from the content of payloads (see common/pathfinder).
 
