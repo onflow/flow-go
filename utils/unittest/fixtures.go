@@ -695,6 +695,12 @@ func WithStake(stake uint64) func(*flow.Identity) {
 	}
 }
 
+func WithEjected(ejected bool) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Ejected = ejected
+	}
+}
+
 // WithAddress sets the network address of identity fixture.
 func WithAddress(address string) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
@@ -1359,15 +1365,19 @@ func IndexFixture() *flow.Index {
 
 func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCommit) {
 	return func(commit *flow.EpochCommit) {
-		lookup := make(map[flow.Identifier]flow.DKGParticipant)
-		for i, node := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
-			lookup[node.NodeID] = flow.DKGParticipant{
-				Index:    uint(i),
-				KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
-			}
-		}
-		commit.DKGParticipants = lookup
+		commit.DKGParticipants = DKGParticipantLookup(participants)
 	}
+}
+
+func DKGParticipantLookup(participants flow.IdentityList) map[flow.Identifier]flow.DKGParticipant {
+	lookup := make(map[flow.Identifier]flow.DKGParticipant)
+	for i, node := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
+		lookup[node.NodeID] = flow.DKGParticipant{
+			Index:    uint(i),
+			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		}
+	}
+	return lookup
 }
 
 func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
