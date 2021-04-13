@@ -4,11 +4,17 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
-	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/storage"
+
+	ledger "github.com/onflow/flow-go/ledger/complete"
+	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"
+	storagebadger "github.com/onflow/flow-go/storage/badger"
 )
 
 func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, error) {
@@ -31,4 +37,44 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 	}
 
 	return protocolState, nil
+}
+
+// InitStates ...
+func InitStates(db *badger.DB, executionStateDir string) (protocol.State, state.ExecutionState, error) {
+	metrics := &metrics.NoopCollector{}
+	tracer := trace.NewNoopTracer()
+
+	storage := InitStorages(db)
+
+	protocolState, err := InitProtocolState(db, storage)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not init protocol state: %w", err)
+	}
+
+	results := storagebadger.NewExecutionResults(metrics, db)
+	receipts := storagebadger.NewExecutionReceipts(metrics, db, results)
+	chunkDataPacks := storagebadger.NewChunkDataPacks(db)
+	stateCommitments := storagebadger.NewCommits(metrics, db)
+	transactions := storagebadger.NewTransactions(metrics, db)
+	collections := storagebadger.NewCollections(db, transactions)
+
+	ledgerStorage, err := ledger.NewLedger(executionStateDir, 100, metrics, zerolog.Nop(), zerolog.Logger{}, 0)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not init ledger: %w", err)
+	}
+
+	executionState := state.NewExecutionState(
+		ledgerStorage,
+		stateCommitments,
+		storage.Blocks,
+		storage.Headers,
+		collections,
+		chunkDataPacks,
+		results,
+		receipts,
+		db,
+		tracer,
+	)
+
+	return protocolState, executionState, nil
 }
