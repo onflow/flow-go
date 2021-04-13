@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -62,9 +63,19 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
-	state, err := hex.DecodeString(targetstate)
-	if err != nil {
-		return fmt.Errorf("failed to decode hex code of state: %w", err)
+	var state flow.StateCommitment
+	// if no target state provided export the most recent state
+	if len(targetstate) == 0 {
+		state, err = led.MostRecentTouchedState()
+		if err != nil {
+			return fmt.Errorf("failed to load most recently used state: %w", err)
+		}
+	} else {
+		st, err := hex.DecodeString(targetstate)
+		if err != nil {
+			return fmt.Errorf("failed to decode hex code of state: %w", err)
+		}
+		state = ledger.State(st)
 	}
 	err = led.DumpTrieAsJSON(ledger.State(state), outputPath)
 	if err != nil {
