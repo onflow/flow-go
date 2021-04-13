@@ -29,7 +29,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 
 		tx := flow.TransactionBody{}
 		tx.SetProposalKey(address, 0, 0)
-		signEnvelope(&tx, address, *privKey)
+		err = signEnvelope(&tx, address, *privKey)
+		require.NoError(t, err)
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
@@ -55,7 +56,8 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx := flow.TransactionBody{}
 		// invalid sequence number is 2
 		tx.SetProposalKey(address, 0, 2)
-		signEnvelope(&tx, address, *privKey)
+		err = signEnvelope(&tx, address, *privKey)
+		require.NoError(t, err)
 		proc := fvm.Transaction(&tx, 0)
 
 		seqChecker := &fvm.TransactionSequenceNumberChecker{}
