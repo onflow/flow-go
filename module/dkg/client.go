@@ -50,7 +50,7 @@ func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgC
 // Broadcast broadcasts a message to all other nodes participating in the
 // DKG. The message is broadcast by submitting a transaction to the DKG
 // smart contract. An error is returned if the transaction has failed.
-func (c *Client) Broadcast(msg model.DKGMessage) error {
+func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
 	defer cancel()
@@ -127,7 +127,7 @@ func (c *Client) Broadcast(msg model.DKGMessage) error {
 // ReadBroadcast reads the broadcast messages from the smart contract.
 // Messages are returned in the order in which they were broadcast (received
 // and stored in the smart contract)
-func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.DKGMessage, error) {
+func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]model.BroadcastDKGMessage, error) {
 
 	ctx := context.Background()
 
@@ -140,7 +140,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 	values := value.(cadence.Array).Values
 
 	// unpack return from contract to `model.DKGMessage`
-	messages := make([]model.DKGMessage, 0, len(values))
+	messages := make([]model.BroadcastDKGMessage, 0, len(values))
 	for _, val := range values {
 
 		content := val.(cadence.Struct).Fields[1]
@@ -149,7 +149,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 			return nil, fmt.Errorf("could not unquote json string: %w", err)
 		}
 
-		var flowMsg model.DKGMessage
+		var flowMsg model.BroadcastDKGMessage
 		err = json.Unmarshal([]byte(jsonString), &flowMsg)
 		if err != nil {
 			return nil, fmt.Errorf("could not unmarshal dkg message: %w", err)

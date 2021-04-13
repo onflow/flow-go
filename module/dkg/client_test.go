@@ -102,7 +102,7 @@ func (s *ClientSuite) TestBroadcast() {
 	s.createParticipant(nodeID)
 
 	// create DKG message fixture
-	msg := unittest.DKGMessageFixture()
+	msg := unittest.DKGBroadcastMessageFixture()
 
 	// broadcast messsage a random broadcast message and verify that there were no errors
 	err := s.contractClient.Broadcast(*msg)
@@ -125,7 +125,7 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	s.createParticipant(nodeID)
 
 	// create DKG message fixture
-	msg := unittest.DKGMessageFixture()
+	msg := unittest.DKGBroadcastMessageFixture()
 
 	// broadcast messsage a random broadcast message and verify that there were no errors
 	err := s.contractClient.Broadcast(*msg)
