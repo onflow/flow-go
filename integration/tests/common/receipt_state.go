@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 	"time"
@@ -90,7 +89,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		currentID = b2.Header.ID()
 		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
 		r2finalState := r2.ExecutionResult.FinalStateCommitment()
-		if bytes.Compare(initialFinalizedSC, r2finalState) == 0 {
+		if initialFinalizedSC == r2finalState {
 			// received a new execution result for the next finalized block, but it has the same final state commitment
 			// check the next finalized block
 			currentHeight++

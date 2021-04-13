@@ -12,8 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/tests/common"
-	ledgerCommon "github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -83,10 +84,10 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	batchProof, err := encoding.DecodeTrieBatchProof(pack2.ChunkDataPack.Proof)
 	require.NoError(gs.T(), err)
 
-	isValid := ledgerCommon.VerifyTrieBatchProof(batchProof, erExe1BlockB.ExecutionResult.Chunks[0].StartState)
+	isValid := proof.VerifyTrieBatchProof(batchProof, ledger.State(erExe1BlockB.ExecutionResult.Chunks[0].StartState))
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, pack2.ChunkDataPack.StartState, partial.DefaultPathFinderVersion)
+	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, ledger.State(pack2.ChunkDataPack.StartState), partial.DefaultPathFinderVersion)
 	require.NoError(gs.T(), err, "error building PSMT")
 }
