@@ -95,7 +95,7 @@ func listAccounts(*cobra.Command, []string) {
 		return payload[0].Value, nil
 	})
 
-	accounts := state.NewAccounts(ldg)
+	accounts := state.NewAccounts(state)
 	finalGenerator, err := state.NewLedgerBoundAddressGenerator(ldg, chain)
 
 	if err != nil {

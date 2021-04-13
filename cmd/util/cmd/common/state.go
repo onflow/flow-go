@@ -9,14 +9,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 
-	ledgercompl "github.com/onflow/flow-go/ledger/complete"
-	"github.com/onflow/flow-go/ledger/complete/wal"
-	walcompl "github.com/onflow/flow-go/ledger/complete/wal"
 	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 )
@@ -43,6 +42,36 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 	return protocolState, nil
 }
 
+// InitForest ...
+func InitForest(executionDir string) (*mtrie.Forest, error) {
+	metrics := &metrics.NoopCollector{}
+
+	w, err := wal.NewDiskWAL(
+		zerolog.Nop(),
+		nil,
+		metrics,
+		executionDir,
+		complete.DefaultCacheSize,
+		pathfinder.PathByteSize,
+		wal.SegmentSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	forest, err := mtrie.NewForest(pathfinder.PathByteSize, complete.DefaultCacheSize, metrics, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.ReplayOnForest(forest)
+	if err != nil {
+		return nil, err
+	}
+
+	return forest, nil
+}
+
 // InitStates initializes the protocol and execution states
 func InitStates(db *badger.DB, executionStateDir string) (protocol.State, state.ExecutionState, error) {
 	metrics := &metrics.NoopCollector{}
@@ -66,12 +95,12 @@ func InitStates(db *badger.DB, executionStateDir string) (protocol.State, state.
 	serviceEvents := storagebadger.NewServiceEvents(metrics, db)
 	transactionResults := storagebadger.NewTransactionResults(metrics, db, 10000)
 
-	wal, err := walcompl.NewDiskWAL(zerolog.Nop(), nil, metrics, executionStateDir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+	wal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics, executionStateDir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not init disk WAL: %w", err)
 	}
 
-	ledgerStorage, err := ledgercompl.NewLedger(wal, 100, metrics, zerolog.Nop(), 0)
+	ledgerStorage, err := complete.NewLedger(wal, 100, metrics, zerolog.Nop(), 0)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not init ledger: %w", err)
 	}
