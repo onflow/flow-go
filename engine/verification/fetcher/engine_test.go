@@ -76,39 +76,43 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 	return e
 }
 
-//// TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
-//// it drops it without processing it any further and and notifies consumer
-//// that it is done with processing that chunk.
-//func TestProcessAssignChunk_HappyPath(t *testing.T) {
-//	s := setupTest()
-//	e := newFetcherEngine(s)
-//
-//	lastSealedHeight := uint64(10)
-//	// creates a single chunk locator, and mocks its corresponding block sealed.
-//	root := unittest.BlockHeaderFixture()
-//	root.Height = lastSealedHeight + 1
-//	completeERs := utils.CompleteExecutionReceiptChainFixture(t, &root, 1,
-//		utils.WithResults(1),
-//		utils.WithChunks(1),
-//		utils.WithCopies(1))
-//	statuses := unittest.ChunkStatusListFixture(t, completeERs.Results(), 1)
-//	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
-//
-//	test.MockLastSealedHeight(s.state, lastSealedHeight)
-//	mockResultsByIDs(s.results, completeERs.Results(), 1)
-//	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
-//
-//	executorID := completeERs.Results()[0].
-//	mockStateAtBlockIDForExecutors(s.state, completeERs.Results()[0].BlockID, )
-//
-//	e.ProcessAssignedChunk(locators[0])
-//
-//	mock.AssertExpectationsForObjects(t, s.results)
-//	// we should not request a duplicate chunk status.
-//	s.requester.AssertNotCalled(t, "Request")
-//	// we should not try adding a chunk of a sealed block to chunk status mempool.
-//	s.pendingChunks.AssertNotCalled(t, "Add")
-//}
+// TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
+// it drops it without processing it any further and and notifies consumer
+// that it is done with processing that chunk.
+func TestProcessAssignChunk_HappyPath(t *testing.T) {
+	s := setupTest()
+	e := newFetcherEngine(s)
+
+	// creates a single chunk locator, and mocks its corresponding block sealed.
+	block := unittest.BlockFixture()
+	result := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&block),
+		unittest.WithChunks(2))
+	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
+	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{result}, 1)
+	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
+
+	_, _, agreeENs, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 1, 0)
+	mockStateAtBlockIDForExecutors(s.state, block.ID(), agreeENs)
+	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
+	chunkID := result.Chunks[locators[0].Index].ID()
+	requests[chunkID] = &verification.ChunkDataPackRequest{
+		ChunkID: chunkID,
+		Height:  block.Header.Height,
+		Agrees:  agreeENs.NodeIDs(),
+	}
+	mockRequester(t, s.requester, requests, agreeENs)
+
+	e.ProcessAssignedChunk(locators[0])
+
+	mock.AssertExpectationsForObjects(t, s.results)
+	// we should not request a duplicate chunk status.
+	s.requester.AssertNotCalled(t, "Request")
+	// we should not try adding a chunk of a sealed block to chunk status mempool.
+	s.pendingChunks.AssertNotCalled(t, "Add")
+}
 
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
 // it drops it without processing it any further and and notifies consumer
@@ -201,7 +205,7 @@ func mockReceiptsBlockID(t *testing.T,
 
 	for i := 0; i < agrees; i++ {
 		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
-		require.NotContains(t, agreeExecutors.NodeIDs(), receipt.ExecutorID)
+		require.NotContains(t, agreeExecutors.NodeIDs(), receipt.ExecutorID) // should not have duplicate executors
 		agreeExecutors = append(agreeExecutors, unittest.IdentityFixture(
 			unittest.WithRole(flow.RoleExecution),
 			unittest.WithNodeID(receipt.ExecutorID)))
@@ -213,7 +217,8 @@ func mockReceiptsBlockID(t *testing.T,
 		require.NotEqual(t, disagreeResult.ID(), result.ID())
 
 		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(disagreeResult))
-		require.NotContains(t, disagreeExecutors.NodeIDs(), receipt.ExecutorID)
+		require.NotContains(t, agreeExecutors.NodeIDs(), receipt.ExecutorID)    // should not have an executor in both lists
+		require.NotContains(t, disagreeExecutors.NodeIDs(), receipt.ExecutorID) // should not have duplicate executors
 		disagreeExecutors = append(disagreeExecutors, unittest.IdentityFixture(
 			unittest.WithRole(flow.RoleExecution),
 			unittest.WithNodeID(receipt.ExecutorID)))
@@ -300,4 +305,27 @@ func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, hea
 	} else {
 		test.MockLastSealedHeight(state, header.Height-1)
 	}
+}
+
+func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
+	requests map[flow.Identifier]*verification.ChunkDataPackRequest,
+	allExecutors flow.IdentityList) {
+
+	mu := sync.Mutex{}
+	requester.On("Request", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		actualRequest, ok := args[0].(*verification.ChunkDataPackRequest)
+		require.True(t, ok)
+
+		expectedRequest, ok := requests[actualRequest.ChunkID]
+		require.True(t, ok, "requester received an unexpected chunk request")
+
+		require.Equal(t, *expectedRequest, *actualRequest)
+
+		actualExecutors, ok := args[1].(flow.IdentityList)
+		require.True(t, ok)
+		require.ElementsMatchf(t, allExecutors, actualExecutors, "execution nodes lists do not match")
+	}).Return().Times(len(requests))
 }
