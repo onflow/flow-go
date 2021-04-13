@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/rs/zerolog"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -13,15 +12,15 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/requester"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // RequesterEngineTestSuite encapsulates data structures for running unittests on requester engine.

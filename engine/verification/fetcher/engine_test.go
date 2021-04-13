@@ -5,13 +5,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
