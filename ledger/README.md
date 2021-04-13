@@ -12,7 +12,7 @@ This package provides two ledger implementations:
 ## Definitions 
 
 ### binary Merkle tree
-![binary Merkle tree image](/ledger/docs/binary_merkle_tree.png?raw=true "binary Merkle tree")
+![binary Merkle tree image](/ledger/docs/binary_merkle_tree.png?raw=true "binary Merkle tree" )  <!-- .element height="50%" width="50%" -->
 
 In this context a binary Merkle tree is defined as a full binary tree with an specific hight including three type of nodes:
 
@@ -34,14 +34,14 @@ A path is a unique address of a node storing a payload. Paths are derived from t
 Get: Fetching a payload from the binary Merkle tree is by traversing the tree based on path bits. (0: left branch, 1: right branch)
 
 Update: Updates to the tree starts with traversing the tree to the leaf node, updating payload, hash value of that node and hash value of all the ancestor nodes (nodes on higher level connected to this node).
-![update image](/ledger/docs/tree_update.png?raw=true "update")
+![update image](/ledger/docs/tree_update.gif?raw=true "update")
 
 Prove: A binary Merkle tree can provide an inclusion proof for any given payload. A Merkle proof in this context includes all the information needed to walk through a tree branch from an specific leaf node (key) up to the root of the tree (yellow node hash values are needed for inclusion proof for the green node). 
 ![proof image](/ledger/docs/proof.png?raw=true "proof")
 
 ### binary Merkle *trie*
 A binary Merkle trie in this context is defined as a compact version of binary Merkle tree, providing exact same functionality but don’t store unnecessary nodes.
-![binary partial trie image](/ledger/docs/trie_update.png?raw=true "binary partial trie")
+![binary partial trie image](/ledger/docs/trie_update.gif?raw=true "binary partial trie")
 
 ### forest 
 A forest holds a set of binary Merkle tries, given a parent trie and a batch of updates it creates a new binary merkle trie and adds it to the forest. 
@@ -49,7 +49,7 @@ A forest holds a set of binary Merkle tries, given a parent trie and a batch of 
 
 ### compact forest 
 A compact forest construct new trie after each update (copy on change) and reuses unchanged sub-tries from the parent.
-![compact forest image](/ledger/docs/reuse-sub-trees.png?raw=true "compact forest")
+![compact forest image](/ledger/docs/reuse_sub_trees.gif?raw=true "compact forest")
 
 ### path finder 
 Path finder deterministically compute a path for a given payload. Path finder is responsible to make sure the trie grows in balance and relevant data are stored nearby so that the proof size can be optimized.
