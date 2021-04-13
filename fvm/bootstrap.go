@@ -166,7 +166,7 @@ func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicK
 func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
 		b.sth,
@@ -183,7 +183,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 
 	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
 
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
 		b.sth,
@@ -203,7 +203,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 		flowToken.HexWithPrefix(),
 	)
 
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
 		b.sth,
@@ -222,7 +222,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	)
 
 	// deploy storage fees contract on the service account
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployStorageFeesTransaction(service, contract),
 		b.sth,
@@ -241,7 +241,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		service.HexWithPrefix(),
 	)
 
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
 		b.sth,
@@ -256,7 +256,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 	service, fungibleToken, flowToken flow.Address,
 	initialSupply cadence.UFix64,
 ) {
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
 		b.sth,
@@ -273,7 +273,7 @@ func (b *BootstrapProcedure) setupFees(
 	addressCreationFee,
 	minimumStorageReservation cadence.UFix64,
 ) {
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation),
 		b.sth,
@@ -287,7 +287,7 @@ func (b *BootstrapProcedure) setupFees(
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	service, fungibleToken, flowToken, feeContract flow.Address,
 ) {
-	err := b.vm.invokeMetaTransaction(
+	_, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
 		b.sth,
