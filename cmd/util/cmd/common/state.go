@@ -7,12 +7,16 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 
-	ledger "github.com/onflow/flow-go/ledger/complete"
+	ledgercompl "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+	walcompl "github.com/onflow/flow-go/ledger/complete/wal"
 	protocolbadger "github.com/onflow/flow-go/state/protocol/badger"
 	storagebadger "github.com/onflow/flow-go/storage/badger"
 )
@@ -39,7 +43,7 @@ func InitProtocolState(db *badger.DB, storages *storage.All) (protocol.State, er
 	return protocolState, nil
 }
 
-// InitStates ...
+// InitStates initializes the protocol and execution states
 func InitStates(db *badger.DB, executionStateDir string) (protocol.State, state.ExecutionState, error) {
 	metrics := &metrics.NoopCollector{}
 	tracer := trace.NewNoopTracer()
@@ -57,8 +61,17 @@ func InitStates(db *badger.DB, executionStateDir string) (protocol.State, state.
 	stateCommitments := storagebadger.NewCommits(metrics, db)
 	transactions := storagebadger.NewTransactions(metrics, db)
 	collections := storagebadger.NewCollections(db, transactions)
+	myReceipts := storagebadger.NewMyExecutionReceipts(metrics, db, receipts)
+	events := storagebadger.NewEvents(metrics, db)
+	serviceEvents := storagebadger.NewServiceEvents(metrics, db)
+	transactionResults := storagebadger.NewTransactionResults(metrics, db, 10000)
 
-	ledgerStorage, err := ledger.NewLedger(executionStateDir, 100, metrics, zerolog.Nop(), zerolog.Logger{}, 0)
+	wal, err := walcompl.NewDiskWAL(zerolog.Nop(), nil, metrics, executionStateDir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not init disk WAL: %w", err)
+	}
+
+	ledgerStorage, err := ledgercompl.NewLedger(wal, 100, metrics, zerolog.Nop(), 0)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not init ledger: %w", err)
 	}
@@ -72,6 +85,10 @@ func InitStates(db *badger.DB, executionStateDir string) (protocol.State, state.
 		chunkDataPacks,
 		results,
 		receipts,
+		myReceipts,
+		events,
+		serviceEvents,
+		transactionResults,
 		db,
 		tracer,
 	)
