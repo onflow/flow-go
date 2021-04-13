@@ -102,7 +102,11 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 		Height:  block.Header.Height,
 		Agrees:  agreeENs.NodeIDs(),
 	}
-	mockRequester(t, s.requester, requests, agreeENs)
+	chunkDataPacks, collections := chunkDataPackResponseFixture(statuses.Chunks())
+	mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier, cdp *flow.ChunkDataPack,
+		collection *flow.Collection) {
+		e.HandleChunkDataPack(originID, cdp, collection)
+	})
 
 	e.ProcessAssignedChunk(locators[0])
 
@@ -243,6 +247,9 @@ func mockStateAtBlockIDForExecutors(state *protocol.State, blockID flow.Identifi
 	snapshot := &protocol.Snapshot{}
 	state.On("AtBlockID", blockID).Return(snapshot)
 	snapshot.On("Identities", mock.Anything).Return(executors, nil)
+	for _, id := range executors {
+		snapshot.On("Identity", id.NodeID).Return(id)
+	}
 }
 
 // mockPendingChunksAdd mocks the add method of pending chunks for expecting only the specified list of chunk statuses.
