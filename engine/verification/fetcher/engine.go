@@ -407,7 +407,7 @@ func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID 
 		return nil, nil, fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
 	}
 
-	var receipts []*flow.ExecutionReceipt
+	receipts := make([]*flow.ExecutionReceipt, len(receiptsData))
 	copy(receipts, receiptsData)
 
 	agrees, disagrees := executorsOf(receipts, resultID)
