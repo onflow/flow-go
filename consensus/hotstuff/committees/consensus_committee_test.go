@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
@@ -15,6 +16,73 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
+
+// TestConsensus_InvalidSigner tests that the appropriate sentinel error is
+// returned by the hotstuff.Committee implementation for non-existent or
+// non-committee identities.
+func TestConsensus_InvalidSigner(t *testing.T) {
+
+	realIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	unstakedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithStake(0))
+	ejectedConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus), unittest.WithEjected(true))
+	validNonConsensusIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	fakeID := unittest.IdentifierFixture()
+	blockID := unittest.IdentifierFixture()
+
+	state := new(protocolmock.State)
+	snapshot := new(protocolmock.Snapshot)
+
+	// create a mock epoch for leader selection setup in constructor
+	currEpoch := newMockEpoch(
+		1,
+		unittest.IdentityListFixture(10),
+		1,
+		100,
+		unittest.SeedFixture(32),
+	)
+	epochs := mocks.NewEpochQuery(t, 1, currEpoch)
+	snapshot.On("Epochs").Return(epochs)
+
+	state.On("Final").Return(snapshot)
+	state.On("AtBlockID", blockID).Return(snapshot)
+
+	snapshot.On("Identity", realIdentity.NodeID).Return(realIdentity, nil)
+	snapshot.On("Identity", unstakedConsensusIdentity.NodeID).Return(unstakedConsensusIdentity, nil)
+	snapshot.On("Identity", ejectedConsensusIdentity.NodeID).Return(ejectedConsensusIdentity, nil)
+	snapshot.On("Identity", validNonConsensusIdentity.NodeID).Return(validNonConsensusIdentity, nil)
+	snapshot.On("Identity", fakeID).Return(nil, protocol.IdentityNotFoundError{})
+
+	com, err := NewConsensusCommittee(state, unittest.IdentifierFixture())
+	require.NoError(t, err)
+
+	t.Run("non-existent identity should return ErrInvalidSigner", func(t *testing.T) {
+		_, err := com.Identity(blockID, fakeID)
+		require.True(t, errors.Is(model.ErrInvalidSigner, err))
+	})
+
+	t.Run("existent but non-committee-member identity should return ErrInvalidSigner", func(t *testing.T) {
+		t.Run("unstaked consensus node", func(t *testing.T) {
+			_, err := com.Identity(blockID, unstakedConsensusIdentity.NodeID)
+			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		})
+
+		t.Run("ejected consensus node", func(t *testing.T) {
+			_, err := com.Identity(blockID, ejectedConsensusIdentity.NodeID)
+			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		})
+
+		t.Run("otherwise valid non-consensus node", func(t *testing.T) {
+			_, err := com.Identity(blockID, validNonConsensusIdentity.NodeID)
+			require.True(t, errors.Is(model.ErrInvalidSigner, err))
+		})
+	})
+
+	t.Run("should be able to retrieve real identity", func(t *testing.T) {
+		actual, err := com.Identity(blockID, realIdentity.NodeID)
+		require.NoError(t, err)
+		require.Equal(t, realIdentity, actual)
+	})
+}
 
 // test that LeaderForView returns a valid leader for the previous and current
 // epoch and that it returns the appropriate sentinel for the next epoch if it
@@ -47,7 +115,7 @@ func TestConsensus_LeaderForView(t *testing.T) {
 	)
 
 	state.On("Final").Return(snapshot)
-	epochs := mocks.NewEpochQuery(t, 2, prevEpoch, currEpoch)
+	epochs := mocks.NewEpochQuery(t, epochCounter, prevEpoch, currEpoch)
 	snapshot.On("Epochs").Return(epochs)
 
 	committee, err := NewConsensusCommittee(state, me)
