@@ -41,6 +41,36 @@ type CompleteExecutionReceipt struct {
 	ReceiptsData   []*ExecutionReceiptData // execution receipts data of the container block
 }
 
+type CompleteExecutionReceiptList []*CompleteExecutionReceipt
+
+// Receipts returns the list of execution receipts in complete execution receipt list.
+func (c CompleteExecutionReceiptList) Receipts() []*flow.ExecutionReceipt {
+	receipts := make([]*flow.ExecutionReceipt, 0)
+	for _, completeER := range c {
+		receipts = append(receipts, completeER.ContainerBlock.Payload.Receipts...)
+	}
+
+	return receipts
+}
+
+// Results returns the list of unique execution results in the complete execution receipt list.
+func (c CompleteExecutionReceiptList) Results() []*flow.ExecutionResult {
+	added := map[flow.Identifier]struct{}{}
+	results := make([]*flow.ExecutionResult, 0)
+
+	for _, receipt := range c.Receipts() {
+		resultID := receipt.ExecutionResult.ID()
+
+		if _, ok := added[resultID]; !ok {
+			added[resultID] = struct{}{}
+			result := receipt.ExecutionResult
+			results = append(results, &result)
+		}
+
+	}
+	return results
+}
+
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
 type CompleteExecutionReceiptBuilder struct {
 	resultsCount int // number of execution results in the container block.
