@@ -21,8 +21,8 @@ type AssignmentCollector struct {
 	collectors map[flow.Identifier]*ApprovalCollector
 	lock       sync.RWMutex // lock for protecting collectors map
 
-	verifiedApprovalsCache *ApprovalsCache
-	approvalsCache         *ApprovalsCache
+	verifiedApprovalsCache *ApprovalsCache // in-memory cache of approvals were already verified
+	approvalsCache         *ApprovalsCache // in-memory cache of approvals that weren't verified
 
 	authorizedApprovers                  map[flow.Identifier]*flow.Identity // map of approvers pre-selected at block that is being sealed
 	assigner                             module.ChunkAssigner
@@ -112,6 +112,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 		authorizedVerifiers, c.requiredApprovalsForSealConstruction)
 
 	c.putCollector(incorporatedResult.IncorporatedBlockID, collector)
+	c.processPendingApprovals()
 
 	// process approvals that are passed needed checks and are ready to be processed
 	for _, approval := range c.verifiedApprovalsCache.Ids() {

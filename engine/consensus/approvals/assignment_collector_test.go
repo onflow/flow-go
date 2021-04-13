@@ -145,3 +145,65 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 }
+
+func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIdentity() {
+
+	s.Run("verifier-not-staked", func() {
+		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+		identity.Stake = 0 // invalid stake
+
+		state := &protocol.State{}
+		state.On("AtBlockID", mock.Anything).Return(
+			func(blockID flow.Identifier) realproto.Snapshot {
+				return unittest.StateSnapshotForKnownBlock(
+					&s.Block,
+					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
+				)
+			},
+		)
+
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
+		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		require.Error(s.T(), err)
+		require.True(s.T(), engine.IsInvalidInputError(err))
+	})
+
+	s.Run("verifier-ejected", func() {
+		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+		identity.Ejected = true // node ejected
+
+		state := &protocol.State{}
+		state.On("AtBlockID", mock.Anything).Return(
+			func(blockID flow.Identifier) realproto.Snapshot {
+				return unittest.StateSnapshotForKnownBlock(
+					&s.Block,
+					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
+				)
+			},
+		)
+
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
+		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		require.Error(s.T(), err)
+		require.True(s.T(), engine.IsInvalidInputError(err))
+	})
+	s.Run("verifier-invalid-role", func() {
+		// invalid role
+		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+
+		state := &protocol.State{}
+		state.On("AtBlockID", mock.Anything).Return(
+			func(blockID flow.Identifier) realproto.Snapshot {
+				return unittest.StateSnapshotForKnownBlock(
+					&s.Block,
+					map[flow.Identifier]*flow.Identity{identity.NodeID: identity},
+				)
+			},
+		)
+
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
+		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		require.Error(s.T(), err)
+		require.True(s.T(), engine.IsInvalidInputError(err))
+	})
+}
