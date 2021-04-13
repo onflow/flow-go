@@ -337,6 +337,12 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
 	}
 
+	// If there are no preferred or fixed ENs, have the default behaviour be that
+	// we just return all the executor IDs, i.e. no preferrence at all.
+	if len(preferredENIdentifiers) == 0 && len(fixedENIdentifiers) == 0 {
+		return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
+	}
+
 	// find the preferred execution node IDs which have executed the transaction
 	preferredENIDs := allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
 		filter.HasNodeID(executorIDs...)))
