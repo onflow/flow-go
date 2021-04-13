@@ -95,7 +95,7 @@ func (s *Suite) PublishVoter() {
 	// sign and publish voter transaction
 	publishVoterTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishVoterScript(s.env)).
-		SetGasLimit(100).
+		SetGasLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -163,7 +163,7 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 
 	registerVoterTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateVoterScript(s.env)).
-		SetGasLimit(100).
+		SetGasLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
@@ -183,7 +183,7 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 func (s *Suite) StopVoting() {
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateStopVotingScript(s.env)).
-		SetGasLimit(100).
+		SetGasLimit(9999).
 		SetProposalKey(s.blockchain.ServiceKey().Address,
 			s.blockchain.ServiceKey().Index, s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
