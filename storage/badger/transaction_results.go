@@ -56,11 +56,10 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 	}
 	return &TransactionResults{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceTransactionResults,
 			withLimit(transactionResultsCacheSize),
 			withStore(noopStore),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceTransactionResults)),
+			withRetrieve(retrieve)),
 	}
 }
 

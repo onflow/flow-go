@@ -37,11 +37,10 @@ func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApp
 
 	res := &ResultApprovals{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceResult,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceResult)),
+			withRetrieve(retrieve)),
 	}
 
 	return res
