@@ -29,10 +29,9 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 
 	return &Events{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEvents,
 			withStore(noopStore),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceEvents)),
+			withRetrieve(retrieve)),
 	}
 }
 
@@ -112,7 +111,7 @@ func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEven
 
 	return &ServiceEvents{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEvents,
 			withStore(noopStore),
 			withRetrieve(retrieve)),
 	}
