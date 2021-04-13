@@ -90,7 +90,7 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
-	mockResultsByIDs(s.results, []*flow.ExecutionResult{result}, 1)
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 
 	_, _, agreeENs, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 1, 0)
@@ -130,7 +130,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	mockBlockSealingStatus(s.state, s.headers, &header, true)
-	mockResultsByIDs(s.results, []*flow.ExecutionResult{result}, 1)
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
@@ -163,7 +163,7 @@ func TestSkipDuplicateChunkStatus(t *testing.T) {
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	mockBlockSealingStatus(s.state, s.headers, &header, false)
 
-	mockResultsByIDs(s.results, []*flow.ExecutionResult{result}, 1)
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	// mocks duplicate chunk exists on pending chunks, i.e., returning false on adding
 	// same locators.
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, false)
@@ -182,9 +182,9 @@ func TestSkipDuplicateChunkStatus(t *testing.T) {
 
 // mockResultsByIDs mocks the results storage for affirmative querying of result IDs.
 // Each result should be queried by the specified number of times.
-func mockResultsByIDs(results *storage.ExecutionResults, list []*flow.ExecutionResult, times int) {
+func mockResultsByIDs(results *storage.ExecutionResults, list []*flow.ExecutionResult) {
 	for _, result := range list {
-		results.On("ByID", result.ID()).Return(result, nil).Times(times)
+		results.On("ByID", result.ID()).Return(result, nil)
 	}
 }
 
@@ -279,6 +279,32 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 
 		require.Fail(t, "tried adding an unexpected chunk status to mempool")
 	}).Return(added).Times(len(list))
+}
+
+// mockPendingChunksRem mocks the remove method of pending chunks for expecting only the specified list of chunk statuses.
+// Each chunk status should be removed only once.
+// It should return the specified added boolean variable as the result of mocking.
+func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, removed bool) {
+	mu := &sync.Mutex{}
+
+	pendingChunks.On("Rem", mock.Anything).Run(func(args mock.Arguments) {
+		// to provide mutual exclusion under concurrent invocations.
+		mu.Lock()
+		defer mu.Unlock()
+
+		actual, ok := args[0].(flow.Identifier)
+		require.True(t, ok)
+
+		// there should be a matching chunk status with the received one.
+		for _, expected := range list {
+			expectedID := expected.Chunk.ID()
+			if bytes.Equal(expectedID[:], actual[:]) {
+				return
+			}
+		}
+
+		require.Fail(t, "tried removing an unexpected chunk status to mempool")
+	}).Return(removed).Times(len(list))
 }
 
 // mockChunkConsumerNotifier mocks the notify method of processing notifier to be notified exactly once per
