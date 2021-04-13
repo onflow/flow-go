@@ -76,6 +76,40 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 	return e
 }
 
+//// TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
+//// it drops it without processing it any further and and notifies consumer
+//// that it is done with processing that chunk.
+//func TestProcessAssignChunk_HappyPath(t *testing.T) {
+//	s := setupTest()
+//	e := newFetcherEngine(s)
+//
+//	lastSealedHeight := uint64(10)
+//	// creates a single chunk locator, and mocks its corresponding block sealed.
+//	root := unittest.BlockHeaderFixture()
+//	root.Height = lastSealedHeight + 1
+//	completeERs := utils.CompleteExecutionReceiptChainFixture(t, &root, 1,
+//		utils.WithResults(1),
+//		utils.WithChunks(1),
+//		utils.WithCopies(1))
+//	statuses := unittest.ChunkStatusListFixture(t, completeERs.Results(), 1)
+//	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+//
+//	test.MockLastSealedHeight(s.state, lastSealedHeight)
+//	mockResultsByIDs(s.results, completeERs.Results(), 1)
+//	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
+//
+//	executorID := completeERs.Results()[0].
+//	mockStateAtBlockIDForExecutors(s.state, completeERs.Results()[0].BlockID, )
+//
+//	e.ProcessAssignedChunk(locators[0])
+//
+//	mock.AssertExpectationsForObjects(t, s.results)
+//	// we should not request a duplicate chunk status.
+//	s.requester.AssertNotCalled(t, "Request")
+//	// we should not try adding a chunk of a sealed block to chunk status mempool.
+//	s.pendingChunks.AssertNotCalled(t, "Add")
+//}
+
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
 // it drops it without processing it any further and and notifies consumer
 // that it is done with processing that chunk.

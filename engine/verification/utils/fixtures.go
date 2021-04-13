@@ -391,7 +391,7 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 // For sake of simplicity and test, container blocks (i.e., C) do not contain any guarantee.
 //
 // It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
-func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, opts ...CompleteExecutionReceiptBuilderOpt) []*CompleteExecutionReceipt {
+func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, opts ...CompleteExecutionReceiptBuilderOpt) CompleteExecutionReceiptList {
 	completeERs := make([]*CompleteExecutionReceipt, 0, count)
 	parent := root
 
