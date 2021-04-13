@@ -25,6 +25,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		privKey, err := unittest.AccountKeyDefaultFixture()
 		require.NoError(t, err)
 		err = accounts.Create([]flow.AccountPublicKey{privKey.PublicKey(1000)}, address)
+		require.NoError(t, err)
 
 		tx := flow.TransactionBody{}
 		tx.SetProposalKey(address, 0, 0)
@@ -49,6 +50,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		privKey, err := unittest.AccountKeyDefaultFixture()
 		require.NoError(t, err)
 		err = accounts.Create([]flow.AccountPublicKey{privKey.PublicKey(1000)}, address)
+		require.NoError(t, err)
 
 		tx := flow.TransactionBody{}
 		// invalid sequence number is 2
@@ -75,6 +77,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		privKey, err := unittest.AccountKeyDefaultFixture()
 		require.NoError(t, err)
 		err = accounts.Create([]flow.AccountPublicKey{privKey.PublicKey(1000)}, address)
+		require.NoError(t, err)
 
 		tx := flow.TransactionBody{}
 		// wrong address
