@@ -8,21 +8,21 @@ This package provides two ledger implementations:
 
 - **Partial Ledger** implements the ledger functionality for a limited subset of keys. Partial ledgers are designed to be constructed and verified by a collection of proofs from a complete ledger. The partial ledger uses a partial binary Merkle trie which holds intermediate hash value for the pruned branched and prevents updates to keys that were not part of proofs.
 
-
-## Definitions 
+## Definitions
 
 ### binary Merkle tree
+
 ![binary Merkle tree image](/ledger/docs/binary_merkle_tree.png?raw=true "binary Merkle tree" )
+
 In this context a binary Merkle tree is defined as a full binary tree with an specific hight including three type of nodes:
 
 - leaf nodes: holds a payload (data), a path (where the node is located), and a hash value (hash of path and payload content)
-![leaf node image](/ledger/docs/leaf_node.png)
 
 - empty leaf nodes: doesn't hold any data and only stores a path, and a default hash value based on the height of tree
-![empty leaf node image](/ledger/docs/empty_leaf_node.png)
 
 - intermediate nodes: holds a path and a hash value which is defined as hash of hash value of left and right children.
-![intermediate node image](/ledger/docs/intermediate_node.png)
+
+![leaf node image](/ledger/docs/node_types.png.png)
 
 A path is a unique address of a node storing a payload. Paths are derived from the content of payloads (see common/pathfinder).
 
