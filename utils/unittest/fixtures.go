@@ -881,7 +881,7 @@ func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int
 		// result should have enough chunk to sample
 		require.GreaterOrEqual(t, len(result.Chunks), n)
 
-		chunkList := make(flow.ChunkList, 2)
+		chunkList := make(flow.ChunkList, n)
 		copy(chunkList, result.Chunks)
 		rand.Shuffle(len(chunkList), func(i, j int) { chunkList[i], chunkList[j] = chunkList[j], chunkList[i] })
 
