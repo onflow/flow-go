@@ -340,18 +340,10 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 
 	// system chunk is the last chunk
 	isSystemChunk := IsSystemChunk(chunk.Index, result)
-	// computes the end state of the chunk
-	var endState flow.StateCommitment
-	if isSystemChunk {
-		// last chunk in a result is the system chunk and takes final state commitment
-		var ok bool
-		endState, ok = result.FinalStateCommitment()
-		if !ok {
-			return nil, fmt.Errorf("can not read final state commitment, likely a bug")
-		}
-	} else {
-		// any chunk except last takes the subsequent chunk's start state
-		endState = result.Chunks[chunk.Index+1].StartState
+
+	endState, err := EndStateCommitment(result, chunk.Index, isSystemChunk)
+	if err != nil {
+		return nil, fmt.Errorf("could not compute end state of chunk: %w", err)
 	}
 
 	return &verification.VerifiableChunkData{
@@ -363,6 +355,25 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
 	}, nil
+}
+
+// EndStateCommitment computes the end state of the given chunk.
+func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemChunk bool) (flow.StateCommitment, error) {
+
+	var endState flow.StateCommitment
+	if systemChunk {
+		// last chunk in a result is the system chunk and takes final state commitment
+		var ok bool
+		endState, ok = result.FinalStateCommitment()
+		if !ok {
+			return nil, fmt.Errorf("can not read final state commitment, likely a bug")
+		}
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.Chunks[chunkIndex+1].StartState
+	}
+
+	return endState, nil
 }
 
 // IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
