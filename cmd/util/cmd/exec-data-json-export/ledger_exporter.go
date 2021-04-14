@@ -1,13 +1,15 @@
 package jsonexporter
 
 import (
+	"bufio"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -32,7 +34,19 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	if err != nil {
 		return fmt.Errorf("failed to decode hex code of state: %w", err)
 	}
-	err = led.DumpTrieAsJSON(ledger.State(state), outputPath)
+
+	path := filepath.Join(outputPath, hex.EncodeToString(state)+".trie.jsonl")
+
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	err = led.DumpTrieAsJSON(state, writer)
 	if err != nil {
 		return fmt.Errorf("cannot dump trie as json: %w", err)
 	}
