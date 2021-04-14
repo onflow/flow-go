@@ -225,9 +225,18 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	log.Info().Msg("chunk data pack arrived")
 
-	status, result, err := e.validatedAndFetch(originID, chunkDataPack, collection)
+	status, err := e.validatedStatus(originID, chunkDataPack, collection)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not validate and fetch chunk status")
+		// TODO: this can be due to a byzantine behavior
+		log.Info().Err(err).Msg("could not validate and fetch chunk status")
+		return
+	}
+
+	result, err := e.results.ByID(status.ExecutionResultID)
+	if err != nil {
+		// this error indicates a fatal situation that we are missing an execution result.
+		log.Fatal().Err(err).Msg("could not retrieve execution result of chunk status")
+		return
 	}
 
 	log = log.With().
@@ -264,32 +273,25 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block")
 }
 
-// validatedAndFetch validates the chunk data pack and if it passes the validation, retrieves and returns its chunk status as well as the
-// execution result.
-func (e *Engine) validatedAndFetch(originID flow.Identifier,
+// validatedStatus validates the chunk data pack and if it passes the validation, retrieves and returns its chunk status.
+func (e *Engine) validatedStatus(originID flow.Identifier,
 	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection) (*verification.ChunkStatus,
-	*flow.ExecutionResult, error) {
+	collection *flow.Collection) (*verification.ChunkStatus, error) {
 
 	// make sure we still need it
 	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
 	if !exists {
-		return nil, nil, fmt.Errorf("could not fetch chunk data from mempool: %x", chunkDataPack.ChunkID)
+		return nil, fmt.Errorf("could not fetch chunk data from mempool: %x", chunkDataPack.ChunkID)
 	}
 
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPack(status.Chunk, originID, chunkDataPack, collection)
 	if err != nil {
-		return nil, nil, engine.NewInvalidInputErrorf("invalid chunk data pack for chunk: %v collection: %v block: %v",
+		return nil, engine.NewInvalidInputErrorf("invalid chunk data pack for chunk: %v collection: %v block: %v",
 			chunkDataPack.ChunkID, collection.ID(), status.Chunk.BlockID)
 	}
 
-	result, err := e.results.ByID(status.ExecutionResultID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("could not get result by id %x: %w", status.ExecutionResultID, err)
-	}
-
-	return status, result, nil
+	return status, nil
 }
 
 // getResultByID
