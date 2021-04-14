@@ -328,6 +328,12 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	return newTrie.RootHash(), nil
 }
 
+// MostRecentTouchedState returns a state which is most recently touched.
+func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
+	root, err := l.forest.MostRecentTouchedRootHash()
+	return ledger.State(root), err
+}
+
 // DumpTrieAsJSON export trie at specific state as a jsonl file, each line is json encode of a payload
 func (l *Ledger) DumpTrieAsJSON(state ledger.State, outputFilePath string) error {
 	fmt.Println(ledger.RootHash(state))
