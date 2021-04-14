@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	vermodel "github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
@@ -396,8 +395,8 @@ func (e *Engine) onTimer() {
 
 }
 
-// requestChunkDataPack request the chunk data pack from the execution node.
-// the chunk data pack includes the collection and statecommitments that
+// requestChunkDataPack request the chunk data pack from the original execution node that executed the chunk.
+// the chunk data pack includes the collection and state commitments that
 // needed to make a VerifiableChunk
 func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 	chunkID := c.ID()
@@ -408,34 +407,8 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
-	// find other execution nodes
-	others, err := e.state.Final().
-		Identities(filter.And(
-			filter.HasRole(flow.RoleExecution),
-			filter.Not(filter.HasNodeID(c.ExecutorID, e.me.NodeID()))))
-	if err != nil {
-		return fmt.Errorf("could not find other execution nodes identities: %w", err)
-	}
-
-	targetIDs := []flow.Identifier{c.ExecutorID}
-
-	// request chunk data pack from another execution node if exists as backup
-	if len(others) > 0 {
-		other := others.Sample(1).NodeIDs()[0]
-		targetIDs = append(targetIDs, other)
-	}
-
-	// TEMP: skip sending chunk data pack requests to avoid overloading ENs
-	// This is OK because RAs are not yet used in the sealing process.
-	e.log.Warn().
-		Hex("block_id", c.Chunk.BlockID[:]).
-		Uint64("chunk_index", c.Chunk.Index).
-		Msg("skipping sending chunk data pack request")
-
-	return nil
-
 	// publishes the chunk data request to the network
-	err = e.con.Publish(req, targetIDs...)
+	err := e.con.Publish(req, c.ExecutorID)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
