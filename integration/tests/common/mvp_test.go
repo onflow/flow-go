@@ -9,6 +9,8 @@ import (
 	"github.com/dapperlabs/testingdock"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow/filter"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -76,15 +78,16 @@ func TestMVP_Bootstrap(t *testing.T) {
 	flowNetwork.RemoveContainers()
 
 	// pick 1 consensus node to restart with empty database and downloaded snapshot
-	//con1 := flowNetwork.Identities().
-	//	Filter(filter.HasRole(flow.RoleConsensus)).
-	//	Sample(1)[0]
-	//
-	//fmt.Println("@@ booting from non-root state on consensus node ", con1.NodeID)
-	//
-	//con1Container := flowNetwork.ContainerByID(con1.NodeID)
-	//con1Container.DropDB()
-	//con1Container.WriteRootSnapshot(snapshot)
+	con1 := flowNetwork.Identities().
+		Filter(filter.HasRole(flow.RoleConsensus)).
+		Sample(1)[0]
+
+	fmt.Println("@@ booting from non-root state on consensus node ", con1.NodeID)
+
+	flowNetwork.DropDBs(filter.HasNodeID(con1.NodeID))
+	con1Container := flowNetwork.ContainerByID(con1.NodeID)
+	con1Container.DropDB()
+	con1Container.WriteRootSnapshot(snapshot)
 
 	fmt.Println("@@ running mvp test 2")
 
