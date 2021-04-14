@@ -705,7 +705,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
 			// verify that all receipts already included in blocks are filtered out:
 			for _, block := range bs.blocks {
-				resultByID := block.Payload.ResultsById()
+				resultByID := block.Payload.Results.Lookup()
 				for _, meta := range block.Payload.Receipts {
 					result := resultByID[meta.ResultID]
 					rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -847,7 +847,7 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -901,7 +901,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -985,7 +985,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -1043,7 +1043,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -1081,7 +1081,7 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)

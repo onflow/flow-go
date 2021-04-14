@@ -103,3 +103,12 @@ func (g ExecutionResultGroupedList) GetGroup(groupID Identifier) ExecutionResult
 func (g ExecutionResultGroupedList) NumberGroups() int {
 	return len(g)
 }
+
+// Lookup generates a map from ExecutionResult ID to ExecutionResult
+func (l ExecutionResultList) Lookup() map[Identifier]*ExecutionResult {
+	resultsByID := make(map[Identifier]*ExecutionResult)
+	for _, result := range l {
+		resultsByID[result.ID()] = result
+	}
+	return resultsByID
+}

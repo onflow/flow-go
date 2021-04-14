@@ -189,3 +189,12 @@ func (g ExecutionReceiptMetaGroupedList) GetGroup(groupID Identifier) ExecutionR
 func (g ExecutionReceiptMetaGroupedList) NumberGroups() int {
 	return len(g)
 }
+
+// Lookup generates a map from ExecutionReceipt ID to ExecutionReceiptMeta
+func (l ExecutionReceiptMetaList) Lookup() map[Identifier]*ExecutionReceiptMeta {
+	receiptsByID := make(map[Identifier]*ExecutionReceiptMeta)
+	for _, receipt := range l {
+		receiptsByID[receipt.ID()] = receipt
+	}
+	return receiptsByID
+}
