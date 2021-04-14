@@ -182,6 +182,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 				}, err
 			}
 		} else {
+			fmt.Println("result: ", result.Status)
 			fmt.Print(".")
 		}
 		time.Sleep(time.Second)

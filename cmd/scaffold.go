@@ -177,7 +177,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.networkKey,
-			fnb.RootBlock.ID().String(),
+			"fakerootblock", //fnb.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network)
 		if err != nil {
@@ -188,7 +188,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			fnb.RootBlock.ID().String(),
+			"fakerootblock", //fnb.RootBlock.ID().String(),
 			fnb.MsgValidators...)
 
 		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)

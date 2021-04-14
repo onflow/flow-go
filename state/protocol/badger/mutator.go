@@ -522,6 +522,17 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 		return fmt.Errorf("could not execute state extension: %w", err)
 	}
 
+	// TODO tmp
+	final, err := m.Final().Head()
+	if err != nil {
+		panic(err)
+	}
+	sealed, err := m.Sealed().Head()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("protocol final/sealed: ", final.Height, sealed.Height)
+
 	return nil
 }
 
