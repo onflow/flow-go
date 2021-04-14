@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -92,6 +93,8 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
+	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
+	mockPendingChunksByID(s.pendingChunks, statuses)
 
 	_, _, agreeENs, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 1, 0)
 	mockStateAtBlockIDForExecutors(s.state, block.ID(), agreeENs)
@@ -103,12 +106,15 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 		Agrees:  agreeENs.NodeIDs(),
 	}
 	chunkDataPacks, collections := chunkDataPackResponseFixture(statuses.Chunks())
-	mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier, cdp *flow.ChunkDataPack,
+	wg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier, cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
 		e.HandleChunkDataPack(originID, cdp, collection)
 	})
 
 	e.ProcessAssignedChunk(locators[0])
+
+	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not handle received chunk data pack on time")
 
 	mock.AssertExpectationsForObjects(t, s.results)
 	// we should not request a duplicate chunk status.
@@ -248,7 +254,7 @@ func mockStateAtBlockIDForExecutors(state *protocol.State, blockID flow.Identifi
 	state.On("AtBlockID", blockID).Return(snapshot)
 	snapshot.On("Identities", mock.Anything).Return(executors, nil)
 	for _, id := range executors {
-		snapshot.On("Identity", id.NodeID).Return(id)
+		snapshot.On("Identity", id.NodeID).Return(id, nil)
 	}
 }
 
@@ -305,6 +311,88 @@ func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 
 		require.Fail(t, "tried removing an unexpected chunk status to mempool")
 	}).Return(removed).Times(len(list))
+}
+
+// mockPendingChunksByID mocks the ByID method of pending chunks for expecting only the specified list of chunk statuses.
+func mockPendingChunksByID(pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus) {
+	mu := &sync.Mutex{}
+
+	pendingChunks.On("ByID", mock.Anything).Return(
+		func(chunkID flow.Identifier) *verification.ChunkStatus {
+			// to provide mutual exclusion under concurrent invocations.
+			mu.Lock()
+			defer mu.Unlock()
+
+			for _, expected := range list {
+				expectedID := expected.Chunk.ID()
+				if expectedID == chunkID {
+					return expected
+				}
+			}
+			return nil
+		},
+		func(chunkID flow.Identifier) bool {
+			for _, expected := range list {
+				expectedID := expected.Chunk.ID()
+				if expectedID == chunkID {
+					return true
+				}
+			}
+			return false
+		})
+}
+
+// mockVerifierEngine mocks verifier engine to expect receiving a matching chunk data pack with specified input.
+// Each chunk data pack should be passed only once.
+func mockVerifierEngine(t *testing.T, verifier *mocknetwork.Engine,
+	verifiableChunks map[flow.Identifier]*verification.VerifiableChunkData) *sync.WaitGroup {
+	mu := sync.Mutex{}
+	wg := &sync.WaitGroup{}
+	wg.Add(len(verifiableChunks))
+
+	seen := make(map[flow.Identifier]struct{})
+
+	verifier.On("ProcessLocal", mock.Anything).Run(func(args mock.Arguments) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		vc, ok := args[0].(*verification.VerifiableChunkData)
+		require.True(t, ok)
+
+		// verifiable chunk data should be distinct.
+		_, ok = seen[vc.Chunk.ID()]
+		require.False(t, ok, "duplicated verifiable chunk received")
+		seen[vc.Chunk.ID()] = struct{}{}
+
+		// we should expect this verifiable chunk and its fields should match our expectation
+		expected, ok := verifiableChunks[vc.Chunk.ID()]
+		require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
+
+		require.Equal(t, *expected.ChunkDataPack, *vc.ChunkDataPack)
+		require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
+		require.Equal(t, expected.Result.ID(), vc.Result.ID())
+		require.Equal(t, expected.Header.ID(), vc.Chunk.ID())
+
+		isSystemChunk := fetcher.IsSystemChunk(vc.Chunk.Index, vc.Result)
+		require.Equal(t, isSystemChunk, vc.IsSystemChunk)
+
+		// its end state should also match our expecation
+		var endState flow.StateCommitment
+		if isSystemChunk {
+			// last chunk in a result is the system chunk and takes final state commitment
+			var ok bool
+			endState, ok = expected.Result.FinalStateCommitment()
+			require.True(t, ok)
+		} else {
+			// any chunk except last takes the subsequent chunk's start state
+			endState = expected.Result.Chunks[vc.Chunk.Index+1].StartState
+		}
+
+		require.Equal(t, endState, vc.EndState)
+		wg.Done()
+	}).Return().Times(len(verifiableChunks))
+
+	return wg
 }
 
 // mockChunkConsumerNotifier mocks the notify method of processing notifier to be notified exactly once per

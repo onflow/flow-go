@@ -347,7 +347,7 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 		var ok bool
 		endState, ok = result.FinalStateCommitment()
 		if !ok {
-			return nil, fmt.Errorf("fatal: can not read final state commitment, likely a bug")
+			return nil, fmt.Errorf("can not read final state commitment, likely a bug")
 		}
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
