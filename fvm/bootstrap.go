@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -172,12 +173,7 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
 	return fungibleToken
 }
 
@@ -192,12 +188,7 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy Flow token contract: %s", txError, err)
 	return flowToken
 }
 
@@ -215,12 +206,7 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to deploy fees contract: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy fees contract: %s", txError, err)
 	return flowFees
 }
 
@@ -237,12 +223,7 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
@@ -259,12 +240,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to deploy service account contract: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy service account contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy service account contract: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) mintInitialTokens(
@@ -277,12 +253,7 @@ func (b *BootstrapProcedure) mintInitialTokens(
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to mint initial token supply: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to mint initial token supply: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to mint initial token supply: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupFees(
@@ -297,12 +268,7 @@ func (b *BootstrapProcedure) setupFees(
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to setup fees: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to setup fees: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
@@ -314,12 +280,7 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 		b.sth,
 		b.programs,
 	)
-	if txError != nil {
-		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", txError.Error()))
-	}
-	if err != nil {
-		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
 }
 
 const deployContractTransactionTemplate = `
@@ -541,6 +502,15 @@ const (
 	flowTokenAccountIndex     = 3
 	flowFeesAccountIndex      = 4
 )
+
+func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
+	if txError != nil {
+		panic(fmt.Sprintf(msg, txError.Error()))
+	}
+	if err != nil {
+		panic(fmt.Sprintf(msg, err.Error()))
+	}
+}
 
 func FungibleTokenAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(fungibleTokenAccountIndex)
