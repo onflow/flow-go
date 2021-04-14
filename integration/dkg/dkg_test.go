@@ -79,7 +79,7 @@ func createNode(
 	firstBlock flow.Identifier) *node {
 
 	core := testutil.GenericNode(t, hub, id, ids, chainID)
-	//core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	// core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
 	// the viewsObserver is used by the reactor engine to subscribe to when
 	// blocks are finalized that are in a new view
@@ -256,7 +256,7 @@ func TestDKG(t *testing.T) {
 		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(epochSetup.Counter)
 		require.NoError(t, err)
 
-		signer := signature.NewThresholdProvider("XXXTAG", priv.RandomBeaconPrivKey.PrivateKey)
+		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
 		signers = append(signers, signer)
 
 		signature, err := signer.Sign(sigData)
