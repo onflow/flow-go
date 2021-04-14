@@ -3,6 +3,7 @@ package approvals
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"sync"
 	"sync/atomic"
 
@@ -26,44 +27,51 @@ type ResultApprovalProcessor interface {
 }
 
 // implementation of ResultApprovalProcessor
-type resultsApprovalProcessor struct {
+type approvalProcessingCore struct {
 	collectors                           map[flow.Identifier]*AssignmentCollector // contains a mapping of ResultID to AssignmentCollector
 	lock                                 sync.RWMutex                             // lock for collectors
 	assigner                             module.ChunkAssigner
 	state                                protocol.State
 	verifier                             module.Verifier
 	seals                                mempool.IncorporatedResultSeals
+	payloads                             storage.Payloads
 	lastSealedBlockHeight                uint64 // atomic variable for last sealed block height
 	blockHeightLookupCache               *lru.Cache
 	requiredApprovalsForSealConstruction uint
 }
 
-func NewResultsApprovalProcess(state protocol.State, assigner module.ChunkAssigner,
-	verifier module.Verifier, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *resultsApprovalProcessor {
+func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
+	verifier module.Verifier, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *approvalProcessingCore {
 	blockHeightLookupCache, _ := lru.New(100)
-	return &resultsApprovalProcessor{
+	return &approvalProcessingCore{
 		collectors:                           make(map[flow.Identifier]*AssignmentCollector),
 		lock:                                 sync.RWMutex{},
 		assigner:                             assigner,
 		state:                                state,
 		verifier:                             verifier,
 		seals:                                seals,
+		payloads:                             payloads,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		blockHeightLookupCache:               blockHeightLookupCache,
 	}
 }
 
-func (p *resultsApprovalProcessor) OnBlockFinalized(block flow.Block) {
-	sealsCount := len(block.Payload.Seals)
+func (p *approvalProcessingCore) OnFinalizedBlock(block *model.Block) {
+	payload, err := p.payloads.ByBlockID(block.BlockID)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", block.BlockID)
+	}
+
+	sealsCount := len(payload.Seals)
 	sealedResultIds := make([]flow.Identifier, sealsCount)
-	for i, seal := range block.Payload.Seals {
+	for i, seal := range payload.Seals {
 		sealedResultIds[i] = seal.ResultID
 
 		// update last sealed height
 		if i == sealsCount-1 {
 			head, err := p.state.AtBlockID(seal.BlockID).Head()
 			if err != nil {
-				log.Fatal().Msgf("could not retrieve state of finalized block %s: %w", seal.BlockID, err)
+				log.Fatal().Err(err).Msgf("could not retrieve state for finalized block %s", seal.BlockID)
 			}
 			atomic.StoreUint64(&p.lastSealedBlockHeight, head.Height)
 		}
@@ -73,7 +81,7 @@ func (p *resultsApprovalProcessor) OnBlockFinalized(block flow.Block) {
 	p.eraseCollectors(sealedResultIds)
 }
 
-func (p *resultsApprovalProcessor) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
+func (p *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 	collector := p.getOrCreateCollector(result.Result.ID())
 	err := collector.ProcessIncorporatedResult(result)
 	if err != nil {
@@ -82,7 +90,7 @@ func (p *resultsApprovalProcessor) ProcessIncorporatedResult(result *flow.Incorp
 	return nil
 }
 
-func (p *resultsApprovalProcessor) validateApproval(approval *flow.ResultApproval) error {
+func (p *approvalProcessingCore) validateApproval(approval *flow.ResultApproval) error {
 	blockID := approval.Body.BlockID
 	height, cached := p.blockHeightLookupCache.Get(blockID)
 	if !cached {
@@ -95,7 +103,8 @@ func (p *resultsApprovalProcessor) validateApproval(approval *flow.ResultApprova
 			return engine.NewUnverifiableInputError("no header for block: %v", approval.Body.BlockID)
 		}
 
-		p.blockHeightLookupCache.Add(blockID, head.Height)
+		height = head.Height
+		p.blockHeightLookupCache.Add(blockID, height)
 	}
 
 	lastSealedHeight := atomic.LoadUint64(&p.lastSealedBlockHeight)
@@ -107,22 +116,27 @@ func (p *resultsApprovalProcessor) validateApproval(approval *flow.ResultApprova
 	return nil
 }
 
-func (p *resultsApprovalProcessor) ProcessApproval(approval *flow.ResultApproval) error {
+func (p *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) error {
+	err := p.validateApproval(approval)
+	if err != nil {
+		return err
+	}
+
 	collector := p.getOrCreateCollector(approval.Body.ExecutionResultID)
-	err := collector.ProcessAssignment(approval)
+	err = collector.ProcessAssignment(approval)
 	if err != nil {
 		return fmt.Errorf("could not process assignment: %w", err)
 	}
 	return nil
 }
 
-func (p *resultsApprovalProcessor) getCollector(resultID flow.Identifier) *AssignmentCollector {
+func (p *approvalProcessingCore) getCollector(resultID flow.Identifier) *AssignmentCollector {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	return p.collectors[resultID]
 }
 
-func (p *resultsApprovalProcessor) createCollector(resultID flow.Identifier) *AssignmentCollector {
+func (p *approvalProcessingCore) createCollector(resultID flow.Identifier) *AssignmentCollector {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier,
@@ -131,7 +145,7 @@ func (p *resultsApprovalProcessor) createCollector(resultID flow.Identifier) *As
 	return collector
 }
 
-func (p *resultsApprovalProcessor) eraseCollectors(resultIDs []flow.Identifier) {
+func (p *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	for _, resultID := range resultIDs {
@@ -139,7 +153,7 @@ func (p *resultsApprovalProcessor) eraseCollectors(resultIDs []flow.Identifier) 
 	}
 }
 
-func (p *resultsApprovalProcessor) getOrCreateCollector(resultID flow.Identifier) *AssignmentCollector {
+func (p *approvalProcessingCore) getOrCreateCollector(resultID flow.Identifier) *AssignmentCollector {
 	if collector := p.getCollector(resultID); collector != nil {
 		return collector
 	}
