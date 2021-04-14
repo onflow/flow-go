@@ -16,6 +16,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -431,6 +432,17 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	err = os.Mkdir(flowDBDir, 0700)
 	require.NoError(t, err)
 
+	// create a directory for the bootstrap files
+	// we create a node-specific bootstrap directory to enable testing nodes
+	// bootstrapping from different root state snapshots and epochs
+	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
+	err = os.Mkdir(nodeBootstrapDir, 0700)
+	require.NoError(t, err)
+
+	// copy bootstrap files to node-specific bootstrap directory
+	err = io.CopyDirectory(bootstrapDir, nodeBootstrapDir)
+	require.NoError(t, err)
+
 	// Bind the host directory to the container's database directory
 	// Bind the common bootstrap directory to the container
 	// NOTE: I did this using the approach from:
@@ -438,7 +450,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	opts.HostConfig.Binds = append(
 		opts.HostConfig.Binds,
 		fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
-		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
+		fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 	)
 
 	if !nodeConf.Ghost {
