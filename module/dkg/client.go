@@ -231,7 +231,11 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		}
 
 		// wait 1 second before trying again.
-		time.Sleep(time.Second)
+		time.Sleep(epochs.TransactionStatusRetryTimeout)
+	}
+
+	if result.Error != nil {
+		return fmt.Errorf("error executing transaction: %w", result.Error)
 	}
 
 	return nil
