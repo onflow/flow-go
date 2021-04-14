@@ -185,7 +185,7 @@ func (e *Engine) validateChunkDataPack(
 	blockID := chunk.BlockID
 	sender, err := e.state.AtBlockID(blockID).Identity(senderID)
 	if errors.Is(err, storage.ErrNotFound) {
-		return engine.NewInvalidInputErrorf("sender is usntaked: %v", senderID)
+		return engine.NewInvalidInputErrorf("sender is unstaked: %v", senderID)
 	}
 
 	if err != nil {
@@ -230,23 +230,25 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		log.Fatal().Err(err).Msg("could not validate and fetch chunk status")
 	}
 
-	e.tracer.WithSpanFromContext(status.Ctx, trace.VERFetcherHandleChunkDataPack, func() {
-		// we need to report that the job has been finished eventually
-		defer e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
+	log = log.With().
+		Hex("result_id", logging.ID(result.ID())).
+		Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
 
-		log = log.With().
-			Hex("result_id", logging.ID(result.ID())).
-			Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
-
-		removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
+	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
+	if !removed {
+		// not being able to remove it means a duplicate response is being processed concurrently
+		// so we terminate processing the current one.
 		log.Debug().Bool("removed", removed).Msg("removed chunk status")
+		return
+	}
 
-		err = e.pushToVerifier(status.Chunk, result, chunkDataPack, collection)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
-		}
-		log.Info().Msg("verifiable chunk successfully pushed to verifier engine")
-	})
+	err = e.pushToVerifier(status.Chunk, result, chunkDataPack, collection)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
+	}
+	// we need to report that the job has been finished eventually
+	e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
+	log.Info().Msg("verifiable chunk successfully pushed to verifier engine")
 }
 
 // NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the chunk ID has been sealed and
@@ -282,7 +284,7 @@ func (e *Engine) validatedAndFetch(originID flow.Identifier,
 			chunkDataPack.ChunkID, collection.ID(), status.Chunk.BlockID)
 	}
 
-	result, err := e.getResultByID(status.Chunk.BlockID, status.ExecutionResultID)
+	result, err := e.results.ByID(status.ExecutionResultID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not get result by id %x: %w", status.ExecutionResultID, err)
 	}
