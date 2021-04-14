@@ -24,11 +24,11 @@ func TestAssignmentCollector(t *testing.T) {
 type AssignmentCollectorTestSuite struct {
 	BaseApprovalsTestSuite
 
-	State           *protocol.State
-	Assigner        *module.ChunkAssigner
-	SealsPL         *mempool.IncorporatedResultSeals
-	SigVerifier     *module.Verifier
-	IdentitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	state           *protocol.State
+	assigner        *module.ChunkAssigner
+	sealsPL         *mempool.IncorporatedResultSeals
+	sigVerifier     *module.Verifier
+	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
 
 	collector *AssignmentCollector
 }
@@ -36,20 +36,20 @@ type AssignmentCollectorTestSuite struct {
 func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
-	s.SealsPL = &mempool.IncorporatedResultSeals{}
-	s.State = &protocol.State{}
-	s.Assigner = &module.ChunkAssigner{}
-	s.SigVerifier = &module.Verifier{}
+	s.sealsPL = &mempool.IncorporatedResultSeals{}
+	s.state = &protocol.State{}
+	s.assigner = &module.ChunkAssigner{}
+	s.sigVerifier = &module.Verifier{}
 
-	s.IdentitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
-	s.IdentitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
+	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
+	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
 
-	s.Assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
+	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
 
-	// define the protocol State snapshot for any block in `bc.Blocks`
-	s.State.On("AtBlockID", mock.Anything).Return(
+	// define the protocol state snapshot for any block in `bc.Blocks`
+	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
-			if identities, found := s.IdentitiesCache[blockID]; found {
+			if identities, found := s.identitiesCache[blockID]; found {
 				return unittest.StateSnapshotForKnownBlock(&s.Block, identities)
 			} else {
 				return unittest.StateSnapshotForUnknownBlock()
@@ -57,7 +57,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 		},
 	)
 
-	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.State, s.Assigner, s.SealsPL, s.SigVerifier, uint(len(s.AuthorizedVerifiers)))
+	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, uint(len(s.AuthorizedVerifiers)))
 }
 
 // TestProcessAssignment_ApprovalsAfterResult tests a scenario when first we have discovered execution result
@@ -67,8 +67,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsAfterResul
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	s.SealsPL.On("Add", mock.Anything).Return(true, nil).Once()
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
@@ -78,14 +78,14 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsAfterResul
 		}
 	}
 
-	s.SealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
 }
 
 // TestProcessAssignment_ApprovalsBeforeResult tests a scenario when first we have received approvals for unknown
 // execution result and after that we discovered execution result. In this scenario we should be able
 // to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
 func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsBeforeResult() {
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
@@ -95,12 +95,12 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsBeforeResu
 		}
 	}
 
-	s.SealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	s.SealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
 }
 
 // TestProcessIncorporatedResult tests different scenarios for processing incorporated result
@@ -116,7 +116,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.State, assigner, s.SealsPL, s.SigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, assigner, s.sealsPL, s.sigVerifier, 1)
 
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
@@ -124,9 +124,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	})
 
 	s.Run("invalid verifier identities", func() {
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.State, s.Assigner, s.SealsPL, s.SigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, 1)
 		// delete identities for Result.BlockID
-		delete(s.IdentitiesCache, s.IncorporatedResult.Result.BlockID)
+		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -149,7 +149,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.Assigner, s.SealsPL, s.SigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -169,7 +169,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.Assigner, s.SealsPL, s.SigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -188,7 +188,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.Assigner, s.SealsPL, s.SigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))

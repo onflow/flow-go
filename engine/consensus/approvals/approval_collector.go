@@ -53,11 +53,11 @@ func (c *ApprovalCollector) hasEnoughApprovals(chunkIndex uint64) bool {
 }
 
 func (c *ApprovalCollector) sealResult() error {
-	// get final State of execution result
+	// get final state of execution result
 	finalState, ok := c.incorporatedResult.Result.FinalStateCommitment()
 	if !ok {
 		// message correctness should have been checked before: failure here is an internal implementation bug
-		return fmt.Errorf("failed to get final State commitment from Execution Result")
+		return fmt.Errorf("failed to get final state commitment from Execution Result")
 	}
 
 	aggregatedSigs := make([]flow.AggregatedSignature, c.numberOfChunks)

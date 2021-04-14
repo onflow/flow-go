@@ -1,6 +1,11 @@
 package approvals
 
 import (
+	"github.com/onflow/flow-go/model/flow"
+	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	module "github.com/onflow/flow-go/module/mock"
+	realproto "github.com/onflow/flow-go/state/protocol"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/stretchr/testify/mock"
 	"testing"
 
@@ -18,17 +23,42 @@ func TestApprovalProcessingCore(t *testing.T) {
 }
 
 type ApprovalProcessingCoreTestSuite struct {
-	AssignmentCollectorTestSuite
+	BaseApprovalsTestSuite
 
-	payloads *storage.Payloads
-	core     *approvalProcessingCore
+	state           *protocol.State
+	assigner        *module.ChunkAssigner
+	sealsPL         *mempool.IncorporatedResultSeals
+	sigVerifier     *module.Verifier
+	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	payloads        *storage.Payloads
+	core            *approvalProcessingCore
 }
 
 func (c *ApprovalProcessingCoreTestSuite) SetupTest() {
-	c.AssignmentCollectorTestSuite.SetupTest()
+	c.BaseApprovalsTestSuite.SetupTest()
 
+	c.sealsPL = &mempool.IncorporatedResultSeals{}
+	c.state = &protocol.State{}
+	c.assigner = &module.ChunkAssigner{}
+	c.sigVerifier = &module.Verifier{}
+
+	c.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
+	c.identitiesCache[c.IncorporatedResult.Result.BlockID] = c.AuthorizedVerifiers
+
+	c.assigner.On("Assign", mock.Anything, mock.Anything).Return(c.ChunksAssignment, nil)
+
+	// define the protocol state snapshot for any block in `bc.Blocks`
+	c.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) realproto.Snapshot {
+			if identities, found := c.identitiesCache[blockID]; found {
+				return unittest.StateSnapshotForKnownBlock(&c.Block, identities)
+			} else {
+				return unittest.StateSnapshotForUnknownBlock()
+			}
+		},
+	)
 	c.payloads = &storage.Payloads{}
-	c.core = NewApprovalProcessingCore(c.payloads, c.State, c.Assigner, c.SigVerifier, c.SealsPL, uint(len(c.AuthorizedVerifiers)))
+	c.core = NewApprovalProcessingCore(c.payloads, c.state, c.assigner, c.sigVerifier, c.sealsPL, uint(len(c.AuthorizedVerifiers)))
 }
 
 func (c *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApprovals() {
