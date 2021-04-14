@@ -17,9 +17,8 @@ import (
 type AssignmentCollector struct {
 	resultID flow.Identifier
 
-	// collectors is a mapping IncorporatedBlockID -> ApprovalCollector
-	collectors map[flow.Identifier]*ApprovalCollector
-	lock       sync.RWMutex // lock for protecting collectors map
+	collectors map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
+	lock       sync.RWMutex                           // lock for protecting collectors map
 
 	verifiedApprovalsCache *ApprovalsCache // in-memory cache of approvals were already verified
 	approvalsCache         *ApprovalsCache // in-memory cache of approvals that weren't verified
