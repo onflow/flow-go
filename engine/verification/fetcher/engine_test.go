@@ -79,7 +79,10 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 }
 
 // TestProcessAssignChunk_HappyPath evaluates behavior of fetcher engine respect to receiving a single assigned chunk,
-// it should request the chunk data.
+// it should request the requester.
+// Then the test mocks sending a chunk data response for what fetcher engine requested.
+// On receiving the response, fetcher engine should validate it and create and pass a verifiable chunk
+// to the verifier engine.
 func TestProcessAssignChunk_HappyPath(t *testing.T) {
 	s := setupTest()
 	e := newFetcherEngine(s)
