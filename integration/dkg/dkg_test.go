@@ -137,6 +137,9 @@ func createNode(
 		viewsObserver,
 	)
 
+	// reactorEngine consumes the EpochSetupPhaseStarted event
+	core.ProtocolEvents.AddConsumer(reactorEngine)
+
 	node := node{
 		GenericNode:     core,
 		keyStorage:      dkgKeys,
@@ -214,7 +217,8 @@ func TestDKG(t *testing.T) {
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
 	// starting the next DKG run
 	for _, n := range nodes {
-		n.reactorEngine.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
+		// n.reactorEngine.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
+		n.ProtocolEvents.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
 	}
 
 	// trigger the BlockFinalized events for each view of interest, effectively
