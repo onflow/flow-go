@@ -10,11 +10,9 @@ import (
 // functor that will be called on each block header when traversing blocks.
 type onVisitBlock = func(header *flow.Header) error
 
-// TraverseBackward traverses a chain segment beginning with the start block (inclusive)
-// Blocks are traversed in reverse
-// height order, meaning the end block must be an ancestor of the start block.
-// The callback is called for each block in this segment.
-// Return value of callback is used to decide if it should continue or not.
+// TraverseBackward traverses the given fork (specified by block ID `forkHead`)
+// in the order of decreasing height. The `terminal` defines when the traversal
+// stops. The `visitor` callback is called for each block in this segment.
 func TraverseBackward(headers storage.Headers, forkHead flow.Identifier, visitor onVisitBlock, terminal Terminal) error {
 	lowestHeightToVisit, sanityChecker, err := terminal.Translate2Height(headers)
 	if err != nil {
@@ -32,6 +30,11 @@ func TraverseBackward(headers storage.Headers, forkHead flow.Identifier, visitor
 	return unsafeTraverse(headers, startBlock, visitor, lowestHeightToVisit, sanityChecker)
 }
 
+// unsafeTraverse implements the fork traversal in the order of decreasing height.
+// It is unsafe because:
+// * always calls the `visitor` on the `block`, _before_ it checks whether to stop
+// * if `block` has a lower height than lowestHeightToVisit, the traversal keeps
+//   going until we hit the root block
 func unsafeTraverse(headers storage.Headers, block *flow.Header, visitor onVisitBlock, lowestHeightToVisit uint64, sanityChecker sanityCheckLowestVisitedBlock) error {
 	for {
 		err := visitor(block)
@@ -54,12 +57,9 @@ func unsafeTraverse(headers storage.Headers, block *flow.Header, visitor onVisit
 	}
 }
 
-// TraverseForward traverses a chain segment in forward order.
-// The algorithm starts at the `forkHead` and walks the chain backwards towards
-// the genesis block. The descend continues as long as `shouldVisitParent` returns
-// true. Starting with the first block where `shouldVisitParent` returned false,
-// the visited blocks are fed into `visitor` in a forward order (order of
-// increasing height). The last block that is fed into `visitor` is `forkHead`.
+// TraverseForward traverses the given fork (specified by block ID `forkHead`)
+// in the order of increasing height. The `terminal` defines when the traversal
+// stops. The `visitor` callback is called for each block in this segment.
 func TraverseForward(headers storage.Headers,
 	forkHead flow.Identifier,
 	visitor onVisitBlock,
@@ -104,10 +104,14 @@ func TraverseForward(headers storage.Headers,
 // functor that will be called on each block header when traversing blocks.
 type sanityCheckLowestVisitedBlock = func(header *flow.Header) error
 
+// Terminal specifies the terminal condition for traversing a fork.
+// Any condition that can be converted to a block height can be
+// represented as a terminal.
 type Terminal interface {
+	// Translate2Height converts the terminal condition to:
+	//  * first parameter: lowest height that should be visited
+	//  * second parameter: a sanity check for the lowest visited block
+	//                      (e.g. reaching a block with a specific ID)
+	//  * third parameter: an error if converting the terminal condition failed
 	Translate2Height(headers storage.Headers) (uint64, sanityCheckLowestVisitedBlock, error)
 }
-
-/*******************************************************************************
-    Implementations of different Terminals for fork traversal
-*******************************************************************************/

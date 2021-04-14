@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -91,7 +91,6 @@ func NewBuilder(
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-
 	b.tracer.StartSpan(parentID, trace.CONBuildOn)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
 
@@ -197,11 +196,7 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 		return nil
 	}
-	shouldVisitParent := func(header *flow.Header) bool {
-		parentHeight := header.Height - 1
-		return parentHeight >= limit
-	}
-	err = state.TraverseBackward(b.headers, parentID, forkScanner, shouldVisitParent)
+	err = fork.TraverseBackward(b.headers, parentID, forkScanner, fork.IncludingHeight(limit))
 	if err != nil {
 		return nil, fmt.Errorf("internal error building set of CollectionGuarantees on fork: %w", err)
 	}
@@ -261,11 +256,12 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve latest seal in the fork, which we are extending: %w", err)
 	}
-	latestSealedBlock, err := b.headers.ByBlockID(lastSeal.BlockID)
+	latestSealedBlockID := lastSeal.BlockID
+	latestSealedBlock, err := b.headers.ByBlockID(latestSealedBlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed block %x: %w", lastSeal.BlockID, err)
 	}
-	lastSealedHeight := latestSealedBlock.Height
+	latestSealedHeight := latestSealedBlock.Height
 
 	// STEP I: Collect the seals for all results that satisfy (0), (1), and (2).
 	//         The will give us a _superset_ of all seals that can be included.
@@ -317,7 +313,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			if err != nil {
 				return fmt.Errorf("could not get header of block %x: %w", incorporatedResult.Result.BlockID, err)
 			}
-			if executedBlock.Height <= lastSealedHeight {
+			if executedBlock.Height <= latestSealedHeight {
 				continue
 			}
 
@@ -328,11 +324,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 		return nil
 	}
-	shouldVisitParent := func(header *flow.Header) bool {
-		parentHeight := header.Height - 1
-		return parentHeight > lastSealedHeight
-	}
-	err = state.TraverseBackward(b.headers, parentID, sealCollector, shouldVisitParent)
+	err = fork.TraverseBackward(b.headers, parentID, sealCollector, fork.ExcludingBlock(latestSealedBlockID))
 	if err != nil {
 		return nil, fmt.Errorf("internal error traversing unsealed section of fork: %w", err)
 	}
@@ -351,13 +343,13 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		}
 
 		// enforce condition (3):
-		candidateSeal, ok := connectingSeal(sealsSuperset[lastSealedHeight+1], lastSeal)
+		candidateSeal, ok := connectingSeal(sealsSuperset[latestSealedHeight+1], lastSeal)
 		if !ok {
 			break
 		}
 		seals = append(seals, candidateSeal)
 		lastSeal = candidateSeal
-		lastSealedHeight += 1
+		latestSealedHeight += 1
 	}
 	return seals, nil
 }
@@ -406,7 +398,8 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
 	}
-	sealedBlock, err := b.headers.ByBlockID(latestSeal.BlockID)
+	sealedBlockID := latestSeal.BlockID
+	sealedBlock, err := b.headers.ByBlockID(sealedBlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", latestSeal.BlockID, err)
 	}
@@ -440,11 +433,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 
 		return nil
 	}
-	shouldVisitParent := func(header *flow.Header) bool {
-		parentHeight := header.Height - 1
-		return parentHeight >= sealedBlock.Height
-	}
-	err = state.TraverseBackward(b.headers, parentID, forkScanner, shouldVisitParent)
+	err = fork.TraverseBackward(b.headers, parentID, forkScanner, fork.IncludingBlock(sealedBlockID))
 	if err != nil {
 		return nil, fmt.Errorf("internal error building set of CollectionGuarantees on fork: %w", err)
 	}
@@ -459,7 +448,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 		return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
 	}
 	isResultForUnsealedBlock := isResultForBlock(ancestors)
-	isReceiptUniqueAndUnsealed := isNoDupAndNotSealed(includedReceipts, sealedBlock.ID())
+	isReceiptUniqueAndUnsealed := isNoDupAndNotSealed(includedReceipts, sealedBlockID)
 	// find all receipts:
 	// 1) whose result connects all the way to the last sealed result
 	// 2) is unique (never seen in unsealed blocks)

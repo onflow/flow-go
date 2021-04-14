@@ -5,10 +5,11 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/state/fork"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -143,8 +144,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 
 	// Traverse fork starting from the lowest unsealed block (included) up to the parent block (included).
 	// For each visited block collect: IncorporatedResults and block ID
-	sealedID := lastSealUpToParent.BlockID
-	err = state.TraverseForward(s.headers, header.ParentID, func(header *flow.Header) error {
+	forkCollector := func(header *flow.Header) error {
 		blockID := header.ID()
 		// keep track of blocks on the fork
 		unsealedBlockIDs = append(unsealedBlockIDs, blockID)
@@ -168,9 +168,8 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			incorporatedResults[resultID] = flow.NewIncorporatedResult(result.BlockID, result)
 		}
 		return nil
-	}, func(header *flow.Header) bool {
-		return sealedID != header.ParentID
-	})
+	}
+	err = fork.TraverseForward(s.headers, header.ParentID, forkCollector, fork.ExcludingBlock(lastSealUpToParent.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("internal error collecting incorporated results from unsealed fork: %w", err)
 	}
