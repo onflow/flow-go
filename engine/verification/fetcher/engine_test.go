@@ -98,6 +98,7 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 
 	_, _, agreeENs, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 1, 0)
 	mockStateAtBlockIDForExecutors(s.state, block.ID(), agreeENs)
+
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	chunkID := result.Chunks[locators[0].Index].ID()
 	requests[chunkID] = &verification.ChunkDataPackRequest{
@@ -105,22 +106,32 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 		Height:  block.Header.Height,
 		Agrees:  agreeENs.NodeIDs(),
 	}
+
 	chunkDataPacks, collections := chunkDataPackResponseFixture(statuses.Chunks())
-	wg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier, cdp *flow.ChunkDataPack,
+	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
+	verifiableChunks[chunkID] = &verification.VerifiableChunkData{
+		Chunk:         statuses[0].Chunk,
+		Header:        block.Header,
+		Result:        result,
+		Collection:    collections[chunkID],
+		ChunkDataPack: chunkDataPacks[chunkID],
+	}
+
+	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier,
+		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
 		e.HandleChunkDataPack(originID, cdp, collection)
 	})
 
+	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.IdentifierList{chunkID})
+
 	e.ProcessAssignedChunk(locators[0])
 
-	wg.Wait()
-	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not handle received chunk data pack on time")
+	unittest.RequireReturnsBefore(t, requesterWg.Wait, 1*time.Second, "could not handle received chunk data pack on time")
+	unittest.RequireReturnsBefore(t, verifierWG.Wait, 1*time.Second, "could not push verifiable chunk on time")
 
 	mock.AssertExpectationsForObjects(t, s.results)
-	// we should not request a duplicate chunk status.
-	s.requester.AssertNotCalled(t, "Request")
-	// we should not try adding a chunk of a sealed block to chunk status mempool.
-	s.pendingChunks.AssertNotCalled(t, "Add")
 }
 
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
@@ -344,7 +355,8 @@ func mockPendingChunksByID(pendingChunks *mempool.ChunkStatuses, list []*verific
 
 // mockVerifierEngine mocks verifier engine to expect receiving a matching chunk data pack with specified input.
 // Each chunk data pack should be passed only once.
-func mockVerifierEngine(t *testing.T, verifier *mocknetwork.Engine,
+func mockVerifierEngine(t *testing.T,
+	verifier *mocknetwork.Engine,
 	verifiableChunks map[flow.Identifier]*verification.VerifiableChunkData) *sync.WaitGroup {
 	mu := sync.Mutex{}
 	wg := &sync.WaitGroup{}
@@ -371,7 +383,7 @@ func mockVerifierEngine(t *testing.T, verifier *mocknetwork.Engine,
 		require.Equal(t, *expected.ChunkDataPack, *vc.ChunkDataPack)
 		require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
 		require.Equal(t, expected.Result.ID(), vc.Result.ID())
-		require.Equal(t, expected.Header.ID(), vc.Chunk.ID())
+		require.Equal(t, expected.Header.ID(), vc.Header.ID())
 
 		isSystemChunk := fetcher.IsSystemChunk(vc.Chunk.Index, vc.Result)
 		require.Equal(t, isSystemChunk, vc.IsSystemChunk)
@@ -390,7 +402,7 @@ func mockVerifierEngine(t *testing.T, verifier *mocknetwork.Engine,
 
 		require.Equal(t, endState, vc.EndState)
 		wg.Done()
-	}).Return().Times(len(verifiableChunks))
+	}).Return(nil).Times(len(verifiableChunks))
 
 	return wg
 }
