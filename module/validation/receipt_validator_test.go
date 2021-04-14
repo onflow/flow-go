@@ -259,9 +259,9 @@ func (s *ReceiptValidationSuite) TestReceiptInvalidResultChain() {
 	s.Assert().True(engine.IsInvalidInputError(err), err)
 }
 
-// TestMultiReceiptValidResultChain tests that multiple within one block payload
-// are accepted, where the receipts are building on top of each other
-// (i.e. their results form a chain).
+// TestMultiReceiptValidResultChain tests that multiple receipts and results
+// within one block payload are accepted, where the receipts are building on
+// top of each other (i.e. their results form a chain).
 // Say B(A) means block B has receipt for A:
 // * we have such chain in storage: G <- A <- B(A) <- C
 // * if a child block of C payload contains receipts and results for (B,C)
@@ -506,6 +506,129 @@ func (s *ReceiptValidationSuite) TestValidationReceiptWithoutIncorporatedResult(
 	require.True(s.T(), engine.IsInvalidInputError(err), err)
 }
 
+// TestPayloadWithExecutionFork checks that the Receipt Validator only
+// accepts results that decent from the sealed result. Specifically, we test that
+// the counter-example is rejected:
+//  * we have the chain in storage:
+//     S <- A(Result[S]_1, Result[S]_2, ReceiptMeta[S]_1, ReceiptMeta[S]_2)
+//            <- B(Seal for Result[S]_2)
+//               <- X(Result[A]_1, Result[A]_2, Result[A]_3,
+//                    ReceiptMeta[A]_1, ReceiptMeta[A]_2, ReceiptMeta[A]_3)
+//  * Note that we are explicitly testing the handling of an execution fork _before_
+//    and _after_ the sealed result
+//       Blocks:      S  <-----------   A
+//      Results:   Result[S]_1  <-  Result[A]_1  :: the root of this execution tree conflicts with sealed result
+//                 Result[S]_2  <-  Result[A]_2  :: the root of this execution tree is sealed
+//                              ^-  Result[A]_3
+// Expected Behaviour:
+// In the fork which X extends, Result[S]_2 has been sealed. Hence, it should be
+//   (i) illegal to include Result[A]_1, because it is _not_ derived from the sealed result.
+//  (ii) legal to include only results Result[A]_2 and Result[A]_3, as they are derived from the sealed result.
+func (s *ReceiptValidationSuite) TestPayloadWithExecutionFork() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// block S: we use s.LatestSealedBlock; its result is s.LatestExecutionResult
+	blockS := s.LatestSealedBlock
+	resultS1 := s.LatestExecutionResult
+	receiptS1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultS1), unittest.WithExecutorID(s.ExeID))
+	resultS2 := unittest.ExecutionResultFixture(unittest.WithBlock(&blockS))
+	receiptS2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultS2), unittest.WithExecutorID(s.ExeID))
+
+	// create block A, including results and receipts for it
+	blockA := unittest.BlockWithParentFixture(blockS.Header)
+	blockA.SetPayload(flow.Payload{
+		Results:  []*flow.ExecutionResult{resultS1, resultS2},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptS1.Meta(), receiptS2.Meta()},
+	})
+	s.Extend(&blockA)
+
+	// create block B
+	blockB := unittest.BlockWithParentFixture(blockA.Header)
+	sealResultS2 := unittest.Seal.Fixture(unittest.Seal.WithBlock(blockS.Header), unittest.Seal.WithResult(resultS2))
+	blockB.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{sealResultS2},
+	})
+	s.Extend(&blockB)
+
+	// create Result[A]_1, Result[A]_2, Result[A]_3 and their receipts
+	resultA1 := unittest.ExecutionResultFixture(unittest.WithBlock(&blockA), unittest.WithPreviousResult(*resultS1))
+	receiptA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA1), unittest.WithExecutorID(s.ExeID))
+	resultA2 := unittest.ExecutionResultFixture(unittest.WithBlock(&blockA), unittest.WithPreviousResult(*resultS2))
+	receiptA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA2), unittest.WithExecutorID(s.ExeID))
+	resultA3 := unittest.ExecutionResultFixture(unittest.WithBlock(&blockA), unittest.WithPreviousResult(*resultS2))
+	receiptA3 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA3), unittest.WithExecutorID(s.ExeID))
+
+	// SCENARIO (i): a block containing Result[A]_1 should fail validation
+	blockX := unittest.BlockWithParentFixture(blockB.Header)
+	blockX.SetPayload(flow.Payload{
+		Results:  []*flow.ExecutionResult{resultA1, resultA2, resultA3},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptA1.Meta(), receiptA2.Meta(), receiptA3.Meta()},
+	})
+	err := s.receiptValidator.ValidatePayload(&blockX)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err), err)
+
+	// SCENARIO (ii): a block containing only results Result[A]_2 and Result[A]_3 should pass validation
+	blockX = unittest.BlockWithParentFixture(blockB.Header)
+	blockX.SetPayload(flow.Payload{
+		Results:  []*flow.ExecutionResult{resultA2, resultA3},
+		Receipts: []*flow.ExecutionReceiptMeta{receiptA2.Meta(), receiptA3.Meta()},
+	})
+	err = s.receiptValidator.ValidatePayload(&blockX)
+	require.NoError(s.T(), err)
+}
+
+// TestMultiLevelExecutionTree verifies that a result is accepted that
+// extends a multi-level execution tree :
+//  * Let S be the latest sealed block
+//  * we have the chain in storage:
+//     S <- A <- B(Result[A], ReceiptMeta[A]) <- C(Result[B], ReceiptMeta[B])
+//  * now receive the new block X:
+//     S <- A <- B(Result[A], ReceiptMeta[A]) <- C(Result[B], ReceiptMeta[B]) <- X(Result[C], ReceiptMeta[C])
+// Block X should be considered valid, as it extends the
+// Execution Tree with root latest sealed Result (i.e. result sealed for S)
+func (s *ReceiptValidationSuite) TestMultiLevelExecutionTree() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// create block A, including result and receipt for it
+	blockA := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
+	resultA := unittest.ExecutionResultFixture(unittest.WithBlock(&blockA), unittest.WithPreviousResult(*s.LatestExecutionResult))
+	receiptA := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA), unittest.WithExecutorID(s.ExeID))
+	s.Extend(&blockA)
+
+	// create block B, including result and receipt for it
+	blockB := unittest.BlockWithParentFixture(blockA.Header)
+	blockB.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receiptA.Meta()},
+		Results:  []*flow.ExecutionResult{resultA},
+	})
+	resultB := unittest.ExecutionResultFixture(unittest.WithBlock(&blockB), unittest.WithPreviousResult(*resultA))
+	receiptB := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB), unittest.WithExecutorID(s.ExeID))
+	s.Extend(&blockB)
+
+	// create block C, including result and receipt for it
+	blockC := unittest.BlockWithParentFixture(blockB.Header)
+	blockC.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receiptB.Meta()},
+		Results:  []*flow.ExecutionResult{resultB},
+	})
+	resultC := unittest.ExecutionResultFixture(unittest.WithBlock(&blockC), unittest.WithPreviousResult(*resultB))
+	receiptC := unittest.ExecutionReceiptFixture(unittest.WithResult(resultC), unittest.WithExecutorID(s.ExeID))
+	s.Extend(&blockC)
+
+	// create block X:
+	blockX := unittest.BlockWithParentFixture(blockC.Header)
+	blockX.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receiptC.Meta()},
+		Results:  []*flow.ExecutionResult{resultC},
+	})
+
+	err := s.receiptValidator.ValidatePayload(&blockX)
+	require.NoError(s.T(), err)
+}
+
 // Test that validator will reject payloads that contain receipts for blocks that
 // are not on the fork
 //
@@ -581,4 +704,24 @@ func (s *ReceiptValidationSuite) TestExtendReceiptsDuplicate() {
 		require.Error(t, err)
 		require.True(t, engine.IsInvalidInputError(err), err)
 	})
+}
+
+// `TestValidateReceiptAfterBootstrap` tests a special case when we try to produce a new block
+// after genesis with empty payload.
+func (s *ReceiptValidationSuite) TestValidateReceiptAfterBootstrap() {
+	// assuming signatures are all good
+	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	// G
+	blocks, result0, seal := unittest.ChainFixture(0)
+	s.SealsIndex[blocks[0].ID()] = seal
+
+	for _, b := range blocks {
+		s.Extend(b)
+	}
+	s.PersistedResults[result0.ID()] = result0
+
+	candidate := unittest.BlockWithParentFixture(blocks[0].Header)
+	err := s.receiptValidator.ValidatePayload(&candidate)
+	s.Require().NoError(err)
 }

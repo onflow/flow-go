@@ -2,7 +2,9 @@ package computation
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"strings"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
@@ -54,6 +56,7 @@ func New(
 	vm VirtualMachine,
 	vmCtx fvm.Context,
 	programsCacheSize uint,
+	committer computer.ViewCommitter,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -63,6 +66,7 @@ func New(
 		metrics,
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
+		committer,
 	)
 
 	if err != nil {
@@ -102,7 +106,26 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
-	err := e.vm.Run(blockCtx, script, view, programs)
+	err := func() (err error) {
+
+		defer func() {
+			if r := recover(); r != nil {
+				err = fmt.Errorf("cadence runtime error: %s", r)
+
+				args := make([]string, 0)
+				for _, a := range arguments {
+					args = append(args, hex.EncodeToString(a))
+				}
+				e.log.Error().
+					Hex("script_hex", code).
+					Str("args", strings.Join(args[:], ",")).
+					Interface("r", r).
+					Msg("script execution caused runtime panic")
+			}
+		}()
+
+		return e.vm.Run(blockCtx, script, view, programs)
+	}()
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}

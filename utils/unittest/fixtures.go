@@ -201,9 +201,11 @@ func PayloadFixture(options ...func(*flow.Payload)) flow.Payload {
 func WithAllTheFixins(payload *flow.Payload) {
 	payload.Seals = Seal.Fixtures(3)
 	payload.Guarantees = CollectionGuaranteesFixture(4)
-	receipt := ExecutionReceiptFixture()
-	payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
-	payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
+	for i := 0; i < 10; i++ {
+		receipt := ExecutionReceiptFixture()
+		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
+		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
+	}
 }
 
 func WithSeals(seals ...*flow.Seal) func(*flow.Payload) {
@@ -235,6 +237,10 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 		Header:  &header,
 		Payload: &payload,
 	}
+}
+
+func WithoutGuarantee(payload *flow.Payload) {
+	payload.Guarantees = nil
 }
 
 func StateInteractionsFixture() *delta.Snapshot {
@@ -651,6 +657,12 @@ func WithStake(stake uint64) func(*flow.Identity) {
 	}
 }
 
+func WithEjected(ejected bool) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.Ejected = ejected
+	}
+}
+
 // WithAddress sets the network address of identity fixture.
 func WithAddress(address string) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
@@ -811,15 +823,15 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 }
 
 func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 32)
+	sig := make([]byte, 48)
 	_, _ = crand.Read(sig)
 	return sig
 }
 
 func CombinedSignatureFixture(n int) crypto.Signature {
 	sigs := SignaturesFixture(n)
-	combiner := signature.NewCombiner()
-	sig, err := combiner.Join(sigs...)
+	combiner := signature.NewCombiner(48, 48)
+	sig, err := combiner.Join(sigs[0], sigs[1])
 	if err != nil {
 		panic(err)
 	}
@@ -1160,15 +1172,19 @@ func IndexFixture() *flow.Index {
 
 func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCommit) {
 	return func(commit *flow.EpochCommit) {
-		lookup := make(map[flow.Identifier]flow.DKGParticipant)
-		for i, node := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
-			lookup[node.NodeID] = flow.DKGParticipant{
-				Index:    uint(i),
-				KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
-			}
-		}
-		commit.DKGParticipants = lookup
+		commit.DKGParticipants = DKGParticipantLookup(participants)
 	}
+}
+
+func DKGParticipantLookup(participants flow.IdentityList) map[flow.Identifier]flow.DKGParticipant {
+	lookup := make(map[flow.Identifier]flow.DKGParticipant)
+	for i, node := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
+		lookup[node.NodeID] = flow.DKGParticipant{
+			Index:    uint(i),
+			KeyShare: KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		}
+	}
+	return lookup
 }
 
 func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
@@ -1297,7 +1313,9 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 	// after changing results we need to update IDs of results in receipt
 	for _, block := range blocks {
 		if len(block.Payload.Results) > 0 {
-			block.Payload.Receipts[0].ResultID = block.Payload.Results[0].ID()
+			for i := range block.Payload.Receipts {
+				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
+			}
 		}
 	}
 }

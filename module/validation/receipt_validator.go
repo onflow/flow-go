@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -148,7 +149,9 @@ func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevRe
 // Returns nil if all checks passed successfully.
 // Expected errors during normal operations:
 // * engine.InvalidInputError
+//   if receipt violates protocol condition
 // * engine.UnverifiableInputError
+//   if receipt's parent result is unknown
 func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 	// TODO: this can be optimized by checking if result was already stored and validated.
 	// This needs to be addressed later since many tests depend on this behavior.
@@ -182,15 +185,22 @@ func (v *receiptValidator) Validate(receipt *flow.ExecutionReceipt) error {
 //  * no duplicates in fork
 // Results:
 // 	* have valid parents and satisfy the subgraph check
-//  * extend the execution tree, where the tree root is the latest finalized
-//    block and only results from this fork are included
+//  * extend the execution tree, where the tree root is the latest
+//    finalized block and only results from this fork are included
 //  * no duplicates in fork
 // Expected errors during normal operations:
 // * engine.InvalidInputError
+//   if some receipts in the candidate block violate protocol condition
 // * engine.UnverifiableInputError
+//   if for some of the receipts, their respective parent result is unknown
 func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	header := candidate.Header
 	payload := candidate.Payload
+
+	// return if nothing to validate
+	if len(payload.Receipts) == 0 && len(payload.Results) == 0 {
+		return nil
+	}
 
 	// Get the latest sealed result on this fork and the corresponding block,
 	// whose result is sealed. This block is not necessarily finalized.
@@ -212,19 +222,25 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	// use it to identify receipts that are for blocks not in the fork.
 	forkBlocks := make(map[flow.Identifier]struct{})
 
-	// Set of the execution tree with root latestSealedResult.
+	// Sub-Set of the execution tree: only contains `ExecutionResult`s that descent from latestSealedResult.
 	// Used for detecting duplicates and results with invalid parent results.
 	executionTree := make(map[flow.Identifier]*flow.ExecutionResult)
 	executionTree[lastSeal.ResultID] = latestSealedResult
 
-	// Set of previously included results. Used for detecting duplicates.
+	// Set of previously included receipts. Used for detecting duplicates.
 	forkReceipts := make(map[flow.Identifier]struct{})
 
-	// Start from the lowest unfinalized block and walk the chain upwards until we
+	// Start from the lowest unsealed block and walk the chain upwards until we
 	// hit the candidate's parent. For each visited block track:
-	bookKeeper := func(blockID flow.Identifier, payloadIndex *flow.Index) error {
+	bookKeeper := func(block *flow.Header) error {
+		blockID := block.ID()
 		// track encountered blocks
 		forkBlocks[blockID] = struct{}{}
+
+		payloadIndex, err := v.index.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve payload index: %w", err)
+		}
 
 		// track encountered receipts
 		for _, recID := range payloadIndex.ReceiptIDs {
@@ -240,14 +256,18 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 			if _, ok := executionTree[result.PreviousResultID]; !ok {
 				// We only collect results that directly descend from the last sealed result.
 				// Because Results are listed in an order that satisfies the parent-first
-				// relationship, we can skip all results whose parent are unknown.
+				// relationship, we can skip all results whose parents are unknown.
 				continue
 			}
 			executionTree[resultID] = result
 		}
 		return nil
 	}
-	err = v.forkCrawler(header.ParentID, sealedHeight+1, bookKeeper)
+	visitParent := func(header *flow.Header) bool {
+		parentHeight := header.Height - 1
+		return parentHeight > sealedHeight
+	}
+	err = state.TraverseForward(v.headers, header.ParentID, bookKeeper, visitParent)
 	if err != nil {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
@@ -367,41 +387,4 @@ func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.
 		return nil, nil, fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
 	}
 	return init, final, nil
-}
-
-// forkCrawler traverses the fork with the provided head. We start at the provided height
-// and work out way upwards until we arrive at the block with the provided ID. For each
-// visited block, we call the provided function.
-//
-// Note that internally, the forkCrawler is implemented as a recursive algorithm that crawls
-// the fork backwards (towards the genesis block) until it hits the specified height.
-func (v *receiptValidator) forkCrawler(
-	headID flow.Identifier,
-	lowestHeight uint64,
-	blockConsumer func(blockID flow.Identifier, payloadIndex *flow.Index) error,
-) error {
-	head, err := v.headers.ByBlockID(headID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve header for block %x: %w", headID, err)
-	}
-	if head.Height < lowestHeight {
-		return nil
-	}
-
-	// descend further down the chain
-	err = v.forkCrawler(head.ParentID, lowestHeight, blockConsumer)
-	if err != nil {
-		return err
-	}
-
-	// now we are on our way back up
-	index, err := v.index.ByBlockID(headID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve payload index for block %x: %w", headID, err)
-	}
-	err = blockConsumer(headID, index)
-	if err != nil {
-		return fmt.Errorf("error in consumer function at height %d (block %x): %w", head.Height, headID, err)
-	}
-	return nil
 }

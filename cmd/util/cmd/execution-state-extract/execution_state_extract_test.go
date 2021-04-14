@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -76,8 +77,9 @@ func TestExtractExecutionState(t *testing.T) {
 			keyMaxByteSize := 64
 			valueMaxByteSize := 1024
 
-			f, err := complete.NewLedger(execdir, size*10, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion)
-			//f, err := oldLedger.NewMTrieStorage(execdir, size*10, metr, nil)
+			diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), execdir, size, pathfinder.PathByteSize, wal.SegmentSize)
+			require.NoError(t, err)
+			f, err := complete.NewLedger(diskWal, size*10, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 			require.NoError(t, err)
 
 			var stateCommitment = f.InitialState()
@@ -119,6 +121,7 @@ func TestExtractExecutionState(t *testing.T) {
 				blocksInOrder[i] = blockID
 			}
 
+			<-diskWal.Done()
 			<-f.Done()
 			err = db.Close()
 			require.NoError(t, err)
@@ -138,8 +141,10 @@ func TestExtractExecutionState(t *testing.T) {
 
 					require.FileExists(t, path.Join(outdir, wal.RootCheckpointFilename)) //make sure we have root checkpoint file
 
-					storage, err := complete.NewLedger(outdir, 1000, metr, zerolog.Nop(), nil, complete.DefaultPathFinderVersion)
-					//storage, err := oldLedger.NewMTrieStorage(outdir, 1000, metr, nil)
+					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), outdir, size, pathfinder.PathByteSize, wal.SegmentSize)
+					require.NoError(t, err)
+
+					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 					require.NoError(t, err)
 
 					data := keysValuesByCommit[string(stateCommitment)]
@@ -172,6 +177,8 @@ func TestExtractExecutionState(t *testing.T) {
 						require.Error(t, err)
 					}
 
+					<-diskWal.Done()
+					<-storage.Done()
 				})
 			}
 		})

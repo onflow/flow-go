@@ -1,10 +1,13 @@
 package fvm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
+	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,13 +18,19 @@ type Procedure interface {
 	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
 }
 
+func NewInterpreterRuntime() runtime.Runtime {
+	return runtime.NewInterpreterRuntime(
+		runtime.WithContractUpdateValidationEnabled(true),
+	)
+}
+
 // A VirtualMachine augments the Cadence runtime with Flow host functionality.
 type VirtualMachine struct {
 	Runtime runtime.Runtime
 }
 
-// New creates a new virtual machine instance with the provided runtime.
-func New(rt runtime.Runtime) *VirtualMachine {
+// NewVirtualMachine creates a new virtual machine instance with the provided runtime.
+func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 	return &VirtualMachine{
 		Runtime: rt,
 	}
@@ -43,10 +52,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			// Return an error for now, which will cause transactions to revert.
 			//
 			if encodingErr, ok := r.(interpreter.EncodingUnsupportedValueError); ok {
-				err = &EncodingUnsupportedValueError{
-					Path:  encodingErr.Path,
-					Value: encodingErr.Value,
-				}
+				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
 				return
 			}
 
@@ -72,8 +78,7 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 	sth := state.NewStateHolder(st)
 	account, err := getAccount(vm, ctx, sth, programs, address)
 	if err != nil {
-		// TODO: wrap error
-		return nil, err
+		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
 }
@@ -84,14 +89,5 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
 func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) error {
 	invocator := NewTransactionInvocator(zerolog.Nop())
-	err := invocator.Process(vm, ctx, tx, sth, programs)
-	if err != nil {
-		return err
-	}
-
-	if tx.Err != nil {
-		return tx.Err
-	}
-
-	return nil
+	return invocator.Process(vm, &ctx, tx, sth, programs)
 }

@@ -3,6 +3,7 @@ package state
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -84,19 +85,25 @@ func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	}
 }
 
+// InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
 func (s *State) InteractionUsed() uint64 {
 	return s.TotalBytesRead + s.TotalBytesWritten
 }
 
 // Get returns a register value given owner, controller and key
 func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
-	if err := s.checkSize(owner, controller, key, []byte{}); err != nil {
+	var value []byte
+	var err error
+
+	if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
 		return nil, err
 	}
 
-	value, err := s.view.Get(owner, controller, key)
-	if err != nil {
-		return nil, err
+	if value, err = s.view.Get(owner, controller, key); err != nil {
+		// wrap error into a fatal error
+		getError := errors.NewLedgerFailure(err)
+		// wrap with more info
+		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, owner, getError)
 	}
 
 	// if not part of recent updates count them as read
@@ -116,7 +123,10 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	}
 
 	if err := s.view.Set(owner, controller, key, value); err != nil {
-		return err
+		// wrap error into a fatal error
+		setError := errors.NewLedgerFailure(err)
+		// wrap with more info
+		return fmt.Errorf("failed to update key %s on account %s: %w", key, owner, setError)
 	}
 
 	if err := s.checkMaxInteraction(); err != nil {
@@ -161,10 +171,9 @@ func (s *State) NewChild() *State {
 
 // MergeState applies the changes from a the given view to this view.
 func (s *State) MergeState(other *State) error {
-
 	err := s.view.MergeView(other.view)
 	if err != nil {
-		return fmt.Errorf("can not merge the state: %w", err)
+		return errors.NewStateMergeFailure(err)
 	}
 
 	// apply address updates
@@ -187,6 +196,7 @@ func (s *State) MergeState(other *State) error {
 	return s.checkMaxInteraction()
 }
 
+// UpdatedAddresses returns a list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
 	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
 	for k := range s.updatedAddresses {
@@ -197,9 +207,7 @@ func (s *State) UpdatedAddresses() []flow.Address {
 
 func (s *State) checkMaxInteraction() error {
 	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return &StateInteractionLimitExceededError{
-			Used:  s.InteractionUsed(),
-			Limit: s.maxInteractionAllowed}
+		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
 	}
 	return nil
 }
@@ -208,16 +216,10 @@ func (s *State) checkSize(owner, controller, key string, value flow.RegisterValu
 	keySize := uint64(len(owner) + len(controller) + len(key))
 	valueSize := uint64(len(value))
 	if keySize > s.maxKeySizeAllowed {
-		return &StateKeySizeLimitError{Owner: owner,
-			Controller: controller,
-			Key:        key,
-			Size:       keySize,
-			Limit:      s.maxKeySizeAllowed}
+		return errors.NewStateKeySizeLimitError(owner, controller, key, keySize, s.maxKeySizeAllowed)
 	}
 	if valueSize > s.maxValueSizeAllowed {
-		return &StateValueSizeLimitError{Value: value,
-			Size:  keySize,
-			Limit: s.maxKeySizeAllowed}
+		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
 	}
 	return nil
 }

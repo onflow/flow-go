@@ -3,6 +3,8 @@ package common
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/cadence"
+	"github.com/onflow/flow-go/fvm"
 	"testing"
 	"time"
 
@@ -36,12 +38,12 @@ func TestMVP_Network(t *testing.T) {
 	net := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
@@ -107,7 +109,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetReferenceBlockID(sdk.Identifier(root.ID())).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress)
-
+	
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
 	require.NoError(t, err)
@@ -126,6 +128,52 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			newAccountAddress = accountCreatedEvent.Address()
 		}
 	}
+
+	fmt.Printf("new account address: %s\n", newAccountAddress)
+
+	// Generate the fund account transaction (so account can be used as a payer)
+	fundAccountTx := sdk.NewTransaction().
+		SetScript([]byte(fmt.Sprintf(`
+			import FungibleToken from 0x%s
+			import FlowToken from 0x%s
+
+			transaction(amount: UFix64, recipient: Address) {
+			  let sentVault: @FungibleToken.Vault
+			  prepare(signer: AuthAccount) {
+				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+				  ?? panic("failed to borrow reference to sender vault")
+				self.sentVault <- vaultRef.withdraw(amount: amount)
+			  }
+			  execute {
+				let receiverRef =  getAccount(recipient)
+				  .getCapability(/public/flowTokenReceiver)
+				  .borrow<&{FungibleToken.Receiver}>()
+					?? panic("failed to borrow reference to recipient vault")
+				receiverRef.deposit(from: <-self.sentVault)
+			  }
+			}`,
+			fvm.FungibleTokenAddress(chain).Hex(),
+			fvm.FlowTokenAddress(chain).Hex()))).
+		AddAuthorizer(serviceAddress).
+		SetReferenceBlockID(sdk.Identifier(root.ID())).
+		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
+		SetPayer(serviceAddress)
+
+	err = fundAccountTx.AddArgument(cadence.UFix64(1_0000_0000))
+	require.NoError(t, err)
+	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
+	require.NoError(t, err)
+
+	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
+	err = serviceAccountClient.SignAndSendTransaction(ctx, fundAccountTx)
+	require.NoError(t, err)
+
+	cancel()
+
+	fundCreationTxRes, err := serviceAccountClient.WaitForSealed(context.Background(), fundAccountTx.ID())
+	require.NoError(t, err)
+	t.Log(fundCreationTxRes)
+
 
 	accountClient, err := testnet.NewClientWithKey(
 		fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]),

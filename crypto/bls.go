@@ -164,7 +164,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	}
 
 	// maps the seed to a private key
-	// error is not checked as it is guaranteed to be nil; len(seed)<maxScalarSize
+	// error is not checked as it is guaranteed to be nil
 	mapToZr(&sk.scalar, seed)
 	return sk, nil
 }
@@ -316,7 +316,7 @@ func (a *blsBLS12381Algo) init() error {
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||
 		pubKeyLengthBLSBLS12381 != PubKeyLenBLSBLS12381 ||
 		prKeyLengthBLSBLS12381 != PrKeyLenBLSBLS12381 {
-		return errors.New("BLS-12381 settings in the Go and C layers are not consistent")
+		return errors.New("BLS-12381 length settings in Go and C are not consistent, check hardcoded lengths and compressions")
 	}
 	return nil
 }
@@ -367,5 +367,5 @@ func hashToG1(data []byte) *pointG1 {
 func OpSwUUnitTest(output []byte, input []byte) {
 	C.opswu_test((*C.uchar)(&output[0]),
 		(*C.uchar)(&input[0]),
-		SignatureLenBLSBLS12381)
+		(C.int)(len(input)))
 }

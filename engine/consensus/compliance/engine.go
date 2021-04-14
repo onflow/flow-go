@@ -273,7 +273,7 @@ func (e *Engine) consumeEvents() {
 			// Public methods of `Core` are supposed to handle all errors internally.
 			// Here if error happens it means that internal state is corrupted or we have caught
 			// exception while processing. In such case best just to abort the node.
-			e.log.Fatal().Err(err).Msgf("fatal internal error in matching core logic")
+			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
 		}
 	}
 }
@@ -286,6 +286,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		Uint64("block_view", view).
 		Hex("recipient_id", recipientID[:]).
 		Logger()
+
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
 	// build the vote message
