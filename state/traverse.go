@@ -10,15 +10,16 @@ import (
 // functor that will be called on each block header when traversing blocks.
 type onVisitBlock = func(header *flow.Header) error
 
-// functor that will be called on each block header to know if we should continue traversing the chain.
-type shouldContinue = func(header *flow.Header) bool
+// functor that will be called on each block header to know if we should
+// continue traversing the chain (specifically, visit the block's parent)
+type shouldVisitParent = func(block *flow.Header) bool
 
 // TraverseBackward traverses a chain segment beginning with the start block (inclusive)
 // Blocks are traversed in reverse
 // height order, meaning the end block must be an ancestor of the start block.
 // The callback is called for each block in this segment.
 // Return value of callback is used to decide if it should continue or not.
-func TraverseBackward(headers storage.Headers, startBlockID flow.Identifier, visitor onVisitBlock, shouldContinue shouldContinue) error {
+func TraverseBackward(headers storage.Headers, startBlockID flow.Identifier, visitor onVisitBlock, shouldVisitParent shouldVisitParent) error {
 	blockID := startBlockID
 	// in case we reached genesis
 	for {
@@ -32,7 +33,7 @@ func TraverseBackward(headers storage.Headers, startBlockID flow.Identifier, vis
 			return err
 		}
 
-		if !shouldContinue(block) {
+		if !shouldVisitParent(block) {
 			return nil
 		}
 
@@ -41,17 +42,21 @@ func TraverseBackward(headers storage.Headers, startBlockID flow.Identifier, vis
 }
 
 // TraverseForward traverses a chain segment in forward order.
-// It first traverses backward with the given `forkHead` and `shouldContinue`. Once stopped, it will pass the visited blocks to the given `visitor` in a forward order. The last block that is fed into `visitor` is the `forkHead`.
+// The algorithm starts at the `forkHead` and walks the chain backwards towards
+// the genesis block. The descend continues as long as `shouldVisitParent` returns
+// true. Starting with the first block where `shouldVisitParent` returned false,
+// the visited blocks are fed into `visitor` in a forward order (order of
+// increasing height). The last block that is fed into `visitor` is `forkHead`.
 func TraverseForward(headers storage.Headers,
 	forkHead flow.Identifier,
 	visitor onVisitBlock,
-	shouldContinue shouldContinue,
+	shouldVisitParent shouldVisitParent,
 ) error {
 	var blocks []*flow.Header
 	err := TraverseBackward(headers, forkHead, func(header *flow.Header) error {
 		blocks = append(blocks, header)
 		return nil
-	}, shouldContinue)
+	}, shouldVisitParent)
 	if err != nil {
 		return err
 	}

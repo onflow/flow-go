@@ -75,7 +75,8 @@ func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receip
 
 	block2 := BlockWithParentFixture(block.Header)
 	block2.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{receipt},
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 	err := st.Extend(&block2)
 	require.NoError(t, err)
