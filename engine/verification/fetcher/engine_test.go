@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -84,12 +85,7 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 	e := newFetcherEngine(s)
 
 	// creates a single chunk locator, and mocks its corresponding block sealed.
-	block := unittest.BlockFixture()
-	result := unittest.ExecutionResultFixture(
-		unittest.WithBlock(&block),
-		unittest.WithChunks(2))
-	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
-	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+	block, result, statuses, locators := completeChunkStatusListFixture(t, 2, 1)
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
@@ -498,4 +494,23 @@ func chunkDataPackResponseFixture(chunks flow.ChunkList) (map[flow.Identifier]*f
 	}
 
 	return chunkDataPacks, collections
+}
+
+// completeChunkStatusListFixture creates a reference block with an execution result associated with it.
+// The result has specified number of chunks, which a random subset them are assumed assigned to fetcher engine,
+// and hence have chunk status associated with them, i.e., `statusCount` of them.
+//
+// It returns the block, result, assigned chunk statuses, and their corresponding locators.
+func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount int) (*flow.Block, *flow.ExecutionResult, verification.ChunkStatusList,
+	chunks.LocatorList) {
+	require.LessOrEqual(t, statusCount, chunkCount)
+
+	block := unittest.BlockFixture()
+	result := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&block),
+		unittest.WithChunks(uint(chunkCount)))
+	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, statusCount)
+	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+
+	return &block, result, statuses, locators
 }
