@@ -183,19 +183,13 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		Uint64("block_height", block.Header.Height).Logger()
 	lg.Debug().Int("result_num", len(block.Payload.Results)).Msg("new finalized block arrived")
 
-	// performs chunk assigment on each result and pushes the assigned chunks to the chunks queue.
+	// determine chunk assigment on each result and pushes the assigned chunks to the chunks queue.
 	receiptsGroupedByResultID := block.Payload.Receipts.GroupByResultID() // for logging purposes
 	for _, result := range block.Payload.Results {
 		resultID := result.ID()
 
 		// log receipts committing to result
-		receiptsForResult := receiptsGroupedByResultID.GetGroup(resultID)
 		resultLog := lg.With().Hex("incorporated_result_id", logging.ID(resultID)).Logger()
-		if receiptsForResult.Size() < 1 {
-			// Producing such a block would be a protocol violation.
-			// If such a block gets finalized we have a byzantine consensus committee.
-			resultLog.Fatal().Msg("protocol violation: there are no receipts in the block that commit to result")
-		}
 		for _, receipt := range receiptsGroupedByResultID.GetGroup(resultID) {
 			resultLog.With().Hex("receipts_for_result", logging.ID(receipt.ID())).Logger()
 		}
@@ -204,7 +198,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		// compute chunk assignment
 		chunkList, err := e.resultChunkAssignmentWithTracing(ctx, result, blockID)
 		if err != nil {
-			resultLog.Fatal().Err(err).Msg("could not determine assigned chunks of the receipt")
+			resultLog.Fatal().Err(err).Msg("could not determine assigned chunks for result")
 		}
 
 		assignedChunksCount += uint64(len(chunkList))
@@ -225,7 +219,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	}
 
 	e.metrics.OnAssignerProcessFinalizedBlock(block.Header.Height)
-	log.Info().
+	e.log.Info().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
 		Msg("finished processing finalized block")
