@@ -10,6 +10,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -26,6 +28,8 @@ import (
 // Client is a client to the Flow DKG contract. Allows functionality to Broadcast,
 // read a Broadcast and submit the final result of the DKG protocol
 type Client struct {
+	log zerolog.Logger
+
 	dkgContractAddress string
 	accountAddress     sdk.Address
 	accountKeyIndex    uint
@@ -36,8 +40,9 @@ type Client struct {
 }
 
 // NewClient initializes a new client to the Flow DKG contract
-func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgContractAddress, accountAddress string, accountKeyIndex uint) *Client {
+func NewClient(log zerolog.Logger, flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgContractAddress, accountAddress string, accountKeyIndex uint) *Client {
 	return &Client{
+		log:                log,
 		flowClient:         flowClient,
 		dkgContractAddress: dkgContractAddress,
 		signer:             signer,
@@ -51,6 +56,8 @@ func NewClient(flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgC
 // DKG. The message is broadcast by submitting a transaction to the DKG
 // smart contract. An error is returned if the transaction has failed.
 func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
+
+	started := time.Now()
 
 	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
 	defer cancel()
@@ -95,30 +102,15 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// submit signed transaction to node
+	log.Info().Float64("duration", time.Now().Sub(started).Seconds()).Msg("submitting broadcast transaction")
 	txID, err := c.submitTx(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
-	// wait for transaction to be sealed
-	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
-	for result.Status != sdk.TransactionStatusSealed {
-		result, err = c.flowClient.GetTransactionResult(ctx, txID)
-		if err != nil {
-			return fmt.Errorf("could not get transaction result: %w", err)
-		}
-
-		// if the transaction has expired we skip waiting for seal
-		if result.Status == sdk.TransactionStatusExpired {
-			return fmt.Errorf("broadcast dkg message transaction has expired")
-		}
-
-		// wait before trying again.
-		time.Sleep(epochs.TransactionStatusRetryTimeout)
-	}
-
-	if result.Error != nil {
-		return fmt.Errorf("error executing transaction: %w", result.Error)
+	err = c.waitForSealed(ctx, txID, started)
+	if err != nil {
+		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
 	return nil
@@ -165,6 +157,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 // public keys for each DKG participant. Serialized pub keys are encoded as hex.
 func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
 
+	// started := time.Now()
 	ctx := context.Background()
 
 	// get account for given address
@@ -212,37 +205,15 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	}
 
 	// submit signed transaction to node
-	txID, err := c.submitTx(ctx, tx)
+	_, err = c.submitTx(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
-	}
-
-	// wait for transaction to be sealed
-	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
-	for result.Status != sdk.TransactionStatusSealed {
-		result, err = c.flowClient.GetTransactionResult(ctx, txID)
-		if err != nil {
-			return fmt.Errorf("could not get transaction result: %w", err)
-		}
-
-		// if the transaction has expired we skip waiting for seal
-		if result.Status == sdk.TransactionStatusExpired {
-			return fmt.Errorf("submit final dkg result transaction has expired")
-		}
-
-		// wait 1 second before trying again.
-		time.Sleep(epochs.TransactionStatusRetryTimeout)
-	}
-
-	if result.Error != nil {
-		return fmt.Errorf("error executing transaction: %w", result.Error)
 	}
 
 	return nil
 }
 
-// submitTx submits a transaction to the flow network and checks that the
-// transaction is signed
+// submitTxAndWaitForSealed submits a transaction to the flow network. Requires transaction to be signed.
 func (c *Client) submitTx(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
 
 	// check if the transaction has a signature
@@ -259,8 +230,38 @@ func (c *Client) submitTx(ctx context.Context, tx *sdk.Transaction) (sdk.Identif
 	return tx.ID(), nil
 }
 
+func (c *Client) waitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
+
+	// wait for transaction to be sealed
+	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
+	// attempts := 1
+	for result.Status != sdk.TransactionStatusSealed {
+
+		// c.log.Info().Int("attempt", attempts).Float64("time_elapsed", float64(1)).Msg("fetching transaction result")
+		result, err := c.flowClient.GetTransactionResult(ctx, txID)
+		if err != nil {
+			return fmt.Errorf("could not get transaction result: %w", err)
+		}
+
+		// if the transaction has expired we skip waiting for seal
+		if result.Status == sdk.TransactionStatusExpired {
+			return fmt.Errorf("broadcast dkg message transaction has expired")
+		}
+
+		// wait before trying again.
+		time.Sleep(epochs.TransactionStatusRetryTimeout)
+		// attempts++
+	}
+
+	if result.Error != nil {
+		return fmt.Errorf("error executing transaction: %w", result.Error)
+	}
+
+	return nil
+}
+
 // trim0x trims the `0x` if it exists from a hexadecimal string
-// This method is required as the DKG contract expects key legths of 192 bytes
+// This method is required as the DKG contract expects key lengths of 192 bytes
 // the `PublicKey.String()` method returns the hexadecimal string representation of the
 // public key prefixed with `0x` resulting in length of 194 bytes.
 func trim0x(hexString string) string {
