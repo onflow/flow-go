@@ -326,7 +326,7 @@ func (e *blockComputer) executeTransaction(
 	// of failed transaction invocation
 	err = collectionView.MergeView(txView)
 	if err != nil {
-		return err
+		return fmt.Errorf("merging tx view to collection view failed: %w", err)
 	}
 
 	res.AddEvents(tx.Events)

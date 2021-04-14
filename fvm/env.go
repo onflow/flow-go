@@ -1013,7 +1013,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			return address, errors.NewMetaTransactionFailuref("failed to invoke account creation meta transaction: %w", err)
 		}
 		if txErr != nil {
-			return address, fmt.Errorf("creating account failed: %w", txErr)
+			return address, fmt.Errorf("meta-transaction for creating account failed: %w", txErr)
 		}
 	}
 
