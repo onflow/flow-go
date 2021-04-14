@@ -221,6 +221,45 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	s.verifier.AssertNotCalled(t, "ProcessLocal")
 }
 
+// TestChunkResponse_MissingResult evaluates the unhappy path of receiving a chunk data response that its result
+// behavior of fetcher engine
+// for which it does not have any chunk status available in memory.
+// This can happen when fetcher receives duplicate response for a requested chunk data pack.
+// This ensures that only one copy of those duplicates can make it through the verifier engine.
+// The deduplication happens by the mutex lock of pending chunks mempool, that allows only one chunk data response
+func TestChunkResponse_InvalidResponse(t *testing.T) {
+	s := setupTest()
+	e := newFetcherEngine(s)
+
+	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
+	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
+	// also the chunk belongs to an unsealed block.
+	block, result, statuses, _ := completeChunkStatusListFixture(t, 2, 1)
+	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+
+	// mocks resources on fetcher engine side.
+	s.results.On("ByID", result.ID()).Return(nil, fmt.Errorf("missing result"))
+	mockPendingChunksByID(s.pendingChunks, statuses)
+
+	// mocks there is no pending status for this chunk
+	mockStateAtBlockIDForExecutors(s.state, block.ID(), agrees)
+
+	chunk := statuses.Chunks()[0]
+	chunkID := chunk.ID()
+	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
+
+	// dispatches response to fetcher engine
+	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
+
+	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks)
+	// no verifiable chunk should be passed to verifier engine
+	// and chunk consumer should not get any notification
+	s.chunkConsumerNotifier.AssertNotCalled(t, "Notify")
+	s.verifier.AssertNotCalled(t, "ProcessLocal")
+	s.pendingChunks.AssertNotCalled(t, "Rem")
+}
+
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
 // it drops it without processing it any further and and notifies consumer
 // that it is done with processing that chunk.
@@ -475,17 +514,8 @@ func mockVerifierEngine(t *testing.T,
 		isSystemChunk := fetcher.IsSystemChunk(vc.Chunk.Index, vc.Result)
 		require.Equal(t, isSystemChunk, vc.IsSystemChunk)
 
-		// its end state should also match our expecation
-		var endState flow.StateCommitment
-		if isSystemChunk {
-			// last chunk in a result is the system chunk and takes final state commitment
-			var ok bool
-			endState, ok = expected.Result.FinalStateCommitment()
-			require.True(t, ok)
-		} else {
-			// any chunk except last takes the subsequent chunk's start state
-			endState = expected.Result.Chunks[vc.Chunk.Index+1].StartState
-		}
+		endState, err := fetcher.EndStateCommitment(vc.Result, vc.Chunk.Index, isSystemChunk)
+		require.NoError(t, err)
 
 		require.Equal(t, endState, vc.EndState)
 		wg.Done()
