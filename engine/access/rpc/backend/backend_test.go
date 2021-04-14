@@ -1340,12 +1340,18 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		if expectedENs == nil {
 			expectedENs = flow.IdentityList{}
 		}
-		require.ElementsMatch(suite.T(), actualList, expectedENs)
+		if len(expectedENs) > maxExecutionNodesCnt {
+			for _, actual := range actualList {
+				require.Contains(suite.T(), expectedENs, actual)
+			}
+		} else {
+			require.ElementsMatch(suite.T(), actualList, expectedENs)
+		}
 	}
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
-	// return an empty list
+	// return the exe node list without a filter
 	suite.Run("no preferred or fixed ENs", func() {
-		testExecutionNodesForBlockID(nil, nil, nil)
+		testExecutionNodesForBlockID(nil, nil, allExecutionNodes)
 	})
 	// if only preferred ENs are specified, the ExecutionNodesForBlockID function should
 	// return the preferred ENs list
