@@ -358,6 +358,16 @@ func (f *Forest) GetEmptyRootHash() []byte {
 	return trie.EmptyTrieRootHash(f.pathByteSize)
 }
 
+// MostRecentTouchedRootHash returns the rootHash of the most recently touched trie
+func (f *Forest) MostRecentTouchedRootHash() ([]byte, error) {
+	keys := f.tries.Keys()
+	if len(keys) > 0 {
+		encodedRootHash := keys[len(keys)-1].(string)
+		return hex.DecodeString(encodedRootHash)
+	}
+	return nil, fmt.Errorf("no trie is stored in the forest")
+}
+
 // Size returns the number of active tries in this store
 func (f *Forest) Size() int {
 	return f.tries.Len()
