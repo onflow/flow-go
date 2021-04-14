@@ -11,8 +11,8 @@ import (
 )
 
 // TestChunkApprovalCollector performs isolated testing of ChunkApprovalCollector.
-// ChunkApprovalCollector has to process and cache signatures for result approvals that meet assignment.
-// ChunkApprovalCollector has to reject approvals with invalid assignment or from invalid verification node.
+// ChunkApprovalCollector has to process and cache signatures for result approvals that satisfy assignment.
+// ChunkApprovalCollector has to reject approvals with invalid assignment.
 // ChunkApprovalCollector is responsible for properly accumulating signatures and creating aggregated signature when requested.
 func TestChunkApprovalCollector(t *testing.T) {
 	suite.Run(t, new(ChunkApprovalCollectorTestSuite))
@@ -33,7 +33,7 @@ func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 	for _, verifier := range s.ChunksAssignment.Verifiers(s.chunk) {
 		s.chunkAssignment[verifier] = struct{}{}
 	}
-	s.collector = NewChunkApprovalCollector(s.chunkAssignment, s.AuthorizedVerifiers)
+	s.collector = NewChunkApprovalCollector(s.chunkAssignment)
 }
 
 // TestProcessApproval_ValidApproval tests processing a valid approval. Expected to process it without error
@@ -51,17 +51,6 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssignment() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	delete(s.chunkAssignment, s.VerID)
-	status := s.collector.ProcessApproval(approval)
-	require.False(s.T(), status.approvalProcessed)
-	require.Equal(s.T(), uint(0), status.numberOfApprovals)
-	require.Equal(s.T(), uint(0), s.collector.chunkApprovals.NumberSignatures())
-}
-
-// TestProcessApproval_InvalidVerifier tests processing approval with invalid approver ID. Expected to
-// reject this approval, signature cache shouldn't be affected.
-func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidVerifier() {
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
-	delete(s.AuthorizedVerifiers, s.VerID)
 	status := s.collector.ProcessApproval(approval)
 	require.False(s.T(), status.approvalProcessed)
 	require.Equal(s.T(), uint(0), status.numberOfApprovals)

@@ -42,10 +42,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.sigVerifier = &module.Verifier{}
 
 	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
-
-	// use same identities for incorporated and sealing block ID
-	s.identitiesCache[s.IncorporatedResult.IncorporatedBlockID] = s.AuthorizedVerifiersIdentities
-	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiersIdentities
+	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
 
 	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
 
@@ -126,17 +123,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 
-	s.Run("invalid incorporated block identities", func() {
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, 1)
-
-		// delete identities for IncorporatedBlockID
-		delete(s.identitiesCache, s.IncorporatedResult.IncorporatedBlockID)
-		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
-		require.Error(s.T(), err)
-		require.True(s.T(), engine.IsInvalidInputError(err))
-	})
-
-	s.Run("invalid assignment identities", func() {
+	s.Run("invalid verifier identities", func() {
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, 1)
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)

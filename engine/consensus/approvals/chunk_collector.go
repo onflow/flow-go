@@ -14,19 +14,16 @@ type ChunkProcessingStatus struct {
 // ChunkApprovalCollector implements logic for checking chunks against assignments as
 // well as accumulating signatures of already checked approvals.
 type ChunkApprovalCollector struct {
-	assignment          map[flow.Identifier]struct{} // set of verifiers that were assigned to current chunk
-	authorizedVerifiers map[flow.Identifier]struct{} // set of authorized verifiers that are authorized for current incorporated result
-	chunkApprovals      *flow.SignatureCollector     // accumulator of signatures for current collector
-	lock                sync.Mutex                   // lock to protect `chunkApprovals`
+	assignment     map[flow.Identifier]struct{} // set of verifiers that were assigned to current chunk
+	chunkApprovals *flow.SignatureCollector     // accumulator of signatures for current collector
+	lock           sync.Mutex                   // lock to protect `chunkApprovals`
 }
 
-func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{},
-	authorizedVerifiers map[flow.Identifier]struct{}) *ChunkApprovalCollector {
+func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{}) *ChunkApprovalCollector {
 	return &ChunkApprovalCollector{
-		assignment:          assignment,
-		authorizedVerifiers: authorizedVerifiers,
-		chunkApprovals:      flow.NewSignatureCollector(),
-		lock:                sync.Mutex{},
+		assignment:     assignment,
+		chunkApprovals: flow.NewSignatureCollector(),
+		lock:           sync.Mutex{},
 	}
 }
 
@@ -39,9 +36,6 @@ func (c *ChunkApprovalCollector) ProcessApproval(approval *flow.ResultApproval) 
 
 	approverID := approval.Body.ApproverID
 	if _, ok := c.assignment[approverID]; !ok {
-		return status
-	}
-	if _, ok := c.authorizedVerifiers[approverID]; !ok {
 		return status
 	}
 

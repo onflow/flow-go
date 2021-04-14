@@ -18,22 +18,20 @@ type ApprovalCollector struct {
 	incorporatedResult                   *flow.IncorporatedResult
 	numberOfChunks                       int
 	chunkCollectors                      []*ChunkApprovalCollector
-	assignmentAuthorizedVerifiers        map[flow.Identifier]struct{}
 	requiredApprovalsForSealConstruction uint                                // min number of approvals required for constructing a candidate seal
 	aggregatedSignatures                 map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
 	lock                                 sync.RWMutex                        // lock for modifying aggregatedSignatures
 	seals                                mempool.IncorporatedResultSeals     // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals,
-	authorizedVerifiers map[flow.Identifier]struct{}, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
+func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := make(map[flow.Identifier]struct{})
 		for _, id := range assignment.Verifiers(chunk) {
 			chunkAssignment[id] = struct{}{}
 		}
-		collector := NewChunkApprovalCollector(chunkAssignment, authorizedVerifiers)
+		collector := NewChunkApprovalCollector(chunkAssignment)
 		chunkCollectors = append(chunkCollectors, collector)
 	}
 	return &ApprovalCollector{
@@ -41,7 +39,6 @@ func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.As
 		incorporatedResult:                   result,
 		numberOfChunks:                       result.Result.Chunks.Len(),
 		chunkCollectors:                      chunkCollectors,
-		assignmentAuthorizedVerifiers:        authorizedVerifiers,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		aggregatedSignatures:                 make(map[uint64]flow.AggregatedSignature, result.Result.Chunks.Len()),
 		seals:                                seals,

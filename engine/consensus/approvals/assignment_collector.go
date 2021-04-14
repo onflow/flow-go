@@ -91,25 +91,13 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 		return engine.NewInvalidInputErrorf("could not determine chunk assignment: %w", err)
 	}
 
-	// pre-select all authorized Verifiers at the block that incorporates the result
-	authorizedVerifiersTmp, err := c.authorizedVerifiersAtBlock(incorporatedResult.IncorporatedBlockID)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("could not determine authorized verifiers: %w", err)
-	}
-
-	authorizedVerifiers := make(map[flow.Identifier]struct{})
-	for nodeID := range authorizedVerifiersTmp {
-		authorizedVerifiers[nodeID] = struct{}{}
-	}
-
 	// pre-select all authorized verifiers at the block that is being sealed
 	c.authorizedApprovers, err = c.authorizedVerifiersAtBlock(incorporatedResult.Result.BlockID)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
 	}
 
-	collector := NewApprovalCollector(incorporatedResult, assignment, c.seals,
-		authorizedVerifiers, c.requiredApprovalsForSealConstruction)
+	collector := NewApprovalCollector(incorporatedResult, assignment, c.seals, c.requiredApprovalsForSealConstruction)
 
 	c.putCollector(incorporatedResult.IncorporatedBlockID, collector)
 	c.processPendingApprovals()

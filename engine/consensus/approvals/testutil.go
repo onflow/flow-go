@@ -14,20 +14,18 @@ import (
 type BaseApprovalsTestSuite struct {
 	suite.Suite
 
-	Block                         flow.Header     // candidate for sealing
-	VerID                         flow.Identifier // for convenience, node id of first verifier
-	Chunks                        flow.ChunkList  // list of chunks of execution result
-	ChunksAssignment              *chunks.Assignment
-	AuthorizedVerifiers           map[flow.Identifier]struct{}       // for convenience set of verifier IDs
-	AuthorizedVerifiersIdentities map[flow.Identifier]*flow.Identity // map of authorized verifier identities for execution result
-	IncorporatedResult            *flow.IncorporatedResult
+	Block               flow.Header     // candidate for sealing
+	VerID               flow.Identifier // for convenience, node id of first verifier
+	Chunks              flow.ChunkList  // list of chunks of execution result
+	ChunksAssignment    *chunks.Assignment
+	AuthorizedVerifiers map[flow.Identifier]*flow.Identity // map of authorized verifier identities for execution result
+	IncorporatedResult  *flow.IncorporatedResult
 }
 
 func (s *BaseApprovalsTestSuite) SetupTest() {
 	s.Block = unittest.BlockHeaderFixture()
 	verifiers := make(flow.IdentifierList, 0)
-	s.AuthorizedVerifiers = make(map[flow.Identifier]struct{})
-	s.AuthorizedVerifiersIdentities = make(map[flow.Identifier]*flow.Identity)
+	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
 	s.ChunksAssignment = chunks.NewAssignment()
 	s.Chunks = unittest.ChunkListFixture(50, s.Block.ID())
 
@@ -35,8 +33,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	for j := 0; j < 5; j++ {
 		identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 		verifiers = append(verifiers, identity.NodeID)
-		s.AuthorizedVerifiersIdentities[identity.NodeID] = identity
-		s.AuthorizedVerifiers[identity.NodeID] = struct{}{}
+		s.AuthorizedVerifiers[identity.NodeID] = identity
 	}
 
 	// create assignment
