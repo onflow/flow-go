@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -156,11 +155,7 @@ func (net *FlowNetwork) DropDBs(filter flow.IdentityFilter) {
 		if !filter(c.Config.Identity()) {
 			continue
 		}
-		flowDBDir := path.Join(c.datadir, DefaultFlowDBDir)
-		err := os.RemoveAll(flowDBDir)
-		assert.NoError(net.t, err)
-		err = os.Mkdir(flowDBDir, 0700)
-		assert.NoError(net.t, err)
+		c.DropDB()
 	}
 }
 
