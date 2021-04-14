@@ -103,15 +103,7 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 		Agrees:  agreeENs.NodeIDs(),
 	}
 
-	chunkDataPacks, collections := chunkDataPackResponseFixture(statuses.Chunks())
-	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
-	verifiableChunks[chunkID] = &verification.VerifiableChunkData{
-		Chunk:         statuses[0].Chunk,
-		Header:        block.Header,
-		Result:        result,
-		Collection:    collections[chunkID],
-		ChunkDataPack: chunkDataPacks[chunkID],
-	}
+	chunkDataPacks, collections, verifiableChunks := verifiableChunkFixture(statuses.Chunks(), block, result)
 
 	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
@@ -494,6 +486,31 @@ func chunkDataPackResponseFixture(chunks flow.ChunkList) (map[flow.Identifier]*f
 	}
 
 	return chunkDataPacks, collections
+}
+
+// verifiableChunkFixture is a test helper that creates verifiable chunks, chunk data packs,
+// and collection fixtures for the given chunks list.
+func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *flow.ExecutionResult) (
+	map[flow.Identifier]*flow.ChunkDataPack,
+	map[flow.Identifier]*flow.Collection,
+	map[flow.Identifier]*verification.VerifiableChunkData) {
+
+	chunkDataPacks, collections := chunkDataPackResponseFixture(chunks)
+
+	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
+	for _, chunk := range chunks {
+		c := chunk // avoids shallow copy of loop variable
+		chunkID := c.ID()
+		verifiableChunks[chunkID] = &verification.VerifiableChunkData{
+			Chunk:         c,
+			Header:        block.Header,
+			Result:        result,
+			Collection:    collections[chunkID],
+			ChunkDataPack: chunkDataPacks[chunkID],
+		}
+	}
+
+	return chunkDataPacks, collections, verifiableChunks
 }
 
 // completeChunkStatusListFixture creates a reference block with an execution result associated with it.
