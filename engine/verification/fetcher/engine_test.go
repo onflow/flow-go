@@ -2,6 +2,7 @@ package fetcher_test
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -78,43 +79,87 @@ func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
 	return e
 }
 
-// TestProcessAssignChunk_HappyPath evaluates behavior of fetcher engine respect to receiving a single assigned chunk,
-// it should request the requester.
+func TestProcessAssignedChunkHappyPath(t *testing.T) {
+	tt := []struct {
+		chunks   int
+		assigned int
+	}{
+		{
+			chunks:   1, // single chunk, single assigned
+			assigned: 1,
+		},
+		{
+			chunks:   2, // two chunks, single assigned
+			assigned: 1,
+		},
+		{
+			chunks:   4, // four chunks, two assigned
+			assigned: 2,
+		},
+		{
+			chunks:   10, // ten chunks, two assigned
+			assigned: 5,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(fmt.Sprintf("%d-chunk-%d-assigned", tc.chunks, tc.assigned), func(t *testing.T) {
+			testProcessAssignChunkHappyPath(t, tc.chunks, tc.assigned)
+		})
+	}
+}
+
+// TestProcessAssignChunk_HappyPath evaluates behavior of fetcher engine respect to receiving some assigned chunks,
+// it should request the requester a chunk data pack for each chunk.
 // Then the test mocks sending a chunk data response for what fetcher engine requested.
 // On receiving the response, fetcher engine should validate it and create and pass a verifiable chunk
 // to the verifier engine.
-func TestProcessAssignChunk_HappyPath(t *testing.T) {
+func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
-	// creates a single chunk locator, and mocks its corresponding block sealed.
-	block, result, statuses, locators := completeChunkStatusListFixture(t, 2, 1)
+	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
+	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
+	// also the chunk belongs to an unsealed block.
+	block, result, statuses, locators := completeChunkStatusListFixture(t, chunkNum, assignedNum)
+	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+
+	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
 	mockPendingChunksByID(s.pendingChunks, statuses)
+	mockStateAtBlockIDForExecutors(s.state, block.ID(), agrees)
 
-	_, _, agreeENs, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 1, 0)
-	mockStateAtBlockIDForExecutors(s.state, block.ID(), agreeENs)
-	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agreeENs.NodeIDs(), nil)
-
+	// generates and mocks requesting chunk data pack fixture
+	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees.NodeIDs(), disagrees.NodeIDs())
 	chunkDataPacks, collections, verifiableChunks := verifiableChunkFixture(statuses.Chunks(), block, result)
-	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier,
+
+	// fetcher engine should request chunk data for received (assigned) chunk locators
+	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agrees, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
 		e.HandleChunkDataPack(originID, cdp, collection)
 	})
 
+	// fetcher engine should create and pass a verifiable chunk to verifier engine upon receiving each
+	// chunk data responses, and notify the consumer that it is done with processing chunk.
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
 	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses.Chunks()))
 
-	e.ProcessAssignedChunk(locators[0])
+	// passes chunk data requests in parallel.
+	processWG := &sync.WaitGroup{}
+	processWG.Add(len(locators))
+	for _, locator := range locators {
+		go func(l *chunks.Locator) {
+			e.ProcessAssignedChunk(l)
+			processWG.Done()
+		}(locator)
+	}
 
 	unittest.RequireReturnsBefore(t, requesterWg.Wait, 1*time.Second, "could not handle received chunk data pack on time")
 	unittest.RequireReturnsBefore(t, verifierWG.Wait, 1*time.Second, "could not push verifiable chunk on time")
-
-	mock.AssertExpectationsForObjects(t, s.results)
 }
 
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
