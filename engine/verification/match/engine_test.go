@@ -116,6 +116,7 @@ func (suite *MatchEngineTestSuite) SetupTest() {
 }
 
 func (suite *MatchEngineTestSuite) ChunkDataPackIsRequestedNTimes(timeout time.Duration,
+	executorID flow.Identifier,
 	n int, f func(*messages.ChunkDataRequest)) <-chan []*messages.ChunkDataRequest {
 	reqs := make([]*messages.ChunkDataRequest, 0)
 	c := make(chan []*messages.ChunkDataRequest, 1)
@@ -128,12 +129,16 @@ func (suite *MatchEngineTestSuite) ChunkDataPackIsRequestedNTimes(timeout time.D
 	// chunk data was requested once, and return the chunk data pack when requested
 	// called with 3 mock.Anything, the first is the request, the second and third are the 2
 	// execution nodes
-	suite.con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	suite.con.On("Publish", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
 		req := args.Get(0).(*messages.ChunkDataRequest)
 		reqs = append(reqs, req)
+
+		// chunk data request should be only dispatched to the executor ID
+		targetID := args.Get(1).(flow.Identifier)
+		require.Equal(suite.T(), targetID, executorID)
 
 		fmt.Printf("con.Submit is called for chunk:%v\n", req.ChunkID)
 
@@ -213,7 +218,6 @@ func (suite *MatchEngineTestSuite) OnVerifiableChunkSentMetricCalledNTimes(n int
 // Happy Path: When receives a ER, and 1 chunk is assigned to me,
 // it will fetch that collection and chunk data, and produces a verifiable chunk
 func (suite *MatchEngineTestSuite) TestChunkVerified() {
-	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
@@ -261,7 +265,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 1, suite.RespondChunkDataPack(e, en.ID()))
+	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 1, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunksC := suite.VerifierCalledNTimes(5*time.Second, 1)
@@ -339,7 +343,6 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 // Multiple Assignments: When receives a ER, and 2 chunks out of 3 are assigned to me,
 // it will produce 2 verifiable chunks.
 func (suite *MatchEngineTestSuite) TestMultiAssignment() {
-	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
@@ -385,7 +388,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 2, suite.RespondChunkDataPack(e, en.ID()))
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 2, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunksC := suite.VerifierCalledNTimes(5*time.Second, 2)
@@ -414,7 +417,6 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 // TestDuplication checks that when the engine receives 2 ER for the same block,
 // which only has 1 chunk, only 1 verifiable chunk will be produced.
 func (suite *MatchEngineTestSuite) TestDuplication() {
-	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
@@ -459,7 +461,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	// setup conduit to return requested chunk data packs
 	// return received requests
 	called := 0
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3,
 		func(req *messages.ChunkDataRequest) {
 			called++
 			if called >= 3 {
@@ -495,7 +497,6 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 // the execution node fails to return data for the first 2 requests,
 // and successful to return in the 3rd try, a verifiable chunk will be produced
 func (suite *MatchEngineTestSuite) TestRetry() {
-	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
@@ -540,7 +541,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	// setup conduit to return requested chunk data packs
 	// return received requests
 	called := 0
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3,
 		func(req *messages.ChunkDataRequest) {
 			called++
 			if called >= 3 {
@@ -559,6 +560,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	<-vchunkC
 
 	<-e.Done()
+
+	// pending chunk should be removed from memory once we have the request received.
+	require.Len(suite.T(), suite.chunks.All(), 0)
+
 	mock.AssertExpectationsForObjects(suite.T(),
 		suite.assigner,
 		suite.con,
@@ -570,7 +575,6 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 // MaxRetry: When receives 1 ER, and 1 chunk is assigned assigned to me, if max retry is 2,
 // and the execution node fails to return data for the first 2 requests, then no verifiable chunk will be produced
 func (suite *MatchEngineTestSuite) TestMaxRetry() {
-	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(3)
 	// create a execution result that assigns to me
 	result, assignment := test.CreateExecutionResult(
@@ -605,7 +609,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// never returned any chunk data pack
-	reqC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3, func(req *messages.ChunkDataRequest) {})
+	reqC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3, func(req *messages.ChunkDataRequest) {})
 
 	<-e.Ready()
 
@@ -626,7 +630,6 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 // Concurrency: When 10 different ER are received concurrently, chunks from both
 // results will be processed
 func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
-	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	ers := make([]*flow.ExecutionResult, 0)
@@ -679,7 +682,7 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, count, suite.RespondChunkDataPack(e, en.ID()))
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, count, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunkC := suite.VerifierCalledNTimes(5*time.Second, count)
@@ -709,7 +712,6 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 // Concurrency: When chunk data pack are sent concurrently, match engine is able to receive
 // all of them, and process concurrently.
 func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
-	suite.T().Skip("this test is skipped as match engine should not request chunk data pack on this branch")
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
@@ -757,7 +759,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	count := len(result.Chunks)
-	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, count, func(*messages.ChunkDataRequest) {})
+	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, count, func(*messages.ChunkDataRequest) {})
 
 	// check verifier's method is called
 	_ = suite.VerifierCalledNTimes(5*time.Second, count)
