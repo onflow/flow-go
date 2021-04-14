@@ -164,16 +164,15 @@ func (c *Client) SDKServiceAddress() sdk.Address {
 }
 
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
-	result, err := c.client.GetTransactionResult(ctx, id)
-	if err != nil {
-		return nil, err
-	}
 
 	fmt.Printf("Waiting for transaction %s to be sealed...\n", id)
 	errCount := 0
+	var result *sdk.TransactionResult
+	var err error
 	for result == nil || (result.Status != sdk.TransactionStatusSealed) {
-		time.Sleep(time.Second)
-		result, err = c.client.GetTransactionResult(ctx, id)
+		childCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+		result, err = c.client.GetTransactionResult(childCtx, id)
+		cancel()
 		if err != nil {
 			fmt.Print("x")
 			errCount++
@@ -185,6 +184,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 		} else {
 			fmt.Print(".")
 		}
+		time.Sleep(time.Second)
 	}
 
 	fmt.Println()
@@ -206,4 +206,15 @@ func (c *Client) GetLatestProtocolSnapshot(ctx context.Context) (*inmem.Snapshot
 	}
 
 	return snapshot, nil
+}
+
+func (c *Client) GetLatestBlockID(ctx context.Context) (flow.Identifier, error) {
+	header, err := c.client.GetLatestBlockHeader(ctx, true)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not get latest block header: %w", err)
+	}
+
+	var id flow.Identifier
+	copy(id[:], header.ID[:])
+	return id, nil
 }
