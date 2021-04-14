@@ -94,17 +94,9 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 
 	_, _, agreeENs, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 1, 0)
 	mockStateAtBlockIDForExecutors(s.state, block.ID(), agreeENs)
-
-	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
-	chunkID := result.Chunks[locators[0].Index].ID()
-	requests[chunkID] = &verification.ChunkDataPackRequest{
-		ChunkID: chunkID,
-		Height:  block.Header.Height,
-		Agrees:  agreeENs.NodeIDs(),
-	}
+	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agreeENs.NodeIDs(), nil)
 
 	chunkDataPacks, collections, verifiableChunks := verifiableChunkFixture(statuses.Chunks(), block, result)
-
 	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agreeENs, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
@@ -112,7 +104,7 @@ func TestProcessAssignChunk_HappyPath(t *testing.T) {
 	})
 
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.IdentifierList{chunkID})
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses.Chunks()))
 
 	e.ProcessAssignedChunk(locators[0])
 
@@ -511,6 +503,25 @@ func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *fl
 	}
 
 	return chunkDataPacks, collections, verifiableChunks
+}
+
+// chunkRequestFixture is a test helper creates and returns chunk data pack requests for given chunks that all belong to the
+// same block height.
+// Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
+// with the execution result that chunks belong to, respectively.
+func chunkRequestFixture(chunks flow.ChunkList, height uint64, agrees flow.IdentifierList, disagrees flow.IdentifierList) map[flow.Identifier]*verification.ChunkDataPackRequest {
+
+	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
+	for _, chunk := range chunks {
+		requests[chunk.ID()] = &verification.ChunkDataPackRequest{
+			ChunkID:   chunk.ID(),
+			Height:    height,
+			Agrees:    agrees,
+			Disagrees: disagrees,
+		}
+	}
+
+	return requests
 }
 
 // completeChunkStatusListFixture creates a reference block with an execution result associated with it.
