@@ -144,13 +144,17 @@ func (net *FlowNetwork) RemoveContainers() {
 	assert.NoError(net.t, err)
 }
 
-// DropDBs resets the protocol state database for all containers in the network.
-func (net *FlowNetwork) DropDBs() {
+// DropDBs resets the protocol state database for all containers in the network
+// matching the given filter.
+func (net *FlowNetwork) DropDBs(filter flow.IdentityFilter) {
 	if net == nil || net.suite == nil {
 		return
 	}
 	// clear data directories
 	for _, c := range net.Containers {
+		if !filter(c.Config.Identity()) {
+			continue
+		}
 		flowDBDir := path.Join(c.datadir, DefaultFlowDBDir)
 		err := os.RemoveAll(flowDBDir)
 		assert.NoError(net.t, err)
@@ -548,16 +552,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
-func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) error {
-
-	// TODO: uset the `convert` module to do this
-	encodable := snapshot.Encodable()
-	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), encodable)
-	if err != nil {
-		return err
-	}
-
-	return nil
+func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
+	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
+	require.NoError(net.t, err)
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, error) {
