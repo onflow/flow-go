@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -182,15 +183,13 @@ func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicK
 func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	fungibleToken := b.createAccount()
 
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(fungibleToken, contracts.FungibleToken(), "FungibleToken"),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy fungible token contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
 	return fungibleToken
 }
 
@@ -199,15 +198,13 @@ func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address
 
 	contract := contracts.FlowToken(fungibleToken.HexWithPrefix())
 
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowTokenTransaction(flowToken, service, contract),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy Flow token contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy Flow token contract: %s", txError, err)
 	return flowToken
 }
 
@@ -219,15 +216,13 @@ func (b *BootstrapProcedure) deployFlowFees(service, fungibleToken, flowToken fl
 		flowToken.HexWithPrefix(),
 	)
 
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployFlowFeesTransaction(flowFees, service, contract),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy fees contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy fees contract: %s", txError, err)
 	return flowFees
 }
 
@@ -238,15 +233,13 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	)
 
 	// deploy storage fees contract on the service account
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployStorageFeesTransaction(service, contract),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy storage fees contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
@@ -257,30 +250,26 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		service.HexWithPrefix(),
 	)
 
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to deploy service account contract: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to deploy service account contract: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) mintInitialTokens(
 	service, fungibleToken, flowToken flow.Address,
 	initialSupply cadence.UFix64,
 ) {
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		mintFlowTokenTransaction(fungibleToken, flowToken, service, initialSupply),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to mint initial token supply: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to mint initial token supply: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupFees(
@@ -290,29 +279,25 @@ func (b *BootstrapProcedure) setupFees(
 	minimumStorageReservation,
 	storagePerFlow cadence.UFix64,
 ) {
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation, storagePerFlow),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to setup fees: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to setup fees: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	service, fungibleToken, flowToken, feeContract flow.Address,
 ) {
-	err := b.vm.invokeMetaTransaction(
+	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		setupStorageForServiceAccountsTransaction(service, fungibleToken, flowToken, feeContract),
 		b.sth,
 		b.programs,
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", err.Error()))
-	}
+	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
 }
 
 const deployContractTransactionTemplate = `
@@ -541,6 +526,15 @@ const (
 	flowTokenAccountIndex     = 3
 	flowFeesAccountIndex      = 4
 )
+
+func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
+	if txError != nil {
+		panic(fmt.Sprintf(msg, txError.Error()))
+	}
+	if err != nil {
+		panic(fmt.Sprintf(msg, err.Error()))
+	}
+}
 
 func FungibleTokenAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(fungibleTokenAccountIndex)
