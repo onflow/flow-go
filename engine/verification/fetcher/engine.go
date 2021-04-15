@@ -2,11 +2,9 @@ package fetcher
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -16,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -89,28 +86,16 @@ func (e *Engine) Done() <-chan struct{} {
 
 // ProcessAssignedChunk is the entry point of fetcher engine.
 // It pushes the assigned chunk down the pipeline with tracing on it enabled.
-// Through the pipeline the chunk data pack for this chunk is requested, a verifiable chunk is shaped for it,
+// Through the pipeline the chunk data pack for this chunk is requested,
+// a verifiable chunk is shaped for it,
 // and is pushed to the verifier engine for verification.
-func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
-	span, ok := e.tracer.GetSpan(locator.ResultID, trace.VERProcessExecutionResult)
-	if !ok {
-		span = e.tracer.StartSpan(locator.ResultID, trace.VERProcessExecutionResult)
-		span.SetTag("result_id", locator.ResultID)
-		defer span.Finish()
-	}
-
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleChunkLocator, func() {
-		e.processAssignedChunk(ctx, locator)
-	})
-}
-
-// processAssignedChunk processes the chunk that assigned to this verification node.
+//
+// ProcessAssignedChunk processes the chunk that assigned to this verification node.
 // It should not be blocking since multiple workers might be calling it concurrently.
 // It fetches the chunk data pack, once received, verifier engine will be verifying
 // Once a chunk has been processed, it will call the processing notifier callback to notify
 // the chunk consumer in order to process the next chunk.
-func (e *Engine) processAssignedChunk(ctx context.Context, locator *chunks.Locator) {
+func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	log := e.log.With().
 		Uint64("chunk_index", locator.Index).
 		Hex("result_id", logging.ID(locator.ResultID)).
@@ -150,7 +135,6 @@ func (e *Engine) processAssignedChunk(ctx context.Context, locator *chunks.Locat
 	status := &verification.ChunkStatus{
 		Chunk:             chunk,
 		ExecutionResultID: locator.ResultID,
-		Ctx:               ctx,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
