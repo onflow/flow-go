@@ -33,7 +33,7 @@ const (
 // QCContractClient is a client to the Quorum Certificate contract. Allows the client to
 // functionality to submit a vote and check if collection node has voted already.
 type QCContractClient struct {
-	*BaseContractClient
+	BaseContractClient
 
 	nodeID flow.Identifier // flow identifier of the collection node
 
@@ -56,7 +56,7 @@ func NewQCContractClient(log zerolog.Logger,
 	env := templates.Environment{QuorumCertificateAddress: qcContractAddress}
 
 	return &QCContractClient{
-		BaseContractClient: base,
+		BaseContractClient: *base,
 		nodeID:             nodeID,
 		env:                env,
 	}, nil

@@ -27,7 +27,7 @@ import (
 // Client is a client to the Flow DKG contract. Allows functionality to Broadcast,
 // read a Broadcast and submit the final result of the DKG protocol
 type Client struct {
-	*epochs.BaseContractClient
+	epochs.BaseContractClient
 
 	log zerolog.Logger
 	env templates.Environment
@@ -48,7 +48,7 @@ func NewClient(log zerolog.Logger,
 	env := templates.Environment{DkgAddress: dkgContractAddress}
 
 	return &Client{
-		BaseContractClient: base,
+		BaseContractClient: *base,
 		env:                env,
 	}, nil
 }
