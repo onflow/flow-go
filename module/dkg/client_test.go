@@ -57,7 +57,8 @@ func (s *ClientSuite) SetupTest() {
 	s.deployDKGContract()
 
 	// Note: using DKG address as DKG participant to avoid funding a new account key
-	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	s.contractClient, err = NewClient(zerolog.Nop(), s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	require.NoError(s.T(), err)
 
 	s.setUpAdmin()
 }

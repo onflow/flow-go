@@ -28,28 +28,29 @@ import (
 // Client is a client to the Flow DKG contract. Allows functionality to Broadcast,
 // read a Broadcast and submit the final result of the DKG protocol
 type Client struct {
-	log zerolog.Logger
+	*epochs.BaseContractClient
 
-	dkgContractAddress string
-	accountAddress     sdk.Address
-	accountKeyIndex    uint
-	flowClient         module.SDKClientWrapper
-	signer             sdkcrypto.Signer
-
-	env templates.Environment // the required contract addresses to be used by the Flow SDK
+	env templates.Environment
 }
 
 // NewClient initializes a new client to the Flow DKG contract
-func NewClient(log zerolog.Logger, flowClient module.SDKClientWrapper, signer sdkcrypto.Signer, dkgContractAddress, accountAddress string, accountKeyIndex uint) *Client {
-	return &Client{
-		log:                log,
-		flowClient:         flowClient,
-		dkgContractAddress: dkgContractAddress,
-		signer:             signer,
-		accountKeyIndex:    accountKeyIndex,
-		accountAddress:     sdk.HexToAddress(accountAddress),
-		env:                templates.Environment{DkgAddress: dkgContractAddress},
+func NewClient(log zerolog.Logger,
+	flowClient module.SDKClientWrapper,
+	signer sdkcrypto.Signer,
+	dkgContractAddress,
+	accountAddress string,
+	accountKeyIndex uint) (*Client, error) {
+
+	base, err := epochs.NewBaseContractClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
+	if err != nil {
+		return nil, err
 	}
+	env := templates.Environment{DkgAddress: dkgContractAddress}
+
+	return &Client{
+		BaseContractClient: base,
+		env:                env,
+	}, nil
 }
 
 // Broadcast broadcasts a message to all other nodes participating in the
@@ -63,13 +64,14 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	defer cancel()
 
 	// get account for given address
-	account, err := c.flowClient.GetAccount(ctx, c.accountAddress, grpc.EmptyCallOption{})
+	account, err := c.Client.GetAccount(ctx, c.Account.Address, grpc.EmptyCallOption{})
 	if err != nil {
 		return fmt.Errorf("could not get account details: %w", err)
 	}
+	c.Account = account
 
 	// get latest sealed block to execute transaction
-	latestBlock, err := c.flowClient.GetLatestBlock(ctx, true)
+	latestBlock, err := c.Client.GetLatestBlock(ctx, true)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
@@ -79,9 +81,9 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
 		SetGasLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(c.accountAddress, int(c.accountKeyIndex), account.Keys[int(c.accountKeyIndex)].SequenceNumber).
-		SetPayer(c.accountAddress).
-		AddAuthorizer(c.accountAddress)
+		SetProposalKey(c.Account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetPayer(c.Account.Address).
+		AddAuthorizer(c.Account.Address)
 
 	// json encode the DKG message
 	data, err := json.Marshal(msg)
@@ -96,21 +98,21 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(c.accountAddress, int(c.accountKeyIndex), c.signer)
+	err = tx.SignEnvelope(c.Account.Address, int(c.AccountKeyIndex), c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
 	// submit signed transaction to node
-	log.Info().Float64("duration", time.Now().Sub(started).Seconds()).Msg("submitting broadcast transaction")
-	txID, err := c.submitTx(ctx, tx)
+	log.Info().Msg("sending Broadcast transaction")
+	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
-	err = c.waitForSealed(ctx, txID, started)
+	err = c.WaitForSealed(ctx, txID, started)
 	if err != nil {
-		return fmt.Errorf("failed to submit transaction: %w", err)
+		return fmt.Errorf("failed to wait for transaction seal: %w", err)
 	}
 
 	return nil
@@ -125,7 +127,7 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 	// construct read latest broadcast messages transaction
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
-	value, err := c.flowClient.ExecuteScriptAtBlockID(ctx, sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
+	value, err := c.Client.ExecuteScriptAtBlockID(ctx, sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
 	if err != nil {
 		return nil, fmt.Errorf("could not execute read broadcast script: %w", err)
 	}
@@ -157,17 +159,18 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 // public keys for each DKG participant. Serialized pub keys are encoded as hex.
 func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
 
-	// started := time.Now()
+	started := time.Now()
 	ctx := context.Background()
 
 	// get account for given address
-	account, err := c.flowClient.GetAccount(ctx, c.accountAddress, grpc.EmptyCallOption{})
+	account, err := c.Client.GetAccount(ctx, c.Account.Address, grpc.EmptyCallOption{})
 	if err != nil {
 		return fmt.Errorf("could not get account details: %w", err)
 	}
+	c.Account = account
 
 	// get latest sealed block to execute transaction
-	latestBlock, err := c.flowClient.GetLatestBlock(ctx, true)
+	latestBlock, err := c.Client.GetLatestBlock(ctx, true)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
@@ -176,9 +179,9 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		SetScript(templates.GenerateSendDKGFinalSubmissionScript(c.env)).
 		SetGasLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(c.accountAddress, int(c.accountKeyIndex), account.Keys[int(c.accountKeyIndex)].SequenceNumber).
-		SetPayer(c.accountAddress).
-		AddAuthorizer(c.accountAddress)
+		SetProposalKey(c.Account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetPayer(c.Account.Address).
+		AddAuthorizer(c.Account.Address)
 
 	// Note: We need to make sure that we pull the keys out in the same order that
 	// we have done here. Group Public key first followed by the individual public keys
@@ -199,62 +202,20 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(c.accountAddress, int(c.accountKeyIndex), c.signer)
+	err = tx.SignEnvelope(c.Account.Address, int(c.AccountKeyIndex), c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
-	// submit signed transaction to node
-	_, err = c.submitTx(ctx, tx)
+	log.Info().Msg("sending SubmitResult transaction")
+	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
 	}
 
-	return nil
-}
-
-// submitTxAndWaitForSealed submits a transaction to the flow network. Requires transaction to be signed.
-func (c *Client) submitTx(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
-
-	// check if the transaction has a signature
-	if len(tx.EnvelopeSignatures) == 0 {
-		return sdk.EmptyID, fmt.Errorf("can not submit an unsigned transaction")
-	}
-
-	// submit trnsaction to client
-	err := c.flowClient.SendTransaction(ctx, *tx)
+	err = c.WaitForSealed(ctx, txID, started)
 	if err != nil {
-		return sdk.EmptyID, fmt.Errorf("failed to send transaction: %w", err)
-	}
-
-	return tx.ID(), nil
-}
-
-func (c *Client) waitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
-
-	// wait for transaction to be sealed
-	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
-	// attempts := 1
-	for result.Status != sdk.TransactionStatusSealed {
-
-		// c.log.Info().Int("attempt", attempts).Float64("time_elapsed", float64(1)).Msg("fetching transaction result")
-		result, err := c.flowClient.GetTransactionResult(ctx, txID)
-		if err != nil {
-			return fmt.Errorf("could not get transaction result: %w", err)
-		}
-
-		// if the transaction has expired we skip waiting for seal
-		if result.Status == sdk.TransactionStatusExpired {
-			return fmt.Errorf("broadcast dkg message transaction has expired")
-		}
-
-		// wait before trying again.
-		time.Sleep(epochs.TransactionStatusRetryTimeout)
-		// attempts++
-	}
-
-	if result.Error != nil {
-		return fmt.Errorf("error executing transaction: %w", result.Error)
+		return fmt.Errorf("failed to wait for transaction seal: %w", err)
 	}
 
 	return nil
