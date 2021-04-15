@@ -183,17 +183,13 @@ func (e *Engine) validateChunkDataPack(
 ) error {
 	// 1. sender must be an execution node at that block
 	blockID := chunk.BlockID
-	sender, err := e.state.AtBlockID(blockID).Identity(senderID)
-	if errors.Is(err, storage.ErrNotFound) {
-		return engine.NewInvalidInputErrorf("sender is unstaked: %v", senderID)
-	}
-
+	staked, err := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if err != nil {
-		return fmt.Errorf("could not find identity for chunk: %w", err)
+		return fmt.Errorf("could not validate identity of sender at block ID as an execution node: %w", err)
 	}
 
-	if sender.Role != flow.RoleExecution {
-		return engine.NewInvalidInputErrorf("sender is not execution node: %v", sender.Role)
+	if !staked {
+		return fmt.Errorf("unstaked execution node sender at block ID")
 	}
 
 	// 2. start state must match
@@ -211,6 +207,25 @@ func (e *Engine) validateChunkDataPack(
 	}
 
 	return nil
+}
+
+// validateStakedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an staked
+// execution node  at the given block ID.
+func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) (bool, error) {
+
+	sender, err := e.state.AtBlockID(blockID).Identity(senderID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return false, engine.NewInvalidInputErrorf("sender is unstaked: %v", senderID)
+	}
+	if err != nil {
+		return false, fmt.Errorf("could not find identity for chunk: %w", err)
+	}
+
+	if sender.Role != flow.RoleExecution {
+		return false, engine.NewInvalidInputErrorf("sender is not execution node: %v", sender.Role)
+	}
+
+	return sender.Stake > 0, nil
 }
 
 // HandleChunkDataPack is called by the chunk requester module everytime a new request chunk arrives.
@@ -287,8 +302,8 @@ func (e *Engine) validatedStatus(originID flow.Identifier,
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPack(status.Chunk, originID, chunkDataPack, collection)
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("invalid chunk data pack for chunk: %v collection: %v block: %v",
-			chunkDataPack.ChunkID, collection.ID(), status.Chunk.BlockID)
+		return nil, engine.NewInvalidInputErrorf("invalid chunk data pack for chunk: %v collection: %v block: %v error:%w",
+			chunkDataPack.ChunkID, collection.ID(), status.Chunk.BlockID, err)
 	}
 
 	return status, nil
