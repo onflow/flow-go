@@ -40,6 +40,9 @@ func TestMVP_Network(t *testing.T) {
 
 func TestMVP_Bootstrap(t *testing.T) {
 
+	// skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451
+	t.Skip()
+
 	testingdock.Verbose = false
 
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
