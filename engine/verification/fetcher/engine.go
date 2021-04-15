@@ -310,22 +310,6 @@ func (e *Engine) validatedStatus(originID flow.Identifier,
 	return status, nil
 }
 
-// getResultByID
-func (e *Engine) getResultByID(blockID flow.Identifier, resultID flow.Identifier) (*flow.ExecutionResult, error) {
-	receipts, err := e.receipts.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get receipts by block ID: %w", err)
-	}
-
-	for _, receipt := range receipts {
-		if receipt.ExecutionResult.ID() == resultID {
-			return &receipt.ExecutionResult, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no receipt found for the result %v", blockID)
-}
-
 // pushToVerifier makes a verifiable chunk data out of the input and pass it to the verifier for verification.
 func (e *Engine) pushToVerifier(chunk *flow.Chunk, result *flow.ExecutionResult, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
 	header, err := e.headers.ByBlockID(chunk.BlockID)

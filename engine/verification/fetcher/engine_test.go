@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -490,14 +490,6 @@ func mockReceiptsBlockID(t *testing.T,
 
 	receipts.On("ByBlockID", blockID).Return(all, nil)
 	return agreeReceipts, disagreeReceipts, agreeExecutors, disagreeExecutors
-}
-
-// mockHeadersByBlockID is a test helper that mocks headers storage ByBlockID method for a header for given block ID
-// at the given height.
-func mockHeadersByBlockID(headers *storage.Headers, blockID flow.Identifier, height uint64) {
-	header := unittest.BlockHeaderFixture()
-	header.Height = height
-	headers.On("ByBlockID", blockID).Return(&header, nil)
 }
 
 // mockStateAtBlockIDForIdentities is a test helper that mocks state at the block ID with the given execution nodes identities.
