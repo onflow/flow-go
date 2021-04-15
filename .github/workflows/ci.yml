@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: 
+    branches:
       - master
       - feature/epochs
       - feature/dkg
@@ -16,41 +16,41 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v2
-    - name: Build relic
-      run: make crypto/relic/build
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v2.3.0
-      with:
-        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.29
-        args: -v --build-tags relic
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build relic
+        run: make crypto/relic/build
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2.3.0
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.29
+          args: -v --build-tags relic
   unit-test:
     name: Unit Tests
     runs-on: ubuntu-latest
     steps:
-    - name: Setup Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: '1.15'
-    - name: Checkout repo
-      uses: actions/checkout@v2
-    - name: Run tests
-      run: make ci
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.15"
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Run tests
+        run: make ci
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
     steps:
-    - name: Setup Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: '1.15'
-    - name: Checkout repo
-      uses: actions/checkout@v2
-    - name: Build relic
-      run: make crypto/relic/build
-    - name: Docker build
-      run: make docker-build-flow
-    - name: Run tests
-      run: make ci-integration
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.15"
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build relic
+        run: make crypto/relic/build
+      - name: Docker build
+        run: make docker-build-flow
+      - name: Run tests
+        run: make ci-integration

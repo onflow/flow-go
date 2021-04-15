@@ -18,8 +18,15 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// TransactionSubmissionTimeout is the time after which we return an error.
-const TransactionSubmissionTimeout = 5 * time.Minute
+const (
+
+	// TransactionSubmissionTimeout is the time after which we return an error.
+	TransactionSubmissionTimeout = 5 * time.Minute
+
+	// TransactionStatusRetryTimeout is the time after which the status of a
+	// transaction is checked again
+	TransactionStatusRetryTimeout = 1 * time.Second
+)
 
 // QCContractClient is a client to the Quorum Certificate contract. Allows the client to
 // functionality to submit a vote and check if collection node has voted already.
@@ -85,7 +92,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	seqNumber := c.account.Keys[int(c.accountKeyIndex)].SequenceNumber
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSubmitVoteScript(c.getEnvironment())).
-		SetGasLimit(1000).
+		SetGasLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
 		SetProposalKey(c.account.Address, int(c.accountKeyIndex), seqNumber).
 		SetPayer(c.account.Address).
@@ -97,8 +104,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
 	}
 
-	// sign payload using account signer
-	err = tx.SignPayload(c.account.Address, int(c.accountKeyIndex), c.signer)
+	// sign envelope using account signer
+	err = tx.SignEnvelope(c.account.Address, int(c.accountKeyIndex), c.signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
@@ -112,6 +119,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	// wait for transaction to be sealed
 	result := &sdk.TransactionResult{Status: sdk.TransactionStatusUnknown}
 	for result.Status != sdk.TransactionStatusSealed {
+
 		result, err = c.client.GetTransactionResult(ctx, txID)
 		if err != nil {
 			return fmt.Errorf("could not get transaction result: %w", err)
@@ -123,7 +131,11 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		}
 
 		// wait 1 second before trying again.
-		time.Sleep(time.Second)
+		time.Sleep(TransactionStatusRetryTimeout)
+	}
+
+	if result.Error != nil {
+		return fmt.Errorf("error executing transaction: %w", result.Error)
 	}
 
 	return nil
@@ -133,14 +145,10 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 // cluster QC aggregator smart contract for the current epoch.
 func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 
-	val, err := jsoncdc.Decode(c.nodeID[:])
-	if err != nil {
-		return false, fmt.Errorf("could not deocde arguments: %w", err)
-	}
-
 	// execute script to read if voted
+	arg := jsoncdc.MustEncode(cadence.String(c.nodeID.String()))
 	template := templates.GenerateGetNodeHasVotedScript(c.getEnvironment())
-	hasVoted, err := c.client.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{val})
+	hasVoted, err := c.client.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(arg)})
 	if err != nil {
 		return false, fmt.Errorf("could not execute voted script: %w", err)
 	}

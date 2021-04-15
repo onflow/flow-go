@@ -1,4 +1,4 @@
-package epochs
+package module
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator"
+
 	sdk "github.com/onflow/flow-go-sdk"
 )
 
@@ -77,6 +78,35 @@ func (c *EmulatorClient) ExecuteScriptAtLatestBlock(ctx context.Context, script 
 	return scriptResult.Value, nil
 }
 
+func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk.Identifier, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
+
+	arguments := [][]byte{}
+	for _, arg := range args {
+		val, err := jsoncdc.Encode(arg)
+		if err != nil {
+			return nil, fmt.Errorf("could not encode arguments: %w", err)
+		}
+		arguments = append(arguments, val)
+	}
+
+	// get block by ID
+	block, err := c.blockchain.GetBlockByID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	scriptResult, err := c.blockchain.ExecuteScriptAtBlock(script, arguments, block.Header.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	if scriptResult.Error != nil {
+		return nil, fmt.Errorf("error in script: %w", scriptResult.Error)
+	}
+
+	return scriptResult.Value, nil
+}
+
 func (c *EmulatorClient) Submit(tx *sdk.Transaction) error {
 	// submit the signed transaction
 	err := c.blockchain.AddTransaction(*tx)
@@ -90,7 +120,7 @@ func (c *EmulatorClient) Submit(tx *sdk.Transaction) error {
 	}
 
 	if !result.Succeeded() {
-		return fmt.Errorf("transaction did not succeeded")
+		return fmt.Errorf("transaction did not succeeded: %w", result.Error)
 	}
 
 	_, err = c.blockchain.CommitBlock()
