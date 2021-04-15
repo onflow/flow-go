@@ -158,12 +158,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 
-		if tx.Err == nil {
-			// if tx is successful, we apply changes to the chunk view by merging the txView into chunk view
-			err = chunkView.MergeView(txView)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
-			}
+		// always merge back the tx view (fvm is responsible for changes on tx errors)
+		err = chunkView.MergeView(txView)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 	}
 
