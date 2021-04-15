@@ -900,28 +900,47 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
-	var minHeight uint64 = 5
-	var maxHeight uint64 = 10
+	const minHeight uint64 = 5
+	const maxHeight uint64 = 10
 	var headHeight uint64
 	var blockHeaders []*flow.Header
+
+	headersDB := make(map[uint64]*flow.Header) // backend for storage.Headers
+	var head *flow.Header                      // backend for Snapshot.Head
+
+	// mock snapshot to return head backend
+	suite.snapshot.On("Head").Return(
+		func() *flow.Header { return head },
+		func() error { return nil },
+	).Maybe()
+
+	// mock headers to pull from headers backend
+	suite.headers.On("ByHeight", mock.Anything).Return(
+		func(height uint64) *flow.Header {
+			return headersDB[height]
+		},
+		func(height uint64) error {
+			_, ok := headersDB[height]
+			if !ok {
+				return storage.ErrNotFound
+			}
+			return nil
+		}).Maybe()
 
 	setupHeadHeight := func(height uint64) {
 		header := unittest.BlockHeaderFixture() // create a mock header
 		header.Height = height                  // set the header height
-		suite.snapshot.On("Head").Return(&header, nil).Once()
+		head = &header
 	}
 
 	setupStorage := func(min uint64, max uint64) []*flow.Header {
-		headers := make([]*flow.Header, 0)
+		headersDB = make(map[uint64]*flow.Header) // reset backend
 
+		var headers []*flow.Header
 		for i := min; i <= max; i++ {
-			b := unittest.BlockFixture()
-
-			suite.headers.
-				On("ByHeight", i).
-				Return(b.Header, nil).Once()
-
-			headers = append(headers, b.Header)
+			header := unittest.BlockHeaderFixture()
+			headersDB[i] = &header
+			headers = append(headers, &header)
 		}
 
 		return headers
@@ -1340,12 +1359,18 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		if expectedENs == nil {
 			expectedENs = flow.IdentityList{}
 		}
-		require.ElementsMatch(suite.T(), actualList, expectedENs)
+		if len(expectedENs) > maxExecutionNodesCnt {
+			for _, actual := range actualList {
+				require.Contains(suite.T(), expectedENs, actual)
+			}
+		} else {
+			require.ElementsMatch(suite.T(), actualList, expectedENs)
+		}
 	}
 	// if no preferred or fixed ENs are specified, the ExecutionNodesForBlockID function should
-	// return an empty list
+	// return the exe node list without a filter
 	suite.Run("no preferred or fixed ENs", func() {
-		testExecutionNodesForBlockID(nil, nil, nil)
+		testExecutionNodesForBlockID(nil, nil, allExecutionNodes)
 	})
 	// if only preferred ENs are specified, the ExecutionNodesForBlockID function should
 	// return the preferred ENs list
