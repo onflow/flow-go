@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
@@ -30,6 +29,7 @@ import (
 type Client struct {
 	*epochs.BaseContractClient
 
+	log zerolog.Logger
 	env templates.Environment
 }
 
@@ -104,7 +104,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// submit signed transaction to node
-	log.Info().Msg("sending Broadcast transaction")
+	c.log.Info().Msg("sending Broadcast transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
@@ -207,7 +207,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
-	log.Info().Msg("sending SubmitResult transaction")
+	c.log.Info().Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
