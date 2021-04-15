@@ -59,8 +59,13 @@ type CleanerMetrics interface {
 }
 
 type CacheMetrics interface {
+	// report the total number of cached items
 	CacheEntries(resource string, entries uint)
+	// report the number of times the queried item is found in the cache
 	CacheHit(resource string)
+	// report the number of items the queried item is not found in the cache, nor found in the database
+	CacheNotFound(resource string)
+	// report the number of items the queried item is not found in the cache, but found in the database
 	CacheMiss(resource string)
 }
 

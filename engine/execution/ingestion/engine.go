@@ -843,8 +843,8 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // G
 func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
-		if stored, new := queue.TryAdd(blockify); stored {
-			return queue, new
+		if stored, isNew := queue.TryAdd(blockify); stored {
+			return queue, isNew
 		}
 	}
 	return newQueue(blockify, queues)

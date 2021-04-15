@@ -254,7 +254,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
+		signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
 	sealingEngine, err := sealing.NewEngine(
@@ -330,7 +331,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
 	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+		return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
