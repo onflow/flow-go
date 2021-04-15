@@ -48,36 +48,6 @@ type CompleteExecutionReceipt struct {
 	ReceiptsData []*ExecutionReceiptData  // execution receipts data of the container block
 }
 
-type CompleteExecutionReceiptList []*CompleteExecutionReceipt
-
-// Receipts returns the list of execution receipts in complete execution receipt list.
-func (c CompleteExecutionReceiptList) Receipts() []*flow.ExecutionReceipt {
-	receipts := make([]*flow.ExecutionReceipt, 0)
-	for _, completeER := range c {
-		receipts = append(receipts, completeER.Receipts...)
-	}
-
-	return receipts
-}
-
-// Results returns the list of unique execution results in the complete execution receipt list.
-func (c CompleteExecutionReceiptList) Results() []*flow.ExecutionResult {
-	added := map[flow.Identifier]struct{}{}
-	results := make([]*flow.ExecutionResult, 0)
-
-	for _, receipt := range c.Receipts() {
-		resultID := receipt.ExecutionResult.ID()
-
-		if _, ok := added[resultID]; !ok {
-			added[resultID] = struct{}{}
-			result := receipt.ExecutionResult
-			results = append(results, &result)
-		}
-
-	}
-	return results
-}
-
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
 type CompleteExecutionReceiptBuilder struct {
 	resultsCount int // number of execution results in the container block.
@@ -404,7 +374,7 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 // For sake of simplicity and test, container blocks (i.e., C) do not contain any guarantee.
 //
 // It returns a slice of complete execution receipt fixtures that contains a container block as well as all data to verify its contained receipts.
-func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, opts ...CompleteExecutionReceiptBuilderOpt) CompleteExecutionReceiptList {
+func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count int, opts ...CompleteExecutionReceiptBuilderOpt) []*CompleteExecutionReceipt {
 	completeERs := make([]*CompleteExecutionReceipt, 0, count)
 	parent := root
 
