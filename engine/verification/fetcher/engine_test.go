@@ -221,13 +221,48 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	s.verifier.AssertNotCalled(t, "ProcessLocal")
 }
 
-// TestChunkResponse_MissingResult evaluates the unhappy path of receiving a chunk data response that its result
-// behavior of fetcher engine
-// for which it does not have any chunk status available in memory.
-// This can happen when fetcher receives duplicate response for a requested chunk data pack.
-// This ensures that only one copy of those duplicates can make it through the verifier engine.
-// The deduplication happens by the mutex lock of pending chunks mempool, that allows only one chunk data response
-func TestChunkResponse_InvalidResponse(t *testing.T) {
+// TestChunkResponse_InvalidChunkDataPack evaluates unhappy path of receiving an invalid chunk data response.
+// A chunk data response is invalid if its integrity is violated. We consider collection id, chunk id, and start state,
+// as the necessary conditions for chunk data integrity.
+func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
+	tt := []struct {
+		alterFunc func(*flow.ChunkDataPack)
+		msg       string
+	}{
+		{
+			alterFunc: func(cdp *flow.ChunkDataPack) {
+				cdp.CollectionID = unittest.IdentifierFixture()
+			},
+			msg: "invalid-collection-ID",
+		},
+		{
+			alterFunc: func(cdp *flow.ChunkDataPack) {
+				cdp.ChunkID = unittest.IdentifierFixture()
+			},
+			msg: "invalid-collection-ID",
+		},
+		{
+			alterFunc: func(cdp *flow.ChunkDataPack) {
+				cdp.StartState = unittest.StateCommitmentFixture()
+			},
+			msg: "invalid-start-state",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(fmt.Sprintf("%s", tc.msg), func(t *testing.T) {
+			testInvalidChunkDataResponse(t, tc.alterFunc)
+		})
+	}
+}
+
+// testInvalidChunkDataResponse evaluates the unhappy path of receiving
+// an invalid chunk data response for an already requested chunk.
+// The invalid response should be dropped without any further action. Particularly, the
+// notifier and verifier engine should not be called as the result of handling an invalid chunk.
+//
+// The input alter function alters the chunk data response to break its integrity.
+func testInvalidChunkDataResponse(t *testing.T, alter func(cdp *flow.ChunkDataPack)) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
@@ -249,14 +284,18 @@ func TestChunkResponse_InvalidResponse(t *testing.T) {
 	chunkID := chunk.ID()
 	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
 
-	// dispatches response to fetcher engine
+	// alters chunk data pack so that it become invalid.
+	alter(chunkDataPacks[chunkID])
 	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
 
-	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks)
+	mock.AssertExpectationsForObjects(t, s.pendingChunks)
 	// no verifiable chunk should be passed to verifier engine
 	// and chunk consumer should not get any notification
 	s.chunkConsumerNotifier.AssertNotCalled(t, "Notify")
 	s.verifier.AssertNotCalled(t, "ProcessLocal")
+
+	// none of the subsequent calls on the pipeline path should happen upon validation fails.
+	s.results.AssertNotCalled(t, "ByID")
 	s.pendingChunks.AssertNotCalled(t, "Rem")
 }
 
