@@ -44,6 +44,7 @@ const (
 	ResourceIdentity                 = "identity"
 	ResourceGuarantee                = "guarantee"
 	ResourceResult                   = "result"
+	ResourceResultApprovals          = "result_approvals"
 	ResourceReceipt                  = "receipt"
 	ResourceMyReceipt                = "my_receipt"
 	ResourceCollection               = "collection"
