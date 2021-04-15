@@ -50,15 +50,16 @@ type ResultApprovalProcessor interface {
 type approvalProcessingCore struct {
 	collectors                           map[flow.Identifier]*AssignmentCollector // mapping of ResultID to AssignmentCollector
 	lock                                 sync.RWMutex                             // lock for collectors
-	assigner                             module.ChunkAssigner
-	state                                protocol.State
-	verifier                             module.Verifier
-	seals                                mempool.IncorporatedResultSeals
-	payloads                             storage.Payloads
-	approvalsCache                       *ApprovalsCache // in-memory cache of approvals that weren't verified
-	lastSealedBlockHeight                uint64          // atomic variable for last sealed block height
-	blockHeightLookupCache               *lru.Cache      // cache for block height lookups
-	requiredApprovalsForSealConstruction uint            // number of approvals that are required for each chunk to be sealed
+	approvalsCache                       *ApprovalsCache                          // in-memory cache of approvals that weren't verified
+	blockHeightLookupCache               *lru.Cache                               // cache for block height lookups
+	lastSealedBlockHeight                uint64                                   // atomic variable for last sealed block height
+	requiredApprovalsForSealConstruction uint                                     // number of approvals that are required for each chunk to be sealed
+
+	assigner module.ChunkAssigner
+	state    protocol.State
+	verifier module.Verifier
+	seals    mempool.IncorporatedResultSeals
+	payloads storage.Payloads
 }
 
 func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
@@ -163,12 +164,8 @@ func (p *approvalProcessingCore) checkBlockOutdated(blockID flow.Identifier) err
 	return nil
 }
 
-func (p *approvalProcessingCore) validateApproval(approval *flow.ResultApproval) error {
-	return p.checkBlockOutdated(approval.Body.BlockID)
-}
-
 func (p *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) error {
-	err := p.validateApproval(approval)
+	err := p.checkBlockOutdated(approval.Body.BlockID)
 	if err != nil {
 		return err
 	}

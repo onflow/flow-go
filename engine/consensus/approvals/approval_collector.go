@@ -14,14 +14,14 @@ import (
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
-	incorporatedBlockID                  flow.Identifier
-	incorporatedResult                   *flow.IncorporatedResult
-	numberOfChunks                       int
-	chunkCollectors                      []*ChunkApprovalCollector
-	requiredApprovalsForSealConstruction uint                                // min number of approvals required for constructing a candidate seal
-	aggregatedSignatures                 map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
-	lock                                 sync.RWMutex                        // lock for modifying aggregatedSignatures
-	seals                                mempool.IncorporatedResultSeals     // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	chunkCollectors      []*ChunkApprovalCollector
+	aggregatedSignatures map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
+	lock                 sync.RWMutex                        // lock for modifying aggregatedSignatures
+	incorporatedResult   *flow.IncorporatedResult
+	numberOfChunks       int
+
+	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
 }
 
 func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
@@ -35,7 +35,6 @@ func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.As
 		chunkCollectors = append(chunkCollectors, collector)
 	}
 	return &ApprovalCollector{
-		incorporatedBlockID:                  result.IncorporatedBlockID,
 		incorporatedResult:                   result,
 		numberOfChunks:                       result.Result.Chunks.Len(),
 		chunkCollectors:                      chunkCollectors,

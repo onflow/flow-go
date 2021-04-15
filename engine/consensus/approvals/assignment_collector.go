@@ -12,22 +12,24 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// AssignmentCollector encapsulates the processing of approvals for one
-// specific result
+// AssignmentCollector is responsible collecting approvals that satisfy one assignment, meaning that we will
+// have multiple collectors for one execution result as same result can be incorporated in multiple forks.
+// AssignmentCollector has a strict ordering of processing, before processing approvals at least one incorporated result has to be
+// processed.
+// AssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
+// AssignmentCollector is responsible for validating approvals on result-level(checking signature, identity).
 type AssignmentCollector struct {
-	ResultID flow.Identifier
+	ResultID                             flow.Identifier
+	collectors                           map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
+	authorizedApprovers                  map[flow.Identifier]*flow.Identity     // map of approvers pre-selected at block that is being sealed
+	lock                                 sync.RWMutex                           // lock for protecting collectors map
+	verifiedApprovalsCache               *ApprovalsCache                        // in-memory cache of approvals were already verified
+	requiredApprovalsForSealConstruction uint                                   // number of approvals that are required for each chunk to be sealed
 
-	collectors map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
-	lock       sync.RWMutex                           // lock for protecting collectors map
-
-	verifiedApprovalsCache *ApprovalsCache // in-memory cache of approvals were already verified
-
-	authorizedApprovers                  map[flow.Identifier]*flow.Identity // map of approvers pre-selected at block that is being sealed
-	assigner                             module.ChunkAssigner
-	state                                protocol.State
-	verifier                             module.Verifier
-	seals                                mempool.IncorporatedResultSeals
-	requiredApprovalsForSealConstruction uint
+	assigner module.ChunkAssigner
+	state    protocol.State
+	verifier module.Verifier
+	seals    mempool.IncorporatedResultSeals
 }
 
 func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
@@ -179,7 +181,7 @@ func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) e
 	for _, collector := range c.allCollectors() {
 		err := collector.ProcessApproval(approval)
 		if err != nil {
-			return fmt.Errorf("could not process assignment for collector %v: %w", collector.incorporatedBlockID, err)
+			return fmt.Errorf("could not process assignment for collector %v: %w", collector.incorporatedResult.IncorporatedBlockID, err)
 		}
 	}
 
