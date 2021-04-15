@@ -17,14 +17,29 @@ func NewApprovalsCache(limit uint) *ApprovalsCache {
 	}
 }
 
-func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
-	approval := c.Get(approvalID)
-	if approval == nil {
+func (c *ApprovalsCache) TakeIf(approvalID flow.Identifier, predicate func(*flow.ResultApproval) bool) *flow.ResultApproval {
+	approvalTmp, cached := c.cache.Peek(approvalID)
+	if !cached {
+		return nil
+	}
+
+	approval := approvalTmp.(*flow.ResultApproval)
+	if !predicate(approval) {
 		return nil
 	}
 
 	c.cache.Remove(approvalID)
 	return approval
+}
+
+func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
+	approval, cached := c.cache.Peek(approvalID)
+	if !cached {
+		return nil
+	}
+
+	c.cache.Remove(approvalID)
+	return approval.(*flow.ResultApproval)
 }
 
 func (c *ApprovalsCache) Ids() []flow.Identifier {
@@ -34,6 +49,16 @@ func (c *ApprovalsCache) Ids() []flow.Identifier {
 		result[i] = key.(flow.Identifier)
 	}
 	return result
+}
+
+func (c *ApprovalsCache) Peek(approvalID flow.Identifier) *flow.ResultApproval {
+	// check if we have it in the cache
+	resource, cached := c.cache.Peek(approvalID)
+	if cached {
+		return resource.(*flow.ResultApproval)
+	}
+
+	return nil
 }
 
 func (c *ApprovalsCache) Get(approvalID flow.Identifier) *flow.ResultApproval {

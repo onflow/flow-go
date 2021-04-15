@@ -81,26 +81,17 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsAfterResul
 	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
 }
 
-// TestProcessAssignment_ApprovalsBeforeResult tests a scenario when first we have received approvals for unknown
-// execution result and after that we discovered execution result. In this scenario we should be able
-// to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
-func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsBeforeResult() {
-	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-
-	for _, chunk := range s.Chunks {
-		for verID := range s.AuthorizedVerifiers {
-			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
-			err := s.collector.ProcessAssignment(approval)
-			require.NoError(s.T(), err)
-		}
-	}
-
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+// TestProcessAssignment_InvalidSignature tests a scenario processing approval with invalid signature
+func (s *AssignmentCollectorTestSuite) TestProcessAssignment_InvalidSignature() {
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
+	err = s.collector.ProcessAssignment(approval)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err))
 }
 
 // TestProcessIncorporatedResult tests different scenarios for processing incorporated result

@@ -15,13 +15,12 @@ import (
 // AssignmentCollector encapsulates the processing of approvals for one
 // specific result
 type AssignmentCollector struct {
-	resultID flow.Identifier
+	ResultID flow.Identifier
 
 	collectors map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
 	lock       sync.RWMutex                           // lock for protecting collectors map
 
 	verifiedApprovalsCache *ApprovalsCache // in-memory cache of approvals were already verified
-	approvalsCache         *ApprovalsCache // in-memory cache of approvals that weren't verified
 
 	authorizedApprovers                  map[flow.Identifier]*flow.Identity // map of approvers pre-selected at block that is being sealed
 	assigner                             module.ChunkAssigner
@@ -35,8 +34,7 @@ func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assi
 	sigVerifier module.Verifier, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
 	collector := &AssignmentCollector{
 		verifiedApprovalsCache:               NewApprovalsCache(1000),
-		approvalsCache:                       NewApprovalsCache(1000),
-		resultID:                             resultID,
+		ResultID:                             resultID,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
 		state:                                state,
 		assigner:                             assigner,
@@ -99,11 +97,10 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	collector := NewApprovalCollector(incorporatedResult, assignment, c.seals, c.requiredApprovalsForSealConstruction)
 
 	c.putCollector(incorporatedResult.IncorporatedBlockID, collector)
-	c.processPendingApprovals()
 
-	// process approvals that are passed needed checks and are ready to be processed
+	// process approvals that have passed needed checks and are ready to be processed
 	for _, approval := range c.verifiedApprovalsCache.Ids() {
-		if approval := c.verifiedApprovalsCache.Get(approval); approval != nil {
+		if approval := c.verifiedApprovalsCache.Peek(approval); approval != nil {
 			err := collector.ProcessApproval(approval)
 			if err != nil {
 				// TODO: add log??
@@ -112,19 +109,6 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	}
 
 	return nil
-}
-
-func (c *AssignmentCollector) processPendingApprovals() {
-	// process unverified approvals that were stored in cache
-	for _, approvalID := range c.approvalsCache.Ids() {
-		if approval := c.approvalsCache.Take(approvalID); approval != nil {
-			err := c.validateAndCache(approval)
-			if err != nil {
-				continue
-				// TODO: add log??
-			}
-		}
-	}
 }
 
 func (c *AssignmentCollector) putCollector(incorporatedBlockID flow.Identifier, collector *ApprovalCollector) {
@@ -189,22 +173,12 @@ func (c *AssignmentCollector) validateAndCache(approval *flow.ResultApproval) er
 }
 
 func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) error {
-	collectors := c.allCollectors()
-
-	if len(collectors) == 0 {
-		// we got approval before discovering execution result
-		// no checks can be made at this point, save result into
-		// cache for later processing
-		c.approvalsCache.Put(approval)
-		return nil
-	}
-
 	err := c.validateAndCache(approval)
 	if err != nil {
 		return fmt.Errorf("could not validate and cache approval: %w", err)
 	}
 
-	for _, collector := range collectors {
+	for _, collector := range c.allCollectors() {
 		err := collector.ProcessApproval(approval)
 		if err != nil {
 			return fmt.Errorf("could not process assignment for collector %v: %w", collector.incorporatedBlockID, err)

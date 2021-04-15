@@ -3,7 +3,6 @@ package approvals
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"sync"
 	"sync/atomic"
 
@@ -18,26 +17,48 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// ResultApprovalProcessor performs processing and storing of approvals
+// ResultApprovalProcessor performs processing of execution results and result approvals.
+// Accepts `flow.IncorporatedResult` to start processing approvals for particular result.
+// Whenever enough approvals are collected produces a candidate seal and adds it to the mempool.
 type ResultApprovalProcessor interface {
-	// submits approval for processing in sync way
+	// ProcessApproval processes approval in blocking way, implementors need to ensure
+	// that this function is reentrant and can be safely used in concurrent environment.
+	// Returns:
+	// * engine.InvalidInputError - result approval is invalid
+	// * engine.UnverifiableInputError -
+	// * engine.OutdatedInputError - result approval is outdated, block was already sealed
+	// * exception in case of any other error, usually this is not expected.
+	// * nil - successfully processed result approval
 	ProcessApproval(approval *flow.ResultApproval) error
-	// submits incorporated result for processing in sync way
+	// ProcessIncorporatedResult processes incorporated result in blocking way, implementors need to ensure
+	// that this function is reentrant.
+	// Returns:
+	// * engine.InvalidInputError - incorporated result is invalid
+	// * engine.UnverifiableInputError - sentinel error in case we haven't discovered requested blockID
+	// * engine.OutdatedInputError - sentinel error in case block is outdated
+	// * exception in case of any other error, usually this is not expected.
+	// * nil - successfully processed incorporated result
 	ProcessIncorporatedResult(result *flow.IncorporatedResult) error
 }
 
-// implementation of ResultApprovalProcessor
+// approvalProcessingCore is an implementation of ResultApprovalProcessor interface
+// This struct is responsible for:
+// 	- collecting approvals for execution results
+// 	- processing multiple incorporated results
+// 	- pre-validating approvals(if they are outdated)
+// 	- pruning already processed collectors
 type approvalProcessingCore struct {
-	collectors                           map[flow.Identifier]*AssignmentCollector // contains a mapping of ResultID to AssignmentCollector
+	collectors                           map[flow.Identifier]*AssignmentCollector // mapping of ResultID to AssignmentCollector
 	lock                                 sync.RWMutex                             // lock for collectors
 	assigner                             module.ChunkAssigner
 	state                                protocol.State
 	verifier                             module.Verifier
 	seals                                mempool.IncorporatedResultSeals
 	payloads                             storage.Payloads
-	lastSealedBlockHeight                uint64 // atomic variable for last sealed block height
-	blockHeightLookupCache               *lru.Cache
-	requiredApprovalsForSealConstruction uint
+	approvalsCache                       *ApprovalsCache // in-memory cache of approvals that weren't verified
+	lastSealedBlockHeight                uint64          // atomic variable for last sealed block height
+	blockHeightLookupCache               *lru.Cache      // cache for block height lookups
+	requiredApprovalsForSealConstruction uint            // number of approvals that are required for each chunk to be sealed
 }
 
 func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
@@ -45,6 +66,7 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 	blockHeightLookupCache, _ := lru.New(100)
 	return &approvalProcessingCore{
 		collectors:                           make(map[flow.Identifier]*AssignmentCollector),
+		approvalsCache:                       NewApprovalsCache(1000),
 		lock:                                 sync.RWMutex{},
 		assigner:                             assigner,
 		state:                                state,
@@ -56,10 +78,12 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 	}
 }
 
-func (p *approvalProcessingCore) OnFinalizedBlock(block *model.Block) {
-	payload, err := p.payloads.ByBlockID(block.BlockID)
+// WARNING: this function is implemented in a way that we expect blocks strictly in parent-child order
+// Caller has to ensure that it doesn't feed blocks that were already processed or in wrong order.
+func (p *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
+	payload, err := p.payloads.ByBlockID(blockID)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", block.BlockID)
+		log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", blockID)
 	}
 
 	sealsCount := len(payload.Seals)
@@ -73,6 +97,8 @@ func (p *approvalProcessingCore) OnFinalizedBlock(block *model.Block) {
 			if err != nil {
 				log.Fatal().Err(err).Msgf("could not retrieve state for finalized block %s", seal.BlockID)
 			}
+
+			// it's important to use atomic operation to make sure that we have correct ordering
 			atomic.StoreUint64(&p.lastSealedBlockHeight, head.Height)
 		}
 	}
@@ -82,31 +108,52 @@ func (p *approvalProcessingCore) OnFinalizedBlock(block *model.Block) {
 }
 
 func (p *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
+	err := p.checkBlockOutdated(result.Result.BlockID)
+	if err != nil {
+		return fmt.Errorf("won't process outdated or unverifiable execution result %s: %w", result.Result.BlockID, err)
+	}
+
 	collector := p.getOrCreateCollector(result.Result.ID())
-	err := collector.ProcessIncorporatedResult(result)
+	err = collector.ProcessIncorporatedResult(result)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated result: %w", err)
 	}
+
+	err = p.processPendingApprovals(collector)
+	if err != nil {
+		return fmt.Errorf("could not process cached approvals:  %w", err)
+	}
+
 	return nil
 }
 
-func (p *approvalProcessingCore) validateApproval(approval *flow.ResultApproval) error {
-	blockID := approval.Body.BlockID
-	height, cached := p.blockHeightLookupCache.Get(blockID)
+// checkBlockOutdated performs a sanity check if block is outdated
+// Returns:
+// * engine.UnverifiableInputError - sentinel error in case we haven't discovered requested blockID
+// * engine.OutdatedInputError - sentinel error in case block is outdated
+// * exception in case of unknown internal error
+// * nil - block isn't sealed
+func (p *approvalProcessingCore) checkBlockOutdated(blockID flow.Identifier) error {
+	// approval validation is called for every approval
+	// it's important to use a cache instead of looking up protocol.State for every approval
+	// since we expect that there will be multiple approvals for same block
+	// Peek internally used RWLock so it should be ok in terms of performance.
+	height, cached := p.blockHeightLookupCache.Peek(blockID)
 	if !cached {
 		// check if we already have the block the approval pertains to
 		head, err := p.state.AtBlockID(blockID).Head()
 		if err != nil {
 			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("failed to retrieve header for block %x: %w", approval.Body.BlockID, err)
+				return fmt.Errorf("failed to retrieve header for block %x: %w", blockID, err)
 			}
-			return engine.NewUnverifiableInputError("no header for block: %v", approval.Body.BlockID)
+			return engine.NewUnverifiableInputError("no header for block: %v", blockID)
 		}
 
 		height = head.Height
 		p.blockHeightLookupCache.Add(blockID, height)
 	}
 
+	// it's important to use atomic operation to make sure that we have correct ordering
 	lastSealedHeight := atomic.LoadUint64(&p.lastSealedBlockHeight)
 	// drop approval, if it is for block whose height is lower or equal to already sealed height
 	if lastSealedHeight >= height.(uint64) {
@@ -116,17 +163,53 @@ func (p *approvalProcessingCore) validateApproval(approval *flow.ResultApproval)
 	return nil
 }
 
+func (p *approvalProcessingCore) validateApproval(approval *flow.ResultApproval) error {
+	return p.checkBlockOutdated(approval.Body.BlockID)
+}
+
 func (p *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) error {
 	err := p.validateApproval(approval)
 	if err != nil {
 		return err
 	}
 
-	collector := p.getOrCreateCollector(approval.Body.ExecutionResultID)
-	err = collector.ProcessAssignment(approval)
-	if err != nil {
-		return fmt.Errorf("could not process assignment: %w", err)
+	if collector := p.getCollector(approval.Body.ExecutionResultID); collector != nil {
+		// if there is a collector it means that we have received execution result and we are ready
+		// to process approvals
+		err = collector.ProcessAssignment(approval)
+		if err != nil {
+			return fmt.Errorf("could not process assignment: %w", err)
+		}
+	} else {
+		// in case we haven't received execution result, cache it and process later.
+		p.approvalsCache.Put(approval)
 	}
+
+	return nil
+}
+
+func (p *approvalProcessingCore) processPendingApprovals(collector *AssignmentCollector) error {
+	predicate := func(approval *flow.ResultApproval) bool {
+		return approval.Body.ExecutionResultID == collector.ResultID
+	}
+
+	// filter cached approvals for concrete execution result
+	for _, approvalID := range p.approvalsCache.Ids() {
+		if approval := p.approvalsCache.TakeIf(approvalID, predicate); approval != nil {
+			err := collector.ProcessAssignment(approval)
+			if err != nil {
+				if engine.IsInvalidInputError(err) {
+					log.Debug().
+						Hex("result_id", collector.ResultID[:]).
+						Err(err).
+						Msgf("invalid approval with id %s", approval.ID())
+				} else {
+					return fmt.Errorf("could not process assignment: %w", err)
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -146,6 +229,10 @@ func (p *approvalProcessingCore) createCollector(resultID flow.Identifier) *Assi
 }
 
 func (p *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {
+	if len(resultIDs) == 0 {
+		return
+	}
+
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	for _, resultID := range resultIDs {
