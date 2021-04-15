@@ -32,6 +32,7 @@ type BootstrapProcedure struct {
 	accountCreationFee        cadence.UFix64
 	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
+	storagePerFlow            cadence.UFix64
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -44,7 +45,7 @@ func WithInitialTokenSupply(supply cadence.UFix64) BootstrapProcedureOption {
 }
 
 var DefaultAccountCreationFee = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("0.10000000")
+	value, err := cadence.NewUFix64("0.00100000")
 	if err != nil {
 		panic(fmt.Errorf("invalid default account creation fee: %w", err))
 	}
@@ -52,7 +53,15 @@ var DefaultAccountCreationFee = func() cadence.UFix64 {
 }()
 
 var DefaultMinimumStorageReservation = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("0.10000000")
+	value, err := cadence.NewUFix64("0.00100000")
+	if err != nil {
+		panic(fmt.Errorf("invalid default minimum storage reservation: %w", err))
+	}
+	return value
+}()
+
+var DefaultStorageMBPerFLOW = func() cadence.UFix64 {
+	value, err := cadence.NewUFix64("10.00000000")
 	if err != nil {
 		panic(fmt.Errorf("invalid default minimum storage reservation: %w", err))
 	}
@@ -86,6 +95,13 @@ func WithTransactionFee(fee cadence.UFix64) BootstrapProcedureOption {
 func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.minimumStorageReservation = reservation
+		return bp
+	}
+}
+
+func WithStorageMBPerFLOW(ratio cadence.UFix64) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.storagePerFlow = ratio
 		return bp
 	}
 }
@@ -130,7 +146,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	}
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
-	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation)
+	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation, b.storagePerFlow)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 	return nil
@@ -260,11 +276,12 @@ func (b *BootstrapProcedure) setupFees(
 	service flow.Address,
 	transactionFee,
 	addressCreationFee,
-	minimumStorageReservation cadence.UFix64,
+	minimumStorageReservation,
+	storagePerFlow cadence.UFix64,
 ) {
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation),
+		setupFeesTransaction(service, transactionFee, addressCreationFee, minimumStorageReservation, storagePerFlow),
 		b.sth,
 		b.programs,
 	)
@@ -351,7 +368,7 @@ transaction(amount: UFix64) {
 const setupFeesTransactionTemplate = `
 import FlowStorageFees, FlowServiceAccount from 0x%s
 
-transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageReservation: UFix64) {
+transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageReservation: UFix64, storageMegaBytesPerReservedFLOW: UFix64) {
     prepare(service: AuthAccount) {
         let serviceAdmin = service.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
             ?? panic("Could not borrow reference to the flow service admin!");
@@ -362,6 +379,7 @@ transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageRe
         serviceAdmin.setTransactionFee(transactionFee)
         serviceAdmin.setAccountCreationFee(accountCreationFee)
         storageAdmin.setMinimumStorageReservation(minimumStorageReservation)
+        storageAdmin.setStorageMegaBytesPerReservedFLOW(storageMegaBytesPerReservedFLOW)
     }
 }
 `
@@ -457,7 +475,8 @@ func setupFeesTransaction(
 	service flow.Address,
 	transactionFee,
 	addressCreationFee,
-	minimumStorageReservation cadence.UFix64,
+	minimumStorageReservation,
+	storagePerFlow cadence.UFix64,
 ) *TransactionProcedure {
 	transactionFeeArg, err := jsoncdc.Encode(transactionFee)
 	if err != nil {
@@ -471,6 +490,10 @@ func setupFeesTransaction(
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode minimum storage reservation: %s", err.Error()))
 	}
+	storagePerFlowArg, err := jsoncdc.Encode(storagePerFlow)
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode storage ratio: %s", err.Error()))
+	}
 
 	return Transaction(
 		flow.NewTransactionBody().
@@ -478,6 +501,7 @@ func setupFeesTransaction(
 			AddArgument(transactionFeeArg).
 			AddArgument(addressCreationFeeArg).
 			AddArgument(minimumStorageReservationArg).
+			AddArgument(storagePerFlowArg).
 			AddAuthorizer(service),
 		0,
 	)

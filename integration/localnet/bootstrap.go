@@ -263,9 +263,9 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"--profiler-interval=2m",
 		},
 		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
-			fmt.Sprintf("%s:/profiler", profilerDir),
-			fmt.Sprintf("%s:/data", dataDir),
+			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+			fmt.Sprintf("%s:/profiler:z", profilerDir),
+			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
 			"JAEGER_AGENT_HOST=jaeger",
@@ -360,7 +360,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
 
 	service.Volumes = append(
 		service.Volumes,
-		fmt.Sprintf("%s:/trie", trieDir),
+		fmt.Sprintf("%s:/trie:z", trieDir),
 	)
 
 	return service
