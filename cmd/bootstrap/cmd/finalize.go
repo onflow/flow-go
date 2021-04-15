@@ -142,7 +142,7 @@ func finalize(cmd *cobra.Command, args []string) {
 			fvm.WithInitialTokenSupply(value),
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-			fvm.WithStoragePerFlow(fvm.DefaultStoragePerFlow),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("unable to generate execution state")

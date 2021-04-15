@@ -615,7 +615,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-		fvm.WithStoragePerFlow(fvm.DefaultStoragePerFlow),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	}
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1687,7 +1687,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	t.Run("Transaction fails because of storage", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithStoragePerFlow(fvm.DefaultStoragePerFlow),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -1732,7 +1732,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	t.Run("Transaction fails but sequence number is incremented", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithStoragePerFlow(fvm.DefaultStoragePerFlow),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {

@@ -59,7 +59,7 @@ var DefaultMinimumStorageReservation = func() cadence.UFix64 {
 	return value
 }()
 
-var DefaultStoragePerFlow = func() cadence.UFix64 {
+var DefaultStorageMBPerFLOW = func() cadence.UFix64 {
 	value, err := cadence.NewUFix64("10.00000000")
 	if err != nil {
 		panic(fmt.Errorf("invalid default minimum storage reservation: %w", err))
@@ -98,7 +98,7 @@ func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedur
 	}
 }
 
-func WithStoragePerFlow(ratio cadence.UFix64) BootstrapProcedureOption {
+func WithStorageMBPerFLOW(ratio cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.storagePerFlow = ratio
 		return bp
