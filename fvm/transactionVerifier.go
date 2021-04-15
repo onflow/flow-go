@@ -178,7 +178,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	validWOTag, err := v.SignatureVerifier.Verify(
+	validWithoutTag, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
 		nil,
 		message,
@@ -191,11 +191,11 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		}
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
-	if validWOTag {
+	if validWithoutTag {
 		return &accountKey, nil
 	}
 
-	validWTag, err := v.SignatureVerifier.Verify(
+	validWithTag, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
 		flow.TransactionDomainTag[:],
 		message,
@@ -209,7 +209,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	if validWTag {
+	if validWithTag {
 		return &accountKey, nil
 	}
 
