@@ -48,8 +48,23 @@ func (c *ChunkApprovalCollector) ProcessApproval(approval *flow.ResultApproval) 
 	return status
 }
 
+// GetAggregatedSignature returns an aggregated signature for this chunk
 func (c *ChunkApprovalCollector) GetAggregatedSignature() flow.AggregatedSignature {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	return c.chunkApprovals.ToAggregatedSignature()
+}
+
+// GetMissingSigners returns ids of approvers that are present in assignment but didn't provide approvals
+func (c *ChunkApprovalCollector) GetMissingSigners() flow.IdentifierList {
+	// provide capacity for worst-case,
+	result := make(flow.IdentifierList, 0)
+	aggregatedSig := c.GetAggregatedSignature()
+	for id := range c.assignment {
+		if !aggregatedSig.HasSigner(id) {
+			result = append(result, id)
+		}
+	}
+
+	return result
 }

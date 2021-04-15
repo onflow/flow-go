@@ -72,3 +72,24 @@ func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApp
 	require.Equal(s.T(), uint(len(s.AuthorizedVerifiers)), status.numberOfApprovals)
 	require.Equal(s.T(), sigCollector.ToAggregatedSignature(), s.collector.GetAggregatedSignature())
 }
+
+// TestGetMissingSigners tests that missing signers returns correct IDs of approvers that haven't provided an approval
+func (s *ChunkApprovalCollectorTestSuite) TestGetMissingSigners() {
+	assignedSigners := make(flow.IdentifierList, 0, len(s.chunkAssignment))
+	for id := range s.chunkAssignment {
+		assignedSigners = append(assignedSigners, id)
+	}
+	require.ElementsMatch(s.T(), assignedSigners, s.collector.GetMissingSigners())
+
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(assignedSigners[0]))
+	s.collector.ProcessApproval(approval)
+
+	require.ElementsMatch(s.T(), assignedSigners[1:], s.collector.GetMissingSigners())
+
+	for verID := range s.AuthorizedVerifiers {
+		approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(verID))
+		s.collector.ProcessApproval(approval)
+	}
+
+	require.Empty(s.T(), s.collector.GetMissingSigners())
+}

@@ -132,3 +132,33 @@ func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, collec
 	defer c.lock.Unlock()
 	c.aggregatedSignatures[chunkIndex] = aggregatedSignature
 }
+
+func (c *ApprovalCollector) collectChunksWithMissingApprovals() []uint64 {
+	// provide enough capacity to avoid allocations while we hold the lock
+	missingChunks := make([]uint64, 0, c.numberOfChunks)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	for i := 0; i < c.numberOfChunks; i++ {
+		chunkIndex := uint64(i)
+		if _, found := c.aggregatedSignatures[chunkIndex]; found {
+			// skip if we already have enough valid approvals for this chunk
+			continue
+		}
+		missingChunks = append(missingChunks, chunkIndex)
+	}
+	return missingChunks
+}
+
+// CollectMissingVerifiers collects ids of verifiers who haven't provided an approval for particular chunk
+// Returns: map { ChunkIndex -> []VerifierId }
+func (c *ApprovalCollector) CollectMissingVerifiers() map[uint64]flow.IdentifierList {
+	targetIDs := make(map[uint64]flow.IdentifierList)
+	for _, chunkIndex := range c.collectChunksWithMissingApprovals() {
+		missingSigners := c.chunkCollectors[chunkIndex].GetMissingSigners()
+		if missingSigners.Len() > 0 {
+			targetIDs[chunkIndex] = missingSigners
+		}
+	}
+
+	return targetIDs
+}
