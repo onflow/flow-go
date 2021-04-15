@@ -2,7 +2,9 @@ package dkg
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -16,6 +18,8 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
+	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -23,6 +27,8 @@ import (
 	"github.com/onflow/flow-go/module/dkg"
 	emulatormod "github.com/onflow/flow-go/module/emulator"
 	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -53,7 +59,7 @@ func (s *DKGSuite) SetupTest() {
 
 	s.nodeIDs = unittest.IdentityListFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
 	for _, id := range s.nodeIDs {
-		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id.NodeID))
+		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
 	}
 	for _, acc := range s.nodeAccounts {
 		s.nodes = append(s.nodes, s.createNode(acc))
@@ -63,6 +69,13 @@ func (s *DKGSuite) SetupTest() {
 
 	for _, node := range s.nodes {
 		s.claimDKGParticipant(node)
+	}
+
+	// We need to initialise the nodes with a list of identities that contain
+	// all roles, otherwise there would be an error initialising the first epoch
+	identities := unittest.CompleteIdentitySet(s.nodeIDs...)
+	for _, node := range s.nodes {
+		s.initEngines(node, identities)
 	}
 }
 
@@ -76,6 +89,8 @@ func (s *DKGSuite) initEmulator() {
 	s.blockchain = blockchain
 
 	s.adminEmulatorClient = emulatormod.NewEmulatorClient(blockchain)
+
+	s.hub = stub.NewNetworkHub()
 }
 
 // deployDKGContract deploys the DKG contract to the emulator and initializes
@@ -127,7 +142,7 @@ func (s *DKGSuite) setupDKGAdmin() {
 }
 
 // createAndFundAccount creates a nodeAccount and funds it in the emulator
-func (s *DKGSuite) createAndFundAccount(netID flow.Identifier) *nodeAccount {
+func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	accountPrivateKey := common.RandomPrivateKey()
 	accountKey := sdk.NewAccountKey().
 		FromPrivateKey(accountPrivateKey).
@@ -308,6 +323,58 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 	result := s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
 		[][]byte{jsoncdc.MustEncode(cadence.String(node.account.netID.String()))})
 	assert.Equal(s.T(), cadence.NewBool(true), result)
+}
+
+func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
+	core := testutil.GenericNode(s.T(), s.hub, node.account.netID, ids, s.chainID)
+	core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+
+	// the viewsObserver is used by the reactor engine to subscribe to when
+	// blocks are finalized that are in a new view
+	viewsObserver := gadgets.NewViews()
+	core.ProtocolEvents.AddConsumer(viewsObserver)
+
+	// keyKeys is used to store the private key resulting from the node's
+	// participation in the DKG run
+	dkgKeys := badger.NewDKGKeys(core.Metrics, core.DB)
+
+	// brokerTunnel is used to communicate between the messaging engine and the
+	// DKG broker/controller
+	brokerTunnel := dkg.NewBrokerTunnel()
+
+	// messagingEngine is a network engine that is used by nodes to exchange
+	// private DKG messages
+	messagingEngine, err := dkgeng.NewMessagingEngine(
+		core.Log,
+		core.Net,
+		core.Me,
+		brokerTunnel,
+	)
+	require.NoError(s.T(), err)
+
+	// the reactor engine reacts to new views being finalized and drives the
+	// DKG protocol
+	reactorEngine := dkgeng.NewReactorEngine(
+		core.Log,
+		core.Me,
+		core.State,
+		dkgKeys,
+		dkg.NewControllerFactory(
+			core.Log,
+			core.Me,
+			node.dkgContractClient,
+			brokerTunnel,
+		),
+		viewsObserver,
+	)
+
+	// reactorEngine consumes the EpochSetupPhaseStarted event
+	core.ProtocolEvents.AddConsumer(reactorEngine)
+
+	node.GenericNode = core
+	node.keyStorage = dkgKeys
+	node.messagingEngine = messagingEngine
+	node.reactorEngine = reactorEngine
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
