@@ -130,7 +130,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
 	mockPendingChunksByID(s.pendingChunks, statuses)
-	mockStateAtBlockIDForExecutors(s.state, block.ID(), agrees)
+	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
 
 	// generates and mocks requesting chunk data pack fixture
 	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees.NodeIDs(), disagrees.NodeIDs())
@@ -185,7 +185,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
-	mockStateAtBlockIDForExecutors(s.state, block.ID(), agrees)
+	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
 
 	// generates and mocks requesting chunk data pack fixture
 	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees.NodeIDs(), disagrees.NodeIDs())
@@ -226,32 +226,74 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 // as the necessary conditions for chunk data integrity.
 func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 	tt := []struct {
-		alterFunc func(*flow.ChunkDataPack)
-		msg       string
+		alterChunkDataPack func(*flow.ChunkDataPack)
+		mockStateFunc      func(flow.Identity, *protocol.State, flow.Identifier)
+		msg                string
 	}{
 		{
-			alterFunc: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				cdp.CollectionID = unittest.IdentifierFixture()
 			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				// mocks a valid execution node as originID
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
 			msg: "invalid-collection-ID",
 		},
 		{
-			alterFunc: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				cdp.ChunkID = unittest.IdentifierFixture()
 			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				// mocks a valid execution node as originID
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
 			msg: "invalid-collection-ID",
 		},
 		{
-			alterFunc: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				cdp.StartState = unittest.StateCommitmentFixture()
 			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				// mocks a valid execution node as originID
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
 			msg: "invalid-start-state",
+		},
+		{
+			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				mockStateAtBlockIDForMissingIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "invalid-origin-id",
+		},
+		{
+			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.Stake = 0
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "unstaked-origin-id",
+		},
+		{
+			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+				// we don't alter chunk data pack content
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				identity.Role = flow.RoleVerification
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "invalid-origin-role",
 		},
 	}
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%s", tc.msg), func(t *testing.T) {
-			testInvalidChunkDataResponse(t, tc.alterFunc)
+			testInvalidChunkDataResponse(t, tc.alterChunkDataPack, tc.mockStateFunc)
 		})
 	}
 }
@@ -262,7 +304,9 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 // notifier and verifier engine should not be called as the result of handling an invalid chunk.
 //
 // The input alter function alters the chunk data response to break its integrity.
-func testInvalidChunkDataResponse(t *testing.T, alter func(cdp *flow.ChunkDataPack)) {
+func testInvalidChunkDataResponse(t *testing.T,
+	alterChunkDataPack func(cdp *flow.ChunkDataPack),
+	mockStateFunc func(flow.Identity, *protocol.State, flow.Identifier)) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
@@ -271,21 +315,18 @@ func testInvalidChunkDataResponse(t *testing.T, alter func(cdp *flow.ChunkDataPa
 	// also the chunk belongs to an unsealed block.
 	block, result, statuses, _ := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
-	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 
 	// mocks resources on fetcher engine side.
 	s.results.On("ByID", result.ID()).Return(nil, fmt.Errorf("missing result"))
 	mockPendingChunksByID(s.pendingChunks, statuses)
-
-	// mocks there is no pending status for this chunk
-	mockStateAtBlockIDForExecutors(s.state, block.ID(), agrees)
 
 	chunk := statuses.Chunks()[0]
 	chunkID := chunk.ID()
 	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
 
 	// alters chunk data pack so that it become invalid.
-	alter(chunkDataPacks[chunkID])
+	alterChunkDataPack(chunkDataPacks[chunkID])
+	mockStateFunc(*agrees[0], s.state, block.ID())
 	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks)
@@ -424,13 +465,23 @@ func mockHeadersByBlockID(headers *storage.Headers, blockID flow.Identifier, hei
 	headers.On("ByBlockID", blockID).Return(&header, nil)
 }
 
-// mockStateAtBlockIDForExecutors is a test helper that mocks state at the block ID with the given execution nodes identities.
-func mockStateAtBlockIDForExecutors(state *protocol.State, blockID flow.Identifier, executors flow.IdentityList) {
+// mockStateAtBlockIDForIdentities is a test helper that mocks state at the block ID with the given execution nodes identities.
+func mockStateAtBlockIDForIdentities(state *protocol.State, blockID flow.Identifier, participant flow.IdentityList) {
 	snapshot := &protocol.Snapshot{}
 	state.On("AtBlockID", blockID).Return(snapshot)
-	snapshot.On("Identities", mock.Anything).Return(executors, nil)
-	for _, id := range executors {
+	snapshot.On("Identities", mock.Anything).Return(participant, nil)
+	for _, id := range participant {
 		snapshot.On("Identity", id.NodeID).Return(id, nil)
+	}
+}
+
+// mockStateAtBlockIDForMissingIdentities is a test helper that mocks state at the block ID with the given execution nodes identities as
+// as missing ones, i.e., they are not part of the state.
+func mockStateAtBlockIDForMissingIdentities(state *protocol.State, blockID flow.Identifier, participants flow.IdentityList) {
+	snapshot := &protocol.Snapshot{}
+	state.On("AtBlockID", blockID).Return(snapshot)
+	for _, id := range participants {
+		snapshot.On("Identity", id.NodeID).Return(nil, fmt.Errorf("missing"))
 	}
 }
 
