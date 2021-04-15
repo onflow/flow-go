@@ -250,7 +250,8 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	result, err := e.results.ByID(status.ExecutionResultID)
 	if err != nil {
 		// this error indicates a fatal situation that we are missing an execution result.
-		log.Fatal().Err(err).Msg("could not retrieve execution result of chunk status")
+		// can be a database leakage.
+		log.Fatal().Err(err).Msg("could not retrieve execution result of chunk status, possibly a bug")
 		return
 	}
 
