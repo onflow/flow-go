@@ -292,7 +292,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		t.Run(fmt.Sprintf("%s", tc.msg), func(t *testing.T) {
+		t.Run(tc.msg, func(t *testing.T) {
 			testInvalidChunkDataResponse(t, tc.alterChunkDataPack, tc.mockStateFunc)
 		})
 	}
