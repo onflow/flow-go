@@ -165,6 +165,41 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.verifier, s.chunkConsumerNotifier)
 }
 
+// TestChunkResponse_RemovingStatusFails evaluates behavior of fetcher engine respect to receiving duplicate and concurrent
+// chunk data pack responses to the same chunk.
+// The deduplication of concurrent chunks happen at the pending chunk statuses mempool, that is protected by a mutex lock.
+// So, of any concurrent chunk data pack responses of the same chunk, only one wins the lock and can successfully remove it
+// from the mempool, while the others fail.
+// If fetcher engine fails on removing a pending chunk status, it means that it has already been processed, and hence,
+// it should drop it gracefully, without notifying the verifier or chunk consumer.
+func TestChunkResponse_RemovingStatusFails(t *testing.T) {
+	s := setupTest()
+	e := newFetcherEngine(s)
+
+	// creates a result with specified 2 chunks and a single assigned chunk to this fetcher engine.
+	block, result, statuses, _ := completeChunkStatusListFixture(t, 2, 1)
+	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
+	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
+	mockPendingChunksByID(s.pendingChunks, statuses)
+	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
+
+	// trying to remove the pending status fails.
+	mockPendingChunksRem(t, s.pendingChunks, statuses, false)
+
+	chunk := statuses.Chunks()[0]
+	chunkID := chunk.ID()
+	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
+
+	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
+
+	// no verifiable chunk should be passed to verifier engine
+	// and chunk consumer should not get any notification
+	s.chunkConsumerNotifier.AssertNotCalled(t, "Notify")
+	s.verifier.AssertNotCalled(t, "ProcessLocal")
+}
+
 // TestProcessAssignChunkSealedAfterRequest evaluates behavior of fetcher engine respect to receiving an assigned chunk
 // that its block is getting sealed after requesting it from requester.
 // The requester notifies the fetcher back that the block for chunk has been sealed.
