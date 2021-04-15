@@ -113,7 +113,8 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 			panic("missing execution result for parent")
 		}
 		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(previousResult))
-		block.Payload.Receipts = append(block.Payload.Receipts, receipt)
+		block.Payload.Receipts = append(block.Payload.Receipts, receipt.Meta())
+		block.Payload.Results = append(block.Payload.Results, &receipt.ExecutionResult)
 
 		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(previousResult),
@@ -704,7 +705,10 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
 			// verify that all receipts already included in blocks are filtered out:
 			for _, block := range bs.blocks {
-				for _, rcpt := range block.Payload.Receipts {
+				resultByID := block.Payload.ResultsById()
+				for _, meta := range block.Payload.Receipts {
+					result := resultByID[meta.ResultID]
+					rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 					assert.False(bs.T(), receiptFilter(rcpt))
 				}
 			}
@@ -759,11 +763,15 @@ func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 
 	// populate the mempool with 5 valid receipts
 	receipts := []*flow.ExecutionReceipt{}
+	metas := []*flow.ExecutionReceiptMeta{}
+	expectedResults := []*flow.ExecutionResult{}
 	var i uint64
 	for i = 0; i < 5; i++ {
 		blockOnFork := bs.blocks[bs.irsList[i].Seal.BlockID]
 		pendingReceipt := unittest.ReceiptForBlockFixture(blockOnFork)
 		receipts = append(receipts, pendingReceipt)
+		metas = append(metas, pendingReceipt.Meta())
+		expectedResults = append(expectedResults, &pendingReceipt.ExecutionResult)
 	}
 	bs.pendingReceipts = receipts
 
@@ -774,15 +782,20 @@ func (bs *BuilderSuite) TestPayloadReceipts_BlockLimit() {
 	// ensure that only 3 of the 5 receipts were included
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
-	bs.Assert().Equal(bs.pendingReceipts[:limit], bs.assembled.Receipts, "should have excluded receipts above maxReceiptCount")
+	bs.Assert().ElementsMatch(metas[:limit], bs.assembled.Receipts, "should have excluded receipts above maxReceiptCount")
+	bs.Assert().ElementsMatch(expectedResults[:limit], bs.assembled.Results, "should have excluded results above maxReceiptCount")
 }
 
 // TestPayloadReceipts_AsProvidedByReceiptForest tests the receipt selection.
 // Expectation: Builder should embed the Receipts as provided by the ExecutionTree
 func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 	var expectedReceipts []*flow.ExecutionReceipt
+	var expectedMetas []*flow.ExecutionReceiptMeta
+	var expectedResults []*flow.ExecutionResult
 	for i := 0; i < 10; i++ {
 		expectedReceipts = append(expectedReceipts, unittest.ExecutionReceiptFixture())
+		expectedMetas = append(expectedMetas, expectedReceipts[i].Meta())
+		expectedResults = append(expectedResults, &expectedReceipts[i].ExecutionResult)
 	}
 	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
@@ -792,7 +805,8 @@ func (bs *BuilderSuite) TestPayloadReceipts_AsProvidedByReceiptForest() {
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
-	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "should include receipts as returned by ExecutionTree")
+	bs.Assert().ElementsMatch(expectedMetas, bs.assembled.Receipts, "should include receipts as returned by ExecutionTree")
+	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "should include results as returned by ExecutionTree")
 	bs.recPool.AssertExpectations(bs.T())
 }
 
@@ -817,11 +831,14 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	blockSABC := unittest.ChainFixtureFrom(4, bs.blocks[bs.parentID].Header)
 	resultS := unittest.ExecutionResultFixture(unittest.WithBlock(blockSABC[0]), unittest.WithPreviousResult(*bs.resultForBlock[bs.parentID]))
 	receiptSABC := unittest.ReceiptChainFor(blockSABC, resultS)
-	blockSABC[0].Payload.Receipts = []*flow.ExecutionReceipt{parentReceipt}
-	blockSABC[1].Payload.Receipts = []*flow.ExecutionReceipt{receiptSABC[0]}
-	blockSABC[2].Payload.Receipts = []*flow.ExecutionReceipt{}
-	blockSABC[3].Payload.Receipts = []*flow.ExecutionReceipt{}
+	blockSABC[0].Payload.Receipts = []*flow.ExecutionReceiptMeta{parentReceipt.Meta()}
+	blockSABC[0].Payload.Results = []*flow.ExecutionResult{&parentReceipt.ExecutionResult}
+	blockSABC[1].Payload.Receipts = []*flow.ExecutionReceiptMeta{receiptSABC[0].Meta()}
+	blockSABC[1].Payload.Results = []*flow.ExecutionResult{&receiptSABC[0].ExecutionResult}
+	blockSABC[2].Payload.Receipts = []*flow.ExecutionReceiptMeta{}
+	blockSABC[3].Payload.Receipts = []*flow.ExecutionReceiptMeta{}
 	unittest.ReconnectBlocksAndReceipts(blockSABC, receiptSABC) // update block header so that blocks are chained together
+
 	bs.storeBlock(blockSABC[0])
 	bs.storeBlock(blockSABC[1])
 	bs.storeBlock(blockSABC[2])
@@ -830,7 +847,10 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		for _, rcpt := range block.Payload.Receipts {
+		resultByID := block.Payload.ResultsById()
+		for _, meta := range block.Payload.Receipts {
+			result := resultByID[meta.ResultID]
+			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)
 		}
@@ -841,8 +861,10 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 
 	_, err := bs.build.BuildOn(blockSABC[3].ID(), bs.setter)
 	bs.Require().NoError(err)
-	expectedReceipts := []*flow.ExecutionReceipt{receiptSABC[1]}
+	expectedReceipts := []*flow.ExecutionReceiptMeta{receiptSABC[1].Meta()}
+	expectedResults := []*flow.ExecutionResult{&receiptSABC[1].ExecutionResult}
 	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain only receipt for block a")
+	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "payload should contain only result for block a")
 }
 
 // TestIntegration_ExtendDifferentExecutionPathsOnSameFork tests that the
@@ -857,7 +879,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
 	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{recP},
+		Receipts: []*flow.ExecutionReceiptMeta{recP.Meta()},
+		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
 	})
 
 	// B is a block containing two valid receipts, with different results, for
@@ -868,7 +891,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
 	B := unittest.BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{recA1, recA2},
+		Receipts: []*flow.ExecutionReceiptMeta{recA1.Meta(), recA2.Meta()},
+		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
 	})
 
 	bs.storeBlock(&A)
@@ -877,7 +901,10 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		for _, rcpt := range block.Payload.Receipts {
+		resultByID := block.Payload.ResultsById()
+		for _, meta := range block.Payload.Receipts {
+			result := resultByID[meta.ResultID]
+			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)
 		}
@@ -897,8 +924,10 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 
 	_, err := bs.build.BuildOn(B.ID(), bs.setter)
 	bs.Require().NoError(err)
-	expectedReceipts := []*flow.ExecutionReceipt{recB1, recB2}
+	expectedReceipts := []*flow.ExecutionReceiptMeta{recB1.Meta(), recB2.Meta()}
+	expectedResults := []*flow.ExecutionResult{&recB1.ExecutionResult, &recB2.ExecutionResult}
 	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain receipts from valid execution forks")
+	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "payload should contain results from valid execution forks")
 }
 
 // TestIntegration_ExtendDifferentExecutionPathsOnDifferentForks tests that the
@@ -926,7 +955,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
 	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{recP},
+		Receipts: []*flow.ExecutionReceiptMeta{recP.Meta()},
+		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
 	})
 
 	// B is a block that builds on A containing a valid receipt for A
@@ -934,7 +964,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	B := unittest.BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{recA1},
+		Receipts: []*flow.ExecutionReceiptMeta{recA1.Meta()},
+		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
 	})
 
 	// C is another block that builds on A containing a valid receipt for A but
@@ -943,7 +974,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
 	C := unittest.BlockWithParentFixture(A.Header)
 	C.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{recA2},
+		Receipts: []*flow.ExecutionReceiptMeta{recA2.Meta()},
+		Results:  []*flow.ExecutionResult{&recA2.ExecutionResult},
 	})
 
 	bs.storeBlock(&A)
@@ -953,7 +985,10 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		for _, rcpt := range block.Payload.Receipts {
+		resultByID := block.Payload.ResultsById()
+		for _, meta := range block.Payload.Receipts {
+			result := resultByID[meta.ResultID]
+			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)
 		}
@@ -966,13 +1001,17 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA2.ExecutionResult))
 	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
 
-	_, _ = bs.build.recPool.AddReceipt(recB1, B.Header)
-	_, _ = bs.build.recPool.AddReceipt(recB2, B.Header)
-
-	_, err := bs.build.BuildOn(B.ID(), bs.setter)
+	_, err := bs.build.recPool.AddReceipt(recB1, B.Header)
 	bs.Require().NoError(err)
-	expectedReceipts := []*flow.ExecutionReceipt{recA2, recB1, recB2}
+	_, err = bs.build.recPool.AddReceipt(recB2, B.Header)
+	bs.Require().NoError(err)
+
+	_, err = bs.build.BuildOn(B.ID(), bs.setter)
+	bs.Require().NoError(err)
+	expectedReceipts := []*flow.ExecutionReceiptMeta{recA2.Meta(), recB1.Meta(), recB2.Meta()}
+	expectedResults := []*flow.ExecutionResult{&recA2.ExecutionResult, &recB1.ExecutionResult, &recB2.ExecutionResult}
 	bs.Assert().ElementsMatch(expectedReceipts, bs.assembled.Receipts, "builder should extend different execution paths")
+	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "builder should extend different execution paths")
 }
 
 // TestIntegration_DuplicateReceipts checks that the builder does not re-include
@@ -985,7 +1024,8 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
 	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
 	A.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{recP},
+		Receipts: []*flow.ExecutionReceiptMeta{recP.Meta()},
+		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
 	})
 
 	// B is a block that builds on A containing a valid receipt for A
@@ -993,7 +1033,8 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
 	B := unittest.BlockWithParentFixture(A.Header)
 	B.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceipt{recA1},
+		Receipts: []*flow.ExecutionReceiptMeta{recA1.Meta()},
+		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult},
 	})
 
 	bs.storeBlock(&A)
@@ -1002,7 +1043,10 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		for _, rcpt := range block.Payload.Receipts {
+		resultByID := block.Payload.ResultsById()
+		for _, meta := range block.Payload.Receipts {
+			result := resultByID[meta.ResultID]
+			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
 			bs.NoError(err)
 		}
@@ -1010,6 +1054,49 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 
 	_, err := bs.build.BuildOn(B.ID(), bs.setter)
 	bs.Require().NoError(err)
-	expectedReceipts := []*flow.ExecutionReceipt{}
+	expectedReceipts := []*flow.ExecutionReceiptMeta{}
+	expectedResults := []*flow.ExecutionResult{}
 	bs.Assert().ElementsMatch(expectedReceipts, bs.assembled.Receipts, "builder should not include receipts that are already incorporated in the current fork")
+	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "builder should not include results that were already incorporated")
+}
+
+// TestIntegration_ResultAlreadyIncorporated checks that the builder includes
+// receipts for results that were already incorporated in blocks on the fork.
+//
+//
+// P <- A(ER[P]) <- X (candidate)
+func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
+	// A is a block containing a valid receipt for block P
+	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
+	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
+	A.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{recP.Meta()},
+		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
+	})
+
+	recP_B := unittest.ExecutionReceiptFixture(unittest.WithResult(&recP.ExecutionResult))
+
+	bs.storeBlock(&A)
+
+	// Instantiate real Execution Tree mempool;
+	bs.build.recPool = mempoolImpl.NewExecutionTree()
+	for _, block := range bs.blocks {
+		resultByID := block.Payload.ResultsById()
+		for _, meta := range block.Payload.Receipts {
+			result := resultByID[meta.ResultID]
+			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
+			_, err := bs.build.recPool.AddReceipt(rcpt, bs.blocks[rcpt.ExecutionResult.BlockID].Header)
+			bs.NoError(err)
+		}
+	}
+
+	_, err := bs.build.recPool.AddReceipt(recP_B, bs.blocks[recP_B.ExecutionResult.BlockID].Header)
+	bs.NoError(err)
+
+	_, err = bs.build.BuildOn(A.ID(), bs.setter)
+	bs.Require().NoError(err)
+	expectedReceipts := []*flow.ExecutionReceiptMeta{recP_B.Meta()}
+	expectedResults := []*flow.ExecutionResult{}
+	bs.Assert().ElementsMatch(expectedReceipts, bs.assembled.Receipts, "builder should include receipt metas for results that were already incorporated")
+	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "builder should not include results that were already incorporated")
 }

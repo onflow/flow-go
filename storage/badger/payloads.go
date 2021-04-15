@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
@@ -15,9 +16,11 @@ type Payloads struct {
 	guarantees *Guarantees
 	seals      *Seals
 	receipts   *ExecutionReceipts
+	results    *ExecutionResults
 }
 
-func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts) *Payloads {
+func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Seals, receipts *ExecutionReceipts,
+	results *ExecutionResults) *Payloads {
 
 	p := &Payloads{
 		db:         db,
@@ -25,12 +28,38 @@ func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Sea
 		guarantees: guarantees,
 		seals:      seals,
 		receipts:   receipts,
+		results:    results,
 	}
 
 	return p
 }
 
 func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*badger.Txn) error {
+	// For correct payloads, the execution result is part of the payload or it's already stored
+	// in storage. If execution result is not present in either of those places, we error.
+	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
+	// which is not included in current payload but was incorporated in one of previous blocks.
+	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
+	// and execution result is decoupled.
+	resultsById := payload.ResultsById()
+	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
+	var err error
+	for _, meta := range payload.Receipts {
+		result, ok := resultsById[meta.ResultID]
+		if !ok {
+			result, err = p.results.ByID(meta.ResultID)
+			if err != nil {
+				if errors.Is(err, badger.ErrKeyNotFound) {
+					err = fmt.Errorf("invalid payload referencing unknown execution result %v", meta.ResultID)
+				}
+				return func(*badger.Txn) error {
+					return err
+				}
+			}
+		}
+		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
+	}
+
 	return func(tx *badger.Txn) error {
 
 		// make sure all payload guarantees are stored
@@ -50,7 +79,7 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 		}
 
 		// store all payload receipts
-		for _, receipt := range payload.Receipts {
+		for _, receipt := range fullReceipts {
 			err := p.receipts.store(receipt)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)
@@ -97,19 +126,29 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 		}
 
 		// retrieve receipts
-		receipts := make([]*flow.ExecutionReceipt, 0, len(idx.ReceiptIDs))
+		receipts := make([]*flow.ExecutionReceiptMeta, 0, len(idx.ReceiptIDs))
 		for _, recID := range idx.ReceiptIDs {
 			receipt, err := p.receipts.byID(recID)(tx)
 			if err != nil {
-				return nil, fmt.Errorf("could not retrieve receipt (%x): %w", recID, err)
+				return nil, fmt.Errorf("could not retrieve receipt %x: %w", recID, err)
 			}
-			receipts = append(receipts, receipt)
+			receipts = append(receipts, receipt.Meta())
 		}
 
+		// retrieve results
+		results := make([]*flow.ExecutionResult, 0, len(idx.ResultIDs))
+		for _, resID := range idx.ResultIDs {
+			result, err := p.results.byID(resID)(tx)
+			if err != nil {
+				return nil, fmt.Errorf("could not retrieve result %x: %w", resID, err)
+			}
+			results = append(results, result)
+		}
 		payload := &flow.Payload{
 			Seals:      seals,
 			Guarantees: guarantees,
 			Receipts:   receipts,
+			Results:    results,
 		}
 
 		return payload, nil

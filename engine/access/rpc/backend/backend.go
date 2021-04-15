@@ -177,9 +177,10 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
 			AllowEmptyReferenceBlockID:   false,
 			AllowUnknownReferenceBlockID: false,
-			MaxGasLimit:                  flow.DefaultMaxGasLimit,
 			CheckScriptsParse:            true,
-			MaxTxSizeLimit:               flow.DefaultMaxTxSizeLimit,
+			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
+			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
+			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
 		},
 	)
 }
@@ -334,6 +335,12 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 	allENs, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
+	}
+
+	// If there are no preferred or fixed ENs, have the default behaviour be that
+	// we just return all the executor IDs, i.e. no preferrence at all.
+	if len(preferredENIdentifiers) == 0 && len(fixedENIdentifiers) == 0 {
+		return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
 	}
 
 	// find the preferred execution node IDs which have executed the transaction
