@@ -99,12 +99,10 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	c.putCollector(incorporatedResult.IncorporatedBlockID, collector)
 
 	// process approvals that have passed needed checks and are ready to be processed
-	for _, approval := range c.verifiedApprovalsCache.Ids() {
-		if approval := c.verifiedApprovalsCache.Peek(approval); approval != nil {
-			err := collector.ProcessApproval(approval)
-			if err != nil {
-				// TODO: add log??
-			}
+	for _, approvalID := range c.verifiedApprovalsCache.Ids() {
+		if approval := c.verifiedApprovalsCache.Peek(approvalID); approval != nil {
+			// those approvals are verified already and shouldn't yield any errors
+			_ = collector.ProcessApproval(approval)
 		}
 	}
 

@@ -17,6 +17,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestAssignmentCollector tests behavior of AssignmentCollector in different scenarios
+// AssignmentCollector is responsible collecting approvals that satisfy one assignment, meaning that we will
+// have multiple collectors for one execution result as same result can be incorporated in multiple forks.
+// AssignmentCollector has a strict ordering of processing, before processing approvals at least one incorporated result has to be
+// processed.
+// AssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
+// AssignmentCollector is responsible for validating approvals on result-level(checking signature, identity).
 func TestAssignmentCollector(t *testing.T) {
 	suite.Run(t, new(AssignmentCollectorTestSuite))
 }
@@ -73,12 +80,38 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsAfterResul
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
-			err := s.collector.ProcessAssignment(approval)
+			err = s.collector.ProcessAssignment(approval)
 			require.NoError(s.T(), err)
 		}
 	}
 
 	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+}
+
+// TestProcessIncorporatedResult_ReusingCachedApprovals tests a scenario where we successfully processed approvals for one incorporated result
+// and we are able to reuse those approvals for another incorporated result of same execution result
+func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCachedApprovals() {
+	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
+
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Twice()
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	for _, chunk := range s.Chunks {
+		for verID := range s.AuthorizedVerifiers {
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
+			err = s.collector.ProcessAssignment(approval)
+			require.NoError(s.T(), err)
+		}
+	}
+
+	// at this point we have proposed a seal, let's construct new incorporated result with same assignment
+	// but different incorporated block ID resulting in new seal.
+	incorporatedResult := unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+	err = s.collector.ProcessIncorporatedResult(incorporatedResult)
+	require.NoError(s.T(), err)
+	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+
 }
 
 // TestProcessAssignment_InvalidSignature tests a scenario processing approval with invalid signature
@@ -98,12 +131,12 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_InvalidSignature() 
 // Expected to process valid incorporated result without error and reject invalid incorporated results
 // with engine.InvalidInputError
 func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
-	s.Run("valid incorporated result", func() {
+	s.Run("valid-incorporated-result", func() {
 		err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.NoError(s.T(), err)
 	})
 
-	s.Run("invalid assignment", func() {
+	s.Run("invalid-assignment", func() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
@@ -114,7 +147,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 
-	s.Run("invalid verifier identities", func() {
+	s.Run("invalid-verifier-identities", func() {
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, 1)
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
@@ -124,6 +157,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	})
 }
 
+// TestProcessIncorporatedResult_InvalidIdentity tests a few scenarios where verifier identity is not correct
+// by one or another reason
 func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIdentity() {
 
 	s.Run("verifier-not-staked", func() {
@@ -184,4 +219,14 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
+}
+
+// TestProcessAssignment_BeforeIncorporatedResult tests scenario when approval is submitted before execution result
+// is discovered, without execution result we are missing information for verification. Calling `ProcessAssignment` before `ProcessApproval`
+// should result in error
+func (s *AssignmentCollectorTestSuite) TestProcessAssignment_BeforeIncorporatedResult() {
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
+	err := s.collector.ProcessAssignment(approval)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err))
 }
