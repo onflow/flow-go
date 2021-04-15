@@ -105,7 +105,7 @@ func (ms *SealingEngineSuite) TestProcessValidReceipt() {
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 	)
 
-	ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 	// we expect that receipt is persisted in storage
 	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 	// we expect that receipt is added to mempool
@@ -137,7 +137,7 @@ func (ms *SealingEngineSuite) TestMultipleProcessingItems() {
 			unittest.WithExecutorID(originID),
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
 		)
-		ms.receiptValidator.On("Validate", []*flow.ExecutionReceipt{receipt}).Return(nil).Once()
+		ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
 		// we expect that receipt is persisted in storage
 		ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 		// we expect that receipt is added to mempool

@@ -119,9 +119,9 @@ func (p Path) Equals(o Path) bool {
 
 // DeepCopy returns a deep copy of the payload
 func (p *Path) DeepCopy() Path {
-	newP := make([]byte, len(*p))
-	copy(newP, *p)
-	return Path(newP)
+	newP := make([]byte, 0, len(*p))
+	path := []byte(*p)
+	return Path(append(newP, path...))
 }
 
 // Payload is the smallest immutable storable unit in ledger
@@ -151,13 +151,10 @@ func (p *Payload) Equals(other *Payload) bool {
 	if other == nil {
 		return false
 	}
-	if !p.Key.Equals(&other.Key) {
-		return false
+	if p.Key.Equals(&other.Key) && p.Value.Equals(other.Value) {
+		return true
 	}
-	if !p.Value.Equals(other.Value) {
-		return false
-	}
-	return true
+	return false
 }
 
 // DeepCopy returns a deep copy of the payload
@@ -184,7 +181,7 @@ type TrieProof struct {
 	Path      Path     // path
 	Payload   *Payload // payload
 	Interims  [][]byte // the non-default intermediate nodes in the proof
-	Inclusion bool     // flag indicating if this is an inclusion or exclusion
+	Inclusion bool     // flag indicating if this is an inclusion or exclusion proof
 	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
 	Steps     uint8    // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
 }

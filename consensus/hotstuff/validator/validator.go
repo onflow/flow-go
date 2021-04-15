@@ -136,7 +136,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		return nil, newInvalidVoteError(vote, err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving voter Identity %x: %w", block.BlockID, err)
+		return nil, fmt.Errorf("error retrieving voter Identity at block %x: %w", block.BlockID, err)
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
