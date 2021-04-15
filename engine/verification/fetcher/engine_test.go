@@ -317,7 +317,6 @@ func testInvalidChunkDataResponse(t *testing.T,
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 
 	// mocks resources on fetcher engine side.
-	s.results.On("ByID", result.ID()).Return(nil, fmt.Errorf("missing result"))
 	mockPendingChunksByID(s.pendingChunks, statuses)
 
 	chunk := statuses.Chunks()[0]
@@ -338,6 +337,42 @@ func testInvalidChunkDataResponse(t *testing.T,
 	// none of the subsequent calls on the pipeline path should happen upon validation fails.
 	s.results.AssertNotCalled(t, "ByID")
 	s.pendingChunks.AssertNotCalled(t, "Rem")
+}
+
+// TestChunkResponse_MissingStatus evaluates that if the fetcher engine receives a chunk data pack response for which
+// it does not have any pending status, it drops it immediately and does not proceed handling pipeline.
+// Receiving such chunk data response can happen in the following scenarios:
+// - After requesting it to the network, requester informs fetcher engine that the chunk belongs to a sealed block.
+// - More than one copy of the same response arrive at different time intervals, while the first copy has been handled.
+func TestChunkResponse_MissingStatus(t *testing.T) {
+	s := setupTest()
+	e := newFetcherEngine(s)
+
+	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
+	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
+	// also the chunk belongs to an unsealed block.
+	block, result, statuses, _ := completeChunkStatusListFixture(t, 2, 1)
+	chunk := statuses.Chunks()[0]
+	chunkID := chunk.ID()
+	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
+
+	// mocks there is no pending status for this chunk at fetcher engine.
+	s.pendingChunks.On("ByID", chunkID).Return(nil, false)
+
+	// alters chunk data pack so that it become invalid.
+	e.HandleChunkDataPack(unittest.IdentifierFixture(), chunkDataPacks[chunkID], collections[chunkID])
+
+	mock.AssertExpectationsForObjects(t, s.pendingChunks)
+
+	// no verifiable chunk should be passed to verifier engine
+	// and chunk consumer should not get any notification
+	s.chunkConsumerNotifier.AssertNotCalled(t, "Notify")
+	s.verifier.AssertNotCalled(t, "ProcessLocal")
+
+	// none of the subsequent calls on the pipeline path should happen.
+	s.results.AssertNotCalled(t, "ByID")
+	s.pendingChunks.AssertNotCalled(t, "Rem")
+	s.state.AssertNotCalled(t, "AtBlockID")
 }
 
 // TestSkipChunkOfSealedBlock evaluates that if fetcher engine receives a chunk belonging to a sealed block,
