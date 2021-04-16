@@ -6,8 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dapperlabs/testingdock"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/flow/filter"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -37,7 +39,14 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
+
+	// skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451
+	t.Skip()
+
+	testingdock.Verbose = false
+
 	flowNetwork := testnet.PrepareFlowNetwork(t, buildMVPNetConfig())
+	defer flowNetwork.Remove()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -50,8 +59,12 @@ func TestMVP_Bootstrap(t *testing.T) {
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
 
+	fmt.Println("@@ running mvp test 1")
+
 	// run mvp test to build a few blocks
 	runMVPTest(t, ctx, flowNetwork)
+
+	fmt.Println("@@ finished running mvp test 1")
 
 	// download root snapshot from access node
 	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
@@ -59,16 +72,34 @@ func TestMVP_Bootstrap(t *testing.T) {
 
 	// verify that the downloaded snapshot is not for the root block
 	header, err := snapshot.Head()
+	require.NoError(t, err)
 	assert.True(t, header.ID() != initialRoot.Header.ID())
 
-	err = flowNetwork.WriteRootSnapshot(snapshot)
-	require.NoError(t, err)
+	fmt.Println("@@ restarting network with new root snapshot")
 
-	flowNetwork.Remove()
+	flowNetwork.StopContainers()
+	flowNetwork.RemoveContainers()
+
+	// pick 1 consensus node to restart with empty database and downloaded snapshot
+	con1 := flowNetwork.Identities().
+		Filter(filter.HasRole(flow.RoleConsensus)).
+		Sample(1)[0]
+
+	fmt.Println("@@ booting from non-root state on consensus node ", con1.NodeID)
+
+	flowNetwork.DropDBs(filter.HasNodeID(con1.NodeID))
+	con1Container := flowNetwork.ContainerByID(con1.NodeID)
+	con1Container.DropDB()
+	con1Container.WriteRootSnapshot(snapshot)
+
+	fmt.Println("@@ running mvp test 2")
+
 	flowNetwork.Start(ctx)
 
 	// Run MVP tests
 	runMVPTest(t, ctx, flowNetwork)
+
+	fmt.Println("@@ finished running mvp test 2")
 }
 
 func TestMVP_Emulator(t *testing.T) {
@@ -92,13 +123,13 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
 	consensusConfigs := append(collectionConfigs,
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.InfoLevel),
 	)
 
 	net := []testnet.NodeConfig{
@@ -118,13 +149,15 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 
 func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
-	root := net.Root()
-	chain := root.Header.ChainID.Chain()
+	chain := net.Root().Header.ChainID.Chain()
 
 	serviceAccountClient, err := testnet.NewClient(fmt.Sprintf(":%s", net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
 
-	//create new account to deploy Counter to
+	latestBlockID, err := serviceAccountClient.GetLatestBlockID(ctx)
+	require.NoError(t, err)
+
+	// create new account to deploy Counter to
 	accountPrivateKey := RandomPrivateKey()
 
 	accountKey := sdk.NewAccountKey().
@@ -144,9 +177,11 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			},
 		},
 		serviceAddress).
-		SetReferenceBlockID(sdk.Identifier(root.ID())).
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress)
+
+	fmt.Println(">> creating new account...")
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
@@ -166,8 +201,9 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			newAccountAddress = accountCreatedEvent.Address()
 		}
 	}
+	require.NotEqual(t, sdk.EmptyAddress, newAccountAddress)
 
-	fmt.Printf("new account address: %s\n", newAccountAddress)
+	fmt.Println(">> new account address: ", newAccountAddress)
 
 	// Generate the fund account transaction (so account can be used as a payer)
 	fundAccountTx := sdk.NewTransaction().
@@ -193,7 +229,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 			fvm.FungibleTokenAddress(chain).Hex(),
 			fvm.FlowTokenAddress(chain).Hex()))).
 		AddAuthorizer(serviceAddress).
-		SetReferenceBlockID(sdk.Identifier(root.ID())).
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress)
 
@@ -201,6 +237,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, err)
 	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
 	require.NoError(t, err)
+
+	fmt.Println(">> funding new account...")
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, fundAccountTx)
@@ -230,10 +268,12 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	// create counter instance
 	createCounterTx := sdk.NewTransaction().
 		SetScript([]byte(CreateCounterTx(newAccountAddress).ToCadence())).
-		SetReferenceBlockID(sdk.Identifier(root.ID())).
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
 		AddAuthorizer(newAccountAddress)
+
+	fmt.Println(">> creating counter...")
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 	err = accountClient.SignAndSendTransaction(ctx, createCounterTx)
@@ -246,6 +286,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 
 	require.NoError(t, resp.Error)
 	t.Log(resp)
+
+	fmt.Println(">> awaiting counter incrementing...")
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {
