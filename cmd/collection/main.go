@@ -404,10 +404,8 @@ func main() {
 				return nil, err
 			}
 
-			qcContractClient, err := epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
-			if err != nil {
-				return nil, err
-			}
+			qcContractClient := epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(),
+				accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,

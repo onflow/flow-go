@@ -46,7 +46,7 @@ func NewQCContractClient(log zerolog.Logger,
 	accountAddress string,
 	accountKeyIndex uint,
 	qcContractAddress string,
-	signer sdkcrypto.Signer) (*QCContractClient, error) {
+	signer sdkcrypto.Signer) *QCContractClient {
 
 	log = log.With().Str("component", "qc_contract_client").Logger()
 	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)
@@ -58,7 +58,7 @@ func NewQCContractClient(log zerolog.Logger,
 		BaseClient: *base,
 		nodeID:     nodeID,
 		env:        env,
-	}, nil
+	}
 }
 
 // SubmitVote submits the given vote to the cluster QC aggregator smart
