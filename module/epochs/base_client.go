@@ -13,49 +13,54 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// BaseContractClient represents the core fields and methods needed to create
+// BaseClient represents the core fields and methods needed to create
 // a client to a contract on the Flow Network.
-type BaseContractClient struct {
-	log zerolog.Logger // default logger
+type BaseClient struct {
+	Log zerolog.Logger // default logger
 
-	ContractAddress string           // contract address
+	ContractAddress string                  // contract address
+	FlowClient      module.SDKClientWrapper // flow access node client
+
+	AccountAddress  sdk.Address      // account belonging to node interacting with the contract
 	AccountKeyIndex uint             // account key index
 	Signer          sdkcrypto.Signer // signer used to sign transactions
-	Account         *sdk.Account     // account belonging to node interacting with the contract
-
-	Client module.SDKClientWrapper // flow access node client
 }
 
-// NewBaseContractClient ...
-func NewBaseContractClient(log zerolog.Logger,
+// NewBaseClient creates a instance of BaseClient
+func NewBaseClient(log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
 	accountAddress string,
 	accountKeyIndex uint,
 	signer sdkcrypto.Signer,
-	contractAddress string) (*BaseContractClient, error) {
+	contractAddress string) *BaseClient {
+	return &BaseClient{
+		Log:             log,
+		ContractAddress: contractAddress,
+		FlowClient:      flowClient,
+		AccountKeyIndex: accountKeyIndex,
+		Signer:          signer,
+		AccountAddress:  sdk.HexToAddress(accountAddress),
+	}
+}
+
+func (c *BaseClient) GetAccount(ctx context.Context) (*sdk.Account, error) {
 
 	// get account from access node for given address
-	account, err := flowClient.GetAccount(context.Background(), sdk.HexToAddress(accountAddress))
+	account, err := c.FlowClient.GetAccount(ctx, c.AccountAddress)
 	if err != nil {
 		return nil, fmt.Errorf("could not get account: %w", err)
 	}
 
 	// check if account key index within range of keys
-	if len(account.Keys) <= int(accountKeyIndex) {
+	if len(account.Keys) <= int(c.AccountKeyIndex) {
 		return nil, fmt.Errorf("given account key index is bigger than the number of keys for this account")
 	}
 
-	return &BaseContractClient{
-		ContractAddress: contractAddress,
-		Client:          flowClient,
-		AccountKeyIndex: accountKeyIndex,
-		Signer:          signer,
-		Account:         account,
-	}, nil
+	return account, nil
 }
 
 // SendTransaction submits a transaction to Flow. Requires transaction to be signed.
-func (c *BaseContractClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
+func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (sdk.Identifier, error) {
 
 	// check if the transaction has a signature
 	if len(tx.EnvelopeSignatures) == 0 {
@@ -63,7 +68,7 @@ func (c *BaseContractClient) SendTransaction(ctx context.Context, tx *sdk.Transa
 	}
 
 	// submit trnsaction to client
-	err := c.Client.SendTransaction(ctx, *tx)
+	err := c.FlowClient.SendTransaction(ctx, *tx)
 	if err != nil {
 		return sdk.EmptyID, fmt.Errorf("failed to send transaction: %w", err)
 	}
@@ -72,13 +77,13 @@ func (c *BaseContractClient) SendTransaction(ctx context.Context, tx *sdk.Transa
 }
 
 // WaitForSealed waits for a transaction to be sealed
-func (c *BaseContractClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
+func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
 
 	attempts := 1
 	for {
-		log := c.log.With().Int("attempt", attempts).Float64("time_elapsed", time.Since(started).Seconds()).Logger()
+		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed", time.Since(started).Seconds()).Logger()
 
-		result, err := c.Client.GetTransactionResult(ctx, txID)
+		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
 			log.Error().Err(err).Msg("could not get transaction result")
 			continue

@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
@@ -27,9 +25,8 @@ import (
 // Client is a client to the Flow DKG contract. Allows functionality to Broadcast,
 // read a Broadcast and submit the final result of the DKG protocol
 type Client struct {
-	epochs.BaseContractClient
+	epochs.BaseClient
 
-	log zerolog.Logger
 	env templates.Environment
 }
 
@@ -39,18 +36,17 @@ func NewClient(log zerolog.Logger,
 	signer sdkcrypto.Signer,
 	dkgContractAddress,
 	accountAddress string,
-	accountKeyIndex uint) (*Client, error) {
+	accountKeyIndex uint) *Client {
 
-	base, err := epochs.NewBaseContractClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
-	if err != nil {
-		return nil, err
-	}
+	log = log.With().Str("component", "dkg_contract_client").Logger()
+	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
+
 	env := templates.Environment{DkgAddress: dkgContractAddress}
 
 	return &Client{
-		BaseContractClient: *base,
-		env:                env,
-	}, nil
+		BaseClient: *base,
+		env:        env,
+	}
 }
 
 // Broadcast broadcasts a message to all other nodes participating in the
@@ -64,14 +60,13 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	defer cancel()
 
 	// get account for given address
-	account, err := c.Client.GetAccount(ctx, c.Account.Address, grpc.EmptyCallOption{})
+	account, err := c.GetAccount(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get account details: %w", err)
 	}
-	c.Account = account
 
 	// get latest sealed block to execute transaction
-	latestBlock, err := c.Client.GetLatestBlock(ctx, true)
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, true)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
@@ -81,9 +76,9 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 		SetScript(templates.GenerateSendDKGWhiteboardMessageScript(c.env)).
 		SetGasLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(c.Account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
-		SetPayer(c.Account.Address).
-		AddAuthorizer(c.Account.Address)
+		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetPayer(account.Address).
+		AddAuthorizer(account.Address)
 
 	// json encode the DKG message
 	data, err := json.Marshal(msg)
@@ -98,13 +93,13 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(c.Account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
 	// submit signed transaction to node
-	c.log.Info().Msg("sending Broadcast transaction")
+	c.Log.Info().Msg("sending Broadcast transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)
@@ -127,7 +122,8 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 
 	// construct read latest broadcast messages transaction
 	template := templates.GenerateGetDKGLatestWhiteBoardMessagesScript(c.env)
-	value, err := c.Client.ExecuteScriptAtBlockID(ctx, sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
+	value, err := c.FlowClient.ExecuteScriptAtBlockID(ctx,
+		sdk.Identifier(referenceBlock), template, []cadence.Value{cadence.NewInt(int(fromIndex))})
 	if err != nil {
 		return nil, fmt.Errorf("could not execute read broadcast script: %w", err)
 	}
@@ -160,17 +156,17 @@ func (c *Client) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) (
 func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []crypto.PublicKey) error {
 
 	started := time.Now()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), epochs.TransactionSubmissionTimeout)
+	defer cancel()
 
 	// get account for given address
-	account, err := c.Client.GetAccount(ctx, c.Account.Address, grpc.EmptyCallOption{})
+	account, err := c.GetAccount(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get account details: %w", err)
 	}
-	c.Account = account
 
 	// get latest sealed block to execute transaction
-	latestBlock, err := c.Client.GetLatestBlock(ctx, true)
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, true)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
@@ -179,9 +175,9 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		SetScript(templates.GenerateSendDKGFinalSubmissionScript(c.env)).
 		SetGasLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(c.Account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
-		SetPayer(c.Account.Address).
-		AddAuthorizer(c.Account.Address)
+		SetProposalKey(account.Address, int(c.AccountKeyIndex), account.Keys[int(c.AccountKeyIndex)].SequenceNumber).
+		SetPayer(account.Address).
+		AddAuthorizer(account.Address)
 
 	// Note: We need to make sure that we pull the keys out in the same order that
 	// we have done here. Group Public key first followed by the individual public keys
@@ -202,12 +198,12 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(c.Account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
 
-	c.log.Info().Msg("sending SubmitResult transaction")
+	c.Log.Info().Msg("sending SubmitResult transaction")
 	txID, err := c.SendTransaction(ctx, tx)
 	if err != nil {
 		return fmt.Errorf("failed to submit transaction: %w", err)

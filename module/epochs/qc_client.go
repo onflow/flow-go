@@ -33,11 +33,10 @@ const (
 // QCContractClient is a client to the Quorum Certificate contract. Allows the client to
 // functionality to submit a vote and check if collection node has voted already.
 type QCContractClient struct {
-	BaseContractClient
+	BaseClient
 
 	nodeID flow.Identifier // flow identifier of the collection node
-
-	env templates.Environment
+	env    templates.Environment
 }
 
 // NewQCContractClient returns a new client to the Quorum Certificate contract
@@ -49,16 +48,16 @@ func NewQCContractClient(log zerolog.Logger,
 	qcContractAddress string,
 	signer sdkcrypto.Signer) (*QCContractClient, error) {
 
-	base, err := NewBaseContractClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)
-	if err != nil {
-		return nil, err
-	}
+	log = log.With().Str("component", "qc_contract_client").Logger()
+	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)
+
+	// set QCContractAddress to the contract address given
 	env := templates.Environment{QuorumCertificateAddress: qcContractAddress}
 
 	return &QCContractClient{
-		BaseContractClient: *base,
-		nodeID:             nodeID,
-		env:                env,
+		BaseClient: *base,
+		nodeID:     nodeID,
+		env:        env,
 	}, nil
 }
 
@@ -75,28 +74,27 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	ctx, cancel := context.WithTimeout(ctx, TransactionSubmissionTimeout)
 	defer cancel()
 
-	// get account for given address
-	account, err := c.Client.GetAccount(ctx, c.Account.Address)
+	// get account for given address and also validates AccountKeyIndex is valid
+	account, err := c.GetAccount(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get account: %w", err)
 	}
-	c.Account = account
 
 	// get latest sealed block to execute transaction
-	latestBlock, err := c.Client.GetLatestBlock(ctx, true)
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, true)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
 
 	// attach submit vote transaction template and build transaction
-	seqNumber := c.Account.Keys[int(c.AccountKeyIndex)].SequenceNumber
+	seqNumber := account.Keys[int(c.AccountKeyIndex)].SequenceNumber
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSubmitVoteScript(c.env)).
 		SetGasLimit(9999).
 		SetReferenceBlockID(latestBlock.ID).
-		SetProposalKey(c.Account.Address, int(c.AccountKeyIndex), seqNumber).
-		SetPayer(c.Account.Address).
-		AddAuthorizer(c.Account.Address)
+		SetProposalKey(account.Address, int(c.AccountKeyIndex), seqNumber).
+		SetPayer(account.Address).
+		AddAuthorizer(account.Address)
 
 	// add signature data to the transaction and submit to node
 	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
@@ -105,7 +103,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 	}
 
 	// sign envelope using account signer
-	err = tx.SignEnvelope(c.Account.Address, int(c.AccountKeyIndex), c.Signer)
+	err = tx.SignEnvelope(account.Address, int(c.AccountKeyIndex), c.Signer)
 	if err != nil {
 		return fmt.Errorf("could not sign transaction: %w", err)
 	}
@@ -131,7 +129,7 @@ func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 	// execute script to read if voted
 	arg := jsoncdc.MustEncode(cadence.String(c.nodeID.String()))
 	template := templates.GenerateGetNodeHasVotedScript(c.env)
-	hasVoted, err := c.Client.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(arg)})
+	hasVoted, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(arg)})
 	if err != nil {
 		return false, fmt.Errorf("could not execute voted script: %w", err)
 	}
