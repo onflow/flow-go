@@ -203,7 +203,7 @@ func TestDKGWithWhiteboard(t *testing.T) {
 	// trigger the BlockFinalized events for each view of interest, effectively
 	// causing the DKG state machine to progress
 	for view = 100; view <= 250; view += dkgeng.DefaultPollStep {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		hub.DeliverAll()
 		for _, n := range nodes {
 			n.ProtocolEvents.BlockFinalized(blocks[view])
