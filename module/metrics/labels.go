@@ -74,6 +74,7 @@ const (
 	ResourceBlockVoteQueue           = "compliance_vote_queue"            // consensus node, compliance engine
 	ResourceChunkDataPack            = "chunk_data_pack"                  // execution node
 	ResourceEvents                   = "events"                           // execution node
+	ResourceServiceEvents            = "service_events"                   // execution node
 	ResourceTransactionResults       = "transaction_results"              // execution node
 )
 

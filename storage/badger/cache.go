@@ -7,7 +7,6 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -50,12 +49,6 @@ func noRetrieve(key interface{}) func(*badger.Txn) (interface{}, error) {
 	}
 }
 
-func withResource(resource string) func(*Cache) {
-	return func(c *Cache) {
-		c.resource = resource
-	}
-}
-
 type Cache struct {
 	metrics  module.CacheMetrics
 	limit    uint
@@ -65,13 +58,13 @@ type Cache struct {
 	cache    *lru.Cache
 }
 
-func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
+func newCache(collector module.CacheMetrics, resourceName string, options ...func(*Cache)) *Cache {
 	c := Cache{
 		metrics:  collector,
 		limit:    1000,
 		store:    noStore,
 		retrieve: noRetrieve,
-		resource: metrics.ResourceUndefined,
+		resource: resourceName,
 	}
 	for _, option := range options {
 		option(&c)

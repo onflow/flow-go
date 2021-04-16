@@ -34,11 +34,10 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCa
 		}
 	}
 
-	cache := newCache(collector,
+	cache := newCache(collector, metrics.ResourceChunkDataPack,
 		withLimit(byChunkIDCacheSize),
 		withStore(store),
 		withRetrieve(retrieve),
-		withResource(metrics.ResourceChunkDataPack),
 	)
 
 	ch := ChunkDataPacks{
