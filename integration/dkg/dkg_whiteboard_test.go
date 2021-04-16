@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -215,24 +214,19 @@ func TestDKGWithWhiteboard(t *testing.T) {
 		n.Done()
 	}
 
-	t.Logf("there are %d results", len(whiteboard.results))
+	t.Logf("there are %d result(s)", len(whiteboard.results))
 
 	winningResultSigCount := 0
 	var winningResult result
 	for _, result := range whiteboard.results {
-		signers := whiteboard.resultSubmitters[result.Fingerprint()]
+		resultID := flow.MakeID(result)
+		signers := whiteboard.resultSubmitters[resultID]
 		if l := len(signers); l > winningResultSigCount {
 			winningResultSigCount = l
 			winningResult = result
 		}
-		t.Logf("result %s has %d proposers", result.Fingerprint(), len(signers))
-
+		t.Logf("result %s has %d proposers", resultID, len(signers))
 	}
-
-	require.GreaterOrEqual(t,
-		winningResultSigCount,
-		signature.RandomBeaconThreshold(len(nodes)),
-	)
 
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
@@ -248,8 +242,8 @@ func TestDKGWithWhiteboard(t *testing.T) {
 
 		signature, err := signer.Sign(sigData)
 		require.NoError(t, err)
-		signatures = append(signatures, signature)
 
+		signatures = append(signatures, signature)
 		indices = append(indices, uint(i))
 	}
 
@@ -259,6 +253,8 @@ func TestDKGWithWhiteboard(t *testing.T) {
 	for i, signer := range signers {
 		ok, err := signer.Verify(sigData, groupSignature, winningResult.groupKey)
 		require.NoError(t, err)
-		require.True(t, ok, fmt.Sprintf("node %d fails to verify threshold signature", i))
+		if !ok {
+			t.Errorf("node %d fails to verify threshold signature", i)
+		}
 	}
 }
