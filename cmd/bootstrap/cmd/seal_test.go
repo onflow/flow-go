@@ -3,8 +3,9 @@ package cmd
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestRandomSource_Deterministic(t *testing.T) {
