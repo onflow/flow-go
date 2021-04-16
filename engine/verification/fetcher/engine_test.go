@@ -283,7 +283,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 				// mocks a valid execution node as originID
 				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
-			msg: "invalid-collection-ID",
+			msg: "invalid-chunk-ID",
 		},
 		{
 			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
