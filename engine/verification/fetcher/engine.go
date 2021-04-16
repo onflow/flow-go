@@ -200,6 +200,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	if err != nil {
 		// TODO: this can be due to a byzantine behavior
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
+		return
 	}
 
 	result, err := e.results.ByID(status.ExecutionResultID)
