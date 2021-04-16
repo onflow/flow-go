@@ -87,6 +87,7 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 
 // Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
+	b.log.Debug().Msg("broadcasting dkg message")
 	bcastMsg, err := b.prepareBroadcastMessage(data)
 	if err != nil {
 		b.log.Error().Err(err).Msg("could not create broadcast message")
@@ -128,7 +129,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	defer b.Unlock()
 	msgs, err := b.dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
 	if err != nil {
-		return fmt.Errorf("could not read broadcast messages: %w", err)
+		return fmt.Errorf("could not read broadcast messages(offset: %d, ref: %v): %w", b.messageOffset, referenceBlock, err)
 	}
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator"
+	"github.com/onflow/flow-go/model/flow"
 
 	sdk "github.com/onflow/flow-go-sdk"
 )
@@ -35,7 +36,8 @@ func (c *EmulatorClient) GetAccountAtLatestBlock(ctx context.Context, address sd
 }
 
 func (c *EmulatorClient) SendTransaction(ctx context.Context, tx sdk.Transaction, opts ...grpc.CallOption) error {
-	return c.Submit(&tx)
+	_, err := c.Submit(&tx)
+	return err
 }
 
 func (c *EmulatorClient) GetLatestBlock(ctx context.Context, isSealed bool, opts ...grpc.CallOption) (*sdk.Block, error) {
@@ -107,26 +109,26 @@ func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk
 	return scriptResult.Value, nil
 }
 
-func (c *EmulatorClient) Submit(tx *sdk.Transaction) error {
+func (c *EmulatorClient) Submit(tx *sdk.Transaction) (*flow.Block, error) {
 	// submit the signed transaction
 	err := c.blockchain.AddTransaction(*tx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	result, err := c.blockchain.ExecuteNextTransaction()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !result.Succeeded() {
-		return fmt.Errorf("transaction did not succeeded: %w", result.Error)
+		return nil, fmt.Errorf("transaction did not succeeded: %w", result.Error)
 	}
 
-	_, err = c.blockchain.CommitBlock()
+	block, err := c.blockchain.CommitBlock()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return block, nil
 }

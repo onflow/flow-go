@@ -134,10 +134,11 @@ func (s *DKGSuite) setupDKGAdmin() {
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
-	s.signAndSubmit(setUpAdminTx,
+	_, err := s.signAndSubmit(setUpAdminTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
+	require.NoError(s.T(), err)
 }
 
 // createAndFundAccount creates a nodeAccount and funds it in the emulator
@@ -155,31 +156,11 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	create Flow account
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-	createAccountTx := sdktemplates.CreateAccount(
+	newAccountAddress, err := s.blockchain.CreateAccount(
 		[]*sdk.AccountKey{accountKey},
 		[]sdktemplates.Contract{},
-		s.blockchain.ServiceKey().Address).
-		SetProposalKey(
-			s.blockchain.ServiceKey().Address,
-			s.blockchain.ServiceKey().Index,
-			s.blockchain.ServiceKey().SequenceNumber).
-		SetPayer(s.blockchain.ServiceKey().Address)
-
-	s.signAndSubmit(createAccountTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
 	)
-
-	res, err := s.adminEmulatorClient.GetTransactionResult(nil, createAccountTx.ID())
 	require.NoError(s.T(), err)
-
-	var newAccountAddress sdk.Address
-	for _, event := range res.Events {
-		if event.Type == sdk.EventAccountCreated {
-			accountCreatedEvent := sdk.AccountCreatedEvent(event)
-			newAccountAddress = accountCreatedEvent.Address()
-		}
-	}
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	fund Flow account
@@ -223,10 +204,11 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
 	require.NoError(s.T(), err)
 
-	s.signAndSubmit(fundAccountTx,
+	_, err = s.signAndSubmit(fundAccountTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
 	)
+	require.NoError(s.T(), err)
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	create nodeAccount
@@ -251,7 +233,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	return account
 }
 
-// createNode creates a DKG test node from an account and initializes it's DKG
+// createNode creates a DKG test node from an account and initializes its DKG
 // smart-contract client
 func (s *DKGSuite) createNode(account *nodeAccount) *node {
 	emulatorClient := emulatormod.NewEmulatorClient(s.blockchain)
@@ -289,10 +271,11 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
 	require.NoError(s.T(), err)
 
-	s.signAndSubmit(startDKGTx,
+	_, err = s.signAndSubmit(startDKGTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
+	require.NoError(s.T(), err)
 
 	// sanity check: verify that DKG was started with correct node IDs
 	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
@@ -316,10 +299,11 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 	err = createParticipantTx.AddArgument(cadence.NewString(node.account.accountKey.PublicKey.String()))
 	require.NoError(s.T(), err)
 
-	s.signAndSubmit(createParticipantTx,
+	_, err = s.signAndSubmit(createParticipantTx,
 		[]sdk.Address{node.account.accountAddress, s.blockchain.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{node.account.accountSigner, s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
+	require.NoError(s.T(), err)
 
 	// verify that nodeID was registered
 	result := s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
@@ -334,8 +318,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 	core := testutil.GenericNode(s.T(), s.hub, node.account.netID, ids, s.chainID)
 	core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
-	// the viewsObserver is used by the reactor engine to subscribe to when
-	// blocks are finalized that are in a new view
+	// the viewsObserver is used by the reactor engine to subscribe to new views
+	// being finalized
 	viewsObserver := gadgets.NewViews()
 	core.ProtocolEvents.AddConsumer(viewsObserver)
 
@@ -385,7 +369,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 // signAndSubmit commits a transaction
-func (s *DKGSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) {
+func (s *DKGSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.Block, error) {
 
 	// sign transaction with each signer
 	for i := len(signerAddresses) - 1; i >= 0; i-- {
@@ -403,8 +387,7 @@ func (s *DKGSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Addr
 	}
 
 	// submit transaction
-	err := s.adminEmulatorClient.Submit(tx)
-	require.NoError(s.T(), err)
+	return s.adminEmulatorClient.Submit(tx)
 }
 
 // executeScript runs a cadence script on the emulator blockchain
