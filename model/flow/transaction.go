@@ -227,7 +227,7 @@ func (tb *TransactionBody) signerMap() map[Address]int {
 	return signers
 }
 
-// SignPayload signs the transaction payload with the specified account key using the default transaction domain tag.
+// SignPayload signs the transaction payload (TransactionDomainTag + payload) with the specified account key using the default transaction domain tag.
 //
 // The resulting signature is combined with the account address and key ID before
 // being added to the transaction.
@@ -239,25 +239,8 @@ func (tb *TransactionBody) SignPayload(
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
-	return tb.SignPayloadWithTag(address, keyID, privateKey, hasher, TransactionDomainTag[:])
-}
+	sig, err := tb.SignMessageWithTag(tb.PayloadMessage(), TransactionDomainTag[:], privateKey, hasher)
 
-// SignPayload signs the transaction payload with the specified account key.
-//
-// The resulting signature is combined with the account address and key ID before
-// being added to the transaction.
-//
-// This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignPayloadWithTag(
-	address Address,
-	keyID uint64,
-	privateKey crypto.PrivateKey,
-	hasher hash.Hasher,
-	tag []byte,
-) error {
-	message := tb.PayloadMessage()
-	message = append(tag[:], message...)
-	sig, err := privateKey.Sign(message, hasher)
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction payload with given key: %w", err)
 	}
@@ -267,7 +250,7 @@ func (tb *TransactionBody) SignPayloadWithTag(
 	return nil
 }
 
-// SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key using the default transaction domain tag.
+// SignEnvelope signs the full transaction (TransactionDomainTag + payload + payload signatures) with the specified account key using the default transaction domain tag.
 //
 // The resulting signature is combined with the account address and key ID before
 // being added to the transaction.
@@ -279,25 +262,8 @@ func (tb *TransactionBody) SignEnvelope(
 	privateKey crypto.PrivateKey,
 	hasher hash.Hasher,
 ) error {
-	return tb.SignEnvelopeWithTag(address, keyID, privateKey, hasher, TransactionDomainTag[:])
-}
+	sig, err := tb.SignMessageWithTag(tb.EnvelopeMessage(), TransactionDomainTag[:], privateKey, hasher)
 
-// SignEnvelope signs the full transaction (payload + payload signatures) with the specified account key.
-//
-// The resulting signature is combined with the account address and key ID before
-// being added to the transaction.
-//
-// This function returns an error if the signature cannot be generated.
-func (tb *TransactionBody) SignEnvelopeWithTag(
-	address Address,
-	keyID uint64,
-	privateKey crypto.PrivateKey,
-	hasher hash.Hasher,
-	tag []byte,
-) error {
-	message := tb.EnvelopeMessage()
-	message = append(tag[:], message...)
-	sig, err := privateKey.Sign(message, hasher)
 	if err != nil {
 		return fmt.Errorf("failed to sign transaction envelope with given key: %w", err)
 	}
@@ -305,6 +271,24 @@ func (tb *TransactionBody) SignEnvelopeWithTag(
 	tb.AddEnvelopeSignature(address, keyID, sig)
 
 	return nil
+}
+
+// SignMessageWithTag signs the message (tag + message) with the specified account key.
+//
+// This function returns an error if the signature cannot be generated.
+func (tb *TransactionBody) SignMessageWithTag(
+	message []byte,
+	tag []byte,
+	privateKey crypto.PrivateKey,
+	hasher hash.Hasher,
+) ([]byte, error) {
+	message = append(tag[:], message...)
+	sig, err := privateKey.Sign(message, hasher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign message with given key: %w", err)
+	}
+
+	return sig, nil
 }
 
 // AddPayloadSignature adds a payload signature to the transaction for the given address and key ID.

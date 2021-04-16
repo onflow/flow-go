@@ -1840,8 +1840,9 @@ func TestSigningWithTags(t *testing.T) {
 				hasher, err := exeUtils.NewHasher(privateKeys[0].HashAlgo)
 				require.NoError(t, err)
 
-				err = txBody.SignEnvelopeWithTag(accounts[0], 0, privateKeys[0].PrivateKey, hasher, nil)
+				sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), nil, privateKeys[0].PrivateKey, hasher)
 				require.NoError(t, err)
+				txBody.AddEnvelopeSignature(accounts[0], 0, sig)
 
 				tx := fvm.Transaction(txBody, 0)
 
