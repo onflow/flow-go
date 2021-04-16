@@ -188,6 +188,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
 	if !exists {
 		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
+		return
 	}
 
 	lg = lg.With().
@@ -227,6 +228,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	err = e.pushToVerifier(status.Chunk, result, chunkDataPack, collection)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
+		return
 	}
 	// we need to report that the job has been finished eventually
 	e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
