@@ -204,17 +204,15 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifi
 }
 
 // validateStakedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an staked
-// execution node  at the given block ID.
+// execution node at the given block ID.
 func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) (bool, error) {
-
 	sender, err := e.state.AtBlockID(blockID).Identity(senderID)
 	if errors.Is(err, storage.ErrNotFound) {
-		return false, engine.NewInvalidInputErrorf("sender is unstaked: %v", senderID)
+		return false, engine.NewInvalidInputErrorf("sender is unstake: %v", senderID)
 	}
 	if err != nil {
 		return false, fmt.Errorf("could not find identity for chunk: %w", err)
 	}
-
 	if sender.Role != flow.RoleExecution {
 		return false, engine.NewInvalidInputErrorf("sender is not execution node: %v", sender.Role)
 	}
@@ -222,52 +220,52 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 	return sender.Stake > 0, nil
 }
 
-// HandleChunkDataPack is called by the chunk requester module everytime a new request chunk arrives.
+// HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
 // The chunks are supposed to be deduplicated by the requester.
 // So invocation of this method indicates arrival of a distinct requested chunk.
 func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
-	log := e.log.With().
+	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 		Hex("collection_id", logging.ID(collection.ID())).
 		Logger()
-
-	log.Info().Msg("chunk data pack arrived")
+	lg.Info().Msg("chunk data pack arrived")
 
 	status, err := e.validatedStatus(originID, chunkDataPack, collection)
 	if err != nil {
 		// TODO: this can be due to a byzantine behavior
-		log.Info().Err(err).Msg("could not validate and fetch chunk status")
+		lg.Info().Err(err).Msg("could not validate and fetch chunk status")
 		return
 	}
 
 	result, err := e.results.ByID(status.ExecutionResultID)
 	if err != nil {
-		// this error indicates a fatal situation that we are missing an execution result.
-		// can be a database leakage.
-		log.Fatal().Err(err).Msg("could not retrieve execution result of chunk status, possibly a bug")
+		// potential database leakage or corruption.
+		lg.Fatal().Err(err).Msg("could not retrieve execution result of chunk status, possibly a bug")
 		return
 	}
 
-	log = log.With().
+	lg = lg.With().
 		Hex("result_id", logging.ID(result.ID())).
 		Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
 
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
+	lg.Debug().Bool("removed", removed).Msg("removed chunk status")
 	if !removed {
-		// not being able to remove it means a duplicate response is being processed concurrently
-		// so we terminate processing the current one.
-		log.Debug().Bool("removed", removed).Msg("removed chunk status")
+		// we deduplicate the chunk data responses at this point, reaching here means a
+		// duplicate chunk data response is under process concurrently, so we give up
+		// on processing current one.
 		return
 	}
 
+	// pushes chunk data pack to verifier, and waits for it to be verified.
 	err = e.pushToVerifier(status.Chunk, result, chunkDataPack, collection)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
+		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
 	}
 	// we need to report that the job has been finished eventually
 	e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
-	log.Info().Msg("verifiable chunk successfully pushed to verifier engine")
+	lg.Info().Msg("chunk verification is done")
 }
 
 // NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the chunk ID has been sealed and
