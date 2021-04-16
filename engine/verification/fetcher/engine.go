@@ -82,6 +82,9 @@ func New(
 	return e
 }
 
+// WithChunkConsumerNotifier sets the processing notifier of fetcher.
+// The fetcher engine uses this notifier to inform the chunk consumer that it is done processing a given chunk, and
+// is ready to receive a new chunk to process.
 func (e *Engine) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.chunkConsumerNotifier = notifier
 }
@@ -100,49 +103,45 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // ProcessAssignedChunk is the entry point of fetcher engine.
-// It pushes the assigned chunk down the pipeline with tracing on it enabled.
+// It pushes the assigned chunk down the pipeline.
 // Through the pipeline the chunk data pack for this chunk is requested,
 // a verifiable chunk is shaped for it,
 // and is pushed to the verifier engine for verification.
 //
-// ProcessAssignedChunk processes the chunk that assigned to this verification node.
-// It should not be blocking since multiple workers might be calling it concurrently.
+// It should not be blocking since multiple chunk consumer workers might be calling it concurrently.
 // It fetches the chunk data pack, once received, verifier engine will be verifying
 // Once a chunk has been processed, it will call the processing notifier callback to notify
 // the chunk consumer in order to process the next chunk.
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
-	log := e.log.With().
-		Uint64("chunk_index", locator.Index).
+	// TODO: add tracing and metrics.
+	lg := e.log.With().
 		Hex("result_id", logging.ID(locator.ResultID)).
+		Uint64("chunk_index", locator.Index).
 		Logger()
+	lg.Info().Msg("chunk locator arrived")
 
-	log.Info().Msg("chunk locator arrived")
-
-	// retrieving result and chunk
+	// retrieves result and chunk using the locator
 	result, err := e.results.ByID(locator.ResultID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not retrieve result for chunk locator")
+		lg.Fatal().Err(err).Msg("could not retrieve result for chunk locator")
 	}
 	chunk := result.Chunks[locator.Index]
 	chunkID := chunk.ID()
 
-	log = log.With().
+	lg = lg.With().
 		Hex("chunk_id", logging.ID(chunkID)).
 		Hex("block_id", logging.ID(chunk.ChunkBody.BlockID)).
 		Logger()
+	lg.Debug().Msg("result and chunk for locator retrieved")
 
-	log.Debug().Msg("result and chunk for locator retrieved")
-
-	// if block has been sealed, then we can finish
+	// skips processing a chunk if it belongs to a sealed block.
 	sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not determine whether block has been sealed")
+		lg.Fatal().Err(err).Msg("could not determine whether block has been sealed")
 	}
-
 	if sealed {
 		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
-		log.Info().
-			Msg("drops requesting chunk of a sealed block")
+		lg.Info().Msg("drops requesting chunk of a sealed block")
 		return
 	}
 
@@ -153,56 +152,52 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
-		// unless chunk consumer fails (on a bug) to deduplicate the chunks, it should not pass
-		// the same chunk locator twice to this fetcher engine.
-		log.Warn().Msg("skips processing an already existing pending chunk, possible data race")
+		// chunk locators are deduplicated by consumer, reaching this point hints failing deduplication on consumer.
 		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
+		lg.Warn().Msg("skips processing an already existing pending chunk, possible data race")
 		return
 	}
 
 	err = e.requestChunkDataPack(chunk.ID(), locator.ResultID, chunk.BlockID)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not request chunk data pack")
+		lg.Fatal().Err(err).Msg("could not request chunk data pack")
 	}
 
 	// requesting a chunk data pack is async, i.e., once engine reaches this point
-	// it gracefully waits (unblocking) till it either delivers us the requested chunk data pack
+	// it gracefully waits (unblocking) for the requested
+	// till it either delivers us the requested chunk data pack
 	// or cancels our request (when chunk belongs to a sealed block).
 	//
 	// both these events happen through requester module calling fetchers callbacks.
 	// it is during those callbacks that we notify the consumer that we are done with this job.
-	log.Info().Msg("chunk data pack requested from requester engine")
+	lg.Info().Msg("chunk data pack requested from requester engine")
 }
 
-func (e *Engine) validateChunkDataPack(
-	chunk *flow.Chunk,
-	senderID flow.Identifier,
-	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection,
-) error {
-	// 1. sender must be an execution node at that block
+// validateChunkDataPack validates the integrity of a received chunk data pack as well as the authenticity of its sender.
+// Regarding the integrity: the chunk data pack should have a matching start state with the chunk itself, as well as a matching collection ID with the
+// given collection.
+//
+// Regarding the authenticity: the chunk data pack should be coming from a sender that is an staked execution node at the block of the chunk.
+func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+	// 1. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
 	staked, err := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if err != nil {
 		return fmt.Errorf("could not validate identity of sender at block ID as an execution node: %w", err)
 	}
-
 	if !staked {
 		return fmt.Errorf("unstaked execution node sender at block ID")
 	}
 
 	// 2. start state must match
 	if !bytes.Equal(chunkDataPack.StartState, chunk.ChunkBody.StartState) {
-		return engine.NewInvalidInputErrorf(
-			"expecting chunk data pack's start state: %v, but got: %v",
-			chunk.ChunkBody.StartState, chunkDataPack.StartState)
+		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %v, but got: %v", chunk.ChunkBody.StartState, chunkDataPack.StartState)
 	}
 
 	// 3. collection id must match
 	collID := collection.ID()
 	if chunkDataPack.CollectionID != collID {
-		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v",
-			chunkDataPack.CollectionID, collID)
+		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
 	}
 
 	return nil
