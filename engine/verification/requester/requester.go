@@ -165,13 +165,16 @@ func (e *Engine) Request(request *verification.ChunkDataPackRequest, targets flo
 		Targets:              targets,
 	}
 	added := e.pendingRequests.Add(status)
-	e.log.Debug().
+	e.log.Info().
 		Hex("chunk_id", logging.ID(request.ChunkID)).
+		Uint64("block_height", request.Height).
+		Int("agree_executors", len(request.Agrees)).
+		Int("disagree_executors", len(request.Disagrees)).
 		Bool("added_to_pending_requests", added).
 		Msg("chunk data pack request arrived")
 }
 
-// onTimer should run periodically, it goes through all pending chunks, and requests their chunk data pack.
+// onTimer should run periodically, it goes through all pending requests, and requests their chunk data pack.
 // It also retries the chunk data request if the data hasn't been received for a while.
 func (e *Engine) onTimer() {
 	pendingReqs := e.pendingRequests.All()
@@ -181,7 +184,7 @@ func (e *Engine) onTimer() {
 		Msg("start processing all pending chunk data requests")
 
 	for _, request := range pendingReqs {
-		log := e.log.With().
+		lg := e.log.With().
 			Hex("chunk_id", logging.ID(request.ID())).
 			Uint64("block_height", request.Height).
 			Logger()
@@ -189,13 +192,13 @@ func (e *Engine) onTimer() {
 		// if block has been sealed, then we can finish
 		sealed, err := e.blockIsSealed(request.Height)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not determine whether block has been sealed")
+			lg.Fatal().Err(err).Msg("could not determine whether block has been sealed")
+			continue
 		}
-
 		if sealed {
 			removed := e.pendingRequests.Rem(request.ID())
 			e.handler.NotifyChunkDataPackSealed(request.ID())
-			log.Info().
+			lg.Info().
 				Bool("removed", removed).
 				Msg("drops requesting chunk of a sealed block")
 			continue
@@ -203,11 +206,11 @@ func (e *Engine) onTimer() {
 
 		err = e.requestChunkDataPack(request)
 		if err != nil {
-			log.Warn().Err(err).Msg("could not request chunk data pack")
+			lg.Warn().Err(err).Msg("could not request chunk data pack")
 			continue
 		}
 
-		log.Info().Msg("chunk data pack requested")
+		lg.Info().Msg("chunk data pack requested")
 	}
 }
 
@@ -224,7 +227,6 @@ func (e Engine) blockIsSealed(height uint64) (bool, error) {
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
 func (e *Engine) requestChunkDataPack(status *verification.ChunkRequestStatus) error {
-	// creates chunk data pack request event
 	req := &messages.ChunkDataRequest{
 		ChunkID: status.ChunkID,
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
