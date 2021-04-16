@@ -13,10 +13,9 @@ type ChunkStatuses struct {
 }
 
 func NewChunkStatuses(limit uint) *ChunkStatuses {
-	chunks := &ChunkStatuses{
+	return &ChunkStatuses{
 		Backend: NewBackend(WithLimit(limit)),
 	}
-	return chunks
 }
 
 func chunkStatus(entity flow.Entity) *verification.ChunkStatus {
@@ -27,23 +26,23 @@ func chunkStatus(entity flow.Entity) *verification.ChunkStatus {
 	return chunk
 }
 
-func (cs *ChunkStatuses) All() []*verification.ChunkStatus {
+func (cs ChunkStatuses) All() []*verification.ChunkStatus {
 	all := cs.Backend.All()
-	allChunks := make([]*verification.ChunkStatus, 0, len(all))
+	statuses := make([]*verification.ChunkStatus, 0, len(all))
 	for _, entity := range all {
 		chunk := chunkStatus(entity)
-		allChunks = append(allChunks, chunk)
+		statuses = append(statuses, chunk)
 	}
-	return allChunks
+	return statuses
 }
 
-func (cs *ChunkStatuses) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
+func (cs ChunkStatuses) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
 		return nil, false
 	}
-	chunk := chunkStatus(entity)
-	return chunk, true
+	status := chunkStatus(entity)
+	return status, true
 }
 
 func (cs *ChunkStatuses) Add(status *verification.ChunkStatus) bool {
