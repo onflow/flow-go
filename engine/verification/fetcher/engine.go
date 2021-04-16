@@ -161,6 +161,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	err = e.requestChunkDataPack(chunk.ID(), locator.ResultID, chunk.BlockID)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not request chunk data pack")
+		return
 	}
 
 	// requesting a chunk data pack is async, i.e., once engine reaches this point
@@ -346,34 +347,7 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 	}, nil
 }
 
-// EndStateCommitment computes the end state of the given chunk.
-func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemChunk bool) (flow.StateCommitment, error) {
-
-	var endState flow.StateCommitment
-	if systemChunk {
-		// last chunk in a result is the system chunk and takes final state commitment
-		var ok bool
-		endState, ok = result.FinalStateCommitment()
-		if !ok {
-			return nil, fmt.Errorf("can not read final state commitment, likely a bug")
-		}
-	} else {
-		// any chunk except last takes the subsequent chunk's start state
-		endState = result.Chunks[chunkIndex+1].StartState
-	}
-
-	return endState, nil
-}
-
-// IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
-// Otherwise, it returns false.
-// In the current version, a chunk is a system chunk if it is the last chunk of the
-// execution result.
-func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
-	return chunkIndex == uint64(len(result.Chunks)-1)
-}
-
-// requestChunkDataPack creates and dispatches a chunk data pack request to the requester module of the engine.
+// requestChunkDataPack creates and dispatches a chunk data pack request to the requester engine.
 func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
 	agrees, disagrees, err := e.getAgreeAndDisagreeExecutors(blockID, resultID)
 	if err != nil {
@@ -444,6 +418,7 @@ func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) (f
 
 	for _, receipt := range receipts {
 		executor := receipt.ExecutorID
+
 		if receipt.ExecutionResult.ID() == resultID {
 			agrees = append(agrees, executor)
 		} else {
@@ -452,4 +427,30 @@ func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) (f
 	}
 
 	return agrees, disagrees
+}
+
+// EndStateCommitment computes the end state of the given chunk.
+func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemChunk bool) (flow.StateCommitment, error) {
+	var endState flow.StateCommitment
+	if systemChunk {
+		// last chunk in a result is the system chunk and takes final state commitment
+		var ok bool
+		endState, ok = result.FinalStateCommitment()
+		if !ok {
+			return nil, fmt.Errorf("can not read final state commitment, likely a bug")
+		}
+	} else {
+		// any chunk except last takes the subsequent chunk's start state
+		endState = result.Chunks[chunkIndex+1].StartState
+	}
+
+	return endState, nil
+}
+
+// IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
+// Otherwise, it returns false.
+// In the current version, a chunk is a system chunk if it is the last chunk of the
+// execution result.
+func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
+	return chunkIndex == uint64(len(result.Chunks)-1)
 }
