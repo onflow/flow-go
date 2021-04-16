@@ -134,8 +134,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 
-	tracer, err := trace.NewTracer(log, "test")
-	require.NoError(t, err)
+	tracer := trace.NewNoopTracer()
 
 	request.EXPECT().Force().Return().AnyTimes()
 
@@ -198,8 +197,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 	newStateCommitment := executableBlock.StartState
 
 	ctx.computationManager.
-		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).Run(func(args mock.Arguments) {
-	}).
+		On("ComputeBlock", mock.Anything, executableBlock, mock.Anything).
 		Return(computationResult, nil).Once()
 
 	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
@@ -790,8 +788,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) *Engine {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
-	tracer, err := trace.NewTracer(log, "test")
-	require.NoError(t, err)
+	tracer := trace.NewNoopTracer()
 	ctrl := gomock.NewController(t)
 	net := module.NewMockNetwork(ctrl)
 	request := module.NewMockRequester(ctrl)
