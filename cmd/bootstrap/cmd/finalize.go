@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -134,7 +135,15 @@ func finalize(cmd *cobra.Command, args []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid genesis token supply")
 		}
-		commit, err = run.GenerateExecutionState(filepath.Join(flagOutdir, model.DirnameExecutionState), serviceAccountPublicKey, value, parseChainID(flagRootChain).Chain())
+		commit, err = run.GenerateExecutionState(
+			filepath.Join(flagOutdir, model.DirnameExecutionState),
+			serviceAccountPublicKey,
+			parseChainID(flagRootChain).Chain(),
+			fvm.WithInitialTokenSupply(value),
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("unable to generate execution state")
 		}

@@ -1,8 +1,6 @@
 package flattener_test
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,12 +15,9 @@ import (
 
 func TestForestStoreAndLoad(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := mtrie.NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	mForest, err := mtrie.NewForest(pathByteSize, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
@@ -53,7 +48,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	forestSequencing, err := flattener.FlattenForest(mForest)
 	require.NoError(t, err)
 
-	newForest, err := mtrie.NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	newForest, err := mtrie.NewForest(pathByteSize, 5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	//forests are different

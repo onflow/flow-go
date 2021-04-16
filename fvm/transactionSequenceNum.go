@@ -1,10 +1,11 @@
 package fvm
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
@@ -23,7 +24,6 @@ func (c *TransactionSequenceNumberChecker) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-
 	return c.checkAndIncrementSequenceNumber(proc, ctx, sth)
 }
 
@@ -55,42 +55,30 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	accountKey, err := accounts.GetPublicKey(proposalKey.Address, proposalKey.KeyIndex)
 	if err != nil {
-		if errors.Is(err, state.ErrAccountPublicKeyNotFound) {
-			return &InvalidProposalKeyPublicKeyDoesNotExistError{
-				Address:  proposalKey.Address,
-				KeyIndex: proposalKey.KeyIndex,
-			}
-		}
-
-		return err
+		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
+		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 
 	if accountKey.Revoked {
-		return &InvalidProposalKeyPublicKeyRevokedError{
-			Address:  proposalKey.Address,
-			KeyIndex: proposalKey.KeyIndex,
-		}
+		err = fmt.Errorf("proposal key has been revoked")
+		err = errors.NewInvalidProposalSignatureError(proposalKey.Address, proposalKey.KeyIndex, err)
+		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
+
+	// Note that proposal key verification happens at the txVerifier and not here.
 
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
-		return &InvalidProposalKeySequenceNumberError{
-			Address:           proposalKey.Address,
-			KeyIndex:          proposalKey.KeyIndex,
-			CurrentSeqNumber:  accountKey.SeqNumber,
-			ProvidedSeqNumber: proposalKey.SequenceNumber,
-		}
+		return errors.NewInvalidProposalSeqNumberError(proposalKey.Address, proposalKey.KeyIndex, accountKey.SeqNumber, proposalKey.SequenceNumber)
 	}
 
 	accountKey.SeqNumber++
 
 	_, err = accounts.SetPublicKey(proposalKey.Address, proposalKey.KeyIndex, accountKey)
 	if err != nil {
-		// drop the changes
 		childState.View().DropDelta()
-		return err
+		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
-
 	return nil
 }

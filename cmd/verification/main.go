@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
@@ -18,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/match"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -37,7 +37,7 @@ const (
 	// requestInterval represents the time interval in milliseconds that the
 	// match engine retries sending resource requests to the network
 	// this value is set following this issue (3443)
-	requestInterval = 1000 * time.Millisecond
+	requestInterval = 5000 * time.Millisecond
 
 	// processInterval represents the time interval in milliseconds that the
 	// finder engine iterates over the execution receipts ready to process
@@ -47,9 +47,8 @@ const (
 	// failureThreshold represents the number of retries match engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// Currently setting the threshold to a very large value (corresponding to 100 days),
-	// which for all practical purposes is equivalent to the Verifier trying indefinitely.
-	failureThreshold = 10000000
+	// This value is currently set to account for a single 24-hour failure of an Execution node.
+	failureThreshold = 17500
 )
 
 func main() {
@@ -265,8 +264,8 @@ func main() {
 			return err
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rt := runtime.NewInterpreterRuntime()
-			vm := fvm.New(rt)
+			rt := fvm.NewInterpreterRuntime()
+			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
 			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)
@@ -334,7 +333,7 @@ func main() {
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
 			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner()
+			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee

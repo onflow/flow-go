@@ -7,19 +7,19 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-
-	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/fvm/programs"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/fvm"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/chunks"
@@ -104,9 +104,9 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	assert.True(s.T(), ok)
 }
 
-// TestFailedTx tests verification behaviour in case
-// of failed transaction. if a transaction fails, it shouldn't
-// change the state commitment.
+// TestFailedTx tests verification behavior in case
+// of failed transaction. if a transaction fails, it should
+// still change the state commitment.
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("failedTx"))
 	assert.NotNil(s.T(), vch)
@@ -194,73 +194,71 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	metricsCollector := &metrics.NoopCollector{}
 
-	unittest.RunWithTempDir(t, func(dbDir string) {
-		f, _ := completeLedger.NewLedger(dbDir, 1000, metricsCollector, zerolog.Nop(), nil, completeLedger.DefaultPathFinderVersion)
+	f, _ := completeLedger.NewLedger(&fixtures.NoopWAL{}, 1000, metricsCollector, zerolog.Nop(), completeLedger.DefaultPathFinderVersion)
 
-		keys := executionState.RegisterIDSToKeys(ids)
-		update, err := ledger.NewUpdate(
-			f.InitialState(),
-			keys,
-			executionState.RegisterValuesToValues(values),
-		)
+	keys := executionState.RegisterIDSToKeys(ids)
+	update, err := ledger.NewUpdate(
+		f.InitialState(),
+		keys,
+		executionState.RegisterValuesToValues(values),
+	)
 
-		require.NoError(t, err)
+	require.NoError(t, err)
 
-		startState, err := f.Set(update)
-		require.NoError(t, err)
+	startState, err := f.Set(update)
+	require.NoError(t, err)
 
-		query, err := ledger.NewQuery(startState, keys)
-		require.NoError(t, err)
+	query, err := ledger.NewQuery(startState, keys)
+	require.NoError(t, err)
 
-		proof, err := f.Prove(query)
-		require.NoError(t, err)
+	proof, err := f.Prove(query)
+	require.NoError(t, err)
 
-		ids = []flow.RegisterID{id2}
-		values = [][]byte{UpdatedValue2}
+	ids = []flow.RegisterID{id2}
+	values = [][]byte{UpdatedValue2}
 
-		keys = executionState.RegisterIDSToKeys(ids)
-		update, err = ledger.NewUpdate(
-			startState,
-			keys,
-			executionState.RegisterValuesToValues(values),
-		)
-		require.NoError(t, err)
+	keys = executionState.RegisterIDSToKeys(ids)
+	update, err = ledger.NewUpdate(
+		startState,
+		keys,
+		executionState.RegisterValuesToValues(values),
+	)
+	require.NoError(t, err)
 
-		endState, err := f.Set(update)
-		require.NoError(t, err)
+	endState, err := f.Set(update)
+	require.NoError(t, err)
 
-		// Chunk setup
-		chunk := flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: 0,
-				StartState:      startState,
-				BlockID:         blockID,
-			},
-			Index: 0,
-		}
+	// Chunk setup
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
+			StartState:      startState,
+			BlockID:         blockID,
+		},
+		Index: 0,
+	}
 
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID:    chunk.ID(),
-			StartState: startState,
-			Proof:      proof,
-		}
+	chunkDataPack := flow.ChunkDataPack{
+		ChunkID:    chunk.ID(),
+		StartState: startState,
+		Proof:      proof,
+	}
 
-		// ExecutionResult setup
-		result := flow.ExecutionResult{
-			BlockID: blockID,
-			Chunks:  flow.ChunkList{&chunk},
-		}
+	// ExecutionResult setup
+	result := flow.ExecutionResult{
+		BlockID: blockID,
+		Chunks:  flow.ChunkList{&chunk},
+	}
 
-		verifiableChunkData = verification.VerifiableChunkData{
-			IsSystemChunk: false,
-			Chunk:         &chunk,
-			Header:        &header,
-			Result:        &result,
-			Collection:    &coll,
-			ChunkDataPack: &chunkDataPack,
-			EndState:      endState,
-		}
-	})
+	verifiableChunkData = verification.VerifiableChunkData{
+		IsSystemChunk: false,
+		Chunk:         &chunk,
+		Header:        &header,
+		Result:        &result,
+		Collection:    &coll,
+		ChunkDataPack: &chunkDataPack,
+		EndState:      endState,
+	}
 
 	return &verifiableChunkData
 }
@@ -280,8 +278,8 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
 		// add updates to the ledger
-		_ = led.Set("00", "", "", []byte{'F'})
-		tx.Err = &fvm.MissingPayerError{} // inside the runtime (e.g. div by zero, access account)
+		_ = led.Set("05", "", "", []byte{'B'})
+		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		_, _ = led.Get("00", "", "")
 		_, _ = led.Get("05", "", "")

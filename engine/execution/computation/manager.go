@@ -60,6 +60,7 @@ func New(
 	vm VirtualMachine,
 	vmCtx fvm.Context,
 	programsCacheSize uint,
+	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
@@ -70,6 +71,7 @@ func New(
 		metrics,
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
+		committer,
 	)
 
 	if err != nil {

@@ -28,6 +28,7 @@ type Context struct {
 	LimitAccountStorage              bool
 	CadenceLoggingEnabled            bool
 	AccountFreezeAvailable           bool
+	ExtensiveTracing                 bool
 	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
@@ -82,6 +83,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
 		AccountFreezeAvailable:           false,
+		ExtensiveTracing:                 false,
 		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
@@ -91,7 +93,6 @@ func defaultContext(logger zerolog.Logger) Context {
 			NewTransactionFeeDeductor(),
 			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvocator(logger),
-			NewTransactionStorageLimiter(),
 		},
 		ScriptProcessors: []ScriptProcessor{
 			NewScriptInvocator(),
@@ -169,6 +170,14 @@ func WithBlockHeader(header *flow.Header) Option {
 func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
 	return func(ctx Context) Context {
 		ctx.AccountFreezeAvailable = accountFreezeAvailable
+		return ctx
+	}
+}
+
+// WithExtensiveTracing sets the extensive tracing
+func WithExtensiveTracing() Option {
+	return func(ctx Context) Context {
+		ctx.ExtensiveTracing = true
 		return ctx
 	}
 }
