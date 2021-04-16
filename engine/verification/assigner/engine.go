@@ -191,7 +191,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		// log receipts committing to result
 		resultLog := lg.With().Hex("incorporated_result_id", logging.ID(resultID)).Logger()
 		for _, receipt := range receiptsGroupedByResultID.GetGroup(resultID) {
-			resultLog.With().Hex("receipts_for_result", logging.ID(receipt.ID())).Logger()
+			resultLog = resultLog.With().Hex("receipts_for_result", logging.ID(receipt.ID())).Logger()
 		}
 		resultLog.Debug().Msg("determining chunk assignment for incorporated result")
 
