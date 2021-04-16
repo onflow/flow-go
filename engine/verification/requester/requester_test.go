@@ -95,8 +95,6 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
-	// we have a request pending for this response chunk ID
-	s.pendingRequests.On("ByID", response.ChunkDataPack.ChunkID).Return(&verification.ChunkRequestStatus{}, true).Once()
 	// we remove pending request on receiving this response
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(true).Once()
 
@@ -105,7 +103,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	err := e.Process(originID, response)
 	require.Nil(t, err)
 
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler)
+	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests)
 }
 
 // TestHandleChunkDataPack_HappyPath_Multiple evaluates the happy path of receiving several requested chunk data packs.
@@ -122,8 +120,6 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	chunkCollectionIdMap := chunkToCollectionIdMap(t, responses)
 	chunkIDs := toChunkIDs(chunkCollectionIdMap)
 
-	// we have a request pending for this response chunk ID
-	mockPendingRequestsByID(t, s.pendingRequests, chunkIDs)
 	// we remove pending request on receiving this response
 	mockPendingRequestsRem(t, s.pendingRequests, chunkIDs)
 	// we pass each chunk data pack and its collection to chunk data pack handler
@@ -134,26 +130,6 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 		require.Nil(t, err)
 	}
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler)
-}
-
-// TestHandleChunkDataPack_NonExistingRequest evaluates that receiving a chunk data pack response that does not have any request attached
-// is dropped without passing it to the handler.
-func TestHandleChunkDataPack_NonExistingRequest(t *testing.T) {
-	s := setupTest()
-	e := newRequesterEngine(t, s)
-
-	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
-	originID := unittest.IdentifierFixture()
-
-	// we have a request pending for this response chunk ID
-	s.pendingRequests.On("ByID", response.ChunkDataPack.ChunkID).Return(nil, false).Once()
-
-	err := e.Process(originID, response)
-	require.Nil(t, err)
-
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con)
-	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
-	s.pendingRequests.AssertNotCalled(t, "Rem")
 }
 
 // TestHandleChunkDataPack_NonExistingRequest evaluates that failing to remove a received chunk data pack's request
@@ -168,8 +144,6 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
-	// we have a request pending for this response chunk ID
-	s.pendingRequests.On("ByID", response.ChunkDataPack.ChunkID).Return(&verification.ChunkRequestStatus{}, true).Once()
 	// however by the time we try remove it, the request status has gone.
 	// this can happen when duplicate chunk data packs are coming concurrently.
 	// the concurrency is safe with pending requests mempool's mutex lock.
@@ -238,7 +212,6 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(status))
-	mockPendingRequestsByID(t, s.pendingRequests, flow.GetIDs(status))
 
 	<-e.Ready()
 
@@ -457,26 +430,6 @@ func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPa
 	}).Return().Times(len(chunkIDs))
 
 	return wg
-}
-
-// mockPendingRequestsByID mocks chunk requests mempool for being queried for affirmative existence of each chunk ID once.
-func mockPendingRequestsByID(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
-	// maps keep track of distinct invocations per chunk ID
-	retrievedRequests := make(map[flow.Identifier]struct{})
-
-	// we have a request pending for this response chunk ID
-	pendingRequests.On("ByID", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
-		// we should have already requested this chunk data pack
-		require.Contains(t, chunkIDs, chunkID)
-
-		// invocation should be distinct per chunk ID
-		_, ok = retrievedRequests[chunkID]
-		require.False(t, ok)
-		retrievedRequests[chunkID] = struct{}{}
-	}).Return(&verification.ChunkRequestStatus{}, true).
-		Times(len(chunkIDs))
 }
 
 // mockPendingRequestsRem mocks chunk requests mempool for being queried for affirmative removal of each chunk ID once.

@@ -93,9 +93,6 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 }
 
 // ProcessLocal processes an event originating on the local node.
-// Note: this method is required as an Engine implementation,
-// however it should not be invoked as match engine requires origin ID of events
-// it receives. Use Process method instead.
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("should not invoke ProcessLocal of Match engine, use Process instead")
 }
@@ -111,7 +108,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // Ready initializes the engine and returns a channel that is closed when the initialization is done.
 func (e *Engine) Ready() <-chan struct{} {
 	delay := time.Duration(0)
-	// run a periodic check to retry requesting chunk data packs for chunks that assigned to me.
+	// run a periodic check to retry requesting chunk data packs.
 	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous
 	// call has finished.
 	// That being said, there won't be two onTimer running in parallel. See test cases for LaunchPeriodically.
@@ -144,29 +141,21 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
 	chunkID := chunkDataPack.ChunkID
 	collectionID := collection.ID()
-	log := e.log.With().
+	lg := e.log.With().
 		Hex("chunk_id", logging.ID(chunkID)).
 		Hex("collection_id", logging.ID(collectionID)).
 		Logger()
+	lg.Debug().Msg("chunk data pack received")
 
-	log.Debug().Msg("chunk data pack received")
-
-	// make sure we still need it.
-	_, exists := e.pendingRequests.ByID(chunkID)
-	if !exists {
-		log.Debug().Msg("chunk data pack is no longer needed, dropped")
-		return
-	}
-
-	// make sure we won't process duplicated chunk data pack.
+	// makes sure we still need this chunk, and we will not process duplicate chunk data packs.
 	removed := e.pendingRequests.Rem(chunkID)
 	if !removed {
-		log.Debug().Msg("chunk not found in mempool to be removed, likely a race condition")
+		lg.Debug().Msg("chunk request status not found in mempool to be removed, dropping chunk")
 		return
 	}
 
 	e.handler.HandleChunkDataPack(originID, chunkDataPack, collection)
-	log.Info().Msg("successfully sent the chunk data pack to the handler")
+	lg.Info().Msg("successfully sent the chunk data pack to the handler")
 }
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
