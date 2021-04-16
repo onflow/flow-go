@@ -10,7 +10,9 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/testingdock"
 
@@ -127,14 +129,37 @@ func (c *Container) Name() string {
 
 // DB returns the node's database.
 func (c *Container) DB() (*badger.DB, error) {
-	dbPath := filepath.Join(c.datadir, DefaultFlowDBDir)
 	opts := badger.
-		DefaultOptions(dbPath).
+		DefaultOptions(c.DBPath()).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
 
 	db, err := badger.Open(opts)
 	return db, err
+}
+
+func (c *Container) DBPath() string {
+	return filepath.Join(c.datadir, DefaultFlowDBDir)
+}
+
+func (c *Container) BootstrapPath() string {
+	return filepath.Join(c.datadir, DefaultBootstrapDir)
+}
+
+// DropDB resets the node's database.
+func (c *Container) DropDB() {
+	err := os.RemoveAll(c.DBPath())
+	require.NoError(c.net.t, err)
+	err = os.Mkdir(c.DBPath(), 0700)
+	require.NoError(c.net.t, err)
+}
+
+// WriteRootSnapshot overwrites the root protocol state snapshot file with the
+// provided state snapshot.
+func (c *Container) WriteRootSnapshot(snap *inmem.Snapshot) {
+	rootSnapshotPath := filepath.Join(c.BootstrapPath(), bootstrap.PathRootProtocolStateSnapshot)
+	err := WriteJSON(rootSnapshotPath, snap.Encodable())
+	require.NoError(c.net.t, err)
 }
 
 // Pause stops this container temporarily, preserving its state. It can be
