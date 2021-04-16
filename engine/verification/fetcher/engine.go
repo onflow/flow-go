@@ -173,6 +173,65 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	lg.Info().Msg("chunk data pack requested from requester engine")
 }
 
+// HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
+// The chunks are supposed to be deduplicated by the requester.
+// So invocation of this method indicates arrival of a distinct requested chunk.
+func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
+	lg := e.log.With().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("collection_id", logging.ID(collection.ID())).
+		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+		Logger()
+	lg.Info().Msg("chunk data pack arrived")
+
+	// make sure we still need it
+	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
+	if !exists {
+		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
+	}
+
+	lg = lg.With().
+		Uint64("chunk_index", status.Chunk.Index).
+		Hex("block_id", logging.ID(status.Chunk.BlockID)).
+		Hex("result_id", logging.ID(status.ExecutionResultID)).Logger()
+
+	// make sure the chunk data pack is valid
+	err := e.validateChunkDataPack(status.Chunk, originID, chunkDataPack, collection)
+	if err != nil {
+		// TODO: this can be due to a byzantine behavior
+		lg.Error().Err(err).Msg("could not validate chunk data pack")
+	}
+
+	result, err := e.results.ByID(status.ExecutionResultID)
+	if err != nil {
+		// potential database leakage or corruption.
+		lg.Fatal().Err(err).Msg("could not retrieve execution result of chunk status, possibly a bug")
+		return
+	}
+
+	lg = lg.With().
+		Hex("result_id", logging.ID(result.ID())).
+		Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
+
+	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
+	lg.Debug().Bool("removed", removed).Msg("removed chunk status")
+	if !removed {
+		// we deduplicate the chunk data responses at this point, reaching here means a
+		// duplicate chunk data response is under process concurrently, so we give up
+		// on processing current one.
+		return
+	}
+
+	// pushes chunk data pack to verifier, and waits for it to be verified.
+	err = e.pushToVerifier(status.Chunk, result, chunkDataPack, collection)
+	if err != nil {
+		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
+	}
+	// we need to report that the job has been finished eventually
+	e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
+	lg.Info().Msg("chunk verification is done")
+}
+
 // validateChunkDataPack validates the integrity of a received chunk data pack as well as the authenticity of its sender.
 // Regarding the integrity: the chunk data pack should have a matching start state with the chunk itself, as well as a matching collection ID with the
 // given collection.
@@ -220,56 +279,8 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 	return sender.Stake > 0, nil
 }
 
-// HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
-// The chunks are supposed to be deduplicated by the requester.
-// So invocation of this method indicates arrival of a distinct requested chunk.
-func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
-	lg := e.log.With().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
-		Hex("collection_id", logging.ID(collection.ID())).
-		Logger()
-	lg.Info().Msg("chunk data pack arrived")
-
-	status, err := e.validatedStatus(originID, chunkDataPack, collection)
-	if err != nil {
-		// TODO: this can be due to a byzantine behavior
-		lg.Info().Err(err).Msg("could not validate and fetch chunk status")
-		return
-	}
-
-	result, err := e.results.ByID(status.ExecutionResultID)
-	if err != nil {
-		// potential database leakage or corruption.
-		lg.Fatal().Err(err).Msg("could not retrieve execution result of chunk status, possibly a bug")
-		return
-	}
-
-	lg = lg.With().
-		Hex("result_id", logging.ID(result.ID())).
-		Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
-
-	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
-	lg.Debug().Bool("removed", removed).Msg("removed chunk status")
-	if !removed {
-		// we deduplicate the chunk data responses at this point, reaching here means a
-		// duplicate chunk data response is under process concurrently, so we give up
-		// on processing current one.
-		return
-	}
-
-	// pushes chunk data pack to verifier, and waits for it to be verified.
-	err = e.pushToVerifier(status.Chunk, result, chunkDataPack, collection)
-	if err != nil {
-		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
-	}
-	// we need to report that the job has been finished eventually
-	e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
-	lg.Info().Msg("chunk verification is done")
-}
-
-// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the chunk ID has been sealed and
-// hence the requester will no longer request it.
+// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler (i.e.,
+// this fetcher engine) that the chunk ID has been sealed and hence the requester will no longer request it.
 //
 // When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
 // through HandleChunkDataPack).
@@ -277,32 +288,13 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 	// we need to report that the job has been finished eventually
 	defer e.chunkConsumerNotifier.Notify(chunkID)
 	removed := e.pendingChunks.Rem(chunkID)
-
 	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block")
 }
 
-// validatedStatus validates the chunk data pack and if it passes the validation, retrieves and returns its chunk status.
-func (e *Engine) validatedStatus(originID flow.Identifier,
-	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection) (*verification.ChunkStatus, error) {
-
-	// make sure we still need it
-	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
-	if !exists {
-		return nil, fmt.Errorf("could not fetch chunk data from mempool: %x", chunkDataPack.ChunkID)
-	}
-
-	// make sure the chunk data pack is valid
-	err := e.validateChunkDataPack(status.Chunk, originID, chunkDataPack, collection)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("invalid chunk data pack for chunk: %v collection: %v block: %v error:%w",
-			chunkDataPack.ChunkID, collection.ID(), status.Chunk.BlockID, err)
-	}
-
-	return status, nil
-}
-
 // pushToVerifier makes a verifiable chunk data out of the input and pass it to the verifier for verification.
+//
+// When this method returns without any error, it means that the verification of the chunk at the verifier engine is done (either successfully,
+// or unsuccessfully)
 func (e *Engine) pushToVerifier(chunk *flow.Chunk, result *flow.ExecutionResult, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
 	header, err := e.headers.ByBlockID(chunk.BlockID)
 	if err != nil {
