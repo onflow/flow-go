@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/model/bootstrap"
 
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow/order"
@@ -689,6 +690,21 @@ func RandomBytes(n int) []byte {
 	return b
 }
 
+func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
+	opts = append(opts, WithKeys)
+	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))
+}
+
+func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
+	opts = append(opts, WithKeys)
+	il := IdentityListFixture(n, opts...)
+	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
+	for _, identity := range il {
+		nodeInfos = append(nodeInfos, bootstrap.NodeInfoFromIdentity(identity))
+	}
+	return nodeInfos
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
@@ -702,6 +718,19 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 		apply(&identity)
 	}
 	return &identity
+}
+
+func WithKeys(identity *flow.Identity) {
+	staking, err := StakingKey()
+	if err != nil {
+		panic(err)
+	}
+	networking, err := NetworkingKey()
+	if err != nil {
+		panic(err)
+	}
+	identity.StakingPubKey = staking.PublicKey()
+	identity.NetworkPubKey = networking.PublicKey()
 }
 
 // WithNodeID adds a node ID with the given first byte to an identity.
