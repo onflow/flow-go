@@ -32,18 +32,25 @@ import (
 // On receiving a chunk data pack response, the fetcher engine validates it, and shapes a verifiable chunk out of it, and passes it
 // to the verifier engine.
 type Engine struct {
-	unit                  *engine.Unit
-	log                   zerolog.Logger
-	metrics               module.VerificationMetrics
-	tracer                module.Tracer
+	// common
+	unit  *engine.Unit
+	state protocol.State // used to verify the origin ID of chunk data response, and sealing status.
+
+	// monitoring
+	log     zerolog.Logger
+	tracer  module.Tracer
+	metrics module.VerificationMetrics
+
+	// memory and storage
+	pendingChunks mempool.ChunkStatuses     // stores all pending chunks that their chunk data is requested from requester.
+	headers       storage.Headers           // used to fetch the block header for building verifiable chunk data.
+	results       storage.ExecutionResults  // used to retrieve execution result of an assigned chunk.
+	receipts      storage.ExecutionReceipts // used to find executor ids of a chunk, for requesting chunk data pack.
+
+	// output interfaces
 	verifier              network.Engine            // used to push verifiable chunk down the verification pipeline.
-	state                 protocol.State            // used to verify the origin ID of chunk data response, and sealing status.
-	pendingChunks         mempool.ChunkStatuses     // stores all pending chunks that their chunk data is requested from requester.
-	headers               storage.Headers           // used to fetch the block header for building verifiable chunk data.
-	chunkConsumerNotifier module.ProcessingNotifier // used to notify chunk consumer that it is done processing a chunk.
-	results               storage.ExecutionResults  // used to retrieve execution result of an assigned chunk.
-	receipts              storage.ExecutionReceipts // used to find executor ids of a chunk, for requesting chunk data pack.
 	requester             ChunkDataPackRequester    // used to request chunk data packs from network.
+	chunkConsumerNotifier module.ProcessingNotifier // used to notify chunk consumer that it is done processing a chunk.
 }
 
 func New(
