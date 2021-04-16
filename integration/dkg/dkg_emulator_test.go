@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-func TestDKGt(t *testing.T) {
+func TestWithEmulator(t *testing.T) {
 	suite.Run(t, new(DKGSuite))
 }
 
-func (s *DKGSuite) TestDKG() {
+func (s *DKGSuite) TestHappyPath() {
 
 	// The EpochSetup event is received at view 100. The phase transitions are
 	// at views 150, 200, and 250. In between phase transitions, the controller
@@ -35,7 +35,7 @@ func (s *DKGSuite) TestDKG() {
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
 		FinalView:          300,
-		Participants:       s.nodeIDs,
+		Participants:       s.netIDs,
 		RandomSource:       []byte("random bytes for seed"),
 	}
 	firstBlock := &flow.Header{View: 100}
@@ -54,7 +54,7 @@ func (s *DKGSuite) TestDKG() {
 		n.ProtocolEvents.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
 	}
 
-	// XXX do shit
+	// XXX do something
 
 	for _, n := range s.nodes {
 		n.Done()

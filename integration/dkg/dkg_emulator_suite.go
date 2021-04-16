@@ -47,7 +47,7 @@ type DKGSuite struct {
 	dkgAccountKey          *sdk.AccountKey
 	dkgSigner              sdkcrypto.Signer
 
-	nodeIDs      flow.IdentityList
+	netIDs       flow.IdentityList
 	nodeAccounts []*nodeAccount
 	nodes        []*node
 }
@@ -57,15 +57,15 @@ func (s *DKGSuite) SetupTest() {
 	s.deployDKGContract()
 	s.setupDKGAdmin()
 
-	s.nodeIDs = unittest.IdentityListFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
-	for _, id := range s.nodeIDs {
+	s.netIDs = unittest.IdentityListFixture(numberOfNodes, unittest.WithRole(flow.RoleConsensus))
+	for _, id := range s.netIDs {
 		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
 	}
 	for _, acc := range s.nodeAccounts {
 		s.nodes = append(s.nodes, s.createNode(acc))
 	}
 
-	s.startDKGWithParticipants(s.nodeIDs.NodeIDs())
+	s.startDKGWithParticipants(s.nodeAccounts)
 
 	for _, node := range s.nodes {
 		s.claimDKGParticipant(node)
@@ -73,7 +73,7 @@ func (s *DKGSuite) SetupTest() {
 
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
-	identities := unittest.CompleteIdentitySet(s.nodeIDs...)
+	identities := unittest.CompleteIdentitySet(s.netIDs...)
 	for _, node := range s.nodes {
 		s.initEngines(node, identities)
 	}
@@ -81,7 +81,7 @@ func (s *DKGSuite) SetupTest() {
 
 // initEmulator initializes the emulator and the admin emulator client
 func (s *DKGSuite) initEmulator() {
-	s.chainID = flow.Testnet
+	s.chainID = flow.Emulator
 
 	blockchain, err := emulator.NewBlockchain()
 	require.NoError(s.T(), err)
@@ -124,7 +124,6 @@ func (s *DKGSuite) deployDKGContract() {
 		s.dkgAddress.String(), 0)
 }
 
-// setupDKGAdmin does XXX?
 func (s *DKGSuite) setupDKGAdmin() {
 	setUpAdminTx := sdk.NewTransaction().
 		SetScript(templates.GeneratePublishDKGParticipantScript(s.env)).
@@ -149,6 +148,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		SetSigAlgo(sdkcrypto.ECDSA_P256).
 		SetHashAlgo(sdkcrypto.SHA3_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
+	accountID := accountKey.PublicKey.String()
 	accountSigner := sdkcrypto.NewInMemorySigner(accountPrivateKey, accountKey.HashAlgo)
 
 	/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,23 +189,24 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		SetScript(
 			[]byte(
 				fmt.Sprintf(`
-			import FungibleToken from 0x%s
-			import FlowToken from 0x%s
-			transaction(amount: UFix64, recipient: Address) {
-			  let sentVault: @FungibleToken.Vault
-			  prepare(signer: AuthAccount) {
-				let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-				  ?? panic("failed to borrow reference to sender vault")
-				self.sentVault <- vaultRef.withdraw(amount: amount)
-			  }
-			  execute {
-				let receiverRef =  getAccount(recipient)
-				  .getCapability(/public/flowTokenReceiver)
-				  .borrow<&{FungibleToken.Receiver}>()
-					?? panic("failed to borrow reference to recipient vault")
-				receiverRef.deposit(from: <-self.sentVault)
-			  }
-			}`,
+				import FungibleToken from 0x%s
+				import FlowToken from 0x%s
+	
+				transaction(amount: UFix64, recipient: Address) {
+				  let sentVault: @FungibleToken.Vault
+				  prepare(signer: AuthAccount) {
+					let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+					  ?? panic("failed to borrow reference to sender vault")
+					self.sentVault <- vaultRef.withdraw(amount: amount)
+				  }
+				  execute {
+					let receiverRef =  getAccount(recipient)
+					  .getCapability(/public/flowTokenReceiver)
+					  .borrow<&{FungibleToken.Receiver}>()
+						?? panic("failed to borrow reference to recipient vault")
+					receiverRef.deposit(from: <-self.sentVault)
+				  }
+				}`,
 					fvm.FungibleTokenAddress(s.chainID.Chain()).Hex(),
 					fvm.FlowTokenAddress(s.chainID.Chain()).Hex(),
 				))).
@@ -235,6 +236,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		netID:          netID,
 		privKey:        accountPrivateKey,
 		accountKey:     accountKey,
+		accountID:      accountID,
 		accountAddress: newAccountAddress,
 		accountSigner:  accountSigner,
 		accountInfo: &bootstrap.NodeMachineAccountInfo{
@@ -266,11 +268,11 @@ func (s *DKGSuite) createNode(account *nodeAccount) *node {
 	}
 }
 
-func (s *DKGSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
+func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// convert node identifiers to candece.Value to be passed in as TX argument
-	valueNodeIDs := make([]cadence.Value, 0, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
-		valueNodeIDs = append(valueNodeIDs, cadence.NewString(nodeID.String()))
+	valueNodeIDs := make([]cadence.Value, 0, len(accounts))
+	for _, account := range accounts {
+		valueNodeIDs = append(valueNodeIDs, cadence.NewString(account.accountID))
 	}
 
 	// start DKG using admin resource
@@ -311,7 +313,7 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
-	err = createParticipantTx.AddArgument(cadence.NewString(node.account.netID.String()))
+	err = createParticipantTx.AddArgument(cadence.NewString(node.account.accountKey.PublicKey.String()))
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(createParticipantTx,
@@ -321,7 +323,10 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 
 	// verify that nodeID was registered
 	result := s.executeScript(templates.GenerateGetDKGNodeIsRegisteredScript(s.env),
-		[][]byte{jsoncdc.MustEncode(cadence.String(node.account.netID.String()))})
+		[][]byte{
+			jsoncdc.MustEncode(
+				cadence.String(node.account.accountID)),
+		})
 	assert.Equal(s.T(), cadence.NewBool(true), result)
 }
 

@@ -22,6 +22,7 @@ type nodeAccount struct {
 	netID          *flow.Identity
 	privKey        crypto.PrivateKey
 	accountKey     *sdk.AccountKey
+	accountID      string
 	accountAddress sdk.Address
 	accountSigner  sdkcrypto.Signer
 	accountInfo    *bootstrap.NodeMachineAccountInfo
@@ -65,4 +66,5 @@ func (n *node) setEpochSetup(t *testing.T, epochSetup flow.EpochSetup, firstBloc
 	state := new(protocolmock.MutableState)
 	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
 	n.GenericNode.State = state
+	n.reactorEngine.State = state
 }

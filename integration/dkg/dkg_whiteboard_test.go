@@ -129,7 +129,7 @@ func createNode(
 	return &node
 }
 
-func TestDKGWithWhiteboard(t *testing.T) {
+func TestWithWhiteboard(t *testing.T) {
 
 	// hub is an in-memory test network that enables nodes to communicate using
 	// the DKG messaging engine
