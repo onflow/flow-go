@@ -86,3 +86,46 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_InvalidChunk() {
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
 }
+
+// TestCollectMissingVerifiers tests that approval collector correctly assembles list of verifiers that haven't provided approvals
+// for each chunk
+func (s *ApprovalCollectorTestSuite) TestCollectMissingVerifiers() {
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Maybe()
+
+	assignedVerifiers := make(map[uint64]flow.IdentifierList)
+	for _, chunk := range s.Chunks {
+		assignedVerifiers[chunk.Index] = s.ChunksAssignment.Verifiers(chunk)
+	}
+
+	// no approvals processed
+	for index, ids := range s.collector.CollectMissingVerifiers() {
+		require.ElementsMatch(s.T(), ids, assignedVerifiers[index])
+	}
+
+	// process one approval for one each chunk
+	for _, chunk := range s.Chunks {
+		verID := assignedVerifiers[chunk.Index][0]
+		approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
+			unittest.WithApproverID(verID))
+		err := s.collector.ProcessApproval(approval)
+		require.NoError(s.T(), err)
+	}
+
+	for index, ids := range s.collector.CollectMissingVerifiers() {
+		// skip first ID since we should have approval for it
+		require.ElementsMatch(s.T(), ids, assignedVerifiers[index][1:])
+	}
+
+	// process remaining approvals for each chunk
+	for _, chunk := range s.Chunks {
+		for _, verID := range assignedVerifiers[chunk.Index] {
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
+				unittest.WithApproverID(verID))
+			err := s.collector.ProcessApproval(approval)
+			require.NoError(s.T(), err)
+		}
+	}
+
+	// skip first ID since we should have approval for it
+	require.Empty(s.T(), s.collector.CollectMissingVerifiers())
+}
