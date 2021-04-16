@@ -19,34 +19,46 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Max number of execution nodes being asked for a chunk data pack.
-const RequestTargetCount = 2
-
-// Engine is responsible of receiving chunk data pack requests, dispatching it to the execution nodes, receiving
-// the requested chunk data pack from execution nodes, and passing it to the registered handler.
+// Engine implements a ChunkDataPackRequester that is responsible of receiving chunk data pack requests,
+// dispatching it to the execution nodes, receiving the requested chunk data pack from execution nodes,
+// and passing it to the registered handler.
 type Engine struct {
-	log             zerolog.Logger
-	unit            *engine.Unit
+	// common
+	log   zerolog.Logger
+	unit  *engine.Unit
+	state protocol.State  // used to check the last sealed height.
+	con   network.Conduit // used to send the chunk data request, and receive the response.
+
+	// monitoring
+	tracer  module.Tracer
+	metrics module.VerificationMetrics
+
+	// output interfaces
 	handler         fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
 	retryInterval   time.Duration                // determines time in milliseconds for retrying chunk data requests.
-	pendingRequests mempool.ChunkRequests        // used to store all the pending chunks that assigned to this node
-	state           protocol.State               // used to check the last sealed height
-	con             network.Conduit              // used to send the chunk data request, and receive the response.
+	requestTargets  uint                         // maximum number of execution nodes being asked for a chunk data pack.
+	pendingRequests mempool.ChunkRequests        // used to track requested chunks.
 }
 
 func New(log zerolog.Logger,
 	state protocol.State,
 	net module.Network,
-	retryInterval time.Duration,
+	tracer module.Tracer,
+	metrics module.VerificationMetrics,
 	pendingRequests mempool.ChunkRequests,
-	handler fetcher.ChunkDataPackHandler) (*Engine, error) {
+	handler fetcher.ChunkDataPackHandler,
+	retryInterval time.Duration,
+	requestTargets uint) (*Engine, error) {
 
 	e := &Engine{
-		unit:            engine.NewUnit(),
 		log:             log.With().Str("engine", "requester").Logger(),
-		retryInterval:   retryInterval,
-		handler:         handler,
+		unit:            engine.NewUnit(),
 		state:           state,
+		tracer:          tracer,
+		metrics:         metrics,
+		handler:         handler,
+		retryInterval:   retryInterval,
+		requestTargets:  requestTargets,
 		pendingRequests: pendingRequests,
 	}
 
@@ -230,7 +242,7 @@ func (e *Engine) requestChunkDataPack(status *verification.ChunkRequestStatus) e
 	}
 
 	// publishes the chunk data request to the network
-	targetIDs := status.SampleTargets(RequestTargetCount)
+	targetIDs := status.SampleTargets(int(e.requestTargets))
 	err := e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
