@@ -222,7 +222,7 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 			log.Info().Msgf("ending %s...", fromState)
 			err := phaseTransition()
 			if err != nil {
-				log.Fatal().Err(err).Msgf("failed to end %s", fromState)
+				log.Fatal().Err(err).Msgf("node failed to end %s", fromState)
 			}
 			log.Info().Msgf("ended %s successfully", fromState)
 		})

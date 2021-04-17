@@ -54,9 +54,10 @@ func (wc *WhiteboardClient) SubmitResult(groupKey crypto.PublicKey, pubKeys []cr
 // the same whiteboard concurrently.
 type whiteboard struct {
 	sync.Mutex
-	messages         []messages.BroadcastDKGMessage        // the ordered list of broadcast messages as published by clients
-	results          map[flow.Identifier]result            // a map of result-hash to result
-	resultSubmitters map[flow.Identifier][]flow.Identifier // a map of result-hash to a list of node IDs that submitted the result
+	messages          []messages.BroadcastDKGMessage        // the ordered list of broadcast messages as published by clients
+	results           map[flow.Identifier]result            // a map of result-hash to result
+	resultSubmitters  map[flow.Identifier][]flow.Identifier // a map of result-hash to a list of node IDs that submitted the result
+	resultBySubmitter map[flow.Identifier]result            // a map of node IDs to the submitted result
 }
 
 type result struct {
@@ -75,8 +76,9 @@ func (r result) Fingerprint() []byte {
 
 func newWhiteboard() *whiteboard {
 	return &whiteboard{
-		results:          make(map[flow.Identifier]result),
-		resultSubmitters: make(map[flow.Identifier][]flow.Identifier),
+		results:           make(map[flow.Identifier]result),
+		resultSubmitters:  make(map[flow.Identifier][]flow.Identifier),
+		resultBySubmitter: make(map[flow.Identifier]result),
 	}
 }
 
@@ -104,4 +106,5 @@ func (w *whiteboard) submit(nodeID flow.Identifier, groupKey crypto.PublicKey, p
 	signers, _ := w.resultSubmitters[resultHash]
 	signers = append(signers, nodeID)
 	w.resultSubmitters[resultHash] = signers
+	w.resultBySubmitter[nodeID] = result
 }

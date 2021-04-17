@@ -62,7 +62,7 @@ func createNode(
 	firstBlock flow.Identifier) *node {
 
 	core := testutil.GenericNode(t, hub, id, ids, chainID)
-	core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	core.Log = zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
 
 	// the viewsObserver is used by the reactor engine to subscribe to when
 	// blocks are finalized that are in a new view
@@ -220,27 +220,17 @@ func TestWithWhiteboard(t *testing.T) {
 	}
 
 	t.Logf("there are %d result(s)", len(whiteboard.results))
+	assert.Equal(t, 1, len(whiteboard.results))
 
-	winningResultSigCount := 0
-	var winningResult result
 	for _, result := range whiteboard.results {
 		signers := whiteboard.resultSubmitters[flow.MakeID(result)]
-		if l := len(signers); l > winningResultSigCount {
-			winningResultSigCount = l
-			winningResult = result
-		}
 		t.Logf("result %s has %d proposers", flow.MakeID(result), len(signers))
-
+		assert.Equal(t, N, len(signers))
 	}
-
-	assert.Equal(t,
-		winningResultSigCount,
-		N,
-	)
 
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	signers := []*signature.ThresholdProvider{}
+	signers := make([]*signature.ThresholdProvider, 0, N)
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
@@ -260,8 +250,11 @@ func TestWithWhiteboard(t *testing.T) {
 	groupSignature, err := signature.CombineThresholdShares(uint(len(nodes)), signatures, indices)
 	require.NoError(t, err)
 
-	for i, signer := range signers {
-		ok, err := signer.Verify(sigData, groupSignature, winningResult.groupKey)
+	for i, n := range nodes {
+		result := whiteboard.resultBySubmitter[n.Me.NodeID()]
+		groupPk := result.groupKey
+		t.Logf("group public key of node %d is %s", i, groupPk)
+		ok, err := signers[i].Verify(sigData, groupSignature, groupPk)
 		require.NoError(t, err)
 		assert.True(t, ok, fmt.Sprintf("node %d fails to verify threshold signature", i))
 	}
