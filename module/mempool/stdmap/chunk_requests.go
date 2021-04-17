@@ -13,10 +13,9 @@ type ChunkRequests struct {
 }
 
 func NewChunkRequests(limit uint) *ChunkRequests {
-	chunks := &ChunkRequests{
+	return &ChunkRequests{
 		Backend: NewBackend(WithLimit(limit)),
 	}
-	return chunks
 }
 
 func chunkRequestStatus(entity flow.Entity) *verification.ChunkRequestStatus {
@@ -29,12 +28,12 @@ func chunkRequestStatus(entity flow.Entity) *verification.ChunkRequestStatus {
 
 func (cs *ChunkRequests) All() []*verification.ChunkRequestStatus {
 	all := cs.Backend.All()
-	allChunks := make([]*verification.ChunkRequestStatus, 0, len(all))
+	requests := make([]*verification.ChunkRequestStatus, 0, len(all))
 	for _, entity := range all {
 		chunk := chunkRequestStatus(entity)
-		allChunks = append(allChunks, chunk)
+		requests = append(requests, chunk)
 	}
-	return allChunks
+	return requests
 }
 
 func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkRequestStatus, bool) {
@@ -42,12 +41,12 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkReque
 	if !exists {
 		return nil, false
 	}
-	chunk := chunkRequestStatus(entity)
-	return chunk, true
+	request := chunkRequestStatus(entity)
+	return request, true
 }
 
-func (cs *ChunkRequests) Add(chunk *verification.ChunkRequestStatus) bool {
-	return cs.Backend.Add(chunk)
+func (cs *ChunkRequests) Add(request *verification.ChunkRequestStatus) bool {
+	return cs.Backend.Add(request)
 }
 
 func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {

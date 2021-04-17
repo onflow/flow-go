@@ -97,7 +97,7 @@ func TestProcessAssignedChunkHappyPath(t *testing.T) {
 			assigned: 2,
 		},
 		{
-			chunks:   10, // ten chunks, two assigned
+			chunks:   10, // ten chunks, five assigned
 			assigned: 5,
 		},
 	}
@@ -114,15 +114,17 @@ func TestProcessAssignedChunkHappyPath(t *testing.T) {
 // Then the test mocks sending a chunk data response for what fetcher engine requested.
 // On receiving the response, fetcher engine should validate it and create and pass a verifiable chunk
 // to the verifier engine.
+// Once the verifier engine returns, the fetcher engine should notify the chunk consumer that it is done with
+// this chunk.
 func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
 	// creates a result with specified chunk number and assigned chunk numbers
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
-	// also the chunk belongs to an unsealed block.
 	block, result, statuses, locators := completeChunkStatusListFixture(t, chunkNum, assignedNum)
-	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
+	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2
+	// the chunks belong to an unsealed block.
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 
 	// mocks resources on fetcher engine side.
@@ -140,6 +142,8 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agrees, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
+
+		// mocks replying to the requests by sending a chunk data pack. 
 		e.HandleChunkDataPack(originID, cdp, collection)
 	})
 
