@@ -123,7 +123,8 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	// creates a result with specified chunk number and assigned chunk numbers
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
 	block, result, statuses, locators := completeChunkStatusListFixture(t, chunkNum, assignedNum)
-	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2
+	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
+
 	// the chunks belong to an unsealed block.
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
 
@@ -143,7 +144,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
 
-		// mocks replying to the requests by sending a chunk data pack. 
+		// mocks replying to the requests by sending a chunk data pack.
 		e.HandleChunkDataPack(originID, cdp, collection)
 	})
 
