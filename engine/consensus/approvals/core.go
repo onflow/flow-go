@@ -3,7 +3,6 @@ package approvals
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"sync"
 	"sync/atomic"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"

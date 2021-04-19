@@ -2,9 +2,6 @@ package approvals
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/consensus/sealing"
-	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/messages"
 	"math/rand"
 	"testing"
 	"time"
@@ -14,7 +11,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
