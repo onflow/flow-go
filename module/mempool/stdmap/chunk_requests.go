@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 )
 
+// ChunkRequests is an implementation of in-memory storage for maintaining chunk requests data objects.
 type ChunkRequests struct {
 	*Backend
 }

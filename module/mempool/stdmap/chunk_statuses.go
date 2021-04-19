@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 )
 
-// ChunkStatuses is an in-memory storage for maintaining the chunk status data objects.
+// ChunkStatuses is an implementation of in-memory storage for maintaining the chunk status data objects.
 type ChunkStatuses struct {
 	*Backend
 }
