@@ -75,7 +75,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 		require.NoError(s.T(), err)
 
-		client, err := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, nodeID, address.String(), 0, s.qcAddress.String(), signer)
+		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, nodeID, address.String(), 0, s.qcAddress.String(), signer)
 		require.NoError(s.T(), err)
 
 		local := &modulemock.Local{}
@@ -122,7 +122,7 @@ func (s *Suite) CreateClusterNode(rootBlock *cluster.Block, me *flow.Identity) *
 	address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
 	require.NoError(s.T(), err)
 
-	client, err := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, me.NodeID, address.String(), 0, s.qcAddress.String(), signer)
+	client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, me.NodeID, address.String(), 0, s.qcAddress.String(), signer)
 	require.NoError(s.T(), err)
 
 	local := &modulemock.Local{}
