@@ -102,7 +102,7 @@ func TraverseForward(headers storage.Headers,
 }
 
 // functor that will be called on each block header when traversing blocks.
-type sanityCheckLowestVisitedBlock = func(header *flow.Header) error
+type sanityCheckLowestVisitedBlock func(header *flow.Header) error
 
 // Terminal specifies the terminal condition for traversing a fork.
 // Any condition that can be converted to a block height can be
