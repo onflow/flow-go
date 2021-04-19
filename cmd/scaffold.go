@@ -548,7 +548,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	if fnb.RootChainID == flow.Testnet {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedAccountCreation(false),
-			fvm.WithRestrictedDeployment(false),
+			fvm.WithRestrictedDeployment(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts
