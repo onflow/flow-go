@@ -106,7 +106,7 @@ func (g ExecutionResultGroupedList) NumberGroups() int {
 
 // Lookup generates a map from ExecutionResult ID to ExecutionResult
 func (l ExecutionResultList) Lookup() map[Identifier]*ExecutionResult {
-	resultsByID := make(map[Identifier]*ExecutionResult)
+	resultsByID := make(map[Identifier]*ExecutionResult, len(l))
 	for _, result := range l {
 		resultsByID[result.ID()] = result
 	}

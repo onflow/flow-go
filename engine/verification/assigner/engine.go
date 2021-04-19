@@ -180,8 +180,9 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 	lg := e.log.With().
 		Hex("block_id", logging.ID(blockID)).
-		Uint64("block_height", block.Header.Height).Logger()
-	lg.Debug().Int("result_num", len(block.Payload.Results)).Msg("new finalized block arrived")
+		Uint64("block_height", block.Header.Height).
+		Int("result_num", len(block.Payload.Results)).Logger()
+	lg.Debug().Msg("new finalized block arrived")
 
 	// determine chunk assigment on each result and pushes the assigned chunks to the chunks queue.
 	receiptsGroupedByResultID := block.Payload.Receipts.GroupByResultID() // for logging purposes
@@ -189,7 +190,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		resultID := result.ID()
 
 		// log receipts committing to result
-		resultLog := lg.With().Hex("incorporated_result_id", logging.ID(resultID)).Logger()
+		resultLog := lg.With().Hex("result_id", logging.ID(resultID)).Logger()
 		for _, receipt := range receiptsGroupedByResultID.GetGroup(resultID) {
 			resultLog = resultLog.With().Hex("receipts_for_result", logging.ID(receipt.ID())).Logger()
 		}
