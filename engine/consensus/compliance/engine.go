@@ -230,28 +230,40 @@ func (e *Engine) loop() {
 		case <-e.unit.Quit():
 			return
 		case <-e.notify:
-			e.processAvailableMessages()
+			err := e.processAvailableMessages()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("internal error processing message from the fifo queue")
+			}
 		}
 	}
 }
 
-func (e *Engine) processAvailableMessages() {
+func (e *Engine) processAvailableMessages() error {
 
 	for {
 		// TODO prioritization
 		// eg: msg := engine.SelectNextMessage()
 		msg, ok := e.pendingBlocks.Get()
 		if ok {
-			e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
+			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
+			if err != nil {
+				return fmt.Errorf("could not handle block proposal: %w", err)
+			}
 			continue
 		}
 
 		msg, ok = e.pendingVotes.Get()
 		if ok {
-			e.core.OnBlockVote(msg.OriginID, msg.Payload.(*messages.BlockVote))
+			err := e.core.OnBlockVote(msg.OriginID, msg.Payload.(*messages.BlockVote))
+			if err != nil {
+				return fmt.Errorf("could not handle block vote: %w", err)
+			}
 			continue
 		}
 
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
 	}
 }
 
