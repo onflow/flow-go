@@ -81,7 +81,7 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 
 	attempts := 1
 	for {
-		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed", time.Since(started).Seconds()).Logger()
+		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
 
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
