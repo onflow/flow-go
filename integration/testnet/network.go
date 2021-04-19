@@ -15,7 +15,9 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/testingdock"
@@ -68,16 +70,17 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t           *testing.T
-	suite       *testingdock.Suite
-	config      NetworkConfig
-	cli         *dockerclient.Client
-	network     *testingdock.Network
-	Containers  map[string]*Container
-	AccessPorts map[string]string
-	root        *flow.Block
-	result      *flow.ExecutionResult
-	seal        *flow.Seal
+	t            *testing.T
+	suite        *testingdock.Suite
+	config       NetworkConfig
+	cli          *dockerclient.Client
+	network      *testingdock.Network
+	Containers   map[string]*Container
+	AccessPorts  map[string]string
+	root         *flow.Block
+	result       *flow.ExecutionResult
+	seal         *flow.Seal
+	bootstrapDir string
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -115,34 +118,44 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 // If you need to inspect state, first `Stop` the containers, then check state, then `Cleanup` resources.
 // If you need to restart containers, use `Stop` instead, which does not remove containers.
 func (net *FlowNetwork) Remove() {
-
 	net.StopContainers()
 	net.RemoveContainers()
 	net.Cleanup()
 }
 
 // StopContainers stops all containers in the network, without removing them. This allows containers to be
-// restarted. To remove them, call `RemoveContainers`.
+// restarted. To remove them, call RemoveContainers.
 func (net *FlowNetwork) StopContainers() {
 	if net == nil || net.suite == nil {
 		return
 	}
 
 	err := net.suite.Close()
-	if err != nil {
-		net.t.Log("failed to stop network", err)
-	}
+	assert.NoError(net.t, err)
 }
 
-// RemoveContainers removes all the containers in the network. Containers need to be stopped first using `Stop`.
+// RemoveContainers removes all the containers in the network. Containers need to be stopped first using StopContainers.
 func (net *FlowNetwork) RemoveContainers() {
 	if net == nil || net.suite == nil {
 		return
 	}
 
 	err := net.suite.Remove()
-	if err != nil {
-		net.t.Log("failed to remove containers", err)
+	assert.NoError(net.t, err)
+}
+
+// DropDBs resets the protocol state database for all containers in the network
+// matching the given filter.
+func (net *FlowNetwork) DropDBs(filter flow.IdentityFilter) {
+	if net == nil || net.suite == nil {
+		return
+	}
+	// clear data directories
+	for _, c := range net.Containers {
+		if !filter(c.Config.Identity()) {
+			continue
+		}
+		c.DropDB()
 	}
 }
 
@@ -154,9 +167,7 @@ func (net *FlowNetwork) Cleanup() {
 	// remove data directories
 	for _, c := range net.Containers {
 		err := os.RemoveAll(c.datadir)
-		if err != nil {
-			net.t.Log("failed to cleanup", err)
-		}
+		assert.NoError(net.t, err)
 	}
 }
 
@@ -176,9 +187,7 @@ func (net *FlowNetwork) ContainerByID(id flow.Identifier) *Container {
 // Otherwise fails the test.
 func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
-	if !exists {
-		net.t.FailNow()
-	}
+	require.True(net.t, exists)
 	return container
 }
 
@@ -349,20 +358,23 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
 	require.Nil(t, err)
 
+	fmt.Printf("bootstrapDir: %s \n", bootstrapDir)
+
 	root, result, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:           t,
-		cli:         dockerClient,
-		config:      networkConf,
-		suite:       suite,
-		network:     network,
-		Containers:  make(map[string]*Container, nNodes),
-		AccessPorts: make(map[string]string),
-		root:        root,
-		seal:        seal,
-		result:      result,
+		t:            t,
+		cli:          dockerClient,
+		config:       networkConf,
+		suite:        suite,
+		network:      network,
+		Containers:   make(map[string]*Container, nNodes),
+		AccessPorts:  make(map[string]string),
+		root:         root,
+		seal:         seal,
+		result:       result,
+		bootstrapDir: bootstrapDir,
 	}
 
 	// add each node to the network
@@ -415,6 +427,17 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	err = os.Mkdir(flowDBDir, 0700)
 	require.NoError(t, err)
 
+	// create a directory for the bootstrap files
+	// we create a node-specific bootstrap directory to enable testing nodes
+	// bootstrapping from different root state snapshots and epochs
+	nodeBootstrapDir := filepath.Join(tmpdir, DefaultBootstrapDir)
+	err = os.Mkdir(nodeBootstrapDir, 0700)
+	require.NoError(t, err)
+
+	// copy bootstrap files to node-specific bootstrap directory
+	err = io.CopyDirectory(bootstrapDir, nodeBootstrapDir)
+	require.NoError(t, err)
+
 	// Bind the host directory to the container's database directory
 	// Bind the common bootstrap directory to the container
 	// NOTE: I did this using the approach from:
@@ -422,7 +445,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	opts.HostConfig.Binds = append(
 		opts.HostConfig.Binds,
 		fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
-		fmt.Sprintf("%s:%s:ro", bootstrapDir, DefaultBootstrapDir),
+		fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 	)
 
 	if !nodeConf.Ghost {
@@ -536,6 +559,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	return nil
 }
 
+func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
+	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
+	require.NoError(net.t, err)
+}
+
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, error) {
 	// Setup as Testnet
 	chainID := flow.Testnet
@@ -573,7 +601,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 			GroupIndex:          i,
 		}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-		err = writeJSON(filepath.Join(bootstrapDir, path), privParticpant)
+		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticpant)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -589,7 +617,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 			return nil, nil, nil, nil, err
 		}
 
-		err = writeJSON(path, private)
+		err = WriteJSON(path, private)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -669,7 +697,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot")
 	}
 
-	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
+	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
