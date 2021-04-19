@@ -93,10 +93,13 @@ func (rt *RequestTracker) Get(resultID, incorporatedBlockID flow.Identifier, chu
 func (rt *RequestTracker) Set(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64, item *RequestTrackerItem) {
 	_, ok := rt.index[resultID]
 	if !ok {
-		rt.index[resultID] = map[flow.Identifier]map[uint64]*RequestTrackerItem{
-			incorporatedBlockID: make(map[uint64]*RequestTrackerItem),
-		}
+		rt.index[resultID] = make(map[flow.Identifier]map[uint64]*RequestTrackerItem)
 	}
+	_, ok = rt.index[resultID][incorporatedBlockID]
+	if !ok {
+		rt.index[resultID][incorporatedBlockID] = make(map[uint64]*RequestTrackerItem)
+	}
+
 	rt.index[resultID][incorporatedBlockID][chunkIndex] = item
 }
 

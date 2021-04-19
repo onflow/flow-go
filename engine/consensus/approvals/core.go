@@ -3,6 +3,7 @@ package approvals
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"sync"
 	"sync/atomic"
 
@@ -62,6 +63,7 @@ type approvalProcessingCore struct {
 	seals           mempool.IncorporatedResultSeals
 	payloads        storage.Payloads
 	approvalConduit network.Conduit
+	requestTracker  *sealing.RequestTracker
 }
 
 func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
@@ -79,6 +81,7 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 		approvalConduit:                      approvalConduit,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		blockHeightLookupCache:               blockHeightLookupCache,
+		requestTracker:                       sealing.NewRequestTracker(10, 30),
 	}
 }
 
@@ -222,8 +225,8 @@ func (p *approvalProcessingCore) getCollector(resultID flow.Identifier) *Assignm
 func (p *approvalProcessingCore) createCollector(resultID flow.Identifier) *AssignmentCollector {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier, p.approvalConduit,
-		p.requiredApprovalsForSealConstruction)
+	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier,
+		p.approvalConduit, p.requestTracker, p.requiredApprovalsForSealConstruction)
 	p.collectors[resultID] = collector
 	return collector
 }

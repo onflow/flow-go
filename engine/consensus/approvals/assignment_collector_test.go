@@ -2,7 +2,12 @@ package approvals
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
+	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/messages"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -32,12 +37,14 @@ func TestAssignmentCollector(t *testing.T) {
 type AssignmentCollectorTestSuite struct {
 	BaseApprovalsTestSuite
 
+	blocks          map[flow.Identifier]*flow.Header
 	state           *protocol.State
 	assigner        *module.ChunkAssigner
 	sealsPL         *mempool.IncorporatedResultSeals
 	sigVerifier     *module.Verifier
 	conduit         *mocknetwork.Conduit
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	requestTracker  *sealing.RequestTracker
 
 	collector *AssignmentCollector
 }
@@ -51,23 +58,32 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.sigVerifier = &module.Verifier{}
 	s.conduit = &mocknetwork.Conduit{}
 
+	s.requestTracker = sealing.NewRequestTracker(1, 3)
+
+	// setup blocks cache for protocol state
+	s.blocks = make(map[flow.Identifier]*flow.Header)
+	s.blocks[s.Block.ID()] = &s.Block
+
+	// setup identities for each block
 	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
 	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
 
-	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
+	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(func(result *flow.ExecutionResult, blockID flow.Identifier) *chunks.Assignment {
+		return s.ChunksAssignment
+	}, func(result *flow.ExecutionResult, blockID flow.Identifier) error { return nil })
 
-	// define the protocol state snapshot for any block in `bc.Blocks`
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
-			if identities, found := s.identitiesCache[blockID]; found {
-				return unittest.StateSnapshotForKnownBlock(&s.Block, identities)
+			if block, found := s.blocks[blockID]; found {
+				return unittest.StateSnapshotForKnownBlock(block, s.identitiesCache[blockID])
 			} else {
 				return unittest.StateSnapshotForUnknownBlock()
 			}
 		},
 	)
 
-	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, s.conduit, uint(len(s.AuthorizedVerifiers)))
+	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL,
+		s.sigVerifier, s.conduit, s.requestTracker, uint(len(s.AuthorizedVerifiers)))
 }
 
 // TestProcessAssignment_ApprovalsAfterResult tests a scenario when first we have discovered execution result
@@ -144,7 +160,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
@@ -153,7 +169,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 
 	s.Run("invalid-verifier-identities", func() {
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -181,7 +197,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -202,7 +218,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -222,7 +238,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -237,4 +253,82 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_BeforeIncorporatedR
 	err := s.collector.ProcessAssignment(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
+}
+
+// TestRequestMissingApprovals checks that requests are sent only for chunks
+// that have not collected enough approvals yet, and are sent only to the
+// verifiers assigned to those chunks. It also checks that the threshold and
+// rate limiting is respected.
+func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
+	// build new assignment with 2 verifiers
+	assignment := chunks.NewAssignment()
+	for _, chunk := range s.Chunks {
+		verifiers := s.ChunksAssignment.Verifiers(chunk)
+		assignment.Add(chunk, verifiers[:2])
+	}
+	// replace old one
+	s.ChunksAssignment = assignment
+
+	incorporatedBlocks := make([]*flow.Header, 0)
+
+	lastHeight := uint64(rand.Uint32())
+	for i := 0; i < 2; i++ {
+		incorporatedBlock := unittest.BlockHeaderFixture()
+		incorporatedBlock.Height = lastHeight
+		lastHeight++
+
+		s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
+		incorporatedBlocks = append(incorporatedBlocks, &incorporatedBlock)
+	}
+
+	incorporatedResults := make([]*flow.IncorporatedResult, 0, len(incorporatedBlocks))
+	for _, block := range incorporatedBlocks {
+		incorporatedResult := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()))
+		incorporatedResults = append(incorporatedResults, incorporatedResult)
+
+		err := s.collector.ProcessIncorporatedResult(incorporatedResult)
+		require.NoError(s.T(), err)
+	}
+
+	requests := make([]*messages.ApprovalRequest, 0)
+	// mock the Publish method when requests are sent to 2 verifiers
+	s.conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Run(func(args mock.Arguments) {
+			// collect the request
+			ar, ok := args[0].(*messages.ApprovalRequest)
+			s.Assert().True(ok)
+			requests = append(requests, ar)
+		})
+
+	err := s.collector.RequestMissingApprovals(lastHeight)
+	require.NoError(s.T(), err)
+
+	// first time it goes through, no requests should be made because of the
+	// blackout period
+	require.Len(s.T(), requests, 0)
+
+	// wait for the max blackout period to elapse and retry
+	time.Sleep(3 * time.Second)
+
+	// requesting with immature height will be ignored
+	err = s.collector.RequestMissingApprovals(lastHeight - uint64(len(incorporatedBlocks)) - 1)
+	s.Require().NoError(err)
+	require.Len(s.T(), requests, 0)
+
+	err = s.collector.RequestMissingApprovals(lastHeight)
+	s.Require().NoError(err)
+
+	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
+
+	resultID := s.IncorporatedResult.Result.ID()
+	for _, chunk := range s.Chunks {
+		for _, incorporatedResult := range incorporatedResults {
+			requestItem := s.requestTracker.Get(resultID, incorporatedResult.IncorporatedBlockID, chunk.Index)
+			require.Equal(s.T(), uint(1), requestItem.Requests)
+		}
+
+	}
 }

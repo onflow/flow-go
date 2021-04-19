@@ -41,7 +41,7 @@ type AssignmentCollector struct {
 }
 
 func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
 	collector := &AssignmentCollector{
 		verifiedApprovalsCache:               NewApprovalsCache(1000),
 		ResultID:                             resultID,
@@ -50,7 +50,7 @@ func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assi
 		assigner:                             assigner,
 		seals:                                seals,
 		verifier:                             sigVerifier,
-		requestTracker:                       sealing.NewRequestTracker(10, 30),
+		requestTracker:                       requestTracker,
 		approvalConduit:                      approvalConduit,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
@@ -216,15 +216,15 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 
 		// Skip result if it is incorporated in a block that is _not_ part of
 		// the finalized fork.
-		finalizedBlockAtHeight, err := c.state.AtHeight(block.Height).Head()
-		if err != nil {
-			return fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
-		}
+		//finalizedBlockAtHeight, err := c.state.AtHeight(block.Height).Head()
+		//if err != nil {
+		//	return fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
+		//}
 		// TODO: replace this check with cleanup while processing finalized blocks in approval processing core
-		if finalizedBlockAtHeight.ID() != collector.IncorporatedBlockID {
-			// block is in an orphaned fork
-			continue
-		}
+		//if finalizedBlockAtHeight.ID() != collector.IncorporatedBlockID {
+		//	// block is in an orphaned fork
+		//	continue
+		//}
 
 		for chunkIndex, verifiers := range collector.CollectMissingVerifiers() {
 			// Retrieve information about requests made for this chunk. Skip
