@@ -26,16 +26,9 @@ func chunkRequestStatus(entity flow.Entity) *verification.ChunkRequestStatus {
 	return chunk
 }
 
-func (cs *ChunkRequests) All() []*verification.ChunkRequestStatus {
-	all := cs.Backend.All()
-	requests := make([]*verification.ChunkRequestStatus, 0, len(all))
-	for _, entity := range all {
-		chunk := chunkRequestStatus(entity)
-		requests = append(requests, chunk)
-	}
-	return requests
-}
-
+// ByID returns a chunk request status by its chunk ID.
+// There is a one-to-one correspondence between the chunk requests in memory, and
+// their chunk ID.
 func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkRequestStatus, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
@@ -45,14 +38,24 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkReque
 	return request, true
 }
 
+// Add provides insertion functionality into the memory pool.
+// The insertion is only successful if there is no duplicate chunk request with the same
+// chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
 func (cs *ChunkRequests) Add(request *verification.ChunkRequestStatus) bool {
 	return cs.Backend.Add(request)
 }
 
+// Rem provides deletion functionality from the memory pool.
+// If there is a chunk request with this ID, Rem removes it and returns true.
+// Otherwise it returns false.
 func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 	return cs.Backend.Rem(chunkID)
 }
 
+// IncrementAttempt increments the Attempt field of the chunk request in memory pool that
+// has the specified chunk ID. If such chunk ID does not exist in the memory pool, it returns
+// false.
+// The increments are done atomically, thread-safe, and in isolation.
 func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkID]
@@ -66,4 +69,15 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	})
 
 	return err == nil
+}
+
+// All returns all chunk requests stored in this memory pool.
+func (cs *ChunkRequests) All() []*verification.ChunkRequestStatus {
+	all := cs.Backend.All()
+	requests := make([]*verification.ChunkRequestStatus, 0, len(all))
+	for _, entity := range all {
+		chunk := chunkRequestStatus(entity)
+		requests = append(requests, chunk)
+	}
+	return requests
 }
