@@ -40,6 +40,11 @@ func (b *backendEvents) GetEventsForHeightRange(
 		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
 	}
 
+	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
+	if rangeSize > uint64(b.maxHeightRange) {
+		return nil, fmt.Errorf("requested block range (%d) exceeded maximum (%d)", rangeSize, b.maxHeightRange)
+	}
+
 	// get the latest sealed block header
 	head, err := b.state.Sealed().Head()
 	if err != nil {
@@ -79,6 +84,10 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 ) ([]flow.BlockEvents, error) {
 
+	if uint(len(blockIDs)) > b.maxHeightRange {
+		return nil, fmt.Errorf("requested block range (%d) exceeded maximum (%d)", len(blockIDs), b.maxHeightRange)
+	}
+
 	// find the block headers for all the block IDs
 	blockHeaders := make([]*flow.Header, 0)
 	for _, blockID := range blockIDs {
@@ -108,11 +117,6 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 
 	if len(blockIDs) == 0 {
 		return []flow.BlockEvents{}, nil
-	}
-
-	// limit height range queries
-	if uint(len(blockIDs)) > b.maxHeightRange {
-		return nil, fmt.Errorf("requested block range (%d) exceeded maximum (%d)", len(blockIDs), b.maxHeightRange)
 	}
 
 	req := execproto.GetEventsForBlockIDsRequest{
