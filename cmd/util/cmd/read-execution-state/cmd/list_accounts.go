@@ -32,8 +32,8 @@ var (
 func init() {
 	RootCmd.AddCommand(listAccountsCmd)
 
-	listAccountsCmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "", "State commitment (64 chars, hex-encoded)")
-	_ = listAccountsCmd.MarkFlagRequired("state-commitment")
+	listAccountsCmd.Flags().StringVarP(&flagStateCommitment, "state", "s", "", "the state commitment (64 chars, hex-encoded)")
+	_ = listAccountsCmd.MarkFlagRequired("state")
 
 	listAccountsCmd.Flags().StringVar(&flagChain, "chain", "", "Chain name")
 	_ = listAccountsCmd.MarkFlagRequired("chain")
@@ -50,7 +50,7 @@ func getChain(chainName string) (chain flow.Chain, err error) {
 }
 
 func listAccounts(*cobra.Command, []string) {
-	startTime := time.Now()
+	invoked := time.Now()
 
 	forest, err := initForest()
 	if err != nil {
@@ -63,7 +63,8 @@ func listAccounts(*cobra.Command, []string) {
 	}
 
 	if len(stateCommitment) != 32 {
-		log.Fatal().Err(err).Msgf("invalid number of bytes, got %d expected %d", len(stateCommitment), 32)
+		log.Fatal().Err(err).Int("recieved", len(stateCommitment)).Int("expected", 32).
+			Msgf("invalid number of bytes for state commitment")
 	}
 
 	chain, err := getChain(flagChain)
@@ -71,10 +72,9 @@ func listAccounts(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 
 		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
-		// TODO (RAMTIN) change the path finder version
 		path, err := pathfinder.KeyToPath(ledgerKey, 0)
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot convert key to path")
@@ -95,18 +95,18 @@ func listAccounts(*cobra.Command, []string) {
 		return payload[0].Value, nil
 	})
 
-	accounts := state.NewAccounts(state)
-	finalGenerator, err := state.NewLedgerBoundAddressGenerator(ldg, chain)
+	stateHolder := state.NewStateHolder(state.NewState(view))
+	accounts := state.NewAccounts(stateHolder)
+	finalGenerator := state.NewStateBoundAddressGenerator(stateHolder, chain)
 
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot get current address state")
 	}
 
 	finalState := finalGenerator.Bytes()
-
 	generator := chain.NewAddressGenerator()
-
 	for !bytes.Equal(generator.Bytes(), finalState) {
+
 		address, err := generator.NextAddress()
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot get address")
@@ -116,18 +116,14 @@ func listAccounts(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("error while getting account")
 		}
-
-		fmt.Printf("Account address %s:\n", account.Address.Short())
+		log.Info().Msgf("Address: %v", address.Short())
 
 		b, err := json.MarshalIndent(account, "", "  ")
 		if err != nil {
 			log.Fatal().Err(err).Msg("error while marshalling account")
 		}
-
 		fmt.Println(string(b))
 	}
 
-	duration := time.Since(startTime)
-
-	log.Info().Float64("total_time_s", duration.Seconds()).Msg("finished")
+	log.Info().Float64("time_elapsed_s", time.Since(invoked).Seconds()).Msg("completed listing accounts")
 }
