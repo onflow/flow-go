@@ -3,6 +3,7 @@ package migrations
 import (
 	"encoding/hex"
 	"fmt"
+	"runtime"
 
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -14,15 +15,61 @@ func StorageFormatV4Migration(payloads []ledger.Payload) ([]ledger.Payload, erro
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
-	for _, payload := range payloads {
-		migratedPayload, err := rencodePayloadV4(payload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to migrate key: %#+v: %w", payload.Key, err)
+	jobs := make(chan ledger.Payload)
+	results := make(chan struct {
+		key string
+		ledger.Payload
+		error
+	})
+
+	workerCount := runtime.NumCPU()
+
+	for i := 0; i < workerCount; i++ {
+		go storageFormatV4MigrationWorker(jobs, results)
+	}
+
+	go func() {
+		for _, payload := range payloads {
+			jobs <- payload
 		}
-		migratedPayloads = append(migratedPayloads, migratedPayload)
+
+		close(jobs)
+	}()
+
+	for result := range results {
+		if result.error != nil {
+			return nil, fmt.Errorf("failed to migrate key: %#+v: %w", result.key, result.error)
+		}
+		migratedPayloads = append(migratedPayloads, result.Payload)
+		if len(migratedPayloads) == len(payloads) {
+			break
+		}
 	}
 
 	return migratedPayloads, nil
+}
+
+func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- struct {
+	key string
+	ledger.Payload
+	error
+}) {
+	for payload := range jobs {
+		migratedPayload, err := rencodePayloadV4(payload)
+		result := struct {
+			key string
+			ledger.Payload
+			error
+		}{
+			key: payload.Key.String(),
+		}
+		if err != nil {
+			result.error = err
+		} else {
+			result.Payload = migratedPayload
+		}
+		results <- result
+	}
 }
 
 func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
