@@ -54,10 +54,10 @@ RequestTracker
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 // RequestTracker is an index of RequestTrackerItems indexed by execution result
-// ID and chunk index.
+// ID, incorporated block ID and chunk index.
 // It is not concurrency-safe.
 type RequestTracker struct {
-	index             map[flow.Identifier]map[uint64]*RequestTrackerItem
+	index             map[flow.Identifier]map[flow.Identifier]map[uint64]*RequestTrackerItem
 	blackoutPeriodMin int
 	blackoutPeriodMax int
 }
@@ -66,39 +66,48 @@ type RequestTracker struct {
 // between min and max seconds.
 func NewRequestTracker(blackoutPeriodMin, blackoutPeriodMax int) *RequestTracker {
 	return &RequestTracker{
-		index:             make(map[flow.Identifier]map[uint64]*RequestTrackerItem),
+		index:             make(map[flow.Identifier]map[flow.Identifier]map[uint64]*RequestTrackerItem),
 		blackoutPeriodMin: blackoutPeriodMin,
 		blackoutPeriodMax: blackoutPeriodMax,
 	}
 }
 
 // GetAll returns a map of all the items in the tracker indexed by execution
-// result ID and chunk index.
-func (rt *RequestTracker) GetAll() map[flow.Identifier]map[uint64]*RequestTrackerItem {
+// result ID, incorporated block ID and chunk index.
+func (rt *RequestTracker) GetAll() map[flow.Identifier]map[flow.Identifier]map[uint64]*RequestTrackerItem {
 	return rt.index
 }
 
 // Get returns the tracker item for a specific chunk, and creates a new one if
 // it doesn't exist.
-func (rt *RequestTracker) Get(resultID flow.Identifier, chunkIndex uint64) *RequestTrackerItem {
-	item, ok := rt.index[resultID][chunkIndex]
+func (rt *RequestTracker) Get(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64) *RequestTrackerItem {
+	item, ok := rt.index[resultID][incorporatedBlockID][chunkIndex]
 	if !ok {
 		item = NewRequestTrackerItem(rt.blackoutPeriodMin, rt.blackoutPeriodMax)
-		rt.Set(resultID, chunkIndex, item)
+		rt.Set(resultID, incorporatedBlockID, chunkIndex, item)
 	}
 	return item
 }
 
 // Set inserts or updates the tracker item for a specific chunk.
-func (rt *RequestTracker) Set(resultID flow.Identifier, chunkIndex uint64, item *RequestTrackerItem) {
+func (rt *RequestTracker) Set(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64, item *RequestTrackerItem) {
 	_, ok := rt.index[resultID]
 	if !ok {
-		rt.index[resultID] = make(map[uint64]*RequestTrackerItem)
+		rt.index[resultID] = map[flow.Identifier]map[uint64]*RequestTrackerItem{
+			incorporatedBlockID: make(map[uint64]*RequestTrackerItem),
+		}
 	}
-	rt.index[resultID][chunkIndex] = item
+	rt.index[resultID][incorporatedBlockID][chunkIndex] = item
 }
 
 // Remove removes all entries pertaining to an execution result
-func (rt *RequestTracker) Remove(resultID flow.Identifier) {
-	delete(rt.index, resultID)
+func (rt *RequestTracker) Remove(resultID, incorporatedBlockID flow.Identifier) {
+	index, ok := rt.index[resultID]
+	if !ok {
+		return
+	}
+	delete(index, incorporatedBlockID)
+	if len(index) == 0 {
+		delete(rt.index, resultID)
+	}
 }

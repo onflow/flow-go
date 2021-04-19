@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -34,6 +35,7 @@ type ApprovalProcessingCoreTestSuite struct {
 	assigner        *module.ChunkAssigner
 	sealsPL         *mempool.IncorporatedResultSeals
 	sigVerifier     *module.Verifier
+	conduit         *mocknetwork.Conduit
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
 	payloads        *storage.Payloads
 	core            *approvalProcessingCore
@@ -46,6 +48,7 @@ func (c *ApprovalProcessingCoreTestSuite) SetupTest() {
 	c.state = &protocol.State{}
 	c.assigner = &module.ChunkAssigner{}
 	c.sigVerifier = &module.Verifier{}
+	c.conduit = &mocknetwork.Conduit{}
 
 	c.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
 	c.identitiesCache[c.IncorporatedResult.Result.BlockID] = c.AuthorizedVerifiers
@@ -63,7 +66,7 @@ func (c *ApprovalProcessingCoreTestSuite) SetupTest() {
 		},
 	)
 	c.payloads = &storage.Payloads{}
-	c.core = NewApprovalProcessingCore(c.payloads, c.state, c.assigner, c.sigVerifier, c.sealsPL, uint(len(c.AuthorizedVerifiers)))
+	c.core = NewApprovalProcessingCore(c.payloads, c.state, c.assigner, c.sigVerifier, c.sealsPL, c.conduit, uint(len(c.AuthorizedVerifiers)))
 }
 
 // TestOnBlockFinalized_RejectOutdatedApprovals tests that approvals will be rejected as outdated

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -55,15 +56,16 @@ type approvalProcessingCore struct {
 	lastSealedBlockHeight                uint64                                   // atomic variable for last sealed block height
 	requiredApprovalsForSealConstruction uint                                     // number of approvals that are required for each chunk to be sealed
 
-	assigner module.ChunkAssigner
-	state    protocol.State
-	verifier module.Verifier
-	seals    mempool.IncorporatedResultSeals
-	payloads storage.Payloads
+	assigner        module.ChunkAssigner
+	state           protocol.State
+	verifier        module.Verifier
+	seals           mempool.IncorporatedResultSeals
+	payloads        storage.Payloads
+	approvalConduit network.Conduit
 }
 
 func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
-	verifier module.Verifier, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *approvalProcessingCore {
+	verifier module.Verifier, seals mempool.IncorporatedResultSeals, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint) *approvalProcessingCore {
 	blockHeightLookupCache, _ := lru.New(100)
 	return &approvalProcessingCore{
 		collectors:                           make(map[flow.Identifier]*AssignmentCollector),
@@ -74,6 +76,7 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 		verifier:                             verifier,
 		seals:                                seals,
 		payloads:                             payloads,
+		approvalConduit:                      approvalConduit,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		blockHeightLookupCache:               blockHeightLookupCache,
 	}
@@ -219,7 +222,7 @@ func (p *approvalProcessingCore) getCollector(resultID flow.Identifier) *Assignm
 func (p *approvalProcessingCore) createCollector(resultID flow.Identifier) *AssignmentCollector {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier,
+	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier, p.approvalConduit,
 		p.requiredApprovalsForSealConstruction)
 	p.collectors[resultID] = collector
 	return collector

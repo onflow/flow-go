@@ -2,13 +2,19 @@ package approvals
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -26,14 +32,16 @@ type AssignmentCollector struct {
 	verifiedApprovalsCache               *ApprovalsCache                        // in-memory cache of approvals were already verified
 	requiredApprovalsForSealConstruction uint                                   // number of approvals that are required for each chunk to be sealed
 
-	assigner module.ChunkAssigner
-	state    protocol.State
-	verifier module.Verifier
-	seals    mempool.IncorporatedResultSeals
+	assigner        module.ChunkAssigner
+	state           protocol.State
+	verifier        module.Verifier
+	seals           mempool.IncorporatedResultSeals
+	approvalConduit network.Conduit         // used to request missing approvals from verification nodes
+	requestTracker  *sealing.RequestTracker // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
 func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
 	collector := &AssignmentCollector{
 		verifiedApprovalsCache:               NewApprovalsCache(1000),
 		ResultID:                             resultID,
@@ -42,6 +50,8 @@ func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assi
 		assigner:                             assigner,
 		seals:                                seals,
 		verifier:                             sigVerifier,
+		requestTracker:                       sealing.NewRequestTracker(10, 30),
+		approvalConduit:                      approvalConduit,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 	return collector
@@ -185,5 +195,71 @@ func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) e
 		}
 	}
 
+	return nil
+}
+
+func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uint64) error {
+	for _, collector := range c.allCollectors() {
+		// not finding the block that the result was incorporated in is a fatal
+		// error at this stage
+		block, err := c.state.AtBlockID(collector.IncorporatedBlockID).Head()
+		if err != nil {
+			return fmt.Errorf("could not retrieve block: %w", err)
+		}
+
+		if block.Height > maxHeightForRequesting {
+			continue
+		}
+
+		// If we got this far, height `block.Height` must be finalized, because
+		// maxHeightForRequesting is lower than the finalized height.
+
+		// Skip result if it is incorporated in a block that is _not_ part of
+		// the finalized fork.
+		finalizedBlockAtHeight, err := c.state.AtHeight(block.Height).Head()
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
+		}
+		// TODO: replace this check with cleanup while processing finalized blocks in approval processing core
+		if finalizedBlockAtHeight.ID() != collector.IncorporatedBlockID {
+			// block is in an orphaned fork
+			continue
+		}
+
+		for chunkIndex, verifiers := range collector.CollectMissingVerifiers() {
+			// Retrieve information about requests made for this chunk. Skip
+			// requesting if the blackout period hasn't expired. Otherwise,
+			// update request count and reset blackout period.
+			requestTrackerItem := c.requestTracker.Get(c.ResultID, collector.IncorporatedBlockID, chunkIndex)
+			if requestTrackerItem.IsBlackout() {
+				continue
+			}
+			requestTrackerItem.Update()
+
+			// for monitoring/debugging purposes, log requests if we start
+			// making more than 10
+			if requestTrackerItem.Requests >= 10 {
+				log.Debug().Msgf("requesting approvals for result %v, incorporatedBlockID %v chunk %d: %d requests",
+					c.ResultID,
+					collector.IncorporatedBlockID,
+					chunkIndex,
+					requestTrackerItem.Requests,
+				)
+			}
+
+			// prepare the request
+			req := &messages.ApprovalRequest{
+				Nonce:      rand.Uint64(),
+				ResultID:   c.ResultID,
+				ChunkIndex: chunkIndex,
+			}
+
+			err = c.approvalConduit.Publish(req, verifiers...)
+			if err != nil {
+				log.Error().Err(err).
+					Msgf("could not publish approval request for chunk %d", chunkIndex)
+			}
+		}
+	}
 	return nil
 }

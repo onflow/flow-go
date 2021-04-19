@@ -14,6 +14,7 @@ import (
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
+	IncorporatedBlockID  flow.Identifier
 	chunkCollectors      []*ChunkApprovalCollector
 	aggregatedSignatures map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
 	lock                 sync.RWMutex                        // lock for modifying aggregatedSignatures
@@ -35,6 +36,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.As
 		chunkCollectors = append(chunkCollectors, collector)
 	}
 	return &ApprovalCollector{
+		IncorporatedBlockID:                  result.IncorporatedBlockID,
 		incorporatedResult:                   result,
 		numberOfChunks:                       result.Result.Chunks.Len(),
 		chunkCollectors:                      chunkCollectors,

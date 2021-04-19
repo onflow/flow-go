@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -35,6 +36,7 @@ type AssignmentCollectorTestSuite struct {
 	assigner        *module.ChunkAssigner
 	sealsPL         *mempool.IncorporatedResultSeals
 	sigVerifier     *module.Verifier
+	conduit         *mocknetwork.Conduit
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
 
 	collector *AssignmentCollector
@@ -47,6 +49,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.state = &protocol.State{}
 	s.assigner = &module.ChunkAssigner{}
 	s.sigVerifier = &module.Verifier{}
+	s.conduit = &mocknetwork.Conduit{}
 
 	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
 	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
@@ -64,7 +67,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 		},
 	)
 
-	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, uint(len(s.AuthorizedVerifiers)))
+	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, s.conduit, uint(len(s.AuthorizedVerifiers)))
 }
 
 // TestProcessAssignment_ApprovalsAfterResult tests a scenario when first we have discovered execution result
@@ -140,7 +143,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, assigner, s.sealsPL, s.sigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, 1)
 
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
@@ -148,7 +152,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	})
 
 	s.Run("invalid-verifier-identities", func() {
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL, s.sigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, 1)
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -175,7 +180,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -195,7 +201,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -214,7 +221,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL, s.sigVerifier, 1)
+		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
