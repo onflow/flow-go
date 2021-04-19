@@ -220,7 +220,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	}
 
 	e.metrics.OnAssignerProcessFinalizedBlock(block.Header.Height)
-	e.log.Info().
+	lg.Info().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
 		Msg("finished processing finalized block")
