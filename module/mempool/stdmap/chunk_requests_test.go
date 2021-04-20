@@ -1,7 +1,9 @@
 package stdmap
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -30,12 +32,20 @@ func TestIncrementStatus(t *testing.T) {
 		ok := requests.Add(status)
 		require.True(t, ok)
 
+		wg := &sync.WaitGroup{}
+		wg.Add(increments)
+
 		// increments attempts
 		for i := 0; i < increments; i++ {
-			ok = requests.IncrementAttempt(status.ID())
-			require.True(t, ok)
+			go func() {
+				ok = requests.IncrementAttempt(status.ID())
+				require.True(t, ok)
 
+				wg.Done()
+			}()
 		}
+
+		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish increments on time")
 
 		// retrieves updated status
 		status, ok = requests.ByID(status.ID())
