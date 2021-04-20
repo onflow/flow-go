@@ -49,7 +49,7 @@ type Consumer interface {
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochSetupPhaseStarted(epoch uint64, first *flow.Header)
 
-	// EpochCommittedPhase is called when we begin the epoch committed phase
+	// EpochCommittedPhaseStarted is called when we begin the epoch committed phase
 	// for the current epoch. This is equivalent to the end of the epoch setup
 	// phase for the current epoch.
 	//
