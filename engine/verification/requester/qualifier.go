@@ -14,5 +14,5 @@ type ChunkDataRequestQualifier interface {
 
 	// OnRequestDispatched encapsulates the bookkeeping logic after dispatching the chunk request
 	// is done successfully.
-	OnRequestDispatched(request *verification.ChunkDataPackRequest) bool
+	OnRequestDispatched(request *verification.ChunkRequestStatus) bool
 }

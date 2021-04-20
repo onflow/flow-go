@@ -34,10 +34,13 @@ type Engine struct {
 	metrics module.VerificationMetrics
 
 	// output interfaces
-	handler         fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
-	retryInterval   time.Duration                // determines time in milliseconds for retrying chunk data requests.
-	requestTargets  uint                         // maximum number of execution nodes being asked for a chunk data pack.
-	pendingRequests mempool.ChunkRequests        // used to track requested chunks.
+	handler fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
+
+	// internal logic
+	retryInterval    time.Duration             // determines time in milliseconds for retrying chunk data requests.
+	requestTargets   uint                      // maximum number of execution nodes being asked for a chunk data pack.
+	pendingRequests  mempool.ChunkRequests     // used to track requested chunks.
+	requestQualifier ChunkDataRequestQualifier // used to decide whether to dispatch a chunk request.
 }
 
 func New(log zerolog.Logger,
@@ -48,18 +51,20 @@ func New(log zerolog.Logger,
 	pendingRequests mempool.ChunkRequests,
 	handler fetcher.ChunkDataPackHandler,
 	retryInterval time.Duration,
+	requestQualifier ChunkDataRequestQualifier,
 	requestTargets uint) (*Engine, error) {
 
 	e := &Engine{
-		log:             log.With().Str("engine", "requester").Logger(),
-		unit:            engine.NewUnit(),
-		state:           state,
-		tracer:          tracer,
-		metrics:         metrics,
-		handler:         handler,
-		retryInterval:   retryInterval,
-		requestTargets:  requestTargets,
-		pendingRequests: pendingRequests,
+		log:              log.With().Str("engine", "requester").Logger(),
+		unit:             engine.NewUnit(),
+		state:            state,
+		tracer:           tracer,
+		metrics:          metrics,
+		handler:          handler,
+		retryInterval:    retryInterval,
+		requestTargets:   requestTargets,
+		pendingRequests:  pendingRequests,
+		requestQualifier: requestQualifier,
 	}
 
 	if e.handler == nil {
@@ -210,6 +215,12 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
+		updated := e.requestQualifier.OnRequestDispatched(request)
+		if !updated {
+			lg.Debug().Bool("updated_request", updated).
+				Msg("could not update the requested chunk data pack")
+		}
+
 		lg.Info().Msg("chunk data pack requested")
 	}
 }
@@ -237,11 +248,6 @@ func (e *Engine) requestChunkDataPack(status *verification.ChunkRequestStatus) e
 	err := e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
-	}
-
-	exists := e.pendingRequests.IncrementAttempt(status.ID())
-	if !exists {
-		return fmt.Errorf("chunk is no longer needed to be processed")
 	}
 
 	return nil

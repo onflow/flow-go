@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/requester"
+	"github.com/onflow/flow-go/engine/verification/requester/qualifier"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -71,6 +72,8 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		Return(s.con, nil).
 		Once()
 
+	requestQualifier := qualifier.NewIncrementalQualifier(s.pendingRequests)
+
 	e, err := requester.New(s.log,
 		s.state,
 		net,
@@ -79,6 +82,7 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		s.pendingRequests,
 		s.handler,
 		s.retryInterval,
+		requestQualifier,
 		s.requestTargets)
 	require.NoError(t, err)
 	testifymock.AssertExpectationsForObjects(t, net)
