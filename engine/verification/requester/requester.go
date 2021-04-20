@@ -210,6 +210,11 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
+		updated := e.pendingRequests.IncrementAttempt(request.ID())
+		if !updated {
+			lg.Debug().Msg("could not update dispatched request, it has been resolved")
+		}
+
 		lg.Info().Msg("chunk data pack requested")
 	}
 }
@@ -237,11 +242,6 @@ func (e *Engine) requestChunkDataPack(status *verification.ChunkRequestStatus) e
 	err := e.con.Publish(req, targetIDs...)
 	if err != nil {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
-	}
-
-	exists := e.pendingRequests.IncrementAttempt(status.ID())
-	if !exists {
-		return fmt.Errorf("chunk is no longer needed to be processed")
 	}
 
 	return nil
