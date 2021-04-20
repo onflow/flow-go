@@ -72,6 +72,30 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	return err == nil
 }
 
+// IncrementAttemptAndRetryAfter increments the Attempt field of the chunk request in memory pool that
+// has the specified chunk ID, and updates the retryAfter field of the chunk request to the specified
+// values.
+//
+// The LastAttempt field of the chunk request is timestamped with the invocation time of this method.
+//
+// If such chunk ID does not exist in the memory pool, it returns false.
+// The updates under this method are atomic, thread-safe, and done in isolation.
+func (cs *ChunkRequests) IncrementAttemptAndRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
+	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[chunkID]
+		if !exists {
+			return fmt.Errorf("not exist")
+		}
+		chunk := chunkRequestStatus(entity)
+		chunk.Attempt++
+		chunk.LastAttempt = time.Now()
+		chunk.RetryAfter = retryAfter
+		return nil
+	})
+
+	return err == nil
+}
+
 // All returns all chunk requests stored in this memory pool.
 func (cs *ChunkRequests) All() []*verification.ChunkRequestStatus {
 	all := cs.Backend.All()

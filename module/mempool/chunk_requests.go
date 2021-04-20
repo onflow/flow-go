@@ -1,6 +1,8 @@
 package mempool
 
 import (
+	"time"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 )
@@ -25,8 +27,18 @@ type ChunkRequests interface {
 	// IncrementAttempt increments the Attempt field of the chunk request in memory pool that
 	// has the specified chunk ID. If such chunk ID does not exist in the memory pool, it returns
 	// false.
-	// The increments are done atomically, thread-safe, and in isolation.
+	// The updates under this method are atomic, thread-safe, and done in isolation.
 	IncrementAttempt(chunkID flow.Identifier) bool
+
+	// IncrementAttemptAndRetryAfter increments the Attempt field of the chunk request in memory pool that
+	// has the specified chunk ID, and updates the retryAfter field of the chunk request to the specified
+	// values.
+	//
+	// The LastAttempt field of the chunk request is timestamped with the invocation time of this method.
+	//
+	// If such chunk ID does not exist in the memory pool, it returns false.
+	// The updates under this method are atomic, thread-safe, and done in isolation.
+	IncrementAttemptAndRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool
 
 	// All returns all chunk requests stored in this memory pool.
 	All() []*verification.ChunkRequestStatus
