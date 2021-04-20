@@ -61,6 +61,7 @@ func (s *DKGSuite) SetupTest() {
 	for _, id := range s.netIDs {
 		s.nodeAccounts = append(s.nodeAccounts, s.createAndFundAccount(id))
 	}
+
 	for _, acc := range s.nodeAccounts {
 		s.nodes = append(s.nodes, s.createNode(acc))
 	}
@@ -312,6 +313,33 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 				cadence.String(node.account.accountID)),
 		})
 	assert.Equal(s.T(), cadence.NewBool(true), result)
+}
+
+// sendDummyTx submits a transaction from the service account
+func (s *DKGSuite) sendDummyTx() (*flow.Block, error) {
+	// we are using an account-creation transaction but it doesnt matter; we
+	// could be using anything other transaction
+	createAccountTx := sdktemplates.CreateAccount(
+		[]*sdk.AccountKey{test.AccountKeyGenerator().New()},
+		[]sdktemplates.Contract{},
+		s.blockchain.ServiceKey().Address).
+		SetProposalKey(
+			s.blockchain.ServiceKey().Address,
+			s.blockchain.ServiceKey().Index,
+			s.blockchain.ServiceKey().SequenceNumber).
+		SetPayer(s.blockchain.ServiceKey().Address)
+
+	block, err := s.signAndSubmit(createAccountTx,
+		[]sdk.Address{s.blockchain.ServiceKey().Address},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
+	)
+	return block, err
+}
+
+func (s *DKGSuite) isDKGCompleted() bool {
+	template := templates.GenerateGetDKGCompletedScript(s.env)
+	value := s.executeScript(template, nil)
+	return value.ToGoValue().(bool)
 }
 
 func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {

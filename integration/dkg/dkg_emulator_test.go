@@ -4,12 +4,8 @@ import (
 	"testing"
 	"time"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/templates"
-	sdktemplates "github.com/onflow/flow-go-sdk/templates"
-	"github.com/onflow/flow-go-sdk/test"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -60,35 +56,33 @@ func (s *DKGSuite) TestHappyPath() {
 		n.ProtocolEvents.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
 	}
 
-	// submit a lot of dummy transactions to force the creation of blocks
-	for i := 0; i < 300; i++ {
-		time.Sleep(200 * time.Millisecond)
+	// submit a lot of dummy transactions to force the creation of blocks and
+	// views
+	view := 0
+	for view < 300 {
+		time.Sleep(1 * time.Second)
+
 		// deliver private messages
 		s.hub.DeliverAll()
-		// submit a tx to force the emulator to create and finalize a block
-		createAccountTx := templates.CreateAccount(
-			[]*sdk.AccountKey{test.AccountKeyGenerator().New()},
-			[]sdktemplates.Contract{},
-			s.blockchain.ServiceKey().Address).
-			SetProposalKey(
-				s.blockchain.ServiceKey().Address,
-				s.blockchain.ServiceKey().Index,
-				s.blockchain.ServiceKey().SequenceNumber).
-			SetPayer(s.blockchain.ServiceKey().Address)
 
-		block, err := s.signAndSubmit(createAccountTx,
-			[]sdk.Address{s.blockchain.ServiceKey().Address},
-			[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
-		)
-		time.Sleep(200 * time.Millisecond)
+		// submit a tx to force the emulator to create and finalize a block
+		block, err := s.sendDummyTx()
+
 		if err == nil {
 			for _, node := range s.nodes {
 				node.ProtocolEvents.BlockFinalized(block.Header)
 			}
+			view = int(block.Header.View)
 		}
 	}
 
 	for _, n := range s.nodes {
 		n.Done()
 	}
+
+	// DKG is completed if one value was proposed by a majority of nodes
+	completed := s.isDKGCompleted()
+	assert.True(s.T(), completed)
+
+	// TODO check signature
 }

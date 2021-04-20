@@ -9,9 +9,9 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator"
-	"github.com/onflow/flow-go/model/flow"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // EmulatorClient is a wrapper around the emulator to implement the same interface
@@ -116,16 +116,7 @@ func (c *EmulatorClient) Submit(tx *sdk.Transaction) (*flow.Block, error) {
 		return nil, err
 	}
 
-	result, err := c.blockchain.ExecuteNextTransaction()
-	if err != nil {
-		return nil, err
-	}
-
-	if !result.Succeeded() {
-		return nil, fmt.Errorf("transaction did not succeeded: %w", result.Error)
-	}
-
-	block, err := c.blockchain.CommitBlock()
+	block, _, err := c.blockchain.ExecuteAndCommitBlock()
 	if err != nil {
 		return nil, err
 	}
