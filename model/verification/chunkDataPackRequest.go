@@ -2,6 +2,7 @@ package verification
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // ChunkDataPackRequest is an internal data structure in fetcher engine that is passed between the engine
@@ -11,4 +12,23 @@ type ChunkDataPackRequest struct {
 	Height    uint64            // block height of execution result of the chunk, used to drop chunk requests of sealed heights.
 	Agrees    []flow.Identifier // execution node ids that generated the result of chunk.
 	Disagrees []flow.Identifier // execution node ids that generated a conflicting result with result of chunk.
+	Targets   flow.IdentityList // list of all execution nodes identity at the block height of this chunk (including non-responders).
+}
+
+// SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
+// the agree and disagree execution nodes of the chunk data pack request.
+func (c ChunkDataPackRequest) SampleTargets(count int) flow.IdentifierList {
+	// if there are enough receipts produced the same result (agrees), we sample from them.
+	if len(c.Agrees) >= count {
+		return c.Targets.Filter(filter.HasNodeID(c.Agrees...)).Sample(uint(count)).NodeIDs()
+	}
+
+	// since there is at least one agree, then usually, we just need `count - 1` extra nodes as backup.
+	// We pick these extra nodes randomly from the rest nodes who we haven't received its receipt.
+	// In the case where all other execution nodes has produced different results, then we will only
+	// fetch from the one produced the same result (the only agree)
+	need := uint(count - len(c.Agrees))
+
+	nonResponders := c.Targets.Filter(filter.Not(filter.HasNodeID(c.Disagrees...))).Sample(need).NodeIDs()
+	return append(c.Agrees, nonResponders...)
 }
