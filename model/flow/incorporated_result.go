@@ -184,7 +184,9 @@ func (c *SignatureCollector) NumberSignatures() uint {
 	return uint(len(c.signerIDs))
 }
 
-/* GROUPING allows to split a list or map of incorporated results by some property */
+/*******************************************************************************
+GROUPING allows to split a list incorporated results by some property
+*******************************************************************************/
 
 // IncorporatedResultList is a slice of IncorporatedResults with the additional
 // functionality to group them by various properties
@@ -208,7 +210,7 @@ func (l IncorporatedResultList) GroupBy(grouper IncorporatedResultGroupingFuncti
 	return groups
 }
 
-// GroupByExecutorID partitions the IncorporatedResultList by the ID of the block that
+// GroupByIncorporatedBlockID partitions the IncorporatedResultList by the ID of the block that
 // incorporates the result. Within each group, the order and multiplicity of the
 // IncorporatedResults is preserved.
 func (l IncorporatedResultList) GroupByIncorporatedBlockID() IncorporatedResultGroupedList {
@@ -223,7 +225,7 @@ func (l IncorporatedResultList) GroupByResultID() IncorporatedResultGroupedList 
 	return l.GroupBy(grouper)
 }
 
-// GroupByResultID partitions the IncorporatedResultList by the IDs of the executed blocks.
+// GroupByExecutedBlockID partitions the IncorporatedResultList by the IDs of the executed blocks.
 // Within each group, the order and multiplicity of the IncorporatedResults is preserved.
 func (l IncorporatedResultList) GroupByExecutedBlockID() IncorporatedResultGroupedList {
 	grouper := func(ir *IncorporatedResult) Identifier { return ir.Result.BlockID }
