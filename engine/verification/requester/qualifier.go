@@ -10,7 +10,7 @@ import (
 type ChunkDataRequestQualifier interface {
 	// CanDispatchRequest returns true if the chunk request can be dispatched to the network, otherwise
 	// it returns false.
-	CanDispatchRequest(request verification.ChunkRequestStatus) bool
+	CanDispatchRequest(request *verification.ChunkRequestStatus) bool
 
 	// OnRequestDispatched encapsulates the bookkeeping logic after dispatching the chunk request
 	// is done successfully.

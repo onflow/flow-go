@@ -16,7 +16,7 @@ func NewIncrementalQualifier(requests mempool.ChunkRequests) *IncrementalQualifi
 }
 
 // CanDispatchRequest always returns true. Its sole purpose is to satisfy the interface implementation.
-func (i *IncrementalQualifier) CanDispatchRequest(request verification.ChunkRequestStatus) bool {
+func (i *IncrementalQualifier) CanDispatchRequest(request *verification.ChunkRequestStatus) bool {
 	return true
 }
 
