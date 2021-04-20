@@ -159,10 +159,9 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 }
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
-func (e *Engine) Request(request *verification.ChunkDataPackRequest, targets flow.IdentityList) {
+func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
 	status := &verification.ChunkRequestStatus{
 		ChunkDataPackRequest: request,
-		Targets:              targets,
 	}
 	added := e.pendingRequests.Add(status)
 	e.log.Info().

@@ -15,13 +15,13 @@ type ChunkRequests struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: chunk
-func (_m *ChunkRequests) Add(chunk *verification.ChunkRequestStatus) bool {
-	ret := _m.Called(chunk)
+// Add provides a mock function with given fields: request
+func (_m *ChunkRequests) Add(request *verification.ChunkRequestStatus) bool {
+	ret := _m.Called(request)
 
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(*verification.ChunkRequestStatus) bool); ok {
-		r0 = rf(chunk)
+		r0 = rf(request)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
