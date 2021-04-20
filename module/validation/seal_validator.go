@@ -5,13 +5,10 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/state/fork"
-
-fix me
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
