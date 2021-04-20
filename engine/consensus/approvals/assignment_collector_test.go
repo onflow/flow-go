@@ -37,14 +37,15 @@ func TestAssignmentCollector(t *testing.T) {
 type AssignmentCollectorTestSuite struct {
 	BaseApprovalsTestSuite
 
-	blocks          map[flow.Identifier]*flow.Header
-	state           *protocol.State
-	assigner        *module.ChunkAssigner
-	sealsPL         *mempool.IncorporatedResultSeals
-	sigVerifier     *module.Verifier
-	conduit         *mocknetwork.Conduit
-	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	requestTracker  *sealing.RequestTracker
+	blocks               map[flow.Identifier]*flow.Header
+	state                *protocol.State
+	assigner             *module.ChunkAssigner
+	sealsPL              *mempool.IncorporatedResultSeals
+	sigVerifier          *module.Verifier
+	conduit              *mocknetwork.Conduit
+	identitiesCache      map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	requestTracker       *sealing.RequestTracker
+	getCachedBlockHeight GetCachedBlockHeight
 
 	collector *AssignmentCollector
 }
@@ -63,6 +64,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	// setup blocks cache for protocol state
 	s.blocks = make(map[flow.Identifier]*flow.Header)
 	s.blocks[s.Block.ID()] = &s.Block
+	s.blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
 
 	// setup identities for each block
 	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
@@ -82,8 +84,16 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 		},
 	)
 
+	s.getCachedBlockHeight = func(blockID flow.Identifier) (uint64, error) {
+		block, err := s.state.AtBlockID(blockID).Head()
+		if err != nil {
+			return 0, err
+		}
+		return block.Height, nil
+	}
+
 	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL,
-		s.sigVerifier, s.conduit, s.requestTracker, uint(len(s.AuthorizedVerifiers)))
+		s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, uint(len(s.AuthorizedVerifiers)))
 }
 
 // TestProcessAssignment_ApprovalsAfterResult tests a scenario when first we have discovered execution result
@@ -160,7 +170,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
 
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
@@ -169,7 +179,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 
 	s.Run("invalid-verifier-identities", func() {
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -197,7 +207,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -218,7 +228,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -238,7 +248,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
 		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
@@ -331,4 +341,23 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 		}
 
 	}
+}
+
+// TestCheckEmergencySealing tests that currently tracked incorporated results can be emergency sealed
+// when height difference reached the emergency sealing threshold.
+func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
+	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
+
+	// checking emergency sealing with current height
+	// should early exit without creating any seals
+	err = s.collector.CheckEmergencySealing(s.IncorporatedBlock.Height)
+	require.NoError(s.T(), err)
+
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+
+	err = s.collector.CheckEmergencySealing(sealing.DefaultEmergencySealingThreshold + s.IncorporatedBlock.Height)
+	require.NoError(s.T(), err)
+
+	s.sealsPL.AssertExpectations(s.T())
 }

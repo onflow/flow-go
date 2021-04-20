@@ -57,19 +57,21 @@ type approvalProcessingCore struct {
 	lastSealedBlockHeight                uint64                                   // atomic variable for last sealed block height
 	requiredApprovalsForSealConstruction uint                                     // number of approvals that are required for each chunk to be sealed
 
-	assigner        module.ChunkAssigner
-	state           protocol.State
-	verifier        module.Verifier
-	seals           mempool.IncorporatedResultSeals
-	payloads        storage.Payloads
-	approvalConduit network.Conduit
-	requestTracker  *sealing.RequestTracker
+	assigner             module.ChunkAssigner
+	state                protocol.State
+	verifier             module.Verifier
+	seals                mempool.IncorporatedResultSeals
+	payloads             storage.Payloads
+	approvalConduit      network.Conduit
+	requestTracker       *sealing.RequestTracker
+	getCachedBlockHeight GetCachedBlockHeight // cache access for assignment collector
 }
 
 func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
 	verifier module.Verifier, seals mempool.IncorporatedResultSeals, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint) *approvalProcessingCore {
 	blockHeightLookupCache, _ := lru.New(100)
-	return &approvalProcessingCore{
+
+	core := &approvalProcessingCore{
 		collectors:                           make(map[flow.Identifier]*AssignmentCollector),
 		approvalsCache:                       NewApprovalsCache(1000),
 		lock:                                 sync.RWMutex{},
@@ -83,6 +85,32 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 		blockHeightLookupCache:               blockHeightLookupCache,
 		requestTracker:                       sealing.NewRequestTracker(10, 30),
 	}
+
+	// Approval validation is called for every approval
+	// it's important to use a cache instead of looking up protocol.State for every approval
+	// since we expect that there will be multiple approvals for same block
+	// Peek internally used RWLock so it should be ok in terms of performance.
+	// Same functor is used by AssignmentCollector to reuse cache instead of using state for every
+	// height lookup.
+	core.getCachedBlockHeight = func(blockID flow.Identifier) (uint64, error) {
+		height, cached := core.blockHeightLookupCache.Peek(blockID)
+		if !cached {
+			// check if we already have the block the approval pertains to
+			head, err := core.state.AtBlockID(blockID).Head()
+			if err != nil {
+				if !errors.Is(err, storage.ErrNotFound) {
+					return 0, fmt.Errorf("failed to retrieve header for block %x: %w", blockID, err)
+				}
+				return 0, engine.NewUnverifiableInputError("no header for block: %v", blockID)
+			}
+
+			height = head.Height
+			core.blockHeightLookupCache.Add(blockID, height)
+		}
+		return height.(uint64), nil
+	}
+
+	return core
 }
 
 // WARNING: this function is implemented in a way that we expect blocks strictly in parent-child order
@@ -112,6 +140,9 @@ func (p *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 
 	// cleanup collectors for already sealed results
 	p.eraseCollectors(sealedResultIds)
+
+	// check if there are stale results qualified for emergency sealing
+	p.checkEmergencySealing()
 }
 
 func (p *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
@@ -141,29 +172,15 @@ func (p *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 // * exception in case of unknown internal error
 // * nil - block isn't sealed
 func (p *approvalProcessingCore) checkBlockOutdated(blockID flow.Identifier) error {
-	// approval validation is called for every approval
-	// it's important to use a cache instead of looking up protocol.State for every approval
-	// since we expect that there will be multiple approvals for same block
-	// Peek internally used RWLock so it should be ok in terms of performance.
-	height, cached := p.blockHeightLookupCache.Peek(blockID)
-	if !cached {
-		// check if we already have the block the approval pertains to
-		head, err := p.state.AtBlockID(blockID).Head()
-		if err != nil {
-			if !errors.Is(err, storage.ErrNotFound) {
-				return fmt.Errorf("failed to retrieve header for block %x: %w", blockID, err)
-			}
-			return engine.NewUnverifiableInputError("no header for block: %v", blockID)
-		}
-
-		height = head.Height
-		p.blockHeightLookupCache.Add(blockID, height)
+	height, err := p.getCachedBlockHeight(blockID)
+	if err != nil {
+		return err
 	}
 
 	// it's important to use atomic operation to make sure that we have correct ordering
 	lastSealedHeight := atomic.LoadUint64(&p.lastSealedBlockHeight)
 	// drop approval, if it is for block whose height is lower or equal to already sealed height
-	if lastSealedHeight >= height.(uint64) {
+	if lastSealedHeight >= height {
 		return engine.NewOutdatedInputErrorf("result is for already sealed and finalized block height")
 	}
 
@@ -189,6 +206,10 @@ func (p *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) 
 	}
 
 	return nil
+}
+
+func (p *approvalProcessingCore) checkEmergencySealing() {
+
 }
 
 func (p *approvalProcessingCore) processPendingApprovals(collector *AssignmentCollector) error {
@@ -226,7 +247,7 @@ func (p *approvalProcessingCore) createCollector(resultID flow.Identifier) *Assi
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier,
-		p.approvalConduit, p.requestTracker, p.requiredApprovalsForSealConstruction)
+		p.approvalConduit, p.requestTracker, p.getCachedBlockHeight, p.requiredApprovalsForSealConstruction)
 	p.collectors[resultID] = collector
 	return collector
 }

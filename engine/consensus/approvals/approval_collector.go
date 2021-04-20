@@ -53,7 +53,7 @@ func (c *ApprovalCollector) hasEnoughApprovals(chunkIndex uint64) bool {
 	return found
 }
 
-func (c *ApprovalCollector) sealResult() error {
+func (c *ApprovalCollector) SealResult() error {
 	// get final state of execution result
 	finalState, ok := c.incorporatedResult.Result.FinalStateCommitment()
 	if !ok {
@@ -121,7 +121,7 @@ func (c *ApprovalCollector) trySealResult() error {
 		return nil
 	}
 
-	return c.sealResult()
+	return c.SealResult()
 }
 
 func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, collector *ChunkApprovalCollector) {

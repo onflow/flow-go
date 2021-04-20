@@ -15,6 +15,7 @@ type BaseApprovalsTestSuite struct {
 	suite.Suite
 
 	Block               flow.Header     // candidate for sealing
+	IncorporatedBlock   flow.Header     // block that incorporated result
 	VerID               flow.Identifier // for convenience, node id of first verifier
 	Chunks              flow.ChunkList  // list of chunks of execution result
 	ChunksAssignment    *chunks.Assignment
@@ -45,6 +46,11 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 	result := unittest.ExecutionResultFixture()
 	result.BlockID = s.Block.ID()
 	result.Chunks = s.Chunks
+
+	s.IncorporatedBlock = unittest.BlockHeaderWithParentFixture(&s.Block)
+
 	// compose incorporated result
-	s.IncorporatedResult = unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(result))
+	s.IncorporatedResult = unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(result),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(s.IncorporatedBlock.ID()))
 }

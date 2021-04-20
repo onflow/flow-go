@@ -18,6 +18,9 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// helper functor that can be used to retrieve cached block height
+type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
+
 // AssignmentCollector is responsible collecting approvals that satisfy one assignment, meaning that we will
 // have multiple collectors for one execution result as same result can be incorporated in multiple forks.
 // AssignmentCollector has a strict ordering of processing, before processing approvals at least one incorporated result has to be
@@ -32,16 +35,17 @@ type AssignmentCollector struct {
 	verifiedApprovalsCache               *ApprovalsCache                        // in-memory cache of approvals were already verified
 	requiredApprovalsForSealConstruction uint                                   // number of approvals that are required for each chunk to be sealed
 
-	assigner        module.ChunkAssigner
-	state           protocol.State
-	verifier        module.Verifier
-	seals           mempool.IncorporatedResultSeals
-	approvalConduit network.Conduit         // used to request missing approvals from verification nodes
-	requestTracker  *sealing.RequestTracker // used to keep track of number of approval requests, and blackout periods, by chunk
+	assigner             module.ChunkAssigner
+	state                protocol.State
+	verifier             module.Verifier
+	seals                mempool.IncorporatedResultSeals
+	approvalConduit      network.Conduit         // used to request missing approvals from verification nodes
+	requestTracker       *sealing.RequestTracker // used to keep track of number of approval requests, and blackout periods, by chunk
+	getCachedBlockHeight GetCachedBlockHeight    // functor to get cached block height
 }
 
 func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, getCachedBlockHeight GetCachedBlockHeight, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
 	collector := &AssignmentCollector{
 		verifiedApprovalsCache:               NewApprovalsCache(1000),
 		ResultID:                             resultID,
@@ -52,6 +56,7 @@ func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assi
 		verifier:                             sigVerifier,
 		requestTracker:                       requestTracker,
 		approvalConduit:                      approvalConduit,
+		getCachedBlockHeight:                 getCachedBlockHeight,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 	return collector
@@ -87,6 +92,40 @@ func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier
 		identities[identity.NodeID] = identity
 	}
 	return identities, nil
+}
+
+// emergencySealable determines whether an incorporated Result qualifies for "emergency sealing".
+// ATTENTION: this is a temporary solution, which is NOT BFT compatible. When the approval process
+// hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
+// sealing kicks in. This will be removed when implementation of seal & verification is finished.
+func (c *AssignmentCollector) emergencySealable(incorporatedBlockID flow.Identifier, finalizedBlockHeight uint64) (bool, error) {
+	incorporatedBlockHeight, err := c.getCachedBlockHeight(incorporatedBlockID)
+	if err != nil {
+		return false, fmt.Errorf("could not get block %v: %w", incorporatedBlockID, err)
+	}
+	// Criterion for emergency sealing:
+	// there must be at least DefaultEmergencySealingThreshold number of blocks between
+	// the block that _incorporates_ result and the latest finalized block
+	return incorporatedBlockHeight+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight, nil
+}
+
+func (c *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
+	for _, collector := range c.allCollectors() {
+		sealable, err := c.emergencySealable(collector.IncorporatedBlockID, finalizedBlockHeight)
+		if err != nil {
+			return fmt.Errorf("could not determnine if incorporated result %s is emergency sealable: %w",
+				collector.IncorporatedBlockID, err)
+		}
+		if sealable {
+			err = collector.SealResult()
+			if err != nil {
+				return fmt.Errorf("could not create emergency seal for incorporated result %s: %w",
+					collector.IncorporatedBlockID, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
@@ -202,12 +241,12 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 	for _, collector := range c.allCollectors() {
 		// not finding the block that the result was incorporated in is a fatal
 		// error at this stage
-		block, err := c.state.AtBlockID(collector.IncorporatedBlockID).Head()
+		blockHeight, err := c.getCachedBlockHeight(collector.IncorporatedBlockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		if block.Height > maxHeightForRequesting {
+		if blockHeight > maxHeightForRequesting {
 			continue
 		}
 
