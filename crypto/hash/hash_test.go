@@ -1,21 +1,12 @@
 package hash
 
 import (
-	"bytes"
 	"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func checkBytes(t *testing.T, input, expected, result []byte) {
-	if !bytes.Equal(expected, result) {
-		t.Errorf("hash mismatch: expect: %x have: %x, input is %x", expected, result, input)
-	} else {
-		t.Logf("hash test ok: expect: %x, input: %x", expected, input)
-	}
-}
 
 // Sanity checks of SHA3_256
 func TestSha3_256(t *testing.T) {
@@ -24,14 +15,14 @@ func TestSha3_256(t *testing.T) {
 
 	alg := NewSHA3_256()
 	hash := alg.ComputeHash(input)
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 
 	alg.Reset()
 	_, _ = alg.Write([]byte("te"))
 	_, _ = alg.Write([]byte("s"))
 	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 }
 
 // Sanity checks of SHA3_384
@@ -41,14 +32,14 @@ func TestSha3_384(t *testing.T) {
 
 	alg := NewSHA3_384()
 	hash := alg.ComputeHash(input)
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 
 	alg.Reset()
 	_, _ = alg.Write([]byte("te"))
 	_, _ = alg.Write([]byte("s"))
 	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 }
 
 // Sanity checks of SHA2_256
@@ -58,14 +49,14 @@ func TestSha2_256(t *testing.T) {
 
 	alg := NewSHA2_256()
 	hash := alg.ComputeHash(input)
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 
 	alg.Reset()
 	_, _ = alg.Write([]byte("te"))
 	_, _ = alg.Write([]byte("s"))
 	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 }
 
 // Sanity checks of SHA2_256
@@ -75,14 +66,14 @@ func TestSha2_384(t *testing.T) {
 
 	alg := NewSHA2_384()
 	hash := alg.ComputeHash(input)
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 
 	alg.Reset()
 	_, _ = alg.Write([]byte("te"))
 	_, _ = alg.Write([]byte("s"))
 	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
-	checkBytes(t, input, expected, hash)
+	assert.Equal(t, Hash(expected), hash)
 }
 
 // SHA3_256 bench
@@ -116,7 +107,7 @@ func BenchmarkSha2_256(b *testing.B) {
 	return
 }
 
-// SHA2_256 bench
+// SHA2_384 bench
 func BenchmarkSha2_384(b *testing.B) {
 	a := []byte("Bench me!")
 	alg := NewSHA2_384()
@@ -132,7 +123,7 @@ func BenchmarkSha2_384(b *testing.B) {
 func TestKmac128(t *testing.T) {
 
 	input := []byte{0x00, 0x01, 0x02, 0x03}
-	expected := [][]byte{
+	expected := []Hash{
 		{0xE5, 0x78, 0x0B, 0x0D, 0x3E, 0xA6, 0xF7, 0xD3, 0xA4, 0x29, 0xC5, 0x70, 0x6A, 0xA4, 0x3A, 0x00,
 			0xFA, 0xDB, 0xD7, 0xD4, 0x96, 0x28, 0x83, 0x9E, 0x31, 0x87, 0x24, 0x3F, 0x45, 0x6E, 0xE1, 0x4E},
 		{0x3B, 0x1F, 0xBA, 0x96, 0x3C, 0xD8, 0xB0, 0xB5, 0x9E, 0x8C, 0x1A, 0x6D, 0x71, 0x88, 0x8B, 0x71,
@@ -151,13 +142,13 @@ func TestKmac128(t *testing.T) {
 	_, _ = alg.Write(input[0:2])
 	_, _ = alg.Write(input[2:])
 	hash := alg.SumHash()
-	checkBytes(t, input, expected[0], hash)
+	assert.Equal(t, expected[0], hash)
 
 	for i := 0; i < len(customizers); i++ {
 		alg, err = NewKMAC_128(key, customizers[i], outputSize)
 		require.Nil(t, err)
 		hash = alg.ComputeHash(input)
-		checkBytes(t, input, expected[i], hash)
+		assert.Equal(t, expected[i], hash)
 	}
 
 	// test short key length
