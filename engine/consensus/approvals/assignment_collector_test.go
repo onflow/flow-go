@@ -92,8 +92,10 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 		return block.Height, nil
 	}
 
-	s.collector = NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL,
+	var err error
+	s.collector, err = NewAssignmentCollector(s.IncorporatedResult.Result, s.state, s.assigner, s.sealsPL,
 		s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, uint(len(s.AuthorizedVerifiers)))
+	require.NoError(s.T(), err)
 }
 
 // TestProcessAssignment_ApprovalsAfterResult tests a scenario when first we have discovered execution result
@@ -169,20 +171,22 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, s.state, assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
+		require.NoError(s.T(), err)
 
-		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 
 	s.Run("invalid-verifier-identities", func() {
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), s.state, s.assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, s.state, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
+		require.NoError(s.T(), err)
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
-		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
@@ -206,9 +210,10 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
-		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		require.NoError(s.T(), err)
+		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
@@ -227,9 +232,10 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
-		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		require.NoError(s.T(), err)
+		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
@@ -247,9 +253,10 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector := NewAssignmentCollector(s.IncorporatedResult.Result.ID(), state, s.assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
-		err := collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		require.NoError(s.T(), err)
+		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})

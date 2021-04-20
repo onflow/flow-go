@@ -116,6 +116,11 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 // WARNING: this function is implemented in a way that we expect blocks strictly in parent-child order
 // Caller has to ensure that it doesn't feed blocks that were already processed or in wrong order.
 func (p *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
+	finalized, err := p.state.AtBlockID(blockID).Head()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", blockID)
+	}
+
 	payload, err := p.payloads.ByBlockID(blockID)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", blockID)
@@ -142,7 +147,10 @@ func (p *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 	p.eraseCollectors(sealedResultIds)
 
 	// check if there are stale results qualified for emergency sealing
-	p.checkEmergencySealing()
+	err = p.checkEmergencySealing(finalized.Height)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalized.ID())
+	}
 }
 
 func (p *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
@@ -151,7 +159,14 @@ func (p *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 		return fmt.Errorf("won't process outdated or unverifiable execution result %s: %w", result.Result.BlockID, err)
 	}
 
-	collector := p.getOrCreateCollector(result.Result.ID())
+	collector := p.getCollector(result.Result.ID())
+	if collector == nil {
+		collector, err = p.createCollector(result.Result)
+		if err != nil {
+			return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
+		}
+	}
+
 	err = collector.ProcessIncorporatedResult(result)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated result: %w", err)
@@ -208,8 +223,17 @@ func (p *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) 
 	return nil
 }
 
-func (p *approvalProcessingCore) checkEmergencySealing() {
-
+func (p *approvalProcessingCore) checkEmergencySealing(lastFinalizedHeight uint64) error {
+	for _, collector := range p.allCollectors() {
+		// let's check at least that candidate block is deep enough for emergency sealing.
+		if collector.BlockHeight+sealing.DefaultEmergencySealingThreshold < lastFinalizedHeight {
+			err := collector.CheckEmergencySealing(lastFinalizedHeight)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (p *approvalProcessingCore) processPendingApprovals(collector *AssignmentCollector) error {
@@ -237,19 +261,33 @@ func (p *approvalProcessingCore) processPendingApprovals(collector *AssignmentCo
 	return nil
 }
 
+func (p *approvalProcessingCore) allCollectors() []*AssignmentCollector {
+	collectors := make([]*AssignmentCollector, 0, len(p.collectors))
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, collector := range p.collectors {
+		collectors = append(collectors, collector)
+	}
+	return collectors
+}
+
 func (p *approvalProcessingCore) getCollector(resultID flow.Identifier) *AssignmentCollector {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	return p.collectors[resultID]
 }
 
-func (p *approvalProcessingCore) createCollector(resultID flow.Identifier) *AssignmentCollector {
+func (p *approvalProcessingCore) createCollector(result *flow.ExecutionResult) (*AssignmentCollector, error) {
+	resultID := result.ID()
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	collector := NewAssignmentCollector(resultID, p.state, p.assigner, p.seals, p.verifier,
-		p.approvalConduit, p.requestTracker, p.getCachedBlockHeight, p.requiredApprovalsForSealConstruction)
+	collector, err := NewAssignmentCollector(result, p.state, p.assigner, p.seals, p.verifier, p.approvalConduit,
+		p.requestTracker, p.getCachedBlockHeight, p.requiredApprovalsForSealConstruction)
+	if err != nil {
+		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
+	}
 	p.collectors[resultID] = collector
-	return collector
+	return collector, nil
 }
 
 func (p *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {
@@ -262,11 +300,4 @@ func (p *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {
 	for _, resultID := range resultIDs {
 		delete(p.collectors, resultID)
 	}
-}
-
-func (p *approvalProcessingCore) getOrCreateCollector(resultID flow.Identifier) *AssignmentCollector {
-	if collector := p.getCollector(resultID); collector != nil {
-		return collector
-	}
-	return p.createCollector(resultID)
 }

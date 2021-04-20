@@ -28,7 +28,9 @@ type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
 // AssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
 // AssignmentCollector is responsible for validating approvals on result-level(checking signature, identity).
 type AssignmentCollector struct {
-	ResultID                             flow.Identifier
+	ResultID                             flow.Identifier                        // ID of execution result
+	BlockID                              flow.Identifier                        // ID of block targeted by execution result
+	BlockHeight                          uint64                                 // height of block targeted by execution result
 	collectors                           map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
 	authorizedApprovers                  map[flow.Identifier]*flow.Identity     // map of approvers pre-selected at block that is being sealed
 	lock                                 sync.RWMutex                           // lock for protecting collectors map
@@ -44,11 +46,18 @@ type AssignmentCollector struct {
 	getCachedBlockHeight GetCachedBlockHeight    // functor to get cached block height
 }
 
-func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, getCachedBlockHeight GetCachedBlockHeight, requiredApprovalsForSealConstruction uint) *AssignmentCollector {
+func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, getCachedBlockHeight GetCachedBlockHeight, requiredApprovalsForSealConstruction uint) (*AssignmentCollector, error) {
+	blockHeight, err := getCachedBlockHeight(result.BlockID)
+	if err != nil {
+		return nil, err
+	}
+
 	collector := &AssignmentCollector{
 		verifiedApprovalsCache:               NewApprovalsCache(1000),
-		ResultID:                             resultID,
+		ResultID:                             result.ID(),
+		BlockID:                              result.BlockID,
+		BlockHeight:                          blockHeight,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
 		state:                                state,
 		assigner:                             assigner,
@@ -59,7 +68,7 @@ func NewAssignmentCollector(resultID flow.Identifier, state protocol.State, assi
 		getCachedBlockHeight:                 getCachedBlockHeight,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
-	return collector
+	return collector, nil
 }
 
 func (c *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
