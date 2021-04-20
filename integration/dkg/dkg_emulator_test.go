@@ -62,9 +62,9 @@ func (s *DKGSuite) TestHappyPath() {
 
 	// submit a lot of dummy transactions to force the creation of blocks
 	for i := 0; i < 300; i++ {
+		time.Sleep(200 * time.Millisecond)
 		// deliver private messages
 		s.hub.DeliverAll()
-
 		// submit a tx to force the emulator to create and finalize a block
 		createAccountTx := templates.CreateAccount(
 			[]*sdk.AccountKey{test.AccountKeyGenerator().New()},
@@ -80,12 +80,12 @@ func (s *DKGSuite) TestHappyPath() {
 			[]sdk.Address{s.blockchain.ServiceKey().Address},
 			[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
 		)
+		time.Sleep(200 * time.Millisecond)
 		if err == nil {
 			for _, node := range s.nodes {
 				node.ProtocolEvents.BlockFinalized(block.Header)
 			}
 		}
-		time.Sleep(200 * time.Millisecond)
 	}
 
 	for _, n := range s.nodes {

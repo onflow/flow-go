@@ -1,9 +1,11 @@
 package dkg
 
 import (
+	"os"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -58,7 +60,7 @@ func createNode(
 	firstBlock flow.Identifier) *node {
 
 	core := testutil.GenericNode(t, hub, id, ids, chainID)
-	// core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
+	core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
 	// the viewsObserver is used by the reactor engine to subscribe to when
 	// blocks are finalized that are in a new view
