@@ -3,6 +3,7 @@ package dkg
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -55,8 +56,7 @@ func (s *ClientSuite) SetupTest() {
 	// deploy contract
 	s.deployDKGContract()
 
-	// Note: using DKG address as DKG participant to avoid funding a new account key
-	s.contractClient = NewClient(s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
+	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
 
 	s.setUpAdmin()
 }
