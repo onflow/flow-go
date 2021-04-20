@@ -119,6 +119,7 @@ func (s *DKGSuite) deployDKGContract() {
 	s.dkgSigner = dkgAccountSigner
 
 	s.adminDKGContractClient = dkg.NewClient(
+		zerolog.Nop(),
 		s.adminEmulatorClient,
 		s.dkgSigner,
 		s.dkgAddress.String(),
@@ -239,6 +240,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 func (s *DKGSuite) createNode(account *nodeAccount) *node {
 	emulatorClient := emulatormod.NewEmulatorClient(s.blockchain)
 	contractClient := dkg.NewClient(
+		zerolog.Nop(),
 		emulatorClient,
 		account.accountSigner,
 		s.dkgAddress.String(),

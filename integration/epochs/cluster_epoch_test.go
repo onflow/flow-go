@@ -228,7 +228,7 @@ func (s *Suite) SignAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address
 	}
 
 	// submit transaction
-	err := s.emulatorClient.Submit(tx)
+	_, err := s.emulatorClient.Submit(tx)
 	require.NoError(s.T(), err)
 }
 
