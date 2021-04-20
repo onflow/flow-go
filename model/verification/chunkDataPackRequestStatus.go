@@ -13,6 +13,7 @@ type ChunkRequestStatus struct {
 	*ChunkDataPackRequest
 	Targets     flow.IdentityList
 	LastAttempt time.Time
+	RetryAfter  time.Duration
 	Attempt     int
 }
 
