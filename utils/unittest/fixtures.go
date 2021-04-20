@@ -203,8 +203,8 @@ func WithAllTheFixins(payload *flow.Payload) {
 	payload.Guarantees = CollectionGuaranteesFixture(4)
 	for i := 0; i < 10; i++ {
 		receipt := ExecutionReceiptFixture()
-		payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
-		payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
+		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
 }
 

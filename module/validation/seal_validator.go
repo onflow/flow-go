@@ -144,7 +144,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// collect IDs of blocks on the fork (from parent to last sealed)
 	var blockIDs []flow.Identifier
 
-	resultsById := candidate.Payload.ResultsById()
+	resultsById := candidate.Payload.Results.Lookup()
 	fetchResult := func(resultID flow.Identifier) *flow.ExecutionResult {
 		res, ok := resultsById[resultID]
 		if !ok {
