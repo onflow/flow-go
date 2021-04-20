@@ -737,10 +737,6 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 
 		require.Equal(t, *expectedRequest, *actualRequest)
 
-		// actualExecutors, ok := args[1].(flow.IdentityList)
-		// require.True(t, ok)
-		// require.ElementsMatchf(t, allExecutors, actualExecutors, "execution nodes lists do not match")
-
 		go func() {
 			cdp, ok := chunkDataPacks[actualRequest.ChunkID]
 			require.True(t, ok)
