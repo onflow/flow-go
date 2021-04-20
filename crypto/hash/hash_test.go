@@ -2,10 +2,13 @@ package hash
 
 import (
 	"encoding/hex"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/sha3"
 )
 
 // Sanity checks of SHA3_256
@@ -13,7 +16,7 @@ func TestSha3_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
-	alg := NewSHA3_256()
+	alg := NewSHA3_256_opt()
 	hash := alg.ComputeHash(input)
 	assert.Equal(t, Hash(expected), hash)
 
@@ -30,7 +33,7 @@ func TestSha3_384(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("e516dabb23b6e30026863543282780a3ae0dccf05551cf0295178d7ff0f1b41eecb9db3ff219007c4e097260d58621bd")
 
-	alg := NewSHA3_384()
+	alg := NewSHA3_384_opt()
 	hash := alg.ComputeHash(input)
 	assert.Equal(t, Hash(expected), hash)
 
@@ -76,6 +79,7 @@ func TestSha2_384(t *testing.T) {
 	assert.Equal(t, Hash(expected), hash)
 }
 
+/*
 // SHA3_256 bench
 func BenchmarkSha3_256(b *testing.B) {
 	a := []byte("Bench me!")
@@ -116,6 +120,26 @@ func BenchmarkSha2_384(b *testing.B) {
 	}
 	return
 }
+
+// SHA2_256 bench
+func BenchmarkSha3_256_opt(b *testing.B) {
+	a := []byte("Bench me!")
+	alg := NewSHA3_256_opt()
+	for i := 0; i < b.N; i++ {
+		alg.ComputeHash(a)
+	}
+	return
+}
+
+// SHA2_384 bench
+func BenchmarkSha3_384_opt(b *testing.B) {
+	a := []byte("Bench me!")
+	alg := NewSHA3_384_opt()
+	for i := 0; i < b.N; i++ {
+		alg.ComputeHash(a)
+	}
+	return
+}*/
 
 // Sanity checks of cSHAKE-128
 // the test vector is taken from the NIST document
@@ -197,4 +221,77 @@ func TestHashersAPI(t *testing.T) {
 		hash = h.SumHash()
 		assert.Equal(t, expectedHash, hash)
 	}
+}
+
+func TestSha3(t *testing.T) {
+	r := time.Now().UnixNano()
+	rand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+
+	t.Run("SHA3_256", func(t *testing.T) {
+		for i := 0; i < 5000; i++ {
+			value := make([]byte, i)
+			rand.Read(value)
+			expected := sha3.Sum256(value)
+
+			hasher := NewSHA3_256_opt()
+			h := hasher.ComputeHash(value)
+			assert.Equal(t, expected[:], []byte(h))
+		}
+	})
+
+	t.Run("SHA3_384", func(t *testing.T) {
+		for i := 0; i < 5000; i++ {
+			value := make([]byte, i)
+			rand.Read(value)
+			expected := sha3.Sum384(value)
+
+			hasher := NewSHA3_384_opt()
+			h := hasher.ComputeHash(value)
+			assert.Equal(t, expected[:], []byte(h))
+		}
+	})
+}
+
+func BenchmarkSha3(b *testing.B) {
+
+	m := make([]byte, 64)
+	rand.Read(m)
+
+	b.Run("SHA3_256", func(b *testing.B) {
+		alg := NewSHA3_256()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA3_384", func(b *testing.B) {
+		alg := NewSHA3_384()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA3_256_opt", func(b *testing.B) {
+		alg := NewSHA3_256_opt()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			//_ = alg.ComputeHash(m)
+			alg.Reset()
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA3_384_opt", func(b *testing.B) {
+		alg := NewSHA3_384_opt()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
 }

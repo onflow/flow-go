@@ -9,9 +9,8 @@ import (
 
 // implements the interface sha3.ShakeHash
 type kmac128 struct {
-	// Common hasher
-	// includes the output size of KMAC
-	*commonHasher
+	// the output size of KMAC
+	outputSize int
 	// embeds ShakeHash
 	// stores the encoding of the function name and customization string
 	// Using the io.Writer interface changes the internal state
@@ -43,9 +42,7 @@ func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) 
 			fmt.Errorf("kmac key size must be at least %d", KmacMinKeyLen)
 	}
 
-	k.commonHasher = &commonHasher{
-		algo:       KMAC128,
-		outputSize: outputSize}
+	k.outputSize = outputSize
 	// initialize the cSHAKE128 instance
 	k.ShakeHash = sha3.NewCShake128([]byte("KMAC"), customizer)
 
@@ -53,6 +50,10 @@ func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) 
 	k.initBlock = bytepad(encodeString(key), cSHAKE128BlockSize)
 	_, _ = k.Write(k.initBlock)
 	return &k, nil
+}
+
+func (k *kmac128) Algorithm() HashingAlgorithm {
+	return KMAC128
 }
 
 const maxEncodeLen = 9

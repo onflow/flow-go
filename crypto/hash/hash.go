@@ -42,28 +42,3 @@ type Hasher interface {
 	// Reset resets the hash state
 	Reset()
 }
-
-// commonHasher holds the common data for all hashers
-type commonHasher struct {
-	algo       HashingAlgorithm
-	outputSize int
-}
-
-func (a *commonHasher) Algorithm() HashingAlgorithm {
-	return a.algo
-}
-
-func BytesToHash(b []byte) Hash {
-	h := make([]byte, len(b))
-	copy(h, b)
-	return h
-}
-
-// HashesToBytes converts a slice of hashes to a slice of byte slices.
-func HashesToBytes(hashes []Hash) [][]byte {
-	b := make([][]byte, len(hashes))
-	for i, h := range hashes {
-		b[i] = h
-	}
-	return b
-}
