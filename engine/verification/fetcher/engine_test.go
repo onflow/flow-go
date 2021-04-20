@@ -133,14 +133,14 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
 	mockPendingChunksByID(s.pendingChunks, statuses)
-	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
+	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees.NodeIDs(), disagrees.NodeIDs())
+	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees, disagrees)
 	chunkDataPacks, collections, verifiableChunks := verifiableChunkFixture(statuses.Chunks(), block, result)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
-	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agrees, func(originID flow.Identifier,
+	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
 
@@ -225,16 +225,16 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
-	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
+	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees.NodeIDs(), disagrees.NodeIDs())
+	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees, disagrees)
 	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	// as the response it receives a notification that chunk belongs to a sealed block.
 	// we mock this as the block is getting sealed after request dispatch.
-	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, agrees, func(originID flow.Identifier,
+	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
 		e.NotifyChunkDataPackSealed(cdp.ChunkID)
@@ -720,12 +720,12 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 	requests map[flow.Identifier]*verification.ChunkDataPackRequest,
 	chunkDataPacks map[flow.Identifier]*flow.ChunkDataPack,
 	collections map[flow.Identifier]*flow.Collection,
-	allExecutors flow.IdentityList, handler func(flow.Identifier, *flow.ChunkDataPack, *flow.Collection)) *sync.WaitGroup {
+	handler func(flow.Identifier, *flow.ChunkDataPack, *flow.Collection)) *sync.WaitGroup {
 
 	mu := sync.Mutex{}
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
-	requester.On("Request", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	requester.On("Request", mock.Anything).Run(func(args mock.Arguments) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -737,9 +737,9 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 
 		require.Equal(t, *expectedRequest, *actualRequest)
 
-		actualExecutors, ok := args[1].(flow.IdentityList)
-		require.True(t, ok)
-		require.ElementsMatchf(t, allExecutors, actualExecutors, "execution nodes lists do not match")
+		// actualExecutors, ok := args[1].(flow.IdentityList)
+		// require.True(t, ok)
+		// require.ElementsMatchf(t, allExecutors, actualExecutors, "execution nodes lists do not match")
 
 		go func() {
 			cdp, ok := chunkDataPacks[actualRequest.ChunkID]
@@ -803,15 +803,16 @@ func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *fl
 // same block height.
 // Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
 // with the execution result that chunks belong to, respectively.
-func chunkRequestFixture(chunks flow.ChunkList, height uint64, agrees flow.IdentifierList, disagrees flow.IdentifierList) map[flow.Identifier]*verification.ChunkDataPackRequest {
+func chunkRequestFixture(chunks flow.ChunkList, height uint64, agrees flow.IdentityList, disagrees flow.IdentityList) map[flow.Identifier]*verification.ChunkDataPackRequest {
 
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	for _, chunk := range chunks {
 		requests[chunk.ID()] = &verification.ChunkDataPackRequest{
 			ChunkID:   chunk.ID(),
 			Height:    height,
-			Agrees:    agrees,
-			Disagrees: disagrees,
+			Agrees:    agrees.NodeIDs(),
+			Disagrees: disagrees.NodeIDs(),
+			Targets:   agrees.Union(disagrees),
 		}
 	}
 

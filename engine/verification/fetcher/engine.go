@@ -359,19 +359,20 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 		return fmt.Errorf("could not get header for block: %x", blockID)
 	}
 
-	request := &verification.ChunkDataPackRequest{
-		ChunkID:   chunkID,
-		Height:    header.Height,
-		Agrees:    agrees,
-		Disagrees: disagrees,
-	}
-
 	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not fetch execution node ids at block: %x", blockID)
 	}
 
-	e.requester.Request(request, allExecutors)
+	request := &verification.ChunkDataPackRequest{
+		ChunkID:   chunkID,
+		Height:    header.Height,
+		Agrees:    agrees,
+		Disagrees: disagrees,
+		Targets:   allExecutors,
+	}
+
+	e.requester.Request(request)
 	return nil
 }
 
