@@ -225,47 +225,47 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	<-e.Done()
 }
 
+// TestRequestPendingChunkSealedBlock_Hybrid evaluates the situation that requester has some pending chunk requests belonging to sealed blocks
+// (i.e., sealed chunks), and some pending chunk requests belonging to unsealed blocks (i.e., unsealed chunks).
 //
-//// TestRequestPendingChunkSealedBlock_Hybrid evaluates the situation that requester has some pending chunk requests belonging to sealed blocks
-//// (i.e., sealed chunks), and some pending chunk requests belonging to unsealed blocks (i.e., unsealed chunks).
-////
-//// On timer, the requester should submit pending requests for unsealed chunks to the network, while dropping the requests for the
-//// sealed chunks, and notify the handler.
-//func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
-//	s := setupTest()
-//	e := newRequesterEngine(t, s)
-//
-//	sealedHeight := uint64(10)
-//	// creates a single chunk request status that belongs to a sealed height.
-//	aggrees := unittest.IdentifierListFixture(2)
-//	disaggrees := unittest.IdentifierListFixture(3)
-//	sealedStatus := unittest.ChunkRequestStatusListFixture(2,
-//		unittest.WithHeight(sealedHeight-1),
-//		unittest.WithAgrees(aggrees),
-//		unittest.WithDisagrees(disaggrees))
-//	unsealedStatus := unittest.ChunkRequestStatusListFixture(3,
-//		unittest.WithHeightGreaterThan(sealedHeight),
-//		unittest.WithAgrees(aggrees),
-//		unittest.WithDisagrees(disaggrees))
-//	status := append(sealedStatus, unsealedStatus...)
-//
-//	test.MockLastSealedHeight(s.state, sealedHeight)
-//	s.pendingRequests.On("All").Return(status)
-//	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
-//
-//	<-e.Ready()
-//
-//	// sealed requests should be removed and the handler should be notified.
-//	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(sealedStatus))
-//	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(sealedStatus))
-//	// unsealed requests should be submitted to the network once
-//	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedStatus, 1, func(*messages.ChunkDataRequest) {})
-//
-//	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
-//	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
-//	<-e.Done()
-//}
-//
+// On timer, the requester should submit pending requests for unsealed chunks to the network, while dropping the requests for the
+// sealed chunks, and notify the handler.
+func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	sealedHeight := uint64(10)
+	// creates 2 chunk data packs that belong to a sealed height, and
+	// 3 that belong to an unsealed height.
+	aggrees := unittest.IdentifierListFixture(2)
+	disaggrees := unittest.IdentifierListFixture(3)
+	sealedRequests := unittest.ChunkDataPackRequestListFixture(2,
+		unittest.WithHeight(sealedHeight-1),
+		unittest.WithAgrees(aggrees),
+		unittest.WithDisagrees(disaggrees))
+	unsealedRequests := unittest.ChunkDataPackRequestListFixture(3,
+		unittest.WithHeightGreaterThan(sealedHeight),
+		unittest.WithAgrees(aggrees),
+		unittest.WithDisagrees(disaggrees))
+	requests := append(sealedRequests, unsealedRequests...)
+
+	test.MockLastSealedHeight(s.state, sealedHeight)
+	s.pendingRequests.On("All").Return(requests)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
+
+	<-e.Ready()
+
+	// sealed requests should be removed and the handler should be notified.
+	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(sealedRequests))
+	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(sealedRequests))
+	// unsealed requests should be submitted to the network once
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
+
+	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
+	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
+	<-e.Done()
+}
+
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
 // The chunk belongs to a non-sealed block.
 // On timer interval, the chunk requests should be dispatched to the set of execution nodes agree with the execution
