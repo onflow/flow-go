@@ -376,13 +376,10 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 // The agree set contains the executors who made receipt with the same result as the given result id.
 // The disagree set contains the executors who made receipt with different result than the given result id.
 func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID flow.Identifier) (flow.IdentifierList, flow.IdentifierList, error) {
-	receiptsData, err := e.receipts.ByBlockID(blockID)
+	receipts, err := e.receipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
 	}
-
-	receipts := make([]*flow.ExecutionReceipt, len(receiptsData))
-	copy(receipts, receiptsData)
 
 	agrees, disagrees := executorsOf(receipts, resultID)
 	return agrees, disagrees, nil
