@@ -1,11 +1,12 @@
 package approvals
 
 import (
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog/log"
 )
 
 // IncorporatedResultSeals implements the incorporated result seals memory pool
