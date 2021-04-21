@@ -212,7 +212,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	lg = lg.With().
-		Hex("result_id", logging.ID(result.ID())).
+		Hex("result_id", logging.ID(status.ExecutionResultID)).
 		Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
 
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
