@@ -1096,35 +1096,44 @@ func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
 	return status
 }
 
-// ChunkRequestStatusListFixture creates and returns a list of chunk request status fixtures.
-func ChunkRequestStatusListFixture(n int, opts ...func(*verification.ChunkRequestStatus)) []*verification.ChunkRequestStatus {
-	lst := make([]*verification.ChunkRequestStatus, 0, n)
+//// ChunkRequestStatusListFixture creates and returns a list of chunk request status fixtures.
+//func ChunkRequestStatusListFixture(n int, opts ...func(*verification.ChunkRequestStatus)) []*verification.ChunkRequestStatus {
+//	lst := make([]*verification.ChunkRequestStatus, 0, n)
+//	for i := 0; i < n; i++ {
+//		lst = append(lst, ChunkRequestStatusFixture(ChunkDataPackRequestFixture(IdentifierFixture()), opts...))
+//	}
+//	return lst
+//}
+
+// ChunkDataPackRequestListFixture creates and returns a list of chunk data pack requests fixtures.
+func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
+	lst := make([]*verification.ChunkDataPackRequest, 0, n)
 	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkRequestStatusFixture(ChunkDataPackRequestFixture(IdentifierFixture()), opts...))
+		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
 	}
 	return lst
 }
 
-func WithHeight(height uint64) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
+func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
 		request.Height = height
 	}
 }
 
-func WithHeightGreaterThan(height uint64) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
+func WithHeightGreaterThan(height uint64) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
 		request.Height = rand.Uint64() + height + 1
 	}
 }
 
-func WithAgrees(list flow.IdentifierList) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
+func WithAgrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
 		request.Agrees = list
 	}
 }
 
-func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
+func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
 		request.Disagrees = list
 	}
 }
