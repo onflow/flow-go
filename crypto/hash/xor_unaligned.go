@@ -19,7 +19,7 @@ func (b *storageBuf) asBytes() *[maxRate]byte {
 
 // xorInUnaligned uses unaligned reads and writes to update d.a to contain d.a
 // XOR buf.
-func xorInUnaligned(d *state, buf []byte) {
+func xorInUnaligned(d *sha3State, buf []byte) {
 	n := len(buf)
 	bw := (*[maxRate / 8]uint64)(unsafe.Pointer(&buf[0]))[: n/8 : n/8]
 	if n >= 72 {
@@ -55,7 +55,7 @@ func xorInUnaligned(d *state, buf []byte) {
 	}
 }
 
-func copyOutUnaligned(d *state, buf []byte) {
+func copyOutUnaligned(buf []byte, d *sha3State) {
 	ab := (*[maxRate]uint8)(unsafe.Pointer(&d.a[0]))
 	copy(buf, ab[:])
 }
