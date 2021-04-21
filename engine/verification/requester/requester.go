@@ -160,10 +160,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
-	status := &verification.ChunkRequestStatus{
-		ChunkDataPackRequest: request,
-	}
-	added := e.pendingRequests.Add(status)
+	added := e.pendingRequests.Add(request)
 	e.log.Info().
 		Hex("chunk_id", logging.ID(request.ChunkID)).
 		Uint64("block_height", request.Height).
@@ -230,7 +227,7 @@ func (e Engine) blockIsSealed(height uint64) (bool, error) {
 }
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
-func (e *Engine) requestChunkDataPack(status *verification.ChunkRequestStatus) error {
+func (e *Engine) requestChunkDataPack(status *verification.ChunkDataPackRequest) error {
 	req := &messages.ChunkDataRequest{
 		ChunkID: status.ChunkID,
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
