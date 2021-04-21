@@ -1143,6 +1143,7 @@ func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackReq
 // Use options to customize the request.
 func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.
 	ChunkDataPackRequest {
+
 	req := &verification.ChunkDataPackRequest{
 		ChunkID:   chunkID,
 		Height:    0,
@@ -1153,6 +1154,18 @@ func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verifica
 	for _, opt := range opts {
 		opt(req)
 	}
+
+	// creates identity fixtures for target ids as union of agrees and disagrees
+	// TODO: remove this inner fixture once we have filter for identifier list.
+	targets := flow.IdentityList{}
+	for _, id := range req.Agrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	}
+	for _, id := range req.Disagrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	}
+
+	req.Targets = targets
 
 	return req
 }
