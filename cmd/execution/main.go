@@ -90,7 +90,7 @@ func main() {
 		extensiveLog                bool
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 		diskWAL                     *wal.DiskWAL
-		scriptLogThreshold    time.Duration
+		scriptLogThreshold          time.Duration
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -235,6 +235,7 @@ func main() {
 				vmCtx,
 				cadenceExecutionCache,
 				committer,
+				scriptLogThreshold,
 			)
 			if err != nil {
 				return nil, err
@@ -328,7 +329,6 @@ func main() {
 				syncThreshold,
 				syncFast,
 				checkStakedAtBlock,
-				scriptLogThreshold,
 			)
 
 			// TODO: we should solve these mutual dependencies better
