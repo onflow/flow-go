@@ -7,10 +7,11 @@ import (
 
 // ChunkRequests is an in-memory storage for maintaining chunk data pack requests.
 type ChunkRequests interface {
-	// ByID returns a chunk request by its chunk ID.
+	// ByID returns a chunk request by its chunk ID as well as the attempt field of its underlying
+	// chunk request status.
 	// There is a one-to-one correspondence between the chunk requests in memory, and
 	// their chunk ID.
-	ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool)
+	ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, int, bool)
 
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate chunk request with the same

@@ -31,23 +31,24 @@ func chunkRequestStatus(entity flow.Entity) *verification.ChunkRequestStatus {
 	return chunk
 }
 
-// ByID returns a chunk request by its chunk ID.
+// ByID returns a chunk request by its chunk ID as well as the attempt field of its underlying
+// chunk request status.
 // There is a one-to-one correspondence between the chunk requests in memory, and
 // their chunk ID.
-func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
+func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, int, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
-		return nil, false
+		return nil, -1, false
 	}
 	request := chunkRequestStatus(entity)
-	return request.ChunkDataPackRequest, true
+	return request.ChunkDataPackRequest, request.Attempt, true
 }
 
 // Add provides insertion functionality into the memory pool.
 // The insertion is only successful if there is no duplicate chunk request with the same
 // chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
-	status := verification.ChunkRequestStatus{
+	status := &verification.ChunkRequestStatus{
 		ChunkDataPackRequest: request,
 	}
 	return cs.Backend.Add(status)
