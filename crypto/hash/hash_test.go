@@ -305,7 +305,7 @@ func BenchmarkSha3(b *testing.B) {
 		alg := NewSHA3_256_opt()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_ = alg.ComputeHash(m)
+			alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})

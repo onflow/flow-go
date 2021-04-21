@@ -100,6 +100,7 @@ func (s *sha3State) Algorithm() HashingAlgorithm {
 // ComputeHash calculates and returns the SHA3-256 output of input byte array.
 // It does not reset the state to allow further writing.
 func (s *sha3State) ComputeHash(data []byte) Hash {
+	s.Reset()
 	_, _ = s.Write(data)
 	return s.sum()
 }
@@ -142,6 +143,9 @@ type sha3State struct {
 // the byte buffer, and setting Sponge.state to absorbing.
 func (d *sha3State) Reset() {
 	// Zero the permutation's state.
+	for i := range d.a {
+		d.a[i] = 0
+	}
 	d.buf = d.storage.asBytes()[:0]
 }
 
