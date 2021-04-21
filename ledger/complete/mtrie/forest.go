@@ -67,9 +67,8 @@ func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted f
 		metrics:        metrics,
 	}
 
-	// add empty roothash
+	// add trie with no allocated registers
 	emptyTrie := trie.NewEmptyMTrie()
-
 	err = forest.AddTrie(emptyTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
@@ -96,15 +95,15 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	// TODO: We could take out the following de-duplication logic
 	//       Which increases the cost for duplicates but reduces read complexity without duplicates.
 	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
-	pathOrgIndex := make(map[string][]int)
+	pathOrgIndex := make(map[ledger.Path][]int)
 	for i, path := range r.Paths {
 		// only collect duplicated keys once
-		indices, ok := pathOrgIndex[string(path[:])]
+		indices, ok := pathOrgIndex[path]
 		if !ok { // deduplication here is optional
 			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		// append the index
-		pathOrgIndex[string(path[:])] = append(indices, i)
+		pathOrgIndex[path] = append(indices, i)
 	}
 
 	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
@@ -114,7 +113,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	totalPayloadSize := 0
 	for i, p := range deduplicatedPaths {
 		payload := payloads[i]
-		indices := pathOrgIndex[string(p[:])]
+		indices := pathOrgIndex[p]
 		for _, j := range indices {
 			orderedPayloads[j] = payload.DeepCopy()
 		}
@@ -145,17 +144,17 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	// Generally, we expect the VM to deduplicate reads and writes.
 	deduplicatedPaths := make([]ledger.Path, 0, len(u.Paths))
 	deduplicatedPayloads := make([]ledger.Payload, 0, len(u.Paths))
-	payloadMap := make(map[string]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
+	payloadMap := make(map[ledger.Path]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
 	totalPayloadSize := 0
 	for i, path := range u.Paths {
 		payload := u.Payloads[i]
 		// check if we already have encountered an update for the respective register
-		if idx, ok := payloadMap[string(path[:])]; ok {
+		if idx, ok := payloadMap[path]; ok {
 			oldPayload := deduplicatedPayloads[idx]
 			deduplicatedPayloads[idx] = *payload
 			totalPayloadSize += -oldPayload.Size() + payload.Size()
 		} else {
-			payloadMap[string(path[:])] = len(deduplicatedPaths)
+			payloadMap[path] = len(deduplicatedPaths)
 			deduplicatedPaths = append(deduplicatedPaths, path)
 			deduplicatedPayloads = append(deduplicatedPayloads, *u.Payloads[i])
 			totalPayloadSize += payload.Size()
@@ -200,12 +199,12 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	deduplicatedPaths := make([]ledger.Path, 0)
 	notFoundPaths := make([]ledger.Path, 0)
 	notFoundPayloads := make([]ledger.Payload, 0)
-	pathOrgIndex := make(map[string][]int)
+	pathOrgIndex := make(map[ledger.Path][]int)
 	for i, path := range r.Paths {
 		// only collect duplicated keys once
-		if _, ok := pathOrgIndex[string(path[:])]; !ok {
+		if _, ok := pathOrgIndex[path]; !ok {
 			deduplicatedPaths = append(deduplicatedPaths, path)
-			pathOrgIndex[string(path[:])] = []int{i}
+			pathOrgIndex[path] = []int{i}
 
 			// add it only once if is empty
 			if retPayloads[i].IsEmpty() {
@@ -214,7 +213,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 			}
 		} else {
 			// handles duplicated keys
-			pathOrgIndex[string(path[:])] = append(pathOrgIndex[string(path[:])], i)
+			pathOrgIndex[path] = append(pathOrgIndex[path], i)
 		}
 	}
 
@@ -249,7 +248,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	// reconstruct the proofs in the same key order that called the method
 	retbp := ledger.NewTrieBatchProofWithEmptyProofs(len(r.Paths))
 	for i, p := range deduplicatedPaths {
-		for _, j := range pathOrgIndex[string(p[:])] {
+		for _, j := range pathOrgIndex[p] {
 			retbp.Proofs[j] = bp.Proofs[i]
 		}
 	}
