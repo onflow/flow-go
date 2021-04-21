@@ -157,7 +157,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		return
 	}
 
-	err = e.requestChunkDataPack(chunk.ID(), locator.ResultID, chunk.BlockID)
+	err = e.requestChunkDataPack(chunkID, locator.ResultID, chunk.BlockID)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not request chunk data pack")
 		return
