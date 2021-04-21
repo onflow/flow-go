@@ -77,11 +77,6 @@ func NewNode(height int,
 	return n
 }
 
-// NewEmptyTreeRoot creates a compact leaf Node
-func NewEmptyTreeRoot() *Node {
-	return nil
-}
-
 // NewLeaf creates a compact leaf Node.
 // UNCHECKED requirement: height must be non-negative
 func NewLeaf(path ledger.Path,

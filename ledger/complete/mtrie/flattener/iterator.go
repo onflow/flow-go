@@ -66,7 +66,7 @@ type NodeIterator struct {
 // When re-building the Trie from the sequence of nodes, one can build the trie on the fly,
 // as for each node, the children have been previously encountered.
 func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
-	// for a Trie with k := mTrie.KeyLength() [bytes], the longest possible path can contain at most 8k+1 vertices
+	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
 	stackSize := hash.TreeMaxHeight + 1
 	i := &NodeIterator{
 		stack: make([]*node.Node, 0, stackSize),

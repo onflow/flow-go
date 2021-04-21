@@ -3,7 +3,6 @@ package trie
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -37,17 +36,15 @@ type MTrie struct {
 	root *node.Node
 }
 
-// NewEmptyMTrie returns an empty Mtrie (root is an empty node)
+// NewEmptyMTrie returns an empty Mtrie (root is nil)
 func NewEmptyMTrie() *MTrie {
-	return &MTrie{
-		root: node.NewEmptyTreeRoot(),
-	}
+	return &MTrie{root: nil}
 }
 
 // NewMTrie returns a Mtrie given the root
 func NewMTrie(root *node.Node) (*MTrie, error) {
-	if root.Height()%8 != 0 {
-		return nil, errors.New("height of root node must be integer-multiple of 8")
+	if root.Height() != hash.TreeMaxHeight {
+		return nil, fmt.Errorf("height of root node must be %d but is %d", hash.TreeMaxHeight, root.Height())
 	}
 	return &MTrie{
 		root: root,
