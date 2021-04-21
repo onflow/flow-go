@@ -23,6 +23,8 @@ func (c ChunkDataPackRequest) Checksum() flow.Identifier {
 	return c.ChunkID
 }
 
+type ChunkDataPackRequestList []*ChunkDataPackRequest
+
 // SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
 // the agree and disagree execution nodes of the chunk data pack request.
 func (c ChunkDataPackRequest) SampleTargets(count int) flow.IdentifierList {
