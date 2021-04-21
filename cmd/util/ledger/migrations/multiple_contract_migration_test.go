@@ -555,6 +555,8 @@ import ITest from %s
 
 	t.Run("contract object", func(t *testing.T) {
 
+		t.Skip("this test assumes Cadence storage format pre-v4")
+
 		payload1 := ledger.Payload{
 			Key: ledger.Key{
 				KeyParts: []ledger.KeyPart{
