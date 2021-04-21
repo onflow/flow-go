@@ -227,17 +227,17 @@ func (e Engine) blockIsSealed(height uint64) (bool, error) {
 }
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
-func (e *Engine) requestChunkDataPack(status *verification.ChunkDataPackRequest) error {
+func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest) error {
 	req := &messages.ChunkDataRequest{
-		ChunkID: status.ChunkID,
+		ChunkID: request.ChunkID,
 		Nonce:   rand.Uint64(), // prevent the request from being deduplicated by the receiver
 	}
 
 	// publishes the chunk data request to the network
-	targetIDs := status.SampleTargets(int(e.requestTargets))
+	targetIDs := request.SampleTargets(int(e.requestTargets))
 	err := e.con.Publish(req, targetIDs...)
 	if err != nil {
-		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", status.ChunkID, err)
+		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", request.ChunkID, err)
 	}
 
 	return nil
