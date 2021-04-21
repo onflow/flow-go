@@ -3,6 +3,7 @@ package fifoqueue
 import (
 	"fmt"
 	mathbits "math/bits"
+	"sync"
 
 	"github.com/ef-ds/deque"
 
@@ -23,6 +24,7 @@ import (
 // * The queue is NOT concurrency safe.
 // * the QueueLengthObserver must be non-blocking
 type FifoQueue struct {
+	mu             sync.RWMutex
 	queue          deque.Deque
 	maxCapacity    int
 	lengthObserver QueueLengthObserver
@@ -86,6 +88,8 @@ func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
 // Push appends the given value to the tail of the queue.
 // If queue capacity is reached, the message is silently dropped.
 func (q *FifoQueue) Push(element interface{}) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	if q.queue.Len() < q.maxCapacity {
 		q.queue.PushBack(element)
 		q.lengthObserver(q.queue.Len())
@@ -94,14 +98,20 @@ func (q *FifoQueue) Push(element interface{}) {
 
 // Front peeks message at the head of the queue (without removing the head).
 func (q *FifoQueue) Front() (interface{}, bool) {
+	q.mu.RLock()
+	defer q.mu.RLock()
 	return q.queue.Front()
 }
 
 // Pop removes and returns the queue's head element.
 // If the queue is empty, (nil, false) is returned.
 func (q *FifoQueue) Pop() (interface{}, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
 	event, ok := q.queue.PopFront()
-	q.lengthObserver(q.queue.Len())
+	length := q.queue.Len()
+
+	q.lengthObserver(length)
 	if !ok {
 		return nil, false
 	}
@@ -110,6 +120,8 @@ func (q *FifoQueue) Pop() (interface{}, bool) {
 
 // Len returns the current length of the queue.
 func (q *FifoQueue) Len() int {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
 	return q.queue.Len()
 }
 

@@ -55,8 +55,6 @@ func NewEngine(
 	prov network.Engine,
 	core *Core) (*Engine, error) {
 
-	notify := make(chan struct{})
-
 	// FIFO queue for block proposals
 	pendingBlocks, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
@@ -76,9 +74,8 @@ func NewEngine(
 	}
 
 	// define message queueing behaviour
-	handler := engine.NewMessageHandler(
+	handler, notify := engine.NewMessageHandler(
 		log,
-		notify,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				switch msg.Payload.(type) {
@@ -104,17 +101,15 @@ func NewEngine(
 					return false
 				}
 			},
-			Map: []engine.MapFunc{
-				func(msg *engine.Message) *engine.Message {
-					syncedBlock := msg.Payload.(*events.SyncedBlock)
-					return &engine.Message{
-						OriginID: msg.OriginID,
-						Payload: &messages.BlockProposal{
-							Payload: syncedBlock.Block.Payload,
-							Header:  syncedBlock.Block.Header,
-						},
-					}
-				},
+			Map: func(msg *engine.Message) *engine.Message {
+				syncedBlock := msg.Payload.(*events.SyncedBlock)
+				return &engine.Message{
+					OriginID: msg.OriginID,
+					Payload: &messages.BlockProposal{
+						Payload: syncedBlock.Block.Payload,
+						Header:  syncedBlock.Block.Header,
+					},
+				}
 			},
 			OnStore: []engine.OnMessageFunc{
 				func(_ *engine.Message) {
