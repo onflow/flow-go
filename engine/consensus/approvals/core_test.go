@@ -31,6 +31,7 @@ func TestApprovalProcessingCore(t *testing.T) {
 type ApprovalProcessingCoreTestSuite struct {
 	BaseApprovalsTestSuite
 
+	blocks          map[flow.Identifier]*flow.Header
 	state           *protocol.State
 	assigner        *module.ChunkAssigner
 	sealsPL         *mempool.IncorporatedResultSeals
@@ -41,178 +42,219 @@ type ApprovalProcessingCoreTestSuite struct {
 	core            *approvalProcessingCore
 }
 
-func (c *ApprovalProcessingCoreTestSuite) SetupTest() {
-	c.BaseApprovalsTestSuite.SetupTest()
+func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
+	s.BaseApprovalsTestSuite.SetupTest()
 
-	c.sealsPL = &mempool.IncorporatedResultSeals{}
-	c.state = &protocol.State{}
-	c.assigner = &module.ChunkAssigner{}
-	c.sigVerifier = &module.Verifier{}
-	c.conduit = &mocknetwork.Conduit{}
+	s.sealsPL = &mempool.IncorporatedResultSeals{}
+	s.state = &protocol.State{}
+	s.assigner = &module.ChunkAssigner{}
+	s.sigVerifier = &module.Verifier{}
+	s.conduit = &mocknetwork.Conduit{}
 
-	c.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
-	c.identitiesCache[c.IncorporatedResult.Result.BlockID] = c.AuthorizedVerifiers
+	// setup blocks cache for protocol state
+	s.blocks = make(map[flow.Identifier]*flow.Header)
+	s.blocks[s.Block.ID()] = &s.Block
+	s.blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
 
-	c.assigner.On("Assign", mock.Anything, mock.Anything).Return(c.ChunksAssignment, nil)
+	// setup identities for each block
+	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
+	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
 
-	// define the protocol state snapshot for any block in `bc.Blocks`
-	c.state.On("AtBlockID", mock.Anything).Return(
+	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
+
+	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
-			if identities, found := c.identitiesCache[blockID]; found {
-				return unittest.StateSnapshotForKnownBlock(&c.Block, identities)
+			if block, found := s.blocks[blockID]; found {
+				return unittest.StateSnapshotForKnownBlock(block, s.identitiesCache[blockID])
 			} else {
 				return unittest.StateSnapshotForUnknownBlock()
 			}
 		},
 	)
-	c.payloads = &storage.Payloads{}
-	c.core = NewApprovalProcessingCore(c.payloads, c.state, c.assigner, c.sigVerifier, c.sealsPL, c.conduit, uint(len(c.AuthorizedVerifiers)))
+	s.payloads = &storage.Payloads{}
+	s.core = NewApprovalProcessingCore(s.payloads, s.state, s.assigner, s.sigVerifier, s.sealsPL, s.conduit,
+		uint(len(s.AuthorizedVerifiers)), false)
 }
 
 // TestOnBlockFinalized_RejectOutdatedApprovals tests that approvals will be rejected as outdated
 // for block that is already sealed
-func (c *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApprovals() {
-	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(c.VerID),
-		unittest.WithChunk(c.Chunks[0].Index),
-		unittest.WithBlockID(c.Block.ID()))
-	err := c.core.ProcessApproval(approval)
-	require.NoError(c.T(), err)
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApprovals() {
+	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(s.VerID),
+		unittest.WithChunk(s.Chunks[0].Index),
+		unittest.WithBlockID(s.Block.ID()))
+	err := s.core.ProcessApproval(approval)
+	require.NoError(s.T(), err)
 
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(c.Block.ID()),
-		unittest.Seal.WithResult(c.IncorporatedResult.Result))
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
+		unittest.Seal.WithResult(s.IncorporatedResult.Result))
 	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
 
-	c.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
+	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
 
-	c.core.OnFinalizedBlock(c.Block.ID())
+	s.core.OnFinalizedBlock(s.Block.ID())
 
-	err = c.core.ProcessApproval(approval)
-	require.Error(c.T(), err)
-	require.True(c.T(), engine.IsOutdatedInputError(err))
+	err = s.core.ProcessApproval(approval)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
 
 // TestOnBlockFinalized_RejectOutdatedExecutionResult tests that incorporated result will be rejected as outdated
 // if the block which is targeted by execution result is already sealed.
-func (c *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExecutionResult() {
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(c.Block.ID()),
-		unittest.Seal.WithResult(c.IncorporatedResult.Result))
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExecutionResult() {
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
+		unittest.Seal.WithResult(s.IncorporatedResult.Result))
 	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
 
-	c.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
+	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
 
-	c.core.OnFinalizedBlock(c.Block.ID())
+	s.core.OnFinalizedBlock(s.Block.ID())
 
-	err := c.core.ProcessIncorporatedResult(c.IncorporatedResult)
-	require.Error(c.T(), err)
-	require.True(c.T(), engine.IsOutdatedInputError(err))
+	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
 
 // TestOnBlockFinalized_RejectUnverifiableEntries tests that core will reject both execution results
 // and approvals for blocks that we have no information about.
-func (c *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectUnverifiableEntries() {
-	c.IncorporatedResult.Result.BlockID = unittest.IdentifierFixture() // replace blockID with random one
-	err := c.core.ProcessIncorporatedResult(c.IncorporatedResult)
-	require.Error(c.T(), err)
-	require.True(c.T(), engine.IsUnverifiableInputError(err))
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectUnverifiableEntries() {
+	s.IncorporatedResult.Result.BlockID = unittest.IdentifierFixture() // replace blockID with random one
+	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsUnverifiableInputError(err))
 
-	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(c.VerID),
-		unittest.WithChunk(c.Chunks[0].Index))
+	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(s.VerID),
+		unittest.WithChunk(s.Chunks[0].Index))
 
-	err = c.core.ProcessApproval(approval)
-	require.Error(c.T(), err)
-	require.True(c.T(), engine.IsUnverifiableInputError(err))
+	err = s.core.ProcessApproval(approval)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsUnverifiableInputError(err))
 }
 
 // TestProcessIncorporated_ApprovalsBeforeResult tests a scenario when first we have received approvals for unknown
 // execution result and after that we discovered execution result. In this scenario we should be able
 // to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
-func (c *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBeforeResult() {
-	c.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBeforeResult() {
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	for _, chunk := range c.Chunks {
-		for verID := range c.AuthorizedVerifiers {
+	for _, chunk := range s.Chunks {
+		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
 				unittest.WithApproverID(verID),
-				unittest.WithBlockID(c.Block.ID()),
-				unittest.WithExecutionResultID(c.IncorporatedResult.Result.ID()))
-			err := c.core.ProcessApproval(approval)
-			require.NoError(c.T(), err)
+				unittest.WithBlockID(s.Block.ID()),
+				unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+			err := s.core.ProcessApproval(approval)
+			require.NoError(s.T(), err)
 		}
 	}
 
-	c.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
-	err := c.core.ProcessIncorporatedResult(c.IncorporatedResult)
-	require.NoError(c.T(), err)
+	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
 
-	c.sealsPL.AssertCalled(c.T(), "Add", mock.Anything)
+	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
 }
 
 // TestProcessIncorporated_ApprovalsAfterResult tests a scenario when first we have discovered execution result
 //// and after that we started receiving approvals. In this scenario we should be able to create a seal right
 //// after processing last needed approval to meet `requiredApprovalsForSealConstruction` threshold.
-func (c *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfterResult() {
-	c.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfterResult() {
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	c.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
-	err := c.core.ProcessIncorporatedResult(c.IncorporatedResult)
-	require.NoError(c.T(), err)
+	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
 
-	for _, chunk := range c.Chunks {
-		for verID := range c.AuthorizedVerifiers {
+	for _, chunk := range s.Chunks {
+		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
 				unittest.WithApproverID(verID),
-				unittest.WithBlockID(c.Block.ID()),
-				unittest.WithExecutionResultID(c.IncorporatedResult.Result.ID()))
-			err := c.core.ProcessApproval(approval)
-			require.NoError(c.T(), err)
+				unittest.WithBlockID(s.Block.ID()),
+				unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
+			err := s.core.ProcessApproval(approval)
+			require.NoError(s.T(), err)
 		}
 	}
 
-	c.sealsPL.AssertCalled(c.T(), "Add", mock.Anything)
+	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
 }
 
 // TestProcessIncorporated_ProcessingInvalidApproval tests that processing invalid approval when result is discovered
 // is correctly handled in case of sentinel error
-func (c *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInvalidApproval() {
+func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInvalidApproval() {
 	// fail signature verification for first approval
-	c.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
 
 	// generate approvals for first chunk
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(c.Chunks[0].Index),
-		unittest.WithApproverID(c.VerID),
-		unittest.WithBlockID(c.Block.ID()),
-		unittest.WithExecutionResultID(c.IncorporatedResult.Result.ID()))
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
+		unittest.WithApproverID(s.VerID),
+		unittest.WithBlockID(s.Block.ID()),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	// this approval has to be cached since execution result is not known yet
-	err := c.core.ProcessApproval(approval)
-	require.NoError(c.T(), err)
+	err := s.core.ProcessApproval(approval)
+	require.NoError(s.T(), err)
 
 	// at this point approval has to be processed, even if it's invalid
 	// if it's an expected sentinel error, it has to be handled internally
-	err = c.core.ProcessIncorporatedResult(c.IncorporatedResult)
-	require.NoError(c.T(), err)
+	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
 }
 
 // TestProcessIncorporated_ApprovalVerificationException tests that processing invalid approval when result is discovered
 // is correctly handled in case of exception
-func (c *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerificationException() {
+func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerificationException() {
 	// fail signature verification with exception
-	c.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
 
 	// generate approvals for first chunk
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(c.Chunks[0].Index),
-		unittest.WithApproverID(c.VerID),
-		unittest.WithBlockID(c.Block.ID()),
-		unittest.WithExecutionResultID(c.IncorporatedResult.Result.ID()))
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
+		unittest.WithApproverID(s.VerID),
+		unittest.WithBlockID(s.Block.ID()),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	// this approval has to be cached since execution result is not known yet
-	err := c.core.ProcessApproval(approval)
-	require.NoError(c.T(), err)
+	err := s.core.ProcessApproval(approval)
+	require.NoError(s.T(), err)
 
 	// at this point approval has to be processed, even if it's invalid
 	// if it's an expected sentinel error, it has to be handled internally
-	err = c.core.ProcessIncorporatedResult(c.IncorporatedResult)
-	require.Error(c.T(), err)
+	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.Error(s.T(), err)
+}
+
+// TestOnFinalizedBlock_CollectorsCleanup tests that stale collectors are cleaned up for
+// already sealed blocks.
+func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup() {
+	blockID := s.Block.ID()
+	numResults := 10
+	for i := 0; i < numResults; i++ {
+		// all results incorporated in different blocks
+		incorporatedBlock := unittest.BlockHeaderWithParentFixture(&s.IncorporatedBlock)
+		s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
+		// create different incorporated results for same block ID
+		result := unittest.ExecutionResultFixture()
+		result.BlockID = blockID
+		incorporatedResult := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(result),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()))
+		err := s.core.ProcessIncorporatedResult(incorporatedResult)
+		require.NoError(s.T(), err)
+	}
+
+	require.Len(s.T(), s.core.collectors, numResults)
+
+	candidate := unittest.BlockHeaderWithParentFixture(&s.Block)
+
+	s.blocks[candidate.ID()] = &candidate
+
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
+		unittest.Seal.WithResult(s.IncorporatedResult.Result))
+	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
+
+	s.payloads.On("ByBlockID", candidate.ID()).Return(&payload, nil).Once()
+
+	s.core.OnFinalizedBlock(candidate.ID())
+	require.Empty(s.T(), s.core.collectors)
 }
