@@ -144,7 +144,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
-	// however by the time we try remove it, the request status has gone.
+	// however by the time we try remove it, the request has gone.
 	// this can happen when duplicate chunk data packs are coming concurrently.
 	// the concurrency is safe with pending requests mempool's mutex lock.
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
@@ -163,7 +163,7 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	// creates a single chunk request status that belongs to a sealed height.
+	// creates a single chunk request that belongs to a sealed height.
 	aggrees := unittest.IdentifierListFixture(2)
 	disaggrees := unittest.IdentifierListFixture(3)
 	requests := unittest.ChunkDataPackRequestListFixture(1,
@@ -284,7 +284,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	// creates 10 chunk request status each with 2 agree targets and 3 disagree targets.
+	// creates 10 chunk request each with 2 agree targets and 3 disagree targets.
 	// chunk belongs to a block at heights greater than 5, but the last sealed block is at height 5, so
 	// the chunk request should be dispatched.
 	aggrees := unittest.IdentifierListFixture(2)

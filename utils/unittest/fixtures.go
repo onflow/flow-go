@@ -1068,43 +1068,6 @@ func ChunkDataResponsesFixture(n int, opts ...func(*messages.ChunkDataResponse))
 	return lst
 }
 
-func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
-	opts ...func(request *verification.ChunkRequestStatus)) *verification.ChunkRequestStatus {
-
-	status := &verification.ChunkRequestStatus{
-		ChunkDataPackRequest: request,
-		LastAttempt:          time.Time{},
-		Attempt:              0,
-	}
-
-	for _, opt := range opts {
-		opt(status)
-	}
-
-	// creates identity fixtures for target ids as union of agrees and disagrees
-	// TODO: remove this inner fixture once we have filter for identifier list.
-	targets := flow.IdentityList{}
-	for _, id := range request.Agrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-	for _, id := range request.Disagrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-
-	status.Targets = targets
-
-	return status
-}
-
-//// ChunkRequestStatusListFixture creates and returns a list of chunk request status fixtures.
-//func ChunkRequestStatusListFixture(n int, opts ...func(*verification.ChunkRequestStatus)) []*verification.ChunkRequestStatus {
-//	lst := make([]*verification.ChunkRequestStatus, 0, n)
-//	for i := 0; i < n; i++ {
-//		lst = append(lst, ChunkRequestStatusFixture(ChunkDataPackRequestFixture(IdentifierFixture()), opts...))
-//	}
-//	return lst
-//}
-
 // ChunkDataPackRequestListFixture creates and returns a list of chunk data pack requests fixtures.
 func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
 	lst := make([]*verification.ChunkDataPackRequest, 0, n)
@@ -1168,15 +1131,6 @@ func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verifica
 	req.Targets = targets
 
 	return req
-}
-
-// ChunkDataPackRequestsFixture creates a list of chunk data requests.
-func ChunkDataPackRequestsFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
-	lst := make([]*verification.ChunkDataPackRequest, 0, n)
-	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
-	}
-	return lst
 }
 
 func WithCollectionID(collectionID flow.Identifier) func(*flow.ChunkDataPack) {
