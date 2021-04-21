@@ -89,6 +89,8 @@ func (s *DKGSuite) TestHappyPath() {
 	completed := s.isDKGCompleted()
 	assert.True(s.T(), completed)
 
+	// the result is an array of public keys where the first item is the group
+	// public key
 	res := s.getResult()
 	groupPubKeyBytes, err := hex.DecodeString(res[0])
 	assert.NoError(s.T(), err)
