@@ -60,7 +60,7 @@ func (s *DKGSuite) TestHappyPath() {
 	// views
 	view := 0
 	for view < 300 {
-		time.Sleep(1 * time.Second)
+		time.Sleep(200 * time.Millisecond)
 
 		// deliver private messages
 		s.hub.DeliverAll()

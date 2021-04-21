@@ -84,7 +84,7 @@ func (s *DKGSuite) SetupTest() {
 func (s *DKGSuite) initEmulator() {
 	s.chainID = flow.Emulator
 
-	blockchain, err := emulator.NewBlockchain()
+	blockchain, err := emulator.NewBlockchain(emulator.WithTransactionExpiry(flow.DefaultTransactionExpiry))
 	require.NoError(s.T(), err)
 
 	s.blockchain = blockchain
@@ -136,7 +136,7 @@ func (s *DKGSuite) setupDKGAdmin() {
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
 		AddAuthorizer(s.dkgAddress)
-	_, err := s.signAndSubmit(setUpAdminTx,
+	_, err := s.prepareAndSubmit(setUpAdminTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
@@ -206,7 +206,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
 	require.NoError(s.T(), err)
 
-	_, err = s.signAndSubmit(fundAccountTx,
+	_, err = s.prepareAndSubmit(fundAccountTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
 	)
@@ -274,7 +274,7 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	err := startDKGTx.AddArgument(cadence.NewArray(valueNodeIDs))
 	require.NoError(s.T(), err)
 
-	_, err = s.signAndSubmit(startDKGTx,
+	_, err = s.prepareAndSubmit(startDKGTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
@@ -302,7 +302,7 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 	err = createParticipantTx.AddArgument(cadence.NewString(node.account.accountKey.PublicKey.String()))
 	require.NoError(s.T(), err)
 
-	_, err = s.signAndSubmit(createParticipantTx,
+	_, err = s.prepareAndSubmit(createParticipantTx,
 		[]sdk.Address{node.account.accountAddress, s.blockchain.ServiceKey().Address, s.dkgAddress},
 		[]sdkcrypto.Signer{node.account.accountSigner, s.blockchain.ServiceKey().Signer(), s.dkgSigner},
 	)
@@ -331,7 +331,7 @@ func (s *DKGSuite) sendDummyTx() (*flow.Block, error) {
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address)
 
-	block, err := s.signAndSubmit(createAccountTx,
+	block, err := s.prepareAndSubmit(createAccountTx,
 		[]sdk.Address{s.blockchain.ServiceKey().Address},
 		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer()},
 	)
@@ -396,10 +396,16 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 	node.reactorEngine = reactorEngine
 }
 
-/*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+// prepareAndSubmit adds a block reference and signs a transaction before
+// submitting it via the admin emulator client.
+func (s *DKGSuite) prepareAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.Block, error) {
 
-// signAndSubmit commits a transaction
-func (s *DKGSuite) signAndSubmit(tx *sdk.Transaction, signerAddresses []sdk.Address, signers []sdkcrypto.Signer) (*flow.Block, error) {
+	// set block reference
+	latestBlock, err := s.adminEmulatorClient.GetLatestBlock(nil, true)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest block: %w", err)
+	}
+	tx.SetReferenceBlockID(latestBlock.ID)
 
 	// sign transaction with each signer
 	for i := len(signerAddresses) - 1; i >= 0; i-- {
