@@ -2,7 +2,6 @@ package fetcher
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -243,10 +242,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
 	// 1. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
-	staked, err := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
-	if err != nil {
-		return fmt.Errorf("could not validate identity of sender at block ID as an execution node: %w", err)
-	}
+	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if !staked {
 		return fmt.Errorf("unstaked execution node sender at block ID")
 	}
@@ -267,19 +263,19 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifi
 
 // validateStakedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an staked
 // execution node at the given block ID.
-func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) (bool, error) {
-	sender, err := e.state.AtBlockID(blockID).Identity(senderID)
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, engine.NewInvalidInputErrorf("sender is unstake: %v", senderID)
-	}
+func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) bool {
+	snapshot := e.state.AtBlockID(blockID)
+	valid, err := protocol.IsNodeStakedWithRoleAt(snapshot, senderID, flow.RoleExecution)
+
 	if err != nil {
-		return false, fmt.Errorf("could not find identity for chunk: %w", err)
-	}
-	if sender.Role != flow.RoleExecution {
-		return false, engine.NewInvalidInputErrorf("sender is not execution node: %v", sender.Role)
+		e.log.Fatal().
+			Err(err).
+			Hex("block_id", logging.ID(blockID)).
+			Hex("sender_id", logging.ID(senderID)).
+			Msg("could not validate sender identity at specified block ID snapshot as execution node")
 	}
 
-	return sender.Stake > 0, nil
+	return valid
 }
 
 // NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler (i.e.,
