@@ -18,18 +18,15 @@ func TestIncrementStatus(t *testing.T) {
 	t.Run("5 times increment", func(t *testing.T) {
 		requests := NewChunkRequests(10)
 
-		status := &verification.ChunkRequestStatus{
-			ChunkDataPackRequest: &verification.ChunkDataPackRequest{
-				ChunkID:   unittest.IdentifierFixture(),
-				Height:    0,
-				Agrees:    []flow.Identifier{},
-				Disagrees: []flow.Identifier{},
-			},
-			Attempt: 0,
+		request := &verification.ChunkDataPackRequest{
+			ChunkID:   unittest.IdentifierFixture(),
+			Height:    0,
+			Agrees:    []flow.Identifier{},
+			Disagrees: []flow.Identifier{},
 		}
 
 		// stores
-		ok := requests.Add(status)
+		ok := requests.Add(request)
 		require.True(t, ok)
 
 		wg := &sync.WaitGroup{}
@@ -38,7 +35,7 @@ func TestIncrementStatus(t *testing.T) {
 		// increments attempts
 		for i := 0; i < increments; i++ {
 			go func() {
-				ok = requests.IncrementAttempt(status.ID())
+				ok = requests.IncrementAttempt(request.ID())
 				require.True(t, ok)
 
 				wg.Done()
@@ -48,8 +45,9 @@ func TestIncrementStatus(t *testing.T) {
 		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish increments on time")
 
 		// retrieves updated status
-		status, ok = requests.ByID(status.ID())
+		expectedReq, attempt, ok := requests.ByID(request.ID())
 		require.True(t, ok)
-		require.Equal(t, status.Attempt, increments)
+		require.Equal(t, request, expectedReq)
+		require.Equal(t, attempt, increments)
 	})
 }
