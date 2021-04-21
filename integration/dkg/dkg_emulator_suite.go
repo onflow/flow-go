@@ -344,6 +344,31 @@ func (s *DKGSuite) isDKGCompleted() bool {
 	return value.ToGoValue().(bool)
 }
 
+func (s *DKGSuite) getResult() []string {
+	script := fmt.Sprintf(
+		`
+	import FlowDKG from 0x%s
+
+	pub fun main(): [String?]? {
+		return FlowDKG.dkgCompleted()
+	} `,
+		s.env.DkgAddress,
+	)
+
+	res := s.executeScript([]byte(script), nil)
+	value := res.(cadence.Optional).ToGoValue()
+	if value == nil {
+		return []string{}
+	}
+	dkgResult := []string{}
+	for _, item := range value.([]interface{}) {
+		s := item.(string)
+		dkgResult = append(dkgResult, s)
+	}
+
+	return dkgResult
+}
+
 func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 	core := testutil.GenericNode(s.T(), s.hub, node.account.netID, ids, s.chainID)
 	core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)

@@ -1,11 +1,16 @@
 package dkg
 
 import (
+	"encoding/hex"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -84,5 +89,37 @@ func (s *DKGSuite) TestHappyPath() {
 	completed := s.isDKGCompleted()
 	assert.True(s.T(), completed)
 
-	// TODO check signature
+	res := s.getResult()
+	groupPubKeyBytes, err := hex.DecodeString(res[0])
+	assert.NoError(s.T(), err)
+	groupPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, groupPubKeyBytes)
+	assert.NoError(s.T(), err)
+
+	// create and test a threshold signature with the keys computed by dkg
+	sigData := []byte("message to be signed")
+	signers := make([]*signature.ThresholdProvider, 0, len(s.nodes))
+	signatures := []crypto.Signature{}
+	indices := []uint{}
+	for i, n := range s.nodes {
+		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(epochSetup.Counter)
+		require.NoError(s.T(), err)
+
+		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
+		signers = append(signers, signer)
+
+		signature, err := signer.Sign(sigData)
+		require.NoError(s.T(), err)
+
+		signatures = append(signatures, signature)
+		indices = append(indices, uint(i))
+	}
+
+	groupSignature, err := signature.CombineThresholdShares(uint(len(s.nodes)), signatures, indices)
+	require.NoError(s.T(), err)
+
+	for i := range s.nodes {
+		ok, err := signers[i].Verify(sigData, groupSignature, groupPubKey)
+		require.NoError(s.T(), err)
+		assert.True(s.T(), ok, fmt.Sprintf("node %d fails to verify threshold signature", i))
+	}
 }
