@@ -249,7 +249,7 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifi
 
 	// 2. start state must match
 	if !bytes.Equal(chunkDataPack.StartState, chunk.ChunkBody.StartState) {
-		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %v, but got: %v", chunk.ChunkBody.StartState, chunkDataPack.StartState)
+		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x", chunk.ChunkBody.StartState, chunkDataPack.StartState)
 	}
 
 	// 3. collection id must match
