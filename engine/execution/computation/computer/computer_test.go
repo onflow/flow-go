@@ -385,7 +385,7 @@ type testRuntime struct {
 	executeTransaction func(runtime.Script, runtime.Context) error
 }
 
-var _ runtime.Runtime = testRuntime{}
+var _ runtime.Runtime = &testRuntime{}
 
 func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return e.executeScript(script, context)

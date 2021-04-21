@@ -282,6 +282,8 @@ type ErrorReturningRuntime struct {
 	TxErrors []error
 }
 
+var _ runtime.Runtime = &ErrorReturningRuntime{}
+
 func (e *ErrorReturningRuntime) ExecuteTransaction(_ runtime.Script, _ runtime.Context) error {
 	if len(e.TxErrors) == 0 {
 		panic("no tx errors left")
@@ -306,6 +308,14 @@ func (*ErrorReturningRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 
 func (*ErrorReturningRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
+}
+
+func (e *ErrorReturningRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadStored not expected")
+}
+
+func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadLinked not expected")
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {
