@@ -23,12 +23,12 @@ func NewChunkRequests(limit uint) *ChunkRequests {
 	}
 }
 
-func chunkRequestStatus(entity flow.Entity) *verification.ChunkRequestStatus {
-	chunk, ok := entity.(*verification.ChunkRequestStatus)
+func toChunkRequestStatus(entity flow.Entity) *chunkRequestStatus {
+	status, ok := entity.(*chunkRequestStatus)
 	if !ok {
 		panic(fmt.Sprintf("could not convert the entity into chunk status from the mempool: %v", entity))
 	}
-	return chunk
+	return status
 }
 
 // ByID returns a chunk request by its chunk ID as well as the attempt field of its underlying
@@ -40,7 +40,7 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 	if !exists {
 		return nil, -1, false
 	}
-	request := chunkRequestStatus(entity)
+	request := toChunkRequestStatus(entity)
 	return request.ChunkDataPackRequest, request.Attempt, true
 }
 
@@ -48,7 +48,7 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 // The insertion is only successful if there is no duplicate chunk request with the same
 // chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
-	status := &verification.ChunkRequestStatus{
+	status := &chunkRequestStatus{
 		ChunkDataPackRequest: request,
 	}
 	return cs.Backend.Add(status)
@@ -72,7 +72,7 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		chunk := chunkRequestStatus(entity)
+		chunk := toChunkRequestStatus(entity)
 		chunk.Attempt++
 		chunk.LastAttempt = time.Now()
 		return nil
@@ -86,8 +86,24 @@ func (cs *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 	all := cs.Backend.All()
 	requests := make([]*verification.ChunkDataPackRequest, 0, len(all))
 	for _, entity := range all {
-		status := chunkRequestStatus(entity)
+		status := toChunkRequestStatus(entity)
 		requests = append(requests, status.ChunkDataPackRequest)
 	}
 	return requests
+}
+
+// chunkRequestStatus is an internal data type for ChunkRequests mempool. It acts as a wrapper for ChunkDataRequests, maintaining
+// some auxiliary attributes that are internal to ChunkRequests.
+type chunkRequestStatus struct {
+	*verification.ChunkDataPackRequest
+	LastAttempt time.Time
+	Attempt     int
+}
+
+func (c chunkRequestStatus) ID() flow.Identifier {
+	return c.ChunkID
+}
+
+func (c chunkRequestStatus) Checksum() flow.Identifier {
+	return c.ChunkID
 }
