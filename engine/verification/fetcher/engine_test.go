@@ -444,40 +444,6 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	s.pendingChunks.AssertNotCalled(t, "Add")
 }
 
-// TestSkipDuplicateChunkStatus evaluates that if fetcher engine receives a duplicate chunk status
-// for which it already has a pending chunk status in memory, it drops the duplicate and notifies consumer
-// that it is done with processing that chunk.
-//
-// Note that fetcher engine relies on chunk consumer to perform the deduplication, and provide distinct chunk
-// locators. So, this test evaluates a rare unhappy path that its occurrence would indicate a data race.
-func TestSkipDuplicateChunkStatus(t *testing.T) {
-	s := setupTest()
-	e := newFetcherEngine(s)
-
-	// creates a single chunk locator, and mocks its corresponding block unsealed.
-	header := unittest.BlockHeaderFixture()
-	result := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(header.ID()))
-	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
-	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
-	mockBlockSealingStatus(s.state, s.headers, &header, false)
-
-	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
-	// mocks duplicate chunk exists on pending chunks, i.e., returning false on adding
-	// same locators.
-	mockPendingChunksAdd(t, s.pendingChunks, statuses, false)
-
-	// expects processing notifier being invoked upon deduplication detected,
-	// which means the termination of processing a duplicate chunk on fetcher engine
-	// side.
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses))
-
-	e.ProcessAssignedChunk(locators[0])
-
-	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.results)
-	// we should not request a duplicate chunk status.
-	s.requester.AssertNotCalled(t, "Request")
-}
-
 // mockResultsByIDs mocks the results storage for affirmative querying of result IDs.
 // Each result should be queried by the specified number of times.
 func mockResultsByIDs(results *storage.ExecutionResults, list []*flow.ExecutionResult) {

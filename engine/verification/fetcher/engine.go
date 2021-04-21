@@ -153,8 +153,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	added := e.pendingChunks.Add(status)
 	if !added {
 		// chunk locators are deduplicated by consumer, reaching this point hints failing deduplication on consumer.
-		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
-		lg.Warn().Msg("skips processing an already existing pending chunk, possible data race")
+		lg.Fatal().Msg("received a duplicate chunk locator, possible data race")
 		return
 	}
 
