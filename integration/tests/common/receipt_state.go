@@ -69,9 +69,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	b1, ok := bs.HighestFinalized()
 	if ok {
 		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
-		r1finalState := r1.ExecutionResult.FinalStateCommitment()
-		require.True(t, ok)
-		initialFinalizedSC = r1finalState
+		initialFinalizedSC = r1.ExecutionResult.FinalStateCommitment()
 	}
 
 	initFinalizedheight := b1.Header.Height
@@ -88,8 +86,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		}
 		currentID = b2.Header.ID()
 		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
-		r2finalState := r2.ExecutionResult.FinalStateCommitment()
-		if initialFinalizedSC == r2finalState {
+		if initialFinalizedSC == r2.ExecutionResult.FinalStateCommitment() {
 			// received a new execution result for the next finalized block, but it has the same final state commitment
 			// check the next finalized block
 			currentHeight++

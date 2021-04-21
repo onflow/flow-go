@@ -130,7 +130,7 @@ func (d *state) hash256plus256(p1, p2 Hash) Hash {
 	xorIn512(d, p1, p2)
 	// permute
 	finalKeccakF1600(&d.a)
-	// reverese the endianess to the output
+	// reverse the endianess to the output
 	return d.copyOut()
 }
 

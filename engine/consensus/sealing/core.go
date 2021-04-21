@@ -757,16 +757,13 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	// collect aggregate signatures
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
-	// get final state of execution result
-	finalState := incorporatedResult.Result.FinalStateCommitment()
-
 	// TODO: Check SPoCK proofs
 
 	// generate & store seal
 	seal := &flow.Seal{
 		BlockID:                incorporatedResult.Result.BlockID,
 		ResultID:               incorporatedResult.Result.ID(),
-		FinalState:             finalState,
+		FinalState:             incorporatedResult.Result.FinalStateCommitment(),
 		AggregatedApprovalSigs: aggregatedSigs,
 	}
 

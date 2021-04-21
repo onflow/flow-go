@@ -29,7 +29,6 @@ const defaultHashesNum = TreeMaxHeight + 1
 var defaultHashes [defaultHashesNum]Hash
 
 func init() {
-
 	hasher := hash.NewSHA3_256()
 	copy(defaultLeafHash[:], hasher.ComputeHash([]byte("default:")))
 
