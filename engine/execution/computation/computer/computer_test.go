@@ -385,6 +385,8 @@ type testRuntime struct {
 	executeTransaction func(runtime.Script, runtime.Context) error
 }
 
+var _ runtime.Runtime = testRuntime{}
+
 func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return e.executeScript(script, context)
 }
@@ -403,6 +405,14 @@ func (*testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 
 func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
+}
+
+func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadStored not expected")
+}
+
+func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadLinked not expected")
 }
 
 type RandomAddressGenerator struct{}
