@@ -367,11 +367,3 @@ func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, b
 
 	return nil
 }
-
-// check the receipt's data integrity by checking its result has
-// both final statecommitment and initial statecommitment
-func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.StateCommitment) {
-	final := receipt.ExecutionResult.FinalStateCommitment()
-	init := receipt.ExecutionResult.InitialStateCommit()
-	return init, final
-}

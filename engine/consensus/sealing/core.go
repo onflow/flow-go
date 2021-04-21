@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -211,19 +210,16 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}()
 
 	resultID := receipt.ExecutionResult.ID()
+	initialState, finalState := receipt.ExecutionResult.InitialStateCommit(), receipt.ExecutionResult.FinalStateCommitment()
 	log := c.log.With().
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", resultID[:]).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Logger()
-
-	initialState, finalState := validation.IntegrityCheck(receipt)
-
-	log = log.With().
 		Hex("initial_state", initialState[:]).
-		Hex("final_state", finalState[:]).Logger()
+		Hex("final_state", finalState[:]).
+		Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
