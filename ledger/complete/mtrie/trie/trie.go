@@ -1,7 +1,6 @@
 package trie
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -57,18 +56,6 @@ func (mt *MTrie) Height() int {
 	return mt.root.Height()
 }
 
-// StringRootHash returns the trie's Hex-encoded root hash.
-// Concurrency safe (as Tries are immutable structures by convention)
-func (mt *MTrie) StringRootHash() string {
-	var rootHash hash.Hash
-	if mt.root == nil {
-		// case of an empty trie
-		rootHash = hash.GetDefaultHashForHeight(hash.TreeMaxHeight)
-	}
-	rootHash = mt.root.Hash()
-	return hex.EncodeToString(rootHash[:])
-}
-
 // RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) RootHash() ledger.RootHash {
@@ -93,10 +80,10 @@ func (mt *MTrie) RootNode() *node.Node {
 	return mt.root
 }
 
-// StringRootHash returns the trie's string representation.
+// String returns the trie's string representation.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) String() string {
-	trieStr := fmt.Sprintf("Trie root hash: %v\n", mt.StringRootHash())
+	trieStr := fmt.Sprintf("Trie root hash: %x\n", mt.RootHash())
 	return trieStr + mt.root.FmtStr("", "")
 }
 

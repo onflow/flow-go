@@ -19,7 +19,7 @@ import (
 //     The height of a Trie is always the height of the fully-expanded tree.
 type PSMT struct {
 	root       *node // Root
-	pathLookUp map[string]*node
+	pathLookUp map[ledger.Path]*node
 }
 
 // RootHash returns the rootNode hash value of the SMT
@@ -34,7 +34,7 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 	payloads := make([]*ledger.Payload, 0)
 	for _, path := range paths {
 		// lookup the path for the payload
-		node, found := p.pathLookUp[string(path[:])]
+		node, found := p.pathLookUp[path]
 		if !found {
 			payloads = append(payloads, nil)
 			failedPaths = append(failedPaths, path)
@@ -56,7 +56,7 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (hash.Has
 	for i, path := range paths {
 		payload := payloads[i]
 		// lookup the path and update the value
-		node, found := p.pathLookUp[string(path[:])]
+		node, found := p.pathLookUp[path]
 		if !found {
 			failedKeys = append(failedKeys, payload.Key)
 			continue
@@ -79,7 +79,7 @@ func NewPSMT(
 
 	height := hash.TreeMaxHeight
 
-	psmt := PSMT{newNode(hash.GetDefaultHashForHeight(height), height), make(map[string]*node)}
+	psmt := PSMT{newNode(hash.GetDefaultHashForHeight(height), height), make(map[ledger.Path]*node)}
 
 	paths := batchProof.Paths()
 	payloads := batchProof.Payloads()
@@ -150,7 +150,7 @@ func NewPSMT(
 			currentNode.hashValue = hash.ComputeCompactValue(hash.Hash(path), payload.Value, currentNode.height)
 		}
 		// keep a reference to this node by path (for update purpose)
-		psmt.pathLookUp[string(path[:])] = currentNode
+		psmt.pathLookUp[path] = currentNode
 
 	}
 
