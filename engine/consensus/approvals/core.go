@@ -130,10 +130,9 @@ func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 
 	sealsCount := len(payload.Seals)
 	sealedResultIds := make([]flow.Identifier, sealsCount)
-	sealedBlocks := make(map[flow.Identifier]struct{}, sealsCount)
+	lastSealedBlockHeight := uint64(0)
 	for i, seal := range payload.Seals {
 		sealedResultIds[i] = seal.ResultID
-		sealedBlocks[seal.BlockID] = struct{}{}
 
 		// update last sealed height
 		if i == sealsCount-1 {
@@ -141,6 +140,8 @@ func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 			if err != nil {
 				c.log.Fatal().Err(err).Msgf("could not retrieve state for finalized block %s", seal.BlockID)
 			}
+
+			lastSealedBlockHeight = head.Height
 
 			// it's important to use atomic operation to make sure that we have correct ordering
 			atomic.StoreUint64(&c.lastSealedBlockHeight, head.Height)
@@ -157,7 +158,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 		c.log.Err(err).Msgf("could not check emergency sealing at block %v", finalized.ID())
 	}
 
-	c.cleanupStaleCollectors(collectors, sealedBlocks)
+	c.cleanupStaleCollectors(collectors, lastSealedBlockHeight)
 }
 
 func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
@@ -317,14 +318,14 @@ func (c *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {
 	}
 }
 
-func (c *approvalProcessingCore) cleanupStaleCollectors(collectors []*AssignmentCollector, sealedBlocks map[flow.Identifier]struct{}) {
+func (c *approvalProcessingCore) cleanupStaleCollectors(collectors []*AssignmentCollector, lastSealedHeight uint64) {
 	// We create collector only if we know about block that is being sealed. If we don't know anything about referred block
 	// we will just discard it. This means even if someone tries to spam us with incorporated results with same blockID it
 	// will get eventually cleaned when we discover a seal for this block.
 	staleCollectors := make([]flow.Identifier, 0)
 	for _, collector := range collectors {
 		// we have collector for already sealed block
-		if _, ok := sealedBlocks[collector.BlockID]; ok {
+		if lastSealedHeight >= collector.BlockHeight {
 			staleCollectors = append(staleCollectors, collector.ResultID)
 		}
 	}
