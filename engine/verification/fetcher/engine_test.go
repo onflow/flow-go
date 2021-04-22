@@ -400,7 +400,6 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	// mocks there is no pending status for this chunk at fetcher engine.
 	s.pendingChunks.On("ByID", chunkID).Return(nil, false)
 
-	// alters chunk data pack so that it become invalid.
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), chunkDataPacks[chunkID], collections[chunkID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks)
