@@ -537,7 +537,7 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 
 		for _, expected := range list {
 			expectedID := expected.Chunk.ID()
-			if bytes.Equal(expectedID[:], statusID[:]) {
+			if expectedID == statusID {
 				require.Equal(t, expected.ExecutionResultID, actual.ExecutionResultID)
 				return
 			}
