@@ -268,7 +268,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 	tt := []struct {
 		alterChunkDataPack func(*flow.ChunkDataPack)
-		mockStateFunc      func(flow.Identity, *protocol.State, flow.Identifier)
+		mockStateFunc      func(flow.Identity, *protocol.State, flow.Identifier) // mocks state at block identifier for the given identity.
 		msg                string
 	}{
 		{
