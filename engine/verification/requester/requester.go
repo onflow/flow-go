@@ -179,6 +179,13 @@ func (e *Engine) onTimer() {
 		Int("total", len(pendingReqs)).
 		Msg("start processing all pending chunk data requests")
 
+	lastSealed, err := e.state.Sealed().Head()
+	if err != nil {
+		e.log.Fatal().
+			Err(err).
+			Msg("could not determine whether block has been sealed")
+	}
+
 	for _, request := range pendingReqs {
 		lg := e.log.With().
 			Hex("chunk_id", logging.ID(request.ID())).
@@ -186,12 +193,7 @@ func (e *Engine) onTimer() {
 			Logger()
 
 		// if block has been sealed, then we can finish
-		sealed, err := e.blockIsSealed(request.Height)
-		if err != nil {
-			lg.Fatal().Err(err).Msg("could not determine whether block has been sealed")
-			continue
-		}
-		if sealed {
+		if request.Height <= lastSealed.Height {
 			removed := e.pendingRequests.Rem(request.ID())
 			e.handler.NotifyChunkDataPackSealed(request.ID())
 			lg.Info().
@@ -213,17 +215,6 @@ func (e *Engine) onTimer() {
 
 		lg.Info().Msg("chunk data pack requested")
 	}
-}
-
-// blockIsSealed returns true if the block at specified height is sealed.
-func (e Engine) blockIsSealed(height uint64) (bool, error) {
-	lastSealed, err := e.state.Sealed().Head()
-	if err != nil {
-		return false, fmt.Errorf("could not get last sealed: %w", err)
-	}
-
-	sealed := height <= lastSealed.Height
-	return sealed, nil
 }
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
