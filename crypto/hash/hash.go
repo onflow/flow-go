@@ -26,19 +26,19 @@ func (h Hash) String() string {
 
 // Hasher interface
 type Hasher interface {
-	// Algorithm returns the hashing algorithm for this hasher.
+	// Algorithm returns the hashing algorithm of the hasher.
 	Algorithm() HashingAlgorithm
-	// Size returns the hash output length
+	// Size returns the hash output length in bytes.
 	Size() int
 	// ComputeHash returns the hash output regardless of the existing hash state.
 	// It may update the state or not depending on the implementation.
 	ComputeHash([]byte) Hash
 	// Write([]bytes) (using the io.Writer interface) adds more bytes to the
-	// current hash state
+	// current hash state.
 	io.Writer
 	// SumHash returns the hash output.
-	// It does not reset the state to allow further writing.
+	// It may update the state or not depending on the implementation.
 	SumHash() Hash
-	// Reset resets the hash state
+	// Reset resets the hash state.
 	Reset()
 }

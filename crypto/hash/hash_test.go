@@ -16,7 +16,7 @@ func TestSanitySha3_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
-	alg := NewSHA3_256_opt()
+	alg := NewSHA3_256()
 	hash := alg.ComputeHash(input)
 	assert.Equal(t, Hash(expected), hash)
 }
@@ -26,7 +26,7 @@ func TestSanitySha3_384(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("e516dabb23b6e30026863543282780a3ae0dccf05551cf0295178d7ff0f1b41eecb9db3ff219007c4e097260d58621bd")
 
-	alg := NewSHA3_384_opt()
+	alg := NewSHA3_384()
 	hash := alg.ComputeHash(input)
 	assert.Equal(t, Hash(expected), hash)
 }
@@ -51,72 +51,10 @@ func TestSanitySha2_384(t *testing.T) {
 	assert.Equal(t, Hash(expected), hash)
 }
 
-/*
-// SHA3_256 bench
-func BenchmarkSha3_256(b *testing.B) {
-	a := []byte("Bench me!")
-	alg := NewSHA3_256()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		alg.ComputeHash(a)
-	}
-	return
-}
-
-// SHA3_384 bench
-func BenchmarkSha3_384(b *testing.B) {
-	a := []byte("Bench me!")
-	alg := NewSHA3_384()
-	for i := 0; i < b.N; i++ {
-		alg.ComputeHash(a)
-	}
-	return
-}
-
-// SHA2_256 bench
-func BenchmarkSha2_256(b *testing.B) {
-	a := []byte("Bench me!")
-	alg := NewSHA2_256()
-	for i := 0; i < b.N; i++ {
-		alg.ComputeHash(a)
-	}
-	return
-}
-
-// SHA2_384 bench
-func BenchmarkSha2_384(b *testing.B) {
-	a := []byte("Bench me!")
-	alg := NewSHA2_384()
-	for i := 0; i < b.N; i++ {
-		alg.ComputeHash(a)
-	}
-	return
-}
-
-// SHA2_256 bench
-func BenchmarkSha3_256_opt(b *testing.B) {
-	a := []byte("Bench me!")
-	alg := NewSHA3_256_opt()
-	for i := 0; i < b.N; i++ {
-		alg.ComputeHash(a)
-	}
-	return
-}
-
-// SHA2_384 bench
-func BenchmarkSha3_384_opt(b *testing.B) {
-	a := []byte("Bench me!")
-	alg := NewSHA3_384_opt()
-	for i := 0; i < b.N; i++ {
-		alg.ComputeHash(a)
-	}
-	return
-}*/
-
-// Sanity checks of cSHAKE-128
+// Sanity checks of KMAC128
 // the test vector is taken from the NIST document
 // https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/Kmac_samples.pdf
-func TestKmac128(t *testing.T) {
+func TestSanityKmac128(t *testing.T) {
 
 	input := []byte{0x00, 0x01, 0x02, 0x03}
 	expected := []Hash{
@@ -150,50 +88,7 @@ func TestKmac128(t *testing.T) {
 	// test short key length
 	_, err = NewKMAC_128(key[:15], customizers[0], outputSize)
 	assert.Error(t, err)
-
 }
-
-// TestHashersAPI tests the expected definition of the hashers APIs
-/*func TestHashersAPI(t *testing.T) {
-	kmac128, err := NewKMAC_128([]byte("test_key________"), []byte("test_custommizer"), 32)
-	require.Nil(t, err)
-
-	hashers := []Hasher{
-		NewSHA2_256(),
-		NewSHA2_384(),
-		NewSHA3_256(),
-		NewSHA3_384(),
-		kmac128,
-	}
-	for _, h := range hashers {
-		// Reset should empty the state
-		expectedEmptyHash := h.SumHash()
-		h.Write([]byte("data"))
-		h.Reset()
-		emptyHash := h.SumHash()
-		assert.Equal(t, expectedEmptyHash, emptyHash)
-
-		// ComputeHash output does not depend on the hasher state
-		h.Write([]byte("data"))
-		emptyHash = h.ComputeHash([]byte(""))
-		assert.Equal(t, expectedEmptyHash, emptyHash)
-
-		// ComputeHash does not update the state (only for KMAC128)
-		hash := h.SumHash()
-		expectedHash := h.ComputeHash([]byte("data"))
-		if h.Algorithm() == KMAC128 {
-			assert.Equal(t, expectedHash, hash)
-		}
-
-		// SumHash does not reset the hasher state and allows writing more data
-		h.Reset()
-		h.Write([]byte("da"))
-		_ = h.SumHash()
-		h.Write([]byte("ta"))
-		hash = h.SumHash()
-		assert.Equal(t, expectedHash, hash)
-	}
-}*/
 
 // TestHashersAPI tests the expected definition of the hashers APIs
 func TestHashersAPI(t *testing.T) {
@@ -245,9 +140,19 @@ func TestHashersAPI(t *testing.T) {
 		_, _ = h.Write(data[902:])
 		hash2 = h.SumHash()
 		assert.Equal(t, hash1, hash2)
+
+		// ComputeHash output does not depend on the hasher state
+		h = newFunction()
+
+		h.Write([]byte("dummy data"))
+		hash1 = h.ComputeHash(data)
+		assert.Equal(t, hash1, hash2)
 	}
 }
 
+// TestSha3 is a specific test of SHA3-256 and SHA3-388.
+// It compares the hashes of random data of different lengths to
+// the output of standard Go sha3.
 func TestSha3(t *testing.T) {
 	r := time.Now().UnixNano()
 	rand.Seed(r)
@@ -259,7 +164,7 @@ func TestSha3(t *testing.T) {
 			rand.Read(value)
 			expected := sha3.Sum256(value)
 
-			hasher := NewSHA3_256_opt()
+			hasher := NewSHA3_256()
 			h := hasher.ComputeHash(value)
 			assert.Equal(t, expected[:], []byte(h))
 		}
@@ -271,23 +176,42 @@ func TestSha3(t *testing.T) {
 			rand.Read(value)
 			expected := sha3.Sum384(value)
 
-			hasher := NewSHA3_384_opt()
+			hasher := NewSHA3_384()
 			h := hasher.ComputeHash(value)
 			assert.Equal(t, expected[:], []byte(h))
 		}
 	})
 }
 
-func BenchmarkSha3(b *testing.B) {
+// Benchmark of all hashers' ComputeHash function
+func BenchmarkComputeHash(b *testing.B) {
 
 	m := make([]byte, 64)
 	rand.Read(m)
+
+	b.Run("SHA2_256", func(b *testing.B) {
+		alg := NewSHA2_256()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA2_384", func(b *testing.B) {
+		alg := NewSHA2_384()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = alg.ComputeHash(m)
+		}
+		b.StopTimer()
+	})
 
 	b.Run("SHA3_256", func(b *testing.B) {
 		alg := NewSHA3_256()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_ = alg.ComputeHash(m)
+			alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
@@ -301,17 +225,9 @@ func BenchmarkSha3(b *testing.B) {
 		b.StopTimer()
 	})
 
-	b.Run("SHA3_256_opt", func(b *testing.B) {
-		alg := NewSHA3_256_opt()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			alg.ComputeHash(m)
-		}
-		b.StopTimer()
-	})
-
-	b.Run("SHA3_384_opt", func(b *testing.B) {
-		alg := NewSHA3_384_opt()
+	// KMAC128 with 128 bytes output
+	b.Run("KMAC128_128", func(b *testing.B) {
+		alg, _ := NewKMAC_128([]byte("bench_key________"), []byte("bench_custommizer"), 32)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_ = alg.ComputeHash(m)
