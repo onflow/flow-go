@@ -87,13 +87,15 @@ func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
 
 // Push appends the given value to the tail of the queue.
 // If queue capacity is reached, the message is silently dropped.
-func (q *FifoQueue) Push(element interface{}) {
+func (q *FifoQueue) Push(element interface{}) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.queue.Len() < q.maxCapacity {
 		q.queue.PushBack(element)
 		q.lengthObserver(q.queue.Len())
+		return true
 	}
+	return false
 }
 
 // Front peeks message at the head of the queue (without removing the head).
@@ -126,8 +128,7 @@ func (q *FifoQueue) Len() int {
 }
 
 func (q *FifoQueue) Put(msg *engine.Message) bool {
-	q.Push(msg)
-	return true // TODO update Push to actually return whether item was stored
+	return q.Push(msg)
 }
 
 func (q *FifoQueue) Get() (*engine.Message, bool) {

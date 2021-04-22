@@ -42,9 +42,9 @@ type messageC struct {
 	s string
 }
 
-func NewEngine(log zerolog.Logger) (*TestEngine, error) {
+func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 	queueA, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(10),
+		fifoqueue.WithCapacity(capacity),
 		fifoqueue.WithLengthObserver(func(len int) {}),
 	)
 	if err != nil {
@@ -52,7 +52,7 @@ func NewEngine(log zerolog.Logger) (*TestEngine, error) {
 	}
 
 	queueB, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(10),
+		fifoqueue.WithCapacity(capacity),
 		fifoqueue.WithLengthObserver(func(len int) {}),
 	)
 	if err != nil {
@@ -124,6 +124,9 @@ func (e *TestEngine) Done() <-chan struct{} {
 }
 
 func (e *TestEngine) loop() {
+	// let Ready() wait until the loop has started
+	// otherwise the message producer's doNotify will not be able to push messages
+	// to the e.notify channel
 	e.ready.Done()
 
 	for {
@@ -188,9 +191,15 @@ func (e *TestEngine) MessageCount() int {
 	return len(e.messages)
 }
 
+func (e *TestEngine) AllCount() (int, int, int) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return len(e.messages), e.queueA.Len(), e.queueB.Len()
+}
+
 func WithEngine(t *testing.T, f func(*TestEngine)) {
 	lg := unittest.Logger()
-	eng, err := NewEngine(lg)
+	eng, err := NewEngine(lg, 99)
 	require.NoError(t, err)
 	<-eng.Ready()
 	f(eng)
@@ -294,6 +303,7 @@ func TestProcessMessageMultiAll(t *testing.T) {
 			return eng.MessageCount() == count
 		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
 			count, eng.MessageCount())
+		require.Equal(t, count, eng.MessageCount())
 	})
 }
 

@@ -1,8 +1,6 @@
 package engine
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -102,7 +100,6 @@ func (e *MessageHandler) ProcessLocal(_ interface{}) error        { panic("not i
 
 // notify the handler to pick new message from the queue
 func (e *MessageHandler) doNotify() {
-	fmt.Println("notify")
 	select {
 	// to prevent from getting blocked by dropping the notification if
 	// there is no handler subscribing the channel.
