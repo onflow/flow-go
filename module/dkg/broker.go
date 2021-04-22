@@ -18,7 +18,7 @@ import (
 
 // RETRY_MAX is the maximum number of times the broker will attempt to broadcast
 // a message or publish a result
-const RETRY_MAX = 20
+const RETRY_MAX = 5
 
 // RETRY_MILLISECONDS is the number of milliseconds to wait between retries
 const RETRY_MILLISECONDS = 1000
