@@ -1,7 +1,6 @@
 package mtrie
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -259,14 +258,11 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 // GetTrie returns trie at specific rootHash
 // warning, use this function for read-only operation
 func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
-	encRootHash := hex.EncodeToString(rootHash[:])
-
 	// if in memory
-	if ent, ok := f.tries.Get(encRootHash); ok {
+	if ent, ok := f.tries.Get(rootHash); ok {
 		return ent.(*trie.MTrie), nil
 	}
-
-	return nil, fmt.Errorf("trie with the given rootHash [%v] not found", encRootHash)
+	return nil, fmt.Errorf("trie with the given rootHash [%x] not found", rootHash)
 }
 
 // GetTries returns list of currently cached tree root hashes
@@ -303,15 +299,14 @@ func (f *Forest) AddTrie(newTrie *trie.MTrie) error {
 
 	// TODO: check Thread safety
 	// TODO what is this string root hash
-	hashString := newTrie.StringRootHash()
-	if storedTrie, found := f.tries.Get(hashString); found {
-		foo := storedTrie.(*trie.MTrie)
-		if foo.Equals(newTrie) {
+	rootHash := newTrie.RootHash()
+	if storedTrie, found := f.tries.Get(rootHash); found {
+		if storedTrie.(*trie.MTrie).Equals(newTrie) {
 			return nil
 		}
 		return fmt.Errorf("forest already contains a tree with same root hash but other properties")
 	}
-	f.tries.Add(hashString, newTrie)
+	f.tries.Add(rootHash, newTrie)
 	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
 
 	return nil
@@ -320,8 +315,7 @@ func (f *Forest) AddTrie(newTrie *trie.MTrie) error {
 // RemoveTrie removes a trie to the forest
 func (f *Forest) RemoveTrie(rootHash ledger.RootHash) {
 	// TODO remove from the file as well
-	encRootHash := hex.EncodeToString(rootHash[:])
-	f.tries.Remove(encRootHash)
+	f.tries.Remove(rootHash)
 	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
 }
 
