@@ -121,6 +121,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	// retrieves result and chunk using the locator
 	result, err := e.results.ByID(locator.ResultID)
 	if err != nil {
+		// a missing result for a chunk locator is a fatal error potentially a database leak.
 		lg.Fatal().Err(err).Msg("could not retrieve result for chunk locator")
 	}
 	chunk := result.Chunks[locator.Index]
