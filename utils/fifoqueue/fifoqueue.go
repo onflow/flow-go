@@ -109,9 +109,9 @@ func (q *FifoQueue) Front() (interface{}, bool) {
 // If the queue is empty, (nil, false) is returned.
 func (q *FifoQueue) Pop() (interface{}, bool) {
 	q.mu.Lock()
-	defer q.mu.Unlock()
 	event, ok := q.queue.PopFront()
 	length := q.queue.Len()
+	q.mu.Unlock()
 
 	q.lengthObserver(length)
 	if !ok {

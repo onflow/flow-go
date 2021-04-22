@@ -199,7 +199,7 @@ func (e *TestEngine) AllCount() (int, int, int) {
 
 func WithEngine(t *testing.T, f func(*TestEngine)) {
 	lg := unittest.Logger()
-	eng, err := NewEngine(lg, 99)
+	eng, err := NewEngine(lg, 150)
 	require.NoError(t, err)
 	<-eng.Ready()
 	f(eng)
