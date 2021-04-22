@@ -499,7 +499,7 @@ func mockReceiptsBlockID(t *testing.T,
 }
 
 // mockStateAtBlockIDForIdentities is a test helper that mocks state at the block ID with the given execution nodes identities.
-func mockStateAtBlockIDForIdentities(state *protocol.State, blockID flow.Identifier, participant flow.IdentityList) {
+func mockStateAtBlockIDForIdentities(state *protocol.State, blockID flow.Identifier, participants flow.IdentityList) {
 	snapshot := &protocol.Snapshot{}
 	state.On("AtBlockID", blockID).Return(snapshot)
 	snapshot.On("Identities", mock.Anything).Return(participant, nil)
