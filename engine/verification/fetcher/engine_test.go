@@ -514,7 +514,7 @@ func mockStateAtBlockIDForMissingIdentities(state *protocol.State, blockID flow.
 	snapshot := &protocol.Snapshot{}
 	state.On("AtBlockID", blockID).Return(snapshot)
 	for _, id := range participants {
-		snapshot.On("Identity", id.NodeID).Return(nil, fmt.Errorf("missing"))
+		snapshot.On("Identity", id.NodeID).Return(nil, protocol.IdentityNotFoundError{id.NodeID})
 	}
 }
 
