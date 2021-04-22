@@ -6,6 +6,8 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 )
 
+// ApprovalsCache is a wrapper over `lru.Cache` that provides needed api for processing result approvals
+// Extends functionality of `lru.Cache` but mainly using grouping of calls and providing more user friendly interface.
 type ApprovalsCache struct {
 	cache *lru.Cache
 }

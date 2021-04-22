@@ -36,14 +36,13 @@ type AssignmentCollector struct {
 	lock                                 sync.RWMutex                           // lock for protecting collectors map
 	verifiedApprovalsCache               *ApprovalsCache                        // in-memory cache of approvals were already verified
 	requiredApprovalsForSealConstruction uint                                   // number of approvals that are required for each chunk to be sealed
-
-	assigner             module.ChunkAssigner
-	state                protocol.State
-	verifier             module.Verifier
-	seals                mempool.IncorporatedResultSeals
-	approvalConduit      network.Conduit         // used to request missing approvals from verification nodes
-	requestTracker       *sealing.RequestTracker // used to keep track of number of approval requests, and blackout periods, by chunk
-	getCachedBlockHeight GetCachedBlockHeight    // functor to get cached block height
+	assigner                             module.ChunkAssigner                   // used to build assignment
+	state                                protocol.State                         // used to access the  protocol state
+	verifier                             module.Verifier                        // used to validate result approvals
+	seals                                mempool.IncorporatedResultSeals        // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	approvalConduit                      network.Conduit                        // used to request missing approvals from verification nodes
+	requestTracker                       *sealing.RequestTracker                // used to keep track of number of approval requests, and blackout periods, by chunk
+	getCachedBlockHeight                 GetCachedBlockHeight                   // functor to get cached block height
 }
 
 func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,

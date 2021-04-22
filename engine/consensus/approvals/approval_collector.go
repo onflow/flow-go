@@ -14,15 +14,14 @@ import (
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
-	IncorporatedBlockID  flow.Identifier
-	chunkCollectors      []*ChunkApprovalCollector
-	aggregatedSignatures map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
-	lock                 sync.RWMutex                        // lock for modifying aggregatedSignatures
-	incorporatedResult   *flow.IncorporatedResult
-	numberOfChunks       int
-
-	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
-	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
+	IncorporatedBlockID                  flow.Identifier                     // block where execution result was incorporated, remains constant
+	chunkCollectors                      []*ChunkApprovalCollector           // slice of chunk collectors that is created on construction and doesn't change
+	aggregatedSignatures                 map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
+	lock                                 sync.RWMutex                        // lock for modifying aggregatedSignatures
+	incorporatedResult                   *flow.IncorporatedResult            // incorporated result that is being sealed
+	seals                                mempool.IncorporatedResultSeals     // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	numberOfChunks                       int                                 // number of chunks for execution result, remains constant
+	requiredApprovalsForSealConstruction uint                                // min number of approvals required for constructing a candidate seal
 }
 
 func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {

@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
@@ -27,18 +27,18 @@ type ResultApprovalProcessor interface {
 	// that this function is reentrant and can be safely used in concurrent environment.
 	// Returns:
 	// * engine.InvalidInputError - result approval is invalid
-	// * engine.UnverifiableInputError -
-	// * engine.OutdatedInputError - result approval is outdated, block was already sealed
-	// * exception in case of any other error, usually this is not expected.
+	// * engine.UnverifiableInputError - result approval is unverifiable since referenced block cannot be found
+	// * engine.OutdatedInputError - result approval is outdated for instance block was already sealed
+	// * exception in case of any other error, usually this is not expected
 	// * nil - successfully processed result approval
 	ProcessApproval(approval *flow.ResultApproval) error
 	// ProcessIncorporatedResult processes incorporated result in blocking way, implementors need to ensure
 	// that this function is reentrant.
 	// Returns:
 	// * engine.InvalidInputError - incorporated result is invalid
-	// * engine.UnverifiableInputError - sentinel error in case we haven't discovered requested blockID
-	// * engine.OutdatedInputError - sentinel error in case block is outdated
-	// * exception in case of any other error, usually this is not expected.
+	// * engine.UnverifiableInputError - result is unverifiable since referenced block cannot be found
+	// * engine.OutdatedInputError - result is outdated for instance block was already sealed
+	// * exception in case of any other error, usually this is not expected
 	// * nil - successfully processed incorporated result
 	ProcessIncorporatedResult(result *flow.IncorporatedResult) error
 }
@@ -47,25 +47,25 @@ type ResultApprovalProcessor interface {
 // This struct is responsible for:
 // 	- collecting approvals for execution results
 // 	- processing multiple incorporated results
-// 	- pre-validating approvals(if they are outdated)
+// 	- pre-validating approvals(if they are outdated or non-verifiable)
 // 	- pruning already processed collectors
 type approvalProcessingCore struct {
+	log                                  zerolog.Logger                           // used to log relevant actions with context
 	collectors                           map[flow.Identifier]*AssignmentCollector // mapping of ResultID to AssignmentCollector
 	lock                                 sync.RWMutex                             // lock for collectors
 	approvalsCache                       *ApprovalsCache                          // in-memory cache of approvals that weren't verified
 	blockHeightLookupCache               *lru.Cache                               // cache for block height lookups
 	lastSealedBlockHeight                uint64                                   // atomic variable for last sealed block height
-	requiredApprovalsForSealConstruction uint                                     // number of approvals that are required for each chunk to be sealed
+	requiredApprovalsForSealConstruction uint                                     // min number of approvals required for constructing a candidate seal
 	emergencySealingActive               bool                                     // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-
-	assigner             module.ChunkAssigner
-	state                protocol.State
-	verifier             module.Verifier
-	seals                mempool.IncorporatedResultSeals
-	payloads             storage.Payloads
-	approvalConduit      network.Conduit
-	requestTracker       *sealing.RequestTracker
-	getCachedBlockHeight GetCachedBlockHeight // cache access for assignment collector
+	assigner                             module.ChunkAssigner                     // used by AssignmentCollector to build chunk assignment
+	state                                protocol.State                           // used to access protocol state
+	verifier                             module.Verifier                          // used to validate result approvals
+	seals                                mempool.IncorporatedResultSeals          // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	payloads                             storage.Payloads                         // used to access seals in finalized block
+	approvalConduit                      network.Conduit                          // used to request missing approvals from verification nodes
+	requestTracker                       *sealing.RequestTracker                  // used to keep track of number of approval requests, and blackout periods, by chunk
+	getCachedBlockHeight                 GetCachedBlockHeight                     // cache height lookups
 }
 
 func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
@@ -120,12 +120,12 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 	finalized, err := c.state.AtBlockID(blockID).Head()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", blockID)
+		c.log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", blockID)
 	}
 
 	payload, err := c.payloads.ByBlockID(blockID)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", blockID)
+		c.log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", blockID)
 	}
 
 	sealsCount := len(payload.Seals)
@@ -139,7 +139,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 		if i == sealsCount-1 {
 			head, err := c.state.AtBlockID(seal.BlockID).Head()
 			if err != nil {
-				log.Fatal().Err(err).Msgf("could not retrieve state for finalized block %s", seal.BlockID)
+				c.log.Fatal().Err(err).Msgf("could not retrieve state for finalized block %s", seal.BlockID)
 			}
 
 			// it's important to use atomic operation to make sure that we have correct ordering
@@ -154,7 +154,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 	// check if there are stale results qualified for emergency sealing
 	err = c.checkEmergencySealing(collectors, finalized.Height)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalized.ID())
+		c.log.Err(err).Msgf("could not check emergency sealing at block %v", finalized.ID())
 	}
 
 	c.cleanupStaleCollectors(collectors, sealedBlocks)
@@ -167,7 +167,8 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 	}
 
 	collector := c.getCollector(result.Result.ID())
-	if collector == nil {
+	newIncorporatedResult := collector == nil
+	if newIncorporatedResult {
 		collector, err = c.createCollector(result.Result)
 		if err != nil {
 			return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
@@ -179,9 +180,12 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 		return fmt.Errorf("could not process incorporated result: %w", err)
 	}
 
-	err = c.processPendingApprovals(collector)
-	if err != nil {
-		return fmt.Errorf("could not process cached approvals:  %w", err)
+	// process pending approvals only if it's a new collector
+	if newIncorporatedResult {
+		err = c.processPendingApprovals(collector)
+		if err != nil {
+			return fmt.Errorf("could not process cached approvals:  %w", err)
+		}
 	}
 
 	return nil
@@ -258,7 +262,7 @@ func (c *approvalProcessingCore) processPendingApprovals(collector *AssignmentCo
 			err := collector.ProcessAssignment(approval)
 			if err != nil {
 				if engine.IsInvalidInputError(err) {
-					log.Debug().
+					c.log.Debug().
 						Hex("result_id", collector.ResultID[:]).
 						Err(err).
 						Msgf("invalid approval with id %s", approval.ID())

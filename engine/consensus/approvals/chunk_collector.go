@@ -6,6 +6,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// ChunkProcessingStatus is a helper structure which is used to report
+// chunk processing status to caller
 type ChunkProcessingStatus struct {
 	numberOfApprovals uint
 	approvalProcessed bool
