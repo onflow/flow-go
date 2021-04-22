@@ -319,11 +319,15 @@ func TestProcessMessageMultiConcurrent(t *testing.T) {
 
 	WithEngine(t, func(eng *TestEngine) {
 		count := 100
+		var sent sync.WaitGroup
 		for i := 0; i < count; i++ {
+			sent.Add(1)
 			go func(i int) {
 				require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageA{n: i}))
+				sent.Done()
 			}(i)
 		}
+		sent.Wait()
 
 		require.Eventuallyf(t, func() bool {
 			return eng.MessageCount() == count
