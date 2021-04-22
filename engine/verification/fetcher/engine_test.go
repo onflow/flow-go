@@ -564,7 +564,7 @@ func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 		// there should be a matching chunk status with the received one.
 		for _, expected := range list {
 			expectedID := expected.Chunk.ID()
-			if bytes.Equal(expectedID[:], actual[:]) {
+			if expectedID == actual {
 				return
 			}
 		}
