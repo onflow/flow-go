@@ -76,16 +76,16 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
 			//store mappings and restore keys from missing paths
-			pathToKey := make(map[string]ledger.Key)
+			pathToKey := make(map[ledger.Path]ledger.Key)
 
 			for i, key := range query.Keys() {
 				path := paths[i]
-				pathToKey[string(path[:])] = key
+				pathToKey[path] = key
 			}
 
 			keys := make([]ledger.Key, 0, len(pErr.Paths))
 			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[string(path[:])])
+				keys = append(keys, pathToKey[path])
 			}
 			return nil, &ledger.ErrMissingKeys{Keys: keys}
 		}
@@ -124,16 +124,16 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 			}
 
 			//store mappings and restore keys from missing paths
-			pathToKey := make(map[string]ledger.Key)
+			pathToKey := make(map[ledger.Path]ledger.Key)
 
 			for i, key := range update.Keys() {
 				path := paths[i]
-				pathToKey[string(path[:])] = key
+				pathToKey[path] = key
 			}
 
 			keys := make([]ledger.Key, 0, len(pErr.Paths))
 			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[string(path[:])])
+				keys = append(keys, pathToKey[path])
 			}
 			return emptyState, &ledger.ErrMissingKeys{Keys: keys}
 		}
