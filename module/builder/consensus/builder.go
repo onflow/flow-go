@@ -252,6 +252,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 	// get the latest seal in the fork, which we are extending and
 	// the corresponding block, whose result is sealed
+	// Note: the last seal might not be included in a finalized block yet
 	lastSeal, err := b.seals.ByBlockID(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve latest seal in the fork, which we are extending: %w", err)
