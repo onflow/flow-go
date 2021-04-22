@@ -32,9 +32,12 @@ func TraverseBackward(headers storage.Headers, forkHead flow.Identifier, visitor
 
 // unsafeTraverse implements the fork traversal in the order of decreasing height.
 // It is unsafe because:
-// * always calls the `visitor` on the `block`, _before_ it checks whether to stop
-// * if `block` has a lower height than lowestHeightToVisit, the traversal keeps
-//   going until we hit the root block
+// it assumes the stop condition for the for-loop has been pre-checked, 
+// which is `startBlock.Height < lowestHeightToVisit`. With the pre-check, 
+// it is guaranteed the for loop will stop eventually.
+// In other words, this unsafe function should only be called after the pre-check.
+// The `TraverseBackward` and `TraverseForward` are "safe" functions since they 
+// does the pre-check before calling the `unsafeTraverse` 
 func unsafeTraverse(headers storage.Headers, block *flow.Header, visitor onVisitBlock, lowestHeightToVisit uint64, sanityChecker sanityCheckLowestVisitedBlock) error {
 	for {
 		err := visitor(block)
