@@ -59,6 +59,9 @@ type BaseConfig struct {
 	profilerInterval time.Duration
 	profilerDuration time.Duration
 	tracerEnabled    bool
+
+	guaranteesCacheSize uint
+	receiptsCacheSize   uint
 }
 
 type Metrics struct {
@@ -74,7 +77,7 @@ type Storage struct {
 	Index        storage.Index
 	Identities   storage.Identities
 	Guarantees   storage.Guarantees
-	Receipts     storage.ExecutionReceipts
+	Receipts     *bstorage.ExecutionReceipts
 	Results      storage.ExecutionResults
 	Seals        storage.Seals
 	Payloads     storage.Payloads
@@ -161,6 +164,8 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
 		"whether to enable tracer")
 
+	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
+	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -387,10 +392,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
+	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)

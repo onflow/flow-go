@@ -19,6 +19,8 @@ func withLimit(limit uint) func(*Cache) {
 
 type storeFunc func(key interface{}, val interface{}) func(*badger.Txn) error
 
+const DefaultCacheSize = uint(1000)
+
 func withStore(store storeFunc) func(*Cache) {
 	return func(c *Cache) {
 		c.store = store
