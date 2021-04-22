@@ -74,22 +74,19 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
 	h := &Headers{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceHeader,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceHeader)),
+			withRetrieve(retrieve)),
 
-		heightCache: newCache(collector,
+		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(storeHeight),
-			withRetrieve(retrieveHeight),
-			withResource(metrics.ResourceFinalizedHeight)),
-		chunkIDCache: newCache(collector,
+			withRetrieve(retrieveHeight)),
+		chunkIDCache: newCache(collector, metrics.ResourceFinalizedHeight,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(storeChunkID),
-			withRetrieve(retrieveChunkID),
-			withResource(metrics.ResourceFinalizedHeight)),
+			withRetrieve(retrieveChunkID)),
 	}
 
 	return h
