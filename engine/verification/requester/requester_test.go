@@ -164,8 +164,8 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 	e := newRequesterEngine(t, s)
 
 	// creates a single chunk request that belongs to a sealed height.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
 	requests := unittest.ChunkDataPackRequestListFixture(1,
 		unittest.WithHeight(5),
 		unittest.WithAgrees(aggrees),
