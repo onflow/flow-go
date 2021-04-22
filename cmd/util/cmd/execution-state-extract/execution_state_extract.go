@@ -21,7 +21,15 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 
 func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
 
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+	diskWal, err := wal.NewDiskWAL(
+		zerolog.Nop(),
+		nil,
+		metrics.NewNoopCollector(),
+		dir,
+		complete.DefaultCacheSize,
+		pathfinder.PathByteSize,
+		wal.SegmentSize,
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create disk WAL: %w", err)
 	}
@@ -39,15 +47,19 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	newState, err := led.ExportCheckpointAt(targetHash,
-		[]ledger.Migration{},
+	newState, err := led.ExportCheckpointAt(
+		targetHash,
+		[]ledger.Migration{
+			migrations.StorageFormatV4Migration,
+		},
 		[]ledger.Reporter{
 			migrations.ContractReporter{Log: log, OutputDir: outputDir},
 			migrations.StorageReporter{Log: log, OutputDir: outputDir},
 		},
 		complete.DefaultPathFinderVersion,
 		outputDir,
-		wal.RootCheckpointFilename)
+		wal.RootCheckpointFilename,
+	)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
 	}
