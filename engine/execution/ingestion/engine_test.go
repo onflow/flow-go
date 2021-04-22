@@ -877,7 +877,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		require.NoError(t, err)
 
 		//// wait until all 4 blocks have been executed
-		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 15*time.Second)
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		assert.False(t, more)
 
