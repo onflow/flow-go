@@ -34,11 +34,10 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 
 	es := &EpochStatuses{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEpochStatus,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochStatus)),
+			withRetrieve(retrieve)),
 	}
 
 	return es
