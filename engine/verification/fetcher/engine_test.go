@@ -746,10 +746,9 @@ func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *fl
 
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, chunk := range chunks {
-		c := chunk // avoids shallow copy of loop variable
-		chunkID := c.ID()
+		chunkID := chunk.ID()
 		verifiableChunks[chunkID] = &verification.VerifiableChunkData{
-			Chunk:         c,
+			Chunk:         chunk,
 			Header:        block.Header,
 			Result:        result,
 			Collection:    collections[chunkID],
