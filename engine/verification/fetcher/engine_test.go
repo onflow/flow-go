@@ -1,7 +1,6 @@
 package fetcher_test
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 	"testing"
