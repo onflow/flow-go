@@ -34,11 +34,10 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
 	c := &Commits{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceCommit,
 			withLimit(100),
 			withStore(store),
 			withRetrieve(retrieve),
-			withResource(metrics.ResourceCommit),
 		),
 	}
 
