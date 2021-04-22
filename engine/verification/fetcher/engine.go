@@ -356,7 +356,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 
 	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
-		return fmt.Errorf("could not fetch execution node ids at block: %x", blockID)
+		return fmt.Errorf("could not fetch execution node ids at block %x: %w", blockID, err)
 	}
 
 	request := &verification.ChunkDataPackRequest{
