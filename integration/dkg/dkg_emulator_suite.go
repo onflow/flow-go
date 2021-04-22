@@ -345,8 +345,7 @@ func (s *DKGSuite) isDKGCompleted() bool {
 }
 
 func (s *DKGSuite) getResult() []string {
-	script := fmt.Sprintf(
-		`
+	script := fmt.Sprintf(`
 	import FlowDKG from 0x%s
 
 	pub fun main(): [String?]? {
