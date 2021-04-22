@@ -97,7 +97,7 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 func (b *Broker) Broadcast(data []byte) {
 	bcastMsg, err := b.prepareBroadcastMessage(data)
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to create broadcast message")
+		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
 	}
 	success := b.retry(
 		func() error {
