@@ -226,7 +226,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNode(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
-	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB)
+	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB, storage.DefaultCacheSize)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -324,11 +324,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
 	eventsStorage := storage.NewEvents(node.Metrics, node.DB)
 	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
-	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
+	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, storage.DefaultCacheSize)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, 100)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
-	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
 	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())

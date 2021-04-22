@@ -95,7 +95,7 @@ func (suite *Suite) RunTest(
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 
 		suite.backend = backend.New(
 			suite.state,
@@ -496,7 +496,7 @@ func (suite *Suite) TestExecuteScript() {
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 
 		identities := unittest.IdentityListFixture(1)
 		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)

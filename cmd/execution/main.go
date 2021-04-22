@@ -53,13 +53,13 @@ import (
 func main() {
 
 	var (
-		followerState               protocol.MutableState
-		ledgerStorage               *ledger.Ledger
-		events                      *storage.Events
-		serviceEvents               *storage.ServiceEvents
-		txResults                   *storage.TransactionResults
-		results                     *storage.ExecutionResults
-		receipts                    *storage.ExecutionReceipts
+		followerState protocol.MutableState
+		ledgerStorage *ledger.Ledger
+		events        *storage.Events
+		serviceEvents *storage.ServiceEvents
+		txResults     *storage.TransactionResults
+		results       *storage.ExecutionResults
+		//receipts                    *storage.ExecutionReceipts
 		myReceipts                  *storage.MyExecutionReceipts
 		providerEngine              *exeprovider.Engine
 		checkerEng                  *checker.Engine
@@ -105,7 +105,7 @@ func main() {
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
-			flags.UintVar(&chdpCacheSize, "chdp-cache", 100, "cache size for Chunk Data Packs")
+			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
@@ -140,8 +140,7 @@ func main() {
 		}).
 		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
-			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, receipts)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts)
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -257,7 +256,7 @@ func main() {
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
-				receipts,
+				node.Storage.Receipts,
 				myReceipts,
 				events,
 				serviceEvents,
