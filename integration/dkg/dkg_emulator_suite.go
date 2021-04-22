@@ -201,7 +201,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		).
 		SetPayer(s.blockchain.ServiceKey().Address)
 
-	err = fundAccountTx.AddArgument(cadence.UFix64(1_0000_0000))
+	err = fundAccountTx.AddArgument(cadence.UFix64(1_000_000))
 	require.NoError(s.T(), err)
 	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
 	require.NoError(s.T(), err)
