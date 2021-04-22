@@ -209,11 +209,9 @@ func (e *Engine) onTimer() {
 		}
 
 		updated := e.pendingRequests.IncrementAttempt(request.ID())
-		if !updated {
-			lg.Debug().Msg("could not update dispatched request, it has been resolved")
-		}
-
-		lg.Info().Msg("chunk data pack requested")
+		lg.Info().
+			Bool("pending_request_updated", updated).
+			Msg("chunk data pack requested")
 	}
 }
 
