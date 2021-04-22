@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -28,7 +29,7 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 
 	return &Events{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEvents,
 			withStore(noopStore),
 			withRetrieve(retrieve)),
 	}
@@ -110,7 +111,7 @@ func NewServiceEvents(collector module.CacheMetrics, db *badger.DB) *ServiceEven
 
 	return &ServiceEvents{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEvents,
 			withStore(noopStore),
 			withRetrieve(retrieve)),
 	}
