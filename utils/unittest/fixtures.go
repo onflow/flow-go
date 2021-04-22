@@ -1085,7 +1085,7 @@ func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
 
 func WithHeightGreaterThan(height uint64) func(*verification.ChunkDataPackRequest) {
 	return func(request *verification.ChunkDataPackRequest) {
-		request.Height = rand.Uint64() + height + 1
+		request.Height = height + rand.Uint32() + 1
 	}
 }
 
