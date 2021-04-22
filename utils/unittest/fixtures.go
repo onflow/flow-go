@@ -1104,8 +1104,7 @@ func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackReq
 // ChunkDataPackRequestFixture creates a chunk data request with some default values, i.e., one agree execution node, one disagree execution node,
 // and height of zero.
 // Use options to customize the request.
-func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
 		ChunkID:   chunkID,
