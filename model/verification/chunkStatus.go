@@ -21,7 +21,7 @@ func (s ChunkStatus) Checksum() flow.Identifier {
 type ChunkStatusList []*ChunkStatus
 
 func (l ChunkStatusList) Chunks() flow.ChunkList {
-	var chunks flow.ChunkList
+	chunks := make(flow.ChunkList, 0, len(l))
 	for _, status := range l {
 		chunks = append(chunks, status.Chunk)
 	}
