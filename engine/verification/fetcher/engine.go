@@ -117,7 +117,6 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Hex("result_id", logging.ID(locator.ResultID)).
 		Uint64("chunk_index", locator.Index).
 		Logger()
-	lg.Info().Msg("chunk locator arrived")
 
 	// retrieves result and chunk using the locator
 	result, err := e.results.ByID(locator.ResultID)
