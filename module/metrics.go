@@ -59,8 +59,13 @@ type CleanerMetrics interface {
 }
 
 type CacheMetrics interface {
+	// report the total number of cached items
 	CacheEntries(resource string, entries uint)
+	// report the number of times the queried item is found in the cache
 	CacheHit(resource string)
+	// report the number of items the queried item is not found in the cache, nor found in the database
+	CacheNotFound(resource string)
+	// report the number of items the queried item is not found in the cache, but found in the database
 	CacheMiss(resource string)
 }
 
@@ -259,7 +264,9 @@ type LedgerMetrics interface {
 
 	// ReadDurationPerItem records read time for single value (total duration / number of read values)
 	ReadDurationPerItem(duration time.Duration)
+}
 
+type WALMetrics interface {
 	// DiskSize records the amount of disk space used by the storage (in bytes)
 	DiskSize(uint64)
 }
@@ -285,6 +292,7 @@ type ExecutionMetrics interface {
 	LedgerMetrics
 	RuntimeMetrics
 	ProviderMetrics
+	WALMetrics
 
 	// StartBlockReceivedToExecuted starts a span to trace the duration of a block
 	// from being received for execution to execution being finished

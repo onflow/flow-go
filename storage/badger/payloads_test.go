@@ -2,6 +2,7 @@ package badger_test
 
 import (
 	"errors"
+
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -23,7 +24,7 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
 		results := badgerstorage.NewExecutionResults(metrics, db)
 		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
 
 		blockID := unittest.IdentifierFixture()
 		expected := unittest.PayloadFixture(unittest.WithAllTheFixins)
@@ -35,11 +36,11 @@ func TestPayloadStoreRetrieve(t *testing.T) {
 		// fetch payload
 		payload, err := store.ByBlockID(blockID)
 		require.NoError(t, err)
-		require.Equal(t, expected.Hash(), payload.Hash())
+		require.Equal(t, &expected, payload)
 	})
 }
 
-func TestPayloadRetrieveWithoutStore(t *testing.T) {
+func TestPayloadRetreiveWithoutStore(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 
@@ -48,7 +49,7 @@ func TestPayloadRetrieveWithoutStore(t *testing.T) {
 		guarantees := badgerstorage.NewGuarantees(metrics, db)
 		results := badgerstorage.NewExecutionResults(metrics, db)
 		receipts := badgerstorage.NewExecutionReceipts(metrics, db, results)
-		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts)
+		store := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
 
 		blockID := unittest.IdentifierFixture()
 

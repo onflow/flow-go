@@ -116,7 +116,7 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 // NextTimeout sets the next timeout of the protocol if any timeout applies
 func (s *JointFeldmanState) NextTimeout() error {
 	if !s.jointRunning {
-		return errors.New("dkg protocol is not running")
+		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
@@ -136,7 +136,7 @@ func (s *JointFeldmanState) NextTimeout() error {
 // - the finalized private key which is the current node's own private key share
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
-		return nil, nil, nil, errors.New("dkg protocol is not running")
+		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
 	}
 
 	disqualifiedTotal := 0
@@ -198,7 +198,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 // orig is the message origin index
 func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return errors.New("dkg protocol is not running")
+		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
@@ -213,7 +213,7 @@ func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 // orig is the message origin index
 func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return errors.New("dkg protocol is not running")
+		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandlePrivateMsg(orig, msg)

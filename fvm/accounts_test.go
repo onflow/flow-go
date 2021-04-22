@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -724,7 +722,7 @@ func TestAddAccountKey(t *testing.T) {
 
 	t.Run("Invalid hash algorithms", func(t *testing.T) {
 
-		for _, hashAlgo := range []string{"SHA2_384", "SHA3_384", "KMAC_128"} {
+		for _, hashAlgo := range []string{"SHA2_384", "SHA3_384"} {
 
 			t.Run(hashAlgo,
 				newVMTest().withContextOptions(options...).
@@ -764,65 +762,7 @@ func TestAddAccountKey(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "invalid account key hash algorithm")
-
-						after, err := vm.GetAccount(ctx, address, view, programs)
-						require.NoError(t, err)
-
-						assert.Empty(t, after.Keys)
-					}),
-			)
-		}
-	})
-
-	t.Run("Invalid signing algorithms", func(t *testing.T) {
-
-		for _, signingAlgo := range []string{"BLS_BLS12381"} {
-
-			t.Run(signingAlgo,
-				newVMTest().withContextOptions(options...).
-					run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-						address := createAccount(t, vm, chain, ctx, view, programs)
-
-						privateKey, err := unittest.AccountKeyFixture(
-							crypto.KeyGenSeedMaxLenBLSBLS12381,
-							crypto.BLSBLS12381,
-							hash.SHA3_256,
-						)
-
-						require.NoError(t, err)
-
-						_, publicKeyArg := newAccountKey(t, privateKey, accountKeyAPIVersionV2)
-
-						txBody := flow.NewTransactionBody().
-							SetScript([]byte(fmt.Sprintf(
-								`
-								transaction(key: [UInt8]) {
-								  prepare(signer: AuthAccount) {
-								    let publicKey = PublicKey(
-									  publicKey: key,
-									  signatureAlgorithm: SignatureAlgorithm.%s
-									)
-								    signer.keys.add(
-								      publicKey: publicKey,
-								      hashAlgorithm: HashAlgorithm.SHA2_256,
-								      weight: 1000.0
-								    )
-								  }
-								}
-								`,
-								signingAlgo,
-							))).
-							AddArgument(publicKeyArg).
-							AddAuthorizer(address)
-
-						tx := fvm.Transaction(txBody, 0)
-
-						err = vm.Run(ctx, tx, view, programs)
-						require.NoError(t, err)
-
-						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "invalid account key signature algorithm")
+						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not found")
 
 						after, err := vm.GetAccount(ctx, address, view, programs)
 						require.NoError(t, err)
@@ -1260,6 +1200,121 @@ func TestGetAccountKey(t *testing.T) {
 
 					assert.Equal(t, expected, tx.Logs[i])
 				}
+			}),
+	)
+}
+
+func TestAccountBalanceFields(t *testing.T) {
+	t.Run("Get balance works",
+		newVMTest().withContextOptions(
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				account := createAccount(t, vm, chain, ctx, view, programs)
+
+				txBody := transferTokensTx(chain).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err := vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.balance
+					}
+				`, account.Hex())))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				assert.NoError(t, err)
+
+				assert.Equal(t, cadence.UFix64(1_0000_0000), script.Value)
+			}),
+	)
+
+	t.Run("Get available balance works",
+		newVMTest().withContextOptions(
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(10_0000_0000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				account := createAccount(t, vm, chain, ctx, view, programs)
+
+				txBody := transferTokensTx(chain).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err := vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.availableBalance
+					}
+				`, account.Hex())))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.UFix64(9999_5030), script.Value)
+			}),
+	)
+
+	t.Run("Get available balance works with minimum balance",
+		newVMTest().withContextOptions(
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(10_0000_0000),
+			fvm.WithAccountCreationFee(10_0000),
+			fvm.WithMinimumStorageReservation(10_0000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				account := createAccount(t, vm, chain, ctx, view, programs)
+
+				txBody := transferTokensTx(chain).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err := vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.availableBalance
+					}
+				`, account.Hex())))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				// Should be 1_0000_0000 because 10_0000 was given to it during account creation and is now locked up
+				assert.Equal(t, cadence.UFix64(1_0000_0000), script.Value)
 			}),
 	)
 }

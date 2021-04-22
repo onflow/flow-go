@@ -1,19 +1,19 @@
 module github.com/onflow/flow-go/integration
 
-go 1.13
+go 1.15
 
 require (
 	github.com/dapperlabs/testingdock v0.4.3-0.20200626075145-ea23fc16bb90
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
-	github.com/go-openapi/strfmt v0.19.5 // indirect
+	github.com/go-openapi/strfmt v0.20.0 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.14.1
+	github.com/onflow/cadence v0.15.1
 	github.com/onflow/flow-go v0.11.1 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.15.0
+	github.com/onflow/flow-go-sdk v0.18.0
 	github.com/onflow/flow-go/crypto v0.12.0 // replaced by version on-disk
-	github.com/onflow/flow/protobuf/go/flow v0.1.9
+	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.19.0
 	github.com/stretchr/testify v1.7.0

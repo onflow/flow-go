@@ -20,11 +20,12 @@ import (
 
 type backendEvents struct {
 	staticExecutionRPC execproto.ExecutionAPIClient
-	blocks             storage.Blocks
+	headers            storage.Headers
 	executionReceipts  storage.ExecutionReceipts
 	state              protocol.State
 	connFactory        ConnectionFactory
 	log                zerolog.Logger
+	maxHeightRange     uint
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -37,6 +38,11 @@ func (b *backendEvents) GetEventsForHeightRange(
 
 	if endHeight < startHeight {
 		return nil, status.Error(codes.InvalidArgument, "invalid start or end height")
+	}
+
+	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
+	if rangeSize > uint64(b.maxHeightRange) {
+		return nil, fmt.Errorf("requested block range (%d) exceeded maximum (%d)", rangeSize, b.maxHeightRange)
 	}
 
 	// get the latest sealed block header
@@ -60,12 +66,12 @@ func (b *backendEvents) GetEventsForHeightRange(
 	blockHeaders := make([]*flow.Header, 0)
 
 	for i := startHeight; i <= endHeight; i++ {
-		block, err := b.blocks.ByHeight(i)
+		header, err := b.headers.ByHeight(i)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 		}
 
-		blockHeaders = append(blockHeaders, block.Header)
+		blockHeaders = append(blockHeaders, header)
 	}
 
 	return b.getBlockEventsFromExecutionNode(ctx, blockHeaders, eventType)
@@ -78,15 +84,19 @@ func (b *backendEvents) GetEventsForBlockIDs(
 	blockIDs []flow.Identifier,
 ) ([]flow.BlockEvents, error) {
 
+	if uint(len(blockIDs)) > b.maxHeightRange {
+		return nil, fmt.Errorf("requested block range (%d) exceeded maximum (%d)", len(blockIDs), b.maxHeightRange)
+	}
+
 	// find the block headers for all the block IDs
 	blockHeaders := make([]*flow.Header, 0)
 	for _, blockID := range blockIDs {
-		block, err := b.blocks.ByID(blockID)
+		header, err := b.headers.ByBlockID(blockID)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 		}
 
-		blockHeaders = append(blockHeaders, block.Header)
+		blockHeaders = append(blockHeaders, header)
 	}
 
 	// forward the request to the execution node

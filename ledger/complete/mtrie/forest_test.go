@@ -3,9 +3,7 @@ package mtrie
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -24,11 +22,7 @@ import (
 func TestTrieOperations(t *testing.T) {
 	pathByteSize := 32 // path size of 256 bits
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// Make new Trie (independently of MForest):
@@ -60,12 +54,8 @@ func TestTrieOperations(t *testing.T) {
 func TestTrieUpdate(t *testing.T) {
 	pathByteSize := 32 // path size of 256 bits
 
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
-
 	metricsCollector := &metrics.NoopCollector{}
-	forest, err := NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	forest, err := NewForest(pathByteSize, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := forest.GetEmptyRootHash()
 
@@ -96,11 +86,8 @@ func TestLeftEmptyInsert(t *testing.T) {
 	//    (X)  [~]      //
 	//////////////////////
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -161,11 +148,8 @@ func TestRightEmptyInsert(t *testing.T) {
 	//    [~]  (X)       //
 	///////////////////////
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 0000...
@@ -230,11 +214,8 @@ func TestExpansionInsert(t *testing.T) {
 	////////////////////////
 
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 100000...
@@ -296,11 +277,8 @@ func TestFullHouseInsert(t *testing.T) {
 	///////////////////////
 
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// paths p0 forms [~1]; p1 and p2 form [~2]
@@ -371,11 +349,8 @@ func TestLeafInsert(t *testing.T) {
 	//         ()  ()    //
 	///////////////////////
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 000...0000000100000000
@@ -411,11 +386,8 @@ func TestLeafInsert(t *testing.T) {
 // We verify that values for _all_ paths in the updated Trie have correct payloads
 func TestOverrideValue(t *testing.T) {
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -454,11 +426,8 @@ func TestOverrideValue(t *testing.T) {
 // We expect that the _last_ written value is persisted in the Trie
 func TestDuplicateOverride(t *testing.T) {
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -490,11 +459,8 @@ func TestDuplicateOverride(t *testing.T) {
 // ie. copy of the data is returned, instead of a slice
 func TestReadSafety(t *testing.T) {
 	pathByteSize := 32 // path size of 256 bits
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 1000...
@@ -526,11 +492,8 @@ func TestReadSafety(t *testing.T) {
 // TestUpdateWithWrongPathSize verifies that attempting to update a trie with a wrong path size
 func TestUpdateWithWrongPathSize(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// short key
@@ -557,11 +520,8 @@ func TestUpdateWithWrongPathSize(t *testing.T) {
 // TestReadOrder tests that payloads from reading a trie are delivered in the order as specified by the paths
 func TestReadOrder(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(116), uint8(74)}, pathByteSize)
@@ -579,12 +539,14 @@ func TestReadOrder(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: testRoot, Paths: []ledger.Path{p1, p2}}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
+	require.Equal(t, len(retPayloads), len(payloads))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[0])))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[1]), encoding.EncodePayload(payloads[1])))
 
 	read = &ledger.TrieRead{RootHash: testRoot, Paths: []ledger.Path{p2, p1}}
 	retPayloads, err = forest.Read(read)
 	require.NoError(t, err)
+	require.Equal(t, len(retPayloads), len(payloads))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[1]), encoding.EncodePayload(payloads[0])))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[1])))
 }
@@ -593,11 +555,8 @@ func TestReadOrder(t *testing.T) {
 // We expect the default payload (nil) to be returned for unset registers.
 func TestMixRead(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// path: 01111101...
@@ -638,11 +597,8 @@ func TestMixRead(t *testing.T) {
 // We expect that we receive the respective value twice in the return.
 func TestReadWithDuplicatedKeys(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -662,6 +618,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
+	require.Equal(t, len(expectedPayloads), len(retPayloads))
 	for i := range paths {
 		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(expectedPayloads[i])))
 	}
@@ -670,11 +627,8 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 // TestReadNonExistingPath tests reading an unset path.
 func TestReadNonExistingPath(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -696,11 +650,8 @@ func TestReadNonExistingPath(t *testing.T) {
 // TestReadWithWrongPathSize verifies that attempting to read a trie with wrong path size
 func TestReadWithWrongPathSize(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	// setup
@@ -730,11 +681,8 @@ func TestReadWithWrongPathSize(t *testing.T) {
 // updated values independently of the other update.
 func TestForkingUpdates(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -795,11 +743,8 @@ func TestForkingUpdates(t *testing.T) {
 // without an error.
 func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)}, pathByteSize)
@@ -840,7 +785,7 @@ func TestIdenticalUpdateAppliedTwice(t *testing.T) {
 }
 
 // TestRandomUpdateReadProof repeats a sequence of actions update, read and proof random paths
-// this simulates the common patern of actions on flow
+// this simulates the common pattern of actions on flow
 func TestRandomUpdateReadProof(t *testing.T) {
 	pathByteSize := 32
 	minPayloadByteSize := 2
@@ -848,11 +793,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	rep := 10
 	maxNumPathsPerStep := 10
 	rand.Seed(time.Now().UnixNano())
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir) // clean up
 
-	forest, err := NewForest(pathByteSize, dir, 5, &metrics.NoopCollector{}, nil)
+	forest, err := NewForest(pathByteSize, 5, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	activeRoot := forest.GetEmptyRootHash()
@@ -930,12 +872,9 @@ func TestRandomUpdateReadProof(t *testing.T) {
 // TestProofGenerationInclusion tests that inclusion proofs generated by a Trie pass verification
 func TestProofGenerationInclusion(t *testing.T) {
 	pathByteSize := 32
-	dir, err := ioutil.TempDir("", "test-mtrie-")
-	require.NoError(t, err)
-	defer os.RemoveAll(dir)
 
 	metricsCollector := &metrics.NoopCollector{}
-	forest, err := NewForest(pathByteSize, dir, 5, metricsCollector, nil)
+	forest, err := NewForest(pathByteSize, 5, metricsCollector, nil)
 	require.NoError(t, err)
 	emptyRoot := forest.GetEmptyRootHash()
 

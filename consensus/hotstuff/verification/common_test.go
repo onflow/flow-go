@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/signature"
@@ -50,7 +51,7 @@ func MakeBeaconSigner(t *testing.T, committee hotstuff.Committee, signerID flow.
 	require.NoError(t, err)
 	staking := signature.NewAggregationProvider("test_staking", local)
 	beacon := signature.NewThresholdProvider("test_beacon", beaconPriv)
-	combiner := signature.NewCombiner()
+	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 	signer := NewCombinedSigner(committee, staking, beacon, combiner, signerID)
 	return signer
 }

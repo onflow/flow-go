@@ -111,6 +111,8 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'Connector' -dir=network/p2p/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
@@ -122,6 +124,8 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'IngestRPC' -dir="./engine/execution/ingestion" -case=underscore -tags relic -output="./engine/execution/ingestion/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=model/fingerprint -case=underscore -output="./model/fingerprint/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ExecForkActor' --structname 'ExecForkActorMock' -dir=module/mempool/consensus/mock/ -case=underscore -output="./module/mempool/consensus/mock/" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/verification/fetcher/ -case=underscore -output="./engine/verification/fetcher/mock" -outpkg="mockfetcher"
+
 
 
 
@@ -284,6 +288,10 @@ PHONY: docker-build-bootstrap
 docker-build-bootstrap:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap --target production \
 		-t "$(CONTAINER_REGISTRY)/bootstrap:latest" -t "$(CONTAINER_REGISTRY)/bootstrap:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap:$(IMAGE_TAG)" .
+
+PHONY: tool-bootstrap
+tool-bootstrap: docker-build-bootstrap
+	docker container create --name bootstrap $(CONTAINER_REGISTRY)/bootstrap:latest;docker container cp bootstrap:/bin/app ./bootstrap;docker container rm bootstrap
 
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:

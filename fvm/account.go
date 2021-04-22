@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/cadence"
@@ -24,18 +23,11 @@ func getAccount(
 
 	account, err := accounts.Get(address)
 	if err != nil {
-		if errors.Is(err, state.ErrAccountNotFound) {
-			return nil, ErrAccountNotFound
-		}
-
 		return nil, err
 	}
 
 	if ctx.ServiceAccountEnabled {
-		env, err := newEnvironment(ctx, vm, sth, programs)
-		if err != nil {
-			return nil, err
-		}
+		env := newEnvironment(ctx, vm, sth, programs)
 		balance, err := env.GetAccountBalance(common.BytesToAddress(address.Bytes()))
 		if err != nil {
 			return nil, err
@@ -67,6 +59,14 @@ import FlowServiceAccount from 0x%s
 pub fun main(): UFix64 {
   let acct = getAccount(0x%s)
   return FlowServiceAccount.defaultTokenBalance(acct)
+}
+`
+
+const getFlowTokenAvailableBalanceScriptTemplate = `
+import FlowStorageFees from 0x%s
+
+pub fun main(): UFix64 {
+  return FlowStorageFees.defaultTokenAvailableBalance(0x%s)
 }
 `
 
@@ -102,6 +102,10 @@ func initAccountTransaction(
 
 func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
 	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
+}
+
+func getFlowTokenAvailableBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
+	return Script([]byte(fmt.Sprintf(getFlowTokenAvailableBalanceScriptTemplate, serviceAddress, accountAddress)))
 }
 
 func getStorageCapacityScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {

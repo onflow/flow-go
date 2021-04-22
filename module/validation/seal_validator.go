@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -29,11 +30,12 @@ type sealValidator struct {
 	seals                                storage.Seals
 	headers                              storage.Headers
 	payloads                             storage.Payloads
+	results                              storage.ExecutionResults
 	requiredApprovalsForSealVerification uint
 	metrics                              module.ConsensusMetrics
 }
 
-func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
+func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, results storage.ExecutionResults, seals storage.Seals,
 	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint, metrics module.ConsensusMetrics) *sealValidator {
 
 	rv := &sealValidator{
@@ -41,6 +43,7 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 		assigner:                             assigner,
 		verifier:                             verifier,
 		headers:                              headers,
+		results:                              results,
 		seals:                                seals,
 		payloads:                             payloads,
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
@@ -141,29 +144,37 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// collect IDs of blocks on the fork (from parent to last sealed)
 	var blockIDs []flow.Identifier
 
+	resultsById := candidate.Payload.Results.Lookup()
+	fetchResult := func(resultID flow.Identifier) *flow.ExecutionResult {
+		res, ok := resultsById[resultID]
+		if !ok {
+			res, err := s.results.ByID(resultID)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("no result in storage: %v", resultID)
+			}
+			return res
+		}
+		return res
+	}
+
 	// loop through the fork backwards from the parent block
 	// up to last sealed block and collect
 	// IncorporatedResults as well as the IDs of blocks visited
 	sealedID := last.BlockID
-	ancestorID := header.ParentID
-	for ancestorID != sealedID {
-
-		ancestor, err := s.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve ancestor header (%x): %w", ancestorID, err)
-		}
-
+	err = state.TraverseBackward(s.headers, header.ParentID, func(header *flow.Header) error {
+		blockID := header.ID()
 		// keep track of blocks on the fork
-		blockIDs = append(blockIDs, ancestorID)
+		blockIDs = append(blockIDs, blockID)
 
-		payload, err := s.payloads.ByBlockID(ancestorID)
+		payload, err := s.payloads.ByBlockID(blockID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get block payload %x: %w", ancestorID, err)
+			return fmt.Errorf("could not get block payload %x: %w", blockID, err)
 		}
 
 		// Collect execution results from receipts.
 		for _, receipt := range payload.Receipts {
-			resultID := receipt.ExecutionResult.ID()
+			resultID := receipt.ResultID
+			result := fetchResult(resultID)
 			// unsealedResults should contain the _first_ appearance of the
 			// ExecutionResult. We are traversing the fork backwards, so we can
 			// overwrite any previously recorded result.
@@ -175,13 +186,17 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			// we are still using a temporary sealing logic where the
 			// IncorporatedBlockID is expected to be the result's block ID.
 			unsealedResults[resultID] = flow.NewIncorporatedResult(
-				receipt.ExecutionResult.BlockID,
-				&receipt.ExecutionResult,
+				result.BlockID,
+				result,
 			)
 
 		}
-
-		ancestorID = ancestor.ParentID
+		return nil
+	}, func(header *flow.Header) bool {
+		return sealedID != header.ParentID
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// We do not include the receipts in the same payload to the unsealedResults.

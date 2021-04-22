@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-
 	"math/rand"
 	"os"
 	"os/signal"
@@ -393,7 +392,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
 	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
-	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts)
+	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
 	transactions := bstorage.NewTransactions(fnb.Metrics.Cache, fnb.DB)
 	collections := bstorage.NewCollections(fnb.DB, transactions)
@@ -465,8 +464,9 @@ func (fnb *FlowNodeBuilder) initState() {
 		fnb.MustNot(err).Msg("could not load root block from protocol state")
 		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
 			fnb.Logger.Fatal().Msgf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
+				rootBlockFromState.ID(),
 				fnb.RootBlock.ID(),
-				fnb.RootBlock.ID())
+			)
 		}
 	} else {
 		// Bootstrap!
@@ -549,6 +549,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
+			fvm.WithAccountStorageLimit(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts

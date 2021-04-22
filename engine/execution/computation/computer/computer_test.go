@@ -16,33 +16,45 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
+	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
+
+	rag := &RandomAddressGenerator{}
 
 	t.Run("single collection", func(t *testing.T) {
 
 		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
-
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
-		require.NoError(t, err)
-
-		// create a block with 1 collection with 2 transactions
-		block := generateBlock(1, 2)
-
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
+
+		committer := new(computermock.ViewCommitter)
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
+			Times(2 + 1) // 2 txs in collection + system chunk
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+		require.NoError(t, err)
+
+		// create a block with 1 collection with 2 transactions
+		block := generateBlock(1, 2, rag)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -60,16 +72,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
+		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		// create an empty block
-		block := generateBlock(0, 0)
+		block := generateBlock(0, 0, rag)
 		programs := programs.NewEmptyPrograms()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
 			Return(nil).
+			Once() // just system chunk
+
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
 			Once() // just system chunk
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -79,7 +96,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TransactionResult, 1)
+		assert.Len(t, result.TransactionResults, 1)
 
 		vm.AssertExpectations(t)
 	})
@@ -88,8 +105,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
+		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -99,19 +117,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
-		block := generateBlock(collectionCount, transactionsPerCollection)
+		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 		programs := programs.NewEmptyPrograms()
 
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, programs).
 			Run(func(args mock.Arguments) {
 				tx := args[1].(*fvm.TransactionProcedure)
 
-				tx.Err = &fvm.MissingPayerError{}
+				tx.Err = fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided")
 				// create dummy events
 				tx.Events = generateEvents(eventsPerTransaction, tx.TxIndex)
 			}).
 			Return(nil).
 			Times(totalTransactionCount)
+
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
+			Times(collectionCount + 1)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -142,12 +164,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  "no payer address provided",
+					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
+		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
 
 		vm.AssertExpectations(t)
 	})
@@ -163,7 +185,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
 
 		// create a block with 2 collections with 2 transactions each
-		block := generateBlock(collectionCount, transactionsPerCollection)
+		block := generateBlock(collectionCount, transactionsPerCollection, rag)
 
 		ordinaryEvent := cadence.Event{
 			EventType: &cadence.EventType{
@@ -211,9 +233,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(emittingRuntime)
+		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
@@ -272,14 +294,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		const collectionCount = 2
 		const transactionCount = 2
-		block := generateBlock(collectionCount, transactionCount)
+		block := generateBlock(collectionCount, transactionCount, rag)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -341,12 +363,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		vm := fvm.New(rt)
+		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, nil, zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
-		block := generateBlock(collectionCount, transactionCount)
+		block := generateBlock(collectionCount, transactionCount, rag)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -362,6 +384,8 @@ type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
 }
+
+var _ runtime.Runtime = &testRuntime{}
 
 func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return e.executeScript(script, context)
@@ -383,13 +407,105 @@ func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
 }
 
-func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBlock {
+func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadStored not expected")
+}
+
+func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadLinked not expected")
+}
+
+type RandomAddressGenerator struct{}
+
+func (r *RandomAddressGenerator) NextAddress() (flow.Address, error) {
+	return flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000))), nil
+}
+
+func (r *RandomAddressGenerator) CurrentAddress() flow.Address {
+	return flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000)))
+}
+
+func (r *RandomAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+type FixedAddressGenerator struct {
+	Address flow.Address
+}
+
+func (f *FixedAddressGenerator) NextAddress() (flow.Address, error) {
+	return f.Address, nil
+}
+
+func (f *FixedAddressGenerator) CurrentAddress() flow.Address {
+	return f.Address
+}
+
+func (f *FixedAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
+
+	address := flow.HexToAddress("1234")
+	fag := &FixedAddressGenerator{Address: address}
+
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
+	execCtx := fvm.NewContext(zerolog.Nop())
+
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+
+	key, err := unittest.AccountKeyDefaultFixture()
+	require.NoError(t, err)
+
+	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+		return ledger.Get(owner, controller, key)
+	})
+	sth := state.NewStateHolder(state.NewState(view))
+	accounts := state.NewAccounts(sth)
+
+	// account creation, signing of transaction and bootstrapping ledger should not be required for this test
+	// as freeze check should happen before a transaction signature is checked
+	// but we currently discard all the touches if it fails and any point
+	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
+	require.NoError(t, err)
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	require.NoError(t, err)
+
+	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {
+		err := testutil.SignTransaction(txBody, txBody.Payer, *key, 0)
+		require.NoError(t, err)
+	})
+
+	_, err = exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+	assert.NoError(t, err)
+
+	registerTouches := view.Interactions().RegisterTouches()
+
+	// make sure check for frozen account has been registered
+	id := flow.RegisterID{
+		Owner:      string(address.Bytes()),
+		Controller: "",
+		Key:        state.KeyAccountFrozen,
+	}
+
+	require.Contains(t, registerTouches, id.String())
+	require.Equal(t, id, registerTouches[id.String()])
+
+}
+func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
+	return generateBlockWithVisitor(collectionCount, transactionCount, addressGenerator, nil)
+}
+
+func generateBlockWithVisitor(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator, visitor func(body *flow.TransactionBody)) *entity.ExecutableBlock {
 	collections := make([]*entity.CompleteCollection, collectionCount)
 	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
 	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection)
 
 	for i := 0; i < collectionCount; i++ {
-		collection := generateCollection(transactionCount)
+		collection := generateCollection(transactionCount, addressGenerator, visitor)
 		collections[i] = collection
 		guarantees[i] = collection.Guarantee
 		completeCollections[collection.Guarantee.ID()] = collection
@@ -410,14 +526,22 @@ func generateBlock(collectionCount, transactionCount int) *entity.ExecutableBloc
 	}
 }
 
-func generateCollection(transactionCount int) *entity.CompleteCollection {
+func generateCollection(transactionCount int, addressGenerator flow.AddressGenerator, visitor func(body *flow.TransactionBody)) *entity.CompleteCollection {
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
 	for i := 0; i < transactionCount; i++ {
-		transactions[i] = &flow.TransactionBody{
-			Payer:  flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000))), // a unique payer for each tx to generate a unique id
+		nextAddress, err := addressGenerator.NextAddress()
+		if err != nil {
+			panic(fmt.Errorf("cannot generate next address in test: %w", err))
+		}
+		txBody := &flow.TransactionBody{
+			Payer:  nextAddress, // a unique payer for each tx to generate a unique id
 			Script: []byte("transaction { execute {} }"),
 		}
+		if visitor != nil {
+			visitor(txBody)
+		}
+		transactions[i] = txBody
 	}
 
 	collection := flow.Collection{Transactions: transactions}

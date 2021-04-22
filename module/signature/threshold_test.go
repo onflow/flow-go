@@ -37,7 +37,7 @@ func TestThresholdSignVerify(t *testing.T) {
 		signers, _ := createThresholdsT(t, n)
 		signer := signers[0]
 		altSigner := signers[1]
-		msg := createMSGT(t)
+		msg := randomByteSliceT(t, 128)
 
 		// generate the signature
 		sig, err := signer.Sign(msg)
@@ -67,7 +67,7 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 		// create signers and message to be signed
 		signers, groupKey := createThresholdsT(t, n)
 		_, altGroupKey := createThresholdsT(t, n)
-		msg := createMSGT(t)
+		msg := randomByteSliceT(t, 128)
 
 		// create a signature share for each signer and store index
 		shares := make([]crypto.Signature, 0, len(signers))
@@ -90,7 +90,7 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 			enoughShares, err = crypto.EnoughShares(RandomBeaconThreshold(len(signers)), sufficient)
 			require.NoError(t, err)
 		}
-		threshold, err := signers[0].Combine(uint(len(signers)), shares[:sufficient], indices[:sufficient])
+		threshold, err := signers[0].Reconstruct(uint(len(signers)), shares[:sufficient], indices[:sufficient])
 		require.NoError(t, err, "should be able to create threshold signature with sufficient shares")
 
 		// should not generate valid signature with insufficient signers
@@ -101,11 +101,11 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 			enoughShares, err = crypto.EnoughShares(RandomBeaconThreshold(len(signers)), insufficient)
 			require.NoError(t, err)
 		}
-		_, err = signers[0].Combine(uint(len(signers)), shares[:insufficient], indices[:insufficient])
+		_, err = signers[0].Reconstruct(uint(len(signers)), shares[:insufficient], indices[:insufficient])
 		require.Error(t, err, "should not be able to create threshold signature with insufficient shares")
 
 		// should not be able to generate signature with missing indices
-		_, err = signers[0].Combine(uint(len(signers)), shares, indices[:len(indices)-1])
+		_, err = signers[0].Reconstruct(uint(len(signers)), shares, indices[:len(indices)-1])
 		require.Error(t, err, "should not be able to create threshold signature with missing indices")
 
 		// threshold signature should be valid for the group public key
@@ -134,7 +134,7 @@ func TestThresholdCombineVerifyThreshold(t *testing.T) {
 
 		// should not generate valid signature with swapped indices
 		indices[0], indices[1] = indices[1], indices[0]
-		threshold, err = signers[0].Combine(n, shares, indices)
+		threshold, err = signers[0].Reconstruct(n, shares, indices)
 		require.NoError(t, err)
 		valid, err = signers[0].VerifyThreshold(msg, threshold, groupKey)
 		require.NoError(t, err)
@@ -156,14 +156,14 @@ func createThresholdsB(b *testing.B, n uint) []*ThresholdProvider {
 	return signers
 }
 
-func BenchmarkThresholdCombination(b *testing.B) {
+func BenchmarkThresholdReconstruction(b *testing.B) {
 
 	// stop timer and reset to zero
 	b.StopTimer()
 	b.ResetTimer()
 
 	// generate the desired fake threshold signature participants and create signatures
-	msg := createMSGB(b)
+	msg := randomByteSliceB(b)
 	signers := createThresholdsB(b, NUM_THRES_BENCH)
 	sigs := make([]crypto.Signature, 0, len(signers))
 	indices := make([]uint, 0, len(signers))
@@ -179,7 +179,7 @@ func BenchmarkThresholdCombination(b *testing.B) {
 	// start the timer and run the benchmark on threshold signatures
 	b.StartTimer()
 	for n := 0; n < b.N; n++ {
-		_, err := signers[0].Combine(uint(len(signers)), sigs, indices)
+		_, err := signers[0].Reconstruct(uint(len(signers)), sigs, indices)
 		if err != nil {
 			b.Fatal(err)
 		}

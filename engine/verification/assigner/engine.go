@@ -58,7 +58,7 @@ func New(
 	}
 }
 
-func (e *Engine) withBlockConsumerNotifier(notifier module.ProcessingNotifier) {
+func (e *Engine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 	e.blockConsumerNotifier = notifier
 }
 
@@ -70,27 +70,23 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// receiptChunkAssignment receives a receipt that appears in a finalized container block. In case this verification node
-// is staked at the reference block of this execution receipt's result, chunk assignment is done on the execution result of the receipt,
-// and the list of assigned chunks returned.
-func (e *Engine) receiptChunkAssignment(ctx context.Context,
-	receipt *flow.ExecutionReceipt,
-	containerBlockID flow.Identifier) (flow.ChunkList, error) {
-	receiptID := receipt.ID()
-	resultID := receipt.ExecutionResult.ID()
-	referenceBlockID := receipt.ExecutionResult.BlockID
-
+// resultChunkAssignment receives an execution result that appears in a finalized incorporating block.
+// In case this verification node is staked at the reference block of this execution receipt's result,
+// chunk assignment is computed for the result, and the list of assigned chunks returned.
+func (e *Engine) resultChunkAssignment(ctx context.Context,
+	result *flow.ExecutionResult,
+	incorporatingBlock flow.Identifier,
+) (flow.ChunkList, error) {
+	resultID := result.ID()
 	log := log.With().
-		Hex("receipt_id", logging.ID(receiptID)).
 		Hex("result_id", logging.ID(resultID)).
-		Hex("reference_block_id", logging.ID(referenceBlockID)).
-		Hex("container_block_id", logging.ID(containerBlockID)).
+		Hex("executed_block_id", logging.ID(result.BlockID)).
+		Hex("incorporating_block_id", logging.ID(incorporatingBlock)).
 		Logger()
-
 	e.metrics.OnExecutionReceiptReceived()
 
 	// verification node should be staked at the reference block id.
-	ok, err := stakedAsVerification(e.state, referenceBlockID, e.me.NodeID())
+	ok, err := stakedAsVerification(e.state, result.BlockID, e.me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not verify stake of verification node for result at reference block id: %w", err)
 	}
@@ -100,7 +96,7 @@ func (e *Engine) receiptChunkAssignment(ctx context.Context,
 	}
 
 	// chunk assignment
-	chunkList, err := e.chunkAssignments(ctx, &receipt.ExecutionResult)
+	chunkList, err := e.chunkAssignments(ctx, result, incorporatingBlock)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
@@ -182,35 +178,36 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	assignedChunksCount := uint64(0)
 	processedChunksCount := uint64(0)
 
-	log := e.log.With().
+	lg := e.log.With().
 		Hex("block_id", logging.ID(blockID)).
 		Uint64("block_height", block.Header.Height).
-		Int("receipt_num", len(block.Payload.Receipts)).Logger()
+		Int("result_num", len(block.Payload.Results)).Logger()
+	lg.Debug().Msg("new finalized block arrived")
 
-	log.Debug().Msg("new finalized block arrived")
+	// determine chunk assigment on each result and pushes the assigned chunks to the chunks queue.
+	receiptsGroupedByResultID := block.Payload.Receipts.GroupByResultID() // for logging purposes
+	for _, result := range block.Payload.Results {
+		resultID := result.ID()
 
-	// performs chunk assigment on each receipt and pushes the assigned chunks to the
-	// chunks queue.
-	for _, receipt := range block.Payload.Receipts {
-		chunkList, err := e.receiptChunkAssignmentWithTracing(ctx, receipt, blockID)
-		resultID := receipt.ExecutionResult.ID()
+		// log receipts committing to result
+		resultLog := lg.With().Hex("result_id", logging.ID(resultID)).Logger()
+		for _, receipt := range receiptsGroupedByResultID.GetGroup(resultID) {
+			resultLog = resultLog.With().Hex("receipts_for_result", logging.ID(receipt.ID())).Logger()
+		}
+		resultLog.Debug().Msg("determining chunk assignment for incorporated result")
+
+		// compute chunk assignment
+		chunkList, err := e.resultChunkAssignmentWithTracing(ctx, result, blockID)
 		if err != nil {
-			log.Fatal().
-				Err(err).
-				Hex("receipt_id", logging.ID(receipt.ID())).
-				Hex("result_id", logging.ID(resultID)).
-				Hex("executor_id", logging.ID(receipt.ExecutorID)).
-				Msg("could not determine assigned chunks of the receipt")
+			resultLog.Fatal().Err(err).Msg("could not determine assigned chunks for result")
 		}
 
 		assignedChunksCount += uint64(len(chunkList))
-
 		for _, chunk := range chunkList {
 			processed, err := e.processChunkWithTracing(ctx, chunk, resultID)
 			if err != nil {
-				log.Fatal().
+				resultLog.Fatal().
 					Err(err).
-					Hex("result_id", logging.ID(resultID)).
 					Hex("chunk_id", logging.ID(chunk.ID())).
 					Uint64("chunk_index", chunk.Index).
 					Msg("could not process chunk")
@@ -223,19 +220,29 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 	}
 
 	e.metrics.OnAssignerProcessFinalizedBlock(block.Header.Height)
-	log.Info().
+	lg.Info().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
 		Msg("finished processing finalized block")
 }
 
 // chunkAssignments returns the list of chunks in the chunk list assigned to this verification node.
-func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult) (flow.ChunkList, error) {
+func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionResult, incorporatingBlock flow.Identifier) (flow.ChunkList, error) {
 	var span opentracing.Span
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
 
-	assignment, err := e.assigner.Assign(result, result.BlockID)
+	// TODO remove shortcut which is only applicable during Sealing Phase 2
+	// Details: in the mature protocol, the chunk assignment for a result is computed
+	// using the Source of Randomness from the _first_ block that incorporates the result
+	// in the respective fork. Per protocol definition, a result is only incorporated _once_
+	// in each fork, specifically in the first block that contains an execution receipt
+	// committing to the result.
+	// However, for Sealing Phase 2, we use a NON-BFT shortcut: we use the source of
+	// randomness from the block the result is for.
+	incorporatingBlock = result.BlockID
+
+	assignment, err := e.assigner.Assign(result, incorporatingBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -276,13 +283,16 @@ func stakedAsVerification(state protocol.State, blockID flow.Identifier, identif
 	return true, nil
 }
 
-// receiptChunkAssignmentWithTracing handles the chunk assignment of a receipt in a container block with tracing enabled.
-func (e *Engine) receiptChunkAssignmentWithTracing(ctx context.Context, receipt *flow.ExecutionReceipt,
-	containerBlockID flow.Identifier) (flow.ChunkList, error) {
+// resultChunkAssignmentWithTracing computes the chunk assignment for the provided receipt with tracing enabled.
+func (e *Engine) resultChunkAssignmentWithTracing(
+	ctx context.Context,
+	result *flow.ExecutionResult,
+	incorporatingBlock flow.Identifier,
+) (flow.ChunkList, error) {
 	var err error
 	var chunkList flow.ChunkList
 	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleExecutionReceipt, func() {
-		chunkList, err = e.receiptChunkAssignment(ctx, receipt, containerBlockID)
+		chunkList, err = e.resultChunkAssignment(ctx, result, incorporatingBlock)
 	})
 	return chunkList, err
 }
