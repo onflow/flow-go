@@ -254,7 +254,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 		}(locator)
 	}
 
-	unittest.RequireReturnsBefore(t, requesterWg.Wait, 1*time.Second, "could not handle sealed chunks notification on time")
+	unittest.RequireReturnsBefore(t, requesterWg.Wait, time.Second, "could not handle sealed chunks notification on time")
 	unittest.RequireReturnsBefore(t, processWG.Wait, 1*time.Second, "could not process chunks on time")
 
 	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.chunkConsumerNotifier)
