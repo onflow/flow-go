@@ -168,8 +168,8 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 	disagrees := unittest.IdentifierListFixture(3)
 	requests := unittest.ChunkDataPackRequestListFixture(1,
 		unittest.WithHeight(5),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
 	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
@@ -197,12 +197,12 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	sealedHeight := uint64(10)
 	// Creates a single chunk request with its corresponding response.
 	// The chunk belongs to an unsealed block.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
 	requests := unittest.ChunkDataPackRequestListFixture(1,
 		unittest.WithHeightGreaterThan(sealedHeight),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 	response := unittest.ChunkDataResponseFixture(requests[0].ChunkID)
 	chunkCollectionIdMap := chunkToCollectionIdMap(t, []*messages.ChunkDataResponse{response})
 
@@ -237,16 +237,16 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	sealedHeight := uint64(10)
 	// creates 2 chunk data packs that belong to a sealed height, and
 	// 3 that belong to an unsealed height.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
 	sealedRequests := unittest.ChunkDataPackRequestListFixture(2,
 		unittest.WithHeight(sealedHeight-1),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 	unsealedRequests := unittest.ChunkDataPackRequestListFixture(3,
 		unittest.WithHeightGreaterThan(sealedHeight),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 	requests := append(sealedRequests, unsealedRequests...)
 
 	test.MockLastSealedHeight(s.state, sealedHeight)
@@ -287,19 +287,19 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	// creates 10 chunk request each with 2 agree targets and 3 disagree targets.
 	// chunk belongs to a block at heights greater than 5, but the last sealed block is at height 5, so
 	// the chunk request should be dispatched.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
-	requestes := unittest.ChunkDataPackRequestListFixture(count,
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
+	requests := unittest.ChunkDataPackRequestListFixture(count,
 		unittest.WithHeightGreaterThan(5),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 5)
-	s.pendingRequests.On("All").Return(requestes)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requestes), attempts)
+	s.pendingRequests.On("All").Return(requests)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), attempts)
 
 	<-e.Ready()
 
-	wg := mockConduitForChunkDataPackRequest(t, s.con, requestes, attempts, func(*messages.ChunkDataRequest) {})
+	wg := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
 	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	<-e.Done()

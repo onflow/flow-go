@@ -22,6 +22,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	flowprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -502,8 +503,8 @@ func mockReceiptsBlockID(t *testing.T,
 func mockStateAtBlockIDForIdentities(state *protocol.State, blockID flow.Identifier, participants flow.IdentityList) {
 	snapshot := &protocol.Snapshot{}
 	state.On("AtBlockID", blockID).Return(snapshot)
-	snapshot.On("Identities", mock.Anything).Return(participant, nil)
-	for _, id := range participant {
+	snapshot.On("Identities", mock.Anything).Return(participants, nil)
+	for _, id := range participants {
 		snapshot.On("Identity", id.NodeID).Return(id, nil)
 	}
 }
@@ -514,7 +515,7 @@ func mockStateAtBlockIDForMissingIdentities(state *protocol.State, blockID flow.
 	snapshot := &protocol.Snapshot{}
 	state.On("AtBlockID", blockID).Return(snapshot)
 	for _, id := range participants {
-		snapshot.On("Identity", id.NodeID).Return(nil, protocol.IdentityNotFoundError{id.NodeID})
+		snapshot.On("Identity", id.NodeID).Return(nil, flowprotocol.IdentityNotFoundError{NodeID: id.NodeID})
 	}
 }
 
