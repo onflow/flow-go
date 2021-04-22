@@ -6,12 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/fifoqueue"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 )
 
 // TestEngine tests the integration of MessageHandler and FifoQueue that buffer and deliver
@@ -194,7 +195,6 @@ func WithEngine(t *testing.T, f func(*TestEngine)) {
 	<-eng.Ready()
 	f(eng)
 	<-eng.Done()
-	return
 }
 
 // if TestEngine receives messages of same type, the engine will handle them message
@@ -207,10 +207,10 @@ func TestProcessMessageSameType(t *testing.T) {
 	m4 := &messageA{n: 4}
 
 	WithEngine(t, func(eng *TestEngine) {
-		eng.Process(id1, m1)
-		eng.Process(id2, m2)
-		eng.Process(id1, m3)
-		eng.Process(id2, m4)
+		require.NoError(t, eng.Process(id1, m1))
+		require.NoError(t, eng.Process(id2, m2))
+		require.NoError(t, eng.Process(id1, m3))
+		require.NoError(t, eng.Process(id2, m4))
 
 		require.Eventuallyf(t, func() bool {
 			return len(eng.messages) == 4
@@ -234,10 +234,10 @@ func TestProcessMessageDifferentType(t *testing.T) {
 	m4 := &messageB{n: 4}
 
 	WithEngine(t, func(eng *TestEngine) {
-		eng.Process(id1, m1)
-		eng.Process(id2, m2)
-		eng.Process(id1, m3)
-		eng.Process(id2, m4)
+		require.NoError(t, eng.Process(id1, m1))
+		require.NoError(t, eng.Process(id2, m2))
+		require.NoError(t, eng.Process(id1, m3))
+		require.NoError(t, eng.Process(id2, m4))
 
 		require.Eventuallyf(t, func() bool {
 			return len(eng.messages) == 4
@@ -261,13 +261,13 @@ func TestProcessMessageInterval(t *testing.T) {
 	m4 := &messageA{n: 4}
 
 	WithEngine(t, func(eng *TestEngine) {
-		eng.Process(id1, m1)
+		require.NoError(t, eng.Process(id1, m1))
 		time.Sleep(3 * time.Millisecond)
-		eng.Process(id2, m2)
+		require.NoError(t, eng.Process(id2, m2))
 		time.Sleep(3 * time.Millisecond)
-		eng.Process(id1, m3)
+		require.NoError(t, eng.Process(id1, m3))
 		time.Sleep(3 * time.Millisecond)
-		eng.Process(id2, m4)
+		require.NoError(t, eng.Process(id2, m4))
 
 		require.Eventuallyf(t, func() bool {
 			return len(eng.messages) == 4
@@ -287,7 +287,7 @@ func TestProcessMessageMultiAll(t *testing.T) {
 	WithEngine(t, func(eng *TestEngine) {
 		count := 100
 		for i := 0; i < count; i++ {
-			eng.Process(unittest.IdentifierFixture(), &messageA{n: i})
+			require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageA{n: i}))
 		}
 
 		require.Eventuallyf(t, func() bool {
@@ -304,7 +304,7 @@ func TestProcessMessageMultiInterval(t *testing.T) {
 		count := 100
 		for i := 0; i < count; i++ {
 			time.Sleep(1 * time.Millisecond)
-			eng.Process(unittest.IdentifierFixture(), &messageB{n: i})
+			require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageB{n: i}))
 		}
 
 		require.Eventuallyf(t, func() bool {
@@ -321,7 +321,7 @@ func TestProcessMessageMultiConcurrent(t *testing.T) {
 		count := 100
 		for i := 0; i < count; i++ {
 			go func(i int) {
-				eng.Process(unittest.IdentifierFixture(), &messageA{n: i})
+				require.NoError(t, eng.Process(unittest.IdentifierFixture(), &messageA{n: i}))
 			}(i)
 		}
 
