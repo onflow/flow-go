@@ -5,6 +5,9 @@ import (
 	"fmt"
 
 	"github.com/vmihailenco/msgpack/v4"
+
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 )
 
 const (
@@ -16,10 +19,79 @@ const (
 // flow.Event type to a ServiceEvent type for use within protocol software
 // and protocol state. This acts as the conversion from the Cadence type to
 // the flow-go type.
-//
-// TODO implement once Cadence types are defined
 func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
-	return nil, fmt.Errorf("ConvertServiceEvent not implemented")
+
+	// create a service event
+	serviceEv := &ServiceEvent{}
+
+	// assign service event type
+	switch event.Type {
+	case EventEpochSetup:
+		serviceEv.Type = ServiceEventSetup
+	case EventEpochCommit:
+		serviceEv.Type = ServiceEventCommit
+	default:
+		return nil, fmt.Errorf("invalid event type: %s", event.Type)
+	}
+
+	// decode bytes using jsoncdc
+	payload, err := jsoncdc.Decode(event.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal event payload: %w", err)
+	}
+
+	// depending on type of Epoch event construct Go type
+	switch event.Type {
+	case EventEpochSetup:
+		ev := &EpochSetup{}
+
+		// parse cadence types to required fields
+		ev.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
+		ev.FirstView = uint64(payload.(cadence.Event).Fields[2].(cadence.UInt64))
+		ev.FinalView = uint64(payload.(cadence.Event).Fields[3].(cadence.UInt64))
+		ev.RandomSource = []byte(payload.(cadence.Event).Fields[5].(cadence.String))
+
+		// parse cluster assignments to Go types
+		collectorClusters := payload.(cadence.Event).Fields[4].(cadence.Array).Values
+		assignments := make(AssignmentList, len(collectorClusters))
+		for _, value := range collectorClusters {
+
+			cluster := value.(cadence.Struct).Fields
+
+			// read cluster index and weights by node ID
+			clusterIndex := uint(cluster[0].(cadence.UInt16))
+			weightsByNodeID := cluster[1].(cadence.Dictionary).Pairs
+
+			for _, pair := range weightsByNodeID {
+				nodeIDString := string(pair.Key.(cadence.String))
+				nodeID, err := HexStringToIdentifier(nodeIDString)
+				if err != nil {
+					return nil, fmt.Errorf("could not convert hex string to identifer: %w", err)
+				}
+				assignments[clusterIndex] = append(assignments[clusterIndex], nodeID)
+			}
+		}
+
+		// parse epoch participants
+		epochParticipants := payload.(cadence.Event).Fields[1].(cadence.Array).Values
+		_ = make(IdentityList, 0, len(epochParticipants))
+		// TODO: for through and read identity values and create idenity
+		serviceEv.Event = ev
+
+	case EventEpochCommit:
+		ev := &EpochCommit{}
+
+		// parse candece types to Go types
+		ev.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
+
+		// TODO: parse counter
+		// TODO: parse clusterQC
+		// TODO: parse dKG group key and participants (in same order they were sent in)
+
+		serviceEv.Event = ev
+	}
+
+	return serviceEv, nil
 }
 
 // ServiceEvent represents a service event, which is a special event that when
