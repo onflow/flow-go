@@ -198,6 +198,17 @@ func (node NodeInfo) Identity() *flow.Identity {
 	return identity
 }
 
+// NodeInfoFromIdentity converts an identity to a public NodeInfo
+func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
+	return NewPublicNodeInfo(
+		identity.NodeID,
+		identity.Role,
+		identity.Address,
+		identity.Stake,
+		identity.NetworkPubKey,
+		identity.StakingPubKey)
+}
+
 func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	var filtered []NodeInfo
 	for _, node := range nodes {
