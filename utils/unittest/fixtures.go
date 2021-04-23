@@ -8,7 +8,6 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/model/bootstrap"
-
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
