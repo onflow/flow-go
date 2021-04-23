@@ -1,6 +1,7 @@
 package migrations
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"runtime"
@@ -72,14 +73,33 @@ func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 	}
 }
 
+var publicKeyKeyPrefix = []byte("public_key_")
+var codeKeyPrefix = []byte("code.")
+var contractNamesKey = []byte("contract_names")
+var accountAddressStateKey = []byte("account_address_state")
+
 func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
 	// If the payload value is not a Cadence value (it does not have the Cadence data magic prefix),
 	// return the payload as is
 
+	rawOwner := payload.Key.KeyParts[0].Value
+	rawController := payload.Key.KeyParts[1].Value
+	rawKey := payload.Key.KeyParts[2].Value
+
+	if len(rawOwner) == 0 ||
+		!bytes.Equal(rawOwner, rawController) ||
+		bytes.HasPrefix(rawKey, publicKeyKeyPrefix) ||
+		bytes.HasPrefix(rawKey, codeKeyPrefix) ||
+		bytes.Equal(rawKey, contractNamesKey) ||
+		bytes.Equal(rawKey, accountAddressStateKey) {
+
+		return payload, nil
+	}
+
 	value, version := interpreter.StripMagic(payload.Value)
 	if version == 0 {
-		return payload, nil
+		return ledger.Payload{}, fmt.Errorf("Cadence payload key has no magic prefix: %s", payload.Key)
 	}
 
 	// Extract the owner from the key and re-encode the value

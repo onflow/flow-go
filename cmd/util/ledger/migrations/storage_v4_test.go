@@ -1,7 +1,6 @@
 package migrations_test
 
 import (
-	"encoding/hex"
 	"testing"
 
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -98,6 +97,4 @@ func TestStorageFormatV4Migration(t *testing.T) {
 		},
 		results[0].Value,
 	)
-
-	println(hex.Dump(results[0].Value))
 }
