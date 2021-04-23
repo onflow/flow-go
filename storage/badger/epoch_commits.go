@@ -33,11 +33,10 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 
 	ec := &EpochCommits{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEpochCommit,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochCommit)),
+			withRetrieve(retrieve)),
 	}
 
 	return ec

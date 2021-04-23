@@ -1,6 +1,7 @@
 package flow_test
 
 import (
+	"math/rand"
 	//"encoding/json"
 	"testing"
 
@@ -132,5 +133,21 @@ func TestSample(t *testing.T) {
 	t.Run("Sample oversized", func(t *testing.T) {
 		il := unittest.IdentityListFixture(10)
 		require.Equal(t, uint(10), il.Sample(11).Count())
+	})
+}
+
+func TestShuffle(t *testing.T) {
+	t.Run("should be shuffled", func(t *testing.T) {
+		il := unittest.IdentityListFixture(15) // ~1/billion chance of shuffling to input state
+		shuffled := il.DeterministicShuffle(rand.Int63())
+		assert.Equal(t, len(il), len(shuffled))
+		assert.ElementsMatch(t, il, shuffled)
+	})
+	t.Run("should be deterministic", func(t *testing.T) {
+		il := unittest.IdentityListFixture(10)
+		seed := rand.Int63()
+		shuffled1 := il.DeterministicShuffle(seed)
+		shuffled2 := il.DeterministicShuffle(seed)
+		assert.Equal(t, shuffled1, shuffled2)
 	})
 }

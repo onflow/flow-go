@@ -4,9 +4,8 @@ import (
 	"path"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
@@ -14,10 +13,10 @@ import (
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
-
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -139,7 +138,7 @@ func TestExtractExecutionState(t *testing.T) {
 					err := Cmd.Execute()
 					require.NoError(t, err)
 
-					require.FileExists(t, path.Join(outdir, wal.RootCheckpointFilename)) //make sure we have root checkpoint file
+					require.FileExists(t, path.Join(outdir, bootstrap.FilenameWALRootCheckpoint)) //make sure we have root checkpoint file
 
 					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), outdir, size, pathfinder.PathByteSize, wal.SegmentSize)
 					require.NoError(t, err)
