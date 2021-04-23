@@ -2,7 +2,6 @@ package fetcher
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -118,11 +117,11 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Hex("result_id", logging.ID(locator.ResultID)).
 		Uint64("chunk_index", locator.Index).
 		Logger()
-	lg.Info().Msg("chunk locator arrived")
 
 	// retrieves result and chunk using the locator
 	result, err := e.results.ByID(locator.ResultID)
 	if err != nil {
+		// a missing result for a chunk locator is a fatal error potentially a database leak.
 		lg.Fatal().Err(err).Msg("could not retrieve result for chunk locator")
 	}
 	chunk := result.Chunks[locator.Index]
@@ -153,12 +152,11 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	added := e.pendingChunks.Add(status)
 	if !added {
 		// chunk locators are deduplicated by consumer, reaching this point hints failing deduplication on consumer.
-		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
-		lg.Warn().Msg("skips processing an already existing pending chunk, possible data race")
+		lg.Fatal().Msg("received a duplicate chunk locator, possible data race")
 		return
 	}
 
-	err = e.requestChunkDataPack(chunk.ID(), locator.ResultID, chunk.BlockID)
+	err = e.requestChunkDataPack(chunkID, locator.ResultID, chunk.BlockID)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not request chunk data pack")
 		return
@@ -213,7 +211,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	lg = lg.With().
-		Hex("result_id", logging.ID(result.ID())).
+		Hex("result_id", logging.ID(status.ExecutionResultID)).
 		Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
 
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
@@ -244,17 +242,14 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
 	// 1. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
-	staked, err := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
-	if err != nil {
-		return fmt.Errorf("could not validate identity of sender at block ID as an execution node: %w", err)
-	}
+	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if !staked {
 		return fmt.Errorf("unstaked execution node sender at block ID")
 	}
 
 	// 2. start state must match
 	if !bytes.Equal(chunkDataPack.StartState, chunk.ChunkBody.StartState) {
-		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %v, but got: %v", chunk.ChunkBody.StartState, chunkDataPack.StartState)
+		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x", chunk.ChunkBody.StartState, chunkDataPack.StartState)
 	}
 
 	// 3. collection id must match
@@ -268,19 +263,19 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifi
 
 // validateStakedExecutionNodeAtBlockID validates sender ID of a chunk data pack response as an staked
 // execution node at the given block ID.
-func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) (bool, error) {
-	sender, err := e.state.AtBlockID(blockID).Identity(senderID)
-	if errors.Is(err, storage.ErrNotFound) {
-		return false, engine.NewInvalidInputErrorf("sender is unstake: %v", senderID)
-	}
+func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, blockID flow.Identifier) bool {
+	snapshot := e.state.AtBlockID(blockID)
+	valid, err := protocol.IsNodeStakedWithRoleAt(snapshot, senderID, flow.RoleExecution)
+
 	if err != nil {
-		return false, fmt.Errorf("could not find identity for chunk: %w", err)
-	}
-	if sender.Role != flow.RoleExecution {
-		return false, engine.NewInvalidInputErrorf("sender is not execution node: %v", sender.Role)
+		e.log.Fatal().
+			Err(err).
+			Hex("block_id", logging.ID(blockID)).
+			Hex("sender_id", logging.ID(senderID)).
+			Msg("could not validate sender identity at specified block ID snapshot as execution node")
 	}
 
-	return sender.Stake > 0, nil
+	return valid
 }
 
 // NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler (i.e.,
@@ -359,19 +354,20 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 		return fmt.Errorf("could not get header for block: %x", blockID)
 	}
 
+	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
+	if err != nil {
+		return fmt.Errorf("could not fetch execution node ids at block %x: %w", blockID, err)
+	}
+
 	request := &verification.ChunkDataPackRequest{
 		ChunkID:   chunkID,
 		Height:    header.Height,
 		Agrees:    agrees,
 		Disagrees: disagrees,
+		Targets:   allExecutors,
 	}
 
-	allExecutors, err := e.state.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleExecution))
-	if err != nil {
-		return fmt.Errorf("could not fetch execution node ids at block: %x", blockID)
-	}
-
-	e.requester.Request(request, allExecutors)
+	e.requester.Request(request)
 	return nil
 }
 
@@ -380,13 +376,10 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 // The agree set contains the executors who made receipt with the same result as the given result id.
 // The disagree set contains the executors who made receipt with different result than the given result id.
 func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID flow.Identifier) (flow.IdentifierList, flow.IdentifierList, error) {
-	receiptsData, err := e.receipts.ByBlockID(blockID)
+	receipts, err := e.receipts.ByBlockID(blockID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not retrieve receipts for block: %v: %w", blockID, err)
 	}
-
-	receipts := make([]*flow.ExecutionReceipt, len(receiptsData))
-	copy(receipts, receiptsData)
 
 	agrees, disagrees := executorsOf(receipts, resultID)
 	return agrees, disagrees, nil

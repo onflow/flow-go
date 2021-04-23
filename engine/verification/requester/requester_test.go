@@ -148,7 +148,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
-	// however by the time we try remove it, the request status has gone.
+	// however by the time we try remove it, the request has gone.
 	// this can happen when duplicate chunk data packs are coming concurrently.
 	// the concurrency is safe with pending requests mempool's mutex lock.
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
@@ -167,26 +167,26 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	// creates a single chunk request status that belongs to a sealed height.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
-	status := unittest.ChunkRequestStatusListFixture(1,
+	// creates a single chunk request that belongs to a sealed height.
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
+	requests := unittest.ChunkDataPackRequestListFixture(1,
 		unittest.WithHeight(5),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 10)
-	s.pendingRequests.On("All").Return(status)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
+	s.pendingRequests.On("All").Return(requests)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
 
-	<-e.Ready()
+	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(status))
-	wg := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(status))
+	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
+	wg := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(requests))
 	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 
 	// requester does not call publish to disseminate the request for this chunk.
 	s.con.AssertNotCalled(t, "Publish")
-	<-e.Done()
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
 // TestCompleteRequestingUnsealedChunkCycle evaluates a complete life cycle of receiving a chunk request by the requester.
@@ -201,32 +201,32 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	sealedHeight := uint64(10)
 	// Creates a single chunk request with its corresponding response.
 	// The chunk belongs to an unsealed block.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
-	status := unittest.ChunkRequestStatusListFixture(1,
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
+	requests := unittest.ChunkDataPackRequestListFixture(1,
 		unittest.WithHeightGreaterThan(sealedHeight),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
-	response := unittest.ChunkDataResponseFixture(status[0].ChunkID)
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+	response := unittest.ChunkDataResponseFixture(requests[0].ChunkID)
 	chunkCollectionIdMap := chunkToCollectionIdMap(t, []*messages.ChunkDataResponse{response})
 
 	// mocks the requester pipeline
 	test.MockLastSealedHeight(s.state, sealedHeight)
-	s.pendingRequests.On("All").Return(status)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
+	s.pendingRequests.On("All").Return(requests)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
-	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(status))
+	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
 
-	<-e.Ready()
+	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	// we wait till the engine submits the chunk request to the network, and receive the response
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, status, 1, func(request *messages.ChunkDataRequest) {
-		err := e.Process(status[0].Agrees[0], response)
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, 1, func(request *messages.ChunkDataRequest) {
+		err := e.Process(requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 
-	<-e.Done()
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
 // TestRequestPendingChunkSealedBlock_Hybrid evaluates the situation that requester has some pending chunk requests belonging to sealed blocks
@@ -239,34 +239,35 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	e := newRequesterEngine(t, s)
 
 	sealedHeight := uint64(10)
-	// creates a single chunk request status that belongs to a sealed height.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
-	sealedStatus := unittest.ChunkRequestStatusListFixture(2,
+	// creates 2 chunk data packs that belong to a sealed height, and
+	// 3 that belong to an unsealed height.
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
+	sealedRequests := unittest.ChunkDataPackRequestListFixture(2,
 		unittest.WithHeight(sealedHeight-1),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
-	unsealedStatus := unittest.ChunkRequestStatusListFixture(3,
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+	unsealedRequests := unittest.ChunkDataPackRequestListFixture(3,
 		unittest.WithHeightGreaterThan(sealedHeight),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
-	status := append(sealedStatus, unsealedStatus...)
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+	requests := append(sealedRequests, unsealedRequests...)
 
 	test.MockLastSealedHeight(s.state, sealedHeight)
-	s.pendingRequests.On("All").Return(status)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), 1)
+	s.pendingRequests.On("All").Return(requests)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
 
-	<-e.Ready()
+	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	// sealed requests should be removed and the handler should be notified.
-	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(sealedStatus))
-	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(sealedStatus))
+	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(sealedRequests))
+	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(sealedRequests))
 	// unsealed requests should be submitted to the network once
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedStatus, 1, func(*messages.ChunkDataRequest) {})
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
 
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
-	<-e.Done()
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
@@ -279,32 +280,33 @@ func TestRequestPendingChunkDataPack(t *testing.T) {
 	testRequestPendingChunkDataPack(t, 10, 10) // 10 requests each 10 attempts
 }
 
+//
 // testRequestPendingChunkDataPack is a test helper that evaluates happy path of having a number of chunk requests pending.
 // The test waits enough so that the required number of attempts is made on the chunks.
 // The chunks belongs to a non-sealed block.
-func testRequestPendingChunkDataPack(t *testing.T, requests int, attempts int) {
+func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	// creates 10 chunk request status each with 2 agree targets and 3 disagree targets.
+	// creates 10 chunk request each with 2 agree targets and 3 disagree targets.
 	// chunk belongs to a block at heights greater than 5, but the last sealed block is at height 5, so
 	// the chunk request should be dispatched.
-	aggrees := unittest.IdentifierListFixture(2)
-	disaggrees := unittest.IdentifierListFixture(3)
-	status := unittest.ChunkRequestStatusListFixture(requests,
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
+	requests := unittest.ChunkDataPackRequestListFixture(count,
 		unittest.WithHeightGreaterThan(5),
-		unittest.WithAgrees(aggrees),
-		unittest.WithDisagrees(disaggrees))
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 5)
-	s.pendingRequests.On("All").Return(status)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(status), attempts)
+	s.pendingRequests.On("All").Return(requests)
+	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), attempts)
 
-	<-e.Ready()
+	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	wg := mockConduitForChunkDataPackRequest(t, s.con, status, attempts, func(*messages.ChunkDataRequest) {})
+	wg := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
 	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
-	<-e.Done()
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
 // chunkToCollectionIdMap is a test helper that extracts a chunkID -> collectionID map from chunk data responses.
@@ -335,16 +337,16 @@ func toChunkIDs(chunkToCollectionIDs map[flow.Identifier]flow.Identifier) flow.I
 // Also, the entire process should not exceed longer than the specified timeout.
 func mockConduitForChunkDataPackRequest(t *testing.T,
 	con *mocknetwork.Conduit,
-	reqList []*verification.ChunkRequestStatus,
+	reqList verification.ChunkDataPackRequestList,
 	count int,
 	requestHandler func(*messages.ChunkDataRequest)) *sync.WaitGroup {
 
 	// counts number of requests for each chunk data pack
 	reqCount := make(map[flow.Identifier]int)
-	reqMap := make(map[flow.Identifier]*verification.ChunkRequestStatus)
-	for _, status := range reqList {
-		reqCount[status.ChunkID] = 0
-		reqMap[status.ChunkID] = status
+	reqMap := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
+	for _, request := range reqList {
+		reqCount[request.ChunkID] = 0
+		reqMap[request.ChunkID] = request
 	}
 	wg := &sync.WaitGroup{}
 

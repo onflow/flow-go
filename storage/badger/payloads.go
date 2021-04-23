@@ -41,7 +41,7 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 	// which is not included in current payload but was incorporated in one of previous blocks.
 	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
 	// and execution result is decoupled.
-	resultsById := payload.ResultsById()
+	resultsById := payload.Results.Lookup()
 	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
 	var err error
 	for _, meta := range payload.Receipts {

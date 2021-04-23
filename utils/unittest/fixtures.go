@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -204,8 +206,8 @@ func WithAllTheFixins(payload *flow.Payload) {
 	payload.Guarantees = CollectionGuaranteesFixture(4)
 	for i := 0; i < 10; i++ {
 		receipt := ExecutionReceiptFixture()
-		payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
-		payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
+		payload.Receipts = flow.ExecutionReceiptMetaList{receipt.Meta()}
+		payload.Results = flow.ExecutionResultList{&receipt.ExecutionResult}
 	}
 }
 
@@ -727,6 +729,21 @@ func RandomBytes(n int) []byte {
 	return b
 }
 
+func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
+	opts = append(opts, WithKeys)
+	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))
+}
+
+func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
+	opts = append(opts, WithKeys)
+	il := IdentityListFixture(n, opts...)
+	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
+	for _, identity := range il {
+		nodeInfos = append(nodeInfos, bootstrap.NodeInfoFromIdentity(identity))
+	}
+	return nodeInfos
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
@@ -740,6 +757,19 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 		apply(&identity)
 	}
 	return &identity
+}
+
+func WithKeys(identity *flow.Identity) {
+	staking, err := StakingKey()
+	if err != nil {
+		panic(err)
+	}
+	networking, err := NetworkingKey()
+	if err != nil {
+		panic(err)
+	}
+	identity.StakingPubKey = staking.PublicKey()
+	identity.NetworkPubKey = networking.PublicKey()
 }
 
 // WithNodeID adds a node ID with the given first byte to an identity.
@@ -1067,64 +1097,35 @@ func ChunkDataResponsesFixture(n int, opts ...func(*messages.ChunkDataResponse))
 	return lst
 }
 
-func ChunkRequestStatusFixture(request *verification.ChunkDataPackRequest,
-	opts ...func(request *verification.ChunkRequestStatus)) *verification.ChunkRequestStatus {
-
-	status := &verification.ChunkRequestStatus{
-		ChunkDataPackRequest: request,
-		Targets:              flow.IdentityList{},
-		LastAttempt:          time.Time{},
-		Attempt:              0,
-	}
-
-	for _, opt := range opts {
-		opt(status)
-	}
-
-	// creates identity fixtures for target ids as union of agrees and disagrees
-	// TODO: remove this inner fixture once we have filter for identifier list.
-	targets := flow.IdentityList{}
-	for _, id := range request.Agrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-	for _, id := range request.Disagrees {
-		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
-	}
-
-	status.Targets = targets
-
-	return status
-}
-
-// ChunkRequestStatusListFixture creates and returns a list of chunk request status fixtures.
-func ChunkRequestStatusListFixture(n int, opts ...func(*verification.ChunkRequestStatus)) []*verification.ChunkRequestStatus {
-	lst := make([]*verification.ChunkRequestStatus, 0, n)
+// ChunkDataPackRequestListFixture creates and returns a list of chunk data pack requests fixtures.
+func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
+	lst := make([]*verification.ChunkDataPackRequest, 0, n)
 	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkRequestStatusFixture(ChunkDataPackRequestFixture(IdentifierFixture()), opts...))
+		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
 	}
 	return lst
 }
 
-func WithHeight(height uint64) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
+func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
 		request.Height = height
 	}
 }
 
-func WithHeightGreaterThan(height uint64) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
-		request.Height = rand.Uint64() + height + 1
+func WithHeightGreaterThan(height uint64) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Height = height + uint64(rand.Uint32()) + 1
 	}
 }
 
-func WithAgrees(list flow.IdentifierList) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
+func WithAgrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
 		request.Agrees = list
 	}
 }
 
-func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkRequestStatus) {
-	return func(request *verification.ChunkRequestStatus) {
+func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
 		request.Disagrees = list
 	}
 }
@@ -1132,8 +1133,8 @@ func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkRequestStat
 // ChunkDataPackRequestFixture creates a chunk data request with some default values, i.e., one agree execution node, one disagree execution node,
 // and height of zero.
 // Use options to customize the request.
-func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.
-	ChunkDataPackRequest {
+func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.ChunkDataPackRequest {
+
 	req := &verification.ChunkDataPackRequest{
 		ChunkID:   chunkID,
 		Height:    0,
@@ -1145,16 +1146,19 @@ func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verifica
 		opt(req)
 	}
 
-	return req
-}
-
-// ChunkDataPackRequestsFixture creates a list of chunk data requests.
-func ChunkDataPackRequestsFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
-	lst := make([]*verification.ChunkDataPackRequest, 0, n)
-	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
+	// creates identity fixtures for target ids as union of agrees and disagrees
+	// TODO: remove this inner fixture once we have filter for identifier list.
+	targets := flow.IdentityList{}
+	for _, id := range req.Agrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
 	}
-	return lst
+	for _, id := range req.Disagrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	}
+
+	req.Targets = targets
+
+	return req
 }
 
 func WithCollectionID(collectionID flow.Identifier) func(*flow.ChunkDataPack) {

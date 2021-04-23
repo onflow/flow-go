@@ -15,13 +15,13 @@ type ChunkRequests struct {
 	mock.Mock
 }
 
-// Add provides a mock function with given fields: chunk
-func (_m *ChunkRequests) Add(chunk *verification.ChunkRequestStatus) bool {
-	ret := _m.Called(chunk)
+// Add provides a mock function with given fields: request
+func (_m *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
+	ret := _m.Called(request)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(*verification.ChunkRequestStatus) bool); ok {
-		r0 = rf(chunk)
+	if rf, ok := ret.Get(0).(func(*verification.ChunkDataPackRequest) bool); ok {
+		r0 = rf(request)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -30,15 +30,15 @@ func (_m *ChunkRequests) Add(chunk *verification.ChunkRequestStatus) bool {
 }
 
 // All provides a mock function with given fields:
-func (_m *ChunkRequests) All() []*verification.ChunkRequestStatus {
+func (_m *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 	ret := _m.Called()
 
-	var r0 []*verification.ChunkRequestStatus
-	if rf, ok := ret.Get(0).(func() []*verification.ChunkRequestStatus); ok {
+	var r0 []*verification.ChunkDataPackRequest
+	if rf, ok := ret.Get(0).(func() []*verification.ChunkDataPackRequest); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*verification.ChunkRequestStatus)
+			r0 = ret.Get(0).([]*verification.ChunkDataPackRequest)
 		}
 	}
 
@@ -46,26 +46,33 @@ func (_m *ChunkRequests) All() []*verification.ChunkRequestStatus {
 }
 
 // ByID provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkRequestStatus, bool) {
+func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, int, bool) {
 	ret := _m.Called(chunkID)
 
-	var r0 *verification.ChunkRequestStatus
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.ChunkRequestStatus); ok {
+	var r0 *verification.ChunkDataPackRequest
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.ChunkDataPackRequest); ok {
 		r0 = rf(chunkID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*verification.ChunkRequestStatus)
+			r0 = ret.Get(0).(*verification.ChunkDataPackRequest)
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+	var r1 int
+	if rf, ok := ret.Get(1).(func(flow.Identifier) int); ok {
 		r1 = rf(chunkID)
 	} else {
-		r1 = ret.Get(1).(bool)
+		r1 = ret.Get(1).(int)
 	}
 
-	return r0, r1
+	var r2 bool
+	if rf, ok := ret.Get(2).(func(flow.Identifier) bool); ok {
+		r2 = rf(chunkID)
+	} else {
+		r2 = ret.Get(2).(bool)
+	}
+
+	return r0, r1, r2
 }
 
 // IncrementAttempt provides a mock function with given fields: chunkID
