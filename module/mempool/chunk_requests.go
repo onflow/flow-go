@@ -21,7 +21,7 @@ type ChunkRequests interface {
 	//
 	// The last boolean parameter returns whether a chunk request for this chunk ID
 	// exists in memory-pool.
-	RequestInfo(chunkID flow.Identifier) (int, time.Time, time.Duration, bool)
+	RequestInfo(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool)
 
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate chunk request with the same

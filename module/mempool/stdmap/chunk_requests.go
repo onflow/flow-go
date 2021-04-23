@@ -50,7 +50,7 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 //
 // The last boolean parameter returns whether a chunk request for this chunk ID
 // exists in memory-pool.
-func (cs *ChunkRequests) RequestInfo(chunkID flow.Identifier) (int, time.Time, time.Duration, bool) {
+func (cs *ChunkRequests) RequestInfo(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
 		return -1, time.Time{}, time.Duration(0), false
@@ -136,7 +136,7 @@ type chunkRequestStatus struct {
 	*verification.ChunkDataPackRequest
 	LastAttempt time.Time     // timestamp of last request dispatched for this chunk id.
 	RetryAfter  time.Duration // interval until request should be retried.
-	Attempt     int
+	Attempt     uint64
 }
 
 func (c chunkRequestStatus) ID() flow.Identifier {
