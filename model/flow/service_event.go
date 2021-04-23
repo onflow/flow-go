@@ -35,9 +35,9 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 	// depending on type of Epoch event construct Go type
 	switch event.Type {
 	case EventEpochSetup:
-		ev := &EpochSetup{}
 
 		// parse cadence types to required fields
+		ev := new(EpochSetup)
 		ev.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
 		ev.FirstView = uint64(payload.(cadence.Event).Fields[2].(cadence.UInt64))
 		ev.FinalView = uint64(payload.(cadence.Event).Fields[3].(cadence.UInt64))
@@ -73,15 +73,15 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 			nodeInfo := value.(cadence.Struct).Fields
 
 			// create and assign fields to identity from cadence Struct
-			identity := Identity{}
+			identity := new(Identity)
+			identity.Role = Role(nodeInfo[1].(cadence.UInt8))
+			identity.Address = string(nodeInfo[2].(cadence.String))
+			identity.Stake = uint64(nodeInfo[5].(cadence.UFix64))
 
 			identity.NodeID, err = HexStringToIdentifier(string(nodeInfo[0].(cadence.String)))
 			if err != nil {
 				return nil, fmt.Errorf("could not convert hex string to identifer: %w", err)
 			}
-
-			identity.Role = Role(nodeInfo[1].(cadence.UInt8))
-			identity.Address = string(nodeInfo[2].(cadence.String))
 
 			netPubKeyString := string(nodeInfo[3].(cadence.String))
 			identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(netPubKeyString))
@@ -94,8 +94,6 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not decode staking public key: %w", err)
 			}
-
-			identity.Stake = uint64(nodeInfo[5].(cadence.UFix64))
 		}
 
 		ev.Assignments = assignments
@@ -105,13 +103,50 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 		serviceEv.Event = ev
 
 	case EventEpochCommit:
-		ev := &EpochCommit{}
 
 		// parse candece types to Go types
+		ev := new(EpochCommit)
 		ev.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
 
 		// TODO: parse clusterQC
-		// TODO: parse dKG group key and participants (in same order they were sent in)
+
+		// parse DKG group key and participants
+		// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
+		// https://github.com/onflow/flow-go/blob/feature/dkg/module/dkg/client.go#L182-L183
+		dkgValues := payload.(cadence.Event).Fields[2].(cadence.Array).Values
+		dkgKeys := make([]string, 0, len(dkgValues))
+		for _, value := range dkgValues {
+			key := string(value.(cadence.String))
+			dkgKeys = append(dkgKeys, key)
+		}
+
+		// pop first element
+		groupPubKeyString, dkgKeys := dkgKeys[0], dkgKeys[1:]
+
+		// decode group public key
+		ev.DKGGroupKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(groupPubKeyString))
+		if err != nil {
+			return nil, fmt.Errorf("could not decode group public key: %w", err)
+		}
+
+		dkgParticipants := make(map[Identifier]DKGParticipant)
+		for index, pubKeyString := range dkgKeys {
+
+			pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(pubKeyString))
+			if err != nil {
+				return nil, fmt.Errorf("could not decode dkg public key: %w", err)
+			}
+
+			id, err := PublicKeyToID(pubKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not create ID from public key: %w", err)
+			}
+
+			dkgParticipants[id] = DKGParticipant{
+				Index:    uint(index + 1),
+				KeyShare: pubKey,
+			}
+		}
 
 		serviceEv.Type = ServiceEventCommit
 		serviceEv.Event = ev
