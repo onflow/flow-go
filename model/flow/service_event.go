@@ -8,6 +8,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
+	"github.com/onflow/flow-go/crypto"
 )
 
 const (
@@ -23,16 +25,6 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 
 	// create a service event
 	serviceEv := &ServiceEvent{}
-
-	// assign service event type
-	switch event.Type {
-	case EventEpochSetup:
-		serviceEv.Type = ServiceEventSetup
-	case EventEpochCommit:
-		serviceEv.Type = ServiceEventCommit
-	default:
-		return nil, fmt.Errorf("invalid event type: %s", event.Type)
-	}
 
 	// decode bytes using jsoncdc
 	payload, err := jsoncdc.Decode(event.Payload)
@@ -63,6 +55,7 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 			weightsByNodeID := cluster[1].(cadence.Dictionary).Pairs
 
 			for _, pair := range weightsByNodeID {
+
 				nodeIDString := string(pair.Key.(cadence.String))
 				nodeID, err := HexStringToIdentifier(nodeIDString)
 				if err != nil {
@@ -74,8 +67,41 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 
 		// parse epoch participants
 		epochParticipants := payload.(cadence.Event).Fields[1].(cadence.Array).Values
-		_ = make(IdentityList, 0, len(epochParticipants))
-		// TODO: for through and read identity values and create idenity
+		participants := make(IdentityList, 0, len(epochParticipants))
+		for _, value := range epochParticipants {
+
+			nodeInfo := value.(cadence.Struct).Fields
+
+			// create and assign fields to identity from cadence Struct
+			identity := Identity{}
+
+			identity.NodeID, err = HexStringToIdentifier(string(nodeInfo[0].(cadence.String)))
+			if err != nil {
+				return nil, fmt.Errorf("could not convert hex string to identifer: %w", err)
+			}
+
+			identity.Role = Role(nodeInfo[1].(cadence.UInt8))
+			identity.Address = string(nodeInfo[2].(cadence.String))
+
+			netPubKeyString := string(nodeInfo[3].(cadence.String))
+			identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(netPubKeyString))
+			if err != nil {
+				return nil, fmt.Errorf("could not decode network public key: %w", err)
+			}
+
+			stakingPubKeyString := string(nodeInfo[4].(cadence.String))
+			identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(stakingPubKeyString))
+			if err != nil {
+				return nil, fmt.Errorf("could not decode staking public key: %w", err)
+			}
+
+			identity.Stake = uint64(nodeInfo[5].(cadence.UFix64))
+		}
+
+		ev.Assignments = assignments
+		ev.Participants = participants
+
+		serviceEv.Type = ServiceEventSetup
 		serviceEv.Event = ev
 
 	case EventEpochCommit:
@@ -84,11 +110,14 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 		// parse candece types to Go types
 		ev.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
 
-		// TODO: parse counter
 		// TODO: parse clusterQC
 		// TODO: parse dKG group key and participants (in same order they were sent in)
 
+		serviceEv.Type = ServiceEventCommit
 		serviceEv.Event = ev
+
+	default:
+		return nil, fmt.Errorf("invalid event type: %s", event.Type)
 	}
 
 	return serviceEv, nil
