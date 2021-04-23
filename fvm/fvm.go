@@ -90,5 +90,6 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
 	invocator := NewTransactionInvocator(zerolog.Nop())
 	err := invocator.Process(vm, &ctx, tx, sth, programs)
-	return errors.SplitErrorTypes(err)
+	txErr, fatalErr := errors.SplitErrorTypes(err)
+	return txErr, fatalErr
 }

@@ -458,8 +458,8 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// if there is a root checkpoint file, then copy that file over
-	if fileExists(wal.RootCheckpointFilename) {
-		filename = wal.RootCheckpointFilename
+	if fileExists(bootstrapFilenames.FilenameWALRootCheckpoint) {
+		filename = bootstrapFilenames.FilenameWALRootCheckpoint
 	} else if fileExists(firstCheckpointFilename) {
 		// else if there is a checkpoint file, then copy that file over
 		filename = firstCheckpointFilename
