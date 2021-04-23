@@ -16,7 +16,7 @@ type ChunkDataPackRequest struct {
 	Disagrees     flow.IdentifierList // execution node ids that generated a conflicting result with result of chunk.
 	RetryAfter    time.Duration       // interval until request should be retried.
 	LastRequested time.Time           // timestamp of last request dispatched for this chunk id.
-	Targets   flow.IdentityList // list of all execution nodes identity at the block height of this chunk (including non-responders).
+	Targets       flow.IdentityList   // list of all execution nodes identity at the block height of this chunk (including non-responders).
 }
 
 func (c ChunkDataPackRequest) ID() flow.Identifier {
