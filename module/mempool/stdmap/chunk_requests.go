@@ -44,6 +44,22 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 	return request.ChunkDataPackRequest, true
 }
 
+// RequestInfo returns the number of times the chunk has been requested,
+// last time the chunk has been requested, and the retry-after time duration of the
+// underlying request status of this chunk.
+//
+// The last boolean parameter returns whether a chunk request for this chunk ID
+// exists in memory-pool.
+func (cs *ChunkRequests) RequestInfo(chunkID flow.Identifier) (int, time.Time, time.Duration, bool) {
+	entity, exists := cs.Backend.ByID(chunkID)
+	if !exists {
+		return -1, time.Time{}, time.Duration(0), false
+	}
+	request := toChunkRequestStatus(entity)
+
+	return request.Attempt, request.LastAttempt, request.RetryAfter, true
+}
+
 // Add provides insertion functionality into the memory pool.
 // The insertion is only successful if there is no duplicate chunk request with the same
 // chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
