@@ -194,7 +194,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
 	newStateCommitment := unittest.StateCommitmentFixture()
 	if len(computationResult.StateSnapshots) == 0 { // if block was empty, no new state commitment is produced
-		newStateCommitment = executableBlock.StartState
+		newStateCommitment = *executableBlock.StartState
 	}
 
 	ctx.computationManager.
@@ -211,7 +211,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 			Return(nil, nil, nil)
 	}
 
-	ctx.executionState.On("NewView", executableBlock.StartState).Return(new(delta.View))
+	ctx.executionState.On("NewView", *executableBlock.StartState).Return(new(delta.View))
 
 	ctx.executionState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
@@ -224,7 +224,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(commits map[flow.Ide
 			newStateCommitment,
 			mock.MatchedBy(func(fs []*flow.ChunkDataPack) bool {
 				for _, f := range fs {
-					if f.StartState != executableBlock.StartState {
+					if f.StartState != *executableBlock.StartState {
 						return false
 					}
 				}
@@ -357,14 +357,14 @@ func TestExecuteOneBlock(t *testing.T) {
 		// A <- B
 		blockA := unittest.BlockHeaderFixture()
 		blockB := unittest.ExecutableBlockFixtureWithParent(nil, &blockA)
-		blockB.StartState = unittest.StateCommitmentFixture()
+		blockB.StartState = unittest.StateCommitmentPointerFixture()
 
 		ctx.mockStakedAtBlockID(blockB.ID(), true)
 
 		// blockA's start state is its parent's state commitment,
 		// and blockA's parent has been executed.
 		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockB.Block.Header.ParentID] = blockB.StartState
+		commits[blockB.Block.Header.ParentID] = *blockB.StartState
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
 
@@ -407,7 +407,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 
 		blocks := make(map[string]*entity.ExecutableBlock)
 		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
-		blocks["A"].StartState = unittest.StateCommitmentFixture()
+		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
@@ -422,7 +422,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blocks["D"].StartState = blocks["C"].StartState
 
 		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blocks["A"].Block.Header.ParentID] = blocks["A"].StartState
+		commits[blocks["A"].Block.Header.ParentID] = *blocks["A"].StartState
 
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)
@@ -510,19 +510,19 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 
 		// Ensure block we're about to query against is executable
 		blockA := unittest.ExecutableBlockFixture(nil)
-		blockA.StartState = unittest.StateCommitmentFixture()
+		blockA.StartState = unittest.StateCommitmentPointerFixture()
 
 		snapshot := new(protocol.Snapshot)
 		snapshot.On("Head").Return(blockA.Block.Header, nil)
 
 		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blockA.ID()] = blockA.StartState
+		commits[blockA.ID()] = *blockA.StartState
 
-		ctx.stateCommitmentExist(blockA.ID(), blockA.StartState)
+		ctx.stateCommitmentExist(blockA.ID(), *blockA.StartState)
 
 		ctx.state.On("AtBlockID", blockA.Block.ID()).Return(snapshot)
 		view := new(delta.View)
-		ctx.executionState.On("NewView", blockA.StartState).Return(view)
+		ctx.executionState.On("NewView", *blockA.StartState).Return(view)
 
 		// Successful call to computation manager
 		ctx.computationManager.
@@ -590,7 +590,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 
 		blocks := make(map[string]*entity.ExecutableBlock)
 		blocks["A"] = unittest.ExecutableBlockFixtureWithParent(nil, &blockSealed)
-		blocks["A"].StartState = unittest.StateCommitmentFixture()
+		blocks["A"].StartState = unittest.StateCommitmentPointerFixture()
 
 		blocks["B"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["A"].Block.Header)
 		blocks["C"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["B"].Block.Header)
@@ -605,7 +605,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		blocks["D"].StartState = blocks["C"].StartState
 
 		commits := make(map[flow.Identifier]flow.StateCommitment)
-		commits[blocks["A"].Block.Header.ParentID] = blocks["A"].StartState
+		commits[blocks["A"].Block.Header.ParentID] = *blocks["A"].StartState
 
 		wg := sync.WaitGroup{}
 		ctx.mockStateCommitsWithMap(commits)

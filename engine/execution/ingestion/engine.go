@@ -481,7 +481,7 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 
 	// if we found the statecommitment for the parent block, then add it to the executable block.
 	if err == nil {
-		executableBlock.StartState = parentCommitment
+		executableBlock.StartState = &parentCommitment
 	} else if errors.Is(err, storage.ErrNotFound) {
 		// the parent block is an unexecuted block.
 		// if the queue only has one block, and its parent doesn't
@@ -527,7 +527,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEExecuteBlock)
 	defer span.Finish()
 
-	view := e.execState.NewView(executableBlock.StartState)
+	view := e.execState.NewView(*executableBlock.StartState)
 
 	computationResult, err := e.computationManager.ComputeBlock(ctx, executableBlock, view)
 	if err != nil {
@@ -541,7 +541,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	e.metrics.ExecutionGasUsedPerBlock(computationResult.GasUsed)
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
-	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, executableBlock.StartState)
+	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
 	if errors.Is(err, storage.ErrDataMismatch) {
 		e.log.Fatal().Err(err).Msg("fatal: trying to store different results for the same block")
 	}
@@ -651,7 +651,7 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 				// the parent block has been executed, update the StartState of
 				// each child block.
 				child := queue.Head.Item.(*entity.ExecutableBlock)
-				child.StartState = finalState
+				child.StartState = &finalState
 
 				err := e.matchOrRequestCollections(child, blockByCollection)
 				if err != nil {
@@ -691,9 +691,6 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 // if yes, execute the block
 // return a bool indicates whether the block was completed
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
-	if !eb.HasStartState() {
-		return false
-	}
 
 	// if the eb has parent statecommitment, and we have the delta for this block
 	// then apply the delta

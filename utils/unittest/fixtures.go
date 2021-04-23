@@ -622,6 +622,11 @@ func StateCommitmentFixture() flow.StateCommitment {
 	return state
 }
 
+func StateCommitmentPointerFixture() *flow.StateCommitment {
+	state := StateCommitmentFixture()
+	return &state
+}
+
 func HashFixture(size int) hash.Hash {
 	hash := make(hash.Hash, size)
 	for i := 0; i < size; i++ {

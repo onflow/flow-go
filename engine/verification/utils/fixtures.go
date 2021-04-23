@@ -194,7 +194,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		executableBlock := &entity.ExecutableBlock{
 			Block:               &referenceBlock,
 			CompleteCollections: completeColls,
-			StartState:          startStateCommitment,
+			StartState:          &startStateCommitment,
 		}
 		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)

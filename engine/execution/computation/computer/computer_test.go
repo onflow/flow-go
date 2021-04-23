@@ -513,6 +513,7 @@ func generateBlockWithVisitor(collectionCount, transactionCount int, addressGene
 	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
+		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
 }
 

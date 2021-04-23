@@ -465,7 +465,7 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 	return &messages.ExecutionStateDelta{
 		ExecutableBlock: entity.ExecutableBlock{
 			Block:               block,
-			StartState:          startStateCommitment,
+			StartState:          &startStateCommitment,
 			CompleteCollections: completeCollections,
 		},
 		StateInteractions:  stateInteractions,
