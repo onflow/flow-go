@@ -137,12 +137,7 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 				return nil, fmt.Errorf("could not decode dkg public key: %w", err)
 			}
 
-			id, err := PublicKeyToID(pubKey)
-			if err != nil {
-				return nil, fmt.Errorf("could not create ID from public key: %w", err)
-			}
-
-			dkgParticipants[id] = DKGParticipant{
+			dkgParticipants[[32]byte{}] = DKGParticipant{
 				Index:    uint(index + 1),
 				KeyShare: pubKey,
 			}
