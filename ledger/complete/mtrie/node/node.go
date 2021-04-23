@@ -183,7 +183,7 @@ func (n *Node) VerifyCachedHash() bool {
 func (n *Node) Hash() hash.Hash {
 	if n == nil {
 		// case of an empty trie root
-		return ledger.GetDefaultHashForHeight(ledger.TreeMaxHeight)
+		return ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight)
 	}
 	return n.hashValue
 }
@@ -193,7 +193,7 @@ func (n *Node) Hash() hash.Hash {
 // of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int {
 	if n == nil {
-		return ledger.TreeMaxHeight
+		return ledger.NodeMaxHeight
 	}
 	return n.height
 }

@@ -67,7 +67,7 @@ type NodeIterator struct {
 // as for each node, the children have been previously encountered.
 func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
 	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
-	stackSize := ledger.TreeMaxHeight + 1
+	stackSize := ledger.NodeMaxHeight + 1
 	i := &NodeIterator{
 		stack: make([]*node.Node, 0, stackSize),
 	}

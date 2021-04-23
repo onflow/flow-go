@@ -41,18 +41,12 @@ func NewEmptyMTrie() *MTrie {
 
 // NewMTrie returns a Mtrie given the root
 func NewMTrie(root *node.Node) (*MTrie, error) {
-	if root.Height() != ledger.TreeMaxHeight {
-		return nil, fmt.Errorf("height of root node must be %d but is %d", ledger.TreeMaxHeight, root.Height())
+	if root.Height() != ledger.NodeMaxHeight {
+		return nil, fmt.Errorf("height of root node must be %d but is %d", ledger.NodeMaxHeight, root.Height())
 	}
 	return &MTrie{
 		root: root,
 	}, nil
-}
-
-// Height returns the height of the trie, which
-// is the height of its root node.
-func (mt *MTrie) Height() int {
-	return mt.root.Height()
 }
 
 // RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
@@ -134,7 +128,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	depth := ledger.TreeMaxHeight - head.Height() // distance to the tree root
+	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
 	partitionIndex := SplitPaths(paths, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
@@ -169,7 +163,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
 func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	updatedRoot := update(ledger.TreeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil)
+	updatedRoot := update(ledger.NodeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil)
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -235,7 +229,7 @@ func update(
 	// Split paths and payloads to recurse:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	depth := ledger.TreeMaxHeight - nodeHeight // distance to the tree root
+	depth := ledger.NodeMaxHeight - nodeHeight // distance to the tree root
 	partitionIndex := splitByPath(paths, payloads, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lpayloads, rpayloads := payloads[:partitionIndex], payloads[partitionIndex:]
@@ -334,7 +328,7 @@ func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 	// partition step to quick sort the paths:
 	// lpaths contains all paths that have `0` at the partitionIndex
 	// rpaths contains all paths that have `1` at the partitionIndex
-	depth := ledger.TreeMaxHeight - head.Height() // distance to the tree root
+	depth := ledger.NodeMaxHeight - head.Height() // distance to the tree root
 	partitionIndex := splitTrieProofsByPath(paths, proofs, depth)
 	lpaths, rpaths := paths[:partitionIndex], paths[partitionIndex:]
 	lproofs, rproofs := proofs[:partitionIndex], proofs[partitionIndex:]
@@ -446,7 +440,7 @@ func dumpAsJSON(n *node.Node, encoder *json.Encoder) error {
 
 // EmptyTrieRootHash returns the rootHash of an empty Trie for the specified path size [bytes]
 func EmptyTrieRootHash() ledger.RootHash {
-	return ledger.RootHash(ledger.GetDefaultHashForHeight(ledger.TreeMaxHeight))
+	return ledger.RootHash(ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight))
 }
 
 // AllPayloads returns all payloads

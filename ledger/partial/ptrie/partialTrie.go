@@ -77,7 +77,7 @@ func NewPSMT(
 	batchProof *ledger.TrieBatchProof,
 ) (*PSMT, error) {
 
-	height := ledger.TreeMaxHeight
+	height := ledger.NodeMaxHeight
 
 	psmt := PSMT{newNode(ledger.GetDefaultHashForHeight(height), height), make(map[ledger.Path]*node)}
 

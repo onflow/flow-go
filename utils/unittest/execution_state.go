@@ -40,7 +40,10 @@ func init() {
 	if err != nil {
 		panic("error while hex decoding hardcoded state commitment")
 	}
-	copy(GenesisStateCommitment[:], GenesisStateCommitmentBytes)
+	GenesisStateCommitment, err = flow.ToStateCommitment(GenesisStateCommitmentBytes)
+	if err != nil {
+		panic(fmt.Sprintf("genesis state commitment size is invalid: %w", err))
+	}
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(ServiceAccountPrivateKeyHex)
 	if err != nil {

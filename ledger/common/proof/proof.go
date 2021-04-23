@@ -11,7 +11,7 @@ import (
 // VerifyTrieProof verifies the proof, by constructing all the
 // hash from the leaf to the root and comparing the rootHash
 func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
-	treeHeight := ledger.TreeMaxHeight
+	treeHeight := ledger.NodeMaxHeight
 	leafHeight := treeHeight - int(p.Steps)             // p.Steps is the number of edges we are traversing until we hit the compactified leaf.
 	if !(0 <= leafHeight && leafHeight <= treeHeight) { // sanity check
 		return false
