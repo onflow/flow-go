@@ -10,16 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
