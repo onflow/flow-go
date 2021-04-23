@@ -153,7 +153,7 @@ func (n *Node) computeHash() hash.Hash {
 	} else {
 		h2 = ledger.GetDefaultHashForHeight(n.height - 1)
 	}
-	return hash.HashInterNodeIn(h1, h2)
+	return hash.HashInterNode(h1, h2)
 }
 
 // VerifyCachedHash verifies the hash of a node is valid

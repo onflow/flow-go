@@ -497,8 +497,10 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
-	var rh ledger.RootHash
-	copy(rh[:], rhBytes)
+	rh, err := ledger.ToRootHash(rhBytes)
+	if err != nil {
+		return nil, fmt.Errorf("decode trie update failed: %w", err)
+	}
 
 	// decode number of paths
 	numOfPaths, rest, err := utils.ReadUint32(rest)
@@ -653,7 +655,10 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	copy(pInst.Path[:], path)
+	pInst.Path, err = ledger.ToPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
 
 	// read payload
 	encPayloadSize, rest, err := utils.ReadUint64(rest)
@@ -688,10 +693,14 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 		}
 
 		interimBytes, rest, err = utils.ReadSlice(rest, int(interimSize))
-		copy(interim[:], interimBytes)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
+		interim, err = hash.ToHash(interimBytes)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding proof: %w", err)
+		}
+
 		interims = append(interims, interim)
 	}
 	pInst.Interims = interims

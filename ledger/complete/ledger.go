@@ -52,7 +52,7 @@ func NewLedger(
 	pathFinderVer uint8) (*Ledger, error) {
 
 	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) error {
-		return wal.RecordDelete(ledger.RootHash(evictedTrie.RootHash()))
+		return wal.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)

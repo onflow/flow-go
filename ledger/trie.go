@@ -72,15 +72,15 @@ func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash
 	}
 
 	var out hash.Hash
-	out = hash.HashLeafIn(path, value) // we first compute the hash of the fully-expanded leaf
+	out = hash.HashLeaf(path, value)   // we first compute the hash of the fully-expanded leaf
 	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
 		bit := utils.Bit(path[:], TreeMaxHeight-h)
 		if bit == 1 { // right branching
-			out = hash.HashInterNodeIn(GetDefaultHashForHeight(h-1), out)
+			out = hash.HashInterNode(GetDefaultHashForHeight(h-1), out)
 		} else { // left branching
-			out = hash.HashInterNodeIn(out, GetDefaultHashForHeight(h-1))
+			out = hash.HashInterNode(out, GetDefaultHashForHeight(h-1))
 		}
 	}
 	return out

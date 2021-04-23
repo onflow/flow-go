@@ -164,14 +164,18 @@ func RebuildNodes(storableNodes []*StorableNode) ([]*node.Node, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode a payload for an storableNode %w", err)
 			}
-			var nodeHash hash.Hash
-			copy(nodeHash[:], snode.HashValue)
+			nodeHash, err := hash.ToHash(snode.HashValue)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode a hash of a storableNode %w", err)
+			}
 			node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], path, payload, nodeHash, snode.MaxDepth, snode.RegCount)
 			nodes = append(nodes, node)
 			continue
 		}
-		var nodeHash hash.Hash
-		copy(nodeHash[:], snode.HashValue)
+		nodeHash, err := hash.ToHash(snode.HashValue)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode a hash of a storableNode %w", err)
+		}
 		node := node.NewNode(int(snode.Height), nodes[snode.LIndex], nodes[snode.RIndex], ledger.DummyPath, nil, nodeHash, snode.MaxDepth, snode.RegCount)
 		nodes = append(nodes, node)
 	}

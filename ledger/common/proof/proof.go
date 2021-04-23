@@ -41,9 +41,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		bit := utils.Bit(p.Path[:], treeHeight-h)
 		// hashing is order dependant
 		if bit == 1 { // we hash our way up to the parent along the parent's right branch
-			computed = hash.HashInterNodeIn(siblingHash, computed)
+			computed = hash.HashInterNode(siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
-			computed = hash.HashInterNodeIn(computed, siblingHash)
+			computed = hash.HashInterNode(computed, siblingHash)
 		}
 	}
 	return (computed == hash.Hash(expectedState)) == p.Inclusion

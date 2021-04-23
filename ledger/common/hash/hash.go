@@ -1,5 +1,7 @@
 package hash
 
+import "fmt"
+
 // HashLen is the ledger default output hash length in bytes
 const HashLen = 32
 
@@ -10,41 +12,30 @@ type Hash [HashLen]byte
 // DummyHash represents a valid hash value.
 var DummyHash Hash
 
-// HashLeaf generates hash value for leaf nodes (SHA3-256).
+// HashLeaf returns the hash value for leaf nodes.
 //
 // path must be a 32 byte slice.
-// note that we don't include the keys here as they are already included in the path
-// TODO: delete this function after refactoring ptrie
+// note that we don't include the keys here as they are already included in the path.
 func HashLeaf(path Hash, value []byte) Hash {
 	hasher := new256()
-	return hasher.hash256Plus(path, value) // path is always 256 bits
+	return hasher.hash256Plus(path, value) // path is 256 bits
 }
 
-// HashInterNode generates hash value for intermediate nodes (SHA3-256).
+// HashInterNode returns the hash value for intermediate nodes.
 //
-// hash1 and hash2 must each be a 32 byte slice.
-// TODO: delete this function after refactoring ptrie
+// hash1 and hash2 must be a 32 byte slice each.
 func HashInterNode(hash1 Hash, hash2 Hash) Hash {
 	hasher := new256()
 	return hasher.hash256plus256(hash1, hash2) // hash1 and hash2 are 256 bits
 }
 
-// HashLeafIn generates hash value for leaf nodes (SHA3-256)
-// and stores the result in the result input
-//
-// path must be a 32 byte slice.
-// note that we don't include the keys here as they are already included in the path
-func HashLeafIn(path Hash, value []byte) Hash {
-	hasher := new256()
-	return hasher.hash256Plus(path, value) // path is always 256 bits
-}
-
-// HashInterNodeIn generates hash value for intermediate nodes (SHA3-256)
-// and stores the result in the input array.
-//
-// result slice can be equal to hash1 or hash2.
-// hash1 and hash2 must each be a 32 byte slice.
-func HashInterNodeIn(hash1 Hash, hash2 Hash) Hash {
-	hasher := new256()
-	return hasher.hash256plus256(hash1, hash2) // hash1 and hash2 are 256 bits
+// ToState converts a byte slice into a State.
+// It returns an error if the slice has an invalid length.
+func ToHash(bytes []byte) (Hash, error) {
+	var h Hash
+	if len(bytes) != len(h) {
+		return DummyHash, fmt.Errorf("expecting %d bytes but got %d bytes", len(h), len(bytes))
+	}
+	copy(h[:], bytes)
+	return h, nil
 }
