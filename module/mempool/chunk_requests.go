@@ -9,11 +9,19 @@ import (
 
 // ChunkRequests is an in-memory storage for maintaining chunk data pack requests.
 type ChunkRequests interface {
-	// ByID returns a chunk request by its chunk ID as well as the attempt field of its underlying
-	// chunk request status.
+	// ByID returns a chunk request by its chunk ID.
+	//
 	// There is a one-to-one correspondence between the chunk requests in memory, and
 	// their chunk ID.
-	ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, int, bool)
+	ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool)
+
+	// RequestInfo returns the number of times the chunk has been requested,
+	// last time the chunk has been requested, and the retry-after time duration of the
+	// underlying request status of this chunk.
+	//
+	// The last boolean parameter returns whether a chunk request for this chunk ID
+	// exists in memory-pool.
+	RequestInfo(chunkID flow.Identifier) (int, time.Time, time.Duration, bool)
 
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate chunk request with the same
@@ -32,15 +40,13 @@ type ChunkRequests interface {
 	// The increments are done atomically, thread-safe, and in isolation.
 	IncrementAttempt(chunkID flow.Identifier) bool
 
-	// IncrementAttemptAndRetryAfter increments the Attempt field of the chunk request in memory pool that
-	// has the specified chunk ID, and updates the retryAfter field of the chunk request to the specified
-	// values.
-	//
-	// The LastAttempt field of the chunk request is timestamped with the invocation time of this method.
+	// UpdateRetryAfter updates the retryAfter field of the chunk request to the specified values.
+	// It also increments the number of time this chunk has been attempted, and the last time this chunk
+	// has been attempted to the current time.
 	//
 	// If such chunk ID does not exist in the memory pool, it returns false.
 	// The updates under this method are atomic, thread-safe, and done in isolation.
-	IncrementAttemptAndRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool
+	UpdateRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool
 
 	// All returns all chunk requests stored in this memory pool.
 	All() []*verification.ChunkDataPackRequest

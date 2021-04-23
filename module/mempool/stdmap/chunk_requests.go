@@ -31,17 +31,17 @@ func toChunkRequestStatus(entity flow.Entity) *chunkRequestStatus {
 	return status
 }
 
-// ByID returns a chunk request by its chunk ID as well as the attempt field of its underlying
-// chunk request status.
+// ByID returns a chunk request by its chunk ID.
+//
 // There is a one-to-one correspondence between the chunk requests in memory, and
 // their chunk ID.
-func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, int, bool) {
+func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
-		return nil, -1, false
+		return nil, false
 	}
 	request := toChunkRequestStatus(entity)
-	return request.ChunkDataPackRequest, request.Attempt, true
+	return request.ChunkDataPackRequest, true
 }
 
 // Add provides insertion functionality into the memory pool.
@@ -81,15 +81,13 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	return err == nil
 }
 
-// IncrementAttemptAndRetryAfter increments the Attempt field of the chunk request in memory pool that
-// has the specified chunk ID, and updates the retryAfter field of the chunk request to the specified
-// values.
-//
-// The LastAttempt field of the chunk request is timestamped with the invocation time of this method.
+// UpdateRetryAfter updates the retryAfter field of the chunk request to the specified values.
+// It also increments the number of time this chunk has been attempted, and the last time this chunk
+// has been attempted to the current time.
 //
 // If such chunk ID does not exist in the memory pool, it returns false.
 // The updates under this method are atomic, thread-safe, and done in isolation.
-func (cs *ChunkRequests) IncrementAttemptAndRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
+func (cs *ChunkRequests) UpdateRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkID]
 		if !exists {
@@ -120,7 +118,8 @@ func (cs *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 // some auxiliary attributes that are internal to ChunkRequests.
 type chunkRequestStatus struct {
 	*verification.ChunkDataPackRequest
-	LastAttempt time.Time
+	LastAttempt time.Time     // timestamp of last request dispatched for this chunk id.
+	RetryAfter  time.Duration // interval until request should be retried.
 	Attempt     int
 }
 
