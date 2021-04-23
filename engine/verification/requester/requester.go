@@ -207,7 +207,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		qualified := e.requestQualifier.CanDispatchRequest(request)
+		qualified := e.requestQualifier.CanDispatchRequest(request.ChunkID)
 		if !qualified {
 			lg.Debug().Bool("qualified_request", qualified).
 				Msg("chunk data pack request is not qualified for dispatching at this round")
@@ -219,7 +219,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		updated := e.requestQualifier.OnRequestDispatched(request)
+		updated := e.requestQualifier.OnRequestDispatched(request.ChunkID)
 		lg.Info().
 			Bool("pending_request_updated", updated).
 			Msg("chunk data pack requested")

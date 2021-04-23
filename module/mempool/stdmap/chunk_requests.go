@@ -95,7 +95,7 @@ func (cs *ChunkRequests) IncrementAttemptAndRetryAfter(chunkID flow.Identifier, 
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		chunk := chunkRequestStatus(entity)
+		chunk := toChunkRequestStatus(entity)
 		chunk.Attempt++
 		chunk.LastAttempt = time.Now()
 		chunk.RetryAfter = retryAfter

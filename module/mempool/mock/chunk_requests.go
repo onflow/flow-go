@@ -7,6 +7,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	time "time"
+
 	verification "github.com/onflow/flow-go/model/verification"
 )
 
@@ -82,6 +84,20 @@ func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
 		r0 = rf(chunkID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// IncrementAttemptAndRetryAfter provides a mock function with given fields: chunkID, retryAfter
+func (_m *ChunkRequests) IncrementAttemptAndRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
+	ret := _m.Called(chunkID, retryAfter)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier, time.Duration) bool); ok {
+		r0 = rf(chunkID, retryAfter)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
