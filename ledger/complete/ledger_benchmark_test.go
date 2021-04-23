@@ -134,8 +134,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 }
 
-// BenchmarkStorage benchmarks the performance of the storage layer
-func BenchmarkUpdate(b *testing.B) {
+// BenchmarkTrieUpdate benchmarks the performance of a trie update
+func BenchmarkTrieUpdate(b *testing.B) {
 	// key updates per iteration
 	numInsPerStep := 10000
 	keyNumberOfParts := 10
@@ -182,8 +182,8 @@ func BenchmarkUpdate(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkStorage benchmarks the performance of the storage layer
-func BenchmarkRead(b *testing.B) {
+// BenchmarkTrieUpdate benchmarks the performance of a trie read
+func BenchmarkTrieRead(b *testing.B) {
 	// key updates per iteration
 	numInsPerStep := 10000
 	keyNumberOfParts := 10
@@ -240,8 +240,8 @@ func BenchmarkRead(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkStorage benchmarks the performance of the storage layer
-func BenchmarkProve(b *testing.B) {
+// BenchmarkTrieUpdate benchmarks the performance of a trie prove
+func BenchmarkTrieProve(b *testing.B) {
 	// key updates per iteration
 	numInsPerStep := 10000
 	keyNumberOfParts := 10

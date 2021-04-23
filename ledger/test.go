@@ -144,15 +144,15 @@ func RandomPathsRandLen(maxN int) []Path {
 // RandomPaths generates n random (no repetition)
 func RandomPaths(n int) []Path {
 	paths := make([]Path, 0, n)
-	alreadySelectPaths := make(map[string]bool)
+	alreadySelectPaths := make(map[Path]bool)
 	i := 0
 	for i < n {
 		var path Path
 		rand.Read(path[:])
 		// deduplicate
-		if _, found := alreadySelectPaths[string(path[:])]; !found {
+		if _, found := alreadySelectPaths[path]; !found {
 			paths = append(paths, path)
-			alreadySelectPaths[string(path[:])] = true
+			alreadySelectPaths[path] = true
 			i++
 		}
 	}

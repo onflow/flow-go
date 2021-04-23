@@ -235,21 +235,19 @@ func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([
 
 // deduplicateWrites retains only the last register write
 func deduplicateWrites(paths []ledger.Path, payloads []ledger.Payload) ([]ledger.Path, []ledger.Payload) {
-	payloadMapping := make(map[string]int)
+	payloadMapping := make(map[ledger.Path]int)
 	if len(paths) != len(payloads) {
 		panic("size mismatch (paths and payloads)")
 	}
 	for i, path := range paths {
 		// we override the latest in the slice
-		payloadMapping[string(path[:])] = i
+		payloadMapping[path] = i
 	}
 	dedupedPaths := make([]ledger.Path, 0, len(payloadMapping))
 	dedupedPayloads := make([]ledger.Payload, 0, len(payloadMapping))
-	for pathString := range payloadMapping {
-		var path ledger.Path
-		copy(path[:], pathString)
+	for path := range payloadMapping {
 		dedupedPaths = append(dedupedPaths, path)
-		dedupedPayloads = append(dedupedPayloads, payloads[payloadMapping[pathString]])
+		dedupedPayloads = append(dedupedPayloads, payloads[payloadMapping[path]])
 	}
 	return dedupedPaths, dedupedPayloads
 }

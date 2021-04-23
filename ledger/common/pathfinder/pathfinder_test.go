@@ -29,7 +29,7 @@ func Test_KeyToPathV0(t *testing.T) {
 	require.NoError(t, err)
 	var expected ledger.Path
 	copy(expected[:], h.Sum(nil))
-	require.True(t, path == expected)
+	require.Equal(t, path, expected)
 }
 
 func Test_KeyToPathV1(t *testing.T) {
@@ -48,5 +48,5 @@ func Test_KeyToPathV1(t *testing.T) {
 
 	var expected ledger.Path
 	copy(expected[:], hasher.SumHash())
-	require.True(t, path == expected)
+	require.Equal(t, path, expected)
 }

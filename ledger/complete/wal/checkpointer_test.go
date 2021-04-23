@@ -124,7 +124,7 @@ func Test_Checkpointing(t *testing.T) {
 		var rootHash = f.GetEmptyRootHash()
 
 		//saved data after updates
-		savedData := make(map[string]map[string]*ledger.Payload)
+		savedData := make(map[ledger.RootHash]map[ledger.Path]*ledger.Payload)
 
 		t.Run("create WAL and initial trie", func(t *testing.T) {
 
@@ -153,12 +153,12 @@ func Test_Checkpointing(t *testing.T) {
 
 				fmt.Printf("Updated with %x\n", rootHash)
 
-				data := make(map[string]*ledger.Payload, len(trieUpdate.Paths))
+				data := make(map[ledger.Path]*ledger.Payload, len(trieUpdate.Paths))
 				for j, path := range trieUpdate.Paths {
-					data[string(path[:])] = trieUpdate.Payloads[j]
+					data[path] = trieUpdate.Payloads[j]
 				}
 
-				savedData[string(rootHash[:])] = data
+				savedData[rootHash] = data
 			}
 			// some buffer time of the checkpointer to run
 			time.Sleep(1 * time.Second)
@@ -235,27 +235,23 @@ func Test_Checkpointing(t *testing.T) {
 			for rootHash, data := range savedData {
 
 				paths := make([]ledger.Path, 0, len(data))
-				for pathString := range data {
-					var path ledger.Path
-					copy(path[:], pathString)
+				for path := range data {
 					paths = append(paths, path)
 				}
 
-				var root ledger.RootHash
-				copy(root[:], []byte(rootHash))
-				payloads1, err := f.Read(&ledger.TrieRead{RootHash: root, Paths: paths})
+				payloads1, err := f.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: root, Paths: paths})
+				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: root, Paths: paths})
+				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[string(path[:])].Equals(payloads1[i]))
-					require.True(t, data[string(path[:])].Equals(payloads2[i]))
-					require.True(t, data[string(path[:])].Equals(payloads3[i]))
+					require.True(t, data[path].Equals(payloads1[i]))
+					require.True(t, data[path].Equals(payloads2[i]))
+					require.True(t, data[path].Equals(payloads3[i]))
 				}
 			}
 		})

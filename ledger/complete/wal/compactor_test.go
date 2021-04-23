@@ -37,7 +37,7 @@ func Test_Compactor(t *testing.T) {
 		var rootHash = f.GetEmptyRootHash()
 
 		//saved data after updates
-		savedData := make(map[string]map[string]*ledger.Payload)
+		savedData := make(map[ledger.RootHash]map[ledger.Path]*ledger.Payload)
 
 		t.Run("Compactor creates checkpoints eventually", func(t *testing.T) {
 
@@ -76,12 +76,12 @@ func Test_Compactor(t *testing.T) {
 
 				require.FileExists(t, path.Join(dir, NumberToFilenamePart(i)))
 
-				data := make(map[string]*ledger.Payload, len(paths))
+				data := make(map[ledger.Path]*ledger.Payload, len(paths))
 				for j, path := range paths {
-					data[string(path[:])] = payloads[j]
+					data[path] = payloads[j]
 				}
 
-				savedData[string(rootHash[:])] = data
+				savedData[rootHash] = data
 			}
 
 			assert.Eventually(t, func() bool {
@@ -157,15 +157,11 @@ func Test_Compactor(t *testing.T) {
 			for rootHash, data := range savedData {
 
 				paths := make([]ledger.Path, 0, len(data))
-				for pathString := range data {
-					var path ledger.Path
-					copy(path[:], pathString)
+				for path := range data {
 					paths = append(paths, path)
 				}
 
-				var root ledger.RootHash
-				copy(root[:], []byte(rootHash))
-				read := &ledger.TrieRead{RootHash: ledger.RootHash(root), Paths: paths}
+				read := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
 				payloads, err := f.Read(read)
 				require.NoError(t, err)
 
@@ -173,8 +169,8 @@ func Test_Compactor(t *testing.T) {
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[string(path[:])].Equals(payloads[i]))
-					require.True(t, data[string(path[:])].Equals(payloads2[i]))
+					require.True(t, data[path].Equals(payloads[i]))
+					require.True(t, data[path].Equals(payloads2[i]))
 				}
 			}
 

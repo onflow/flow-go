@@ -259,8 +259,12 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 // warning, use this function for read-only operation
 func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 	// if in memory
-	if ent, ok := f.tries.Get(rootHash); ok {
-		return ent.(*trie.MTrie), nil
+	if ent, found := f.tries.Get(rootHash); found {
+		trie, ok := ent.(*trie.MTrie)
+		if !ok {
+			return nil, fmt.Errorf("forest contains an element of a wrong type")
+		}
+		return trie, nil
 	}
 	return nil, fmt.Errorf("trie with the given rootHash [%x] not found", rootHash)
 }
@@ -275,7 +279,11 @@ func (f *Forest) GetTries() ([]*trie.MTrie, error) {
 		if !ok {
 			return nil, errors.New("concurrent Forest modification")
 		}
-		tries = append(tries, t.(*trie.MTrie))
+		trie, ok := t.(*trie.MTrie)
+		if !ok {
+			return nil, errors.New("forest contains an element of a wrong type")
+		}
+		tries = append(tries, trie)
 	}
 	return tries, nil
 }
@@ -298,10 +306,13 @@ func (f *Forest) AddTrie(newTrie *trie.MTrie) error {
 	}
 
 	// TODO: check Thread safety
-	// TODO what is this string root hash
 	rootHash := newTrie.RootHash()
 	if storedTrie, found := f.tries.Get(rootHash); found {
-		if storedTrie.(*trie.MTrie).Equals(newTrie) {
+		trie, ok := storedTrie.(*trie.MTrie)
+		if !ok {
+			return fmt.Errorf("forest contains an element of a wrong type")
+		}
+		if trie.Equals(newTrie) {
 			return nil
 		}
 		return fmt.Errorf("forest already contains a tree with same root hash but other properties")
