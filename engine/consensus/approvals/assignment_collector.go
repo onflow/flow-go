@@ -33,16 +33,18 @@ type AssignmentCollector struct {
 	BlockHeight                          uint64                                 // height of block targeted by execution result
 	collectors                           map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
 	authorizedApprovers                  map[flow.Identifier]*flow.Identity     // map of approvers pre-selected at block that is being sealed
+	incorporatedAtHeight                 map[uint64][]flow.Identifier           // mapping blockHeight -> []IncorporatedBlockID
 	lock                                 sync.RWMutex                           // lock for protecting collectors map
-	verifiedApprovalsCache               *ApprovalsCache                        // in-memory cache of approvals were already verified
-	requiredApprovalsForSealConstruction uint                                   // number of approvals that are required for each chunk to be sealed
-	assigner                             module.ChunkAssigner                   // used to build assignment
-	state                                protocol.State                         // used to access the  protocol state
-	verifier                             module.Verifier                        // used to validate result approvals
-	seals                                mempool.IncorporatedResultSeals        // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
-	approvalConduit                      network.Conduit                        // used to request missing approvals from verification nodes
-	requestTracker                       *sealing.RequestTracker                // used to keep track of number of approval requests, and blackout periods, by chunk
-	getCachedBlockHeight                 GetCachedBlockHeight                   // functor to get cached block height
+	incorporatedAtHeightLock             sync.Mutex
+	verifiedApprovalsCache               *ApprovalsCache                 // in-memory cache of approvals were already verified
+	requiredApprovalsForSealConstruction uint                            // number of approvals that are required for each chunk to be sealed
+	assigner                             module.ChunkAssigner            // used to build assignment
+	state                                protocol.State                  // used to access the  protocol state
+	verifier                             module.Verifier                 // used to validate result approvals
+	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
+	requestTracker                       *sealing.RequestTracker         // used to keep track of number of approval requests, and blackout periods, by chunk
+	getCachedBlockHeight                 GetCachedBlockHeight            // functor to get cached block height
 }
 
 func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
@@ -58,6 +60,7 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		BlockID:                              result.BlockID,
 		BlockHeight:                          blockHeight,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
+		incorporatedAtHeight:                 make(map[uint64][]flow.Identifier),
 		state:                                state,
 		assigner:                             assigner,
 		seals:                                seals,
@@ -136,13 +139,25 @@ func (c *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64)
 	return nil
 }
 
+func (c *AssignmentCollector) putIncorporatedAtHeight(incorporatdAtHeight uint64, incorporatedBlockID flow.Identifier) {
+	c.incorporatedAtHeightLock.Lock()
+	defer c.incorporatedAtHeightLock.Unlock()
+	ids, ok := c.incorporatedAtHeight[incorporatdAtHeight]
+	if !ok {
+		ids = make([]flow.Identifier, 0)
+	}
+	ids = append(ids, incorporatedBlockID)
+	c.incorporatedAtHeight[incorporatdAtHeight] = ids
+}
+
 func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
-	if collector := c.collectorByBlockID(incorporatedResult.IncorporatedBlockID); collector != nil {
+	incorporatedBlockID := incorporatedResult.IncorporatedBlockID
+	if collector := c.collectorByBlockID(incorporatedBlockID); collector != nil {
 		return nil
 	}
 
 	// chunk assigment is based on the first block in the fork that incorporates the result
-	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedResult.IncorporatedBlockID)
+	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {
 		return engine.NewInvalidInputErrorf("could not determine chunk assignment: %w", err)
 	}
@@ -153,9 +168,16 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 		return engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
 	}
 
+	incorporatedAtHeight, err := c.getCachedBlockHeight(incorporatedBlockID)
+	if err != nil {
+		return fmt.Errorf("coulld not determine height of incorporated block %s: %w",
+			incorporatedBlockID, err)
+	}
+
 	collector := NewApprovalCollector(incorporatedResult, assignment, c.seals, c.requiredApprovalsForSealConstruction)
 
-	c.putCollector(incorporatedResult.IncorporatedBlockID, collector)
+	c.putCollector(incorporatedBlockID, collector)
+	c.putIncorporatedAtHeight(incorporatedAtHeight, incorporatedBlockID)
 
 	// process approvals that have passed needed checks and are ready to be processed
 	for _, approvalID := range c.verifiedApprovalsCache.Ids() {
@@ -168,10 +190,44 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	return nil
 }
 
+// OnBlockFinalizedAtHeight is responsible to cleanup collectors that are incorporated in orphan blocks
+// by passing blockID and height of last finalized block we are able to identify if collector is for valid chain or
+// for orphan fork.
+func (c *AssignmentCollector) OnBlockFinalizedAtHeight(blockID flow.Identifier, blockHeight uint64) {
+	c.incorporatedAtHeightLock.Lock()
+	ids, ok := c.incorporatedAtHeight[blockHeight]
+	if ok {
+		delete(c.incorporatedAtHeight, blockHeight)
+	}
+	c.incorporatedAtHeightLock.Unlock()
+
+	orphanBlockIds := make([]flow.Identifier, 0)
+	// collect orphan incorporated blocks
+	for _, id := range ids {
+		if id != blockID {
+			orphanBlockIds = append(orphanBlockIds, id)
+		}
+	}
+
+	c.eraseCollectors(orphanBlockIds)
+}
+
 func (c *AssignmentCollector) putCollector(incorporatedBlockID flow.Identifier, collector *ApprovalCollector) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.collectors[incorporatedBlockID] = collector
+}
+
+func (c *AssignmentCollector) eraseCollectors(incorporatedBlockIds []flow.Identifier) {
+	if len(incorporatedBlockIds) == 0 {
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	for _, incorporatedBlockID := range incorporatedBlockIds {
+		delete(c.collectors, incorporatedBlockID)
+	}
 }
 
 func (c *AssignmentCollector) allCollectors() []*ApprovalCollector {

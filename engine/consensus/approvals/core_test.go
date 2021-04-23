@@ -130,6 +130,111 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectUnverifiabl
 	require.True(s.T(), engine.IsUnverifiableInputError(err))
 }
 
+// TestOnBlockFinalized_RejectOrphanIncorporatedResults tests that execution results incorporated in orphan blocks
+// are rejected as outdated in next situation
+// A <- B_1
+// 	 <- B_2
+// B_1 is finalized rending B_2 as orphan, submitting IR[ER[A], B_1] is a success, submitting IR[ER[A], B_2] is an outdated incorporated result
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncorporatedResults() {
+	blockB1 := unittest.BlockHeaderWithParentFixture(&s.Block)
+	blockB2 := unittest.BlockHeaderWithParentFixture(&s.Block)
+
+	s.blocks[blockB1.ID()] = &blockB1
+	s.blocks[blockB2.ID()] = &blockB2
+
+	IR1 := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB1.ID()),
+		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+
+	IR2 := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
+		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+
+	payload := unittest.PayloadFixture()
+
+	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
+	s.state.On("AtHeight", blockB1.Height).Return(unittest.StateSnapshotForKnownBlock(&blockB1, nil))
+
+	// blockB1 becomes finalized
+	s.core.OnFinalizedBlock(blockB1.ID())
+
+	err := s.core.ProcessIncorporatedResult(IR1)
+	require.NoError(s.T(), err)
+
+	err = s.core.ProcessIncorporatedResult(IR2)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsOutdatedInputError(err))
+}
+
+// TestOnFinalizedBlock_CollectorsCleanup tests that stale collectors are cleaned up for
+// already sealed blocks.
+func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup() {
+	blockID := s.Block.ID()
+	numResults := 10
+	for i := 0; i < numResults; i++ {
+		// all results incorporated in different blocks
+		incorporatedBlock := unittest.BlockHeaderWithParentFixture(&s.IncorporatedBlock)
+		s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
+		// create different incorporated results for same block ID
+		result := unittest.ExecutionResultFixture()
+		result.BlockID = blockID
+		incorporatedResult := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(result),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()))
+		err := s.core.ProcessIncorporatedResult(incorporatedResult)
+		require.NoError(s.T(), err)
+	}
+
+	require.Len(s.T(), s.core.collectors, numResults)
+
+	candidate := unittest.BlockHeaderWithParentFixture(&s.Block)
+
+	s.blocks[candidate.ID()] = &candidate
+
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
+		unittest.Seal.WithResult(s.IncorporatedResult.Result))
+	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
+
+	s.payloads.On("ByBlockID", candidate.ID()).Return(&payload, nil).Once()
+
+	s.core.OnFinalizedBlock(candidate.ID())
+	require.Empty(s.T(), s.core.collectors)
+}
+
+func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CleanupOrphanCollectors() {
+	blockB1 := unittest.BlockHeaderWithParentFixture(&s.Block)
+	blockB2 := unittest.BlockHeaderWithParentFixture(&s.Block)
+
+	s.blocks[blockB1.ID()] = &blockB1
+	s.blocks[blockB2.ID()] = &blockB2
+
+	IR1 := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB1.ID()),
+		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+
+	IR2 := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
+		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+
+	err := s.core.ProcessIncorporatedResult(IR1)
+	require.NoError(s.T(), err)
+
+	err = s.core.ProcessIncorporatedResult(IR2)
+	require.NoError(s.T(), err)
+
+	payload := unittest.PayloadFixture()
+	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
+	s.state.On("AtHeight", blockB1.Height).Return(unittest.StateSnapshotForKnownBlock(&blockB1, nil))
+
+	// blockB1 becomes finalized
+	s.core.OnFinalizedBlock(blockB1.ID())
+
+	resultCollector := s.core.collectors[IR1.Result.ID()]
+	require.NotNil(s.T(), resultCollector)
+	require.Len(s.T(), resultCollector.collectors, 1)
+	require.NotNil(s.T(), resultCollector.collectors[IR1.IncorporatedBlockID])
+}
+
 // TestProcessIncorporated_ApprovalsBeforeResult tests a scenario when first we have received approvals for unknown
 // execution result and after that we discovered execution result. In this scenario we should be able
 // to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
@@ -222,39 +327,4 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 	// if it's an expected sentinel error, it has to be handled internally
 	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.Error(s.T(), err)
-}
-
-// TestOnFinalizedBlock_CollectorsCleanup tests that stale collectors are cleaned up for
-// already sealed blocks.
-func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup() {
-	blockID := s.Block.ID()
-	numResults := 10
-	for i := 0; i < numResults; i++ {
-		// all results incorporated in different blocks
-		incorporatedBlock := unittest.BlockHeaderWithParentFixture(&s.IncorporatedBlock)
-		s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
-		// create different incorporated results for same block ID
-		result := unittest.ExecutionResultFixture()
-		result.BlockID = blockID
-		incorporatedResult := unittest.IncorporatedResult.Fixture(
-			unittest.IncorporatedResult.WithResult(result),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()))
-		err := s.core.ProcessIncorporatedResult(incorporatedResult)
-		require.NoError(s.T(), err)
-	}
-
-	require.Len(s.T(), s.core.collectors, numResults)
-
-	candidate := unittest.BlockHeaderWithParentFixture(&s.Block)
-
-	s.blocks[candidate.ID()] = &candidate
-
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
-		unittest.Seal.WithResult(s.IncorporatedResult.Result))
-	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
-
-	s.payloads.On("ByBlockID", candidate.ID()).Return(&payload, nil).Once()
-
-	s.core.OnFinalizedBlock(candidate.ID())
-	require.Empty(s.T(), s.core.collectors)
 }

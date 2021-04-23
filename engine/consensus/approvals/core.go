@@ -56,6 +56,7 @@ type approvalProcessingCore struct {
 	approvalsCache                       *ApprovalsCache                          // in-memory cache of approvals that weren't verified
 	blockHeightLookupCache               *lru.Cache                               // cache for block height lookups
 	lastSealedBlockHeight                uint64                                   // atomic variable for last sealed block height
+	lastFinalizedBlockHeight             uint64                                   // atomic variable for last finalized block height
 	requiredApprovalsForSealConstruction uint                                     // min number of approvals required for constructing a candidate seal
 	emergencySealingActive               bool                                     // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 	assigner                             module.ChunkAssigner                     // used by AssignmentCollector to build chunk assignment
@@ -117,16 +118,19 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 
 // WARNING: this function is implemented in a way that we expect blocks strictly in parent-child order
 // Caller has to ensure that it doesn't feed blocks that were already processed or in wrong order.
-func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
-	finalized, err := c.state.AtBlockID(blockID).Head()
+func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
+	finalized, err := c.state.AtBlockID(finalizedBlockID).Head()
 	if err != nil {
-		c.log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", blockID)
+		c.log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", finalizedBlockID)
 	}
 
-	payload, err := c.payloads.ByBlockID(blockID)
+	payload, err := c.payloads.ByBlockID(finalizedBlockID)
 	if err != nil {
-		c.log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", blockID)
+		c.log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", finalizedBlockID)
 	}
+
+	// it's important to use atomic operation to make sure that we have correct ordering
+	atomic.StoreUint64(&c.lastFinalizedBlockHeight, finalized.Height)
 
 	sealsCount := len(payload.Seals)
 	sealedResultIds := make([]flow.Identifier, sealsCount)
@@ -155,10 +159,14 @@ func (c *approvalProcessingCore) OnFinalizedBlock(blockID flow.Identifier) {
 	// check if there are stale results qualified for emergency sealing
 	err = c.checkEmergencySealing(collectors, finalized.Height)
 	if err != nil {
-		c.log.Err(err).Msgf("could not check emergency sealing at block %v", finalized.ID())
+		c.log.Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
-	c.cleanupStaleCollectors(collectors, lastSealedBlockHeight)
+	collectors = c.cleanupStaleCollectors(collectors, lastSealedBlockHeight)
+	// to those collectors that are not stale, report finalization event to cleanup orphan blocks
+	for _, collector := range collectors {
+		collector.OnBlockFinalizedAtHeight(finalizedBlockID, finalized.Height)
+	}
 }
 
 func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
@@ -167,9 +175,34 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 		return fmt.Errorf("won't process outdated or unverifiable execution result %s: %w", result.Result.BlockID, err)
 	}
 
+	incorporatedAtHeight, err := c.getCachedBlockHeight(result.IncorporatedBlockID)
+	if err != nil {
+		return fmt.Errorf("could not get block height for incorporated block %s: %w",
+			result.IncorporatedBlockID, err)
+	}
+
+	lastFinalizedBlockHeight := atomic.LoadUint64(&c.lastFinalizedBlockHeight)
+
+	// check if we are dealing with finalized block or an orphan
+	if incorporatedAtHeight <= lastFinalizedBlockHeight {
+		finalized, err := c.state.AtHeight(incorporatedAtHeight).Head()
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
+		}
+		if finalized.ID() != result.IncorporatedBlockID {
+			// it means that we got incorporated result for a block which doesn't extend our chain
+			// and should be discarded from future processing
+			return engine.NewOutdatedInputErrorf("won't process incorporated result from orphan block %s", result.IncorporatedBlockID)
+		}
+	}
+
 	collector := c.getCollector(result.Result.ID())
 	newIncorporatedResult := collector == nil
 	if newIncorporatedResult {
+		// in case block is not finalized we will create collector and start processing approvals
+		// no checks for orphans can be made at this point
+		// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
+
 		collector, err = c.createCollector(result.Result)
 		if err != nil {
 			return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
@@ -318,17 +351,22 @@ func (c *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {
 	}
 }
 
-func (c *approvalProcessingCore) cleanupStaleCollectors(collectors []*AssignmentCollector, lastSealedHeight uint64) {
+func (c *approvalProcessingCore) cleanupStaleCollectors(collectors []*AssignmentCollector, lastSealedHeight uint64) []*AssignmentCollector {
 	// We create collector only if we know about block that is being sealed. If we don't know anything about referred block
 	// we will just discard it. This means even if someone tries to spam us with incorporated results with same blockID it
 	// will get eventually cleaned when we discover a seal for this block.
 	staleCollectors := make([]flow.Identifier, 0)
+	filteredCollectors := make([]*AssignmentCollector, 0)
 	for _, collector := range collectors {
 		// we have collector for already sealed block
 		if lastSealedHeight >= collector.BlockHeight {
 			staleCollectors = append(staleCollectors, collector.ResultID)
+		} else {
+			filteredCollectors = append(filteredCollectors, collector)
 		}
 	}
 
 	c.eraseCollectors(staleCollectors)
+
+	return filteredCollectors
 }

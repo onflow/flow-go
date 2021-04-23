@@ -136,9 +136,16 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 		}
 	}
 
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&s.Block)
+	s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
+
 	// at this point we have proposed a seal, let's construct new incorporated result with same assignment
 	// but different incorporated block ID resulting in new seal.
-	incorporatedResult := unittest.IncorporatedResult.Fixture(unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+	incorporatedResult := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()),
+		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
+	)
+
 	err = s.collector.ProcessIncorporatedResult(incorporatedResult)
 	require.NoError(s.T(), err)
 	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
@@ -367,4 +374,38 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 	require.NoError(s.T(), err)
 
 	s.sealsPL.AssertExpectations(s.T())
+}
+
+// TestOnBlockFinalizedAtHeight_ErasingOrphanCollectors tests that orphan collectors are cleaned up in next case
+// 	A <- B_1 <- C
+//    <- B_2
+// First we process IR[ER[A], B_2], IR[ER[A], B_1] then B_1 gets finalized and B_2 is orphaned
+// Check if cleanup logic removes collector for IR[ER[A], B_2] and leaves collector for IR[ER[A], B_1]
+func (s *AssignmentCollectorTestSuite) TestOnBlockFinalizedAtHeight_ErasingOrphanCollectors() {
+	blockB1 := unittest.BlockHeaderWithParentFixture(&s.Block)
+	blockB2 := unittest.BlockHeaderWithParentFixture(&s.Block)
+
+	s.blocks[blockB1.ID()] = &blockB1
+	s.blocks[blockB2.ID()] = &blockB2
+
+	IR1 := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB1.ID()),
+		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+
+	IR2 := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
+		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
+
+	err := s.collector.ProcessIncorporatedResult(IR1)
+	require.NoError(s.T(), err)
+
+	err = s.collector.ProcessIncorporatedResult(IR2)
+	require.NoError(s.T(), err)
+
+	require.Len(s.T(), s.collector.collectors, 2)
+
+	s.collector.OnBlockFinalizedAtHeight(blockB1.ID(), blockB1.Height)
+
+	require.Len(s.T(), s.collector.collectors, 1)
+	require.NotNil(s.T(), s.collector.collectors[IR1.IncorporatedBlockID])
 }
