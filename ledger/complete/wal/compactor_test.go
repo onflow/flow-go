@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -247,7 +248,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			}
 
 			// assert precisely creation of checkpoint files
-			require.NoFileExists(t, path.Join(dir, RootCheckpointFilename))
+			require.NoFileExists(t, path.Join(dir, bootstrap.FilenameWALRootCheckpoint))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
 			require.FileExists(t, path.Join(dir, "checkpoint.00000003"))
@@ -272,7 +273,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			err = compactor.cleanupCheckpoints()
 			require.NoError(t, err)
 
-			require.NoFileExists(t, path.Join(dir, RootCheckpointFilename))
+			require.NoFileExists(t, path.Join(dir, bootstrap.FilenameWALRootCheckpoint))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000003"))

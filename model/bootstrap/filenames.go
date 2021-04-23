@@ -2,8 +2,6 @@ package bootstrap
 
 import (
 	"path/filepath"
-
-	"github.com/onflow/flow-go/ledger/complete/wal"
 )
 
 // Canonical filenames/paths for bootstrapping files.
@@ -23,13 +21,10 @@ var (
 	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
 	PathNodeInfoPub           = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
 
-	PathRootBlock                 = filepath.Join(DirnamePublicBootstrap, "root-block.json")
-	PathRootQC                    = filepath.Join(DirnamePublicBootstrap, "root-qc.json")
-	PathRootResult                = filepath.Join(DirnamePublicBootstrap, "root-execution-result.json")
-	PathRootSeal                  = filepath.Join(DirnamePublicBootstrap, "root-block-seal.json")
 	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
 
-	PathRootCheckpoint = filepath.Join(DirnameExecutionState, wal.RootCheckpointFilename) // only available on an execution node
+	FilenameWALRootCheckpoint = "root.checkpoint"
+	PathRootCheckpoint        = filepath.Join(DirnameExecutionState, FilenameWALRootCheckpoint) // only available on an execution node
 
 	// private genesis information
 	DirPrivateRoot           = "private-root-information"
