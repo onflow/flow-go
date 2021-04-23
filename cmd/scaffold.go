@@ -164,8 +164,8 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
 		"whether to enable tracer")
 
-	fnb.flags.UintVarP(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", "gch", bstorage.DefaultCacheSize, "collection guarantees cache size")
-	fnb.flags.UintVarP(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", "rch", bstorage.DefaultCacheSize, "receipts cache size")
+	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
+	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
