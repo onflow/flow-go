@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
@@ -58,7 +59,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		},
 		complete.DefaultPathFinderVersion,
 		outputDir,
-		wal.RootCheckpointFilename,
+		bootstrap.FilenameWALRootCheckpoint,
 	)
 	if err != nil {
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
