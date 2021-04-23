@@ -1,5 +1,9 @@
 package flow
 
+import (
+	"fmt"
+)
+
 // ExecutionResult ...
 type ExecutionResult struct {
 	PreviousResultID Identifier // commit of the previous ER
@@ -32,8 +36,11 @@ func (er ExecutionResult) ValidateChunksLength() bool {
 //
 // The function assumes the number of chunks is non-zero. A check using
 // ValidateChunksLength is required before calling this function.
-func (er ExecutionResult) FinalStateCommitment() StateCommitment {
-	return er.Chunks[er.Chunks.Len()-1].EndState
+func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
+	if !er.ValidateChunksLength() {
+		return DummyStateCommitment, fmt.Errorf("execution result has no chunks")
+	}
+	return er.Chunks[er.Chunks.Len()-1].EndState, nil
 }
 
 // InitialStateCommit returns a commitment to the execution state used as input
@@ -41,6 +48,9 @@ func (er ExecutionResult) FinalStateCommitment() StateCommitment {
 //
 // The function assumes the number of chunks is non-zero. A check using
 // ValidateChunksLength is required before calling this function.
-func (er ExecutionResult) InitialStateCommit() StateCommitment {
-	return er.Chunks[0].StartState
+func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {
+	if !er.ValidateChunksLength() {
+		return DummyStateCommitment, fmt.Errorf("execution result has no chunks")
+	}
+	return er.Chunks[0].StartState, nil
 }

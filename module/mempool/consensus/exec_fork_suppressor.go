@@ -284,11 +284,11 @@ func (s *ExecForkSuppressor) enforceConsistentStateTransitions(irSeal, irSeal2 *
 	// the results for the seals have different IDs (!)
 	// => check whether initial and final state match in both seals
 
-	// unsafe: we assume validity of states has been checked before
-	irSeal1InitialState := irSeal.IncorporatedResult.Result.InitialStateCommit()
-	irSeal1FinalState := irSeal.IncorporatedResult.Result.FinalStateCommitment()
-	irSeal2InitialState := irSeal2.IncorporatedResult.Result.InitialStateCommit()
-	irSeal2FinalState := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
+	// unsafe: we assume validity of chunks has been checked before
+	irSeal1InitialState, _ := irSeal.IncorporatedResult.Result.InitialStateCommit()
+	irSeal1FinalState, _ := irSeal.IncorporatedResult.Result.FinalStateCommitment()
+	irSeal2InitialState, _ := irSeal2.IncorporatedResult.Result.InitialStateCommit()
+	irSeal2FinalState, _ := irSeal2.IncorporatedResult.Result.FinalStateCommitment()
 
 	if irSeal1InitialState != irSeal2InitialState || irSeal1FinalState != irSeal2FinalState {
 		log.Error().Msg("inconsistent seals for the same block")

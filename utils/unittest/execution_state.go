@@ -42,7 +42,7 @@ func init() {
 	}
 	GenesisStateCommitment, err = flow.ToStateCommitment(GenesisStateCommitmentBytes)
 	if err != nil {
-		panic(fmt.Sprintf("genesis state commitment size is invalid: %w", err))
+		panic("genesis state commitment size is invalid")
 	}
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(ServiceAccountPrivateKeyHex)

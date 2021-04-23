@@ -58,7 +58,10 @@ func constructRootResultAndSeal(
 	}
 
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
-	seal := run.GenerateRootSeal(result)
+	seal, err := run.GenerateRootSeal(result)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not generate root seal")
+	}
 
 	return result, seal
 }

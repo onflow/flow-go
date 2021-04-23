@@ -230,7 +230,10 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
-	finalState := receipt.ExecutionResult.FinalStateCommitment()
+	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
+	if err != nil {
+		return fmt.Errorf("could not get final state: %w", err)
+	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
 	defer span.Finish()

@@ -448,8 +448,11 @@ func (e *Engine) verifyChunkWithChunkDataPack(
 		return fmt.Errorf("could not get result by id %v: %w", resultID, err)
 	}
 
-	vchunk := e.makeVerifiableChunkData(
+	vchunk, err := e.makeVerifiableChunkData(
 		chunk, header, result, chunkDataPack, collection)
+	if err != nil {
+		return fmt.Errorf("could not verify chunk: %w", err)
+	}
 
 	err = e.verifier.ProcessLocal(vchunk)
 	if err != nil {
@@ -518,15 +521,19 @@ func (e *Engine) makeVerifiableChunkData(
 	result *flow.ExecutionResult,
 	chunkDataPack *flow.ChunkDataPack,
 	collection *flow.Collection,
-) *verification.VerifiableChunkData {
+) (*verification.VerifiableChunkData, error) {
 
 	// system chunk is the last chunk
 	isSystemChunk := IsSystemChunk(chunk.Index, result)
 	// computes the end state of the chunk
 	var endState flow.StateCommitment
 	if isSystemChunk {
+		var err error
 		// last chunk in a result is the system chunk and takes final state commitment
-		endState = result.FinalStateCommitment()
+		endState, err = result.FinalStateCommitment()
+		if err != nil {
+			return nil, fmt.Errorf("can not read final state commitment, likely a bug:%w", err)
+		}
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		endState = result.Chunks[chunk.Index+1].StartState
@@ -540,7 +547,7 @@ func (e *Engine) makeVerifiableChunkData(
 		Collection:    collection,
 		ChunkDataPack: chunkDataPack,
 		EndState:      endState,
-	}
+	}, nil
 }
 
 // HandleChunkDataPack is called by the chunk requester module everytime a new request chunk arrives.

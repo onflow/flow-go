@@ -69,7 +69,8 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	b1, ok := bs.HighestFinalized()
 	if ok {
 		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
-		initialFinalizedSC = r1.ExecutionResult.FinalStateCommitment()
+		initialFinalizedSC, err = r1.ExecutionResult.FinalStateCommitment()
+		require.NoError(t, err)
 	}
 
 	initFinalizedheight := b1.Header.Height

@@ -210,7 +210,17 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	}()
 
 	resultID := receipt.ExecutionResult.ID()
-	initialState, finalState := receipt.ExecutionResult.InitialStateCommit(), receipt.ExecutionResult.FinalStateCommitment()
+	initialState, err := receipt.ExecutionResult.InitialStateCommit()
+	if err != nil {
+		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
+		return false, nil
+	}
+	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
+	if err != nil {
+		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
+		return false, nil
+	}
+
 	log := c.log.With().
 		Hex("receipt_id", logging.Entity(receipt)).
 		Hex("result_id", resultID[:]).
@@ -757,18 +767,25 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	// collect aggregate signatures
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
+	// get final state of execution result
+	finalState, err := incorporatedResult.Result.FinalStateCommitment()
+	if err != nil {
+		// message correctness should have been checked before: failure here is an internal implementation bug
+		return fmt.Errorf("failed to get final state commitment from Execution Result: %w", err)
+	}
+
 	// TODO: Check SPoCK proofs
 
 	// generate & store seal
 	seal := &flow.Seal{
 		BlockID:                incorporatedResult.Result.BlockID,
 		ResultID:               incorporatedResult.Result.ID(),
-		FinalState:             incorporatedResult.Result.FinalStateCommitment(),
+		FinalState:             finalState,
 		AggregatedApprovalSigs: aggregatedSigs,
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err := c.seals.Add(&flow.IncorporatedResultSeal{
+	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})
