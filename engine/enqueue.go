@@ -43,7 +43,17 @@ type MessageHandler struct {
 }
 
 func NewMessageHandler(log zerolog.Logger, patterns ...Pattern) (*MessageHandler, <-chan struct{}) {
-	notifier := make(chan struct{})
+	// the 1 message buffer is important to avoid the race condition.
+	// the consumer might decide to listen to the notify channel, and drain the messages in the
+	// message store, however there is a blind period start from the point the consumer learned
+	// the message store is empty to the point the consumer start listening to the notifier channel
+	// again. During this blind period, if the notifier had no buffer, then `doNotify` call will not
+	// able to push message to the notifier channel, therefore has to drop the message and cause the
+	// consumer waiting forever with unconsumed message in the message store.
+	// having 1 message buffer covers the "blind period", so that during the blind priod if there is
+	// a new message arrived, it will be buffered, and once the blind period is over, the consumer
+	// will empty the buffer and start draining the message store again.
+	notifier := make(chan struct{}, 1)
 	enqueuer := &MessageHandler{
 		log:      log.With().Str("component", "message_handler").Logger(),
 		notify:   notifier,
