@@ -43,7 +43,7 @@ func TestUpdate(t *testing.T) {
 		operation, stateCommitment, up, err := realWAL.Decode(data)
 		require.NoError(t, err)
 		assert.Equal(t, realWAL.WALUpdate, operation)
-		assert.Equal(t, stateCommitment, ledger.RootHash(hash.EmptyHash))
+		assert.Equal(t, stateCommitment, ledger.RootHash(hash.DummyHash))
 		assert.Equal(t, update, up)
 	})
 }

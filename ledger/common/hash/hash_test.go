@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	cryhash "github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 )
 
@@ -15,14 +16,14 @@ import (
 func Test_GetDefaultHashForHeight(t *testing.T) {
 	hasher := cryhash.NewSHA3_256()
 	defaultLeafHash := hasher.ComputeHash([]byte("default:"))
-	expected := hash.GetDefaultHashForHeight(0)
+	expected := ledger.GetDefaultHashForHeight(0)
 	assert.Equal(t, []byte(expected[:]), []byte(defaultLeafHash))
 
-	l1 := hash.HashInterNode(hash.GetDefaultHashForHeight(0), hash.GetDefaultHashForHeight(0))
-	assert.Equal(t, l1, hash.GetDefaultHashForHeight(1))
+	l1 := hash.HashInterNode(ledger.GetDefaultHashForHeight(0), ledger.GetDefaultHashForHeight(0))
+	assert.Equal(t, l1, ledger.GetDefaultHashForHeight(1))
 
 	l2 := hash.HashInterNode(l1, l1)
-	assert.Equal(t, l2, hash.GetDefaultHashForHeight(2))
+	assert.Equal(t, l2, ledger.GetDefaultHashForHeight(2))
 }
 
 func Test_ComputeCompactValue(t *testing.T) {
@@ -36,12 +37,12 @@ func Test_ComputeCompactValue(t *testing.T) {
 	l := 0
 	// exclude last 3 level
 	for ; l < nodeHeight-3; l++ {
-		h = hash.HashInterNode(h, hash.GetDefaultHashForHeight(l))
+		h = hash.HashInterNode(h, ledger.GetDefaultHashForHeight(l))
 	}
-	l1 := hash.HashInterNode(hash.GetDefaultHashForHeight(l), h)
-	l2 := hash.HashInterNode(l1, hash.GetDefaultHashForHeight(l+1))
-	l3 := hash.HashInterNode(hash.GetDefaultHashForHeight(l+2), l2)
-	result := hash.ComputeCompactValue(path, v, nodeHeight)
+	l1 := hash.HashInterNode(ledger.GetDefaultHashForHeight(l), h)
+	l2 := hash.HashInterNode(l1, ledger.GetDefaultHashForHeight(l+1))
+	l3 := hash.HashInterNode(ledger.GetDefaultHashForHeight(l+2), l2)
+	result := ledger.ComputeCompactValue(path, v, nodeHeight)
 	assert.Equal(t, l3, result)
 }
 

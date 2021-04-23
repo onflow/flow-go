@@ -32,8 +32,11 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	if err != nil {
 		return fmt.Errorf("failed to decode hex code of state: %w", err)
 	}
-	var state ledger.State
-	copy(state[:], stateBytes)
+
+	state, err := ledger.ToState(stateBytes)
+	if err != nil {
+		return fmt.Errorf("cannot use the input state: %w", err)
+	}
 	err = led.DumpTrieAsJSON(state, outputPath)
 	if err != nil {
 		return fmt.Errorf("cannot dump trie as json: %w", err)

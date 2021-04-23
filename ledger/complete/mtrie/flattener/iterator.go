@@ -1,7 +1,7 @@
 package flattener
 
 import (
-	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
@@ -67,7 +67,7 @@ type NodeIterator struct {
 // as for each node, the children have been previously encountered.
 func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
 	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
-	stackSize := hash.TreeMaxHeight + 1
+	stackSize := ledger.TreeMaxHeight + 1
 	i := &NodeIterator{
 		stack: make([]*node.Node, 0, stackSize),
 	}

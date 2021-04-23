@@ -5,8 +5,86 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	cryptoHash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
+
+// Path captures storage path of a payload;
+// where we store a payload in the ledger
+type Path hash.Hash
+
+// DummyPath is an arbitrary path value, used in function error returns.
+var DummyPath = Path(hash.DummyHash)
+
+// PathLen is the size of paths in bytes.
+const PathLen = 32
+
+// The tree maximum height.
+// The tree maximum size corresponds to the path size in bits.
+const TreeMaxHeight = PathLen * 8
+
+// we are currently supporting paths of a size equal to 32 bytes.
+// I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256.
+// A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
+const defaultHashesNum = TreeMaxHeight + 1
+
+// array to store all default hashes
+var defaultHashes [defaultHashesNum]hash.Hash
+
+func init() {
+	hasher := cryptoHash.NewSHA3_256()
+
+	// default value and default hash value for a default node
+	var defaultLeafHash hash.Hash
+	copy(defaultLeafHash[:], hasher.ComputeHash([]byte("default:")))
+
+	// Creates the Default hashes from base to level height
+	defaultHashes[0] = defaultLeafHash
+	for i := 1; i < defaultHashesNum; i++ {
+		defaultHashes[i] = hash.HashInterNode(defaultHashes[i-1], defaultHashes[i-1])
+	}
+}
+
+// GetDefaultHashes returns the default hashes of the SMT.
+//
+// For each tree level N, there is a default hash equal to the chained
+// hashing of the default value N times.
+func GetDefaultHashes() [defaultHashesNum]hash.Hash {
+	return defaultHashes
+}
+
+// GetDefaultHashForHeight returns the default hashes of the SMT at a specified height.
+//
+// For each tree level N, there is a default hash equal to the chained
+// hashing of the default value N times.
+func GetDefaultHashForHeight(height int) hash.Hash {
+	return defaultHashes[height]
+}
+
+// ComputeCompactValue computes the value for the node considering the sub tree
+// to only include this value and default values. It writes the hash result to the result input.
+// UNCHECKED: payload!= nil
+func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash {
+	// if register is unallocated: return default hash
+	if len(value) == 0 {
+		return GetDefaultHashForHeight(nodeHeight)
+	}
+
+	var out hash.Hash
+	out = hash.HashLeafIn(path, value) // we first compute the hash of the fully-expanded leaf
+	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+		// h is the height of the node, whose hash we are computing in this iteration.
+		// The hash is computed from the node's children at height h-1.
+		bit := utils.Bit(path[:], TreeMaxHeight-h)
+		if bit == 1 { // right branching
+			out = hash.HashInterNodeIn(GetDefaultHashForHeight(h-1), out)
+		} else { // left branching
+			out = hash.HashInterNodeIn(out, GetDefaultHashForHeight(h-1))
+		}
+	}
+	return out
+}
 
 // TrieRead captures a trie read query
 type TrieRead struct {
@@ -86,13 +164,16 @@ func (rh RootHash) Equals(o RootHash) bool {
 	return rh == o
 }
 
-// Path captures storage path of a payload;
-// where we store a payload in the ledger
-type Path hash.Hash
-
-var EmptyPath = Path(hash.EmptyHash)
-
-const PathLen = hash.HashLen
+// ToRootHash converts a byte slice into a root hash.
+// It returns an error if the slice has an invalid length.
+func ToRootHash(rootHashBytes []byte) (RootHash, error) {
+	var rootHash RootHash
+	if len(rootHashBytes) != len(rootHash) {
+		return RootHash(hash.DummyHash), fmt.Errorf("expecting %d bytes but got %d bytes", len(rootHash), len(rootHashBytes))
+	}
+	copy(rootHash[:], rootHashBytes)
+	return rootHash, nil
+}
 
 func (p Path) String() string {
 	str := ""
@@ -106,6 +187,17 @@ func (p Path) String() string {
 // Equals compares this path to another path
 func (p Path) Equals(o Path) bool {
 	return p == o
+}
+
+// ToPath converts a byte slice into a path.
+// It returns an error if the slice has an invalid length.
+func ToPath(pathBytes []byte) (Path, error) {
+	var path Path
+	if len(pathBytes) != len(path) {
+		return DummyPath, fmt.Errorf("expecting %d bytes but got %d bytes", len(path), len(pathBytes))
+	}
+	copy(path[:], pathBytes)
+	return path, nil
 }
 
 // Payload is the smallest immutable storable unit in ledger

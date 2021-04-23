@@ -1022,7 +1022,7 @@ func (e *Engine) handleComputationResult(
 		startState,
 	)
 	if err != nil {
-		return flow.EmptyStateCommitment, nil, fmt.Errorf("could not save execution results: %w", err)
+		return flow.DummyStateCommitment, nil, fmt.Errorf("could not save execution results: %w", err)
 	}
 
 	var finalState flow.StateCommitment

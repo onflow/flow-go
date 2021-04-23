@@ -51,7 +51,7 @@ func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCo
 		execState.RegisterValuesToValues(values),
 	)
 	if err != nil {
-		return flow.EmptyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
 	state, err := s.ldg.Set(update)

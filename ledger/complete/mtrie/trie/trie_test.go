@@ -12,7 +12,6 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
@@ -21,7 +20,7 @@ import (
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
-	require.Equal(t, emptyTrie.RootHash(), ledger.RootHash(hash.GetDefaultHashForHeight(hash.TreeMaxHeight)))
+	require.Equal(t, emptyTrie.RootHash(), ledger.RootHash(ledger.GetDefaultHashForHeight(ledger.TreeMaxHeight)))
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most

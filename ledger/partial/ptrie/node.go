@@ -48,13 +48,13 @@ func (n *node) HashValue() hash.Hash {
 	if n.lChild != nil {
 		h1 = n.lChild.HashValue()
 	} else {
-		h1 = hash.GetDefaultHashForHeight(n.height - 1)
+		h1 = ledger.GetDefaultHashForHeight(n.height - 1)
 	}
 
 	if n.rChild != nil {
 		h2 = n.rChild.HashValue()
 	} else {
-		h2 = hash.GetDefaultHashForHeight(n.height - 1)
+		h2 = ledger.GetDefaultHashForHeight(n.height - 1)
 	}
 	// For debugging purpose uncomment this
 	// n.value = HashInterNode(h1, h2)

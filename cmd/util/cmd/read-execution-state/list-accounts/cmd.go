@@ -64,11 +64,10 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msg("invalid flag, cannot decode")
 	}
 
-	if len(stateCommitmentBytes) != 32 {
-		log.Fatal().Err(err).Msgf("invalid number of bytes, got %d expected %d", len(stateCommitmentBytes), 32)
+	stateCommitment, err := flow.ToStateCommitment(stateCommitmentBytes)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("invalid number of bytes, got %d expected %d", len(stateCommitmentBytes), len(stateCommitment))
 	}
-	var stateCommitment flow.StateCommitment
-	copy(stateCommitment[:], stateCommitmentBytes)
 
 	chain, err := getChain(flagChain)
 	if err != nil {

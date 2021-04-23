@@ -77,7 +77,10 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot get decode the state commitment")
 		}
-		copy(stateCommitment[:], stateCommitmentBytes)
+		stateCommitment, err = flow.ToStateCommitment(stateCommitmentBytes)
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid state commitment length")
+		}
 	}
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))

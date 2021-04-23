@@ -20,8 +20,6 @@ import (
 //      hash is pre-computed, lChild and rChild are nil)
 //    * INTERIOR node: at least one of lChild or rChild is not nil.
 //      Height, and Hash value are set; (key-value is nil)
-//    * ROOT of empty trie node: this is a special case, where the node
-//      has no children, and no key-value
 // Currently, we represent both data structures by Node instances
 //
 // Nodes are supposed to be used in READ-ONLY fashion. However,
@@ -79,6 +77,7 @@ func NewNode(height int,
 
 // NewLeaf creates a compact leaf Node.
 // UNCHECKED requirement: height must be non-negative
+// UNCHECKED requirement: payload is non nil
 func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
 	height int) *Node {
@@ -131,28 +130,28 @@ func (n *Node) computeAndStoreHash() {
 
 // computeHash returns the hashValue of the node
 func (n *Node) computeHash() hash.Hash {
+	// check for leaf node
 	if n.lChild == nil && n.rChild == nil {
-		// both ROOT NODE and LEAF NODE have n.lChild == n.rChild == nil
+		// if payload is non-nil, compute the hash based on the payload content
 		if n.payload != nil {
-			// LEAF node: defined by key-value pair
-			return hash.ComputeCompactValue(hash.Hash(n.path), n.payload.Value, n.height)
+			return ledger.ComputeCompactValue(hash.Hash(n.path), n.payload.Value, n.height)
 		}
-		// ROOT NODE: no children, no key-value pair
-		return hash.GetDefaultHashForHeight(n.height)
+		// if payload is nil, return the default hash
+		return ledger.GetDefaultHashForHeight(n.height)
 	}
 
-	// this is an INTERIOR node at least one of lChild or rChild is not nil.
+	// this is an interim node at least one of lChild or rChild is not nil.
 	var h1, h2 hash.Hash
 	if n.lChild != nil {
 		h1 = n.lChild.Hash()
 	} else {
-		h1 = hash.GetDefaultHashForHeight(n.height - 1)
+		h1 = ledger.GetDefaultHashForHeight(n.height - 1)
 	}
 
 	if n.rChild != nil {
 		h2 = n.rChild.Hash()
 	} else {
-		h2 = hash.GetDefaultHashForHeight(n.height - 1)
+		h2 = ledger.GetDefaultHashForHeight(n.height - 1)
 	}
 	return hash.HashInterNodeIn(h1, h2)
 }
@@ -184,7 +183,7 @@ func (n *Node) VerifyCachedHash() bool {
 func (n *Node) Hash() hash.Hash {
 	if n == nil {
 		// case of an empty trie root
-		return hash.GetDefaultHashForHeight(hash.TreeMaxHeight)
+		return ledger.GetDefaultHashForHeight(ledger.TreeMaxHeight)
 	}
 	return n.hashValue
 }
@@ -194,7 +193,7 @@ func (n *Node) Hash() hash.Hash {
 // of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int {
 	if n == nil {
-		return hash.TreeMaxHeight
+		return ledger.TreeMaxHeight
 	}
 	return n.height
 }
@@ -222,7 +221,7 @@ func (n *Node) RegCount() uint64 {
 // no node or trie algorithm is relying on this value.
 func (n *Node) Path() ledger.Path {
 	if n == nil {
-		return ledger.EmptyPath
+		return ledger.DummyPath
 	}
 	return n.path
 }

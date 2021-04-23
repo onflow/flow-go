@@ -221,12 +221,12 @@ func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommi
 	)
 
 	if err != nil {
-		return flow.EmptyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
 	commit, err := ldg.Set(update)
 	if err != nil {
-		return flow.EmptyStateCommitment, err
+		return flow.DummyStateCommitment, err
 	}
 
 	return flow.StateCommitment(commit), nil

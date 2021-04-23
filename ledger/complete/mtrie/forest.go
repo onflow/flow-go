@@ -128,7 +128,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 // In case there are multiple updates to the same register, Update will persist the latest
 // written value.
 func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
-	emptyHash := ledger.RootHash(hash.EmptyHash)
+	emptyHash := ledger.RootHash(hash.DummyHash)
 
 	parentTrie, err := f.GetTrie(u.RootHash)
 	if err != nil {
@@ -230,7 +230,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 		// rootHash shouldn't change
 		if newTrie.RootHash() != r.RootHash {
-			return nil, fmt.Errorf("root hash has changed during the operation %s, %s", newTrie.RootHash(), r.RootHash)
+			return nil, fmt.Errorf("root hash has changed during the operation %x, %x", newTrie.RootHash(), r.RootHash)
 		}
 		stateTrie = newTrie
 	}

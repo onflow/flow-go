@@ -107,11 +107,9 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	emptyState := ledger.State(hash.EmptyHash)
-
 	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
-		return emptyState, err
+		return ledger.DummyState, err
 	}
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
@@ -120,7 +118,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 			paths, err := pathfinder.KeysToPaths(update.Keys(), l.pathFinderVersion)
 			if err != nil {
-				return emptyState, err
+				return ledger.DummyState, err
 			}
 
 			//store mappings and restore keys from missing paths
@@ -135,9 +133,9 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 			for _, path := range pErr.Paths {
 				keys = append(keys, pathToKey[path])
 			}
-			return emptyState, &ledger.ErrMissingKeys{Keys: keys}
+			return ledger.DummyState, &ledger.ErrMissingKeys{Keys: keys}
 		}
-		return emptyState, err
+		return ledger.DummyState, err
 	}
 
 	// TODO log info state

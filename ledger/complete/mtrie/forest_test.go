@@ -714,7 +714,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 
 	activeRoot := forest.GetEmptyRootHash()
 	require.NoError(t, err)
-	latestPayloadByPath := make(map[string]*ledger.Payload) // map store
+	latestPayloadByPath := make(map[ledger.Path]*ledger.Payload) // map store
 
 	for e := 0; e < rep; e++ {
 		paths := ledger.RandomPathsRandLen(maxNumPathsPerStep)
@@ -723,13 +723,13 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		// update map store with key values
 		// we use this at the end of each step to check all existing keys
 		for i, p := range paths {
-			latestPayloadByPath[string(p[:])] = payloads[i]
+			latestPayloadByPath[p] = payloads[i]
 		}
 
 		// test reading for non-existing keys
 		nonExistingPaths := make([]ledger.Path, 0)
 		for _, p := range paths {
-			if _, ok := latestPayloadByPath[string(p[:])]; !ok {
+			if _, ok := latestPayloadByPath[p]; !ok {
 				nonExistingPaths = append(nonExistingPaths, p)
 			}
 		}
@@ -771,9 +771,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		allPaths := make([]ledger.Path, 0, len(latestPayloadByPath))
 		allPayloads := make([]*ledger.Payload, 0, len(latestPayloadByPath))
 		for p, v := range latestPayloadByPath {
-			var path ledger.Path
-			copy(path[:], p)
-			allPaths = append(allPaths, path)
+			allPaths = append(allPaths, p)
 			allPayloads = append(allPayloads, v)
 		}
 

@@ -149,7 +149,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
-		return ledger.State(hash.EmptyHash), err
+		return ledger.State(hash.DummyHash), err
 	}
 
 	l.metrics.UpdateCount()
@@ -165,10 +165,10 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	walError := <-walChan
 
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("cannot update state: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
 	}
 	if walError != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
+		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -245,13 +245,13 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("cannot get try at the given state commitment: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
 	// clean up tries to release memory
 	err = l.keepOnlyOneTrie(state)
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
 	// TODO enable validity check of trie
@@ -272,7 +272,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 
 		payloads, err = migrate(payloads)
 		if err != nil {
-			return ledger.State(hash.EmptyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
+			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
 		}
 		if payloadSize != len(payloads) {
 			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
@@ -284,7 +284,7 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	for i, reporter := range reporters {
 		err = reporter.Report(payloads)
 		if err != nil {
-			return ledger.State(hash.EmptyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
+			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
 		}
 	}
 
@@ -293,33 +293,33 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	// get paths
 	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
 
 	emptyTrie := trie.NewEmptyMTrie()
 
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("constructing updated trie failed: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
 	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
 	flatTrie, err := flattener.FlattenTrie(newTrie)
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("failed to flatten the trie: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to flatten the trie: %w", err)
 	}
 
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
 	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
 	if err != nil {
-		return ledger.State(hash.EmptyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
 	writer.Close()
 

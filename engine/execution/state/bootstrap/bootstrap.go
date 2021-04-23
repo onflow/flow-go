@@ -49,12 +49,12 @@ func (b *Bootstrapper) BootstrapLedger(
 
 	err := vm.Run(ctx, bootstrap, view, programs)
 	if err != nil {
-		return flow.EmptyStateCommitment, err
+		return flow.DummyStateCommitment, err
 	}
 
 	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
-		return flow.EmptyStateCommitment, err
+		return flow.DummyStateCommitment, err
 	}
 
 	return newStateCommitment, nil
@@ -75,11 +75,11 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 	})
 
 	if errors.Is(err, storage.ErrNotFound) {
-		return flow.EmptyStateCommitment, false, nil
+		return flow.DummyStateCommitment, false, nil
 	}
 
 	if err != nil {
-		return flow.EmptyStateCommitment, false, err
+		return flow.DummyStateCommitment, false, err
 	}
 
 	return commit, true, nil

@@ -61,10 +61,10 @@ func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (hash.Has
 			failedKeys = append(failedKeys, payload.Key)
 			continue
 		}
-		node.hashValue = hash.ComputeCompactValue(hash.Hash(path), payload.Value, node.height)
+		node.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, node.height)
 	}
 	if len(failedKeys) > 0 {
-		return hash.EmptyHash, &ledger.ErrMissingKeys{Keys: failedKeys}
+		return hash.DummyHash, &ledger.ErrMissingKeys{Keys: failedKeys}
 	}
 	// after updating all the nodes, compute the value recursively only once
 	return p.root.HashValue(), nil
@@ -77,9 +77,9 @@ func NewPSMT(
 	batchProof *ledger.TrieBatchProof,
 ) (*PSMT, error) {
 
-	height := hash.TreeMaxHeight
+	height := ledger.TreeMaxHeight
 
-	psmt := PSMT{newNode(hash.GetDefaultHashForHeight(height), height), make(map[ledger.Path]*node)}
+	psmt := PSMT{newNode(ledger.GetDefaultHashForHeight(height), height), make(map[ledger.Path]*node)}
 
 	paths := batchProof.Paths()
 	payloads := batchProof.Payloads()
@@ -108,7 +108,7 @@ func NewPSMT(
 		for j := 0; j < int(pr.Steps); j++ {
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
-			defaultHash := hash.GetDefaultHashForHeight(currentNode.height - 1)
+			defaultHash := ledger.GetDefaultHashForHeight(currentNode.height - 1)
 			v := defaultHash
 			flag := utils.Bit(pr.Flags, j)
 			if flag == 1 {
@@ -147,7 +147,7 @@ func NewPSMT(
 		currentNode.path = path
 		// update node's hashvalue only for inclusion proofs (for others we assume default value)
 		if pr.Inclusion {
-			currentNode.hashValue = hash.ComputeCompactValue(hash.Hash(path), payload.Value, currentNode.height)
+			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, currentNode.height)
 		}
 		// keep a reference to this node by path (for update purpose)
 		psmt.pathLookUp[path] = currentNode

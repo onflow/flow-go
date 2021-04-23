@@ -53,7 +53,7 @@ func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow
 	return func(tx *badger.Txn) (flow.StateCommitment, error) {
 		val, err := c.cache.Get(blockID)(tx)
 		if err != nil {
-			return flow.EmptyStateCommitment, err
+			return flow.DummyStateCommitment, err
 		}
 		return val.(flow.StateCommitment), nil
 	}

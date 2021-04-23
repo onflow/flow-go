@@ -293,22 +293,24 @@ func DecodePath(encodedPath []byte) (ledger.Path, error) {
 	// check enc dec version
 	rest, _, err := CheckVersion(encodedPath)
 	if err != nil {
-		return ledger.EmptyPath, err
+		return ledger.DummyPath, err
 	}
 
 	// check the encoding type
 	rest, err = CheckType(rest, TypePath)
 	if err != nil {
-		return ledger.EmptyPath, err
+		return ledger.DummyPath, err
 	}
 
-	return decodePath(rest), nil
+	return decodePath(rest)
 }
 
-func decodePath(inp []byte) ledger.Path {
-	var path ledger.Path
-	copy(path[:], inp)
-	return path
+func decodePath(inp []byte) (ledger.Path, error) {
+	path, err := ledger.ToPath(inp)
+	if err != nil {
+		return path, fmt.Errorf("decode path failed: %w", err)
+	}
+	return path, nil
 }
 
 // EncodePayload encodes a ledger payload
@@ -517,7 +519,10 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error decoding trie update: %w", err)
 		}
-		path = decodePath(encPath)
+		path, err = decodePath(encPath)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding trie update: %w", err)
+		}
 		paths = append(paths, path)
 	}
 

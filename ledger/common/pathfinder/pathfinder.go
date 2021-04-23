@@ -25,10 +25,12 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 			h := sha256.New()
 			_, err := h.Write(ret)
 			if err != nil {
-				return ledger.EmptyPath, err
+				return ledger.DummyPath, err
 			}
-			var path ledger.Path
-			copy(path[:], h.Sum(nil))
+			path, err := ledger.ToPath(h.Sum(nil))
+			if err != nil {
+				return ledger.DummyPath, err
+			}
 			return path, nil
 		}
 	case 1:
@@ -38,12 +40,14 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 			if err != nil {
 				panic(err)
 			}
-			var path ledger.Path
-			copy(path[:], hasher.SumHash())
+			path, err := ledger.ToPath(hasher.SumHash())
+			if err != nil {
+				return ledger.DummyPath, err
+			}
 			return path, nil
 		}
 	}
-	return ledger.EmptyPath, fmt.Errorf("unsupported key to path version")
+	return ledger.DummyPath, fmt.Errorf("unsupported key to path version")
 }
 
 // KeysToPaths converts an slice of keys into a paths

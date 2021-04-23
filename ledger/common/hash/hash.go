@@ -1,59 +1,14 @@
 package hash
 
-import (
-	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
-)
-
 // HashLen is the ledger default output hash length in bytes
 const HashLen = 32
 
 // Hash is the hash type used in all ledger
 type Hash [HashLen]byte
 
-// default value and default hash value for a default node
-var defaultLeafHash Hash
-
-// EmptyHash is a hash with all zeroes, used for padding
-var EmptyHash Hash
-
-// tree maximum height
-const TreeMaxHeight = 256
-
-// we are currently supporting paths of a size equal to 32 bytes.
-// I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256.
-// A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
-const defaultHashesNum = TreeMaxHeight + 1
-
-// array to store all default hashes
-var defaultHashes [defaultHashesNum]Hash
-
-func init() {
-	hasher := hash.NewSHA3_256()
-	copy(defaultLeafHash[:], hasher.ComputeHash([]byte("default:")))
-
-	// Creates the Default hashes from base to level height
-	defaultHashes[0] = defaultLeafHash
-	for i := 1; i < defaultHashesNum; i++ {
-		defaultHashes[i] = HashInterNode(defaultHashes[i-1], defaultHashes[i-1])
-	}
-}
-
-// GetDefaultHashes returns the default hashes of the SMT.
-//
-// For each tree level N, there is a default hash equal to the chained
-// hashing of the default value N times.
-func GetDefaultHashes() [defaultHashesNum]Hash {
-	return defaultHashes
-}
-
-// GetDefaultHashForHeight returns the default hashes of the SMT at a specified height.
-//
-// For each tree level N, there is a default hash equal to the chained
-// hashing of the default value N times.
-func GetDefaultHashForHeight(height int) Hash {
-	return defaultHashes[height]
-}
+// DummyHash is an arbitrary hash value, used in function errors.
+// DummyHash represents a valid hash value.
+var DummyHash Hash
 
 // HashLeaf generates hash value for leaf nodes (SHA3-256).
 //
@@ -92,28 +47,4 @@ func HashLeafIn(path Hash, value []byte) Hash {
 func HashInterNodeIn(hash1 Hash, hash2 Hash) Hash {
 	hasher := new256()
 	return hasher.hash256plus256(hash1, hash2) // hash1 and hash2 are 256 bits
-}
-
-// ComputeCompactValue computes the value for the node considering the sub tree
-// to only include this value and default values. It writes the hash result to the result input.
-// UNCHECKED: payload!= nil
-func ComputeCompactValue(path Hash, value []byte, nodeHeight int) Hash {
-	// if register is unallocated: return default hash
-	if len(value) == 0 {
-		return GetDefaultHashForHeight(nodeHeight)
-	}
-
-	var out Hash
-	out = HashLeafIn(path, value)      // we first compute the hash of the fully-expanded leaf
-	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
-		// h is the height of the node, whose hash we are computing in this iteration.
-		// The hash is computed from the node's children at height h-1.
-		bit := utils.Bit(path[:], TreeMaxHeight-h)
-		if bit == 1 { // right branching
-			out = HashInterNodeIn(GetDefaultHashForHeight(h-1), out)
-		} else { // left branching
-			out = HashInterNodeIn(out, GetDefaultHashForHeight(h-1))
-		}
-	}
-	return out
 }

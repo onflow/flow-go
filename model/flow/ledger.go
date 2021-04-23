@@ -75,5 +75,17 @@ type StorageProof = []byte
 // TODO: solve the circular dependency and define StateCommitment as ledger.State
 type StateCommitment ledgerHash.Hash
 
-// EmptyStateCommitment represents an empty state commitment
-var EmptyStateCommitment = StateCommitment(ledgerHash.EmptyHash)
+// DummyStateCommitment is an arbitrary value used in function failure cases,
+// although it can represent a valid state commitment.
+var DummyStateCommitment = StateCommitment(ledgerHash.DummyHash)
+
+// ToStateCommitment converts a byte slice into a StateComitment.
+// It returns an error if the slice has an invalid length.
+func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
+	var state StateCommitment
+	if len(stateBytes) != len(state) {
+		return DummyStateCommitment, fmt.Errorf("expecting %d bytes but got %d bytes", len(state), len(stateBytes))
+	}
+	copy(state[:], stateBytes)
+	return state, nil
+}

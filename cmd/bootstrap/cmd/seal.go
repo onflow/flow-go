@@ -19,11 +19,16 @@ func constructRootResultAndSeal(
 	dkgData model.DKGData,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
-	var stateCommit flow.StateCommitment
 	stateCommitBytes, err := hex.DecodeString(rootCommit)
-	copy(stateCommit[:], stateCommitBytes)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not decode state commitment")
+	}
+	stateCommit, err := flow.ToStateCommitment(stateCommitBytes)
+	if err != nil {
+		log.Fatal().
+			Int("expected_state_commitment_length", len(stateCommit)).
+			Int("received_state_commitment_length", len(stateCommitBytes)).
+			Msg("root state commitment has incompatible length")
 	}
 
 	participants := model.ToIdentityList(participantNodes)
