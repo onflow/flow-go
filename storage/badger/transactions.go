@@ -34,11 +34,10 @@ func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transacti
 
 	t := &Transactions{
 		db: db,
-		cache: newCache(cacheMetrics,
+		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceTransaction)),
+			withRetrieve(retrieve)),
 	}
 
 	return t

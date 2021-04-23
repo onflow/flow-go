@@ -20,7 +20,7 @@ func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	epochCommits := NewEpochCommits(metrics, db)
 	statuses := NewEpochStatuses(metrics, db)
 
-	chunkDataPacks := NewChunkDataPacks(db)
+	chunkDataPacks := NewChunkDataPacks(metrics, db, 1000)
 	commits := NewCommits(metrics, db)
 	transactions := NewTransactions(metrics, db)
 	transactionResults := NewTransactionResults(metrics, db, 10000)
