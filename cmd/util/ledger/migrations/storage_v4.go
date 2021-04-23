@@ -92,6 +92,11 @@ func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 		return ledger.Payload{}, err
 	}
 
+	payload.Value = interpreter.PrependMagic(
+		payload.Value,
+		interpreter.CurrentEncodingVersion,
+	)
+
 	return payload, nil
 }
 
