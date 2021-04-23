@@ -48,7 +48,7 @@ func (_m *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 }
 
 // ByID provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, int, bool) {
+func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
 	ret := _m.Called(chunkID)
 
 	var r0 *verification.ChunkDataPackRequest
@@ -60,21 +60,14 @@ func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 		}
 	}
 
-	var r1 int
-	if rf, ok := ret.Get(1).(func(flow.Identifier) int); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
 		r1 = rf(chunkID)
 	} else {
-		r1 = ret.Get(1).(int)
+		r1 = ret.Get(1).(bool)
 	}
 
-	var r2 bool
-	if rf, ok := ret.Get(2).(func(flow.Identifier) bool); ok {
-		r2 = rf(chunkID)
-	} else {
-		r2 = ret.Get(2).(bool)
-	}
-
-	return r0, r1, r2
+	return r0, r1
 }
 
 // IncrementAttempt provides a mock function with given fields: chunkID
@@ -91,20 +84,6 @@ func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	return r0
 }
 
-// IncrementAttemptAndRetryAfter provides a mock function with given fields: chunkID, retryAfter
-func (_m *ChunkRequests) IncrementAttemptAndRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
-	ret := _m.Called(chunkID, retryAfter)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, time.Duration) bool); ok {
-		r0 = rf(chunkID, retryAfter)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	return r0
-}
-
 // Rem provides a mock function with given fields: chunkID
 func (_m *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 	ret := _m.Called(chunkID)
@@ -112,6 +91,55 @@ func (_m *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 	var r0 bool
 	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
 		r0 = rf(chunkID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// RequestInfo provides a mock function with given fields: chunkID
+func (_m *ChunkRequests) RequestInfo(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
+	ret := _m.Called(chunkID)
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(flow.Identifier) uint64); ok {
+		r0 = rf(chunkID)
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	var r1 time.Time
+	if rf, ok := ret.Get(1).(func(flow.Identifier) time.Time); ok {
+		r1 = rf(chunkID)
+	} else {
+		r1 = ret.Get(1).(time.Time)
+	}
+
+	var r2 time.Duration
+	if rf, ok := ret.Get(2).(func(flow.Identifier) time.Duration); ok {
+		r2 = rf(chunkID)
+	} else {
+		r2 = ret.Get(2).(time.Duration)
+	}
+
+	var r3 bool
+	if rf, ok := ret.Get(3).(func(flow.Identifier) bool); ok {
+		r3 = rf(chunkID)
+	} else {
+		r3 = ret.Get(3).(bool)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// UpdateRetryAfter provides a mock function with given fields: chunkID, retryAfter
+func (_m *ChunkRequests) UpdateRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
+	ret := _m.Called(chunkID, retryAfter)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier, time.Duration) bool); ok {
+		r0 = rf(chunkID, retryAfter)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
